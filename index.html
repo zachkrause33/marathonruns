@@ -1,0 +1,2307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#FFD9A8">
+<title>MARATHON RUSH</title>
+<style>
+  :root{
+    --ink:#fff;
+    --shadow:0 2px 10px rgba(20,12,4,.45), 0 1px 2px rgba(20,12,4,.35);
+    --font:-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{width:100%;height:100%;overflow:hidden;background:#0d0b0a;font-family:var(--font);
+    -webkit-user-select:none;user-select:none;touch-action:none;overscroll-behavior:none}
+  canvas{display:block;position:fixed;inset:0}
+
+  #ui{position:fixed;inset:0;pointer-events:none;z-index:10;
+      padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+  .hud{position:absolute;color:var(--ink);text-shadow:var(--shadow);opacity:0;transition:opacity .5s ease}
+  #ui.playing .hud{opacity:1}
+
+  /* top center: pace + clock */
+  #topc{top:14px;left:50%;transform:translateX(-50%);text-align:center;line-height:1}
+  #clock{font-size:min(7.6vw,32px);font-weight:600;letter-spacing:.5px;font-variant-numeric:tabular-nums}
+  #pace{font-size:min(3.4vw,14px);font-weight:500;letter-spacing:2.5px;opacity:.85;margin-top:6px}
+
+  /* top right: mile */
+  #topr{top:15px;right:14px;text-align:right;line-height:1}
+  #mile{font-size:min(5.4vw,24px);font-weight:600;font-variant-numeric:tabular-nums}
+  #mile small{font-size:min(3.2vw,13px);font-weight:500;opacity:.7}
+  #chapter{font-size:min(2.7vw,11px);font-weight:600;letter-spacing:2px;opacity:.75;margin-top:7px}
+
+  /* top left: gel badge */
+  #topl{top:16px;left:18px;display:flex;gap:8px;align-items:center}
+  #gel{font-size:11px;font-weight:700;letter-spacing:1.5px;padding:6px 10px;border-radius:20px;
+       background:linear-gradient(180deg,#FFE39A,#F0B441);color:#4a2f00;text-shadow:none;
+       box-shadow:0 0 18px rgba(255,196,80,.75);opacity:0;transform:scale(.7);transition:opacity .25s,transform .25s}
+  #gel.on{opacity:1;transform:scale(1)}
+
+  /* bottom: combo */
+  #combo{bottom:26px;left:50%;transform:translateX(-50%);text-align:center;line-height:1;opacity:0}
+  #ui.playing #combo{opacity:0}
+  #ui.playing #combo.on{opacity:1}
+  #comboN{font-size:40px;font-weight:700;font-variant-numeric:tabular-nums}
+  #comboL{font-size:10px;font-weight:600;letter-spacing:3px;opacity:.8;margin-top:4px}
+
+  /* mile marker flag + split popup */
+  #flag{position:absolute;top:34%;left:50%;transform:translate(-50%,-50%) scale(.8);text-align:center;
+        color:#fff;text-shadow:var(--shadow);opacity:0;pointer-events:none}
+  #flagN{font-size:88px;font-weight:800;letter-spacing:-3px;line-height:.9}
+  #flagL{font-size:12px;font-weight:600;letter-spacing:5px;opacity:.85;margin-top:6px}
+  #flag.pop{animation:flagPop 1.5s cubic-bezier(.2,.9,.25,1) forwards}
+  @keyframes flagPop{
+    0%{opacity:0;transform:translate(-50%,-50%) scale(.72)}
+    14%{opacity:1;transform:translate(-50%,-50%) scale(1.04)}
+    26%{transform:translate(-50%,-50%) scale(1)}
+    72%{opacity:1}
+    100%{opacity:0;transform:translate(-50%,-58%) scale(1)}
+  }
+  #split{position:absolute;top:44%;left:50%;transform:translate(-50%,-50%);font-size:22px;font-weight:700;
+         font-variant-numeric:tabular-nums;text-shadow:var(--shadow);opacity:0}
+  #split.pop{animation:splitPop 1.6s ease-out forwards}
+  @keyframes splitPop{0%{opacity:0;transform:translate(-50%,-30%)}18%{opacity:1;transform:translate(-50%,-50%)}
+    75%{opacity:1}100%{opacity:0;transform:translate(-50%,-70%)}}
+  .good{color:#7BE39B}.bad{color:#FF9C8A}.neutral{color:#fff}
+
+  /* overlays */
+  .overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;color:#fff;background:radial-gradient(120% 90% at 50% 30%, rgba(24,14,6,.30), rgba(16,9,4,.78));
+    -webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);pointer-events:auto;padding:24px}
+  .overlay.hidden{display:none}
+  .kicker{font-size:11px;font-weight:700;letter-spacing:5px;opacity:.7}
+  .title{font-size:min(15vw,74px);font-weight:800;letter-spacing:-2px;line-height:.92;margin:10px 0 2px;
+         text-shadow:0 6px 30px rgba(255,170,80,.35), var(--shadow)}
+  .title em{font-style:normal;display:block;
+    background:linear-gradient(180deg,#FFE7B4,#FFB061);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{font-size:13px;font-weight:500;letter-spacing:2px;opacity:.8;margin-top:10px}
+  .best{margin-top:22px;font-size:13px;font-weight:600;letter-spacing:1.5px;opacity:.9;line-height:1.7}
+  .best b{font-variant-numeric:tabular-nums;font-size:17px}
+  .cta{margin-top:34px;font-size:13px;font-weight:700;letter-spacing:4px;opacity:.95;
+       padding:15px 34px;border:1.5px solid rgba(255,255,255,.55);border-radius:999px;
+       animation:breathe 2.2s ease-in-out infinite}
+  @keyframes breathe{0%,100%{opacity:.62;transform:scale(1)}50%{opacity:1;transform:scale(1.035)}}
+
+  /* tutorial */
+  #tut .row{display:flex;gap:26px;margin-top:26px;flex-wrap:wrap;justify-content:center;max-width:440px}
+  #tut .card{width:92px}
+  #tut .gly{font-size:30px;line-height:1}
+  #tut .cap{font-size:10px;font-weight:700;letter-spacing:2px;margin-top:9px;opacity:.8}
+
+  /* results */
+  #res .rTime{font-size:min(17vw,86px);font-weight:800;letter-spacing:-3px;font-variant-numeric:tabular-nums;
+              line-height:1;margin:6px 0 4px;
+              background:linear-gradient(180deg,#FFF3D8,#FFB061);-webkit-background-clip:text;background-clip:text;color:transparent}
+  #res .rRow{display:flex;gap:30px;justify-content:center;margin-top:16px}
+  #res .rCell{text-align:center}
+  #res .rK{font-size:9px;font-weight:700;letter-spacing:2.5px;opacity:.6}
+  #res .rV{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:5px}
+  #spark{margin-top:26px;width:min(86vw,420px);height:66px;opacity:.95}
+  #sparkCap{font-size:9px;font-weight:700;letter-spacing:2.5px;opacity:.55;margin-top:7px}
+  #pb{margin-top:16px;font-size:11px;font-weight:800;letter-spacing:3px;color:#FFD98A;opacity:0}
+  #pb.on{opacity:1;animation:breathe 1.6s ease-in-out infinite}
+</style>
+</head>
+<body>
+<div id="ui">
+  <div class="hud" id="topc"><div id="clock">0:00:00</div><div id="pace">8:30 /MI</div></div>
+  <div class="hud" id="topr"><div id="mile">0.00<small> / 26.2</small></div><div id="chapter">PARK START</div></div>
+  <div class="hud" id="topl"><div id="gel">GEL</div></div>
+  <div class="hud" id="combo"><div id="comboN">0</div><div id="comboL">CLEAN</div></div>
+  <div id="flag"><div id="flagN">1</div><div id="flagL">MILE</div></div>
+  <div id="split"></div>
+
+  <div class="overlay hidden" id="menu">
+    <div class="kicker">TODAY'S COURSE</div>
+    <h1 class="title">MARATHON<em>RUSH</em></h1>
+    <div class="sub" id="mDate">—</div>
+    <div class="best" id="mBest"></div>
+    <div class="cta" id="mCta">SWIPE UP TO START</div>
+  </div>
+
+  <div class="overlay hidden" id="tut">
+    <div class="kicker">HOW TO RACE</div>
+    <h1 class="title" style="font-size:min(9vw,40px)">26.2 MILES</h1>
+    <div class="row">
+      <div class="card"><div class="gly">⬅➡</div><div class="cap">CHANGE LANE</div></div>
+      <div class="card"><div class="gly">⬆</div><div class="cap">JUMP</div></div>
+      <div class="card"><div class="gly">⬇</div><div class="cap">DUCK</div></div>
+    </div>
+    <div class="sub" style="max-width:340px;line-height:1.6">Hits cost 3 seconds, never the run.<br>Clean passes build pace.</div>
+    <div class="cta" id="tCta">TAP TO CONTINUE</div>
+  </div>
+
+  <div class="overlay hidden" id="res">
+    <div class="kicker">FINISH · 26.2 MILES</div>
+    <div class="rTime" id="rTime">0:00:00</div>
+    <div class="rRow">
+      <div class="rCell"><div class="rK">AVG PACE</div><div class="rV" id="rPace">—</div></div>
+      <div class="rCell"><div class="rK">BEST EVER</div><div class="rV" id="rBest">—</div></div>
+      <div class="rCell"><div class="rK">STUMBLES</div><div class="rV" id="rHits">—</div></div>
+    </div>
+    <svg id="spark" viewBox="0 0 420 66" preserveAspectRatio="none"></svg>
+    <div id="sparkCap">MILE SPLITS</div>
+    <div id="pb">NEW PERSONAL BEST</div>
+    <div class="cta" id="rCta">TAP TO RACE AGAIN</div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+/* ============================================================================
+   MARATHON RUSH
+   Single-file daily marathon runner. No physics engine: lane position,
+   jump/duck state and obstacle bounds are all tracked analytically; geometry
+   is purely visual. Course layout comes from a date-seeded PRNG so every
+   player races the identical course on a given calendar day.
+   ========================================================================== */
+
+/* ------------------------------ TUNING ---------------------------------- */
+
+const WORLD_UNITS_PER_MILE = 700;   // single source of truth for real-world scale
+const MARATHON_MILES       = 26.2;
+const COURSE_LENGTH        = WORLD_UNITS_PER_MILE * MARATHON_MILES;
+
+// Real play-seconds -> simulated marathon-clock-seconds. A clean run averaging
+// ~7:05/mi finishes in ~3:35 of real play while the clock still reads ~3:05:00.
+const TIME_COMPRESSION     = 52;
+
+const CHUNK_LEN     = 60;           // road segment length in world units
+const CHUNK_OVERLAP = 2;            // geometry runs long to hide curve seams
+const CHUNKS_AHEAD  = 6;
+const CHUNKS_BEHIND = 2;
+const CHUNK_POOL    = CHUNKS_AHEAD + CHUNKS_BEHIND + 2;
+const CHUNK_COUNT   = Math.ceil(COURSE_LENGTH / CHUNK_LEN) + 4;
+
+const LANE_X          = [-4.6, 0, 4.6];
+const ROAD_HALF_W     = 8.6;
+const LANE_SHIFT_MS   = 180;
+const JUMP_MS         = 400;
+const DUCK_MS         = 300;
+const JUMP_HEIGHT     = 3.4;
+const RUNNER_H        = 3.1;
+const STUMBLE_MS      = 400;
+// At cruise the runner covers ~71 units/sec, so an obstacle is only in contact
+// for ~90ms. Holding the low hitbox slightly past the crouch pose keeps the
+// duck from being a coin-flip on a swipe; the pose itself is still DUCK_MS.
+const DUCK_GRACE_MS   = 140;
+
+const PACE_BASE   = 8.5;            // min/mile cruise
+const PACE_FLOOR  = 6.75;           // min/mile ceiling of effort
+const COMBO_GRACE = 2.5;            // seconds of clean-pass credit
+const COMBO_FULL  = 14;             // clean passes for full pace benefit
+const GRADE_EFFECT = 0.08;          // hills swing pace +/- 8%
+const MAX_GRADE    = 0.072;
+
+const STUMBLE_PENALTY_SEC = 3;      // added to the marathon clock, never a fail
+const PICKUP_RADIUS       = 2.6;    // lateral grab window (~1.1m at course scale)
+const FATIGUE_PER_MILE    = 0.34;
+const FATIGUE_THRESHOLD   = 1.0;
+const FATIGUE_PENALTY     = 0.05;
+
+const LOD_NEAR = 200, LOD_FAR = 450;
+const FRAME_BUDGET_MS = 19.5;
+
+/* --------------------------- DAILY SEED / PRNG --------------------------- */
+
+function mulberry32(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function hashStr(str){
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < str.length; i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+function dateKey(d = new Date()){
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+const DATE_KEY  = dateKey();
+const DAILY_SEED = hashStr('MARATHON_RUSH::' + DATE_KEY);
+// Course generation stream. Art kits use their own fixed stream so the game
+// looks the same every day while the *layout* changes.
+const rngCourse = mulberry32(DAILY_SEED);
+const rngArt    = mulberry32(0x5EED1234);
+const pick = (rng, arr) => arr[(rng() * arr.length) | 0];
+const rr   = (rng, a, b) => a + rng() * (b - a);
+
+/* ------------------------------ CHAPTERS -------------------------------- */
+
+const PARK = 0, URBAN = 1, BRIDGE = 2, HILLS = 3, FINISH = 4;
+const CHAPTERS = [
+  { name:'PARK START',       start:0,    end:4,
+    road:0x3E3E43, ground:0x6E8E54, accent:0x89A867, grade:new THREE.Color(1.00,0.99,0.94), vig:0.90, crowd:0.35 },
+  { name:'URBAN CANYON',     start:4,    end:10,
+    road:0x3A3A3F, ground:0x55555C, accent:0x8C8C96, grade:new THREE.Color(0.97,0.97,1.02), vig:1.25, crowd:0.70 },
+  { name:'WATERFRONT BRIDGE',start:10,   end:15,
+    road:0x45454B, ground:0x3E6F92, accent:0xC9CCD2, grade:new THREE.Color(1.00,1.01,1.03), vig:0.85, crowd:0.30 },
+  { name:'ROLLING HILLS',    start:15,   end:22,
+    road:0x3C3C40, ground:0x76914F, accent:0xA8B972, grade:new THREE.Color(1.04,1.00,0.94), vig:0.95, crowd:0.45 },
+  { name:'FINISH STRAIGHT',  start:22,   end:26.2,
+    road:0x38383D, ground:0x5A5A62, accent:0xE0A45C, grade:new THREE.Color(1.07,1.01,0.92), vig:1.00, crowd:1.00 },
+];
+function chapterAtMile(mi){
+  for (let i = CHAPTERS.length - 1; i >= 0; i--) if (mi >= CHAPTERS[i].start) return i;
+  return 0;
+}
+function chapterAtS(s){ return chapterAtMile(s / WORLD_UNITS_PER_MILE); }
+
+/* ---------------------------- COURSE CENTERLINE -------------------------- */
+/* The whole marathon rides a single gently-curving spline. Everything (road
+   chunks, obstacles, runner, camera) is placed by evaluating it at a distance
+   s, so the course reads as one continuous ribbon rather than a straight tube. */
+
+const CX1 = 22, CW1 = 2 * Math.PI / 2600, CP1 = rngCourse() * 6.283;
+const CX2 = 6,  CW2 = 2 * Math.PI / 1400, CP2 = rngCourse() * 6.283;
+const HILL_AMP = 16, HILL_W = 2 * Math.PI / 1300, HILL_P = rngCourse() * 6.283;
+const HILL_S0 = 15 * WORLD_UNITS_PER_MILE, HILL_S1 = 22 * WORLD_UNITS_PER_MILE;
+
+const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp  = (a, b, t) => a + (b - a) * t;
+
+function courseX(s){ return CX1 * Math.sin(s * CW1 + CP1) + CX2 * Math.sin(s * CW2 + CP2); }
+function courseY(s){
+  const w = smoothstep(HILL_S0, HILL_S0 + 380, s) * (1 - smoothstep(HILL_S1 - 380, HILL_S1, s));
+  if (w <= 0) return 0;
+  return w * HILL_AMP * (Math.sin(s * HILL_W + HILL_P) + 0.45 * Math.sin(s * HILL_W * 2.3 + HILL_P * 1.7));
+}
+// Numeric derivatives: called a handful of times per frame, never in a hot loop.
+function courseXd(s){ return (courseX(s + 0.5) - courseX(s - 0.5)); }
+function courseYd(s){ return (courseY(s + 0.5) - courseY(s - 0.5)); }
+
+const _cpos = new THREE.Vector3(), _cright = new THREE.Vector3();
+const _frame = { yaw:0, pitch:0 };          // scratch: never allocate per frame
+function courseFrame(s){
+  const yaw   = -Math.atan(courseXd(s));
+  _frame.yaw = yaw;
+  _frame.pitch = Math.atan(courseYd(s));
+  _cpos.set(courseX(s), courseY(s), -s);
+  _cright.set(Math.cos(yaw), 0, -Math.sin(yaw));
+  return _frame;
+}
+// World position of a point at course distance s, lateral offset x, height y.
+function courseToWorld(s, x, y, out){
+  const f = courseFrame(s);
+  out.set(_cpos.x + _cright.x * x, _cpos.y + y, _cpos.z + _cright.z * x);
+  return f;
+}
+
+/* ------------------------------- RENDERER -------------------------------- */
+
+const PR = Math.min(window.devicePixelRatio || 1, 1.5);
+const renderer = new THREE.WebGLRenderer({ antialias:false, powerPreference:'high-performance', stencil:false });
+renderer.setPixelRatio(PR);
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;   // applied by OutputPass
+renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene  = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(68, innerWidth / innerHeight, 0.5, 3000);
+const HORIZON = new THREE.Color(0xFFD9A8);
+scene.fog = new THREE.FogExp2(0xFFD5A2, 0.0016);
+
+/* --------------------------------- SKY ----------------------------------- */
+
+// low morning sun, well off to the left: keeps the halo out of the runner's
+// sightline so the sky overhead stays pale blue rather than blowing out
+const SUN_DIR = new THREE.Vector3(-0.62, 0.36, -0.70).normalize();
+const skyMat = new THREE.ShaderMaterial({
+  side: THREE.BackSide, depthWrite:false, fog:false,
+  uniforms:{
+    // Color.set() already lands in the linear working space (ColorManagement is
+    // on). These deliberately sit just under the bloom threshold so the sky
+    // itself never blooms — only the sun disc, its halo and the pickup glows do.
+    uHorizon:{ value:new THREE.Color(0xFFD9A8) },
+    uTop:    { value:new THREE.Color(0xBFE3F5).multiplyScalar(0.92) },
+    uSun:    { value:SUN_DIR.clone() },
+    uWarm:   { value:1.0 },
+  },
+  vertexShader:`varying vec3 vD; void main(){ vD = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+  fragmentShader:`
+    uniform vec3 uHorizon, uTop, uSun; uniform float uWarm; varying vec3 vD;
+    void main(){
+      vec3 d = normalize(vD);
+      float t = smoothstep(-0.06, 0.62, d.y);
+      vec3 col = mix(uHorizon, uTop, t);
+      float sd = max(dot(d, normalize(uSun)), 0.0);
+      col += uHorizon * pow(sd, 8.0) * 0.45;                 // broad halo
+      col += vec3(1.0, 0.86, 0.66) * pow(sd, 220.0) * 5.0;   // soft low sun
+      col *= vec3(uWarm, 1.0, 2.0 - uWarm);
+      gl_FragColor = vec4(col, 1.0);
+    }`,
+});
+const sky = new THREE.Mesh(new THREE.SphereGeometry(1600, 24, 16), skyMat);
+sky.frustumCulled = false;
+scene.add(sky);
+
+/* -------------------------------- LIGHTS --------------------------------- */
+
+const hemi = new THREE.HemisphereLight(0xFFE2BC, 0x6A6553, 0.8);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xFFE0B4, 1.85);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+sun.shadow.camera.near = 1; sun.shadow.camera.far = 120;
+sun.shadow.camera.left = -30; sun.shadow.camera.right = 30;
+sun.shadow.camera.top = 34;   sun.shadow.camera.bottom = -22;
+sun.shadow.bias = -0.0016;
+scene.add(sun, sun.target);
+
+/* ------------------------ GEOMETRY BUILDING HELPERS ---------------------- */
+/* Everything static is merged into a handful of big vertex-coloured meshes so
+   a chunk costs a few draw calls instead of a few hundred. AO is baked into
+   those vertex colours (darker near the ground and under overhangs). */
+
+// all bases are non-indexed so mergeGeometries can mix them freely
+const deindex = g => g.index ? g.toNonIndexed() : g;
+const BOX  = deindex(new THREE.BoxGeometry(1,1,1));
+const CYL  = deindex(new THREE.CylinderGeometry(0.5,0.5,1,7,1));
+const CONE = deindex(new THREE.ConeGeometry(0.5,1,7,1));
+const ICO  = deindex(new THREE.IcosahedronGeometry(0.5,0));
+const QUAD = deindex(new THREE.PlaneGeometry(1,1));
+
+const _mtx = new THREE.Matrix4(), _pos = new THREE.Vector3(),
+      _qt = new THREE.Quaternion(), _scl = new THREE.Vector3(), _eul = new THREE.Euler();
+const _col = new THREE.Color();
+
+// push a transformed, vertex-coloured copy of a base geometry into a merge list
+function put(list, base, x,y,z, sx,sy,sz, color, opt = {}){
+  const g = base.clone();
+  _eul.set(opt.rx || 0, opt.ry || 0, opt.rz || 0);
+  _mtx.compose(_pos.set(x,y,z), _qt.setFromEuler(_eul), _scl.set(sx,sy,sz));
+  g.applyMatrix4(_mtx);
+  const p = g.attributes.position, n = p.count;
+  const arr = new Float32Array(n * 3);
+  _col.set(color);                       // already converted to linear by set()
+  const ao = opt.ao === undefined ? 0.42 : opt.ao;      // strength of ground AO
+  const y0 = opt.y0 === undefined ? y - sy * 0.5 : opt.y0;
+  const h  = Math.max(0.001, opt.aoH === undefined ? Math.abs(sy) : opt.aoH);
+  const tint = opt.tint || 0;
+  for (let i = 0; i < n; i++){
+    const vy = p.getY(i);
+    let k = 1 - ao * (1 - clamp((vy - y0) / h, 0, 1));
+    if (opt.overhang) k *= 0.72;                        // baked under-shadow
+    if (tint) k *= 1 + (((i * 2654435761) % 1000) / 1000 - 0.5) * tint;
+    arr[i*3] = _col.r * k; arr[i*3+1] = _col.g * k; arr[i*3+2] = _col.b * k;
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+  list.push(g);
+  return g;
+}
+// horizontal quad helper (plane is XY by default, so rotate -90 about X)
+function putFlat(list, x,y,z, sx,sz, color, opt = {}){
+  return put(list, QUAD, x,y,z, sx, sz, 1, color,
+    Object.assign({ rx:-Math.PI/2, ao:0, aoH:1, y0:y }, opt));
+}
+function mergeList(list){
+  if (!list.length) return null;
+  const g = mergeGeometries(list, false);
+  list.forEach(x => x.dispose());
+  g.computeBoundingSphere();
+  return g;
+}
+// Chunk dressing is authored running back from the segment origin (local z 0
+// to -CHUNK_LEN) but chunks are anchored at the segment *midpoint*, so recentre
+// the merged result — otherwise every chunk sits half a segment too far ahead.
+function mergeChunk(list){
+  const g = mergeList(list);
+  if (g){ g.translate(0, 0, CHUNK_LEN / 2); g.computeBoundingSphere(); }
+  return g;
+}
+
+const MAT_SOLID = new THREE.MeshLambertMaterial({ vertexColors:true, flatShading:true });
+const MAT_ROAD  = new THREE.MeshLambertMaterial({ vertexColors:true });
+const MAT_CROWD = new THREE.MeshLambertMaterial({ vertexColors:true, flatShading:true });
+
+/* ----------------------------- ROAD GEOMETRY ----------------------------- */
+/* One merged road+shoulder geometry per chapter, incl. painted lane lines
+   whose brightness is worn down per chapter. */
+
+const SEG_L = CHUNK_LEN + CHUNK_OVERLAP;
+function buildRoad(ch, crosswalk){
+  const L = [];
+  const c = CHAPTERS[ch];
+  const zc = -CHUNK_LEN / 2;
+
+  // shoulders / ground apron
+  if (ch === BRIDGE){
+    putFlat(L, 0, -14, zc, 900, SEG_L * 3, c.ground, { tint:0.05 });   // water
+    putFlat(L, 0, -0.35, zc, 30, SEG_L, 0x6E6E76);                     // deck
+    put(L, BOX, -11.4, -1.2, zc, 5.5, 1.6, SEG_L, 0x8A8A93, { ao:0.3 });
+    put(L, BOX,  11.4, -1.2, zc, 5.5, 1.6, SEG_L, 0x8A8A93, { ao:0.3 });
+  } else {
+    putFlat(L, 0, -0.06, zc, 240, SEG_L, c.ground, { tint:0.06 });
+  }
+  // asphalt
+  putFlat(L, 0, 0, zc, ROAD_HALF_W * 2, SEG_L, c.road, { tint:0.035 });
+  // curbs
+  const curbC = ch === BRIDGE ? 0x9A9AA2 : (ch === URBAN || ch === FINISH ? 0x7A7A82 : 0x8B8676);
+  put(L, BOX, -ROAD_HALF_W - 0.4, 0.16, zc, 0.9, 0.34, SEG_L, curbC, { ao:0.25 });
+  put(L, BOX,  ROAD_HALF_W + 0.4, 0.16, zc, 0.9, 0.34, SEG_L, curbC, { ao:0.25 });
+
+  // lane lines: dashed, worn per chapter
+  const wear = [0.86, 0.62, 0.78, 0.70, 0.95][ch];
+  const lineC = _col.set(0xF2EFE2).multiplyScalar(wear).getHex();
+  for (const lx of [-2.3, 2.3]){
+    for (let z = 0; z < SEG_L; z += 10)
+      putFlat(L, lx, 0.02, -z, 0.34, 6, lineC, { tint:0.08 });
+  }
+  // edge lines
+  for (const lx of [-ROAD_HALF_W + 0.55, ROAD_HALF_W - 0.55])
+    putFlat(L, lx, 0.02, zc, 0.26, SEG_L, lineC);
+
+  if (crosswalk){
+    for (let i = -4; i <= 4; i++)
+      putFlat(L, i * 1.7, 0.03, -SEG_L * 0.45, 1.05, 5.5, 0xF6F2E4);
+  }
+  return mergeChunk(L);
+}
+
+/* --------------------------- CHAPTER SIDE DRESSING ----------------------- */
+/* Two merged variants per chapter-variant: `full` (LOD0) and `lod` (LOD1,
+   large silhouettes only). LOD2 chunks show road alone. */
+
+function tree(L, x, z, s, lod){
+  const trunk = 0x6B5540, leaf = pick(rngArt, [0x5F8B48, 0x6E9A50, 0x537C42, 0x7CA65C]);
+  put(L, CYL, x, 2.2 * s, z, 0.75 * s, 4.6 * s, 0.75 * s, trunk, { ao:0.5 });
+  put(L, ICO, x, 6.4 * s, z, 6.2 * s, 6.0 * s, 6.2 * s, leaf, { ao:0.34, aoH:6, y0:3, tint:0.10 });
+  if (!lod){
+    put(L, ICO, x + 1.6 * s, 8.6 * s, z + 1.1 * s, 4.0 * s, 3.6 * s, 4.0 * s, leaf, { ao:0.28, aoH:5, y0:5 });
+    put(L, ICO, x - 1.4 * s, 8.2 * s, z - 1.3 * s, 3.4 * s, 3.2 * s, 3.4 * s, leaf, { ao:0.28, aoH:5, y0:5 });
+  }
+  putFlat(L, x, 0.04, z, 7 * s, 7 * s, 0x2E3A22, { });   // contact shadow
+}
+function building(L, x, z, w, h, d, lod){
+  const tones = [0xB9AEA0, 0xA79C92, 0xC8BDAE, 0x8E8C90, 0xD2C3AE, 0x9C9088];
+  const base = pick(rngArt, tones);
+  put(L, BOX, x, h / 2, z, w, h, d, base, { ao:0.55, aoH:h * 0.8, y0:0, tint:0.04 });
+  if (!lod){
+    // window bands, darkened toward the street (baked AO in the canyon)
+    const rows = Math.max(2, Math.floor(h / 7));
+    for (let r = 1; r <= rows; r++){
+      const wy = (r / (rows + 1)) * h;
+      const s = x < 0 ? 1 : -1;
+      put(L, BOX, x + s * (w / 2 + 0.06), wy, z, 0.14, 1.5, d * 0.86, 0x4E5A66,
+        { ao:0.42, aoH:h * 0.7, y0:0 });
+    }
+    put(L, BOX, x, h + 0.7, z, w * 0.34, 1.4, d * 0.34, 0x7E7873, { ao:0.2 });
+  }
+  putFlat(L, x, 0.05, z, w * 1.5, d * 1.5, 0x2B2A2E, {});   // ground occlusion
+}
+function crowdRow(L, x, z, n, spread, face){
+  for (let i = 0; i < n; i++){
+    const px = x + rr(rngArt, -1.4, 1.4);
+    const pz = z + (i / n) * spread - spread / 2 + rr(rngArt, -0.8, 0.8);
+    const h  = rr(rngArt, 1.5, 2.0);
+    const shirt = pick(rngArt, [0xE8615A, 0x4E8AD6, 0xF0C24B, 0xE8E4DA, 0x6FB78A, 0xC97BD1, 0xEE9A4D]);
+    put(L, CYL, px, h * 0.55, pz, 0.72, h, 0.72, shirt, { ao:0.45, tint:0.06 });
+    put(L, ICO, px, h + 0.32, pz, 0.66, 0.7, 0.66, 0xC79A78, { ao:0.2 });
+  }
+}
+function barrier(L, x, z, len, color){
+  put(L, BOX, x, 0.95, z, 0.16, 0.18, len, color, { ao:0.1 });
+  put(L, BOX, x, 0.55, z, 0.16, 0.16, len, color, { ao:0.1 });
+  for (let i = -2; i <= 2; i++)
+    put(L, BOX, x, 0.5, z + i * (len / 5), 0.18, 1.0, 0.18, color, { ao:0.4 });
+}
+
+function buildDressing(ch, variant, lod){
+  const L = [];
+  const zc = -CHUNK_LEN / 2, half = CHUNK_LEN / 2;
+  const side = [-1, 1];
+
+  if (ch === PARK){
+    for (const s of side){
+      for (let i = 0; i < (lod ? 2 : 4); i++){
+        const z = -rr(rngArt, 0, CHUNK_LEN);
+        tree(L, s * rr(rngArt, 13, 30), z, rr(rngArt, 0.85, 1.4), lod);
+      }
+      if (!lod) for (let i = 0; i < 5; i++)
+        put(L, ICO, s * rr(rngArt, 11, 22), 0.5, -rr(rngArt, 0, CHUNK_LEN),
+            rr(rngArt,1.6,2.6), 1.3, rr(rngArt,1.6,2.6), 0x53753F, { ao:0.4 });
+      if (!lod && variant === 1)
+        for (let i = 0; i < 3; i++)
+          put(L, CYL, s * 11.5, 2.4, -18 - i * 20, 0.28, 4.8, 0.28, 0x3C4038, { ao:0.35 });
+    }
+  }
+  else if (ch === URBAN){
+    for (const s of side){
+      let z = -rr(rngArt, 0, 14);
+      while (z > -CHUNK_LEN){
+        const d = rr(rngArt, 16, 30), w = rr(rngArt, 16, 26), h = rr(rngArt, 34, 118);
+        building(L, s * (18 + w / 2), z - d / 2, w, h, d, lod);
+        z -= d + rr(rngArt, 2, 7);
+      }
+      putFlat(L, s * 13.5, 0.12, zc, 8, SEG_L, 0x6E6C70);       // sidewalk
+      if (!lod){
+        for (let i = 0; i < 2; i++){
+          const z2 = -rr(rngArt, 4, CHUNK_LEN - 4);
+          put(L, CYL, s * 10.6, 2.8, z2, 0.22, 5.6, 0.22, 0x33343A, { ao:0.4 });
+          put(L, BOX, s * 10.6, 5.8, z2, 0.5, 1.3, 0.4, 0x22242A, { ao:0.2 });
+        }
+      }
+    }
+  }
+  else if (ch === BRIDGE){
+    for (const s of side){
+      barrier(L, s * 13.6, zc, SEG_L, 0xD6D8DC);
+      if (!lod){
+        for (let i = 0; i < 6; i++)
+          put(L, BOX, s * 13.9, 3.2, -i * 10 - 4, 0.14, 5.0, 0.14, 0xC2C6CC, { ao:0.3 });
+        if (variant === 0){
+          put(L, BOX, s * 15.5, 26, zc, 2.4, 52, 2.4, 0xE2E4E8, { ao:0.35, aoH:40, y0:0 });
+          put(L, BOX, s * 15.5, 50, zc, 3.4, 2.0, 3.4, 0xCFD3D8, { ao:0.1 });
+        }
+        if (variant === 2){
+          for (let i = 0; i < 3; i++){
+            const z2 = -12 - i * 18;
+            put(L, CYL, s * 14.4, 4.2, z2, 0.2, 8.4, 0.2, 0xB9BDC4, { ao:0.3 });
+            put(L, QUAD, s * 15.6, 6.4, z2, 2.4, 3.0, 1,
+              pick(rngArt, [0xE8615A, 0x4E8AD6, 0xF0C24B]),
+              { ry: s * 0.35, ao:0.15, aoH:3, y0:5 });
+          }
+        }
+      }
+    }
+  }
+  else if (ch === HILLS){
+    for (const s of side){
+      for (let i = 0; i < (lod ? 3 : 6); i++)
+        put(L, ICO, s * rr(rngArt, 22, 70), rr(rngArt, -3, 1), -rr(rngArt, 0, CHUNK_LEN),
+            rr(rngArt, 26, 60), rr(rngArt, 8, 22), rr(rngArt, 26, 60),
+            pick(rngArt, [0x76914F, 0x6C8748, 0x849A57]), { ao:0.25, aoH:14, y0:-4, tint:0.05 });
+      if (!lod){
+        for (let i = 0; i < 2; i++)
+          tree(L, s * rr(rngArt, 16, 34), -rr(rngArt, 0, CHUNK_LEN), rr(rngArt, 0.9, 1.5), false);
+        for (let i = 0; i < 7; i++)
+          put(L, BOX, s * 12.4, 0.9, -i * 9 - 3, 0.16, 1.8, 0.16, 0x8A7455, { ao:0.4 });
+        put(L, BOX, s * 12.4, 1.5, zc, 0.1, 0.14, SEG_L, 0x8A7455, { ao:0.1 });
+      }
+    }
+  }
+  else { // FINISH
+    for (const s of side){
+      barrier(L, s * 11.6, zc, SEG_L, 0xE4E6EA);
+      if (!lod){
+        for (let i = 0; i < 4; i++){
+          const z2 = -i * 15 - 6;
+          put(L, CYL, s * 12.6, 3.0, z2, 0.18, 6.0, 0.18, 0xB0B4BA, { ao:0.3 });
+          put(L, QUAD, s * 13.6, 4.6, z2, 2.2, 2.8, 1,
+            pick(rngArt, [0xE8615A, 0xF0C24B, 0x4E8AD6, 0xEE9A4D]),
+            { ry: s * 0.4, ao:0.15, aoH:3, y0:3.2 });
+        }
+        put(L, BOX, s * 22, 3.0, zc, 14, 6, SEG_L * 0.9, 0x6A6068, { ao:0.45, aoH:6, y0:0 });
+      }
+    }
+  }
+  return mergeChunk(L);
+}
+
+function buildCrowd(ch, density){
+  const L = [];
+  const zc = -CHUNK_LEN / 2;
+  const base = CHAPTERS[ch].crowd;
+  const n = Math.round(base * density * 26);
+  if (n <= 0) return null;
+  const x = ch === FINISH ? 13.4 : (ch === URBAN ? 12.0 : 12.8);
+  for (const s of [-1, 1]) crowdRow(L, s * x, zc, Math.max(1, n >> 1), CHUNK_LEN, s);
+  return mergeChunk(L);
+}
+
+// far silhouette band (LOD2) — one cheap merged strip per chapter
+function buildFar(ch){
+  const L = [];
+  const zc = -CHUNK_LEN / 2;
+  if (ch === URBAN){
+    for (const s of [-1, 1]){
+      let z = 0;
+      while (z > -CHUNK_LEN){
+        const d = rr(rngArt, 18, 32), h = rr(rngArt, 34, 110);
+        put(L, BOX, s * rr(rngArt, 28, 40), h / 2, z - d / 2, rr(rngArt, 16, 26), h, d,
+            0xA79C92, { ao:0.5, aoH:h, y0:0 });
+        z -= d + 4;
+      }
+    }
+  } else if (ch === PARK || ch === HILLS){
+    for (const s of [-1, 1])
+      for (let i = 0; i < 2; i++)
+        put(L, CONE, s * rr(rngArt, 24, 46), 5, -rr(rngArt, 0, CHUNK_LEN), 12, 13, 12,
+            0x5F8B48, { ao:0.3, aoH:10, y0:0 });
+  } else if (ch === FINISH){
+    for (const s of [-1, 1])
+      put(L, BOX, s * 22, 3.0, zc, 14, 6, SEG_L, 0x6A6068, { ao:0.4, aoH:6, y0:0 });
+  } else {
+    for (const s of [-1, 1]) barrier(L, s * 13.6, zc, SEG_L, 0xD6D8DC);
+  }
+  return mergeChunk(L);
+}
+
+/* -------------------------- BAKE ALL CHAPTER KITS ------------------------ */
+
+const VARIANTS = 3, CROWD_LEVELS = [0.45, 0.8, 1.3];
+const KIT = CHAPTERS.map((c, ch) => ({
+  road:      [buildRoad(ch, false), buildRoad(ch, true)],
+  full:      Array.from({ length:VARIANTS }, (_, v) => buildDressing(ch, v, false)),
+  lod:       Array.from({ length:VARIANTS }, (_, v) => buildDressing(ch, v, true)),
+  crowd:     CROWD_LEVELS.map(d => buildCrowd(ch, d)),
+  far:       buildFar(ch),
+}));
+
+/* ---------------------------- CHUNK STREAMING ---------------------------- */
+/* A fixed pool of chunk groups; only geometry references and transforms change
+   as the course scrolls. Nothing is allocated after startup. */
+
+class Chunk {
+  constructor(){
+    this.group   = new THREE.Group();
+    this.road    = new THREE.Mesh(KIT[0].road[0], MAT_ROAD);
+    this.dressF  = new THREE.Mesh(KIT[0].full[0], MAT_SOLID);
+    this.dressL  = new THREE.Mesh(KIT[0].lod[0],  MAT_SOLID);
+    this.crowd   = new THREE.Mesh(KIT[0].crowd[1] || KIT[1].crowd[1], MAT_CROWD);
+    this.far     = new THREE.Mesh(KIT[0].far, MAT_SOLID);
+    this.road.receiveShadow = true;
+    this.dressF.castShadow = true; this.dressF.receiveShadow = true;
+    this.crowd.castShadow = false;
+    this.group.add(this.road, this.dressF, this.dressL, this.crowd, this.far);
+    this.group.visible = false;
+    this.index = -1;
+    scene.add(this.group);
+  }
+  place(index){
+    this.index = index;
+    const s = index * CHUNK_LEN;
+    const mid = s + CHUNK_LEN / 2;
+    const f = courseFrame(mid);
+    this.group.position.copy(_cpos);
+    this.group.rotation.set(f.pitch, f.yaw, 0, 'YXZ');
+    this.group.visible = true;
+
+    const ch  = chapterAtS(mid);
+    const k   = KIT[ch];
+    const r   = mulberry32(DAILY_SEED ^ (index * 0x9E3779B1));
+    const v   = (r() * VARIANTS) | 0;
+    const cw  = ch === URBAN && r() < 0.18 ? 1 : 0;      // occasional crosswalk
+    this.chapter = ch;
+    this.road.geometry   = k.road[cw];
+    this.dressF.geometry = k.full[v];
+    this.dressL.geometry = k.lod[v];
+    this.far.geometry    = k.far;
+    // crowd swells near mile markers and ramps hard through the finish
+    const mi = mid / WORLD_UNITS_PER_MILE;
+    const nearMile = Math.abs(mi - Math.round(mi)) < 0.09 ? 1 : 0;
+    const ramp = ch === FINISH ? smoothstep(22, 26.2, mi) : 0;
+    let lvl = nearMile ? 1 : 0;
+    if (ramp > 0.35 || (ch === FINISH && nearMile)) lvl = 2;
+    lvl = Math.min(lvl, quality.crowdMax);
+    this.crowdGeoms = k.crowd;
+    this.crowdLevel = lvl;
+    const cg = k.crowd[lvl] || k.crowd[0];
+    if (cg){ this.crowd.geometry = cg; this.crowd.visible = true; }
+    else this.crowd.visible = false;
+    this.mid = mid;
+  }
+  setLOD(dist){
+    if (dist < LOD_NEAR){
+      this.dressF.visible = true;  this.dressL.visible = false; this.far.visible = false;
+      this.crowd.visible = !!this.crowdGeoms[this.crowdLevel];
+    } else if (dist < LOD_FAR){
+      this.dressF.visible = false; this.dressL.visible = true;  this.far.visible = false;
+      this.crowd.visible = false;
+    } else {
+      this.dressF.visible = false; this.dressL.visible = false; this.far.visible = true;
+      this.crowd.visible = false;
+    }
+  }
+  hide(){ this.group.visible = false; this.index = -1; }
+}
+
+const chunks = [];
+function initChunks(){
+  for (let i = 0; i < CHUNK_POOL; i++) chunks.push(new Chunk());
+}
+function updateChunks(s){
+  const cur = Math.floor(s / CHUNK_LEN);
+  const lo = cur - CHUNKS_BEHIND, hi = cur + CHUNKS_AHEAD;
+  // pool is ten items: plain loops beat a Map and allocate nothing
+  for (let j = 0; j < chunks.length; j++){
+    const c = chunks[j];
+    if (c.index >= 0 && (c.index < lo || c.index > hi || c.index >= CHUNK_COUNT)) c.hide();
+  }
+  for (let i = Math.max(0, lo); i <= hi && i < CHUNK_COUNT; i++){
+    let loaded = false, free = null;
+    for (let j = 0; j < chunks.length; j++){
+      if (chunks[j].index === i){ loaded = true; break; }
+      if (!free && chunks[j].index < 0) free = chunks[j];
+    }
+    if (loaded || !free) continue;
+    free.place(i);
+  }
+  for (let j = 0; j < chunks.length; j++){
+    const c = chunks[j];
+    if (c.index >= 0) c.setLOD(Math.abs(c.mid - s));
+  }
+}
+
+/* ------------------------------ RUNNER MODEL ----------------------------- */
+/* Procedural low-poly runner: capsule torso, jointed limbs, sine-driven gait
+   whose period shortens as pace improves. */
+
+const SINGLET = 0xE85D4A, SHORTS = 0x2B3446, SKIN = 0xC79A78, SHOE = 0xF4F1E8;
+function limb(len, rad, color){
+  const g = new THREE.Group();
+  const m = new THREE.Mesh(new THREE.CapsuleGeometry(rad, len, 3, 6),
+                           new THREE.MeshStandardMaterial({ color, roughness:0.72, metalness:0.02, flatShading:true }));
+  m.position.y = -len / 2 - rad * 0.4;
+  m.castShadow = true;
+  g.add(m);
+  return { pivot:g, mesh:m };
+}
+const runner = new THREE.Group();
+const body = new THREE.Group();          // holds lean/duck so gait is unaffected
+runner.add(body);
+const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.42, 0.78, 4, 8),
+  new THREE.MeshStandardMaterial({ color:SINGLET, roughness:0.68, flatShading:true }));
+torso.position.y = 2.02; torso.castShadow = true;
+const hips = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.5, 0.5),
+  new THREE.MeshStandardMaterial({ color:SHORTS, roughness:0.8, flatShading:true }));
+hips.position.y = 1.44; hips.castShadow = true;
+const head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.32, 1),
+  new THREE.MeshStandardMaterial({ color:SKIN, roughness:0.85, flatShading:true }));
+head.position.y = 2.72; head.castShadow = true;
+body.add(torso, hips, head);
+
+const armL = limb(0.62, 0.13, SKIN), armR = limb(0.62, 0.13, SKIN);
+const foreL = limb(0.54, 0.115, SKIN), foreR = limb(0.54, 0.115, SKIN);
+armL.pivot.position.set(-0.5, 2.32, 0); armR.pivot.position.set(0.5, 2.32, 0);
+foreL.pivot.position.y = -0.86; foreR.pivot.position.y = -0.86;
+armL.pivot.add(foreL.pivot); armR.pivot.add(foreR.pivot);
+const thighL = limb(0.72, 0.17, SKIN), thighR = limb(0.72, 0.17, SKIN);
+const shinL = limb(0.68, 0.14, SKIN), shinR = limb(0.68, 0.14, SKIN);
+thighL.pivot.position.set(-0.26, 1.34, 0); thighR.pivot.position.set(0.26, 1.34, 0);
+shinL.pivot.position.y = -0.98; shinR.pivot.position.y = -0.98;
+thighL.pivot.add(shinL.pivot); thighR.pivot.add(shinR.pivot);
+const shoeMat = new THREE.MeshStandardMaterial({ color:SHOE, roughness:0.6, flatShading:true });
+const shoeGeo = new THREE.BoxGeometry(0.26, 0.16, 0.5);
+const shoeL = new THREE.Mesh(shoeGeo, shoeMat), shoeR = new THREE.Mesh(shoeGeo, shoeMat);
+shoeL.position.set(0, -0.86, 0.08); shoeR.position.copy(shoeL.position);
+shoeL.castShadow = shoeR.castShadow = true;
+shinL.pivot.add(shoeL); shinR.pivot.add(shoeR);
+body.add(armL.pivot, armR.pivot, thighL.pivot, thighR.pivot);
+scene.add(runner);
+
+let gaitPhase = 0;
+function animateRunner(dt, pace, airborne, ducking, stumbleT){
+  // faster pace -> shorter cycle, slightly longer stride
+  const cadence = lerp(1.55, 2.35, clamp((PACE_BASE - pace) / (PACE_BASE - PACE_FLOOR), 0, 1));
+  const stride  = lerp(0.86, 1.16, clamp((PACE_BASE - pace) / (PACE_BASE - PACE_FLOOR), 0, 1));
+  gaitPhase += dt * cadence * Math.PI * 2;
+  if (gaitPhase > Math.PI * 4) gaitPhase -= Math.PI * 4;
+
+  const p = gaitPhase, sw = Math.sin(p) * stride, sw2 = Math.sin(p + Math.PI) * stride;
+  const air = airborne ? 1 : 0;
+  thighL.pivot.rotation.x = lerp(sw * 0.85, -0.9, air);
+  thighR.pivot.rotation.x = lerp(sw2 * 0.85, -0.35, air);
+  shinL.pivot.rotation.x  = lerp(Math.max(0, -Math.sin(p - 0.7)) * 1.25, 1.1, air);
+  shinR.pivot.rotation.x  = lerp(Math.max(0, -Math.sin(p + Math.PI - 0.7)) * 1.25, 0.5, air);
+  armL.pivot.rotation.x   = lerp(sw2 * 0.75, -1.2, air);
+  armR.pivot.rotation.x   = lerp(sw * 0.75, -1.2, air);
+  foreL.pivot.rotation.x  = -0.9 - Math.max(0, sw2) * 0.5;
+  foreR.pivot.rotation.x  = -0.9 - Math.max(0, sw) * 0.5;
+  armL.pivot.rotation.z   =  0.16; armR.pivot.rotation.z = -0.16;
+
+  // torso lean grows with pace; duck folds the whole body forward and down
+  const effort = clamp((PACE_BASE - pace) / (PACE_BASE - PACE_FLOOR), 0, 1);
+  const duckT  = ducking ? 1 : 0;
+  body.rotation.x = lerp(body.rotation.x, lerp(0.13 + effort * 0.16, 0.95, duckT), 1 - Math.exp(-dt * 16));
+  duckOffset = lerp(duckOffset, duckT ? -0.95 : 0, 1 - Math.exp(-dt * 18));
+  head.rotation.x = -body.rotation.x * 0.55;
+  // duck crouch plus a subtle vertical bob from the gait
+  body.position.y = duckOffset + (airborne ? 0 : Math.abs(Math.sin(p)) * 0.09);
+}
+let duckOffset = 0;
+
+/* -------------------------------- INPUT ---------------------------------- */
+/* Swipes (25px minimum, dominant axis) and keyboard. Inputs that arrive during
+   a jump/duck are queued for the next available frame rather than dropped. */
+
+const input = { queue:[] };
+function queueAction(a){
+  audioUnlock();
+  // outside a run, any directional input is just "go"
+  if (S.phase !== 'running'){ onTap(); return; }
+  if (input.queue.length < 3) input.queue.push(a);
+}
+let touchX = 0, touchY = 0, touchActive = false, touchTime = 0;
+const SWIPE_MIN = 25;
+addEventListener('touchstart', e => {
+  const t = e.changedTouches[0];
+  touchX = t.clientX; touchY = t.clientY; touchActive = true; touchTime = performance.now();
+  audioUnlock();
+}, { passive:true });
+addEventListener('touchend', e => {
+  if (!touchActive) return;
+  touchActive = false;
+  const t = e.changedTouches[0];
+  const dx = t.clientX - touchX, dy = t.clientY - touchY;
+  const ax = Math.abs(dx), ay = Math.abs(dy);
+  if (Math.max(ax, ay) < SWIPE_MIN){ onTap(); return; }
+  if (ax > ay) queueAction(dx > 0 ? 'right' : 'left');
+  else         queueAction(dy > 0 ? 'down' : 'up');
+}, { passive:true });
+addEventListener('mousedown', () => audioUnlock());
+addEventListener('click', () => onTap());
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (k === 'arrowleft'  || k === 'a') queueAction('left');
+  else if (k === 'arrowright' || k === 'd') queueAction('right');
+  else if (k === 'arrowup'    || k === 'w') queueAction('up');
+  else if (k === 'arrowdown'  || k === 's') queueAction('down');
+  else if (k === ' ' || k === 'enter') onTap();
+  else return;
+  e.preventDefault();
+}, { passive:false });
+
+/* --------------------------------- STATE --------------------------------- */
+
+const S = {
+  phase:'menu',            // menu | tutorial | running | finished
+  s:0,                     // course distance travelled, world units
+  lane:1, laneFrom:1, laneT:1,
+  jumpT:1, duckT:1, duckHold:0,
+  stumbleT:0,
+  pace:PACE_BASE, paceTarget:PACE_BASE,
+  combo:0, comboTimer:0, bestCombo:0,
+  fatigue:0,
+  gel:false,
+  hits:0,
+  clock:0,                 // simulated marathon seconds
+  penalty:0,
+  boostMul:1, boostT:0,
+  mile:0, lastMileMarked:0,
+  splits:[], splitStart:0,
+  started:false,
+};
+let quality = { bloom:1, blur:1, crowdMax:2, level:0 };
+
+const laneXNow = () => lerp(LANE_X[S.laneFrom], LANE_X[S.lane], easeOutCubic(S.laneT));
+const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
+const jumpY = () => S.jumpT >= 1 ? 0 : Math.sin(S.jumpT * Math.PI) * JUMP_HEIGHT;
+const isAirborne = () => S.jumpT < 1;
+const isDucking  = () => S.duckT < 1;          // crouch pose
+const isLow      = () => S.duckHold > 0;       // forgiving low hitbox
+
+function tryConsumeInput(){
+  if (!input.queue.length) return;
+  const busy = isAirborne() || isDucking();
+  const a = input.queue[0];
+  if (a === 'left' || a === 'right'){
+    // lane changes are allowed mid-air; they just read as a body shift
+    if (S.laneT < 1) return;
+    const next = clamp(S.lane + (a === 'right' ? 1 : -1), 0, 2);
+    input.queue.shift();
+    if (next === S.lane) return;
+    S.laneFrom = S.lane; S.lane = next; S.laneT = 0;
+  } else if (a === 'up'){
+    if (busy) return;                       // queued, retried next frame
+    input.queue.shift(); S.jumpT = 0; sfxJump();
+  } else if (a === 'down'){
+    if (busy) return;
+    input.queue.shift(); S.duckT = 0; S.duckHold = (DUCK_MS + DUCK_GRACE_MS) / 1000;
+  }
+}
+
+/* -------------------------------- CAMERA --------------------------------- */
+
+const camPos = new THREE.Vector3(), camVel = new THREE.Vector3(), camAim = new THREE.Vector3();
+const _target = new THREE.Vector3(), _look = new THREE.Vector3(), _tmp = new THREE.Vector3();
+let camLateral = 0, camDip = 0, camLift = 0, camSway = 0;
+const CAM_STIFF = 7, CAM_DAMP = 0.85;
+
+function updateCamera(dt, immediate){
+  const s = S.s;
+  const f = courseFrame(s);
+  camSway += dt;
+  const back = 11.5, up = 5.4;
+  // lateral lag: camera trails the lane change so swipes read as weighted turns
+  camLateral = lerp(camLateral, laneXNow(), 1 - Math.exp(-dt * 8.5));
+  const idle = S.phase === 'menu' ? Math.sin(camSway * 0.6) * 1.4 : 0;
+  courseToWorld(s - back, camLateral * 0.72 + idle, 0, _target);
+  _target.y += up + camLift - camDip + Math.sin(camSway * 0.5) * (S.phase === 'menu' ? 0.35 : 0);
+
+  if (immediate){ camPos.copy(_target); camVel.set(0,0,0); }
+  else {
+    // spring-damper follow
+    _tmp.copy(_target).sub(camPos).multiplyScalar(CAM_STIFF);
+    _tmp.addScaledVector(camVel, -2 * Math.sqrt(CAM_STIFF) * CAM_DAMP);
+    camVel.addScaledVector(_tmp, dt);
+    camPos.addScaledVector(camVel, dt);
+  }
+  camera.position.copy(camPos);
+  courseToWorld(s + 15, laneXNow() * 0.45, 2.2 - camDip * 0.5, _look);
+  camera.lookAt(_look);
+  camera.rotation.z += Math.sin(camSway * 0.9) * 0.004 + (laneXNow() - camLateral) * 0.012;
+
+  const effort = clamp((PACE_BASE - S.pace) / (PACE_BASE - PACE_FLOOR), 0, 1);
+  const fov = lerp(68, 74, effort);
+  if (Math.abs(camera.fov - fov) > 0.01){
+    camera.fov = lerp(camera.fov, fov, 1 - Math.exp(-dt * 3));
+    camera.updateProjectionMatrix();
+  }
+  camDip  = lerp(camDip, 0, 1 - Math.exp(-dt * 6));
+  camLift = lerp(camLift, 0, 1 - Math.exp(-dt * 5));
+}
+
+/* ---------------------------- RUNNER PLACEMENT --------------------------- */
+
+function placeRunner(){
+  const f = courseToWorld(S.s, laneXNow(), jumpY(), _tmp);
+  runner.position.copy(_tmp);
+  // bank into the turn: lean from lane-change velocity plus course curvature
+  const laneVel = (LANE_X[S.lane] - LANE_X[S.laneFrom]) * (S.laneT < 1 ? 1 : 0);
+  runner.rotation.set(f.pitch, f.yaw, 0, 'YXZ');
+  const wobble = S.stumbleT > 0 ? Math.sin(S.stumbleT * 46) * 0.26 * (S.stumbleT / (STUMBLE_MS / 1000)) : 0;
+  body.rotation.z = lerp(body.rotation.z, -laneVel * 0.055 + wobble, 0.35);
+  sun.position.copy(runner.position).addScaledVector(SUN_DIR, 60);
+  sun.target.position.copy(runner.position);
+  sun.target.updateMatrixWorld();
+}
+
+/* ------------------------------ PACE / CLOCK ----------------------------- */
+// worldSpeed converts the pace value into world units per real second.
+function worldSpeed(){ return WORLD_UNITS_PER_MILE * TIME_COMPRESSION / (S.pace * 60); }
+
+/* ========================================================================== */
+/*  COURSE OBJECTS: OBSTACLES, PICKUPS, MILE GANTRIES                         */
+/* ========================================================================== */
+
+const T = {
+  POTHOLE:0, CONE:1, SAWHORSE:2, CAR:3, SCAFFOLD:4, CYCLIST:5,
+  WATER:6, BANANA:7, GEL:8, GANTRY:9,
+};
+// width / half-length along the course / how it can be cleared.
+// `jump:true` means the whole jump arc clears it — a runner who is off the
+// ground is over it, which is both more forgiving and more intuitive than
+// comparing against a height threshold mid-arc.
+const SPEC = {
+  [T.POTHOLE] : { w:3.6,  half:2.6, jump:true,  mode:'ground' },
+  [T.CONE]    : { w:1.9,  half:1.2, jump:true,  mode:'ground' },
+  [T.SAWHORSE]: { w:3.8,  half:1.4, jump:true,  mode:'ground' },
+  [T.CAR]     : { w:8.2,  half:5.6, jump:false, mode:'ground' },   // lane change only
+  [T.SCAFFOLD]: { w:19,   half:1.8, jump:false, mode:'over'   },   // duck only
+  [T.CYCLIST] : { w:2.6,  half:1.8, jump:false, mode:'ground' },   // lane change only
+  [T.WATER]   : { w:0,    half:1.4, jump:false, mode:'pickup' },
+  [T.BANANA]  : { w:0,    half:1.4, jump:false, mode:'pickup' },
+  [T.GEL]     : { w:0,    half:1.4, jump:false, mode:'pickup' },
+  [T.GANTRY]  : { w:0,    half:1,   jump:false, mode:'decor'  },
+};
+const SPAWN_AHEAD = 430;
+const CROSS_DUR   = 3.0;   // seconds a cyclist takes to cross the road
+const TELEGRAPH   = 1.2;
+
+/* ------------------------- course object geometry ------------------------ */
+
+function geoPothole(){
+  const L = [];
+  putFlat(L, 0, 0.03, 0, 3.4, 4.6, 0x141418, { tint:0.1 });
+  putFlat(L, 0, 0.04, 0, 2.4, 3.4, 0x0A0A0C);
+  for (let i = 0; i < 5; i++)
+    put(L, BOX, rr(rngArt,-1.7,1.7), 0.09, rr(rngArt,-2.2,2.2),
+        rr(rngArt,0.3,0.7), 0.18, rr(rngArt,0.3,0.7), 0x2A2A2E, { ao:0.2 });
+  return mergeList(L);
+}
+function geoCone(){
+  const L = [];
+  putFlat(L, 0, 0.03, 0, 1.5, 1.5, 0x1A1A1E);
+  put(L, BOX,  0, 0.09, 0, 1.35, 0.18, 1.35, 0xE0621F, { ao:0.2 });
+  put(L, CONE, 0, 0.86, 0, 1.05, 1.6, 1.05, 0xF2701F, { ao:0.34, aoH:1.6, y0:0.06 });
+  put(L, CONE, 0, 1.02, 0, 0.86, 0.42, 0.86, 0xF4F1E8, { ao:0.1 });
+  return mergeList(L);
+}
+function geoSawhorse(){
+  const L = [];
+  for (const s of [-1, 1]){
+    put(L, BOX, s * 1.55, 0.6, 0.18, 0.2, 1.25, 0.2, 0xD8D5CC, { ao:0.45, rz:s * 0.2 });
+    put(L, BOX, s * 1.55, 0.6, -0.18, 0.2, 1.25, 0.2, 0xD8D5CC, { ao:0.45, rz:s * 0.2 });
+  }
+  for (let i = -3; i <= 3; i++)
+    put(L, BOX, i * 0.52, 1.18, 0, 0.52, 0.42, 0.3, i % 2 ? 0xE83F2E : 0xF4F1E8, { ao:0.12 });
+  put(L, BOX, 0, 0.72, 0, 3.5, 0.16, 0.24, 0xD8D5CC, { ao:0.2 });
+  putFlat(L, 0, 0.03, 0, 4.2, 1.6, 0x1C1C20);
+  return mergeList(L);
+}
+function geoCar(){
+  const L = [];
+  const paint = 0x3E6FA8;
+  put(L, BOX, 0, 1.15, 0, 7.4, 1.5, 10.4, paint, { ao:0.4, aoH:1.6, y0:0.4 });
+  put(L, BOX, 0, 2.35, -0.6, 6.5, 1.2, 5.6, 0x2B4E77, { ao:0.25, aoH:1.4, y0:1.8 });
+  put(L, BOX, 0, 2.42, -0.6, 6.7, 0.75, 4.9, 0x9FC4DC, { ao:0.1 });
+  for (const sx of [-1, 1]) for (const sz of [-1, 1])
+    put(L, CYL, sx * 3.5, 0.72, sz * 3.5, 1.44, 0.9, 1.44, 0x1B1B1F,
+        { rz:Math.PI/2, ao:0.3, aoH:1.4, y0:0 });
+  put(L, BOX, 0, 1.6, 5.3, 6.0, 0.5, 0.3, 0xF3E5B0, { ao:0.1 });
+  put(L, BOX, 0, 1.6, -5.3, 6.0, 0.5, 0.3, 0xD8443A, { ao:0.1 });
+  putFlat(L, 0, 0.04, 0, 9.0, 12.0, 0x1A1A1E);
+  return mergeList(L);
+}
+function geoScaffold(){
+  const L = [];
+  for (const s of [-1, 1]){
+    put(L, BOX, s * 8.6, 2.4, 0, 0.42, 4.8, 0.42, 0xC9A24B, { ao:0.5, aoH:4.8, y0:0 });
+    put(L, BOX, s * 8.6, 2.4, 1.1, 0.3, 4.6, 0.3, 0xC9A24B, { ao:0.5, aoH:4.6, y0:0 });
+    put(L, BOX, s * 8.0, 1.3, 0.55, 1.6, 0.22, 0.22, 0xB08F3E, { ao:0.3, rz:0.5 });
+  }
+  put(L, BOX, 0, 4.5, 0, 18.2, 0.55, 1.5, 0xC9A24B, { ao:0.15, overhang:true });
+  put(L, BOX, 0, 3.55, 0, 18.2, 1.5, 0.5, 0xE2E0D6, { ao:0.15, overhang:true });
+  put(L, BOX, 0, 3.55, 0.28, 14.0, 1.0, 0.06, 0xE85D4A, { ao:0.05, overhang:true });
+  put(L, BOX, 0, 5.1, 0, 18.6, 0.3, 2.4, 0xB08F3E, { ao:0.1, overhang:true });
+  return mergeList(L);
+}
+function geoCyclist(){
+  const L = [];
+  // wheels: cylinder axis is Y, so roll it about Z to put the axle across the bike
+  for (const sz of [-1, 1])
+    put(L, CYL, 0, 0.68, sz * 0.9, 1.36, 0.14, 1.36, 0x1B1B1F, { rz:Math.PI/2, ao:0.2 });
+  put(L, BOX, 0, 0.95, 0, 0.14, 0.12, 2.1, 0x2E3446, { ao:0.2 });
+  put(L, BOX, 0, 1.25, -0.5, 0.12, 0.7, 0.12, 0x2E3446, { ao:0.2, rx:0.3 });
+  put(L, CYL, 0, 1.9, -0.1, 0.5, 1.1, 0.5, 0x4FBF87, { ao:0.3, rx:0.35 });
+  put(L, ICO, 0, 2.6, -0.35, 0.62, 0.66, 0.62, 0xF2C14E, { ao:0.15 });
+  putFlat(L, 0, 0.04, 0, 1.8, 2.6, 0x1A1A1E);
+  return mergeList(L);
+}
+function geoGantry(){
+  const L = [];
+  for (const s of [-1, 1]){
+    put(L, BOX, s * 10.4, 3.2, 0, 0.5, 6.4, 0.5, 0xE4E2DA, { ao:0.5, aoH:6.4, y0:0 });
+    put(L, BOX, s * 10.4, 0.25, 0, 1.4, 0.5, 1.4, 0xB8B6AE, { ao:0.3 });
+  }
+  put(L, BOX, 0, 6.6, 0, 21.4, 0.6, 0.6, 0xE4E2DA, { ao:0.1 });
+  put(L, BOX, 0, 5.55, 0, 20.6, 1.7, 0.16, 0xE85D4A, { ao:0.1, overhang:true });
+  return mergeList(L);
+}
+
+// mile-number plates for the gantries, baked once at boot
+const MILE_TEX = [];
+(function bakeMileText(){
+  for (let mi = 1; mi <= 26; mi++){
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = 128;
+    const g = c.getContext('2d');
+    g.clearRect(0, 0, 256, 128);
+    g.font = 'bold 92px -apple-system, "SF Pro Display", Helvetica, sans-serif';
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = '#FFF6E4';
+    g.fillText('MILE ' + mi, 128, 68);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    MILE_TEX.push(t);
+  }
+})();
+
+const OBGEO = {};
+function buildCourseGeometry(){
+  OBGEO[T.POTHOLE]  = geoPothole();
+  OBGEO[T.CONE]     = geoCone();
+  OBGEO[T.SAWHORSE] = geoSawhorse();
+  OBGEO[T.CAR]      = geoCar();
+  OBGEO[T.SCAFFOLD] = geoScaffold();
+  OBGEO[T.CYCLIST]  = geoCyclist();
+  OBGEO[T.GANTRY]   = geoGantry();
+}
+buildCourseGeometry();
+
+/* ------------------------------- pickups --------------------------------- */
+/* One visual grammar for all three: emissive body + soft glow sprite, and on
+   collection a ring shockwave, a particle burst and a chime. */
+
+const glowTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d');
+  const rad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  rad.addColorStop(0, 'rgba(255,255,255,1)');
+  rad.addColorStop(0.35, 'rgba(255,240,200,0.55)');
+  rad.addColorStop(1, 'rgba(255,220,160,0)');
+  g.fillStyle = rad; g.fillRect(0, 0, 64, 64);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+})();
+
+function pickupMesh(type){
+  const g = new THREE.Group();
+  let color, geo;
+  if (type === T.WATER){
+    color = 0x7FD8F5;
+    geo = new THREE.CylinderGeometry(0.34, 0.24, 0.62, 8, 1, true);
+  } else if (type === T.BANANA){
+    color = 0xFFD84D;
+    geo = new THREE.CapsuleGeometry(0.2, 0.62, 3, 6);
+  } else {
+    color = 0xFFC24A;
+    geo = new THREE.BoxGeometry(0.5, 0.66, 0.16);
+  }
+  const mat = new THREE.MeshStandardMaterial({
+    color, emissive:color, emissiveIntensity:type === T.GEL ? 1.5 : 0.85,
+    roughness:0.4, flatShading:true, side:THREE.DoubleSide,
+  });
+  const m = new THREE.Mesh(geo, mat);
+  m.position.y = 1.5;
+  if (type === T.BANANA) m.rotation.z = 0.9;
+  g.add(m);
+  if (type === T.WATER){
+    const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.08, 8),
+      new THREE.MeshStandardMaterial({ color:0xFFFFFF, emissive:0xBFE9F8, emissiveIntensity:0.5, flatShading:true }));
+    lid.position.y = 1.8; g.add(lid);
+  }
+  const spr = new THREE.Sprite(new THREE.SpriteMaterial({
+    map:glowTex, color, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, opacity:0.75 }));
+  spr.scale.setScalar(type === T.GEL ? 3.4 : 2.5);
+  spr.position.y = 1.5;
+  g.add(spr);
+  g.userData.core = m; g.userData.glow = spr;
+  return g;
+}
+
+/* ----------------------------- object pools ------------------------------ */
+
+class Pool {
+  constructor(make, n){
+    this.items = [];
+    for (let i = 0; i < n; i++){ const o = make(i); o.visible = false; scene.add(o); this.items.push(o); }
+    this.next = 0;
+  }
+  get(){
+    for (let i = 0; i < this.items.length; i++){
+      const o = this.items[(this.next + i) % this.items.length];
+      if (!o.visible){ this.next = (this.next + i + 1) % this.items.length; o.visible = true; return o; }
+    }
+    return null;
+  }
+}
+const solidPool = (type, n, shadow = true) => new Pool(() => {
+  const m = new THREE.Mesh(OBGEO[type], MAT_SOLID);
+  m.castShadow = shadow; m.receiveShadow = false;
+  return m;
+}, n);
+
+const POOLS = {
+  [T.POTHOLE] : solidPool(T.POTHOLE, 10, false),
+  [T.CONE]    : solidPool(T.CONE, 16),
+  [T.SAWHORSE]: solidPool(T.SAWHORSE, 10),
+  [T.CAR]     : solidPool(T.CAR, 6),
+  [T.SCAFFOLD]: solidPool(T.SCAFFOLD, 6),
+  [T.CYCLIST] : solidPool(T.CYCLIST, 5),
+  [T.GANTRY]  : new Pool(() => {
+    const g = new THREE.Group();
+    const post = new THREE.Mesh(OBGEO[T.GANTRY], MAT_SOLID);
+    post.castShadow = true;
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 1.7),
+      new THREE.MeshBasicMaterial({ transparent:true, toneMapped:false }));
+    sign.position.set(0, 5.55, 0.12);
+    g.add(post, sign);
+    g.userData.sign = sign;
+    return g;
+  }, 4),
+  [T.WATER]   : new Pool(() => pickupMesh(T.WATER), 18),
+  [T.BANANA]  : new Pool(() => pickupMesh(T.BANANA), 14),
+  [T.GEL]     : new Pool(() => pickupMesh(T.GEL), 4),
+};
+
+// cyclist telegraph: a dark warning shadow on the road 1.2s before the crossing
+const warnPool = new Pool(() => {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 5.2),
+    new THREE.MeshBasicMaterial({ color:0x10101a, transparent:true, opacity:0, depthWrite:false }));
+  m.rotation.x = -Math.PI / 2;
+  return m;
+}, 5);
+
+// finish line: tape + gantry
+const finishGroup = new THREE.Group();
+{
+  const L = [];
+  for (const s of [-1, 1]){
+    put(L, BOX, s * 11.2, 4.0, 0, 0.7, 8.0, 0.7, 0xF2F0E8, { ao:0.5, aoH:8, y0:0 });
+    put(L, BOX, s * 11.2, 0.3, 0, 1.8, 0.6, 1.8, 0xC8C6BE, { ao:0.3 });
+  }
+  put(L, BOX, 0, 8.3, 0, 23.4, 0.8, 0.8, 0xF2F0E8, { ao:0.1 });
+  put(L, BOX, 0, 6.9, 0, 22.4, 2.4, 0.18, 0xE85D4A, { ao:0.1, overhang:true });
+  put(L, BOX, 0, 6.9, 0.12, 18.0, 1.1, 0.06, 0xFFF3D8, { ao:0.05, overhang:true });
+  for (let i = -6; i <= 6; i++)
+    putFlat(L, i * 1.35, 0.03, 0, 1.3, 3.0, i % 2 ? 0x1A1A1E : 0xF4F1E8);
+  finishGroup.add(new THREE.Mesh(mergeList(L), MAT_SOLID));
+}
+const finishTape = new THREE.Mesh(new THREE.PlaneGeometry(18, 0.34),
+  new THREE.MeshStandardMaterial({ color:0xFFFFFF, emissive:0xFFE6B0, emissiveIntensity:0.6, side:THREE.DoubleSide }));
+finishTape.position.y = 2.4;
+finishGroup.add(finishTape);
+finishGroup.visible = false;
+scene.add(finishGroup);
+
+/* -------------------------- COURSE GENERATION ---------------------------- */
+/* Never scattered: each chunk draws one deliberate pattern from its chapter's
+   palette, and aid stations are placed to require a light weave. */
+
+const COURSE = [];
+function addObj(s, type, lane, extra){
+  const sp = SPEC[type];
+  const o = {
+    s, type, lane,
+    x: extra && extra.x !== undefined ? extra.x : LANE_X[lane],
+    w: sp.w, half: sp.half, jump: sp.jump, mode: sp.mode,
+    dir: extra && extra.dir || 1, n: extra && extra.n || 0,
+    done:false, obj:null, warn:null, t:0,
+  };
+  COURSE.push(o);
+  return o;
+}
+
+const P = {
+  pothole(rng, s0){
+    const lane = (rng() * 3) | 0;
+    addObj(s0 + 26, T.POTHOLE, lane);
+  },
+  car(rng, s0){
+    const left = rng() < 0.5;
+    // spans two lanes: sits between lane 0-1 or 1-2, leaving exactly one open
+    addObj(s0 + 28, T.CAR, left ? 0 : 2, { x:(LANE_X[left ? 0 : 1] + LANE_X[left ? 1 : 2]) / 2 });
+  },
+  sawhorse(rng, s0){
+    const lane = (rng() * 3) | 0;
+    addObj(s0 + 26, T.SAWHORSE, lane);
+    if (rng() < 0.4){
+      const other = lane === 1 ? (rng() < 0.5 ? 0 : 2) : 1;
+      addObj(s0 + 26, T.SAWHORSE, other);
+    }
+  },
+  scaffold(rng, s0){ addObj(s0 + 28, T.SCAFFOLD, 1); },
+  slalom(rng, s0){
+    const a = (rng() * 3) | 0;
+    const b = a === 1 ? (rng() < 0.5 ? 0 : 2) : 1;
+    addObj(s0 + 16, T.CONE, a);
+    addObj(s0 + 19, T.CONE, a);
+    addObj(s0 + 40, T.CONE, b);
+    addObj(s0 + 43, T.CONE, b);
+  },
+  cyclist(rng, s0){
+    const lane = (rng() * 3) | 0;
+    addObj(s0 + 30, T.CYCLIST, lane, { dir: rng() < 0.5 ? -1 : 1 });
+  },
+};
+const PALETTE = [
+  ['pothole', 'sawhorse', 'slalom', 'pothole'],                                  // PARK
+  ['car', 'scaffold', 'cyclist', 'slalom', 'pothole', 'car', 'scaffold'],        // URBAN
+  ['slalom', 'sawhorse', 'scaffold', 'pothole', 'slalom'],                       // BRIDGE
+  ['pothole', 'sawhorse', 'car', 'slalom', 'pothole'],                           // HILLS
+  ['slalom', 'sawhorse', 'pothole', 'slalom'],                                   // FINISH
+];
+// chance a chunk is left empty, so the course breathes early and bites later
+const REST = [0.42, 0.14, 0.22, 0.20, 0.28];
+
+function generateCourse(){
+  COURSE.length = 0;
+  const rng = mulberry32(DAILY_SEED ^ 0xC0FFEE);
+
+  for (let i = 0; i < CHUNK_COUNT; i++){
+    const s0 = i * CHUNK_LEN;
+    if (s0 < 180 || s0 > COURSE_LENGTH - 120) continue;   // clean start & finish
+    const ch = chapterAtS(s0 + CHUNK_LEN / 2);
+    if (rng() < REST[ch]) continue;
+    P[pick(rng, PALETTE[ch])](rng, s0);
+    // the canyon occasionally doubles up
+    if (ch === URBAN && rng() < 0.22) P[pick(rng, ['pothole', 'slalom'])](rng, s0 + 4);
+  }
+
+  // aid stations: one cluster per mile, always offset so a straight line misses
+  for (let mi = 1; mi <= 25; mi++){
+    const s0 = mi * WORLD_UNITS_PER_MILE - 120;
+    let lane = (rng() * 3) | 0;
+    const n = 3 + ((rng() * 3) | 0);
+    for (let k = 0; k < n; k++){
+      const type = rng() < 0.42 ? T.BANANA : T.WATER;
+      addObj(s0 + k * 15, type, lane);
+      lane = lane === 0 ? 1 : lane === 2 ? 1 : (rng() < 0.5 ? 0 : 2);   // forces a weave
+    }
+  }
+  // small mid-mile clusters
+  for (let mi = 0; mi < 26; mi++){
+    if (rng() < 0.55){
+      const s0 = (mi + 0.55) * WORLD_UNITS_PER_MILE;
+      const lane = (rng() * 3) | 0;
+      for (let k = 0; k < 3; k++) addObj(s0 + k * 12, rng() < 0.5 ? T.WATER : T.BANANA, lane);
+    }
+  }
+  // energy gel: 15% chance per chapter
+  for (let ch = 0; ch < CHAPTERS.length; ch++){
+    if (rng() < 0.15){
+      const c = CHAPTERS[ch];
+      const s = rr(rng, c.start + 0.3, c.end - 0.3) * WORLD_UNITS_PER_MILE;
+      addObj(s, T.GEL, (rng() * 3) | 0);
+    }
+  }
+  // mile gantries
+  for (let mi = 1; mi <= 26; mi++) addObj(mi * WORLD_UNITS_PER_MILE, T.GANTRY, 1, { n:mi });
+
+  COURSE.sort((a, b) => a.s - b.s);
+}
+generateCourse();
+
+/* ------------------------- spawn / despawn / collide --------------------- */
+
+const live = [];
+let nextSpawn = 0;
+const _op = new THREE.Vector3();
+
+function spawn(o){
+  const pool = POOLS[o.type];
+  if (!pool) return;
+  const m = pool.get();
+  if (!m) return;
+  o.obj = m;
+  const f = courseToWorld(o.s, o.x, 0, _op);
+  m.position.copy(_op);
+  m.rotation.set(f.pitch, f.yaw, 0, 'YXZ');
+  if (o.type === T.GANTRY && m.userData.sign){
+    const tex = MILE_TEX[clamp(o.n - 1, 0, MILE_TEX.length - 1)];
+    m.userData.sign.material.map = tex;
+    m.userData.sign.material.needsUpdate = true;
+  }
+  live.push(o);
+}
+function despawn(o){
+  if (o.obj){ o.obj.visible = false; o.obj = null; }
+  if (o.warn){ o.warn.visible = false; o.warn.material.opacity = 0; o.warn = null; }
+}
+function resetCourseObjects(){
+  for (const o of live) despawn(o);
+  live.length = 0;
+  for (const o of COURSE){ o.done = false; o.t = 0; }
+  nextSpawn = 0;
+  finishGroup.visible = false;
+  courseToWorld(COURSE_LENGTH, 0, 0, _op);
+  finishGroup.position.copy(_op);
+  const ff = courseFrame(COURSE_LENGTH);
+  finishGroup.rotation.set(ff.pitch, ff.yaw, 0, 'YXZ');
+}
+
+function updateCourseObjects(dt){
+  while (nextSpawn < COURSE.length && COURSE[nextSpawn].s < S.s + SPAWN_AHEAD)
+    spawn(COURSE[nextSpawn++]);
+
+  const v = worldSpeed();
+  const px = laneXNow();                     // lateral position, mid-slide included
+  const low = isLow();                       // duck: hitbox height halved
+  const airborne = isAirborne();
+
+  for (let i = live.length - 1; i >= 0; i--){
+    const o = live[i];
+    const ds = o.s - S.s;
+    if (ds < -60){ despawn(o); live.splice(i, 1); continue; }
+
+    if (o.type === T.CYCLIST){
+      // telegraphs 1.2s out, then crosses so it reaches its lane exactly as the
+      // player arrives — dodge by being anywhere else
+      const tta = ds / v;
+      const u = clamp(0.5 - tta / CROSS_DUR, 0, 1);
+      const x = lerp(LANE_X[o.lane] - 11 * o.dir, LANE_X[o.lane] + 11 * o.dir, u);
+      const f = courseToWorld(o.s, x, 0, _op);
+      o.obj.position.copy(_op);
+      o.obj.rotation.set(f.pitch, f.yaw + o.dir * Math.PI * 0.5, 0, 'YXZ');
+      if (!o.warn && tta < TELEGRAPH && tta > -0.4){
+        o.warn = warnPool.get();
+        if (o.warn){
+          courseToWorld(o.s, LANE_X[o.lane], 0.06, _op);
+          o.warn.position.copy(_op);
+          o.warn.rotation.set(-Math.PI / 2, f.yaw, 0, 'YXZ');
+        }
+      }
+      if (o.warn){
+        const k = clamp(1 - Math.abs(tta) / TELEGRAPH, 0, 1);
+        o.warn.material.opacity = k * (0.35 + 0.25 * Math.sin(performance.now() * 0.02));
+      }
+      o.x = x;
+    }
+    else if (o.mode === 'pickup'){
+      const m = o.obj.userData.core, g = o.obj.userData.glow;
+      o.t += dt;
+      m.rotation.y += dt * 2.2;
+      m.position.y = 1.5 + Math.sin(o.t * 3.4) * 0.14;
+      g.position.y = m.position.y;
+      const pulse = 0.62 + 0.32 * Math.sin(o.t * 5.5);
+      g.material.opacity = pulse;
+      m.material.emissiveIntensity = (o.type === T.GEL ? 1.3 : 0.7) + pulse * 0.5;
+    }
+
+    if (o.done || o.mode === 'decor'){ continue; }
+
+    // --- analytic collision / collection, no raycasts ---
+    if (Math.abs(ds) < o.half + 1.3){
+      if (o.mode === 'pickup'){
+        if (Math.abs(px - o.x) < PICKUP_RADIUS){
+          collect(o);
+          o.done = true;
+          // return the mesh immediately so a collected cup can't keep bobbing
+          despawn(o); live.splice(i, 1); continue;
+        }
+      } else {
+        const overlap = Math.abs(px - o.x) < o.w * 0.5 + 0.75;
+        if (overlap){
+          const cleared = o.mode === 'over' ? (low && !airborne)
+                                            : (o.jump && airborne);
+          if (!cleared){ stumble(o); o.done = true; }
+        }
+      }
+    }
+    // resolved cleanly once it is fully behind the runner
+    if (!o.done && ds < -(o.half + 1.3)){
+      o.done = true;
+      if (o.mode !== 'pickup') cleanPass();
+    }
+  }
+
+  // finish line becomes visible in the distance down the finish straight
+  if (!finishGroup.visible && COURSE_LENGTH - S.s < SPAWN_AHEAD * 1.6) finishGroup.visible = true;
+  if (finishGroup.visible) finishTape.material.emissiveIntensity = 0.5 + 0.35 * Math.sin(performance.now() * 0.004);
+}
+
+function cleanPass(){
+  S.combo = Math.floor(S.combo) + 1;
+  S.comboTimer = COMBO_GRACE;
+  if (S.combo > S.bestCombo) S.bestCombo = S.combo;
+  sfxClean(S.combo);
+}
+function stumble(o){
+  if (S.gel){                       // gel absorbs one hit instead of the penalty
+    S.gel = false;
+    ringBurst(o.x, 1.6, 0xFFC24A, 9);
+    sfxShield();
+    return;
+  }
+  S.hits++;
+  S.penalty += STUMBLE_PENALTY_SEC;
+  S.combo = 0; S.comboTimer = 0;
+  S.stumbleT = STUMBLE_MS / 1000;
+  S.pace = Math.min(PACE_BASE * 1.3, S.pace * 1.07);
+  camDip = 1.25;
+  burst(o.x, 0.4, 12, 0x8A7C6A, 0.26, 0.55);
+  sfxThud();
+}
+function collect(o){
+  if (o.type === T.WATER){
+    S.boostMul = Math.max(S.boostMul, 1.06); S.boostT = Math.max(S.boostT, 2.0);
+    S.fatigue = 0;
+    burst(o.x, 1.5, 14, 0x9FE4F8, 0.30, 0.60);
+    sfxSplash();
+  } else if (o.type === T.BANANA){
+    S.boostMul = Math.max(S.boostMul, 1.10); S.boostT = Math.max(S.boostT, 3.0);
+    S.fatigue = Math.max(0, S.fatigue - 0.35);
+    burst(o.x, 1.5, 12, 0xFFE27A, 0.28, 0.55);
+  } else {
+    S.gel = true;
+    burst(o.x, 1.5, 16, 0xFFC24A, 0.32, 0.65);
+  }
+  ringBurst(o.x, 1.5, o.type === T.WATER ? 0x9FE4F8 : o.type === T.BANANA ? 0xFFE27A : 0xFFC24A, 5);
+  sfxChime(S.combo);
+  camLift = 0.35;
+}
+
+/* ========================================================================== */
+/*  PARTICLES: dust trail, splashes, confetti — one pooled system             */
+/* ========================================================================== */
+
+const PMAX = 340;
+const pPos = new Float32Array(PMAX * 3);
+const pCol = new Float32Array(PMAX * 3);
+const pSize = new Float32Array(PMAX);
+const pAlpha = new Float32Array(PMAX);
+const pVel = new Float32Array(PMAX * 3);
+const pLife = new Float32Array(PMAX);
+const pMax = new Float32Array(PMAX);
+const pGrav = new Float32Array(PMAX);
+const pPeak = new Float32Array(PMAX);   // peak opacity, per particle
+let pHead = 0;
+
+const pGeo = new THREE.BufferGeometry();
+pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+pGeo.setAttribute('color', new THREE.BufferAttribute(pCol, 3));
+pGeo.setAttribute('psize', new THREE.BufferAttribute(pSize, 1));
+pGeo.setAttribute('palpha', new THREE.BufferAttribute(pAlpha, 1));
+pGeo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e6);
+const pMat = new THREE.ShaderMaterial({
+  transparent:true, depthWrite:false, blending:THREE.NormalBlending,
+  uniforms:{ uMap:{ value:glowTex }, uScale:{ value:innerHeight * PR * 0.5 } },
+  vertexShader:`
+    attribute float psize; attribute float palpha;
+    varying vec3 vC; varying float vA; uniform float uScale;
+    void main(){
+      vC = color; vA = palpha;
+      vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      float depth = -mv.z;
+      // the world scrolls past fast enough that spent particles sweep through
+      // the camera; clamp the sprite and cull it before it fills the screen
+      gl_PointSize = min(psize * uScale / max(0.001, depth), 110.0);
+      gl_Position = depth < 2.0 ? vec4(2.0, 2.0, 2.0, 1.0) : projectionMatrix * mv;
+    }`,
+  fragmentShader:`
+    uniform sampler2D uMap; varying vec3 vC; varying float vA;
+    void main(){
+      vec4 t = texture2D(uMap, gl_PointCoord);
+      if (t.a * vA < 0.01) discard;
+      gl_FragColor = vec4(vC * t.rgb, t.a * vA);
+    }`,
+  vertexColors:true,
+});
+const points = new THREE.Points(pGeo, pMat);
+points.frustumCulled = false;
+scene.add(points);
+
+const _pc = new THREE.Color();
+function emit(x, y, z, vx, vy, vz, color, size, life, grav, peak){
+  const i = pHead; pHead = (pHead + 1) % PMAX;
+  pPos[i*3] = x; pPos[i*3+1] = y; pPos[i*3+2] = z;
+  pVel[i*3] = vx; pVel[i*3+1] = vy; pVel[i*3+2] = vz;
+  _pc.set(color);
+  pCol[i*3] = _pc.r; pCol[i*3+1] = _pc.g; pCol[i*3+2] = _pc.b;
+  pSize[i] = size; pLife[i] = life; pMax[i] = life; pGrav[i] = grav;
+  pPeak[i] = peak === undefined ? 1 : peak;
+  pAlpha[i] = pPeak[i];
+}
+// world-space burst at a course-relative lateral offset near the runner
+function burst(x, y, n, color, size, life){
+  courseToWorld(S.s, x, y, _op);
+  for (let i = 0; i < n; i++){
+    emit(_op.x, _op.y, _op.z,
+      rr(rngArt,-4,4), rr(rngArt,2,8), rr(rngArt,-4,4),
+      color, size * rr(rngArt,0.6,1.3), life * rr(rngArt,0.6,1.1), 14, 0.9);
+  }
+}
+function confetti(){
+  courseToWorld(S.s + 6, 0, 6, _op);
+  const cols = [0xE85D4A, 0xFFD84D, 0x4E8AD6, 0x7BE39B, 0xFFF3D8, 0xC97BD1];
+  for (let i = 0; i < 74; i++){
+    emit(_op.x + rr(rngArt,-9,9), _op.y + rr(rngArt,-1,4), _op.z + rr(rngArt,-4,4),
+      rr(rngArt,-7,7), rr(rngArt,3,13), rr(rngArt,-7,7),
+      cols[i % cols.length], rr(rngArt,0.32,0.6), 2.5, 9, 1);
+  }
+}
+
+let dustAcc = 0;
+function updateParticles(dt){
+  // dust / motion streaks off the feet, denser the faster you are moving
+  if (S.phase === 'running' && !isAirborne()){
+    const effort = clamp((PACE_BASE - S.pace) / (PACE_BASE - PACE_FLOOR), 0, 1);
+    dustAcc += dt * (12 + effort * 26);
+    while (dustAcc >= 1){
+      dustAcc -= 1;
+      courseToWorld(S.s - 1.2, laneXNow() + rr(rngArt,-0.4,0.4), 0.18, _op);
+      emit(_op.x, _op.y, _op.z, rr(rngArt,-1.2,1.2), rr(rngArt,0.6,2.4), rr(rngArt,-1,1),
+        0xC9B79C, 0.20 + effort * 0.14, 0.42 + effort * 0.25, 2.5, 0.34);
+    }
+  }
+  let anyAlive = false;
+  for (let i = 0; i < PMAX; i++){
+    if (pLife[i] <= 0){ if (pAlpha[i] !== 0) pAlpha[i] = 0; continue; }
+    anyAlive = true;
+    pLife[i] -= dt;
+    if (pLife[i] <= 0){ pAlpha[i] = 0; continue; }
+    pVel[i*3+1] -= pGrav[i] * dt;
+    pPos[i*3]   += pVel[i*3] * dt;
+    pPos[i*3+1] += pVel[i*3+1] * dt;
+    pPos[i*3+2] += pVel[i*3+2] * dt;
+    if (pPos[i*3+1] < 0.05){ pPos[i*3+1] = 0.05; pVel[i*3] *= 0.6; pVel[i*3+2] *= 0.6; pVel[i*3+1] *= -0.24; }
+    const k = pLife[i] / pMax[i];
+    pAlpha[i] = (k < 0.35 ? k / 0.35 : 1) * pPeak[i];
+  }
+  if (anyAlive){
+    pGeo.attributes.position.needsUpdate = true;
+    pGeo.attributes.color.needsUpdate = true;
+    pGeo.attributes.psize.needsUpdate = true;
+    pGeo.attributes.palpha.needsUpdate = true;
+  }
+}
+
+/* --------------------------- ring shockwaves ----------------------------- */
+
+const rings = [];
+const ringPool = new Pool(() => {
+  const m = new THREE.Mesh(new THREE.RingGeometry(0.7, 0.86, 24),
+    new THREE.MeshBasicMaterial({ color:0xffffff, transparent:true, opacity:0,
+      blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide }));
+  return m;
+}, 10);
+function ringBurst(x, y, color, speed){
+  const m = ringPool.get();
+  if (!m) return;
+  courseToWorld(S.s, x, y, _op);
+  m.position.copy(_op);
+  m.quaternion.copy(camera.quaternion);
+  m.material.color.set(color);
+  m.material.opacity = 0.95;
+  m.scale.setScalar(0.4);
+  rings.push({ m, t:0, speed });
+}
+function updateRings(dt){
+  for (let i = rings.length - 1; i >= 0; i--){
+    const r = rings[i];
+    r.t += dt;
+    r.m.scale.setScalar(0.4 + r.t * r.speed);
+    r.m.material.opacity = Math.max(0, 0.95 - r.t * 2.6);
+    r.m.quaternion.copy(camera.quaternion);
+    if (r.t > 0.4){ r.m.visible = false; rings.splice(i, 1); }
+  }
+}
+
+function updateEffects(dt){ updateParticles(dt); updateRings(dt); }
+
+/* ========================================================================== */
+/*  PROCEDURAL AUDIO — one context, no files                                  */
+/* ========================================================================== */
+
+let AC = null, master = null, noiseBuf = null, crowdGain = null, crowdSrc = null;
+
+function audioUnlock(){
+  if (AC){ if (AC.state === 'suspended') AC.resume(); return; }
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return;
+  AC = new Ctx();
+
+  master = AC.createGain();
+  master.gain.value = 0.9;
+  const comp = AC.createDynamicsCompressor();
+  comp.threshold.value = -12; comp.ratio.value = 4; comp.knee.value = 18;
+  master.connect(comp); comp.connect(AC.destination);
+
+  // 2s of white noise, reused by every noise-based voice
+  noiseBuf = AC.createBuffer(1, AC.sampleRate * 2, AC.sampleRate);
+  const d = noiseBuf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+
+  // crowd murmur bed: filtered noise, gain driven by crowd density each frame
+  crowdSrc = AC.createBufferSource();
+  crowdSrc.buffer = noiseBuf; crowdSrc.loop = true;
+  const lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 620; lp.Q.value = 0.6;
+  const bp = AC.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 340; bp.Q.value = 0.4;
+  crowdGain = AC.createGain(); crowdGain.gain.value = 0;
+  crowdSrc.connect(lp); lp.connect(bp); bp.connect(crowdGain); crowdGain.connect(master);
+  crowdSrc.start();
+}
+const now = () => AC.currentTime;
+
+function noiseVoice(dur, type, f0, f1, q, gain, pan){
+  if (!AC) return;
+  const t = now();
+  const src = AC.createBufferSource();
+  src.buffer = noiseBuf;
+  src.playbackRate.value = 0.8 + Math.random() * 0.4;
+  const flt = AC.createBiquadFilter();
+  flt.type = type; flt.Q.value = q;
+  flt.frequency.setValueAtTime(f0, t);
+  flt.frequency.exponentialRampToValueAtTime(Math.max(40, f1), t + dur);
+  const g = AC.createGain();
+  g.gain.setValueAtTime(gain, t);
+  g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+  src.connect(flt); flt.connect(g);
+  if (pan !== undefined && AC.createStereoPanner){
+    const p = AC.createStereoPanner(); p.pan.value = pan;
+    g.connect(p); p.connect(master);
+  } else g.connect(master);
+  src.start(t); src.stop(t + dur + 0.02);
+}
+function toneVoice(freq, dur, type, gain, detune, pan){
+  if (!AC) return;
+  const t = now();
+  const o = AC.createOscillator();
+  o.type = type || 'triangle';
+  o.frequency.setValueAtTime(freq, t);
+  if (detune) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq * detune), t + dur);
+  const g = AC.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(gain, t + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g);
+  if (pan !== undefined && AC.createStereoPanner){
+    const p = AC.createStereoPanner(); p.pan.value = pan;
+    g.connect(p); p.connect(master);
+  } else g.connect(master);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+
+const PENTA = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21];
+function sfxChime(combo){
+  if (!AC) return;
+  const step = PENTA[Math.min(PENTA.length - 1, Math.floor(combo / 2))];
+  const f = 660 * Math.pow(2, step / 12);
+  toneVoice(f, 0.30, 'triangle', 0.20);
+  toneVoice(f * 2, 0.18, 'sine', 0.09);
+}
+function sfxSplash(){ noiseVoice(0.24, 'bandpass', 900, 3200, 1.4, 0.16); }
+function sfxJump(){ noiseVoice(0.16, 'highpass', 500, 2400, 0.8, 0.075); }
+function sfxThud(){
+  // a stumble, not a failure: soft and low, no harsh transient
+  toneVoice(96, 0.26, 'sine', 0.30, 0.45);
+  noiseVoice(0.20, 'lowpass', 420, 140, 0.7, 0.13);
+}
+function sfxShield(){ toneVoice(880, 0.34, 'triangle', 0.18, 1.5); toneVoice(1320, 0.22, 'sine', 0.09); }
+function sfxClean(combo){
+  if (combo % 5 !== 0) return;
+  toneVoice(520 * Math.pow(2, Math.min(4, combo / 10)), 0.10, 'sine', 0.045);
+}
+function sfxMile(){
+  toneVoice(784, 0.42, 'triangle', 0.16);
+  setTimeout(() => toneVoice(1046, 0.5, 'triangle', 0.13), 130);
+}
+function sfxFinish(){
+  if (!AC) return;
+  const t = now();
+  // air horn: three detuned saws through a lowpass
+  for (const [f, det] of [[233, 1], [235.5, 1], [349, 1]]){
+    const o = AC.createOscillator();
+    o.type = 'sawtooth'; o.frequency.value = f * det;
+    const lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1800;
+    const g = AC.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.16, t + 0.06);
+    g.gain.setValueAtTime(0.16, t + 1.0);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.7);
+    o.connect(lp); lp.connect(g); g.connect(master);
+    o.start(t); o.stop(t + 1.8);
+  }
+  // cheer swell
+  const src = AC.createBufferSource();
+  src.buffer = noiseBuf; src.loop = true;
+  const bp = AC.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 0.5;
+  bp.frequency.setValueAtTime(500, t);
+  bp.frequency.exponentialRampToValueAtTime(1500, t + 0.9);
+  const g = AC.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.30, t + 0.5);
+  g.gain.setValueAtTime(0.30, t + 1.6);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 3.0);
+  src.connect(bp); bp.connect(g); g.connect(master);
+  src.start(t); src.stop(t + 3.1);
+}
+
+// footsteps ride the gait cycle so the rhythm always matches the legs
+let lastFootIndex = 0;
+function updateAudio(dt){
+  if (!AC) return;
+  const idx = Math.floor(gaitPhase / Math.PI);
+  if (idx !== lastFootIndex && S.phase === 'running' && !isAirborne()){
+    lastFootIndex = idx;
+    const pan = (idx % 2) ? 0.3 : -0.3;
+    const effort = clamp((PACE_BASE - S.pace) / (PACE_BASE - PACE_FLOOR), 0, 1);
+    noiseVoice(0.075, 'bandpass', 1500 + effort * 600, 700, 1.3, 0.055 + effort * 0.035, pan);
+  } else if (idx !== lastFootIndex) lastFootIndex = idx;
+
+  // crowd swells near mile markers and maxes at the finish
+  const frac = Math.abs(S.mile - Math.round(S.mile));
+  const nearMile = 1 - smoothstep(0.04, 0.22, frac);
+  const finishRamp = smoothstep(23.5, 26.2, S.mile);
+  const chCrowd = CHAPTERS[chapterAtMile(S.mile)].crowd;
+  const target = S.phase === 'menu' ? 0.05
+    : clamp(0.055 * chCrowd + nearMile * 0.10 + finishRamp * 0.34, 0, 0.5);
+  crowdAcc += dt;
+  if (crowdAcc > 0.15){ crowdAcc = 0; crowdGain.gain.setTargetAtTime(target, now(), 0.4); }
+}
+let crowdAcc = 0;
+
+/* ========================================================================== */
+/*  POST-PROCESSING                                                           */
+/* ========================================================================== */
+
+const composer = new EffectComposer(renderer);
+composer.setPixelRatio(PR);
+composer.setSize(innerWidth, innerHeight);
+
+const renderPass = new RenderPass(scene, camera);
+composer.addPass(renderPass);
+
+// daytime scene: threshold sits high so only the sun, glows and paint bloom
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.62, 0.62, 0.85);
+composer.addPass(bloomPass);
+
+/* -- radial + directional motion blur, scaling with pace ------------------ */
+class MotionBlurPass extends Pass {
+  constructor(){
+    super();
+    this.uniforms = {
+      tDiffuse:{ value:null },
+      uStrength:{ value:0 },
+      uCenter:{ value:new THREE.Vector2(0.5, 0.5) },
+      uDir:{ value:new THREE.Vector2(0, 0) },
+    };
+    this.material = new THREE.ShaderMaterial({
+      uniforms:this.uniforms,
+      vertexShader:`varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+      fragmentShader:`
+        uniform sampler2D tDiffuse; uniform float uStrength;
+        uniform vec2 uCenter; uniform vec2 uDir; varying vec2 vUv;
+        void main(){
+          vec2 toC = vUv - uCenter;
+          // keep the runner readable: blur ramps up away from screen centre
+          float mask = smoothstep(0.06, 0.46, length(toC));
+          float amt = uStrength * mask;
+          if (amt < 0.0006){ gl_FragColor = texture2D(tDiffuse, vUv); return; }
+          vec4 sum = vec4(0.0); float w = 0.0;
+          for (int i = 0; i < 8; i++){
+            float f = float(i) / 7.0;
+            vec2 off = toC * amt * f + uDir * amt * f * 0.6;
+            float wi = 1.0 - f * 0.65;
+            sum += texture2D(tDiffuse, vUv - off) * wi; w += wi;
+          }
+          gl_FragColor = sum / w;
+        }`,
+    });
+    this.fsQuad = new FullScreenQuad(this.material);
+  }
+  render(renderer, writeBuffer, readBuffer){
+    this.uniforms.tDiffuse.value = readBuffer.texture;
+    if (this.renderToScreen){ renderer.setRenderTarget(null); }
+    else { renderer.setRenderTarget(writeBuffer); if (this.clear) renderer.clear(); }
+    this.fsQuad.render(renderer);
+  }
+  dispose(){ this.material.dispose(); this.fsQuad.dispose(); }
+}
+const blurPass = new MotionBlurPass();
+composer.addPass(blurPass);
+
+/* -- warm grade + vignette + film grain ----------------------------------- */
+const GradeShader = {
+  uniforms:{
+    tDiffuse:{ value:null },
+    uTime:{ value:0 },
+    uGrain:{ value:0.035 },
+    uVig:{ value:1.0 },
+    uTint:{ value:new THREE.Vector3(1, 1, 1) },
+    uWarm:{ value:0 },
+  },
+  vertexShader:`varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+  fragmentShader:`
+    uniform sampler2D tDiffuse; uniform float uTime, uGrain, uVig, uWarm;
+    uniform vec3 uTint; varying vec2 vUv;
+    float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    void main(){
+      vec4 c = texture2D(tDiffuse, vUv);
+      c.rgb *= uTint;
+      // gentle golden lift in the shadows, strongest through the finish
+      c.rgb += vec3(0.045, 0.022, -0.012) * uWarm * (1.0 - smoothstep(0.0, 0.75, dot(c.rgb, vec3(0.33))));
+      vec2 d = vUv - 0.5;
+      float vig = 1.0 - uVig * dot(d, d) * 0.95;
+      c.rgb *= clamp(vig, 0.0, 1.0);
+      float g = hash(vUv * 900.0 + fract(uTime) * 91.0) - 0.5;
+      float luma = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
+      c.rgb += g * uGrain * (0.3 + 0.7 * smoothstep(0.0, 0.5, luma));
+      gl_FragColor = c;
+    }`,
+};
+const gradePass = new ShaderPass(GradeShader);
+composer.addPass(gradePass);
+
+const smaaPass = new SMAAPass(innerWidth * PR, innerHeight * PR);
+composer.addPass(smaaPass);
+composer.addPass(new OutputPass());   // ACES tonemap + sRGB
+
+/* ------------------------- per-frame grade blending ---------------------- */
+
+const _gradeCur = new THREE.Color(1, 1, 1);
+const FOG_BASE = new THREE.Color(0xFFD5A2);
+const FOG_FINISH = new THREE.Color(0xFFC489);
+const _fogCur = new THREE.Color(0xFFD5A2);
+function updateGrade(dt){
+  const mi = S.mile;
+  const ch = chapterAtMile(mi);
+  const c = CHAPTERS[ch];
+  const k = 1 - Math.exp(-dt * 1.4);
+  _gradeCur.lerp(c.grade, k);
+  gradePass.uniforms.uTint.value.set(_gradeCur.r, _gradeCur.g, _gradeCur.b);
+  gradePass.uniforms.uVig.value = lerp(gradePass.uniforms.uVig.value, c.vig, k);
+  // warmth ramps through the hills and peaks on the finish straight
+  const warm = smoothstep(15, 22, mi) * 0.55 + smoothstep(22, 26.2, mi) * 0.45;
+  gradePass.uniforms.uWarm.value = lerp(gradePass.uniforms.uWarm.value, warm, k);
+  gradePass.uniforms.uTime.value += dt;
+  skyMat.uniforms.uWarm.value = lerp(skyMat.uniforms.uWarm.value, 1 + warm * 0.14, k);
+  _fogCur.lerpColors(FOG_BASE, FOG_FINISH, warm);
+  scene.fog.color.copy(_fogCur);
+  // haze thickens toward the skyline in the canyon, thins over open water
+  const dens = ch === URBAN ? 0.0021 : ch === BRIDGE ? 0.0012 : 0.0016;
+  scene.fog.density = lerp(scene.fog.density, dens, k);
+
+  const effort = clamp((PACE_BASE - S.pace) / (PACE_BASE - PACE_FLOOR), 0, 1);
+  const target = S.phase === 'running' ? Math.pow(effort, 1.6) * 0.11 + (S.stumbleT > 0 ? 0.05 : 0) : 0;
+  blurPass.uniforms.uStrength.value = lerp(blurPass.uniforms.uStrength.value, target, 1 - Math.exp(-dt * 5));
+  blurPass.uniforms.uDir.value.set((laneXNow() - camLateral) * 0.02, 0);
+  bloomPass.strength = quality.bloomStrength * (0.55 + effort * 0.18);
+}
+
+/* ========================================================================== */
+/*  ADAPTIVE QUALITY                                                          */
+/* ========================================================================== */
+
+quality = { level:0, bloomStrength:0.85, crowdMax:2, overT:0, underT:0 };
+const QUALITY_STEPS = [
+  () => {},                                                    // 0: everything on
+  () => { quality.bloomStrength = 0.45; bloomPass.radius = 0.4; },   // 1: cheaper bloom
+  () => { bloomPass.enabled = false; },                        // 2: bloom off
+  () => { blurPass.enabled = false; },                         // 3: motion blur off
+  () => { quality.crowdMax = 0; applyCrowdCap(); },            // 4: thin the crowds
+];
+const QUALITY_UNDO = [
+  () => {},
+  () => { quality.bloomStrength = 0.85; bloomPass.radius = 0.62; },
+  () => { bloomPass.enabled = true; },
+  () => { blurPass.enabled = true; },
+  () => { quality.crowdMax = 2; applyCrowdCap(); },
+];
+function applyCrowdCap(){
+  for (const c of chunks){
+    if (c.index < 0 || !c.crowdGeoms) continue;
+    c.crowdLevel = Math.min(c.crowdLevel, quality.crowdMax);
+    const g = c.crowdGeoms[c.crowdLevel];
+    if (g) c.crowd.geometry = g; else c.crowd.visible = false;
+  }
+}
+function adaptQuality(){
+  const dt = 1 / 60;
+  if (frameEMA > FRAME_BUDGET_MS){
+    quality.overT += dt; quality.underT = 0;
+    if (quality.overT > 1.2 && quality.level < QUALITY_STEPS.length - 1){
+      quality.overT = 0;
+      quality.level++;
+      QUALITY_STEPS[quality.level]();
+    }
+  } else if (frameEMA < 14.5){
+    quality.underT += dt; quality.overT = 0;
+    if (quality.underT > 8 && quality.level > 0){
+      quality.underT = 0;
+      QUALITY_UNDO[quality.level]();
+      quality.level--;
+    }
+  } else { quality.overT = 0; quality.underT = 0; }
+}
+
+function render(dt){
+  updateGrade(dt);
+  updateAudio(dt);
+  composer.render();
+}
+function onResize(){
+  // composer.setSize forwards device-pixel dimensions to every pass itself
+  composer.setSize(innerWidth, innerHeight);
+  pMat.uniforms.uScale.value = innerHeight * PR * 0.5;
+}
+
+/* -------------------------------- HUD ------------------------------------ */
+
+const el = id => document.getElementById(id);
+const UI = {
+  root:el('ui'), clock:el('clock'), pace:el('pace'), mile:el('mile'), chapter:el('chapter'),
+  gel:el('gel'), combo:el('combo'), comboN:el('comboN'),
+  flag:el('flag'), flagN:el('flagN'), split:el('split'),
+  menu:el('menu'), mDate:el('mDate'), mBest:el('mBest'),
+  tut:el('tut'), res:el('res'),
+};
+function fmtClock(sec){
+  sec = Math.max(0, Math.floor(sec));
+  const h = Math.floor(sec / 3600), m = Math.floor(sec / 60) % 60, s = sec % 60;
+  return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+function fmtPace(p){
+  const m = Math.floor(p), s = Math.round((p - m) * 60);
+  return s === 60 ? `${m+1}:00` : `${m}:${String(s).padStart(2,'0')}`;
+}
+
+let hudAcc = 0;
+function updateHUD(dt){
+  hudAcc += dt;
+  if (hudAcc < 0.06) return;
+  hudAcc = 0;
+  UI.clock.textContent = fmtClock(S.clock + S.penalty);
+  UI.pace.textContent  = fmtPace(S.pace) + ' /MI';
+  UI.mile.innerHTML    = `${S.mile.toFixed(2)}<small> / 26.2</small>`;
+  const ch = chapterAtMile(S.mile);
+  if (UI.chapter.textContent !== CHAPTERS[ch].name) UI.chapter.textContent = CHAPTERS[ch].name;
+  UI.comboN.textContent = Math.floor(S.combo);
+  UI.combo.classList.toggle('on', S.combo >= 3);
+  UI.gel.classList.toggle('on', S.gel);
+}
+
+/* ------------------------------ SCREENS ---------------------------------- */
+
+const LS = {
+  get(k, d){ try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+const K_TUT = 'mr_tut_v1', K_PLAYED = 'mr_played_v1', K_BEST = 'mr_best_v1',
+      K_TODAY = 'mr_today_' + DATE_KEY, K_SPLITS = 'mr_splits_v1';
+
+function showMenu(){
+  S.phase = 'menu';
+  UI.root.classList.remove('playing');
+  UI.res.classList.add('hidden');
+  const d = new Date();
+  UI.mDate.textContent = d.toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' }).toUpperCase();
+  const today = LS.get(K_TODAY, null), best = LS.get(K_BEST, null);
+  let html = '';
+  if (today) html += `TODAY'S BEST <b>${fmtClock(today)}</b><br>`;
+  if (best)  html += `<span style="opacity:.65">ALL-TIME <b>${fmtClock(best)}</b></span>`;
+  UI.mBest.innerHTML = html || `<span style="opacity:.6">FIRST RUN OF THE DAY</span>`;
+  UI.menu.classList.remove('hidden');
+}
+function showTutorial(){ S.phase = 'tutorial'; UI.tut.classList.remove('hidden'); }
+let lastTap = 0;
+function onTap(){
+  // touchend and the synthetic click both fire on mobile; take only the first
+  const t = performance.now();
+  if (t - lastTap < 400) return;
+  lastTap = t;
+  if (S.phase === 'tutorial'){ LS.set(K_TUT, 1); UI.tut.classList.add('hidden'); showMenu(); return; }
+  if (S.phase === 'menu'){ startRun(); return; }
+  if (S.phase === 'finished'){ UI.res.classList.add('hidden'); showMenu(); return; }
+}
+function startRun(){
+  UI.menu.classList.add('hidden');
+  UI.root.classList.add('playing');
+  resetRun();
+  S.phase = 'running';
+  LS.set(K_PLAYED, 1);
+  audioUnlock();
+}
+function resetRun(){
+  S.s = 0; S.lane = 1; S.laneFrom = 1; S.laneT = 1;
+  S.jumpT = 1; S.duckT = 1; S.duckHold = 0; S.stumbleT = 0;
+  S.pace = PACE_BASE; S.paceTarget = PACE_BASE;
+  S.combo = 0; S.comboTimer = 0; S.bestCombo = 0;
+  S.fatigue = 0; S.gel = false; S.hits = 0;
+  S.clock = 0; S.penalty = 0; S.boostMul = 1; S.boostT = 0;
+  S.mile = 0; S.lastMileMarked = 0; S.splits.length = 0; S.splitStart = 0;
+  input.queue.length = 0;
+  resetCourseObjects();
+  updateChunks(0);
+  updateCamera(0, true);
+}
+
+/* --------------------- MILE MARKERS, SPLITS, RESULTS --------------------- */
+
+function checkMileMarker(){
+  const m = Math.floor(S.mile);
+  if (m <= S.lastMileMarked || m < 1 || m > 26) return;
+  S.lastMileMarked = m;
+  const t = S.clock + S.penalty;
+  const split = t - S.splitStart;
+  S.splitStart = t;
+  S.splits.push(split);
+
+  const best = LS.get(K_SPLITS, []);
+  const prev = best[m - 1];
+  let cls = 'neutral', txt = fmtSplitDur(split);
+  if (typeof prev === 'number'){
+    const d = split - prev;
+    cls = d < 0 ? 'good' : 'bad';
+    txt = `${fmtSplitDur(split)}  ${d < 0 ? '−' : '+'}${Math.abs(d).toFixed(1)}s`;
+  }
+  if (typeof prev !== 'number' || split < prev){ best[m - 1] = split; LS.set(K_SPLITS, best); }
+
+  UI.flagN.textContent = m;
+  restartAnim(UI.flag, 'pop');
+  UI.split.className = cls;
+  UI.split.textContent = txt;
+  restartAnim(UI.split, 'pop');
+  sfxMile();
+}
+function fmtSplitDur(sec){
+  const m = Math.floor(sec / 60), s = sec - m * 60;
+  return `${m}:${s.toFixed(1).padStart(4, '0')}`;
+}
+function restartAnim(node, cls){
+  node.classList.remove(cls);
+  void node.offsetWidth;                 // force reflow so the animation replays
+  node.classList.add(cls);
+}
+
+function finishRun(){
+  if (S.phase !== 'running') return;
+  S.phase = 'finished';
+  S.s = COURSE_LENGTH;
+  S.mile = MARATHON_MILES;
+  const total = S.clock + S.penalty;
+  S.splits.push(total - S.splitStart);
+  confetti();
+  sfxFinish();
+  camLift = 1.2;
+
+  const prevBest = LS.get(K_BEST, null);
+  const prevToday = LS.get(K_TODAY, null);
+  const isPB = prevBest === null || total < prevBest;
+  if (isPB) LS.set(K_BEST, total);
+  if (prevToday === null || total < prevToday) LS.set(K_TODAY, total);
+
+  el('rTime').textContent = fmtClock(total);
+  el('rPace').textContent = fmtPace(total / 60 / MARATHON_MILES) + '/mi';
+  el('rBest').textContent = fmtClock(isPB ? total : prevBest);
+  el('rHits').textContent = S.hits;
+  el('pb').classList.toggle('on', isPB);
+  // the trailing 0.2mi leg isn't a mile — charting it would dwarf every split
+  drawSparkline(S.splits.slice(0, 26));
+
+  setTimeout(() => {
+    UI.root.classList.remove('playing');
+    UI.res.classList.remove('hidden');
+  }, 1600);
+}
+
+function drawSparkline(splits){
+  const svg = el('spark');
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  if (splits.length < 2) return;
+  const W = 420, H = 66, pad = 6;
+  let lo = Infinity, hi = -Infinity;
+  for (const s of splits){ if (s < lo) lo = s; if (s > hi) hi = s; }
+  if (hi - lo < 1) { hi = lo + 1; }
+  const X = i => pad + (i / (splits.length - 1)) * (W - pad * 2);
+  const Y = v => H - pad - ((v - lo) / (hi - lo)) * (H - pad * 2);
+  const ns = 'http://www.w3.org/2000/svg';
+  let d = '', a = `M ${X(0)} ${H - pad}`;
+  splits.forEach((v, i) => { d += `${i ? 'L' : 'M'} ${X(i).toFixed(1)} ${Y(v).toFixed(1)} `; });
+  splits.forEach((v, i) => { a += ` L ${X(i).toFixed(1)} ${Y(v).toFixed(1)}`; });
+  a += ` L ${X(splits.length - 1)} ${H - pad} Z`;
+
+  const grad = document.createElementNS(ns, 'linearGradient');
+  grad.setAttribute('id', 'sg'); grad.setAttribute('x1', '0'); grad.setAttribute('y1', '0');
+  grad.setAttribute('x2', '0'); grad.setAttribute('y2', '1');
+  for (const [off, col, op] of [['0%', '#FFC98A', '.45'], ['100%', '#FFC98A', '0']]){
+    const st = document.createElementNS(ns, 'stop');
+    st.setAttribute('offset', off); st.setAttribute('stop-color', col); st.setAttribute('stop-opacity', op);
+    grad.appendChild(st);
+  }
+  const defs = document.createElementNS(ns, 'defs'); defs.appendChild(grad); svg.appendChild(defs);
+  const fill = document.createElementNS(ns, 'path');
+  fill.setAttribute('d', a); fill.setAttribute('fill', 'url(#sg)'); svg.appendChild(fill);
+  const line = document.createElementNS(ns, 'path');
+  line.setAttribute('d', d.trim()); line.setAttribute('fill', 'none');
+  line.setAttribute('stroke', '#FFE0B0'); line.setAttribute('stroke-width', '2');
+  line.setAttribute('stroke-linejoin', 'round'); line.setAttribute('stroke-linecap', 'round');
+  line.setAttribute('vector-effect', 'non-scaling-stroke');
+  svg.appendChild(line);
+  // mark the fastest mile
+  const fi = splits.indexOf(lo);
+  const dot = document.createElementNS(ns, 'circle');
+  dot.setAttribute('cx', X(fi)); dot.setAttribute('cy', Y(lo)); dot.setAttribute('r', '3');
+  dot.setAttribute('fill', '#7BE39B');
+  svg.appendChild(dot);
+}
+
+/* -------------------------------- LOOP ----------------------------------- */
+
+let last = performance.now(), frameEMA = 16.7;
+function tick(now){
+  requestAnimationFrame(tick);
+  let dt = (now - last) / 1000; last = now;
+  if (dt > 0.05) dt = 0.05;                       // clamp after a stall
+  frameEMA = frameEMA * 0.94 + (dt * 1000) * 0.06;
+  adaptQuality();
+
+  if (S.phase === 'running'){
+    tryConsumeInput();
+    stepRun(dt);
+  } else {
+    camSway += dt;
+  }
+
+  // timeline advances for lane slide / jump / duck / stumble regardless of phase
+  if (S.laneT < 1) S.laneT = Math.min(1, S.laneT + dt * 1000 / LANE_SHIFT_MS);
+  if (S.jumpT < 1) S.jumpT = Math.min(1, S.jumpT + dt * 1000 / JUMP_MS);
+  if (S.duckT < 1) S.duckT = Math.min(1, S.duckT + dt * 1000 / DUCK_MS);
+  if (S.duckHold > 0) S.duckHold = Math.max(0, S.duckHold - dt);
+  if (S.stumbleT > 0) S.stumbleT = Math.max(0, S.stumbleT - dt);
+
+  animateRunner(dt, S.pace, isAirborne(), isDucking(), S.stumbleT);
+  placeRunner();
+  updateCamera(dt, false);
+  updateChunks(S.s);
+  updateEffects(dt);
+  updateHUD(dt);
+  sky.position.copy(camera.position);
+  render(dt);
+}
+
+function stepRun(dt){
+  updatePace(dt);
+  const v = worldSpeed();
+  S.s += v * dt;
+  S.clock += dt * TIME_COMPRESSION;
+  S.mile = S.s / WORLD_UNITS_PER_MILE;
+  updateCourseObjects(dt);
+  checkMileMarker();
+  if (S.s >= COURSE_LENGTH) finishRun();
+}
+
+function updatePace(dt){
+  const effort = clamp(S.combo / COMBO_FULL, 0, 1);
+  let target = lerp(PACE_BASE, PACE_FLOOR, effort);
+  const grade = clamp(courseYd(S.s) / MAX_GRADE, -1, 1);
+  target *= 1 + grade * GRADE_EFFECT;                    // uphill = slower
+  if (S.fatigue > FATIGUE_THRESHOLD) target *= 1 + FATIGUE_PENALTY;
+  target /= S.boostMul;
+  S.paceTarget = clamp(target, PACE_FLOOR * 0.9, PACE_BASE * 1.35);
+  S.pace = lerp(S.pace, S.paceTarget, 1 - Math.exp(-dt * 1.6));
+
+  if (S.boostT > 0){ S.boostT -= dt; if (S.boostT <= 0) S.boostMul = 1; }
+  S.comboTimer -= dt;
+  if (S.comboTimer <= 0 && S.combo > 0){
+    S.combo = Math.max(0, S.combo - dt * 2.2);
+    if (S.combo < 0.01) S.combo = 0;
+  }
+  S.fatigue += (worldSpeed() * dt / WORLD_UNITS_PER_MILE) * FATIGUE_PER_MILE;
+}
+
+
+/* -------------------------------- RESIZE --------------------------------- */
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  onResize();
+});
+
+/* --------------------------------- BOOT ---------------------------------- */
+
+initChunks();
+resetRun();
+if (!LS.get(K_TUT, 0)) showTutorial();
+else if (LS.get(K_PLAYED, 0)){
+  // repeat players skip the menu: brief beat, then the gun goes off
+  showMenu();
+  setTimeout(() => { if (S.phase === 'menu') startRun(); }, 1200);
+} else showMenu();
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

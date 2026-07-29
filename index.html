@@ -25,6 +25,11 @@
   #topc{top:14px;left:50%;transform:translateX(-50%);text-align:center;line-height:1}
   #clock{font-size:min(7.6vw,32px);font-weight:600;letter-spacing:.5px;font-variant-numeric:tabular-nums}
   #pace{font-size:min(3.4vw,14px);font-weight:500;letter-spacing:2.5px;opacity:.85;margin-top:6px}
+  /* live gap to world-record pace: the number you are actually racing */
+  #wrGap{font-size:min(4.4vw,18px);font-weight:800;letter-spacing:1.2px;font-variant-numeric:tabular-nums;margin-top:5px}
+  #wrGap.ahead{color:#7BE39B}
+  #wrGap.behind{color:#FF9C8A}
+  #wrGap small{font-size:9px;font-weight:700;letter-spacing:2px;opacity:.65}
 
   /* top right: mile */
   #topr{top:15px;right:14px;text-align:right;line-height:1}
@@ -84,17 +89,38 @@
        animation:breathe 2.2s ease-in-out infinite}
   @keyframes breathe{0%,100%{opacity:.62;transform:scale(1)}50%{opacity:1;transform:scale(1.035)}}
 
+  /* goal block on the menu */
+  .goal{margin-top:20px;padding:14px 26px;border:1px solid rgba(255,214,150,.4);border-radius:14px;
+        background:linear-gradient(180deg,rgba(255,196,110,.16),rgba(255,150,60,.06))}
+  .goalK{font-size:9px;font-weight:800;letter-spacing:3px;opacity:.8}
+  .goalT{font-size:min(13vw,52px);font-weight:800;letter-spacing:-1.5px;font-variant-numeric:tabular-nums;
+         line-height:1.05;margin:4px 0 2px;
+         background:linear-gradient(180deg,#FFF0CE,#FFB863);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .goalS{font-size:9.5px;font-weight:700;letter-spacing:2.2px;opacity:.72}
+  .rulesLine{margin-top:16px;max-width:min(88vw,430px);font-size:12.5px;font-weight:500;line-height:1.65;opacity:.88}
+  .rulesLine b{font-variant-numeric:tabular-nums;color:#FFD98A}
+  .gWater{color:#8FDFF7;font-weight:800;letter-spacing:.5px;white-space:nowrap}
+  .gBan{color:#FFD84D;font-weight:800;letter-spacing:.5px;white-space:nowrap}
+  .linkBtn{margin-top:18px;font-size:10px;font-weight:800;letter-spacing:2.5px;opacity:.6;
+           padding:9px 16px;border-bottom:1px solid rgba(255,255,255,.3);pointer-events:auto}
+
   /* tutorial */
-  #tut .row{display:flex;gap:26px;margin-top:26px;flex-wrap:wrap;justify-content:center;max-width:440px}
-  #tut .card{width:92px}
-  #tut .gly{font-size:30px;line-height:1}
-  #tut .cap{font-size:10px;font-weight:700;letter-spacing:2px;margin-top:9px;opacity:.8}
+  #tut{justify-content:flex-start;padding-top:max(28px,env(safe-area-inset-top));overflow-y:auto}
+  #tut .rSec{margin-top:20px;font-size:9px;font-weight:800;letter-spacing:3.5px;opacity:.55}
+  #tut .row{display:flex;gap:22px;margin-top:14px;flex-wrap:wrap;justify-content:center;max-width:440px}
+  #tut .card{width:94px}
+  #tut .gly{font-size:26px;line-height:1}
+  #tut .cap{font-size:9px;font-weight:700;letter-spacing:1.6px;margin-top:8px;opacity:.8;line-height:1.5}
+  #tut .cta{margin-top:26px;margin-bottom:20px}
 
   /* results */
   #res .rTime{font-size:min(17vw,86px);font-weight:800;letter-spacing:-3px;font-variant-numeric:tabular-nums;
               line-height:1;margin:6px 0 4px;
               background:linear-gradient(180deg,#FFF3D8,#FFB061);-webkit-background-clip:text;background-clip:text;color:transparent}
-  #res .rRow{display:flex;gap:30px;justify-content:center;margin-top:16px}
+  #rVerdict{margin-top:8px;font-size:11px;font-weight:800;letter-spacing:3px}
+  #rVerdict.record{color:#7BE39B}
+  #rVerdict.missed{color:#FF9C8A}
+  #res .rRow{display:flex;gap:min(6vw,26px);justify-content:center;margin-top:16px;flex-wrap:wrap}
   #res .rCell{text-align:center}
   #res .rK{font-size:9px;font-weight:700;letter-spacing:2.5px;opacity:.6}
   #res .rV{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:5px}
@@ -106,7 +132,7 @@
 </head>
 <body>
 <div id="ui">
-  <div class="hud" id="topc"><div id="clock">0:00:00</div><div id="pace">8:30 /MI</div></div>
+  <div class="hud" id="topc"><div id="clock">0:00:00</div><div id="wrGap">—</div><div id="pace">5:30 /MI</div></div>
   <div class="hud" id="topr"><div id="mile">0.00<small> / 26.2</small></div><div id="chapter">PARK START</div></div>
   <div class="hud" id="topl"><div id="gel">GEL</div></div>
   <div class="hud" id="combo"><div id="comboN">0</div><div id="comboL">CLEAN</div></div>
@@ -117,27 +143,52 @@
     <div class="kicker">TODAY'S COURSE</div>
     <h1 class="title">MARATHON<em>RUSH</em></h1>
     <div class="sub" id="mDate">—</div>
+    <div class="goal">
+      <div class="goalK">YOUR GOAL — BEAT THE WORLD RECORD</div>
+      <div class="goalT" id="mWR">1:59:30</div>
+      <div class="goalS">26.2 MILES · <span id="mWRPace">4:34</span>/MI PACE OR BETTER</div>
+    </div>
+    <div class="rulesLine">Dodge everything in the road. Grab water and bananas —<br>they are what keep you on record pace.</div>
     <div class="best" id="mBest"></div>
     <div class="cta" id="mCta">SWIPE UP TO START</div>
+    <div class="linkBtn" id="mRules">HOW TO PLAY</div>
   </div>
 
   <div class="overlay hidden" id="tut">
-    <div class="kicker">HOW TO RACE</div>
-    <h1 class="title" style="font-size:min(9vw,40px)">26.2 MILES</h1>
+    <div class="kicker">HOW TO PLAY</div>
+    <h1 class="title" style="font-size:min(9.5vw,44px);margin-bottom:6px">RACE THE RECORD</h1>
+    <div class="rulesLine" style="margin-top:2px">Run all 26.2 miles in under <b id="tWR">1:59:30</b> to break
+      the world record. You start slower than that — the only way to find the pace is a clean race.</div>
+
+    <div class="rSec">CONTROLS</div>
     <div class="row">
-      <div class="card"><div class="gly">⬅➡</div><div class="cap">CHANGE LANE</div></div>
-      <div class="card"><div class="gly">⬆</div><div class="cap">JUMP</div></div>
-      <div class="card"><div class="gly">⬇</div><div class="cap">DUCK</div></div>
+      <div class="card"><div class="gly">⬅ ➡</div><div class="cap">SWIPE<br>CHANGE LANE</div></div>
+      <div class="card"><div class="gly">⬆</div><div class="cap">SWIPE UP<br>JUMP</div></div>
+      <div class="card"><div class="gly">⬇</div><div class="cap">SWIPE DOWN<br>DUCK</div></div>
     </div>
-    <div class="sub" style="max-width:340px;line-height:1.6">Hits cost 3 seconds, never the run.<br>Clean passes build pace.</div>
+
+    <div class="rSec">AVOID</div>
+    <div class="rulesLine" style="margin-top:0">Potholes, cones, barricades, parked cars, overhead
+      scaffolds and cyclists. A hit costs <b>3 seconds</b> and resets your pace chain — it never ends your run.</div>
+
+    <div class="rSec">GRAB</div>
+    <div class="rulesLine" style="margin-top:0">
+      <span class="gWater">◧ WATER</span> clears fatigue and nudges you faster.
+      <span class="gBan">◗ BANANA</span> is a bigger burst of speed.
+      Both make up time — but they sit off your line, so going for one can put you into an obstacle.
+      Choosing what to take is the race.
+    </div>
+
     <div class="cta" id="tCta">TAP TO CONTINUE</div>
   </div>
 
   <div class="overlay hidden" id="res">
     <div class="kicker">FINISH · 26.2 MILES</div>
     <div class="rTime" id="rTime">0:00:00</div>
+    <div id="rVerdict">—</div>
     <div class="rRow">
       <div class="rCell"><div class="rK">AVG PACE</div><div class="rV" id="rPace">—</div></div>
+      <div class="rCell"><div class="rK">RECORD</div><div class="rV" id="rWR">—</div></div>
       <div class="rCell"><div class="rK">BEST EVER</div><div class="rV" id="rBest">—</div></div>
       <div class="rCell"><div class="rK">STUMBLES</div><div class="rV" id="rHits">—</div></div>
     </div>
@@ -182,9 +233,17 @@ const WORLD_UNITS_PER_MILE = 700;   // single source of truth for real-world sca
 const MARATHON_MILES       = 26.2;
 const COURSE_LENGTH        = WORLD_UNITS_PER_MILE * MARATHON_MILES;
 
-// Real play-seconds -> simulated marathon-clock-seconds. A clean run averaging
-// ~7:05/mi finishes in ~3:35 of real play while the clock still reads ~3:05:00.
-const TIME_COMPRESSION     = 52;
+// THE TARGET. Everything about the pace band below is tuned so that beating
+// this requires a near-perfect race: full combo held through most of the
+// course, most aid stations taken, and only a couple of stumbles.
+// One-line change if the record moves.
+const WR_SECONDS = 1 * 3600 + 59 * 60 + 30;            // 1:59:30
+const WR_PACE    = WR_SECONDS / 60 / MARATHON_MILES;   // 4:33.7 /mi to tie
+
+// Real play-seconds -> simulated marathon-clock-seconds. Sized so the slowest
+// plausible race still lands inside 4 minutes of real play, and a record run
+// takes about 3:10.
+const TIME_COMPRESSION     = 38;
 
 const CHUNK_LEN     = 60;           // road segment length in world units
 const CHUNK_OVERLAP = 2;            // geometry runs long to hide curve seams
@@ -206,18 +265,34 @@ const STUMBLE_MS      = 400;
 // duck from being a coin-flip on a swipe; the pose itself is still DUCK_MS.
 const DUCK_GRACE_MS   = 140;
 
-const PACE_BASE   = 8.5;            // min/mile cruise
-const PACE_FLOOR  = 6.75;           // min/mile ceiling of effort
+// Pace band, in min/mile. The record needs a 4:33.7 average, which sits close
+// to the floor — so the player has to live near full combo to have any chance.
+// Cruising with no combo lands around 2:24, comfortably outside the record.
+const PACE_BASE   = 5.5;            // min/mile with no combo at all
+// Full combo alone lands just OUTSIDE the record — pickups are what buy the
+// last ~90 seconds. That makes "what do I grab" the real race, not just
+// "what do I dodge".
+const PACE_FLOOR  = 4.22;           // min/mile at full combo, before boosts
+const PACE_CAP    = 4.05;           // absolute fastest, boosts included
 const COMBO_GRACE = 2.5;            // seconds of clean-pass credit
-const COMBO_FULL  = 14;             // clean passes for full pace benefit
+// Deliberately high relative to the ~23 obstacles per mile: rebuilding after a
+// stumble costs roughly two miles of degraded pace, so mistakes really bite.
+const COMBO_FULL  = 28;             // clean passes for full pace benefit
 const GRADE_EFFECT = 0.08;          // hills swing pace +/- 8%
 const MAX_GRADE    = 0.072;
 
 const STUMBLE_PENALTY_SEC = 3;      // added to the marathon clock, never a fail
 const PICKUP_RADIUS       = 2.6;    // lateral grab window (~1.1m at course scale)
-const FATIGUE_PER_MILE    = 0.34;
+// Fatigue is the reason aid stations matter: left alone it creeps up and taxes
+// your pace, and water is the only thing that clears it.
+const FATIGUE_PER_MILE    = 0.5;
 const FATIGUE_THRESHOLD   = 1.0;
-const FATIGUE_PENALTY     = 0.05;
+const FATIGUE_PENALTY     = 0.07;
+
+// Difficulty escalation: the back half of the course gets denser and the
+// patterns double up more often, so holding a combo late is the real test.
+const RAMP_START_MILE = 8;
+const RAMP_END_MILE   = 24;
 
 const LOD_NEAR = 200, LOD_FAR = 450;
 const FRAME_BUDGET_MS = 19.5;
@@ -255,15 +330,15 @@ const rr   = (rng, a, b) => a + rng() * (b - a);
 const PARK = 0, URBAN = 1, BRIDGE = 2, HILLS = 3, FINISH = 4;
 const CHAPTERS = [
   { name:'PARK START',       start:0,    end:4,
-    road:0x3E3E43, ground:0x6E8E54, accent:0x89A867, grade:new THREE.Color(1.00,0.99,0.94), vig:0.90, crowd:0.35 },
+    road:0x5B5B62, ground:0x7CA05F, accent:0x89A867, grade:new THREE.Color(1.00,0.99,0.94), vig:0.48, crowd:0.35 },
   { name:'URBAN CANYON',     start:4,    end:10,
-    road:0x3A3A3F, ground:0x55555C, accent:0x8C8C96, grade:new THREE.Color(0.97,0.97,1.02), vig:1.25, crowd:0.70 },
+    road:0x565660, ground:0x62626A, accent:0x8C8C96, grade:new THREE.Color(0.97,0.97,1.02), vig:0.72, crowd:0.70 },
   { name:'WATERFRONT BRIDGE',start:10,   end:15,
-    road:0x45454B, ground:0x3E6F92, accent:0xC9CCD2, grade:new THREE.Color(1.00,1.01,1.03), vig:0.85, crowd:0.30 },
+    road:0x62626A, ground:0x4B80A6, accent:0xC9CCD2, grade:new THREE.Color(1.00,1.01,1.03), vig:0.44, crowd:0.30 },
   { name:'ROLLING HILLS',    start:15,   end:22,
-    road:0x3C3C40, ground:0x76914F, accent:0xA8B972, grade:new THREE.Color(1.04,1.00,0.94), vig:0.95, crowd:0.45 },
+    road:0x585860, ground:0x83A05A, accent:0xA8B972, grade:new THREE.Color(1.04,1.00,0.94), vig:0.52, crowd:0.45 },
   { name:'FINISH STRAIGHT',  start:22,   end:26.2,
-    road:0x38383D, ground:0x5A5A62, accent:0xE0A45C, grade:new THREE.Color(1.07,1.01,0.92), vig:1.00, crowd:1.00 },
+    road:0x545459, ground:0x66666E, accent:0xE0A45C, grade:new THREE.Color(1.07,1.01,0.92), vig:0.55, crowd:1.00 },
 ];
 function chapterAtMile(mi){
   for (let i = CHAPTERS.length - 1; i >= 0; i--) if (mi >= CHAPTERS[i].start) return i;
@@ -319,7 +394,7 @@ const renderer = new THREE.WebGLRenderer({ antialias:false, powerPreference:'hig
 renderer.setPixelRatio(PR);
 renderer.setSize(innerWidth, innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;   // applied by OutputPass
-renderer.toneMappingExposure = 1.05;
+renderer.toneMappingExposure = 1.24;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
@@ -327,13 +402,13 @@ document.body.appendChild(renderer.domElement);
 const scene  = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(68, innerWidth / innerHeight, 0.5, 3000);
 const HORIZON = new THREE.Color(0xFFD9A8);
-scene.fog = new THREE.FogExp2(0xFFD5A2, 0.0016);
+scene.fog = new THREE.FogExp2(0xFFDFB6, 0.00105);
 
 /* --------------------------------- SKY ----------------------------------- */
 
-// low morning sun, well off to the left: keeps the halo out of the runner's
-// sightline so the sky overhead stays pale blue rather than blowing out
-const SUN_DIR = new THREE.Vector3(-0.62, 0.36, -0.70).normalize();
+// Morning sun off to the left, but high enough that tree shadows don't stripe
+// the whole road — the lanes have to stay readable at speed.
+const SUN_DIR = new THREE.Vector3(-0.60, 0.55, -0.58).normalize();
 const skyMat = new THREE.ShaderMaterial({
   side: THREE.BackSide, depthWrite:false, fog:false,
   uniforms:{
@@ -365,9 +440,9 @@ scene.add(sky);
 
 /* -------------------------------- LIGHTS --------------------------------- */
 
-const hemi = new THREE.HemisphereLight(0xFFE2BC, 0x6A6553, 0.8);
+const hemi = new THREE.HemisphereLight(0xFFEBD2, 0x8A8472, 1.2);
 scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xFFE0B4, 1.85);
+const sun = new THREE.DirectionalLight(0xFFE8C6, 1.9);
 sun.castShadow = true;
 sun.shadow.mapSize.set(1024, 1024);
 sun.shadow.camera.near = 1; sun.shadow.camera.far = 120;
@@ -873,12 +948,12 @@ addEventListener('touchend', e => {
   const t = e.changedTouches[0];
   const dx = t.clientX - touchX, dy = t.clientY - touchY;
   const ax = Math.abs(dx), ay = Math.abs(dy);
-  if (Math.max(ax, ay) < SWIPE_MIN){ onTap(); return; }
+  if (Math.max(ax, ay) < SWIPE_MIN){ onTap(t.target); return; }
   if (ax > ay) queueAction(dx > 0 ? 'right' : 'left');
   else         queueAction(dy > 0 ? 'down' : 'up');
 }, { passive:true });
 addEventListener('mousedown', () => audioUnlock());
-addEventListener('click', () => onTap());
+addEventListener('click', e => onTap(e.target));
 addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
   if (k === 'arrowleft'  || k === 'a') queueAction('left');
@@ -950,7 +1025,9 @@ function updateCamera(dt, immediate){
   const s = S.s;
   const f = courseFrame(s);
   camSway += dt;
-  const back = 11.5, up = 5.4;
+  // Temple Run framing: tucked in close behind the runner and higher up, so the
+  // camera looks down the road rather than along it and you read the lanes early
+  const back = 7.4, up = 5.0;
   // lateral lag: camera trails the lane change so swipes read as weighted turns
   camLateral = lerp(camLateral, laneXNow(), 1 - Math.exp(-dt * 8.5));
   const idle = S.phase === 'menu' ? Math.sin(camSway * 0.6) * 1.4 : 0;
@@ -966,7 +1043,7 @@ function updateCamera(dt, immediate){
     camPos.addScaledVector(camVel, dt);
   }
   camera.position.copy(camPos);
-  courseToWorld(s + 15, laneXNow() * 0.45, 2.2 - camDip * 0.5, _look);
+  courseToWorld(s + 11, laneXNow() * 0.45, 0.9 - camDip * 0.5, _look);
   camera.lookAt(_look);
   camera.rotation.z += Math.sin(camSway * 0.9) * 0.004 + (laneXNow() - camLateral) * 0.012;
 
@@ -1155,35 +1232,64 @@ const glowTex = (() => {
   return t;
 })();
 
+/* Pickups have to be readable in the half-second you have to decide whether to
+   weave for them, so each one is a distinct silhouette: an upright bottle, a
+   curved banana, a flat foil packet. Built once per type and shared. */
+
+function geoBottle(){
+  const L = [];
+  put(L, CYL, 0, 0.30, 0, 0.44, 0.60, 0.44, 0x8FDFF7, { ao:0.18, aoH:0.6, y0:0 });
+  put(L, CYL, 0, 0.63, 0, 0.30, 0.10, 0.30, 0x8FDFF7, { ao:0 });   // shoulder
+  put(L, CYL, 0, 0.73, 0, 0.17, 0.14, 0.17, 0xE8F8FF, { ao:0 });   // neck
+  put(L, CYL, 0, 0.83, 0, 0.23, 0.09, 0.23, 0x3A6DE0, { ao:0 });   // cap
+  put(L, BOX, 0, 0.34, 0, 0.45, 0.20, 0.45, 0xDCF4FF, { ao:0 });   // label band
+  return mergeList(L);
+}
+function geoBanana(){
+  const L = [];
+  // five segments swept along an arc: reads as a crescent from any angle
+  for (let i = 0; i < 5; i++){
+    const t = i / 4, a = (t - 0.5) * 2.1;
+    put(L, CYL, Math.sin(a) * 0.42, 0.34 + Math.cos(a) * 0.30 - 0.30, 0,
+        0.30 - Math.abs(t - 0.5) * 0.16, 0.26, 0.30 - Math.abs(t - 0.5) * 0.16,
+        0xFFD400, { ao:0, rz: -a });
+  }
+  put(L, CYL,  Math.sin(1.05) * 0.42, 0.34 + Math.cos(1.05) * 0.30 - 0.30, 0,
+      0.13, 0.12, 0.13, 0x6B5324, { ao:0, rz:-1.05 });     // stem
+  put(L, CYL, -Math.sin(1.05) * 0.42, 0.34 + Math.cos(1.05) * 0.30 - 0.30, 0,
+      0.13, 0.10, 0.13, 0x6B5324, { ao:0, rz:1.05 });      // tip
+  return mergeList(L);
+}
+function geoGel(){
+  const L = [];
+  put(L, BOX, 0, 0.34, 0, 0.46, 0.62, 0.14, 0xFFC24A, { ao:0 });
+  put(L, BOX, 0, 0.68, 0, 0.50, 0.10, 0.16, 0xC98A22, { ao:0 });   // crimped top
+  put(L, BOX, 0, 0.34, 0.08, 0.30, 0.30, 0.02, 0xFFF0C4, { ao:0 });
+  return mergeList(L);
+}
+const PICKUP_GEO = {};
+const PICKUP_TINT = { [T.WATER]:0x7FD8F5, [T.BANANA]:0xFFD84D, [T.GEL]:0xFFC24A };
+function buildPickupGeometry(){
+  PICKUP_GEO[T.WATER]  = geoBottle();
+  PICKUP_GEO[T.BANANA] = geoBanana();
+  PICKUP_GEO[T.GEL]    = geoGel();
+}
+buildPickupGeometry();
+
 function pickupMesh(type){
   const g = new THREE.Group();
-  let color, geo;
-  if (type === T.WATER){
-    color = 0x7FD8F5;
-    geo = new THREE.CylinderGeometry(0.34, 0.24, 0.62, 8, 1, true);
-  } else if (type === T.BANANA){
-    color = 0xFFD84D;
-    geo = new THREE.CapsuleGeometry(0.2, 0.62, 3, 6);
-  } else {
-    color = 0xFFC24A;
-    geo = new THREE.BoxGeometry(0.5, 0.66, 0.16);
-  }
+  const color = PICKUP_TINT[type];
+  // vertexColors carries the shape's own colours; emissive drives the glow pulse
   const mat = new THREE.MeshStandardMaterial({
-    color, emissive:color, emissiveIntensity:type === T.GEL ? 1.5 : 0.85,
-    roughness:0.4, flatShading:true, side:THREE.DoubleSide,
+    vertexColors:true, emissive:color, emissiveIntensity:type === T.GEL ? 1.1 : 0.6,
+    roughness:0.35, flatShading:true,
   });
-  const m = new THREE.Mesh(geo, mat);
-  m.position.y = 1.5;
-  if (type === T.BANANA) m.rotation.z = 0.9;
+  const m = new THREE.Mesh(PICKUP_GEO[type], mat);
+  m.position.y = 1.35;
   g.add(m);
-  if (type === T.WATER){
-    const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.08, 8),
-      new THREE.MeshStandardMaterial({ color:0xFFFFFF, emissive:0xBFE9F8, emissiveIntensity:0.5, flatShading:true }));
-    lid.position.y = 1.8; g.add(lid);
-  }
   const spr = new THREE.Sprite(new THREE.SpriteMaterial({
-    map:glowTex, color, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, opacity:0.75 }));
-  spr.scale.setScalar(type === T.GEL ? 3.4 : 2.5);
+    map:glowTex, color, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, opacity:0.6 }));
+  spr.scale.setScalar(type === T.GEL ? 2.6 : 2.0);
   spr.position.y = 1.5;
   g.add(spr);
   g.userData.core = m; g.userData.glow = spr;
@@ -1324,6 +1430,9 @@ const PALETTE = [
 ];
 // chance a chunk is left empty, so the course breathes early and bites later
 const REST = [0.42, 0.14, 0.22, 0.20, 0.28];
+// 0 at the start, 1 by mile 24: squeezes out the rest chunks and stacks a
+// second pattern on top more and more often as the race wears on.
+const rampAt = mi => smoothstep(RAMP_START_MILE, RAMP_END_MILE, mi);
 
 function generateCourse(){
   COURSE.length = 0;
@@ -1332,11 +1441,15 @@ function generateCourse(){
   for (let i = 0; i < CHUNK_COUNT; i++){
     const s0 = i * CHUNK_LEN;
     if (s0 < 180 || s0 > COURSE_LENGTH - 120) continue;   // clean start & finish
-    const ch = chapterAtS(s0 + CHUNK_LEN / 2);
-    if (rng() < REST[ch]) continue;
+    const mid = s0 + CHUNK_LEN / 2;
+    const ch = chapterAtS(mid);
+    const ramp = rampAt(mid / WORLD_UNITS_PER_MILE);
+    // fewer and fewer chunks get left empty
+    if (rng() < REST[ch] * (1 - 0.8 * ramp)) continue;
     P[pick(rng, PALETTE[ch])](rng, s0);
-    // the canyon occasionally doubles up
-    if (ch === URBAN && rng() < 0.22) P[pick(rng, ['pothole', 'slalom'])](rng, s0 + 4);
+    // stacked patterns: rare early, routine by the closing miles
+    const doubleChance = (ch === URBAN ? 0.22 : 0.05) + 0.34 * ramp;
+    if (rng() < doubleChance) P[pick(rng, ['pothole', 'slalom', 'sawhorse'])](rng, s0 + 4);
   }
 
   // aid stations: one cluster per mile, always offset so a straight line misses
@@ -1370,6 +1483,52 @@ function generateCourse(){
   for (let mi = 1; mi <= 26; mi++) addObj(mi * WORLD_UNITS_PER_MILE, T.GANTRY, 1, { n:mi });
 
   COURSE.sort((a, b) => a.s - b.s);
+  repairCourse();
+}
+
+/* The stacked-pattern pass can put a two-lane car and a cyclist (or a second
+   car) close enough together to seal all three lanes. Nothing clears that —
+   it's a guaranteed stumble through no fault of the player, and with the record
+   this tight a few of those would put it out of reach. So sweep the finished
+   course and thin any cluster that leaves no way through. */
+
+function lanesBlockedAt(s, skip){
+  const blocked = [false, false, false];
+  for (const o of COURSE){
+    if (o === skip || o.mode === 'pickup' || o.mode === 'decor') continue;
+    if (o.mode === 'over' || o.jump) continue;      // duck or jump is an out
+    if (Math.abs(o.s - s) > o.half + 3.2) continue;
+    for (let L = 0; L < 3; L++){
+      const ox = o.type === T.CYCLIST ? LANE_X[o.lane] : o.x;
+      if (Math.abs(LANE_X[L] - ox) < o.w * 0.5 + 0.9) blocked[L] = true;
+    }
+  }
+  return blocked;
+}
+function repairCourse(){
+  let removed = 0;
+  for (let guard = 0; guard < 200; guard++){
+    let culprit = -1;
+    for (const o of COURSE){
+      if (o.mode === 'pickup' || o.mode === 'decor' || o.mode === 'over' || o.jump) continue;
+      const blocked = lanesBlockedAt(o.s, null);
+      if (blocked[0] && blocked[1] && blocked[2]){
+        // drop whichever overlapping lane-blocker is not the one we are standing on
+        for (let j = COURSE.length - 1; j >= 0; j--){
+          const p = COURSE[j];
+          if (p === o || p.mode === 'pickup' || p.mode === 'decor') continue;
+          if (p.mode === 'over' || p.jump) continue;
+          if (Math.abs(p.s - o.s) > p.half + o.half + 3.2) continue;
+          culprit = j; break;
+        }
+        break;
+      }
+    }
+    if (culprit < 0) break;
+    COURSE.splice(culprit, 1);
+    removed++;
+  }
+  return removed;
 }
 generateCourse();
 
@@ -1452,11 +1611,11 @@ function updateCourseObjects(dt){
       const m = o.obj.userData.core, g = o.obj.userData.glow;
       o.t += dt;
       m.rotation.y += dt * 2.2;
-      m.position.y = 1.5 + Math.sin(o.t * 3.4) * 0.14;
-      g.position.y = m.position.y;
+      m.position.y = 1.35 + Math.sin(o.t * 3.4) * 0.14;
+      g.position.y = m.position.y + 0.15;
       const pulse = 0.62 + 0.32 * Math.sin(o.t * 5.5);
       g.material.opacity = pulse;
-      m.material.emissiveIntensity = (o.type === T.GEL ? 1.3 : 0.7) + pulse * 0.5;
+      m.material.emissiveIntensity = (o.type === T.GEL ? 1.0 : 0.5) + pulse * 0.45;
     }
 
     if (o.done || o.mode === 'decor'){ continue; }
@@ -1515,13 +1674,13 @@ function stumble(o){
 }
 function collect(o){
   if (o.type === T.WATER){
-    S.boostMul = Math.max(S.boostMul, 1.06); S.boostT = Math.max(S.boostT, 2.0);
-    S.fatigue = 0;
+    S.boostMul = Math.max(S.boostMul, 1.07); S.boostT = Math.max(S.boostT, 3.0);
+    S.fatigue = 0;                       // water is the only thing that clears it
     burst(o.x, 1.5, 14, 0x9FE4F8, 0.30, 0.60);
     sfxSplash();
   } else if (o.type === T.BANANA){
-    S.boostMul = Math.max(S.boostMul, 1.10); S.boostT = Math.max(S.boostT, 3.0);
-    S.fatigue = Math.max(0, S.fatigue - 0.35);
+    S.boostMul = Math.max(S.boostMul, 1.12); S.boostT = Math.max(S.boostT, 4.0);
+    S.fatigue = Math.max(0, S.fatigue - 0.4);
     burst(o.x, 1.5, 12, 0xFFE27A, 0.28, 0.55);
   } else {
     S.gel = true;
@@ -1931,9 +2090,9 @@ composer.addPass(new OutputPass());   // ACES tonemap + sRGB
 /* ------------------------- per-frame grade blending ---------------------- */
 
 const _gradeCur = new THREE.Color(1, 1, 1);
-const FOG_BASE = new THREE.Color(0xFFD5A2);
+const FOG_BASE = new THREE.Color(0xFFDFB6);
 const FOG_FINISH = new THREE.Color(0xFFC489);
-const _fogCur = new THREE.Color(0xFFD5A2);
+const _fogCur = new THREE.Color(0xFFDFB6);
 function updateGrade(dt){
   const mi = S.mile;
   const ch = chapterAtMile(mi);
@@ -1950,7 +2109,7 @@ function updateGrade(dt){
   _fogCur.lerpColors(FOG_BASE, FOG_FINISH, warm);
   scene.fog.color.copy(_fogCur);
   // haze thickens toward the skyline in the canyon, thins over open water
-  const dens = ch === URBAN ? 0.0021 : ch === BRIDGE ? 0.0012 : 0.0016;
+  const dens = ch === URBAN ? 0.00135 : ch === BRIDGE ? 0.0008 : 0.00105;
   scene.fog.density = lerp(scene.fog.density, dens, k);
 
   const effort = clamp((PACE_BASE - S.pace) / (PACE_BASE - PACE_FLOOR), 0, 1);
@@ -2022,11 +2181,21 @@ function onResize(){
 const el = id => document.getElementById(id);
 const UI = {
   root:el('ui'), clock:el('clock'), pace:el('pace'), mile:el('mile'), chapter:el('chapter'),
-  gel:el('gel'), combo:el('combo'), comboN:el('comboN'),
+  gel:el('gel'), combo:el('combo'), comboN:el('comboN'), wrGap:el('wrGap'),
   flag:el('flag'), flagN:el('flagN'), split:el('split'),
   menu:el('menu'), mDate:el('mDate'), mBest:el('mBest'),
   tut:el('tut'), res:el('res'),
 };
+// Signed gap against world-record pace at the distance already covered.
+// Negative means on track to break it.
+function wrGapSeconds(){
+  return (S.clock + S.penalty) - S.mile * WR_PACE * 60;
+}
+function fmtGap(sec){
+  const a = Math.abs(sec), m = Math.floor(a / 60), r = Math.floor(a % 60);
+  const body = m > 0 ? `${m}:${String(r).padStart(2,'0')}` : `${r}s`;
+  return (sec <= 0 ? '−' : '+') + body;
+}
 function fmtClock(sec){
   sec = Math.max(0, Math.floor(sec));
   const h = Math.floor(sec / 3600), m = Math.floor(sec / 60) % 60, s = sec % 60;
@@ -2050,6 +2219,14 @@ function updateHUD(dt){
   UI.comboN.textContent = Math.floor(S.combo);
   UI.combo.classList.toggle('on', S.combo >= 3);
   UI.gel.classList.toggle('on', S.gel);
+  if (S.mile > 0.08){
+    const g = wrGapSeconds();
+    UI.wrGap.innerHTML = `${fmtGap(g)} <small>VS RECORD</small>`;
+    UI.wrGap.className = g <= 0 ? 'ahead' : 'behind';
+  } else {
+    UI.wrGap.innerHTML = `<small>CHASING ${fmtClock(WR_SECONDS)}</small>`;
+    UI.wrGap.className = '';
+  }
 }
 
 /* ------------------------------ SCREENS ---------------------------------- */
@@ -2072,15 +2249,25 @@ function showMenu(){
   if (today) html += `TODAY'S BEST <b>${fmtClock(today)}</b><br>`;
   if (best)  html += `<span style="opacity:.65">ALL-TIME <b>${fmtClock(best)}</b></span>`;
   UI.mBest.innerHTML = html || `<span style="opacity:.6">FIRST RUN OF THE DAY</span>`;
+  el('mWR').textContent = fmtClock(WR_SECONDS);
+  el('mWRPace').textContent = fmtPace(WR_PACE);
+  el('tWR').textContent = fmtClock(WR_SECONDS);
   UI.menu.classList.remove('hidden');
 }
-function showTutorial(){ S.phase = 'tutorial'; UI.tut.classList.remove('hidden'); }
+function showTutorial(){
+  S.phase = 'tutorial';
+  UI.menu.classList.add('hidden');
+  UI.tut.classList.remove('hidden');
+  UI.tut.scrollTop = 0;
+}
 let lastTap = 0;
-function onTap(){
+function onTap(target){
   // touchend and the synthetic click both fire on mobile; take only the first
   const t = performance.now();
   if (t - lastTap < 400) return;
   lastTap = t;
+  // a tap on HOW TO PLAY must not also read as "start the race"
+  if (target && target.closest && target.closest('#mRules')){ showTutorial(); return; }
   if (S.phase === 'tutorial'){ LS.set(K_TUT, 1); UI.tut.classList.add('hidden'); showMenu(); return; }
   if (S.phase === 'menu'){ startRun(); return; }
   if (S.phase === 'finished'){ UI.res.classList.add('hidden'); showMenu(); return; }
@@ -2166,6 +2353,11 @@ function finishRun(){
   el('rPace').textContent = fmtPace(total / 60 / MARATHON_MILES) + '/mi';
   el('rBest').textContent = fmtClock(isPB ? total : prevBest);
   el('rHits').textContent = S.hits;
+  const beat = total < WR_SECONDS;
+  const gap = total - WR_SECONDS;
+  el('rVerdict').textContent = beat ? 'WORLD RECORD BROKEN' : `${fmtGap(gap)} OFF THE RECORD`;
+  el('rVerdict').className = beat ? 'record' : 'missed';
+  el('rWR').textContent = fmtClock(WR_SECONDS);
   el('pb').classList.toggle('on', isPB);
   // the trailing 0.2mi leg isn't a mile — charting it would dwarf every split
   drawSparkline(S.splits.slice(0, 26));
@@ -2269,7 +2461,7 @@ function updatePace(dt){
   target *= 1 + grade * GRADE_EFFECT;                    // uphill = slower
   if (S.fatigue > FATIGUE_THRESHOLD) target *= 1 + FATIGUE_PENALTY;
   target /= S.boostMul;
-  S.paceTarget = clamp(target, PACE_FLOOR * 0.9, PACE_BASE * 1.35);
+  S.paceTarget = clamp(target, PACE_CAP, PACE_BASE * 1.2);
   S.pace = lerp(S.pace, S.paceTarget, 1 - Math.exp(-dt * 1.6));
 
   if (S.boostT > 0){ S.boostT -= dt; if (S.boostT <= 0) S.boostMul = 1; }

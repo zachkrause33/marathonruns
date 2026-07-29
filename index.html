@@ -1016,39 +1016,48 @@ function tryConsumeInput(){
 
 /* -------------------------------- CAMERA --------------------------------- */
 
-const camPos = new THREE.Vector3(), camVel = new THREE.Vector3(), camAim = new THREE.Vector3();
+const camPos = new THREE.Vector3();
 const _target = new THREE.Vector3(), _look = new THREE.Vector3(), _tmp = new THREE.Vector3();
-let camLateral = 0, camDip = 0, camLift = 0, camSway = 0;
-const CAM_STIFF = 7, CAM_DAMP = 0.85;
+let camLateral = 0, camDip = 0, camLift = 0, camSway = 0, camDrag = 0;
+const CAM_BACK = 7.0, CAM_UP = 4.9;
 
-function updateCamera(dt, immediate){
+/* Camera follow.
+   The obvious implementation — spring the camera's world position toward a
+   point behind the runner — does not work here, and the reason is worth
+   spelling out. A spring-damper chasing a target that moves at constant
+   velocity settles at a permanent offset of c*v/k. At course speed (~98
+   units/sec) with a soft spring that error is around 60 units, so the camera
+   ends up ten times further back than intended, and no amount of framerate
+   fixes it because the error is framerate-independent.
+
+   So the follow is rigid along the course and sprung only where springiness
+   settles to zero and therefore cannot accumulate: lateral offset (lane
+   changes), the dip on a stumble, the lift on a pickup, and a small
+   speed-dependent drag that eases the camera back as you accelerate. */
+
+function updateCamera(dt){
   const s = S.s;
-  const f = courseFrame(s);
   camSway += dt;
-  // Temple Run framing: tucked in close behind the runner and higher up, so the
-  // camera looks down the road rather than along it and you read the lanes early
-  const back = 7.4, up = 5.0;
   // lateral lag: camera trails the lane change so swipes read as weighted turns
   camLateral = lerp(camLateral, laneXNow(), 1 - Math.exp(-dt * 8.5));
+  // drag eases the camera back a touch at speed, then settles — bounded, so it
+  // can never turn into the runaway lag a positional spring produced
+  const speedT = clamp((worldSpeed() - 70) / 45, 0, 1);
+  camDrag = lerp(camDrag, speedT * 0.8, 1 - Math.exp(-dt * 2.5));
+  const back = CAM_BACK + camDrag, up = CAM_UP;
+
   const idle = S.phase === 'menu' ? Math.sin(camSway * 0.6) * 1.4 : 0;
   courseToWorld(s - back, camLateral * 0.72 + idle, 0, _target);
   _target.y += up + camLift - camDip + Math.sin(camSway * 0.5) * (S.phase === 'menu' ? 0.35 : 0);
 
-  if (immediate){ camPos.copy(_target); camVel.set(0,0,0); }
-  else {
-    // spring-damper follow
-    _tmp.copy(_target).sub(camPos).multiplyScalar(CAM_STIFF);
-    _tmp.addScaledVector(camVel, -2 * Math.sqrt(CAM_STIFF) * CAM_DAMP);
-    camVel.addScaledVector(_tmp, dt);
-    camPos.addScaledVector(camVel, dt);
-  }
+  camPos.copy(_target);
   camera.position.copy(camPos);
   courseToWorld(s + 11, laneXNow() * 0.45, 0.9 - camDip * 0.5, _look);
   camera.lookAt(_look);
   camera.rotation.z += Math.sin(camSway * 0.9) * 0.004 + (laneXNow() - camLateral) * 0.012;
 
   const effort = clamp((PACE_BASE - S.pace) / (PACE_BASE - PACE_FLOOR), 0, 1);
-  const fov = lerp(68, 74, effort);
+  const fov = lerp(68, 71, effort);
   if (Math.abs(camera.fov - fov) > 0.01){
     camera.fov = lerp(camera.fov, fov, 1 - Math.exp(-dt * 3));
     camera.updateProjectionMatrix();
@@ -2291,7 +2300,7 @@ function resetRun(){
   input.queue.length = 0;
   resetCourseObjects();
   updateChunks(0);
-  updateCamera(0, true);
+  updateCamera(0);
 }
 
 /* --------------------- MILE MARKERS, SPLITS, RESULTS --------------------- */
@@ -2435,7 +2444,7 @@ function tick(now){
 
   animateRunner(dt, S.pace, isAirborne(), isDucking(), S.stumbleT);
   placeRunner();
-  updateCamera(dt, false);
+  updateCamera(dt);
   updateChunks(S.s);
   updateEffects(dt);
   updateHUD(dt);

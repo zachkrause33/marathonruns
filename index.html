@@ -322,6 +322,7 @@ const DAILY_SEED = hashStr('MARATHON_RUSH::' + DATE_KEY);
 // looks the same every day while the *layout* changes.
 const rngCourse = mulberry32(DAILY_SEED);
 const rngArt    = mulberry32(0x5EED1234);
+let   rngFx     = mulberry32(0xF00D5EED);   // runtime effects only, resettable
 const pick = (rng, arr) => arr[(rng() * arr.length) | 0];
 const rr   = (rng, a, b) => a + rng() * (b - a);
 
@@ -330,15 +331,15 @@ const rr   = (rng, a, b) => a + rng() * (b - a);
 const PARK = 0, URBAN = 1, BRIDGE = 2, HILLS = 3, FINISH = 4;
 const CHAPTERS = [
   { name:'PARK START',       start:0,    end:4,
-    road:0x5B5B62, ground:0x7CA05F, accent:0x89A867, grade:new THREE.Color(1.00,0.99,0.94), vig:0.48, crowd:0.35 },
+    road:0xF2F0EC, ground:0xF6FFF2, accent:0x89A867, grade:new THREE.Color(1.00,0.99,0.94), vig:0.48, crowd:0.35 },
   { name:'URBAN CANYON',     start:4,    end:10,
-    road:0x565660, ground:0x62626A, accent:0x8C8C96, grade:new THREE.Color(0.97,0.97,1.02), vig:0.72, crowd:0.70 },
+    road:0xE9EAF2, ground:0xF2F2F6, accent:0x8C8C96, grade:new THREE.Color(0.97,0.97,1.02), vig:0.72, crowd:0.70 },
   { name:'WATERFRONT BRIDGE',start:10,   end:15,
-    road:0x62626A, ground:0x4B80A6, accent:0xC9CCD2, grade:new THREE.Color(1.00,1.01,1.03), vig:0.44, crowd:0.30 },
+    road:0xF4F5F8, ground:0xEEF6FF, accent:0xC9CCD2, grade:new THREE.Color(1.00,1.01,1.03), vig:0.44, crowd:0.30 },
   { name:'ROLLING HILLS',    start:15,   end:22,
-    road:0x585860, ground:0x83A05A, accent:0xA8B972, grade:new THREE.Color(1.04,1.00,0.94), vig:0.52, crowd:0.45 },
+    road:0xEFEEE6, ground:0xFAFFF0, accent:0xA8B972, grade:new THREE.Color(1.04,1.00,0.94), vig:0.52, crowd:0.45 },
   { name:'FINISH STRAIGHT',  start:22,   end:26.2,
-    road:0x545459, ground:0x66666E, accent:0xE0A45C, grade:new THREE.Color(1.07,1.01,0.92), vig:0.55, crowd:1.00 },
+    road:0xE9E7E4, ground:0xF0F0F2, accent:0xE0A45C, grade:new THREE.Color(1.07,1.01,0.92), vig:0.55, crowd:1.00 },
 ];
 function chapterAtMile(mi){
   for (let i = CHAPTERS.length - 1; i >= 0; i--) if (mi >= CHAPTERS[i].start) return i;
@@ -394,7 +395,7 @@ const renderer = new THREE.WebGLRenderer({ antialias:false, powerPreference:'hig
 renderer.setPixelRatio(PR);
 renderer.setSize(innerWidth, innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;   // applied by OutputPass
-renderer.toneMappingExposure = 1.24;
+renderer.toneMappingExposure = 1.12;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
@@ -440,9 +441,9 @@ scene.add(sky);
 
 /* -------------------------------- LIGHTS --------------------------------- */
 
-const hemi = new THREE.HemisphereLight(0xFFEBD2, 0x8A8472, 1.2);
+const hemi = new THREE.HemisphereLight(0xFFEBD2, 0x8A8472, 0.42);
 scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xFFE8C6, 1.9);
+const sun = new THREE.DirectionalLight(0xFFE8C6, 2.35);
 sun.castShadow = true;
 sun.shadow.mapSize.set(1024, 1024);
 sun.shadow.camera.near = 1; sun.shadow.camera.far = 120;
@@ -450,6 +451,20 @@ sun.shadow.camera.left = -30; sun.shadow.camera.right = 30;
 sun.shadow.camera.top = 34;   sun.shadow.camera.bottom = -22;
 sun.shadow.bias = -0.0016;
 scene.add(sun, sun.target);
+
+/* --------------------- ENVIRONMENT MAP FROM THE SKY ---------------------- */
+
+function buildEnvironment(){
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  pmrem.compileEquirectangularShader();
+  const envScene = new THREE.Scene();
+  const probe = new THREE.Mesh(new THREE.SphereGeometry(50, 24, 16), skyMat);
+  envScene.add(probe);
+  const rt = pmrem.fromScene(envScene, 0, 1, 120);
+  scene.environment = rt.texture;
+  probe.geometry.dispose();
+  pmrem.dispose();
+}
 
 /* ------------------------ GEOMETRY BUILDING HELPERS ---------------------- */
 /* Everything static is merged into a handful of big vertex-coloured meshes so
@@ -481,21 +496,28 @@ function put(list, base, x,y,z, sx,sy,sz, color, opt = {}){
   const y0 = opt.y0 === undefined ? y - sy * 0.5 : opt.y0;
   const h  = Math.max(0.001, opt.aoH === undefined ? Math.abs(sy) : opt.aoH);
   const tint = opt.tint || 0;
+  const gain = opt.gain === undefined ? 1 : opt.gain;
   for (let i = 0; i < n; i++){
     const vy = p.getY(i);
     let k = 1 - ao * (1 - clamp((vy - y0) / h, 0, 1));
     if (opt.overhang) k *= 0.72;                        // baked under-shadow
     if (tint) k *= 1 + (((i * 2654435761) % 1000) / 1000 - 0.5) * tint;
-    arr[i*3] = _col.r * k; arr[i*3+1] = _col.g * k; arr[i*3+2] = _col.b * k;
+    arr[i*3] = _col.r * k * gain; arr[i*3+1] = _col.g * k * gain; arr[i*3+2] = _col.b * k * gain;
   }
   g.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+  // scale UVs so a texture tiles in world units rather than stretching to fit
+  if (opt.uv){
+    const uv = g.attributes.uv;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * opt.uv[0], uv.getY(i) * opt.uv[1]);
+  }
   list.push(g);
   return g;
 }
 // horizontal quad helper (plane is XY by default, so rotate -90 about X)
 function putFlat(list, x,y,z, sx,sz, color, opt = {}){
-  return put(list, QUAD, x,y,z, sx, sz, 1, color,
-    Object.assign({ rx:-Math.PI/2, ao:0, aoH:1, y0:y }, opt));
+  const o = Object.assign({ rx:-Math.PI/2, ao:0, aoH:1, y0:y }, opt);
+  if (o.tile) o.uv = [sx / o.tile, sz / o.tile];
+  return put(list, QUAD, x,y,z, sx, sz, 1, color, o);
 }
 function mergeList(list){
   if (!list.length) return null;
@@ -513,52 +535,204 @@ function mergeChunk(list){
   return g;
 }
 
+/* =========================== PROCEDURAL SURFACES ========================== */
+/* No image files: every texture is generated at load from tiling value noise.
+   The lattice size of each octave divides the texture width, so all octaves
+   wrap and the result tiles seamlessly however far the road runs. Normals come
+   from a Sobel pass over the same height field, which is what turns flat
+   vertex-coloured asphalt into a surface that catches the low sun. */
+
+const TEX_SIZE = 256;
+
+// value noise on a wrapped lattice — tiles exactly at the texture edge
+function latticeNoise(rng, n){
+  const lat = new Float32Array(n * n);
+  for (let i = 0; i < lat.length; i++) lat[i] = rng();
+  const at = (x, y) => lat[((y % n) + n) % n * n + (((x % n) + n) % n)];
+  const sm = t => t * t * (3 - 2 * t);
+  return (u, v) => {
+    const x = u * n, y = v * n;
+    const xi = Math.floor(x), yi = Math.floor(y);
+    const fx = sm(x - xi), fy = sm(y - yi);
+    return lerp(lerp(at(xi, yi), at(xi + 1, yi), fx),
+                lerp(at(xi, yi + 1), at(xi + 1, yi + 1), fx), fy);
+  };
+}
+function fbm(rng, octaves){
+  const layers = octaves.map(([n, amp]) => ({ f:latticeNoise(rng, n), amp }));
+  const norm = layers.reduce((a, l) => a + l.amp, 0);
+  return (u, v) => layers.reduce((a, l) => a + l.f(u, v) * l.amp, 0) / norm;
+}
+
+/* paint(u,v,noise) -> [r,g,b,height]; returns { map, normalMap } */
+function makeSurface(seed, paint, normalStrength = 1.8){
+  const rng = mulberry32(seed);
+  const N = { fine:fbm(rng, [[64, 1], [128, 0.6]]),
+              mid: fbm(rng, [[16, 1], [32, 0.55], [64, 0.3]]),
+              broad:fbm(rng, [[4, 1], [8, 0.5]]),
+              grit: latticeNoise(rng, 128) };
+  const S = TEX_SIZE;
+  const col = document.createElement('canvas'); col.width = col.height = S;
+  const cg = col.getContext('2d');
+  const img = cg.createImageData(S, S);
+  const height = new Float32Array(S * S);
+  for (let y = 0; y < S; y++){
+    for (let x = 0; x < S; x++){
+      const u = x / S, v = y / S;
+      const out = paint(u, v, N);
+      const i = (y * S + x) * 4;
+      img.data[i]     = clamp(out[0], 0, 255);
+      img.data[i + 1] = clamp(out[1], 0, 255);
+      img.data[i + 2] = clamp(out[2], 0, 255);
+      img.data[i + 3] = 255;
+      height[y * S + x] = out[3];
+    }
+  }
+  cg.putImageData(img, 0, 0);
+
+  // Sobel height -> normal, sampling with wrap so the normal map tiles too
+  const nrm = document.createElement('canvas'); nrm.width = nrm.height = S;
+  const ng = nrm.getContext('2d');
+  const nimg = ng.createImageData(S, S);
+  const h = (x, y) => height[(((y % S) + S) % S) * S + (((x % S) + S) % S)];
+  for (let y = 0; y < S; y++){
+    for (let x = 0; x < S; x++){
+      const gx = (h(x+1,y-1) + 2*h(x+1,y) + h(x+1,y+1)) - (h(x-1,y-1) + 2*h(x-1,y) + h(x-1,y+1));
+      const gy = (h(x-1,y+1) + 2*h(x,y+1) + h(x+1,y+1)) - (h(x-1,y-1) + 2*h(x,y-1) + h(x+1,y-1));
+      let nx = -gx * normalStrength, ny = -gy * normalStrength, nz = 1;
+      const len = Math.hypot(nx, ny, nz);
+      nx /= len; ny /= len; nz /= len;
+      const i = (y * S + x) * 4;
+      nimg.data[i]     = (nx * 0.5 + 0.5) * 255;
+      nimg.data[i + 1] = (ny * 0.5 + 0.5) * 255;
+      nimg.data[i + 2] = (nz * 0.5 + 0.5) * 255;
+      nimg.data[i + 3] = 255;
+    }
+  }
+  ng.putImageData(nimg, 0, 0);
+
+  const mk = (canvas, srgb) => {
+    const t = new THREE.CanvasTexture(canvas);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+    if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  };
+  return { map:mk(col, true), normalMap:mk(nrm, false) };
+}
+
+// Tonal blotching plus fine grit is what stops a flat colour reading as plastic.
+// Each painter returns [r,g,b,height]; height drives the Sobel normal pass.
+const SURF_ASPHALT = makeSurface(0x51DEA7, (u, v, N) => {
+  const grit = N.grit(u * 2, v * 2);
+  const patch = N.broad(u, v);
+  const fine = N.fine(u, v);
+  // aggregate: sparse bright stones over a dark binder
+  const stone = grit > 0.72 ? (grit - 0.72) * 3.2 : 0;
+  const base = 74 + patch * 26 + fine * 14 + stone * 52;
+  const h = fine * 0.5 + stone * 0.9 + patch * 0.15;
+  return [base * 1.00, base * 0.99, base * 1.05, h];
+}, 2.4);
+
+const SURF_GRASS = makeSurface(0x6A5514, (u, v, N) => {
+  const clump = N.mid(u, v), fine = N.fine(u * 2, v * 2), broad = N.broad(u, v);
+  const g = 96 + clump * 54 + fine * 30;
+  return [g * 0.60 + broad * 14, g * 0.95, g * 0.42, fine * 0.7 + clump * 0.4];
+}, 1.5);
+
+const SURF_PAVING = makeSurface(0x9A17C3, (u, v, N) => {
+  const blot = N.mid(u, v), fine = N.fine(u, v);
+  // faint slab joints, so pavement reads as laid rather than poured
+  const jx = Math.min(Math.abs(((u * 4) % 1) - 0.5) * 2, 1);
+  const jy = Math.min(Math.abs(((v * 4) % 1) - 0.5) * 2, 1);
+  const joint = Math.min(jx, jy) < 0.06 ? 0.55 : 1;
+  const g = (118 + blot * 30 + fine * 16) * joint;
+  return [g, g * 0.99, g * 0.96, fine * 0.35 + (1 - joint) * 1.6];
+}, 1.7);
+
+const SURF_CONCRETE = makeSurface(0xC0FFEE, (u, v, N) => {
+  const blot = N.broad(u, v), mid = N.mid(u, v), fine = N.fine(u, v);
+  const g = 150 + blot * 34 + mid * 18 + fine * 10;
+  return [g * 1.02, g * 0.99, g * 0.94, fine * 0.4 + mid * 0.25];
+}, 1.2);
+
+const SURF_WATER = makeSurface(0x5EA123, (u, v, N) => {
+  const w = N.mid(u * 1.5, v * 0.6), f = N.fine(u * 2, v * 0.8);
+  const b = 70 + w * 40 + f * 22;
+  return [b * 0.42, b * 0.78, b * 1.05, w * 0.8 + f * 0.5];
+}, 1.0);
+
 const MAT_SOLID = new THREE.MeshLambertMaterial({ vertexColors:true, flatShading:true });
-const MAT_ROAD  = new THREE.MeshLambertMaterial({ vertexColors:true });
+const AMBIENT_FILL = new THREE.AmbientLight(0xFFF0DC, 0.55);   // Lambert props see no IBL
+scene.add(AMBIENT_FILL);
 const MAT_CROWD = new THREE.MeshLambertMaterial({ vertexColors:true, flatShading:true });
+
+/* Road and apron get real materials rather than flat Lambert: a normal map plus
+   an environment map is what makes low-sun grazing light read across asphalt,
+   and it is the surface the player stares at for three minutes. */
+const MAT_ASPHALT = new THREE.MeshStandardMaterial({
+  vertexColors:true, map:SURF_ASPHALT.map, normalMap:SURF_ASPHALT.normalMap,
+  roughness:0.82, metalness:0.02, envMapIntensity:0.55,
+});
+MAT_ASPHALT.normalScale.set(0.85, 0.85);
+
+const MAT_APRON = {
+  grass:    new THREE.MeshStandardMaterial({ vertexColors:true, map:SURF_GRASS.map,    normalMap:SURF_GRASS.normalMap,    roughness:0.95, envMapIntensity:0.4 }),
+  paving:   new THREE.MeshStandardMaterial({ vertexColors:true, map:SURF_PAVING.map,   normalMap:SURF_PAVING.normalMap,   roughness:0.88, envMapIntensity:0.45 }),
+  water:    new THREE.MeshStandardMaterial({ vertexColors:true, map:SURF_WATER.map,    normalMap:SURF_WATER.normalMap,    roughness:0.28, metalness:0.15, envMapIntensity:0.9 }),
+  concrete: new THREE.MeshStandardMaterial({ vertexColors:true, map:SURF_CONCRETE.map, normalMap:SURF_CONCRETE.normalMap, roughness:0.85, envMapIntensity:0.45 }),
+};
+const APRON_FOR = [MAT_APRON.grass, MAT_APRON.paving, MAT_APRON.water, MAT_APRON.grass, MAT_APRON.paving];
 
 /* ----------------------------- ROAD GEOMETRY ----------------------------- */
 /* One merged road+shoulder geometry per chapter, incl. painted lane lines
    whose brightness is worn down per chapter. */
 
 const SEG_L = CHUNK_LEN + CHUNK_OVERLAP;
+/* Two meshes per chunk now instead of one: the carriageway on the asphalt
+   material, and the apron on whatever surface that chapter sits in. Colours here
+   are near-white *tints* — the texture supplies the albedo, so a dark tint would
+   multiply into near-black. `gain` lets painted markings sit brightly on top of
+   a dark asphalt map instead of being multiplied away. */
+const ROAD_TILE = 6, APRON_TILE = 14;
+
 function buildRoad(ch, crosswalk){
-  const L = [];
+  const Ls = [], La = [];        // Ls: asphalt material, La: chapter apron
   const c = CHAPTERS[ch];
   const zc = -CHUNK_LEN / 2;
 
-  // shoulders / ground apron
   if (ch === BRIDGE){
-    putFlat(L, 0, -14, zc, 900, SEG_L * 3, c.ground, { tint:0.05 });   // water
-    putFlat(L, 0, -0.35, zc, 30, SEG_L, 0x6E6E76);                     // deck
-    put(L, BOX, -11.4, -1.2, zc, 5.5, 1.6, SEG_L, 0x8A8A93, { ao:0.3 });
-    put(L, BOX,  11.4, -1.2, zc, 5.5, 1.6, SEG_L, 0x8A8A93, { ao:0.3 });
+    putFlat(La, 0, -14, zc, 900, SEG_L * 3, c.ground, { tint:0.05, tile:70 });   // water
+    // deck and side beams are concrete, so they ride the asphalt material
+    putFlat(Ls, 0, -0.35, zc, 30, SEG_L, 0xF0F0F4, { tile:9, gain:1.5 });
+    put(Ls, BOX, -11.4, -1.2, zc, 5.5, 1.6, SEG_L, 0xF2F2F6, { ao:0.3, gain:1.7 });
+    put(Ls, BOX,  11.4, -1.2, zc, 5.5, 1.6, SEG_L, 0xF2F2F6, { ao:0.3, gain:1.7 });
   } else {
-    putFlat(L, 0, -0.06, zc, 240, SEG_L, c.ground, { tint:0.06 });
+    putFlat(La, 0, -0.06, zc, 240, SEG_L, c.ground, { tint:0.06, tile:APRON_TILE });
   }
-  // asphalt
-  putFlat(L, 0, 0, zc, ROAD_HALF_W * 2, SEG_L, c.road, { tint:0.035 });
-  // curbs
-  const curbC = ch === BRIDGE ? 0x9A9AA2 : (ch === URBAN || ch === FINISH ? 0x7A7A82 : 0x8B8676);
-  put(L, BOX, -ROAD_HALF_W - 0.4, 0.16, zc, 0.9, 0.34, SEG_L, curbC, { ao:0.25 });
-  put(L, BOX,  ROAD_HALF_W + 0.4, 0.16, zc, 0.9, 0.34, SEG_L, curbC, { ao:0.25 });
+  // carriageway
+  putFlat(Ls, 0, 0, zc, ROAD_HALF_W * 2, SEG_L, c.road, { tint:0.035, tile:ROAD_TILE });
+  // curbs: lighter than the road, so they need a gain over the asphalt map
+  const curbC = ch === BRIDGE ? 0xF4F4F8 : (ch === URBAN || ch === FINISH ? 0xEFEFF2 : 0xF2EFE4);
+  put(Ls, BOX, -ROAD_HALF_W - 0.4, 0.16, zc, 0.9, 0.34, SEG_L, curbC, { ao:0.25, gain:1.9 });
+  put(Ls, BOX,  ROAD_HALF_W + 0.4, 0.16, zc, 0.9, 0.34, SEG_L, curbC, { ao:0.25, gain:1.9 });
 
-  // lane lines: dashed, worn per chapter
+  // lane lines: dashed, worn per chapter. The asphalt grit still shows through
+  // the paint, which is what makes worn markings read as painted on.
   const wear = [0.86, 0.62, 0.78, 0.70, 0.95][ch];
-  const lineC = _col.set(0xF2EFE2).multiplyScalar(wear).getHex();
+  const lineGain = 4.2 * wear;
   for (const lx of [-2.3, 2.3]){
     for (let z = 0; z < SEG_L; z += 10)
-      putFlat(L, lx, 0.02, -z, 0.34, 6, lineC, { tint:0.08 });
+      putFlat(Ls, lx, 0.02, -z, 0.34, 6, 0xF2EFE2, { tint:0.08, tile:ROAD_TILE, gain:lineGain });
   }
-  // edge lines
   for (const lx of [-ROAD_HALF_W + 0.55, ROAD_HALF_W - 0.55])
-    putFlat(L, lx, 0.02, zc, 0.26, SEG_L, lineC);
+    putFlat(Ls, lx, 0.02, zc, 0.26, SEG_L, 0xF2EFE2, { tile:ROAD_TILE, gain:lineGain });
 
   if (crosswalk){
     for (let i = -4; i <= 4; i++)
-      putFlat(L, i * 1.7, 0.03, -SEG_L * 0.45, 1.05, 5.5, 0xF6F2E4);
+      putFlat(Ls, i * 1.7, 0.03, -SEG_L * 0.45, 1.05, 5.5, 0xF6F2E4, { tile:ROAD_TILE, gain:4.4 });
   }
-  return mergeChunk(L);
+  return { surface: mergeChunk(Ls), apron: mergeChunk(La) };
 }
 
 /* --------------------------- CHAPTER SIDE DRESSING ----------------------- */
@@ -758,15 +932,17 @@ const KIT = CHAPTERS.map((c, ch) => ({
 class Chunk {
   constructor(){
     this.group   = new THREE.Group();
-    this.road    = new THREE.Mesh(KIT[0].road[0], MAT_ROAD);
+    this.road    = new THREE.Mesh(KIT[0].road[0].surface, MAT_ASPHALT);
+    this.apron   = new THREE.Mesh(KIT[0].road[0].apron, APRON_FOR[0]);
     this.dressF  = new THREE.Mesh(KIT[0].full[0], MAT_SOLID);
     this.dressL  = new THREE.Mesh(KIT[0].lod[0],  MAT_SOLID);
     this.crowd   = new THREE.Mesh(KIT[0].crowd[1] || KIT[1].crowd[1], MAT_CROWD);
     this.far     = new THREE.Mesh(KIT[0].far, MAT_SOLID);
     this.road.receiveShadow = true;
+    this.apron.receiveShadow = true;
     this.dressF.castShadow = true; this.dressF.receiveShadow = true;
     this.crowd.castShadow = false;
-    this.group.add(this.road, this.dressF, this.dressL, this.crowd, this.far);
+    this.group.add(this.apron, this.road, this.dressF, this.dressL, this.crowd, this.far);
     this.group.visible = false;
     this.index = -1;
     scene.add(this.group);
@@ -786,7 +962,9 @@ class Chunk {
     const v   = (r() * VARIANTS) | 0;
     const cw  = ch === URBAN && r() < 0.18 ? 1 : 0;      // occasional crosswalk
     this.chapter = ch;
-    this.road.geometry   = k.road[cw];
+    this.road.geometry   = k.road[cw].surface;
+    this.apron.geometry  = k.road[cw].apron;
+    this.apron.material  = APRON_FOR[ch];
     this.dressF.geometry = k.full[v];
     this.dressL.geometry = k.lod[v];
     this.far.geometry    = k.far;
@@ -854,7 +1032,7 @@ const SINGLET = 0xE85D4A, SHORTS = 0x2B3446, SKIN = 0xC79A78, SHOE = 0xF4F1E8;
 function limb(len, rad, color){
   const g = new THREE.Group();
   const m = new THREE.Mesh(new THREE.CapsuleGeometry(rad, len, 3, 6),
-                           new THREE.MeshStandardMaterial({ color, roughness:0.72, metalness:0.02, flatShading:true }));
+                           new THREE.MeshStandardMaterial({ color, roughness:0.72, metalness:0.02, flatShading:true, envMapIntensity:0.35 }));
   m.position.y = -len / 2 - rad * 0.4;
   m.castShadow = true;
   g.add(m);
@@ -864,13 +1042,13 @@ const runner = new THREE.Group();
 const body = new THREE.Group();          // holds lean/duck so gait is unaffected
 runner.add(body);
 const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.42, 0.78, 4, 8),
-  new THREE.MeshStandardMaterial({ color:SINGLET, roughness:0.68, flatShading:true }));
+  new THREE.MeshStandardMaterial({ color:SINGLET, roughness:0.68, flatShading:true, envMapIntensity:0.35 }));
 torso.position.y = 2.02; torso.castShadow = true;
 const hips = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.5, 0.5),
-  new THREE.MeshStandardMaterial({ color:SHORTS, roughness:0.8, flatShading:true }));
+  new THREE.MeshStandardMaterial({ color:SHORTS, roughness:0.8, flatShading:true, envMapIntensity:0.35 }));
 hips.position.y = 1.44; hips.castShadow = true;
 const head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.32, 1),
-  new THREE.MeshStandardMaterial({ color:SKIN, roughness:0.85, flatShading:true }));
+  new THREE.MeshStandardMaterial({ color:SKIN, roughness:0.85, flatShading:true, envMapIntensity:0.3 }));
 head.position.y = 2.72; head.castShadow = true;
 body.add(torso, hips, head);
 
@@ -884,7 +1062,7 @@ const shinL = limb(0.68, 0.14, SKIN), shinR = limb(0.68, 0.14, SKIN);
 thighL.pivot.position.set(-0.26, 1.34, 0); thighR.pivot.position.set(0.26, 1.34, 0);
 shinL.pivot.position.y = -0.98; shinR.pivot.position.y = -0.98;
 thighL.pivot.add(shinL.pivot); thighR.pivot.add(shinR.pivot);
-const shoeMat = new THREE.MeshStandardMaterial({ color:SHOE, roughness:0.6, flatShading:true });
+const shoeMat = new THREE.MeshStandardMaterial({ color:SHOE, roughness:0.6, flatShading:true, envMapIntensity:0.4 });
 const shoeGeo = new THREE.BoxGeometry(0.26, 0.16, 0.5);
 const shoeL = new THREE.Mesh(shoeGeo, shoeMat), shoeR = new THREE.Mesh(shoeGeo, shoeMat);
 shoeL.position.set(0, -0.86, 0.08); shoeR.position.copy(shoeL.position);
@@ -1018,6 +1196,7 @@ function tryConsumeInput(){
 
 const camPos = new THREE.Vector3();
 const _target = new THREE.Vector3(), _look = new THREE.Vector3(), _tmp = new THREE.Vector3();
+const _shadowAt = new THREE.Vector3();
 let camLateral = 0, camDip = 0, camLift = 0, camSway = 0, camDrag = 0;
 const CAM_BACK = 7.0, CAM_UP = 4.9;
 
@@ -1076,8 +1255,17 @@ function placeRunner(){
   runner.rotation.set(f.pitch, f.yaw, 0, 'YXZ');
   const wobble = S.stumbleT > 0 ? Math.sin(S.stumbleT * 46) * 0.26 * (S.stumbleT / (STUMBLE_MS / 1000)) : 0;
   body.rotation.z = lerp(body.rotation.z, -laneVel * 0.055 + wobble, 0.35);
-  sun.position.copy(runner.position).addScaledVector(SUN_DIR, 60);
-  sun.target.position.copy(runner.position);
+  // Snap the shadow frustum to its own texel grid. Unsnapped, the whole map
+  // slides by sub-texel amounts every frame and every shadow edge crawls — an
+  // artefact that is far more obvious when the ground is always moving.
+  const sc = sun.shadow.camera;
+  const texel = (sc.right - sc.left) / sun.shadow.mapSize.x;
+  _shadowAt.copy(runner.position);
+  _shadowAt.x = Math.round(_shadowAt.x / texel) * texel;
+  _shadowAt.y = Math.round(_shadowAt.y / texel) * texel;
+  _shadowAt.z = Math.round(_shadowAt.z / texel) * texel;
+  sun.position.copy(_shadowAt).addScaledVector(SUN_DIR, 60);
+  sun.target.position.copy(_shadowAt);
   sun.target.updateMatrixWorld();
 }
 
@@ -1110,6 +1298,10 @@ const SPEC = {
   [T.GANTRY]  : { w:0,    half:1,   jump:false, mode:'decor'  },
 };
 const SPAWN_AHEAD = 430;
+// Engine clock for visual oscillations. Anything animating off performance.now()
+// instead inherits boot-duration jitter, which desynchronises identical runs and
+// makes tools/imagediff.mjs unusable as a gate.
+let animClock = 0;
 const CROSS_DUR   = 3.0;   // seconds a cyclist takes to cross the road
 const TELEGRAPH   = 1.2;
 
@@ -1339,7 +1531,7 @@ const POOLS = {
     const post = new THREE.Mesh(OBGEO[T.GANTRY], MAT_SOLID);
     post.castShadow = true;
     const sign = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 1.7),
-      new THREE.MeshBasicMaterial({ transparent:true, toneMapped:false }));
+      new THREE.MeshBasicMaterial({ map:MILE_TEX[0], transparent:true, toneMapped:false }));
     sign.position.set(0, 5.55, 0.12);
     g.add(post, sign);
     g.userData.sign = sign;
@@ -1557,9 +1749,8 @@ function spawn(o){
   m.position.copy(_op);
   m.rotation.set(f.pitch, f.yaw, 0, 'YXZ');
   if (o.type === T.GANTRY && m.userData.sign){
-    const tex = MILE_TEX[clamp(o.n - 1, 0, MILE_TEX.length - 1)];
-    m.userData.sign.material.map = tex;
-    m.userData.sign.material.needsUpdate = true;
+    // same define set, so this is a texture swap and not a shader recompile
+    m.userData.sign.material.map = MILE_TEX[clamp(o.n - 1, 0, MILE_TEX.length - 1)];
   }
   live.push(o);
 }
@@ -1580,6 +1771,7 @@ function resetCourseObjects(){
 }
 
 function updateCourseObjects(dt){
+  animClock += dt;
   while (nextSpawn < COURSE.length && COURSE[nextSpawn].s < S.s + SPAWN_AHEAD)
     spawn(COURSE[nextSpawn++]);
 
@@ -1612,7 +1804,7 @@ function updateCourseObjects(dt){
       }
       if (o.warn){
         const k = clamp(1 - Math.abs(tta) / TELEGRAPH, 0, 1);
-        o.warn.material.opacity = k * (0.35 + 0.25 * Math.sin(performance.now() * 0.02));
+        o.warn.material.opacity = k * (0.35 + 0.25 * Math.sin(animClock * 20));
       }
       o.x = x;
     }
@@ -1656,7 +1848,7 @@ function updateCourseObjects(dt){
 
   // finish line becomes visible in the distance down the finish straight
   if (!finishGroup.visible && COURSE_LENGTH - S.s < SPAWN_AHEAD * 1.6) finishGroup.visible = true;
-  if (finishGroup.visible) finishTape.material.emissiveIntensity = 0.5 + 0.35 * Math.sin(performance.now() * 0.004);
+  if (finishGroup.visible) finishTape.material.emissiveIntensity = 0.5 + 0.35 * Math.sin(animClock * 4);
 }
 
 function cleanPass(){
@@ -1696,7 +1888,7 @@ function collect(o){
     burst(o.x, 1.5, 16, 0xFFC24A, 0.32, 0.65);
   }
   ringBurst(o.x, 1.5, o.type === T.WATER ? 0x9FE4F8 : o.type === T.BANANA ? 0xFFE27A : 0xFFC24A, 5);
-  sfxChime(S.combo);
+  sfxChime(S.combo, clamp(o.x / 8, -1, 1));   // heard where it was taken
   camLift = 0.35;
 }
 
@@ -1766,17 +1958,17 @@ function burst(x, y, n, color, size, life){
   courseToWorld(S.s, x, y, _op);
   for (let i = 0; i < n; i++){
     emit(_op.x, _op.y, _op.z,
-      rr(rngArt,-4,4), rr(rngArt,2,8), rr(rngArt,-4,4),
-      color, size * rr(rngArt,0.6,1.3), life * rr(rngArt,0.6,1.1), 14, 0.9);
+      rr(rngFx,-4,4), rr(rngFx,2,8), rr(rngFx,-4,4),
+      color, size * rr(rngFx,0.6,1.3), life * rr(rngFx,0.6,1.1), 14, 0.9);
   }
 }
 function confetti(){
   courseToWorld(S.s + 6, 0, 6, _op);
   const cols = [0xE85D4A, 0xFFD84D, 0x4E8AD6, 0x7BE39B, 0xFFF3D8, 0xC97BD1];
   for (let i = 0; i < 74; i++){
-    emit(_op.x + rr(rngArt,-9,9), _op.y + rr(rngArt,-1,4), _op.z + rr(rngArt,-4,4),
-      rr(rngArt,-7,7), rr(rngArt,3,13), rr(rngArt,-7,7),
-      cols[i % cols.length], rr(rngArt,0.32,0.6), 2.5, 9, 1);
+    emit(_op.x + rr(rngFx,-9,9), _op.y + rr(rngFx,-1,4), _op.z + rr(rngFx,-4,4),
+      rr(rngFx,-7,7), rr(rngFx,3,13), rr(rngFx,-7,7),
+      cols[i % cols.length], rr(rngFx,0.32,0.6), 2.5, 9, 1);
   }
 }
 
@@ -1788,8 +1980,8 @@ function updateParticles(dt){
     dustAcc += dt * (12 + effort * 26);
     while (dustAcc >= 1){
       dustAcc -= 1;
-      courseToWorld(S.s - 1.2, laneXNow() + rr(rngArt,-0.4,0.4), 0.18, _op);
-      emit(_op.x, _op.y, _op.z, rr(rngArt,-1.2,1.2), rr(rngArt,0.6,2.4), rr(rngArt,-1,1),
+      courseToWorld(S.s - 1.2, laneXNow() + rr(rngFx,-0.4,0.4), 0.18, _op);
+      emit(_op.x, _op.y, _op.z, rr(rngFx,-1.2,1.2), rr(rngFx,0.6,2.4), rr(rngFx,-1,1),
         0xC9B79C, 0.20 + effort * 0.14, 0.42 + effort * 0.25, 2.5, 0.34);
     }
   }
@@ -1853,6 +2045,31 @@ function updateEffects(dt){ updateParticles(dt); updateRings(dt); }
 /* ========================================================================== */
 
 let AC = null, master = null, noiseBuf = null, crowdGain = null, crowdSrc = null;
+let fxBus = null, wetGain = null;
+
+/* A procedurally generated impulse response — noise under an exponential decay,
+   with a few discrete early reflections so it reads as a space rather than a
+   wash. Wet level is driven per chapter, so footsteps and chimes ring off the
+   buildings in the Urban Canyon and go dry out over the open water. */
+function makeImpulseResponse(seconds, decay){
+  const len = Math.floor(AC.sampleRate * seconds);
+  const buf = AC.createBuffer(2, len, AC.sampleRate);
+  for (let ch = 0; ch < 2; ch++){
+    const d = buf.getChannelData(ch);
+    for (let i = 0; i < len; i++){
+      const t = i / len;
+      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, decay);
+    }
+    // early reflections, offset per ear so the space has width
+    for (const [ms, amp] of [[11, 0.5], [23, 0.36], [37, 0.26], [53, 0.18]]){
+      const at = Math.floor(AC.sampleRate * (ms + ch * 3) / 1000);
+      if (at < len) d[at] += amp * (ch ? -1 : 1);
+    }
+  }
+  return buf;
+}
+// chapter -> reverb wet level: canyon rings, open water does not
+const CHAPTER_WET = [0.07, 0.30, 0.09, 0.12, 0.22];
 
 function audioUnlock(){
   if (AC){ if (AC.state === 'suspended') AC.resume(); return; }
@@ -1879,7 +2096,18 @@ function audioUnlock(){
   crowdGain = AC.createGain(); crowdGain.gain.value = 0;
   crowdSrc.connect(lp); lp.connect(bp); bp.connect(crowdGain); crowdGain.connect(master);
   crowdSrc.start();
+
+  // every one-shot voice runs through fxBus, which fans out dry to the master
+  // and wet through the convolver. The crowd bed stays dry: it is already diffuse.
+  fxBus = AC.createGain();
+  fxBus.connect(master);
+  const conv = AC.createConvolver();
+  conv.buffer = makeImpulseResponse(1.7, 2.6);
+  wetGain = AC.createGain();
+  wetGain.gain.value = CHAPTER_WET[0];
+  fxBus.connect(conv); conv.connect(wetGain); wetGain.connect(master);
 }
+const fxOut = () => fxBus || master;
 const now = () => AC.currentTime;
 
 function noiseVoice(dur, type, f0, f1, q, gain, pan){
@@ -1898,8 +2126,8 @@ function noiseVoice(dur, type, f0, f1, q, gain, pan){
   src.connect(flt); flt.connect(g);
   if (pan !== undefined && AC.createStereoPanner){
     const p = AC.createStereoPanner(); p.pan.value = pan;
-    g.connect(p); p.connect(master);
-  } else g.connect(master);
+    g.connect(p); p.connect(fxOut());
+  } else g.connect(fxOut());
   src.start(t); src.stop(t + dur + 0.02);
 }
 function toneVoice(freq, dur, type, gain, detune, pan){
@@ -1916,18 +2144,18 @@ function toneVoice(freq, dur, type, gain, detune, pan){
   o.connect(g);
   if (pan !== undefined && AC.createStereoPanner){
     const p = AC.createStereoPanner(); p.pan.value = pan;
-    g.connect(p); p.connect(master);
-  } else g.connect(master);
+    g.connect(p); p.connect(fxOut());
+  } else g.connect(fxOut());
   o.start(t); o.stop(t + dur + 0.02);
 }
 
 const PENTA = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21];
-function sfxChime(combo){
+function sfxChime(combo, pan){
   if (!AC) return;
   const step = PENTA[Math.min(PENTA.length - 1, Math.floor(combo / 2))];
   const f = 660 * Math.pow(2, step / 12);
-  toneVoice(f, 0.30, 'triangle', 0.20);
-  toneVoice(f * 2, 0.18, 'sine', 0.09);
+  toneVoice(f, 0.30, 'triangle', 0.20, 0, pan);
+  toneVoice(f * 2, 0.18, 'sine', 0.09, 0, pan);
 }
 function sfxSplash(){ noiseVoice(0.24, 'bandpass', 900, 3200, 1.4, 0.16); }
 function sfxJump(){ noiseVoice(0.16, 'highpass', 500, 2400, 0.8, 0.075); }
@@ -1996,7 +2224,11 @@ function updateAudio(dt){
   const target = S.phase === 'menu' ? 0.05
     : clamp(0.055 * chCrowd + nearMile * 0.10 + finishRamp * 0.34, 0, 0.5);
   crowdAcc += dt;
-  if (crowdAcc > 0.15){ crowdAcc = 0; crowdGain.gain.setTargetAtTime(target, now(), 0.4); }
+  if (crowdAcc > 0.15){
+    crowdAcc = 0;
+    crowdGain.gain.setTargetAtTime(target, now(), 0.4);
+    if (wetGain) wetGain.gain.setTargetAtTime(CHAPTER_WET[chapterAtMile(S.mile)], now(), 1.2);
+  }
 }
 let crowdAcc = 0;
 
@@ -2422,6 +2654,7 @@ function drawSparkline(splits){
 
 let last = performance.now(), frameEMA = 16.7;
 function tick(now){
+  if (window.__mrDetached) return;      // tools/ drive frames explicitly
   requestAnimationFrame(tick);
   let dt = (now - last) / 1000; last = now;
   if (dt > 0.05) dt = 0.05;                       // clamp after a stall
@@ -2492,10 +2725,134 @@ addEventListener('resize', () => {
   onResize();
 });
 
+/* ----------------------------- SHADER PRE-WARM ---------------------------- */
+/* Every material/lighting/shadow combination compiles its GLSL program the
+   first time it is actually drawn. Left alone that happens mid-race — a pooled
+   obstacle type appearing for the first time, the finish tape coming into view —
+   and the resulting stall lands on the clock. The clock is the score in a daily
+   game where players compare times, so a hitch is not a cosmetic problem here.
+
+   So: make every pooled object visible for one frame, compile the whole scene,
+   and push one full composer frame through. That pulls the forward programs,
+   the shadow-depth programs and the post chain to boot, where a slow frame
+   costs nothing. tools/profile.mjs gates this at zero compiles after boot. */
+
+function prewarmShaders(){
+  // Unhide EVERY invisible node, not just meshes. Pooled pickups and gantries
+  // are Groups whose children are individually visible, so skipping the Group
+  // left their materials undrawn and therefore uncompiled.
+  const hidden = [], unculled = [];
+  scene.traverse(o => {
+    if (!o.visible){ hidden.push(o); o.visible = true; }
+    // pooled objects all sit at the origin until first use; culling would skip
+    // most of them and leave their programs to compile mid-race
+    if (o.frustumCulled){ unculled.push(o); o.frustumCulled = false; }
+  });
+  finishGroup.visible = true;
+
+  // Shadow-depth programs only compile for casters inside the shadow frustum,
+  // which normally hugs the runner. Widen it for this one frame.
+  const sc = sun.shadow.camera;
+  const box = { l:sc.left, r:sc.right, t:sc.top, b:sc.bottom, f:sc.far };
+  sc.left = -400; sc.right = 400; sc.top = 400; sc.bottom = -400; sc.far = 1200;
+  sc.updateProjectionMatrix();
+
+  // Two things had to be true before this actually worked, both found by
+  // measuring rather than reasoning (see tools/profile.mjs):
+  //
+  //  - renderer.compile() is useless here. three keys the program cache on tone
+  //    mapping and uses NoToneMapping whenever it draws into a render target.
+  //    compile() runs against the screen, so with a composer it builds
+  //    tone-mapped variants nothing ever draws with — 11 dead programs, while
+  //    the real ones still compiled mid-race. A genuine composer frame builds
+  //    exactly the variants the game uses.
+  //
+  //  - Unhiding was not enough. Pooled objects all sit at the origin until first
+  //    use, so the renderer culled them straight back out of this frame and
+  //    their programs still waited for the race. Hence frustumCulled above.
+  try {
+    composer.render();
+  } catch (e) {
+    console.warn('prewarm skipped:', e);
+  }
+
+  sc.left = box.l; sc.right = box.r; sc.top = box.t; sc.bottom = box.b; sc.far = box.f;
+  sc.updateProjectionMatrix();
+  for (const o of hidden) o.visible = false;
+  for (const o of unculled) o.frustumCulled = true;
+  finishGroup.visible = false;
+}
+
 /* --------------------------------- BOOT ---------------------------------- */
 
+buildEnvironment();
 initChunks();
 resetRun();
+prewarmShaders();
+
+/* Test hook. Only exposed with ?debug in the URL, so the shipped page leaks
+   nothing. The tools in tools/ drive the game through this rather than
+   string-injecting a harness, which kept silently rotting as the file moved. */
+if (location.search.includes('debug')){
+  window.MR = {
+    THREE, renderer, composer, scene, camera, S, chunks, runner, live, COURSE, T, LANE_X, quality,
+    startRun, stepRun, resetRun, updateChunks, updateCamera, placeRunner, animateRunner,
+    updateEffects, updateGrade, updateHUD, tryConsumeInput, input, render,
+    worldSpeed, laneXNow, jumpY, isAirborne, isDucking, isLow,
+    WR_SECONDS, WR_PACE, PACE_BASE, PACE_FLOOR, PACE_CAP, COMBO_FULL, DATE_KEY,
+    TIME_COMPRESSION, WORLD_UNITS_PER_MILE,
+    // one full frame of the real loop, at a fixed dt — used by the tools so a
+    // scripted run is reproducible instead of tied to wall-clock rAF timing.
+    // draw:false advances everything but skips the composer, so a tool can cover
+    // ground cheaply on software GL and still render at the points it samples.
+    frame(dt, draw = true){
+      tryConsumeInput();
+      if (S.phase === 'running') stepRun(dt);
+      if (S.laneT < 1) S.laneT = Math.min(1, S.laneT + dt * 1000 / LANE_SHIFT_MS);
+      if (S.jumpT < 1) S.jumpT = Math.min(1, S.jumpT + dt * 1000 / JUMP_MS);
+      if (S.duckT < 1) S.duckT = Math.min(1, S.duckT + dt * 1000 / DUCK_MS);
+      if (S.duckHold > 0) S.duckHold = Math.max(0, S.duckHold - dt);
+      if (S.stumbleT > 0) S.stumbleT = Math.max(0, S.stumbleT - dt);
+      animateRunner(dt, S.pace, isAirborne(), isDucking(), S.stumbleT);
+      placeRunner();
+      updateCamera(dt);
+      updateChunks(S.s);
+      updateEffects(dt);
+      updateHUD(dt);
+      sky.position.copy(camera.position);
+      if (draw) render(dt); else updateGrade(dt);
+    },
+    // stop the rAF loop so a scripted run is the only thing advancing state
+    detach(){ window.__mrDetached = true; },
+    // zero every visual accumulator. rAF frames can slip in before a tool takes
+    // control, and residual sway/gait/grain phase otherwise shifts every pixel.
+    reseed(){
+      animClock = 0; camSway = 0; camDrag = 0; camLateral = 0;
+      gaitPhase = 0; duckOffset = 0; camDip = 0; camLift = 0; hudAcc = 0;
+      rngFx = mulberry32(0xF00D5EED);
+      dustAcc = 0; pHead = 0;
+      for (let i = 0; i < PMAX; i++){ pLife[i] = 0; pAlpha[i] = 0; }
+      pGeo.attributes.palpha.needsUpdate = true;
+      for (const r of rings) r.m.visible = false;
+      rings.length = 0;
+      // the adaptive ladder may already have stepped down off bad frame times
+      frameEMA = 16.7;
+      while (quality.level > 0){ QUALITY_UNDO[quality.level](); quality.level--; }
+      quality.overT = 0; quality.underT = 0;
+      // every grade/fog/fov value is a lerp with history — pin them
+      _gradeCur.setRGB(1, 1, 1);
+      gradePass.uniforms.uTime.value = 0;
+      gradePass.uniforms.uTint.value.set(1, 1, 1);
+      gradePass.uniforms.uVig.value = CHAPTERS[0].vig;
+      gradePass.uniforms.uWarm.value = 0;
+      blurPass.uniforms.uStrength.value = 0;
+      skyMat.uniforms.uWarm.value = 1;
+      scene.fog.color.copy(FOG_BASE);
+      scene.fog.density = 0.00105;
+      camera.fov = 68; camera.updateProjectionMatrix();
+    },
+  };
+}
 if (!LS.get(K_TUT, 0)) showTutorial();
 else if (LS.get(K_PLAYED, 0)){
   // repeat players skip the menu: brief beat, then the gun goes off

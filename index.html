@@ -1156,7 +1156,8 @@ const head = part(L => {
   put(L, ICO1, 0,  0,    0,     0.40, 0.44, 0.42, SKIN, A0);
   put(L, ICO1, 0,  0.10, -0.03, 0.42, 0.32, 0.43, HAIR, A0);
 });
-head.position.y = 2.83;
+const HEAD_Y = 2.83;               // rest height; animateRunner damps the bob around it
+head.position.y = HEAD_Y;
 body.add(head);
 
 const upperArm = () => limb(L => {
@@ -1195,12 +1196,35 @@ body.add(armL.pivot, armR.pivot, thighL.pivot, thighR.pivot);
 scene.add(runner);
 
 let gaitPhase = 0;
+// Per-stride variation, resampled once per cycle. Per-frame noise reads as
+// jitter rather than as a human; the point is that no two strides are quite
+// identical. It draws from rngFx (resettable) so tools/shots.mjs stays
+// reproducible across runs.
+let strideVar = 1, armVar = 1, gaitCycle = -1;
+// Hip roll is authored here but applied in placeRunner, which owns body.rotation.z.
+let gaitRoll = 0;
+// Landing squash, armed on the airborne -> grounded edge.
+let landT = 0, wasAirborne = false;
+const LAND_MS = 0.20;
+
 function animateRunner(dt, pace, airborne, ducking, stumbleT){
   const effort = clamp((PACE_BASE - pace) / (PACE_BASE - PACE_FLOOR), 0, 1);
   const cadence = lerp(1.55, 2.35, effort);
-  const stride  = lerp(0.86, 1.16, effort);
   gaitPhase += dt * cadence * Math.PI * 2;
   if (gaitPhase > Math.PI * 4) gaitPhase -= Math.PI * 4;
+
+  const cyc = Math.floor(gaitPhase / (Math.PI * 2));
+  if (cyc !== gaitCycle){
+    gaitCycle = cyc;
+    strideVar = 1 + rr(rngFx, -0.045, 0.045);
+    armVar    = 1 + rr(rngFx, -0.05,  0.05);
+  }
+  const stride = lerp(0.86, 1.16, effort) * strideVar;
+
+  if (wasAirborne && !airborne) landT = LAND_MS;
+  wasAirborne = airborne;
+  if (landT > 0) landT = Math.max(0, landT - dt);
+  const land = landT / LAND_MS;
 
   const p = gaitPhase;
   const sinP  = Math.sin(p),  cosP  = Math.cos(p);
@@ -1214,27 +1238,31 @@ function animateRunner(dt, pace, airborne, ducking, stumbleT){
   thighR.pivot.rotation.x = lerp(sw2 * kneeUp, -0.35, air);
 
   // knee bend: the trailing leg bends as the thigh swings back,
-  // the leading leg straightens during push-off
+  // the leading leg straightens during push-off. Landing folds both.
   const kBendL = Math.max(0, -sinP) * lerp(0.9, 1.4, effort)
                + Math.max(0, -cosP) * 0.35;
   const kBendR = Math.max(0, -sinP2) * lerp(0.9, 1.4, effort)
                + Math.max(0, -cosP2) * 0.35;
-  shinL.pivot.rotation.x = lerp(kBendL, 1.1, air);
-  shinR.pivot.rotation.x = lerp(kBendR, 0.5, air);
+  shinL.pivot.rotation.x = lerp(kBendL, 1.1, air) + land * 0.55;
+  shinR.pivot.rotation.x = lerp(kBendR, 0.5, air) + land * 0.55;
 
   // Arms oppose the legs. The upper arm swings far less than the thigh — a
   // runner's shoulder travels maybe 30 degrees either side of vertical, and the
   // elbow stays locked near a right angle rather than opening and closing. An
   // earlier pass swung it as widely as the leg (~60 degrees) and compounded that
   // with a varying elbow, which read as flailing rather than running.
-  const armSwing = lerp(0.50, 0.68, effort);
+  const armSwing = lerp(0.50, 0.68, effort) * armVar;
   armL.pivot.rotation.x = lerp(sw2 * armSwing, -1.2, air);
   armR.pivot.rotation.x = lerp(sw  * armSwing, -1.2, air);
   const elbow = -lerp(1.35, 1.55, effort);
   foreL.pivot.rotation.x = elbow - Math.max(0, sw2) * 0.16;
   foreR.pivot.rotation.x = elbow - Math.max(0, sw)  * 0.16;
-  armL.pivot.rotation.z =  lerp(0.14, 0.09, effort);
-  armR.pivot.rotation.z = -lerp(0.14, 0.09, effort);
+  // Second plane: the arms also swing slightly across the chest, in opposite
+  // phase to each other. Without this the swing is a flat pendulum in the
+  // sagittal plane, which is the plane the chase camera looks straight down.
+  const add = lerp(0.14, 0.09, effort);
+  armL.pivot.rotation.z =  add + sw2 * 0.07;
+  armR.pivot.rotation.z = -add - sw  * 0.07;
 
   // stumble: forward lurch, arms flail, head drops
   const stT = stumbleT > 0 ? stumbleT / (STUMBLE_MS / 1000) : 0;
@@ -1245,7 +1273,10 @@ function animateRunner(dt, pace, airborne, ducking, stumbleT){
   const leanBase = lerp(0.10, 0.24, effort) + stT * 0.45;
   body.rotation.x = lerp(body.rotation.x, lerp(leanBase, 0.95, duckT), 1 - Math.exp(-dt * 16));
   duckOffset = lerp(duckOffset, duckT ? -0.95 : 0, 1 - Math.exp(-dt * 18));
-  head.rotation.x = -body.rotation.x * 0.55 + stT * 0.3;
+  // Head stabilisation. A runner holds the head level and lets the neck absorb
+  // the trunk's pitch and bob; slaving it 1:1 to the torso is the strongest
+  // single "this is a puppet, not a person" tell in the whole rig.
+  head.rotation.x = -body.rotation.x * 0.7 + stT * 0.3;
 
   // stumble arm flail: override arm positions during stumble
   if (stT > 0){
@@ -1257,18 +1288,33 @@ function animateRunner(dt, pace, airborne, ducking, stumbleT){
     foreR.pivot.rotation.x -= stT * 0.8;
   }
 
-  // vertical bounce on footstrike — double-bump per stride cycle,
-  // amplitude grows with effort for sprint impact feel
-  const footstrike = Math.abs(sinP);
-  const bounce = footstrike * lerp(0.06, 0.14, effort);
+  // Vertical travel. Footstrike is where the legs are most spread — |sin(p)| = 1
+  // — and the body is lowest just after it. The previous version used |sin(p)|
+  // directly as the height, which put the body at its *highest* exactly when it
+  // should have been compressing: the bob was a half-cycle out of phase with the
+  // legs the whole time. Phase is re-zeroed on contact here, and the curve is
+  // asymmetric — a fast compression over the first 15% of the half-cycle, then a
+  // slow rise — because a symmetric sinusoid is what reads as floaty.
+  const u = ((((p - Math.PI / 2) % Math.PI) + Math.PI) % Math.PI) / Math.PI;
+  const rise = u < 0.15 ? 1 - smoothstep(0, 0.15, u) : smoothstep(0.15, 1, u);
+  const bounce = rise * lerp(0.06, 0.14, effort) - land * 0.12;
   // stumble dips the body down briefly
   const stDip = stT > 0 ? stT * -0.3 : 0;
-  body.position.y = duckOffset + stDip + (airborne ? 0 : bounce);
+  const bob = airborne ? 0 : bounce;
+  body.position.y = duckOffset + stDip + bob;
+  // The neck eats most of the trunk's rise and fall, so the head travels about
+  // 30% of it rather than riding the torso 1:1.
+  head.position.y = HEAD_Y - bob * 0.7;
 
-  // slight torso twist opposing the arms; stumble adds lateral stagger. The
-  // pelvis is part of the same merged mesh now, so there is no counter-rotating
-  // hip — the limb pivots hang off `body` and simply do not inherit the twist.
-  torso.rotation.y = sw * lerp(0.03, 0.06, effort) + stPhase * 0.08 * stT;
+  // Hip roll, applied in placeRunner because that owns body.rotation.z.
+  gaitRoll = sinP * lerp(0.02, 0.06, effort);
+  // Trunk and pelvis counter-rotate about the spine instead of turning as one
+  // rigid block: the hips yaw with the legs, the shoulders yaw against them.
+  // `body` carries the pelvis yaw so the leg pivots inherit it, and the torso
+  // mesh takes the difference on top.
+  const hipYaw = -sw * lerp(0.015, 0.03, effort);
+  body.rotation.y = hipYaw;
+  torso.rotation.y = sw * lerp(0.03, 0.06, effort) - hipYaw + stPhase * 0.08 * stT;
 }
 let duckOffset = 0;
 
@@ -1368,7 +1414,32 @@ function tryConsumeInput(){
 
 const camPos = new THREE.Vector3();
 const _target = new THREE.Vector3(), _look = new THREE.Vector3(), _tmp = new THREE.Vector3();
-const _shadowAt = new THREE.Vector3();
+const _shadowAt = new THREE.Vector3(), _blobAt = new THREE.Vector3();
+
+/* Contact shadow. The sun sits well off to one side, so the real cast shadow
+   lands beside the runner and nothing darkens the ground directly under the
+   feet — and from a camera looking down at the road, that patch under the feet
+   is what actually sells contact with the ground. One textured quad, squashed
+   and faded by jump height, is a far better return than any amount of extra
+   shadow-map resolution. */
+const blobTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d');
+  const rad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  // tight core, quick falloff — a wide soft haze reads as dirt on the road
+  // rather than as the runner touching it
+  rad.addColorStop(0,   'rgba(0,0,0,0.78)');
+  rad.addColorStop(0.32,'rgba(0,0,0,0.44)');
+  rad.addColorStop(1,   'rgba(0,0,0,0)');
+  g.fillStyle = rad; g.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+})();
+const contactShadow = new THREE.Mesh(
+  new THREE.PlaneGeometry(1, 1),
+  new THREE.MeshBasicMaterial({ map:blobTex, transparent:true, depthWrite:false, toneMapped:false }));
+contactShadow.rotation.x = -Math.PI / 2;
+contactShadow.renderOrder = 1;
+scene.add(contactShadow);
 let camLateral = 0, camDip = 0, camLift = 0, camSway = 0, camDrag = 0;
 const CAM_BACK = 7.0, CAM_UP = 4.9;
 
@@ -1410,7 +1481,11 @@ function updateCamera(dt){
   camera.position.copy(camPos);
   courseToWorld(s + 11, laneXNow() * 0.45, 0.9 - camDip * 0.5, _look);
   camera.lookAt(_look);
-  camera.rotation.z += Math.sin(camSway * 0.9) * 0.004 + (laneXNow() - camLateral) * 0.012;
+  // Bank into a lane change. camLateral trails laneXNow(), so their difference
+  // is a free signed measure of how hard the runner is currently cutting across
+  // — it peaks mid-swipe and decays to zero on its own, which is exactly the
+  // ease-out the roll wants. ~3 degrees at full crossing.
+  camera.rotation.z += Math.sin(camSway * 0.9) * 0.004 + (laneXNow() - camLateral) * 0.030;
 
   const effort = clamp((PACE_BASE - S.pace) / (PACE_BASE - PACE_FLOOR), 0, 1);
   const fov = lerp(68, 71, effort);
@@ -1431,7 +1506,18 @@ function placeRunner(){
   const laneVel = (LANE_X[S.lane] - LANE_X[S.laneFrom]) * (S.laneT < 1 ? 1 : 0);
   runner.rotation.set(f.pitch, f.yaw, 0, 'YXZ');
   const wobble = S.stumbleT > 0 ? Math.sin(S.stumbleT * 46) * 0.26 * (S.stumbleT / (STUMBLE_MS / 1000)) : 0;
-  body.rotation.z = lerp(body.rotation.z, -laneVel * 0.055 + wobble, 0.35);
+  // gaitRoll is the per-stride hip roll from animateRunner; it lands here
+  // because this is the one place body.rotation.z is written.
+  body.rotation.z = lerp(body.rotation.z, -laneVel * 0.055 + wobble + gaitRoll, 0.35);
+
+  // contact shadow: on the road under the runner, shrinking and fading as they rise
+  const gy = clamp(1 - jumpY() / JUMP_HEIGHT, 0, 1);
+  courseToWorld(S.s, laneXNow(), 0.05, _blobAt);
+  contactShadow.position.copy(_blobAt);
+  contactShadow.rotation.set(-Math.PI / 2, f.yaw, 0, 'YXZ');
+  contactShadow.scale.set(0.55 + 0.9 * gy, 0.7 + 1.2 * gy, 1);
+  contactShadow.material.opacity = 0.25 + 0.65 * gy;
+
   // Snap the shadow frustum to its own texel grid. Unsnapped, the whole map
   // slides by sub-texel amounts every frame and every shadow edge crawls — an
   // artefact that is far more obvious when the ground is always moving.
@@ -3064,6 +3150,10 @@ if (location.search.includes('debug')){
     reseed(){
       animClock = 0; camSway = 0; camDrag = 0; camLateral = 0;
       gaitPhase = 0; duckOffset = 0; camDip = 0; camLift = 0; hudAcc = 0;
+      // per-stride variation is drawn from rngFx, so its cached values and the
+      // cycle counter that gates them have to be pinned alongside the stream
+      strideVar = 1; armVar = 1; gaitCycle = -1; gaitRoll = 0;
+      landT = 0; wasAirborne = false;
       rngFx = mulberry32(0xF00D5EED);
       dustAcc = 0; pHead = 0;
       for (let i = 0; i < PMAX; i++){ pLife[i] = 0; pAlpha[i] = 0; }

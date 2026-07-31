@@ -1,0 +1,6 @@
+node_modules/
+shots/
+*.tgz
+package/
+package-lock.json
+dist/

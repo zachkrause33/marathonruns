@@ -389,7 +389,7 @@ document.body.appendChild(renderer.domElement);
 const scene  = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(68, innerWidth / innerHeight, 0.5, 3000);
 const HORIZON = new THREE.Color(0xFFD9A8);
-scene.fog = new THREE.FogExp2(0xFFDFB6, 0.00105);
+scene.fog = new THREE.FogExp2(0xFFDFB6, 0.00068);
 
 /* --------------------------------- SKY ----------------------------------- */
 
@@ -445,7 +445,7 @@ const mistMat = new THREE.ShaderMaterial({
     void main(){
       float d = abs(vWP.z - uCamZ);
       // fade in: transparent near the camera, opaque at distance
-      float alpha = smoothstep(40.0, 260.0, d) * 0.42;
+      float alpha = smoothstep(110.0, 430.0, d) * 0.28;
       gl_FragColor = vec4(uFogColor, alpha);
     }`,
 });
@@ -458,9 +458,14 @@ scene.add(mistPlane);
 
 /* -------------------------------- LIGHTS --------------------------------- */
 
-const hemi = new THREE.HemisphereLight(0xFFEBD2, 0x8A8472, 0.42);
+// Fill is deliberately weak relative to the sun. Ambient-dominant lighting is
+// what flattens a scene into "everything is its own albedo"; a single strong
+// key with a quiet fill is what gives the road and the runner a visible lit/
+// shadowed split, and keeps the character's shading direction agreeing with
+// the world's so it reads as standing in the scene rather than pasted over it.
+const hemi = new THREE.HemisphereLight(0xFFEBD2, 0x8A8472, 0.26);
 scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xFFE8C6, 2.35);
+const sun = new THREE.DirectionalLight(0xFFE8C6, 2.60);
 sun.castShadow = true;
 sun.shadow.mapSize.set(1024, 1024);
 sun.shadow.camera.near = 1; sun.shadow.camera.far = 120;
@@ -684,25 +689,65 @@ const SURF_WATER = makeSurface(0x5EA123, (u, v, N) => {
   return [b * 0.42, b * 0.78, b * 1.05, w * 0.8 + f * 0.5];
 }, 1.0);
 
-const MAT_SOLID = new THREE.MeshLambertMaterial({ vertexColors:true, flatShading:true });
-const AMBIENT_FILL = new THREE.AmbientLight(0xFFF0DC, 0.55);   // Lambert props see no IBL
-scene.add(AMBIENT_FILL);
-const MAT_CROWD = new THREE.MeshLambertMaterial({ vertexColors:true, flatShading:true });
+/* ---------------------------- TOY CEL SHADING ---------------------------- */
+/* One material language for the whole world, character included. A hard 2-tone
+   break plus a rim term is what makes injection-moulded toy surfaces read; a
+   smooth Lambert falloff is what makes them read as cardboard.
 
-/* Road and apron get real materials rather than flat Lambert: a normal map plus
-   an environment map is what makes low-sun grazing light read across asphalt,
-   and it is the surface the player stares at for three minutes. */
-const MAT_ASPHALT = new THREE.MeshStandardMaterial({
-  vertexColors:true, map:SURF_ASPHALT.map, normalMap:SURF_ASPHALT.normalMap,
-  roughness:0.82, metalness:0.02, envMapIntensity:0.55,
-});
+   The break lives in a 16-texel ramp rather than a 2-texel one because three
+   samples the gradient at dotNL*0.5+0.5, so a 2-texel ramp can only ever break
+   at dotNL = 0 — straight down the terminator. 16 texels puts the step near
+   dotNL 0.35, which throws the shadow side wider and is what actually gives the
+   forms their toy roundness. The lit band stops short of 255 on purpose: at full
+   white the lit side crosses the 0.85 bloom threshold and every surface haloes. */
+const TOON_RAMP = (() => {
+  const N = 16, d = new Uint8Array(N);
+  const brk = Math.round(((0.35 * 0.5) + 0.5) * N);   // dotNL 0.35 -> texel index
+  for (let i = 0; i < N; i++) d[i] = i < brk ? 130 : 224;
+  const t = new THREE.DataTexture(d, N, 1, THREE.RedFormat);
+  t.minFilter = t.magFilter = THREE.NearestFilter;
+  t.needsUpdate = true;
+  return t;
+})();
+// Fresnel rim, added after lighting so the band structure does not quantise it.
+function addRim(mat, strength, colour = 0xFFEBC8){
+  mat.onBeforeCompile = sh => {
+    sh.uniforms.uRimCol = { value: new THREE.Color(colour) };
+    sh.uniforms.uRimStr = { value: strength };
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform vec3 uRimCol;\nuniform float uRimStr;')
+      .replace('#include <opaque_fragment>', `#include <opaque_fragment>
+        {
+          float rim = pow(1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0), 3.0);
+          gl_FragColor.rgb += uRimCol * rim * uRimStr;
+        }`);
+  };
+  return mat;
+}
+const toonMat = (opts, rim) => addRim(
+  new THREE.MeshToonMaterial(Object.assign({ vertexColors:true, gradientMap:TOON_RAMP }, opts)), rim);
+
+const MAT_SOLID = toonMat({}, 0.16);
+const AMBIENT_FILL = new THREE.AmbientLight(0xFFF0DC, 0.40);
+scene.add(AMBIENT_FILL);
+const MAT_CROWD = toonMat({}, 0.10);
+
+/* Ground surfaces move onto the same cel ramp so the world is one material
+   language rather than a toy character standing on a photographic road. The
+   procedural maps and normal maps stay — they keep the tarmac from reading as a
+   flat plane of colour — but the lighting response is now banded like everything
+   else, and the rim is dialled right down since a road has no silhouette to
+   separate. */
+const MAT_ASPHALT = toonMat({
+  map:SURF_ASPHALT.map, normalMap:SURF_ASPHALT.normalMap,
+}, 0.05);
 MAT_ASPHALT.normalScale.set(0.85, 0.85);
 
 const MAT_APRON = {
-  grass:    new THREE.MeshStandardMaterial({ vertexColors:true, map:SURF_GRASS.map,    normalMap:SURF_GRASS.normalMap,    roughness:0.95, envMapIntensity:0.4 }),
-  paving:   new THREE.MeshStandardMaterial({ vertexColors:true, map:SURF_PAVING.map,   normalMap:SURF_PAVING.normalMap,   roughness:0.88, envMapIntensity:0.45 }),
-  water:    new THREE.MeshStandardMaterial({ vertexColors:true, map:SURF_WATER.map,    normalMap:SURF_WATER.normalMap,    roughness:0.28, metalness:0.15, envMapIntensity:0.9 }),
-  concrete: new THREE.MeshStandardMaterial({ vertexColors:true, map:SURF_CONCRETE.map, normalMap:SURF_CONCRETE.normalMap, roughness:0.85, envMapIntensity:0.45 }),
+  grass:    toonMat({ map:SURF_GRASS.map,    normalMap:SURF_GRASS.normalMap    }, 0.05),
+  paving:   toonMat({ map:SURF_PAVING.map,   normalMap:SURF_PAVING.normalMap   }, 0.05),
+  water:    toonMat({ map:SURF_WATER.map,    normalMap:SURF_WATER.normalMap    }, 0.14),
+  concrete: toonMat({ map:SURF_CONCRETE.map, normalMap:SURF_CONCRETE.normalMap }, 0.05),
 };
 const APRON_FOR = [MAT_APRON.grass, MAT_APRON.paving, MAT_APRON.water, MAT_APRON.grass, MAT_APRON.paving];
 
@@ -1114,11 +1159,17 @@ function updateChunks(s){
 const SINGLET = 0xE85D4A, SHORTS = 0x2B3446, SKIN = 0xC79A78,
       SHOE = 0xF4F1E8, SOLE = 0x2FA8C4, SOCK = 0xF7F5EE, HAIR = 0x3A2A20;
 
-// The runner is lit, not ground-shaded, so the baked ground-AO gradient that
-// scenery uses is switched off for every part.
+// The torso and head are lit, not ground-shaded, so the baked ground-AO
+// gradient the scenery uses is off for them. Limb segments keep a little of it:
+// it darkens each segment toward the joint below, which fakes the contact
+// shading between upper arm and forearm, thigh and shin.
 const A0 = { ao:0 };
-const MAT_RUNNER = new THREE.MeshStandardMaterial({
-  vertexColors:true, roughness:0.72, metalness:0.02, flatShading:true, envMapIntensity:0.35 });
+const AJ = { ao:0.25 };
+
+// The runner rides the same cel ramp as the world, with the strongest rim in
+// the scene: it is the one thing that must never lose its silhouette against a
+// road sitting at nearly its own mid-tone.
+const MAT_RUNNER = toonMat({}, 0.26);
 
 function part(build){
   const L = []; build(L);
@@ -1134,63 +1185,119 @@ function limb(build){
   return { pivot:g };
 }
 
-/* Skeleton, feet at 0: ankle .17 · knee .83 · hip 1.50 · shoulder 2.30
-   · neck 2.48 · crown 3.05. Head 0.44 tall => 3.05/0.44 = 6.9 heads. */
+/* Skeleton, feet at 0: ankle .15 · knee .74 · hip 1.32 · shoulder 2.02
+   · neck 2.10 · crown 2.92. Head 0.70 tall => 2.92/0.70 = 4.2 heads.
+
+   Full commit to the toy read, in two steps: 6.9 heads (naturalistic) -> 5.6 ->
+   4.2. Real proportions under-read at gameplay distance, and the head is the
+   feature the eye tracks. The body is compact as well as small-relative-to-head
+   — legs and torso both shortened — because a normal body under a big head
+   reads as a bobblehead rather than as a toy. Chunky limbs, oversized rounded
+   hands and shoes to hold the silhouette while everything is moving fast.
+
+   Total height stays ~2.92 so the figure's scale against lanes, obstacles and
+   the camera rig is unchanged; only the internal proportions moved. */
 
 const runner = new THREE.Group();
 const body = new THREE.Group();          // holds lean/duck so gait is unaffected
 runner.add(body);
 
 const torso = part(L => {
-  put(L, BOX,   0, 1.60, 0, 0.42, 0.34, 0.27, SHORTS,  A0);   // pelvis
-  put(L, CYL10, 0, 1.90, 0, 0.50, 0.32, 0.34, SINGLET, A0);   // waist  (wide, shallow)
-  put(L, CYL10, 0, 2.18, 0, 0.60, 0.30, 0.38, SINGLET, A0);   // chest  (wider still)
-  put(L, ICO1, -0.28, 2.30, 0, 0.26, 0.24, 0.30, SINGLET, A0);// deltoids bridge the
-  put(L, ICO1,  0.28, 2.30, 0, 0.26, 0.24, 0.30, SINGLET, A0);// gap to the arms
-  put(L, CYL10, 0, 2.48, 0, 0.17, 0.22, 0.17, SKIN, A0);      // neck
+  put(L, BOX,   0, 1.42, 0, 0.52, 0.30, 0.32, SHORTS,  A0);   // pelvis
+  put(L, CYL10, 0, 1.64, 0, 0.60, 0.28, 0.40, SINGLET, A0);   // waist (wide, shallow)
+  put(L, CYL10, 0, 1.88, 0, 0.72, 0.30, 0.46, SINGLET, A0);   // chest (wider still)
+  put(L, ICO1, -0.34, 1.99, 0, 0.34, 0.32, 0.38, SINGLET, A0);// deltoids bridge the
+  put(L, ICO1,  0.34, 1.99, 0, 0.34, 0.32, 0.38, SINGLET, A0);// gap to the arms
+  put(L, CYL10, 0, 2.10, 0, 0.22, 0.18, 0.22, SKIN, A0);      // neck (short, toy-like)
 });
 body.add(torso);
 
 // authored about its own centre so head.rotation.x pivots at the neck
 const head = part(L => {
-  put(L, ICO1, 0,  0,    0,     0.40, 0.44, 0.42, SKIN, A0);
-  put(L, ICO1, 0,  0.10, -0.03, 0.42, 0.32, 0.43, HAIR, A0);
+  put(L, ICO1, 0,  0,     0,      0.64, 0.70, 0.66, SKIN, A0);
+  put(L, ICO1, 0,  0.16,  0.045,  0.665, 0.50, 0.68, HAIR, A0);
 });
-const HEAD_Y = 2.83;               // rest height; animateRunner damps the bob around it
+const HEAD_Y = 2.55;               // rest height; animateRunner damps the bob around it
 head.position.y = HEAD_Y;
 body.add(head);
 
+/* Caricature face — three states, no in-betweens, each meant to read in a
+   glance rather than reward a close look.
+
+   Worth being straight about: the chase camera sits behind the runner, so
+   during a race this renders the back of a head and nothing else. To make the
+   work pay for itself the menu turns the figure around to face the camera (see
+   animateRunner), which is where the character actually gets looked at. */
+function faceTex(draw){
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d');
+  draw(g);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+const eye = (g, x, y, rx, ry) => {
+  g.fillStyle = '#FFFFFF'; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, 7); g.fill();
+  g.fillStyle = '#241A14'; g.beginPath(); g.ellipse(x, y + ry * 0.12, rx * 0.46, ry * 0.52, 0, 0, 7); g.fill();
+};
+const FACE = {
+  calm: faceTex(g => {                       // wide determined grin
+    eye(g, 44, 52, 15, 17); eye(g, 84, 52, 15, 17);
+    g.strokeStyle = '#241A14'; g.lineWidth = 7; g.lineCap = 'round';
+    g.beginPath(); g.arc(64, 72, 23, 0.22 * Math.PI, 0.78 * Math.PI); g.stroke();
+  }),
+  strain: faceTex(g => {                     // squint + open grimace
+    g.strokeStyle = '#241A14'; g.lineWidth = 8; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(28, 48); g.lineTo(58, 59); g.stroke();
+    g.beginPath(); g.moveTo(100, 48); g.lineTo(70, 59); g.stroke();
+    g.fillStyle = '#241A14'; g.beginPath(); g.ellipse(64, 86, 21, 15, 0, 0, 7); g.fill();
+    g.fillStyle = '#FFFFFF'; g.fillRect(46, 74, 36, 7);
+  }),
+  ohno: faceTex(g => {                       // wide eyes, small round mouth
+    eye(g, 43, 49, 18, 20); eye(g, 85, 49, 18, 20);
+    g.fillStyle = '#241A14'; g.beginPath(); g.ellipse(64, 88, 11, 13, 0, 0, 7); g.fill();
+  }),
+};
+// Same define set on every swap, so changing state is a texture bind and never
+// a shader recompile.
+const faceMat = new THREE.MeshBasicMaterial({
+  map:FACE.calm, transparent:true, toneMapped:false, depthWrite:false });
+const faceMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.58, 0.54), faceMat);
+faceMesh.position.set(0, 0.02, -0.315);    // forward is -z: +z faces the chase camera
+faceMesh.renderOrder = 2;
+head.add(faceMesh);
+
 const upperArm = () => limb(L => {
-  put(L, CYL10, 0, -0.27, 0, 0.17, 0.54, 0.17, SKIN, A0);
-  put(L, ICO1,  0, -0.54, 0, 0.19, 0.19, 0.19, SKIN, A0);     // elbow
+  put(L, CYL10, 0, -0.23, 0, 0.234, 0.46, 0.234, SKIN, AJ);
+  put(L, ICO1,  0, -0.46, 0, 0.26, 0.26, 0.26, SKIN, A0);     // elbow
 });
 const foreArm = () => limb(L => {
-  put(L, CYL10, 0, -0.21, 0, 0.145, 0.42, 0.145, SKIN, A0);
-  put(L, ICO1,  0, -0.46, 0, 0.17, 0.20, 0.15, SKIN, A0);     // fist
+  put(L, CYL10, 0, -0.18, 0, 0.20, 0.36, 0.20, SKIN, AJ);
+  put(L, ICO1,  0, -0.40, 0, 0.235, 0.27, 0.21, SKIN, A0);    // fist, oversized
 });
 const armL = upperArm(), armR = upperArm();
 const foreL = foreArm(), foreR = foreArm();
-armL.pivot.position.set(-0.30, 2.30, 0); armR.pivot.position.set(0.30, 2.30, 0);
-foreL.pivot.position.y = -0.54; foreR.pivot.position.y = -0.54;
+armL.pivot.position.set(-0.34, 1.97, 0); armR.pivot.position.set(0.34, 1.97, 0);
+foreL.pivot.position.y = -0.46; foreR.pivot.position.y = -0.46;
 armL.pivot.add(foreL.pivot); armR.pivot.add(foreR.pivot);
 
 const thighPart = () => limb(L => {
-  put(L, CYL10, 0, -0.15, 0, 0.32, 0.32, 0.30, SHORTS, A0);   // short leg
-  put(L, CYL10, 0, -0.46, 0, 0.25, 0.34, 0.25, SKIN, A0);     // quad
-  put(L, ICO1,  0, -0.67, 0, 0.24, 0.22, 0.24, SKIN, A0);     // knee
+  put(L, CYL10, 0, -0.14, 0, 0.44, 0.30, 0.41, SHORTS, A0);   // short leg
+  put(L, CYL10, 0, -0.40, 0, 0.345, 0.30, 0.345, SKIN, AJ);   // quad
+  put(L, ICO1,  0, -0.58, 0, 0.33, 0.26, 0.33, SKIN, A0);     // knee
 });
 const shinPart = () => limb(L => {
-  put(L, CYL10, 0, -0.26, 0, 0.21, 0.48, 0.21, SKIN, A0);     // calf
-  put(L, CYL10, 0, -0.57, 0, 0.185, 0.16, 0.185, SOCK, A0);
-  // sole bottom lands at hip - 0.67 - 0.82 = 0.01, so a leg hanging straight
+  put(L, CYL10, 0, -0.23, 0, 0.29, 0.42, 0.29, SKIN, AJ);     // calf
+  put(L, CYL10, 0, -0.50, 0, 0.256, 0.14, 0.256, SOCK, A0);
+  // sole bottom lands at hip - 0.58 - 0.72 = 0.02, so a leg hanging straight
   // down just touches the road instead of hovering above it
-  put(L, BOX,   0, -0.72, 0.07, 0.21, 0.13, 0.40, SHOE, A0);
-  put(L, BOX,   0, -0.79, 0.07, 0.225, 0.06, 0.42, SOLE, A0);
+  put(L, BOX,   0, -0.62, -0.09, 0.29, 0.16, 0.55, SHOE, A0);
+  put(L, BOX,   0, -0.685, -0.09, 0.31, 0.075, 0.575, SOLE, A0);
 });
 const thighL = thighPart(), thighR = thighPart();
 const shinL = shinPart(), shinR = shinPart();
-thighL.pivot.position.set(-0.17, 1.50, 0); thighR.pivot.position.set(0.17, 1.50, 0);
-shinL.pivot.position.y = -0.67; shinR.pivot.position.y = -0.67;
+thighL.pivot.position.set(-0.20, 1.32, 0); thighR.pivot.position.set(0.20, 1.32, 0);
+shinL.pivot.position.y = -0.58; shinR.pivot.position.y = -0.58;
 thighL.pivot.add(shinL.pivot); thighR.pivot.add(shinR.pivot);
 body.add(armL.pivot, armR.pivot, thighL.pivot, thighR.pivot);
 scene.add(runner);
@@ -1206,6 +1313,18 @@ let gaitRoll = 0;
 // Landing squash, armed on the airborne -> grounded edge.
 let landT = 0, wasAirborne = false;
 const LAND_MS = 0.20;
+/* Squash and stretch. Rotating joints alone can never sell impact — the volume
+   has to deform. `squash` is +1 fully compressed, -1 fully stretched, driven by
+   a spring that is deliberately UNDERdamped (zeta ~0.4) so it overshoots past
+   rest and rebounds a couple of times instead of easing politely back. That
+   overshoot is the entire effect; a critically damped version reads as nothing.
+   Integrated in fixed substeps because the tick can hand over a 50ms dt after a
+   stall, and explicit Euler on a spring this stiff diverges at that step. */
+let squash = 0, squashV = 0;
+const SQ_K = 160, SQ_C = 10;
+// Published for the camera micro-bob, so the rig reads as attached to a moving
+// body rather than gliding along a rail.
+let gaitBounce = 0;
 
 function animateRunner(dt, pace, airborne, ducking, stumbleT){
   const effort = clamp((PACE_BASE - pace) / (PACE_BASE - PACE_FLOOR), 0, 1);
@@ -1219,12 +1338,24 @@ function animateRunner(dt, pace, airborne, ducking, stumbleT){
     strideVar = 1 + rr(rngFx, -0.045, 0.045);
     armVar    = 1 + rr(rngFx, -0.05,  0.05);
   }
-  const stride = lerp(0.86, 1.16, effort) * strideVar;
+  // Pushed well past real biomechanics: a game runner has to look faster than a
+  // real one to read as fast on camera, and the low-effort end matters most —
+  // an accurate jog amplitude reads as a brisk walk at this camera distance.
+  const stride = lerp(1.05, 1.34, effort) * strideVar;
 
-  if (wasAirborne && !airborne) landT = LAND_MS;
+  if (wasAirborne && !airborne){ landT = LAND_MS; squash =  1.0; squashV = 0; }  // land
+  if (!wasAirborne && airborne){                  squash = -0.85; squashV = 0; } // take off
   wasAirborne = airborne;
   if (landT > 0) landT = Math.max(0, landT - dt);
   const land = landT / LAND_MS;
+
+  const sqSteps = Math.min(8, Math.max(1, Math.ceil(dt / 0.008)));
+  const sqH = dt / sqSteps;
+  for (let i = 0; i < sqSteps; i++){
+    squashV += (-SQ_K * squash - SQ_C * squashV) * sqH;
+    squash  += squashV * sqH;
+  }
+  body.scale.set(1 + squash * 0.16, 1 - squash * 0.16, 1 + squash * 0.16);
 
   const p = gaitPhase;
   const sinP  = Math.sin(p),  cosP  = Math.cos(p);
@@ -1233,15 +1364,15 @@ function animateRunner(dt, pace, airborne, ducking, stumbleT){
   const air = airborne ? 1 : 0;
 
   // thigh swing: higher knee lift at sprint
-  const kneeUp = lerp(0.85, 1.15, effort);
+  const kneeUp = lerp(0.92, 1.18, effort);
   thighL.pivot.rotation.x = lerp(sw * kneeUp, -0.9, air);
   thighR.pivot.rotation.x = lerp(sw2 * kneeUp, -0.35, air);
 
   // knee bend: the trailing leg bends as the thigh swings back,
   // the leading leg straightens during push-off. Landing folds both.
-  const kBendL = Math.max(0, -sinP) * lerp(0.9, 1.4, effort)
+  const kBendL = Math.max(0, -sinP) * lerp(1.15, 1.62, effort)
                + Math.max(0, -cosP) * 0.35;
-  const kBendR = Math.max(0, -sinP2) * lerp(0.9, 1.4, effort)
+  const kBendR = Math.max(0, -sinP2) * lerp(1.15, 1.62, effort)
                + Math.max(0, -cosP2) * 0.35;
   shinL.pivot.rotation.x = lerp(kBendL, 1.1, air) + land * 0.55;
   shinR.pivot.rotation.x = lerp(kBendR, 0.5, air) + land * 0.55;
@@ -1251,12 +1382,15 @@ function animateRunner(dt, pace, airborne, ducking, stumbleT){
   // elbow stays locked near a right angle rather than opening and closing. An
   // earlier pass swung it as widely as the leg (~60 degrees) and compounded that
   // with a varying elbow, which read as flailing rather than running.
-  const armSwing = lerp(0.50, 0.68, effort) * armVar;
+  // Full stylised range. A swing this wide only stays legible because the elbow
+  // stays locked near a right angle — an early pass that let the elbow open and
+  // close across the swing at this amplitude read as flailing, not running.
+  const armSwing = lerp(0.80, 1.16, effort) * armVar;
   armL.pivot.rotation.x = lerp(sw2 * armSwing, -1.2, air);
   armR.pivot.rotation.x = lerp(sw  * armSwing, -1.2, air);
-  const elbow = -lerp(1.35, 1.55, effort);
-  foreL.pivot.rotation.x = elbow - Math.max(0, sw2) * 0.16;
-  foreR.pivot.rotation.x = elbow - Math.max(0, sw)  * 0.16;
+  const elbow = -lerp(1.30, 1.50, effort);
+  foreL.pivot.rotation.x = elbow - Math.max(0, sw2) * 0.35;
+  foreR.pivot.rotation.x = elbow - Math.max(0, sw)  * 0.35;
   // Second plane: the arms also swing slightly across the chest, in opposite
   // phase to each other. Without this the swing is a flat pendulum in the
   // sagittal plane, which is the plane the chase camera looks straight down.
@@ -1270,7 +1404,14 @@ function animateRunner(dt, pace, airborne, ducking, stumbleT){
 
   // forward lean increases with pace; stumble adds a dramatic forward pitch
   const duckT = ducking ? 1 : 0;
-  const leanBase = lerp(0.10, 0.24, effort) + stT * 0.45;
+  // Raised floor as well as ceiling — an upright jog is what most reads as
+  // "walking" at a glance, regardless of how fast the legs are moving.
+  const leanBase = lerp(0.20, 0.45, effort) + stT * 0.45;
+
+  // Face: three discrete states, picked not blended. Blending caricature
+  // expressions just produces a mush that reads as neither.
+  const wantFace = stT > 0 ? FACE.ohno : (effort > 0.55 ? FACE.strain : FACE.calm);
+  if (faceMat.map !== wantFace) faceMat.map = wantFace;
   body.rotation.x = lerp(body.rotation.x, lerp(leanBase, 0.95, duckT), 1 - Math.exp(-dt * 16));
   duckOffset = lerp(duckOffset, duckT ? -0.95 : 0, 1 - Math.exp(-dt * 18));
   // Head stabilisation. A runner holds the head level and lets the neck absorb
@@ -1301,6 +1442,7 @@ function animateRunner(dt, pace, airborne, ducking, stumbleT){
   // stumble dips the body down briefly
   const stDip = stT > 0 ? stT * -0.3 : 0;
   const bob = airborne ? 0 : bounce;
+  gaitBounce = bob;                  // updateCamera rides a tenth of this
   body.position.y = duckOffset + stDip + bob;
   // The neck eats most of the trunk's rise and fall, so the head travels about
   // 30% of it rather than riding the torso 1:1.
@@ -1313,7 +1455,10 @@ function animateRunner(dt, pace, airborne, ducking, stumbleT){
   // `body` carries the pelvis yaw so the leg pivots inherit it, and the torso
   // mesh takes the difference on top.
   const hipYaw = -sw * lerp(0.015, 0.03, effort);
-  body.rotation.y = hipYaw;
+  // On the menu the figure is spun to face the camera — it is the only place
+  // the character is looked at rather than chased, so it is the only place the
+  // face is worth anything.
+  body.rotation.y = hipYaw + (S.phase === 'menu' ? Math.PI : 0);
   torso.rotation.y = sw * lerp(0.03, 0.06, effort) - hipYaw + stPhase * 0.08 * stT;
 }
 let duckOffset = 0;
@@ -1441,7 +1586,23 @@ contactShadow.rotation.x = -Math.PI / 2;
 contactShadow.renderOrder = 1;
 scene.add(contactShadow);
 let camLateral = 0, camDip = 0, camLift = 0, camSway = 0, camDrag = 0;
-const CAM_BACK = 7.0, CAM_UP = 4.9;
+/* Lower, closer and tighter than a neutral follow cam. A high wide rig reads as
+   a diagram of the road; dropping the eye and narrowing the lens is what makes
+   near props sweep past instead of receding politely.
+
+   Held back from the 5.8 / 3.5 / 54-degree end of the brief, because closing
+   distance and narrowing the lens both magnify the same subject and the two
+   compound. Measured as a share of screen height, the runner goes 29% -> 48% at
+   those numbers: it stops being the foreground and starts being the view,
+   covering the road you are trying to read. 6.2 / 3.9 / 62 lands at 38%, which
+   is the whole directional move without the occlusion.
+
+   Lane visibility turned out not to be the constraint, which is worth writing
+   down because it looks like it should be: portrait aspect halves the
+   horizontal FOV, but even at 54 degrees an outer lane enters frame ~12 units
+   ahead of the runner, and a lane change needs ~42 units of warning. Peripheral
+   clipping happens long after the decision is made. */
+const CAM_BACK = 6.2, CAM_UP = 3.9;
 
 /* Camera follow.
    The obvious implementation — spring the camera's world position toward a
@@ -1475,7 +1636,12 @@ function updateCamera(dt){
 
   const idle = S.phase === 'menu' ? Math.sin(camSway * 0.6) * 1.4 : 0;
   courseToWorld(s - back, camLateral * 0.72 + idle + shakeX, 0, _target);
-  _target.y += up + camLift - camDip + shakeY + Math.sin(camSway * 0.5) * (S.phase === 'menu' ? 0.35 : 0);
+  // Micro-bob: a tenth of the runner's own footstrike travel, so the rig feels
+  // carried by a moving body rather than gliding on a rail. Any more than this
+  // and it stops reading as weight and starts reading as a loose camera mount.
+  const micro = S.phase === 'running' ? gaitBounce * 0.1 : 0;
+  _target.y += up + camLift - camDip + shakeY + micro
+             + Math.sin(camSway * 0.5) * (S.phase === 'menu' ? 0.35 : 0);
 
   camPos.copy(_target);
   camera.position.copy(camPos);
@@ -1488,7 +1654,7 @@ function updateCamera(dt){
   camera.rotation.z += Math.sin(camSway * 0.9) * 0.004 + (laneXNow() - camLateral) * 0.030;
 
   const effort = clamp((PACE_BASE - S.pace) / (PACE_BASE - PACE_FLOOR), 0, 1);
-  const fov = lerp(68, 71, effort);
+  const fov = lerp(62, 65, effort);
   if (Math.abs(camera.fov - fov) > 0.01){
     camera.fov = lerp(camera.fov, fov, 1 - Math.exp(-dt * 3));
     camera.updateProjectionMatrix();
@@ -2579,15 +2745,20 @@ const GradeShader = {
     uVig:{ value:1.0 },
     uTint:{ value:new THREE.Vector3(1, 1, 1) },
     uWarm:{ value:0 },
+    // One global lever beats hand-editing every ground, foliage and prop hex:
+    // the palette wants to sit above a realistic outdoor reference everywhere.
+    uSat:{ value:1.45 },
   },
   vertexShader:`varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
   fragmentShader:`
-    uniform sampler2D tDiffuse; uniform float uTime, uGrain, uVig, uWarm;
+    uniform sampler2D tDiffuse; uniform float uTime, uGrain, uVig, uWarm, uSat;
     uniform vec3 uTint; varying vec2 vUv;
     float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
     void main(){
       vec4 c = texture2D(tDiffuse, vUv);
       c.rgb *= uTint;
+      // saturation lift, about the luma axis so nothing shifts hue
+      c.rgb = mix(vec3(dot(c.rgb, vec3(0.2126, 0.7152, 0.0722))), c.rgb, uSat);
       // gentle golden lift in the shadows, strongest through the finish
       c.rgb += vec3(0.045, 0.022, -0.012) * uWarm * (1.0 - smoothstep(0.0, 0.75, dot(c.rgb, vec3(0.33))));
       vec2 d = vUv - 0.5;
@@ -2671,8 +2842,12 @@ function updateGrade(dt){
   skyMat.uniforms.uWarm.value = lerp(skyMat.uniforms.uWarm.value, 1 + warm * 0.14, k);
   _fogCur.lerpColors(FOG_BASE, FOG_FINISH, warm);
   scene.fog.color.copy(_fogCur);
-  // haze thickens toward the skyline in the canyon, thins over open water
-  const dens = ch === URBAN ? 0.00135 : ch === BRIDGE ? 0.0008 : 0.00105;
+  // Haze thickens toward the skyline in the canyon, thins over open water.
+  // Pulled back roughly a third from where it was: low-contrast fog sitting
+  // close to the camera is what flattens the depth read, and depth here should
+  // be coming from layered geometry — near props, mid road, distant skyline —
+  // rather than from a grey wash over all three.
+  const dens = ch === URBAN ? 0.00088 : ch === BRIDGE ? 0.00052 : 0.00068;
   scene.fog.density = lerp(scene.fog.density, dens, k);
 
   const effort = clamp((PACE_BASE - S.pace) / (PACE_BASE - PACE_FLOOR), 0, 1);
@@ -3153,7 +3328,7 @@ if (location.search.includes('debug')){
       // per-stride variation is drawn from rngFx, so its cached values and the
       // cycle counter that gates them have to be pinned alongside the stream
       strideVar = 1; armVar = 1; gaitCycle = -1; gaitRoll = 0;
-      landT = 0; wasAirborne = false;
+      landT = 0; wasAirborne = false; squash = 0; squashV = 0;
       rngFx = mulberry32(0xF00D5EED);
       dustAcc = 0; pHead = 0;
       for (let i = 0; i < PMAX; i++){ pLife[i] = 0; pAlpha[i] = 0; }
@@ -3175,7 +3350,7 @@ if (location.search.includes('debug')){
       shimmerPass.uniforms.uTime.value = 0;
       skyMat.uniforms.uWarm.value = 1;
       scene.fog.color.copy(FOG_BASE);
-      scene.fog.density = 0.00105;
+      scene.fog.density = 0.00068;
       camera.fov = 68; camera.updateProjectionMatrix();
     },
   };

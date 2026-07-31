@@ -495,6 +495,11 @@ const CYL  = deindex(new THREE.CylinderGeometry(0.5,0.5,1,7,1));
 const CONE = deindex(new THREE.ConeGeometry(0.5,1,7,1));
 const ICO  = deindex(new THREE.IcosahedronGeometry(0.5,0));
 const QUAD = deindex(new THREE.PlaneGeometry(1,1));
+// Finer pair, used only by the runner. It is the one object always on screen
+// and the only one the eye reads as anatomy, so its silhouette earns the extra
+// segments; scenery stays on the 7-sided pair.
+const CYL10 = deindex(new THREE.CylinderGeometry(0.5,0.5,1,10,1));
+const ICO1  = deindex(new THREE.IcosahedronGeometry(0.5,1));
 
 const _mtx = new THREE.Matrix4(), _pos = new THREE.Vector3(),
       _qt = new THREE.Quaternion(), _scl = new THREE.Vector3(), _eul = new THREE.Euler();
@@ -1089,49 +1094,103 @@ function updateChunks(s){
 }
 
 /* ------------------------------ RUNNER MODEL ----------------------------- */
-/* Procedural low-poly runner: capsule torso, jointed limbs, sine-driven gait
-   whose period shortens as pace improves. */
+/* Procedural low-poly runner: merged vertex-coloured body, jointed limbs, and a
+   sine-driven gait whose period shortens as pace improves. */
 
-const SINGLET = 0xE85D4A, SHORTS = 0x2B3446, SKIN = 0xC79A78, SHOE = 0xF4F1E8;
-function limb(len, rad, color){
-  const g = new THREE.Group();
-  const m = new THREE.Mesh(new THREE.CapsuleGeometry(rad, len, 3, 6),
-                           new THREE.MeshStandardMaterial({ color, roughness:0.72, metalness:0.02, flatShading:true, envMapIntensity:0.35 }));
-  m.position.y = -len / 2 - rad * 0.4;
+/* What makes a figure read as a person is proportion, not detail.
+   The first version of this model was 4.75 heads tall — a 0.64 head on a 3.04
+   body — which is toy proportion. The head is the yardstick the eye measures
+   every other length against, so nothing bolted on top rescues one that size.
+   It also had no neck (the skull sat inside the shoulders), a torso that was a
+   circular capsule rather than a form wider than it is deep tapering to the
+   waist, arms ending in stumps, and one skin colour from hip to ankle. This
+   figure is 6.9 heads, and clothing stops where clothing stops.
+
+   Parts that share a transform go through the same vertex-colour merge the
+   scenery uses, so the runner is 10 meshes rather than the 13 it took to say
+   less. It stays flat-shaded and low-poly on purpose: the whole world is, and a
+   smooth-shaded character would read as pasted in from a different game. */
+
+const SINGLET = 0xE85D4A, SHORTS = 0x2B3446, SKIN = 0xC79A78,
+      SHOE = 0xF4F1E8, SOLE = 0x2FA8C4, SOCK = 0xF7F5EE, HAIR = 0x3A2A20;
+
+// The runner is lit, not ground-shaded, so the baked ground-AO gradient that
+// scenery uses is switched off for every part.
+const A0 = { ao:0 };
+const MAT_RUNNER = new THREE.MeshStandardMaterial({
+  vertexColors:true, roughness:0.72, metalness:0.02, flatShading:true, envMapIntensity:0.35 });
+
+function part(build){
+  const L = []; build(L);
+  const m = new THREE.Mesh(mergeList(L), MAT_RUNNER);
   m.castShadow = true;
-  g.add(m);
-  return { pivot:g, mesh:m };
+  return m;
 }
+// A limb hangs below its pivot group, so rotating the pivot swings it from the
+// joint rather than about its own middle.
+function limb(build){
+  const g = new THREE.Group();
+  g.add(part(build));
+  return { pivot:g };
+}
+
+/* Skeleton, feet at 0: ankle .17 · knee .83 · hip 1.50 · shoulder 2.30
+   · neck 2.48 · crown 3.05. Head 0.44 tall => 3.05/0.44 = 6.9 heads. */
+
 const runner = new THREE.Group();
 const body = new THREE.Group();          // holds lean/duck so gait is unaffected
 runner.add(body);
-const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.42, 0.78, 4, 8),
-  new THREE.MeshStandardMaterial({ color:SINGLET, roughness:0.68, flatShading:true, envMapIntensity:0.35 }));
-torso.position.y = 2.02; torso.castShadow = true;
-const hips = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.5, 0.5),
-  new THREE.MeshStandardMaterial({ color:SHORTS, roughness:0.8, flatShading:true, envMapIntensity:0.35 }));
-hips.position.y = 1.44; hips.castShadow = true;
-const head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.32, 1),
-  new THREE.MeshStandardMaterial({ color:SKIN, roughness:0.85, flatShading:true, envMapIntensity:0.3 }));
-head.position.y = 2.72; head.castShadow = true;
-body.add(torso, hips, head);
 
-const armL = limb(0.62, 0.13, SKIN), armR = limb(0.62, 0.13, SKIN);
-const foreL = limb(0.54, 0.115, SKIN), foreR = limb(0.54, 0.115, SKIN);
-armL.pivot.position.set(-0.5, 2.32, 0); armR.pivot.position.set(0.5, 2.32, 0);
-foreL.pivot.position.y = -0.86; foreR.pivot.position.y = -0.86;
+const torso = part(L => {
+  put(L, BOX,   0, 1.60, 0, 0.42, 0.34, 0.27, SHORTS,  A0);   // pelvis
+  put(L, CYL10, 0, 1.90, 0, 0.50, 0.32, 0.34, SINGLET, A0);   // waist  (wide, shallow)
+  put(L, CYL10, 0, 2.18, 0, 0.60, 0.30, 0.38, SINGLET, A0);   // chest  (wider still)
+  put(L, ICO1, -0.28, 2.30, 0, 0.26, 0.24, 0.30, SINGLET, A0);// deltoids bridge the
+  put(L, ICO1,  0.28, 2.30, 0, 0.26, 0.24, 0.30, SINGLET, A0);// gap to the arms
+  put(L, CYL10, 0, 2.48, 0, 0.17, 0.22, 0.17, SKIN, A0);      // neck
+});
+body.add(torso);
+
+// authored about its own centre so head.rotation.x pivots at the neck
+const head = part(L => {
+  put(L, ICO1, 0,  0,    0,     0.40, 0.44, 0.42, SKIN, A0);
+  put(L, ICO1, 0,  0.10, -0.03, 0.42, 0.32, 0.43, HAIR, A0);
+});
+head.position.y = 2.83;
+body.add(head);
+
+const upperArm = () => limb(L => {
+  put(L, CYL10, 0, -0.27, 0, 0.17, 0.54, 0.17, SKIN, A0);
+  put(L, ICO1,  0, -0.54, 0, 0.19, 0.19, 0.19, SKIN, A0);     // elbow
+});
+const foreArm = () => limb(L => {
+  put(L, CYL10, 0, -0.21, 0, 0.145, 0.42, 0.145, SKIN, A0);
+  put(L, ICO1,  0, -0.46, 0, 0.17, 0.20, 0.15, SKIN, A0);     // fist
+});
+const armL = upperArm(), armR = upperArm();
+const foreL = foreArm(), foreR = foreArm();
+armL.pivot.position.set(-0.30, 2.30, 0); armR.pivot.position.set(0.30, 2.30, 0);
+foreL.pivot.position.y = -0.54; foreR.pivot.position.y = -0.54;
 armL.pivot.add(foreL.pivot); armR.pivot.add(foreR.pivot);
-const thighL = limb(0.72, 0.17, SKIN), thighR = limb(0.72, 0.17, SKIN);
-const shinL = limb(0.68, 0.14, SKIN), shinR = limb(0.68, 0.14, SKIN);
-thighL.pivot.position.set(-0.26, 1.34, 0); thighR.pivot.position.set(0.26, 1.34, 0);
-shinL.pivot.position.y = -0.98; shinR.pivot.position.y = -0.98;
+
+const thighPart = () => limb(L => {
+  put(L, CYL10, 0, -0.15, 0, 0.32, 0.32, 0.30, SHORTS, A0);   // short leg
+  put(L, CYL10, 0, -0.46, 0, 0.25, 0.34, 0.25, SKIN, A0);     // quad
+  put(L, ICO1,  0, -0.67, 0, 0.24, 0.22, 0.24, SKIN, A0);     // knee
+});
+const shinPart = () => limb(L => {
+  put(L, CYL10, 0, -0.26, 0, 0.21, 0.48, 0.21, SKIN, A0);     // calf
+  put(L, CYL10, 0, -0.57, 0, 0.185, 0.16, 0.185, SOCK, A0);
+  // sole bottom lands at hip - 0.67 - 0.82 = 0.01, so a leg hanging straight
+  // down just touches the road instead of hovering above it
+  put(L, BOX,   0, -0.72, 0.07, 0.21, 0.13, 0.40, SHOE, A0);
+  put(L, BOX,   0, -0.79, 0.07, 0.225, 0.06, 0.42, SOLE, A0);
+});
+const thighL = thighPart(), thighR = thighPart();
+const shinL = shinPart(), shinR = shinPart();
+thighL.pivot.position.set(-0.17, 1.50, 0); thighR.pivot.position.set(0.17, 1.50, 0);
+shinL.pivot.position.y = -0.67; shinR.pivot.position.y = -0.67;
 thighL.pivot.add(shinL.pivot); thighR.pivot.add(shinR.pivot);
-const shoeMat = new THREE.MeshStandardMaterial({ color:SHOE, roughness:0.6, flatShading:true, envMapIntensity:0.4 });
-const shoeGeo = new THREE.BoxGeometry(0.26, 0.16, 0.5);
-const shoeL = new THREE.Mesh(shoeGeo, shoeMat), shoeR = new THREE.Mesh(shoeGeo, shoeMat);
-shoeL.position.set(0, -0.86, 0.08); shoeR.position.copy(shoeL.position);
-shoeL.castShadow = shoeR.castShadow = true;
-shinL.pivot.add(shoeL); shinR.pivot.add(shoeR);
 body.add(armL.pivot, armR.pivot, thighL.pivot, thighR.pivot);
 scene.add(runner);
 
@@ -1206,9 +1265,10 @@ function animateRunner(dt, pace, airborne, ducking, stumbleT){
   const stDip = stT > 0 ? stT * -0.3 : 0;
   body.position.y = duckOffset + stDip + (airborne ? 0 : bounce);
 
-  // slight torso twist opposing the arms; stumble adds lateral stagger
+  // slight torso twist opposing the arms; stumble adds lateral stagger. The
+  // pelvis is part of the same merged mesh now, so there is no counter-rotating
+  // hip — the limb pivots hang off `body` and simply do not inherit the twist.
   torso.rotation.y = sw * lerp(0.03, 0.06, effort) + stPhase * 0.08 * stT;
-  hips.rotation.y  = sw * lerp(0.02, 0.04, effort) * -1;
 }
 let duckOffset = 0;
 

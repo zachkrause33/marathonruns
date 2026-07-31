@@ -14,7 +14,7 @@
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{width:100%;height:100%;overflow:hidden;background:#0d0b0a;font-family:var(--font);
     -webkit-user-select:none;user-select:none;touch-action:none;overscroll-behavior:none}
-  canvas{display:block;position:fixed;inset:0}
+  canvas{display:block;position:fixed;inset:0;z-index:0}
 
   #ui{position:fixed;inset:0;pointer-events:none;z-index:10;
       padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
@@ -213,6 +213,30 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
    player races the identical course on a given calendar day.
    ========================================================================== */
 
+/* --------------------------- FAILURE SURFACE ----------------------------- */
+/* A black canvas under a working HUD is close to undiagnosable for whoever is
+   holding the phone. Anything that goes wrong says so on screen, once. */
+const reportedIssues = new Set();
+function reportIssue(msg){
+  console.warn('MARATHON RUSH:', msg);
+  if (reportedIssues.has(msg) || reportedIssues.size > 3) return;
+  reportedIssues.add(msg);
+  let bar = document.getElementById('issue');
+  if (!bar){
+    bar = document.createElement('div');
+    bar.id = 'issue';
+    bar.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99;padding:8px 12px;' +
+      'background:rgba(60,12,8,.92);color:#FFD2C6;font:11px/1.45 ui-monospace,Menlo,monospace;' +
+      'white-space:pre-wrap;pointer-events:auto';
+    bar.addEventListener('click', () => bar.remove());
+    const ui = document.getElementById('ui');
+    ((ui && ui.parentNode) || document.body).appendChild(bar);
+  }
+  bar.textContent += (bar.textContent ? '\n' : '') + msg;
+}
+addEventListener('error', e => reportIssue(e.message || 'script error'));
+addEventListener('unhandledrejection', e => reportIssue('promise: ' + e.reason));
+
 /* ------------------------------ TUNING ---------------------------------- */
 
 const WORLD_UNITS_PER_MILE = 700;   // single source of truth for real-world scale
@@ -384,7 +408,21 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;   // applied by OutputPass
 renderer.toneMappingExposure = 1.12;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-document.body.appendChild(renderer.domElement);
+/* Mount the canvas as a sibling of the HUD, not on <body>.
+   Appending to document.body assumes this markup IS the document. Embedded in a
+   host that wraps the page in its own positioned, background-painting container
+   — an artifact shell, a CMS, an iframe wrapper — the HUD ends up inside that
+   container while a body-level canvas stays outside and beneath it. The
+   container's background then paints over the canvas, while #ui (z-index 10,
+   inside the container) keeps drawing on top: a live, ticking HUD over a black
+   screen, with no error anywhere to explain it.
+   Sharing a parent with the HUD makes the stacking order ours to decide. */
+(() => {
+  const ui = document.getElementById('ui');
+  const stage = (ui && ui.parentNode) || document.body;
+  renderer.domElement.style.zIndex = '0';
+  stage.insertBefore(renderer.domElement, ui || null);
+})();
 
 const scene  = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(68, innerWidth / innerHeight, 0.5, 3000);
@@ -701,10 +739,17 @@ const SURF_WATER = makeSurface(0x5EA123, (u, v, N) => {
    forms their toy roundness. The lit band stops short of 255 on purpose: at full
    white the lit side crosses the 0.85 bloom threshold and every surface haloes. */
 const TOON_RAMP = (() => {
-  const N = 16, d = new Uint8Array(N);
+  // RGBA rather than RedFormat: three only samples .r, but single-channel
+  // textures are the least portable thing available here — WebGL1 has no R8 at
+  // all, and drivers differ on UNPACK_ALIGNMENT for rows that are not a
+  // multiple of four bytes. 64 bytes is not worth the compatibility question.
+  const N = 16, d = new Uint8Array(N * 4);
   const brk = Math.round(((0.35 * 0.5) + 0.5) * N);   // dotNL 0.35 -> texel index
-  for (let i = 0; i < N; i++) d[i] = i < brk ? 130 : 224;
-  const t = new THREE.DataTexture(d, N, 1, THREE.RedFormat);
+  for (let i = 0; i < N; i++){
+    const v = i < brk ? 130 : 224;
+    d[i*4] = d[i*4+1] = d[i*4+2] = v; d[i*4+3] = 255;
+  }
+  const t = new THREE.DataTexture(d, N, 1, THREE.RGBAFormat);
   t.minFilter = t.magFilter = THREE.NearestFilter;
   t.needsUpdate = true;
   return t;
@@ -2515,12 +2560,29 @@ function makeImpulseResponse(seconds, decay){
 // chapter -> reverb wet level: canyon rings, open water does not
 const CHAPTER_WET = [0.07, 0.30, 0.09, 0.12, 0.22];
 
+/* Audio is optional. It must be able to fail without taking the frame with it.
+   The original version assigned AC before building the graph, so a throw partway
+   through — which is exactly what a sandboxed iframe or a locked-down autoplay
+   policy produces — left AC non-null while crowdGain was still null. updateAudio's
+   `if (!AC) return` guard then sailed past, crowdGain.gain threw every frame, and
+   because that throw happens inside render() before composer.render(), the canvas
+   simply never got drawn again: a black screen under a HUD that kept ticking. */
+let audioFailed = false;
 function audioUnlock(){
+  if (audioFailed) return;
   if (AC){ if (AC.state === 'suspended') AC.resume(); return; }
   const Ctx = window.AudioContext || window.webkitAudioContext;
   if (!Ctx) return;
-  AC = new Ctx();
-
+  try { buildAudioGraph(new Ctx()); }
+  catch (e){
+    // half-built graph is worse than none: tear it down so the guards work
+    audioFailed = true;
+    AC = master = noiseBuf = crowdGain = crowdSrc = fxBus = wetGain = null;
+    reportIssue('audio disabled: ' + (e && e.message ? e.message : e));
+  }
+}
+function buildAudioGraph(ctx){
+  AC = ctx;
   master = AC.createGain();
   master.gain.value = 0.9;
   const comp = AC.createDynamicsCompressor();
@@ -2651,7 +2713,7 @@ function sfxFinish(){
 // footsteps ride the gait cycle so the rhythm always matches the legs
 let lastFootIndex = 0;
 function updateAudio(dt){
-  if (!AC) return;
+  if (!AC || !crowdGain) return;   // both, not just AC — see audioUnlock
   const idx = Math.floor(gaitPhase / Math.PI);
   if (idx !== lastFootIndex && S.phase === 'running' && !isAirborne()){
     lastFootIndex = idx;
@@ -2907,9 +2969,16 @@ function adaptQuality(){
   } else { quality.overT = 0; quality.underT = 0; }
 }
 
+/* Colour grading and audio are decorative; the composer is not. Letting either
+   throw out of here skips composer.render() entirely, and because tick() calls
+   requestAnimationFrame at the top and updateHUD before this, the failure mode
+   is a live, ticking HUD over a canvas that never gets drawn again — which
+   reads as "the renderer is broken" and is very hard to diagnose from the
+   outside. Isolate them, report once, keep drawing. */
 function render(dt){
-  updateGrade(dt);
-  updateAudio(dt);
+  try { updateGrade(dt); } catch (e){ reportIssue('grade: ' + (e && e.message || e)); }
+  try { updateAudio(dt); } catch (e){ audioFailed = true; AC = null;
+        reportIssue('audio: ' + (e && e.message || e)); }
   composer.render();
 }
 function onResize(){

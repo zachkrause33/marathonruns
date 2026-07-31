@@ -766,14 +766,36 @@ function building(L, x, z, w, h, d, lod){
   }
   putFlat(L, x, 0.05, z, w * 1.5, d * 1.5, 0x2B2A2E, {});   // ground occlusion
 }
+function crowdFigure(L, px, pz, h, shirt, face){
+  const legH = h * 0.42, torsoH = h * 0.35, headR = h * 0.14;
+  const legW = 0.18, torsoW = 0.4;
+  // legs
+  put(L, BOX, px - 0.14, legH * 0.5, pz, legW, legH, legW, 0x2B3446, { ao:0.5 });
+  put(L, BOX, px + 0.14, legH * 0.5, pz, legW, legH, legW, 0x2B3446, { ao:0.5 });
+  // torso
+  put(L, BOX, px, legH + torsoH * 0.5, pz, torsoW, torsoH, 0.24, shirt, { ao:0.35 });
+  // head
+  put(L, ICO, px, legH + torsoH + headR, pz, headR * 2, headR * 2, headR * 2, 0xC79A78, { ao:0.2 });
+  // arms up/out based on a seeded pose phase — static geometry, animation is
+  // handled at render time by the chunk's crowd mesh rotation
+  const armUp = rr(rngArt, 0, 1);
+  const armAngle = armUp > 0.65 ? lerp(0.8, 2.2, (armUp - 0.65) / 0.35) : 0;
+  const armLen = h * 0.30, armW = 0.13;
+  const armY = legH + torsoH * 0.8;
+  const cosA = Math.cos(armAngle), sinA = Math.sin(armAngle);
+  put(L, BOX, px - torsoW - armLen * 0.5 * cosA, armY + armLen * 0.5 * sinA, pz,
+      armLen, armW, armW, 0xC79A78, { ao:0.15, rz: armAngle });
+  put(L, BOX, px + torsoW + armLen * 0.5 * cosA, armY + armLen * 0.5 * sinA, pz,
+      armLen, armW, armW, 0xC79A78, { ao:0.15, rz: -armAngle });
+}
+const CROWD_SHIRTS = [0xE8615A, 0x4E8AD6, 0xF0C24B, 0xE8E4DA, 0x6FB78A, 0xC97BD1, 0xEE9A4D, 0xFF8844, 0x55CC88];
 function crowdRow(L, x, z, n, spread, face){
   for (let i = 0; i < n; i++){
     const px = x + rr(rngArt, -1.4, 1.4);
     const pz = z + (i / n) * spread - spread / 2 + rr(rngArt, -0.8, 0.8);
     const h  = rr(rngArt, 1.5, 2.0);
-    const shirt = pick(rngArt, [0xE8615A, 0x4E8AD6, 0xF0C24B, 0xE8E4DA, 0x6FB78A, 0xC97BD1, 0xEE9A4D]);
-    put(L, CYL, px, h * 0.55, pz, 0.72, h, 0.72, shirt, { ao:0.45, tint:0.06 });
-    put(L, ICO, px, h + 0.32, pz, 0.66, 0.7, 0.66, 0xC79A78, { ao:0.2 });
+    const shirt = pick(rngArt, CROWD_SHIRTS);
+    crowdFigure(L, px, pz, h, shirt, face);
   }
 }
 function barrier(L, x, z, len, color){
@@ -1020,7 +1042,17 @@ function updateChunks(s){
   }
   for (let j = 0; j < chunks.length; j++){
     const c = chunks[j];
-    if (c.index >= 0) c.setLOD(Math.abs(c.mid - s));
+    if (c.index < 0) continue;
+    const dist = Math.abs(c.mid - s);
+    c.setLOD(dist);
+    // crowd cheer: nearby crowds bob and sway when the runner passes
+    if (c.crowd.visible && S.phase === 'running'){
+      const prox = clamp(1 - dist / 120, 0, 1);
+      const wave = Math.sin(animClock * 4.5 + c.index * 1.7) * 0.35 * prox;
+      c.crowd.position.y = wave;
+    } else {
+      c.crowd.position.y = 0;
+    }
   }
 }
 
@@ -1073,32 +1105,75 @@ scene.add(runner);
 
 let gaitPhase = 0;
 function animateRunner(dt, pace, airborne, ducking, stumbleT){
-  // faster pace -> shorter cycle, slightly longer stride
-  const cadence = lerp(1.55, 2.35, clamp((PACE_BASE - pace) / (PACE_BASE - PACE_FLOOR), 0, 1));
-  const stride  = lerp(0.86, 1.16, clamp((PACE_BASE - pace) / (PACE_BASE - PACE_FLOOR), 0, 1));
+  const effort = clamp((PACE_BASE - pace) / (PACE_BASE - PACE_FLOOR), 0, 1);
+  const cadence = lerp(1.55, 2.35, effort);
+  const stride  = lerp(0.86, 1.16, effort);
   gaitPhase += dt * cadence * Math.PI * 2;
   if (gaitPhase > Math.PI * 4) gaitPhase -= Math.PI * 4;
 
-  const p = gaitPhase, sw = Math.sin(p) * stride, sw2 = Math.sin(p + Math.PI) * stride;
+  const p = gaitPhase;
+  const sinP  = Math.sin(p),  cosP  = Math.cos(p);
+  const sinP2 = Math.sin(p + Math.PI), cosP2 = Math.cos(p + Math.PI);
+  const sw = sinP * stride, sw2 = sinP2 * stride;
   const air = airborne ? 1 : 0;
-  thighL.pivot.rotation.x = lerp(sw * 0.85, -0.9, air);
-  thighR.pivot.rotation.x = lerp(sw2 * 0.85, -0.35, air);
-  shinL.pivot.rotation.x  = lerp(Math.max(0, -Math.sin(p - 0.7)) * 1.25, 1.1, air);
-  shinR.pivot.rotation.x  = lerp(Math.max(0, -Math.sin(p + Math.PI - 0.7)) * 1.25, 0.5, air);
-  armL.pivot.rotation.x   = lerp(sw2 * 0.75, -1.2, air);
-  armR.pivot.rotation.x   = lerp(sw * 0.75, -1.2, air);
-  foreL.pivot.rotation.x  = -0.9 - Math.max(0, sw2) * 0.5;
-  foreR.pivot.rotation.x  = -0.9 - Math.max(0, sw) * 0.5;
-  armL.pivot.rotation.z   =  0.16; armR.pivot.rotation.z = -0.16;
 
-  // torso lean grows with pace; duck folds the whole body forward and down
-  const effort = clamp((PACE_BASE - pace) / (PACE_BASE - PACE_FLOOR), 0, 1);
-  const duckT  = ducking ? 1 : 0;
-  body.rotation.x = lerp(body.rotation.x, lerp(0.13 + effort * 0.16, 0.95, duckT), 1 - Math.exp(-dt * 16));
+  // thigh swing: higher knee lift at sprint
+  const kneeUp = lerp(0.85, 1.15, effort);
+  thighL.pivot.rotation.x = lerp(sw * kneeUp, -0.9, air);
+  thighR.pivot.rotation.x = lerp(sw2 * kneeUp, -0.35, air);
+
+  // knee bend: the trailing leg bends as the thigh swings back,
+  // the leading leg straightens during push-off
+  const kBendL = Math.max(0, -sinP) * lerp(0.9, 1.4, effort)
+               + Math.max(0, -cosP) * 0.35;
+  const kBendR = Math.max(0, -sinP2) * lerp(0.9, 1.4, effort)
+               + Math.max(0, -cosP2) * 0.35;
+  shinL.pivot.rotation.x = lerp(kBendL, 1.1, air);
+  shinR.pivot.rotation.x = lerp(kBendR, 0.5, air);
+
+  // arms oppose legs; elbows bend more on the back-swing
+  const armSwing = lerp(0.65, 0.95, effort);
+  armL.pivot.rotation.x = lerp(sw2 * armSwing, -1.2, air);
+  armR.pivot.rotation.x = lerp(sw  * armSwing, -1.2, air);
+  const elbowL = -0.8 - Math.max(0, sw2) * lerp(0.4, 0.7, effort);
+  const elbowR = -0.8 - Math.max(0, sw)  * lerp(0.4, 0.7, effort);
+  foreL.pivot.rotation.x = elbowL;
+  foreR.pivot.rotation.x = elbowR;
+  armL.pivot.rotation.z =  lerp(0.16, 0.10, effort);
+  armR.pivot.rotation.z = -lerp(0.16, 0.10, effort);
+
+  // stumble: forward lurch, arms flail, head drops
+  const stT = stumbleT > 0 ? stumbleT / (STUMBLE_MS / 1000) : 0;
+  const stPhase = stT > 0 ? Math.sin(stT * 42) : 0;
+
+  // forward lean increases with pace; stumble adds a dramatic forward pitch
+  const duckT = ducking ? 1 : 0;
+  const leanBase = lerp(0.10, 0.24, effort) + stT * 0.45;
+  body.rotation.x = lerp(body.rotation.x, lerp(leanBase, 0.95, duckT), 1 - Math.exp(-dt * 16));
   duckOffset = lerp(duckOffset, duckT ? -0.95 : 0, 1 - Math.exp(-dt * 18));
-  head.rotation.x = -body.rotation.x * 0.55;
-  // duck crouch plus a subtle vertical bob from the gait
-  body.position.y = duckOffset + (airborne ? 0 : Math.abs(Math.sin(p)) * 0.09);
+  head.rotation.x = -body.rotation.x * 0.55 + stT * 0.3;
+
+  // stumble arm flail: override arm positions during stumble
+  if (stT > 0){
+    armL.pivot.rotation.x += stPhase * 1.2 * stT;
+    armR.pivot.rotation.x -= stPhase * 1.2 * stT;
+    armL.pivot.rotation.z += stT * 0.5;
+    armR.pivot.rotation.z -= stT * 0.5;
+    foreL.pivot.rotation.x -= stT * 0.8;
+    foreR.pivot.rotation.x -= stT * 0.8;
+  }
+
+  // vertical bounce on footstrike — double-bump per stride cycle,
+  // amplitude grows with effort for sprint impact feel
+  const footstrike = Math.abs(sinP);
+  const bounce = footstrike * lerp(0.06, 0.14, effort);
+  // stumble dips the body down briefly
+  const stDip = stT > 0 ? stT * -0.3 : 0;
+  body.position.y = duckOffset + stDip + (airborne ? 0 : bounce);
+
+  // slight torso twist opposing the arms; stumble adds lateral stagger
+  torso.rotation.y = sw * lerp(0.03, 0.06, effort) + stPhase * 0.08 * stT;
+  hips.rotation.y  = sw * lerp(0.02, 0.04, effort) * -1;
 }
 let duckOffset = 0;
 
@@ -1225,9 +1300,14 @@ function updateCamera(dt){
   camDrag = lerp(camDrag, speedT * 0.8, 1 - Math.exp(-dt * 2.5));
   const back = CAM_BACK + camDrag, up = CAM_UP;
 
+  // stumble camera shake: rapid oscillation that decays with stumbleT
+  const stShake = S.stumbleT > 0 ? S.stumbleT / (STUMBLE_MS / 1000) : 0;
+  const shakeX = stShake * Math.sin(camSway * 65) * 0.3;
+  const shakeY = stShake * Math.cos(camSway * 47) * 0.2;
+
   const idle = S.phase === 'menu' ? Math.sin(camSway * 0.6) * 1.4 : 0;
-  courseToWorld(s - back, camLateral * 0.72 + idle, 0, _target);
-  _target.y += up + camLift - camDip + Math.sin(camSway * 0.5) * (S.phase === 'menu' ? 0.35 : 0);
+  courseToWorld(s - back, camLateral * 0.72 + idle + shakeX, 0, _target);
+  _target.y += up + camLift - camDip + shakeY + Math.sin(camSway * 0.5) * (S.phase === 'menu' ? 0.35 : 0);
 
   camPos.copy(_target);
   camera.position.copy(camPos);
@@ -1603,7 +1683,7 @@ const P = {
   sawhorse(rng, s0){
     const lane = (rng() * 3) | 0;
     addObj(s0 + 26, T.SAWHORSE, lane);
-    if (rng() < 0.4){
+    if (rng() < 0.2){
       const other = lane === 1 ? (rng() < 0.5 ? 0 : 2) : 1;
       addObj(s0 + 26, T.SAWHORSE, other);
     }
@@ -1623,14 +1703,14 @@ const P = {
   },
 };
 const PALETTE = [
-  ['pothole', 'sawhorse', 'slalom', 'pothole'],                                  // PARK
-  ['car', 'scaffold', 'cyclist', 'slalom', 'pothole', 'car', 'scaffold'],        // URBAN
-  ['slalom', 'sawhorse', 'scaffold', 'pothole', 'slalom'],                       // BRIDGE
+  ['pothole', 'sawhorse', 'slalom', 'pothole', 'pothole'],                       // PARK
+  ['car', 'scaffold', 'cyclist', 'slalom', 'pothole', 'car', 'slalom'],          // URBAN — one scaffold, not two
+  ['slalom', 'sawhorse', 'pothole', 'slalom', 'sawhorse'],                       // BRIDGE — removed scaffold
   ['pothole', 'sawhorse', 'car', 'slalom', 'pothole'],                           // HILLS
   ['slalom', 'sawhorse', 'pothole', 'slalom'],                                   // FINISH
 ];
-// chance a chunk is left empty, so the course breathes early and bites later
-const REST = [0.42, 0.14, 0.22, 0.20, 0.28];
+// higher rest = more empty chunks; a fluid run where obstacles are deliberate
+const REST = [0.52, 0.28, 0.34, 0.30, 0.36];
 // 0 at the start, 1 by mile 24: squeezes out the rest chunks and stacks a
 // second pattern on top more and more often as the race wears on.
 const rampAt = mi => smoothstep(RAMP_START_MILE, RAMP_END_MILE, mi);
@@ -1648,9 +1728,9 @@ function generateCourse(){
     // fewer and fewer chunks get left empty
     if (rng() < REST[ch] * (1 - 0.8 * ramp)) continue;
     P[pick(rng, PALETTE[ch])](rng, s0);
-    // stacked patterns: rare early, routine by the closing miles
-    const doubleChance = (ch === URBAN ? 0.22 : 0.05) + 0.34 * ramp;
-    if (rng() < doubleChance) P[pick(rng, ['pothole', 'slalom', 'sawhorse'])](rng, s0 + 4);
+    // stacked patterns: rare early, moderate even late — keeps it fluid
+    const doubleChance = (ch === URBAN ? 0.12 : 0.03) + 0.18 * ramp;
+    if (rng() < doubleChance) P[pick(rng, ['pothole', 'slalom'])](rng, s0 + 4);
   }
 
   // aid stations: one cluster per mile, always offset so a straight line misses
@@ -1869,8 +1949,10 @@ function stumble(o){
   S.combo = 0; S.comboTimer = 0;
   S.stumbleT = STUMBLE_MS / 1000;
   S.pace = Math.min(PACE_BASE * 1.3, S.pace * 1.07);
-  camDip = 1.25;
-  burst(o.x, 0.4, 12, 0x8A7C6A, 0.26, 0.55);
+  camDip = 1.8;
+  // bigger, more dramatic impact burst
+  burst(o.x, 0.4, 20, 0x8A7C6A, 0.32, 0.65);
+  burst(laneXNow(), 0.8, 8, 0xFFAA66, 0.18, 0.4);
   sfxThud();
 }
 function collect(o){

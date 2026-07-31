@@ -104,14 +104,15 @@
   .linkBtn{margin-top:18px;font-size:10px;font-weight:800;letter-spacing:2.5px;opacity:.6;
            padding:9px 16px;border-bottom:1px solid rgba(255,255,255,.3);pointer-events:auto}
 
-  /* tutorial */
-  #tut{justify-content:flex-start;padding-top:max(28px,env(safe-area-inset-top));overflow-y:auto}
-  #tut .rSec{margin-top:20px;font-size:9px;font-weight:800;letter-spacing:3.5px;opacity:.55}
-  #tut .row{display:flex;gap:22px;margin-top:14px;flex-wrap:wrap;justify-content:center;max-width:440px}
-  #tut .card{width:94px}
-  #tut .gly{font-size:26px;line-height:1}
-  #tut .cap{font-size:9px;font-weight:700;letter-spacing:1.6px;margin-top:8px;opacity:.8;line-height:1.5}
-  #tut .cta{margin-top:26px;margin-bottom:20px}
+  /* shared rule section styles */
+  .rSec{font-size:9px;font-weight:800;letter-spacing:3.5px;opacity:.55}
+  .row{display:flex;gap:22px;margin-top:14px;flex-wrap:wrap;justify-content:center;max-width:440px}
+  .card{width:94px}
+  .gly{font-size:26px;line-height:1}
+  .cap{font-size:9px;font-weight:700;letter-spacing:1.6px;margin-top:8px;opacity:.8;line-height:1.5}
+  /* menu: scrollable when content is tall on short screens */
+  #menu{overflow-y:auto;justify-content:flex-start;padding-top:max(24px,env(safe-area-inset-top))}
+  #mStart{margin-top:18px;margin-bottom:20px}
 
   /* results */
   #res .rTime{font-size:min(17vw,86px);font-weight:800;letter-spacing:-3px;font-variant-numeric:tabular-nums;
@@ -148,38 +149,23 @@
       <div class="goalT" id="mWR">1:59:30</div>
       <div class="goalS">26.2 MILES · <span id="mWRPace">4:34</span>/MI PACE OR BETTER</div>
     </div>
-    <div class="rulesLine">Dodge everything in the road. Grab water and bananas —<br>they are what keep you on record pace.</div>
-    <div class="best" id="mBest"></div>
-    <div class="cta" id="mCta">SWIPE UP TO START</div>
-    <div class="linkBtn" id="mRules">HOW TO PLAY</div>
-  </div>
 
-  <div class="overlay hidden" id="tut">
-    <div class="kicker">HOW TO PLAY</div>
-    <h1 class="title" style="font-size:min(9.5vw,44px);margin-bottom:6px">RACE THE RECORD</h1>
-    <div class="rulesLine" style="margin-top:2px">Run all 26.2 miles in under <b id="tWR">1:59:30</b> to break
-      the world record. You start slower than that — the only way to find the pace is a clean race.</div>
-
-    <div class="rSec">CONTROLS</div>
-    <div class="row">
+    <div class="rSec" style="margin-top:18px">CONTROLS</div>
+    <div class="row" style="gap:18px;margin-top:10px">
       <div class="card"><div class="gly">⬅ ➡</div><div class="cap">SWIPE<br>CHANGE LANE</div></div>
       <div class="card"><div class="gly">⬆</div><div class="cap">SWIPE UP<br>JUMP</div></div>
       <div class="card"><div class="gly">⬇</div><div class="cap">SWIPE DOWN<br>DUCK</div></div>
     </div>
 
-    <div class="rSec">AVOID</div>
-    <div class="rulesLine" style="margin-top:0">Potholes, cones, barricades, parked cars, overhead
-      scaffolds and cyclists. A hit costs <b>3 seconds</b> and resets your pace chain — it never ends your run.</div>
+    <div class="rSec" style="margin-top:14px">THE RACE</div>
+    <div class="rulesLine" style="margin-top:4px">Dodge everything in the road. A hit costs <b>3 seconds</b> and resets your
+      pace chain — it never ends your run.<br>
+      <span class="gWater">WATER</span> clears fatigue and nudges you faster.
+      <span class="gBan">BANANA</span> is a bigger burst of speed.
+      Both make up time — but grabbing one can put you into an obstacle. Choosing what to take is the race.</div>
 
-    <div class="rSec">GRAB</div>
-    <div class="rulesLine" style="margin-top:0">
-      <span class="gWater">◧ WATER</span> clears fatigue and nudges you faster.
-      <span class="gBan">◗ BANANA</span> is a bigger burst of speed.
-      Both make up time — but they sit off your line, so going for one can put you into an obstacle.
-      Choosing what to take is the race.
-    </div>
-
-    <div class="cta" id="tCta">TAP TO CONTINUE</div>
+    <div class="best" id="mBest"></div>
+    <div class="cta" id="mStart">START</div>
   </div>
 
   <div class="overlay hidden" id="res">
@@ -438,6 +424,37 @@ const skyMat = new THREE.ShaderMaterial({
 const sky = new THREE.Mesh(new THREE.SphereGeometry(1600, 24, 16), skyMat);
 sky.frustumCulled = false;
 scene.add(sky);
+
+// ground mist: a plane at road level that fades road markings in from distance
+const mistMat = new THREE.ShaderMaterial({
+  transparent:true, depthWrite:false, fog:false, side:THREE.DoubleSide,
+  uniforms:{
+    uFogColor:{ value:new THREE.Color(0xFFDFB6) },
+    uCamZ:{ value:0 },
+  },
+  vertexShader:`
+    varying vec3 vWP;
+    void main(){
+      vec4 wp = modelMatrix * vec4(position, 1.0);
+      vWP = wp.xyz;
+      gl_Position = projectionMatrix * viewMatrix * wp;
+    }`,
+  fragmentShader:`
+    uniform vec3 uFogColor; uniform float uCamZ;
+    varying vec3 vWP;
+    void main(){
+      float d = abs(vWP.z - uCamZ);
+      // fade in: transparent near the camera, opaque at distance
+      float alpha = smoothstep(40.0, 260.0, d) * 0.42;
+      gl_FragColor = vec4(uFogColor, alpha);
+    }`,
+});
+const mistPlane = new THREE.Mesh(new THREE.PlaneGeometry(200, 800), mistMat);
+mistPlane.rotation.x = -Math.PI / 2;
+mistPlane.position.y = 0.15;
+mistPlane.frustumCulled = false;
+mistPlane.renderOrder = 10;
+scene.add(mistPlane);
 
 /* -------------------------------- LIGHTS --------------------------------- */
 
@@ -1045,6 +1062,10 @@ function updateChunks(s){
     if (c.index < 0) continue;
     const dist = Math.abs(c.mid - s);
     c.setLOD(dist);
+    // parallax: distant dressing scrolls slower than the road, creating depth
+    const signedD = c.mid - s;
+    c.far.position.z  = signedD * 0.15;
+    c.dressL.position.z = signedD * 0.06;
     // crowd cheer: nearby crowds bob and sway when the runner passes
     if (c.crowd.visible && S.phase === 'running'){
       const prox = clamp(1 - dist / 120, 0, 1);
@@ -1184,8 +1205,7 @@ let duckOffset = 0;
 const input = { queue:[] };
 function queueAction(a){
   audioUnlock();
-  // outside a run, any directional input is just "go"
-  if (S.phase !== 'running'){ onTap(); return; }
+  if (S.phase !== 'running') return;
   if (input.queue.length < 3) input.queue.push(a);
 }
 let touchX = 0, touchY = 0, touchActive = false, touchTime = 0;
@@ -1213,7 +1233,10 @@ addEventListener('keydown', e => {
   else if (k === 'arrowright' || k === 'd') queueAction('right');
   else if (k === 'arrowup'    || k === 'w') queueAction('up');
   else if (k === 'arrowdown'  || k === 's') queueAction('down');
-  else if (k === ' ' || k === 'enter') onTap();
+  else if (k === ' ' || k === 'enter'){
+    if (S.phase === 'menu') onTap(el('mStart'));
+    else onTap();
+  }
   else return;
   e.preventDefault();
 }, { passive:false });
@@ -1221,7 +1244,7 @@ addEventListener('keydown', e => {
 /* --------------------------------- STATE --------------------------------- */
 
 const S = {
-  phase:'menu',            // menu | tutorial | running | finished
+  phase:'menu',            // menu | running | finished
   s:0,                     // course distance travelled, world units
   lane:1, laneFrom:1, laneT:1,
   jumpT:1, duckT:1, duckHold:0,
@@ -2406,6 +2429,47 @@ const GradeShader = {
 const gradePass = new ShaderPass(GradeShader);
 composer.addPass(gradePass);
 
+/* -- heat shimmer: distortion on the road ahead, ramps in during later miles - */
+class HeatShimmerPass extends Pass {
+  constructor(){
+    super();
+    this.uniforms = {
+      tDiffuse:{ value:null },
+      uTime:{ value:0 },
+      uStrength:{ value:0 },
+    };
+    this.material = new THREE.ShaderMaterial({
+      uniforms:this.uniforms,
+      vertexShader:`varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+      fragmentShader:`
+        uniform sampler2D tDiffuse; uniform float uTime, uStrength;
+        varying vec2 vUv;
+        void main(){
+          if (uStrength < 0.001){ gl_FragColor = texture2D(tDiffuse, vUv); return; }
+          // shimmer strongest in the upper-middle band (the road ahead)
+          float band = smoothstep(0.30, 0.48, vUv.y) * smoothstep(0.70, 0.52, vUv.y);
+          float horiz = smoothstep(0.0, 0.25, vUv.x) * smoothstep(1.0, 0.75, vUv.x);
+          float mask = band * horiz;
+          float wave1 = sin(vUv.x * 42.0 + uTime * 2.8) * cos(vUv.y * 28.0 + uTime * 1.9);
+          float wave2 = sin(vUv.x * 18.0 - uTime * 3.6) * cos(vUv.y * 34.0 + uTime * 2.2);
+          vec2 offset = vec2(wave1 + wave2 * 0.6, wave1 * 0.7 - wave2 * 0.4)
+                        * uStrength * mask * 0.004;
+          gl_FragColor = texture2D(tDiffuse, vUv + offset);
+        }`,
+    });
+    this.fsQuad = new FullScreenQuad(this.material);
+  }
+  render(renderer, writeBuffer, readBuffer){
+    this.uniforms.tDiffuse.value = readBuffer.texture;
+    if (this.renderToScreen){ renderer.setRenderTarget(null); }
+    else { renderer.setRenderTarget(writeBuffer); if (this.clear) renderer.clear(); }
+    this.fsQuad.render(renderer);
+  }
+  dispose(){ this.material.dispose(); this.fsQuad.dispose(); }
+}
+const shimmerPass = new HeatShimmerPass();
+composer.addPass(shimmerPass);
+
 const smaaPass = new SMAAPass(innerWidth * PR, innerHeight * PR);
 composer.addPass(smaaPass);
 composer.addPass(new OutputPass());   // ACES tonemap + sRGB
@@ -2440,6 +2504,10 @@ function updateGrade(dt){
   blurPass.uniforms.uStrength.value = lerp(blurPass.uniforms.uStrength.value, target, 1 - Math.exp(-dt * 5));
   blurPass.uniforms.uDir.value.set((laneXNow() - camLateral) * 0.02, 0);
   bloomPass.strength = quality.bloomStrength * (0.55 + effort * 0.18);
+  // heat shimmer: fades in from mile 12, full strength by mile 20
+  const shimTarget = S.phase === 'running' ? smoothstep(12, 20, mi) : 0;
+  shimmerPass.uniforms.uStrength.value = lerp(shimmerPass.uniforms.uStrength.value, shimTarget, k);
+  shimmerPass.uniforms.uTime.value += dt;
 }
 
 /* ========================================================================== */
@@ -2451,14 +2519,14 @@ const QUALITY_STEPS = [
   () => {},                                                    // 0: everything on
   () => { quality.bloomStrength = 0.45; bloomPass.radius = 0.4; },   // 1: cheaper bloom
   () => { bloomPass.enabled = false; },                        // 2: bloom off
-  () => { blurPass.enabled = false; },                         // 3: motion blur off
+  () => { blurPass.enabled = false; shimmerPass.enabled = false; }, // 3: blur + shimmer off
   () => { quality.crowdMax = 0; applyCrowdCap(); },            // 4: thin the crowds
 ];
 const QUALITY_UNDO = [
   () => {},
   () => { quality.bloomStrength = 0.85; bloomPass.radius = 0.62; },
   () => { bloomPass.enabled = true; },
-  () => { blurPass.enabled = true; },
+  () => { blurPass.enabled = true; shimmerPass.enabled = true; },
   () => { quality.crowdMax = 2; applyCrowdCap(); },
 ];
 function applyCrowdCap(){
@@ -2507,7 +2575,7 @@ const UI = {
   gel:el('gel'), combo:el('combo'), comboN:el('comboN'), wrGap:el('wrGap'),
   flag:el('flag'), flagN:el('flagN'), split:el('split'),
   menu:el('menu'), mDate:el('mDate'), mBest:el('mBest'),
-  tut:el('tut'), res:el('res'),
+  res:el('res'),
 };
 // Signed gap against world-record pace at the distance already covered.
 // Negative means on track to break it.
@@ -2574,25 +2642,15 @@ function showMenu(){
   UI.mBest.innerHTML = html || `<span style="opacity:.6">FIRST RUN OF THE DAY</span>`;
   el('mWR').textContent = fmtClock(WR_SECONDS);
   el('mWRPace').textContent = fmtPace(WR_PACE);
-  el('tWR').textContent = fmtClock(WR_SECONDS);
   UI.menu.classList.remove('hidden');
-}
-function showTutorial(){
-  S.phase = 'tutorial';
-  UI.menu.classList.add('hidden');
-  UI.tut.classList.remove('hidden');
-  UI.tut.scrollTop = 0;
 }
 let lastTap = 0;
 function onTap(target){
-  // touchend and the synthetic click both fire on mobile; take only the first
   const t = performance.now();
   if (t - lastTap < 400) return;
   lastTap = t;
-  // a tap on HOW TO PLAY must not also read as "start the race"
-  if (target && target.closest && target.closest('#mRules')){ showTutorial(); return; }
-  if (S.phase === 'tutorial'){ LS.set(K_TUT, 1); UI.tut.classList.add('hidden'); showMenu(); return; }
-  if (S.phase === 'menu'){ startRun(); return; }
+  // only the START button launches a run — forces reading the rules first
+  if (target && target.closest && target.closest('#mStart')){ if (S.phase === 'menu') startRun(); return; }
   if (S.phase === 'finished'){ UI.res.classList.add('hidden'); showMenu(); return; }
 }
 function startRun(){
@@ -2764,6 +2822,11 @@ function tick(now){
   updateEffects(dt);
   updateHUD(dt);
   sky.position.copy(camera.position);
+  // ground mist follows the camera, fog color syncs with the scene fog
+  mistPlane.position.x = camera.position.x;
+  mistPlane.position.z = camera.position.z - 200;
+  mistMat.uniforms.uCamZ.value = camera.position.z;
+  mistMat.uniforms.uFogColor.value.copy(scene.fog.color);
   render(dt);
 }
 
@@ -2928,6 +2991,8 @@ if (location.search.includes('debug')){
       gradePass.uniforms.uVig.value = CHAPTERS[0].vig;
       gradePass.uniforms.uWarm.value = 0;
       blurPass.uniforms.uStrength.value = 0;
+      shimmerPass.uniforms.uStrength.value = 0;
+      shimmerPass.uniforms.uTime.value = 0;
       skyMat.uniforms.uWarm.value = 1;
       scene.fog.color.copy(FOG_BASE);
       scene.fog.density = 0.00105;
@@ -2935,12 +3000,7 @@ if (location.search.includes('debug')){
     },
   };
 }
-if (!LS.get(K_TUT, 0)) showTutorial();
-else if (LS.get(K_PLAYED, 0)){
-  // repeat players skip the menu: brief beat, then the gun goes off
-  showMenu();
-  setTimeout(() => { if (S.phase === 'menu') startRun(); }, 1200);
-} else showMenu();
+showMenu();
 requestAnimationFrame(tick);
 </script>
 </body>

@@ -13,9 +13,11 @@ are the tools used to verify changes.
 | `tools/shots.mjs` | Reproducible capture set, one fresh page per shot at a fixed date and fixed frame count. |
 | `tools/difficulty.mjs` | Plays the full marathon at several skill levels and reports each against the world record. Guards the thing that makes the game a test rather than a coin flip. |
 | `tools/imagediff.mjs` | Per-pixel gate between two capture directories. Exits non-zero if any pixel moved. |
+| `tools/gait.mjs` | Side-on capture of the runner's stride cycle at jog and sprint pace. |
+| `tools/sheet.mjs` | Stitches a directory of frames into one labelled contact sheet. |
 
-All three drive the game through `window.MR`, which `index.html` exposes **only**
-when loaded with `?debug`. The shipped page exposes nothing.
+All of them drive the game through `window.MR`, which `index.html` exposes
+**only** when loaded with `?debug`. The shipped page exposes nothing.
 
 ## Why these particular measurements
 
@@ -47,6 +49,22 @@ number of fixed-`dt` frames.
 against software GL, where absolute fps is meaningless. Draw calls, triangle
 counts and program counts are hardware-independent, so those are what we gate
 on. Real fps still needs a real device.
+
+**The chase camera hides the animation it is pointed at.** Knee bend, arm swing
+and lean all happen in the sagittal plane, which is exactly the plane the game
+camera looks down — from behind, a flailing gait and a good one look the same.
+`gait.mjs` parks a camera beside the runner and drives `animateRunner` directly
+at a fixed pace, because pace is emergent (combo, fatigue, grade) and cannot be
+pinned by poking state. That framing is what showed the upper arm swinging as
+widely as the thigh.
+
+**A skill sweep is only as honest as its bot.** Two independent bugs made this
+lie. Its LCG (`rnd*1103515245+12345 & 0x7fffffff`) overflowed 2^53, lost integer
+precision and collapsed to a sequence that never returned a value under 0.04, so
+every skill tier played identically to `perfect`. And the bot only ever looked at
+`lane±1`, while a car spans two lanes — from the far side the sole escape is two
+lanes across, which it scored as impossible. Cars were 15 of its 16 stumbles.
+Both are fixed; treat a suspiciously flat tier spread as a bug in here first.
 
 ## Offline / sandboxed use
 

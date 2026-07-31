@@ -13,7 +13,6 @@ import { serve, launch, threeDirFromArgv } from './serve.mjs';
 
 const SHOTS = [
   { name: 'menu',   mile: null },
-  { name: 'rules',  mile: null, rules: true },
   { name: 'park',   mile: 1.4 },
   { name: 'urban',  mile: 5.2 },
   { name: 'bridge', mile: 12.0 },
@@ -45,14 +44,7 @@ for (const shot of SHOTS) {
     const M = window.MR;
     M.detach();
     M.reseed();          // rAF frames may have slipped in before we took control
-    if (s.rules) {
-      document.getElementById('menu').classList.add('hidden');
-      document.getElementById('tut').classList.remove('hidden');
-      for (let i = 0; i < 12; i++) M.frame(1 / 60);
-      return { note: 'rules overlay' };
-    }
     if (s.mile === null) {                       // menu: idle sway, fixed frames
-      document.getElementById('tut').classList.add('hidden');
       document.getElementById('menu').classList.remove('hidden');
       for (let i = 0; i < 20; i++) M.frame(1 / 60, i > 16);
       return { note: 'menu' };

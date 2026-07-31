@@ -51,8 +51,19 @@ const results = await page.evaluate(() => {
 
   // errorRate: probability of fumbling a given decision, to model skill levels
   const run=(errorRate, grabPickups, seed)=>{
-    let rnd=seed||12345;
-    const rand=()=>{ rnd=(rnd*1103515245+12345)&0x7fffffff; return rnd/0x7fffffff; };
+    // The obvious LCG (rnd*1103515245 + 12345) & 0x7fffffff silently breaks in
+    // JS: once rnd is large the product passes 2^53, the double loses integer
+    // precision and the sequence collapses. It never returned a value under
+    // 0.04, so every skill tier played identically to `perfect` and the sweep
+    // reported a tier separation that did not exist. mulberry32 stays inside
+    // 32-bit ops via Math.imul and does not have that failure mode.
+    let rnd=(seed||12345)>>>0;
+    const rand=()=>{
+      rnd=(rnd+0x6D2B79F5)|0;
+      let t=Math.imul(rnd^rnd>>>15, 1|rnd);
+      t=t+Math.imul(t^t>>>7, 61|t)^t;
+      return ((t^t>>>14)>>>0)/4294967296;
+    };
     d.startRun();
     let real=0, guard=0, pickTaken=0, pickSeen=0, comboSum=0, samples=0;
     const ignored=new Set(), judged=new Set();
@@ -80,13 +91,20 @@ const results = await page.evaluate(() => {
         if(threat && shouldIgnore(threat)) threat=null;
         if(threat){
           {
-            // prefer a lane that stays clear for a while
+            // Consider every lane, not just the neighbours, and step toward the
+            // best one. A car spans two lanes, so from the far side the only
+            // escape is two lanes across; a bot that only looked at S.lane±1
+            // scored that -100, gave up, and ate the car. That made cars 15 of
+            // its 16 stumbles and understated what the course actually allows.
             let bestL=-1,bestScore=-1e9;
-            for(const L of [S.lane-1,S.lane+1]){
-              if(L<0||L>2) continue;
+            for(let L=0;L<3;L++){
+              if(L===S.lane) continue;
               const blk=laneBlocked(L,s0,s1+40);
               let sc = blk? -100 : 0;
+              sc -= Math.abs(L-S.lane);                  // prefer the nearer out
               if(!blk && pickupInLane(L,s0,s1+40)) sc+=5;
+              // crossing a middle lane is only viable if the middle is clear too
+              if(Math.abs(L-S.lane)===2 && laneBlocked(1,s0,s1+40)) sc-=100;
               if(sc>bestScore){bestScore=sc;bestL=L;}
             }
             if(bestScore>-50 && bestL>=0 && S.laneT>=1){

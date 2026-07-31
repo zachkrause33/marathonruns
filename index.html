@@ -795,15 +795,22 @@ function crowdFigure(L, px, pz, h, shirt, face){
   put(L, ICO, px, legH + torsoH + headR, pz, headR * 2, headR * 2, headR * 2, 0xC79A78, { ao:0.2 });
   // arms up/out based on a seeded pose phase — static geometry, animation is
   // handled at render time by the chunk's crowd mesh rotation
+  // Arms are authored along Y so that "resting" is a limb hanging beside the
+  // torso. Authoring them along X instead makes the default pose a horizontal
+  // bar, which reads as a crowd of scarecrows.
+  // `a` is the angle away from straight-down; the shoulder is the pivot, so the
+  // box centre has to be swung out by hand and the box turned by s*a to match.
   const armUp = rr(rngArt, 0, 1);
-  const armAngle = armUp > 0.65 ? lerp(0.8, 2.2, (armUp - 0.65) / 0.35) : 0;
-  const armLen = h * 0.30, armW = 0.13;
-  const armY = legH + torsoH * 0.8;
-  const cosA = Math.cos(armAngle), sinA = Math.sin(armAngle);
-  put(L, BOX, px - torsoW - armLen * 0.5 * cosA, armY + armLen * 0.5 * sinA, pz,
-      armLen, armW, armW, 0xC79A78, { ao:0.15, rz: armAngle });
-  put(L, BOX, px + torsoW + armLen * 0.5 * cosA, armY + armLen * 0.5 * sinA, pz,
-      armLen, armW, armW, 0xC79A78, { ao:0.15, rz: -armAngle });
+  const a = armUp > 0.62 ? lerp(1.9, 2.7, (armUp - 0.62) / 0.38) : rr(rngArt, 0.05, 0.3);
+  const armLen = h * 0.30, armW = 0.12;
+  const armY = legH + torsoH * 0.92;
+  const shoulder = torsoW * 0.5 + armW * 0.5;
+  for (const s of [-1, 1]){
+    put(L, BOX,
+        px + s * (shoulder + Math.sin(a) * armLen * 0.5),
+        armY - Math.cos(a) * armLen * 0.5,
+        pz, armW, armLen, armW, 0xC79A78, { ao:0.15, rz: s * a });
+  }
 }
 const CROWD_SHIRTS = [0xE8615A, 0x4E8AD6, 0xF0C24B, 0xE8E4DA, 0x6FB78A, 0xC97BD1, 0xEE9A4D, 0xFF8844, 0x55CC88];
 function crowdRow(L, x, z, n, spread, face){
@@ -1062,10 +1069,14 @@ function updateChunks(s){
     if (c.index < 0) continue;
     const dist = Math.abs(c.mid - s);
     c.setLOD(dist);
-    // parallax: distant dressing scrolls slower than the road, creating depth
+    // Parallax: distant dressing scrolls slower than the road, exaggerating
+    // depth. Both far tiers use the SAME coefficient and it fades to zero by
+    // LOD_NEAR — otherwise a chunk crossing a LOD boundary swaps to geometry
+    // carrying a different offset and the whole treeline visibly jumps.
     const signedD = c.mid - s;
-    c.far.position.z  = signedD * 0.15;
-    c.dressL.position.z = signedD * 0.06;
+    const par = signedD * 0.15 * smoothstep(LOD_NEAR, LOD_FAR, dist);
+    c.far.position.z = par;
+    c.dressL.position.z = par;
     // crowd cheer: nearby crowds bob and sway when the runner passes
     if (c.crowd.visible && S.phase === 'running'){
       const prox = clamp(1 - dist / 120, 0, 1);
@@ -1152,16 +1163,19 @@ function animateRunner(dt, pace, airborne, ducking, stumbleT){
   shinL.pivot.rotation.x = lerp(kBendL, 1.1, air);
   shinR.pivot.rotation.x = lerp(kBendR, 0.5, air);
 
-  // arms oppose legs; elbows bend more on the back-swing
-  const armSwing = lerp(0.65, 0.95, effort);
+  // Arms oppose the legs. The upper arm swings far less than the thigh — a
+  // runner's shoulder travels maybe 30 degrees either side of vertical, and the
+  // elbow stays locked near a right angle rather than opening and closing. An
+  // earlier pass swung it as widely as the leg (~60 degrees) and compounded that
+  // with a varying elbow, which read as flailing rather than running.
+  const armSwing = lerp(0.50, 0.68, effort);
   armL.pivot.rotation.x = lerp(sw2 * armSwing, -1.2, air);
   armR.pivot.rotation.x = lerp(sw  * armSwing, -1.2, air);
-  const elbowL = -0.8 - Math.max(0, sw2) * lerp(0.4, 0.7, effort);
-  const elbowR = -0.8 - Math.max(0, sw)  * lerp(0.4, 0.7, effort);
-  foreL.pivot.rotation.x = elbowL;
-  foreR.pivot.rotation.x = elbowR;
-  armL.pivot.rotation.z =  lerp(0.16, 0.10, effort);
-  armR.pivot.rotation.z = -lerp(0.16, 0.10, effort);
+  const elbow = -lerp(1.35, 1.55, effort);
+  foreL.pivot.rotation.x = elbow - Math.max(0, sw2) * 0.16;
+  foreR.pivot.rotation.x = elbow - Math.max(0, sw)  * 0.16;
+  armL.pivot.rotation.z =  lerp(0.14, 0.09, effort);
+  armR.pivot.rotation.z = -lerp(0.14, 0.09, effort);
 
   // stumble: forward lurch, arms flail, head drops
   const stT = stumbleT > 0 ? stumbleT / (STUMBLE_MS / 1000) : 0;
@@ -1791,42 +1805,55 @@ function generateCourse(){
 }
 
 /* The stacked-pattern pass can put a two-lane car and a cyclist (or a second
-   car) close enough together to seal all three lanes. Nothing clears that —
+   car) close enough together that there is no way through. Nothing clears that —
    it's a guaranteed stumble through no fault of the player, and with the record
-   this tight a few of those would put it out of reach. So sweep the finished
-   course and thin any cluster that leaves no way through. */
+   this tight a few of those would put it out of reach.
 
-function lanesBlockedAt(s, skip){
-  const blocked = [false, false, false];
+   The first version of this check asked "are all three lanes blocked at the
+   instant of contact", and that turned out to be much too weak. Measuring a
+   zero-error bot (tools/difficulty.mjs, plus a one-off hit audit) showed 15 of
+   its 16 stumbles were cars, and roughly half of those had no lane that was
+   clear for long enough to move into — the escape lane existed at the moment of
+   contact but was itself blocked 30 units earlier, so reaching it was
+   impossible. A lane is only a real escape if it stays clear across the whole
+   approach, which is what APPROACH encodes: at cruise the runner covers ~98
+   units/sec, so 64 units is about two-thirds of a second — enough to queue and
+   complete a two-lane change (2 x LANE_SHIFT_MS) with reaction time to spare. */
+
+const APPROACH = 64;
+
+function laneClearOver(L, s0, s1){
   for (const o of COURSE){
-    if (o === skip || o.mode === 'pickup' || o.mode === 'decor') continue;
+    if (o.mode === 'pickup' || o.mode === 'decor') continue;
     if (o.mode === 'over' || o.jump) continue;      // duck or jump is an out
-    if (Math.abs(o.s - s) > o.half + 3.2) continue;
-    for (let L = 0; L < 3; L++){
-      const ox = o.type === T.CYCLIST ? LANE_X[o.lane] : o.x;
-      if (Math.abs(LANE_X[L] - ox) < o.w * 0.5 + 0.9) blocked[L] = true;
-    }
+    if (o.s + o.half < s0 || o.s - o.half > s1) continue;
+    const ox = o.type === T.CYCLIST ? LANE_X[o.lane] : o.x;
+    if (Math.abs(LANE_X[L] - ox) < o.w * 0.5 + 0.9) return false;
   }
-  return blocked;
+  return true;
 }
 function repairCourse(){
   let removed = 0;
-  for (let guard = 0; guard < 200; guard++){
+  for (let guard = 0; guard < 600; guard++){
     let culprit = -1;
     for (const o of COURSE){
       if (o.mode === 'pickup' || o.mode === 'decor' || o.mode === 'over' || o.jump) continue;
-      const blocked = lanesBlockedAt(o.s, null);
-      if (blocked[0] && blocked[1] && blocked[2]){
-        // drop whichever overlapping lane-blocker is not the one we are standing on
-        for (let j = COURSE.length - 1; j >= 0; j--){
-          const p = COURSE[j];
-          if (p === o || p.mode === 'pickup' || p.mode === 'decor') continue;
-          if (p.mode === 'over' || p.jump) continue;
-          if (Math.abs(p.s - o.s) > p.half + o.half + 3.2) continue;
-          culprit = j; break;
-        }
-        break;
+      let ok = false;
+      for (let L = 0; L < 3 && !ok; L++)
+        if (laneClearOver(L, o.s - APPROACH, o.s + o.half)) ok = true;
+      if (ok) continue;
+      // No lane survives the run-up. Drop the nearest other hard blocker rather
+      // than this one, so the pattern that owns this chunk keeps its anchor.
+      let bestJ = -1, bestD = Infinity;
+      for (let j = 0; j < COURSE.length; j++){
+        const p = COURSE[j];
+        if (p === o || p.mode === 'pickup' || p.mode === 'decor') continue;
+        if (p.mode === 'over' || p.jump) continue;
+        const dd = Math.abs(p.s - o.s);
+        if (dd <= APPROACH + o.half + p.half && dd < bestD){ bestD = dd; bestJ = j; }
       }
+      culprit = bestJ;
+      break;
     }
     if (culprit < 0) break;
     COURSE.splice(culprit, 1);
@@ -2446,14 +2473,17 @@ class HeatShimmerPass extends Pass {
         varying vec2 vUv;
         void main(){
           if (uStrength < 0.001){ gl_FragColor = texture2D(tDiffuse, vUv); return; }
-          // shimmer strongest in the upper-middle band (the road ahead)
-          float band = smoothstep(0.30, 0.48, vUv.y) * smoothstep(0.70, 0.52, vUv.y);
+          // Shimmer sits in a band around the vanishing point. The waves are
+          // deliberately high-frequency in y: a low-frequency vertical wave
+          // displaces a long horizontal edge (hillside meeting road) coherently,
+          // which reads as green streaks lying on the tarmac rather than heat.
+          float band = smoothstep(0.42, 0.56, vUv.y) * smoothstep(0.80, 0.62, vUv.y);
           float horiz = smoothstep(0.0, 0.25, vUv.x) * smoothstep(1.0, 0.75, vUv.x);
           float mask = band * horiz;
-          float wave1 = sin(vUv.x * 42.0 + uTime * 2.8) * cos(vUv.y * 28.0 + uTime * 1.9);
-          float wave2 = sin(vUv.x * 18.0 - uTime * 3.6) * cos(vUv.y * 34.0 + uTime * 2.2);
-          vec2 offset = vec2(wave1 + wave2 * 0.6, wave1 * 0.7 - wave2 * 0.4)
-                        * uStrength * mask * 0.004;
+          float wave1 = sin(vUv.x * 58.0 + uTime * 2.8) * cos(vUv.y * 96.0 + uTime * 1.9);
+          float wave2 = sin(vUv.x * 31.0 - uTime * 3.6) * cos(vUv.y * 71.0 + uTime * 2.2);
+          vec2 offset = vec2((wave1 + wave2 * 0.6) * 0.5, wave1 * 0.7 - wave2 * 0.4)
+                        * uStrength * mask * 0.0022;
           gl_FragColor = texture2D(tDiffuse, vUv + offset);
         }`,
     });

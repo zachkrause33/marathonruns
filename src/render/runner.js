@@ -416,17 +416,22 @@ MR.Runner = (function () {
       upper.position.y = -0.122;
       shoulder.add(upper);
 
-      const elbow = pivot(shoulder, 0, -0.245, 0);
-      // Short forearm ending in a pale mitt over a trim wristband. Arms and
-      // thighs are both skin, and from behind they overlap for most of the
-      // stride -- without a bright break at the wrist the whole lower half of
-      // the character reads as one undifferentiated mass. The mitt is 0.22
-      // across against a 0.57 head, which is the ratio Sonic's gloves run at
-      // and is what makes both the arm swing and the spread jump pose land.
+      // Arms are the one place the toy proportion is knowingly broken: they
+      // are about a head longer than the reference characters carry, because
+      // reach is the only term in the spread jump pose and short arms cannot
+      // buy enough width to make the airborne state unmistakable. At rest the
+      // extra length is absorbed by the elbow's flexion and does not show.
+      const elbow = pivot(shoulder, 0, -0.262, 0);
+      // Forearm ending in a pale mitt over a trim wristband. Arms and thighs
+      // are both skin, and from behind they overlap for most of the stride --
+      // without a bright break at the wrist the whole lower half of the
+      // character reads as one undifferentiated mass. The mitt is 0.24 across
+      // against a 0.57 head, which is the ratio Sonic's gloves run at, and it
+      // is what makes both the arm swing and the spread jump pose land.
       const fore = multi([
-        { g: new THREE.CapsuleGeometry(0.078, 0.080, 3, 10), c: P.runnerSkin, y: -0.098 },
-        { g: new THREE.CylinderGeometry(0.088, 0.088, 0.048, 10), c: TRIM, y: -0.176 },
-        { g: new THREE.SphereGeometry(0.112, 10, 8), c: GLOVE, y: -0.244, sx: 0.90, sz: 1.06 },
+        { g: new THREE.CapsuleGeometry(0.078, 0.090, 3, 10), c: P.runnerSkin, y: -0.103 },
+        { g: new THREE.CylinderGeometry(0.088, 0.088, 0.048, 10), c: TRIM, y: -0.188 },
+        { g: new THREE.SphereGeometry(0.118, 10, 8), c: GLOVE, y: -0.258, sx: 0.90, sz: 1.06 },
       ]);
       elbow.add(fore);
 
@@ -547,7 +552,7 @@ MR.Runner = (function () {
         // A little splay keeps the two legs from overlapping into one shape
         // when they pass each other at midstride, and opens further in the
         // air so the tuck reads as two legs rather than as one mass.
-        L.hip.rotation.z = L.side * (0.05 + spread * 0.20);
+        L.hip.rotation.z = L.side * (0.05 + spread * 0.30);
       }
 
       // ---- arms ----------------------------------------------------------
@@ -575,8 +580,16 @@ MR.Runner = (function () {
         const back = Math.max(0, s);
 
         A.shoulder.rotation.x = (s * swing * 0.95 - duck * 0.25) * cycA - spread * 0.26;
-        A.shoulder.rotation.z = A.side * ((0.19 + back * 0.20 + duck * 0.14) * cycA + spread * 1.55);
+        // Abduction. The running band is deliberately tighter than it used to
+        // be: the mitts got big enough to break the outline on their own, so
+        // the elbows no longer have to be held out to do it -- and every
+        // degree taken off the run widens the gap the jump has to clear.
+        A.shoulder.rotation.z = A.side * ((0.13 + back * 0.15 + duck * 0.14) * cycA + spread * 1.56);
         A.shoulder.rotation.y = -A.side * (0.16 + fwd * 0.22) * cycA;
+        // Ride the whole shoulder outboard in the air as well as rotating it.
+        // Worth 0.09 of span for nothing, and it keeps the arm root buried in
+        // the deltoid instead of tearing a gap at the seam.
+        A.shoulder.position.x = A.side * (0.222 + spread * 0.048);
         // Flexion peaks with the arm forward -- glove up by the chest at the
         // front of the swing, forearm opening out past the hip at the back,
         // which is exactly when the pale glove clears the torso silhouette.

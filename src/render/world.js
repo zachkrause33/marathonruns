@@ -974,7 +974,7 @@ MR.World = (function () {
           const cz = gates[gi].z + RING_AT[k];
           // Anything already level with the runner is behind their shoulder and
           // cannot be read; drop it rather than let it swell across the lens.
-          if (cz < z + 7) continue;
+          if (cz < z + 9) continue;
           // Alpha falls away down the trail so the eye is pulled to the next
           // gate first and the far ones stay a suggestion, not a second read.
           const a = 0.92 * Math.max(0.18, 1 - (cz - z) / (ROUTE_FAR * 1.15));

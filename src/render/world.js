@@ -29,6 +29,14 @@
  * But palette alone never made a place: each biome also picks the roadside
  * furniture the road tiles wear and the set pieces that get spawned beside it,
  * so THE BRIDGE actually has a bridge and RIVERSIDE actually has water.
+ *
+ *  3. THE CORRIDOR IS SACRED. Nothing that is not a hazard may occupy the
+ *     three lanes or the air above them below OVERHEAD_Y, and nothing may
+ *     stand between the camera and the next gate. That rule is what allows
+ *     the landmarks at the bottom of this file to be as big as they are: they
+ *     can crop the frame edge precisely because they are nowhere near the
+ *     road. It is also why the rival runners are gone -- see the note where
+ *     they used to be.
  */
 MR.World = (function () {
   const K = MR.K;
@@ -54,9 +62,26 @@ MR.World = (function () {
 
   // The widest point of any hazard, measured from its lane centre: the DUCK
   // frame's foot, 0.50 wide at 1.20 out. Anything that has to stand clear of
-  // the lanes -- a rival runner, a set piece -- starts from here rather than
+  // the lanes -- an aid table, a set piece -- starts from here rather than
   // from a literal that goes stale the next time the track is retuned.
   const HAZARD_HALF = 1.20 * LANE_FIT + 0.25;
+
+  // ---- the play corridor, and the one rule about it ---------------------
+  // CORRIDOR_HALF is the outermost point anything the player can collide with
+  // reaches: the outer lane centre plus the widest hazard. Nothing may stand
+  // inside it that is not a hazard, and no set piece may put geometry between
+  // the camera and the next gate -- one contact costs the record, so an
+  // "atmospheric" prop that clips the runner is a bug, not decoration.
+  //
+  // The big cropped-by-the-frame-edge landmarks below therefore start at
+  // LANDMARK_IN, which is derived from the corridor rather than typed in, and
+  // anything that reaches back over the road does so above OVERHEAD_Y. That
+  // height is not a guess either: the chase camera trails 4.35 units and
+  // carries part of the jump arc, sweeping to about y = 3.1 through a gate,
+  // and the WALL overpass has spanned the road at 8.0 since it was added.
+  const CORRIDOR_HALF = Math.max(K.TRACK_HALF_WIDTH, LANE + HAZARD_HALF);
+  const LANDMARK_IN = CORRIDOR_HALF + 8.0;
+  const OVERHEAD_Y = 9.0;
 
   // ---- biome palettes ---------------------------------------------------
   // `edge` names the roadside furniture the road tile wears; `mix` weights the
@@ -80,7 +105,7 @@ MR.World = (function () {
     'CITY START': {
       sky: [0x2b3fa8, 0x9fdcff], ground: 0x63c96b, road: 0x9aa0d8, fog: 0x9fdcff,
       edge: 'barrier',
-      mix: { building: 2.6, tree: 0.55, grove: 0.15, crowd: 2.3, rival: 0.5, station: 0.10 },
+      mix: { building: 2.6, tree: 1.1, grove: 0.3, crowd: 2.3 },
     },
     // `bank` cuts the shoulder back on one side so the water can come right up
     // to the road; at full shoulder width the river sat 35 units out and read
@@ -88,33 +113,34 @@ MR.World = (function () {
     'RIVERSIDE': {
       sky: [0x1f6fb8, 0xbdf0ff], ground: 0x57c7a8, road: 0x8fb4dc, fog: 0xbdf0ff,
       edge: 'hedge', bank: -1,
-      mix: { building: 0.45, tree: 1.5, grove: 1.3, crowd: 1.0, rival: 0.45, station: 0.12 },
+      mix: { building: 0.45, tree: 2.0, grove: 2.0, crowd: 1.0 },
     },
     // Nothing stands beside a bridge deck -- the emptiness is the point, and a
-    // spectator out there would be standing on the river.
+    // spectator out there would be standing on the river. What the leg gets
+    // instead is the towers and a ship on the water, both set pieces.
     'THE BRIDGE': {
       sky: [0x3a4fc0, 0xffd9a8], ground: 0x2f8fc4, road: 0xb9a8e0, fog: 0xffd9a8,
       edge: 'rail',
-      mix: { building: 0.0, tree: 0.0, crowd: 0.0, rival: 1.0, station: 0.0 },
+      mix: {},
     },
     'PARKLAND': {
       sky: [0x2e8fd0, 0xcdf5c0], ground: 0x6fd46a, road: 0xa8b6e2, fog: 0xcdf5c0,
       edge: 'hedge',
-      mix: { building: 0.12, tree: 2.2, grove: 3.2, crowd: 1.1, rival: 0.45, station: 0.12 },
+      mix: { building: 0.12, tree: 2.6, grove: 3.6, crowd: 1.1 },
     },
     'THE WALL': {
       sky: [0x8a3a6b, 0xffb27a], ground: 0x8f9a5e, road: 0xc79ab0, fog: 0xffb27a,
       edge: 'wall',
-      mix: { building: 2.0, tree: 0.25, crowd: 0.35, rival: 0.3, station: 0.18 },
+      mix: { building: 2.0, tree: 0.25, crowd: 0.35 },
     },
     'FINAL MILE': {
       sky: [0x24306e, 0xffcf6b], ground: 0x5cb46a, road: 0xa9a2e4, fog: 0xffcf6b,
       edge: 'barrier',
-      mix: { building: 1.1, tree: 0.3, crowd: 3.4, rival: 0.6, station: 0.0 },
+      mix: { building: 1.1, tree: 0.7, crowd: 3.4 },
     },
   };
 
-  const PROP_KINDS = ['building', 'tree', 'grove', 'crowd', 'rival', 'station'];
+  const PROP_KINDS = ['building', 'tree', 'grove', 'crowd'];
 
   // Scratch colours: applyBiome runs every frame and must not allocate.
   const _cA = new THREE.Color();
@@ -355,6 +381,10 @@ MR.World = (function () {
   function cone(r, h, seg, x, y, z, color) {
     return part(new THREE.ConeGeometry(r, h, seg), color, x, y, z);
   }
+  /** Low-poly blob, for canopies and anything that must not read as a box. */
+  function sph(r, seg, x, y, z, color) {
+    return part(new THREE.SphereGeometry(r, seg || 7, Math.max(3, (seg || 7) - 2)), color, x, y, z);
+  }
 
   /**
    * bx() for hazard parts. Width and lateral offset follow the lane; height
@@ -542,7 +572,10 @@ MR.World = (function () {
 
   function create(course) {
     const group = new THREE.Group();
-    const rnd = MR.rng.stream(course.key, 'scenery/v2');
+    // v3: the prop lottery lost its rival and station entries, which moves
+    // every draw after the first and so re-rolls the whole layout. Naming that
+    // is cheaper than wondering later why a day's scenery moved.
+    const rnd = MR.rng.stream(course.key, 'scenery/v3');
 
     // Biome spans in world units, so road tiles and set pieces can ask "where
     // am I" without reconstructing the fraction every time.
@@ -665,8 +698,8 @@ MR.World = (function () {
       const parts = [];
       const flat = -Math.PI / 2;
       // Carriageway edge lines, on the outer lane boundary rather than at the
-      // tarmac edge. The shoulder beyond them carries the kerb and the rival
-      // runners; painting it as road instead of as shoulder is what made three
+      // tarmac edge. The shoulder beyond them carries the kerb and the aid
+      // tables; painting it as road instead of as shoulder is what made three
       // lanes read as one enormous one.
       for (const sx of [-1, 1]) {
         parts.push(part(new THREE.PlaneGeometry(0.26, TILE), 0xf2f4ff,
@@ -1302,75 +1335,188 @@ MR.World = (function () {
       return S.outlined(geo, mats.prop, S.INK.prop);
     }, group));
 
+    // Rival runners used to live here, on the shoulder, drifting forward and
+    // yielding as the player came past. They are gone, and not only because the
+    // playtester called them unnecessary.
+    //
+    // This game's entire skill is parsing objects on the play surface: three
+    // lanes, one contact, no second chance. Putting non-interactive human
+    // figures on that surface teaches exactly the wrong reflex -- that some of
+    // the traffic on the road can be ignored -- and the frames prove the cost:
+    // a yielding rival at the closest approach filled a third of the frame
+    // beside the runner at the moment the next gate had to be read. The record
+    // ghost is the only figure allowed on the road, because it is the only one
+    // that means something.
+    //
+    // The geometry is not kept. A future pass that wants a field of runners
+    // wants them OFF the course -- a start-line pack behind the barriers -- and
+    // that is a single merged static knot in the shape of crowdGeo below, not a
+    // pool of individually animated movers. See git history for the old code.
+    //
+    // Removing them also freed the shoulder, which is what the oversized
+    // landmarks further down now stand on.
+
+    // ---- aid -------------------------------------------------------------
     /**
-     * Rival runners. They live on the shoulder, outside the three lanes, so
-     * the player can be passing bodies all race without any chance of a
-     * phantom collision. They drift forward at a slower pace than the player,
-     * which is what makes overtaking read as overtaking rather than as scenery.
+     * Water and fruit: the only things on the road that are good to hit.
      *
-     * Where they run is derived, never a literal: the inner limit is the
-     * widest point of a hazard in the outer lane, the outer limit is the
-     * tarmac. RIVAL_YIELD is the other half of the answer -- see the pass
-     * handling in update().
+     * Everything about them is built to be the OPPOSITE of a hazard, because
+     * the player loses the race by misreading road objects and aid is supposed
+     * to be the merciful option:
+     *
+     *   HAZARD                          AID
+     *   fills its lane                  small, a fifth of a lane wide
+     *   sits on the road, or overhead   hovers at hip height, between the two
+     *   saturated amber/cyan/pink       white and mint, the "go" family
+     *   hard-edged icon mat, 14 units   a soft pale pool of light, 1 unit
+     *   dead still                      turning
+     *
+     * The turn is doing more work than it looks like. Nothing else in this
+     * world rotates -- hazards, props and scenery are all rigidly static -- so
+     * a slowly spinning object is unambiguous at any distance, and it is the
+     * genre's universal "pick me up" besides.
+     *
+     * Collection is lane-match only, with no vertical test and no action (see
+     * player.js), so nothing here is allowed to imply otherwise: the item never
+     * rises above 1.2, never spans the lane, and the pool of light beneath it
+     * says that being in the lane is the whole requirement.
      */
-    const RIVAL_HALF = 0.40;                                  // arm to arm
-    const RIVAL_IN = LANE + HAZARD_HALF + RIVAL_HALF;         // nearest line
-    const RIVAL_OUT = Math.max(RIVAL_IN, K.TRACK_HALF_WIDTH - RIVAL_HALF);
-    // How far out a rival swings at the closest approach, and over how much
-    // ground the swing opens up. The ceiling is the tarmac, and that is not
-    // fussiness: 0.17 further out is the kerb block, and on the bridge deck the
-    // balustrade stands at TRACK_HALF_WIDTH + 0.55 with open water past it, so
-    // a wider yield puts a runner over the river. The shoulder is therefore
-    // what limits this, not the effect.
-    const RIVAL_YIELD_X = RIVAL_OUT;
-    const RIVAL_YIELD_Z = 30;
+    const AID_Y = 0.95;   // hip height: not the ground (jump), not overhead (duck)
+    const AID_POP_TIME = 0.42;
+    // Released much sooner than BEHIND, because an uncollected bottle sitting
+    // in the next lane back is only clutter -- and the pop needs the slot.
+    const AID_BEHIND = 14;
+    const aidItems = course.aid || [];
 
-    function rivalGeo(vest, skin, shorts) {
-      return merge([
-        bx(0.24, 0.14, 0.34, -0.16, 0.07, 0.02, 0xfff2e0),
-        bx(0.24, 0.14, 0.34, 0.16, 0.07, -0.02, 0xfff2e0),
-        bx(0.20, 0.62, 0.20, -0.16, 0.45, 0, skin),
-        bx(0.20, 0.62, 0.20, 0.16, 0.45, 0, skin),
-        bx(0.50, 0.34, 0.30, 0, 0.90, 0, shorts),
-        bx(0.52, 0.52, 0.32, 0, 1.32, 0, vest),
-        bx(0.14, 0.50, 0.14, -0.33, 1.28, 0.06, skin, 0.45),
-        bx(0.14, 0.50, 0.14, 0.33, 1.28, -0.06, skin, -0.45),
-        bx(0.30, 0.30, 0.28, 0, 1.72, 0, skin),
-        bx(0.32, 0.14, 0.30, 0, 1.87, 0, 0x3a2b46),
-        bx(0.26, 0.16, 0.02, 0, 1.30, 0.17, 0xfffdf5),
-      ]);
+    /**
+     * The pool of light under an item, as GEOMETRY rather than as a soft
+     * transparent sprite. A glow sprite is the obvious way to draw this and it
+     * is the wrong one here: large transparent surfaces are the single most
+     * expensive thing this renderer does, and there can be five bottles on
+     * screen at once. Two flat opaque discs of a pale mint cost nothing and
+     * read the same at the distance that matters.
+     *
+     * Both discs are rotationally symmetric on purpose -- the whole item is one
+     * mesh and one draw, so the spin below turns the pickup while leaving the
+     * pool looking planted on the road.
+     */
+    function aidPool(r) {
+      return [
+        cyl(r, r, 0.04, 14, 0, 0.03, 0, 0x86eec0),
+        cyl(r * 0.58, r * 0.58, 0.04, 14, 0, 0.06, 0, 0xf0fff8),
+      ];
     }
-    const rivalGeos = [
-      rivalGeo(0x37d6ff, 0xffc79a, 0x2b2f52),
-      rivalGeo(0xffe45e, 0xb87a4e, 0x1b1633),
-      rivalGeo(0x59d47a, 0xe0a173, 0x2b2f52),
-      rivalGeo(0xff9ad5, 0x8a5a3c, 0x1b1633),
-    ];
-    const rivalPool = rivalGeos.map((geo) => Pool(function () {
-      return S.outlined(geo, mats.propLit, S.INK.character);
-    }, group));
 
-    /** Aid station: trestle table, cups, and a volunteer holding one out. */
-    const stationGeo = merge([
-      bx(2.6, 0.12, 0.9, 0, 0.86, 0, 0xfff2e0),
-      bx(0.12, 0.86, 0.12, -1.15, 0.43, -0.32, 0x2b2f52),
-      bx(0.12, 0.86, 0.12, 1.15, 0.43, -0.32, 0x2b2f52),
-      bx(0.12, 0.86, 0.12, -1.15, 0.43, 0.32, 0x2b2f52),
-      bx(0.12, 0.86, 0.12, 1.15, 0.43, 0.32, 0x2b2f52),
-      bx(2.7, 0.5, 0.06, 0, 0.55, -0.48, 0x37d6ff),
-      cyl(0.09, 0.07, 0.16, 6, -0.9, 1.0, 0.1, 0xfffdf5),
-      cyl(0.09, 0.07, 0.16, 6, -0.6, 1.0, -0.1, 0xfffdf5),
-      cyl(0.09, 0.07, 0.16, 6, -0.3, 1.0, 0.15, 0xfffdf5),
-      cyl(0.09, 0.07, 0.16, 6, 0.05, 1.0, -0.05, 0xfffdf5),
-      cyl(0.09, 0.07, 0.16, 6, 0.4, 1.0, 0.12, 0xfffdf5),
-      cyl(0.09, 0.07, 0.16, 6, 0.75, 1.0, -0.12, 0xfffdf5),
-      bx(0.44, 0.60, 0.28, 0.05, 1.30, -0.85, 0xffe45e),
-      bx(0.30, 0.66, 0.22, 0.05, 0.66, -0.85, 0x2b2f52),
-      bx(0.26, 0.26, 0.24, 0.05, 1.72, -0.85, 0xffc79a),
-      bx(0.12, 0.46, 0.12, -0.24, 1.34, -0.70, 0xffc79a, 0, 0, 0.9),
-    ]);
-    const stationPool = Pool(function () {
-      return S.outlined(stationGeo, mats.prop, S.INK.prop);
+    // A bottle, drawn as a chunky box rather than a cylinder: a cylinder is its
+    // own axis of rotation and the spin would be invisible on it. 0.36 across is
+    // 21% of a lane -- big enough to be an object rather than a speck, and a
+    // quarter of the 95% a hazard fills, which is the ratio doing the work.
+    const waterGeo = merge(aidPool(0.54).concat([
+      bx(0.36, 0.56, 0.30, 0, AID_Y, 0, 0xf6fffb),
+      bx(0.39, 0.18, 0.33, 0, AID_Y - 0.04, 0, 0x2fd39a),
+      bx(0.19, 0.16, 0.19, 0, AID_Y + 0.36, 0, 0x2fd39a),
+    ]));
+
+    // Fruit is the rare one and worth more than twice a bottle, so it is bigger,
+    // sits in a wider pool and carries its own hue. Lemon yellow rather than the
+    // JUMP amber, and on a mint pool it never joins that family.
+    const bananaGeo = merge(aidPool(0.70).concat([
+      bx(0.58, 0.21, 0.21, 0, AID_Y + 0.15, 0, 0xffe45e),
+      bx(0.30, 0.21, 0.21, -0.38, AID_Y, 0, 0xffe45e, 0, 0, 0.6),
+      bx(0.30, 0.21, 0.21, 0.38, AID_Y, 0, 0xffe45e, 0, 0, -0.6),
+      bx(0.11, 0.15, 0.15, -0.53, AID_Y - 0.17, 0, 0x6b4f1f),
+      bx(0.11, 0.15, 0.15, 0.53, AID_Y - 0.17, 0, 0x6b4f1f),
+    ]));
+
+    const waterPool = Pool(function () {
+      return S.outlined(waterGeo, mats.propLit, S.INK.prop);
+    }, group);
+    const bananaPool = Pool(function () {
+      return S.outlined(bananaGeo, mats.propLit, S.INK.prop);
+    }, group);
+
+    /**
+     * The water table itself: trestle, cloth, cups, volunteers, and a sign.
+     *
+     * This is what says the floating bottles are aid and not another thing to
+     * dodge, and it is why the bottles arrive in runs of three to five -- a
+     * table serves a stretch of road, so the props and the pickups have to
+     * agree about that. It stands on the shoulder outside CORRIDOR_HALF, on
+     * whichever side the served lane is nearest, and it is built with the road
+     * toward local -x so one geometry serves both sides under a half-turn.
+     *
+     * Subway-Surfers chunky: few, large, saturated shapes. The volunteer
+     * holding a cup out over the kerb is the whole story of the prop in one
+     * silhouette.
+     */
+    const aidTableGeo = (function () {
+      const parts = [];
+      const CLOTH = 0x2fd39a, LINEN = 0xf6fffb;
+      parts.push(bx(1.20, 0.16, 5.4, 0, 0.94, 0, LINEN));       // table top
+      parts.push(bx(1.24, 0.50, 5.46, 0, 0.62, 0, CLOTH));      // skirt
+      parts.push(bx(1.28, 0.12, 5.5, 0, 0.86, 0, LINEN));       // trim
+      for (const z of [-2.4, 0, 2.4]) {
+        parts.push(bx(0.14, 0.86, 0.14, -0.42, 0.43, z, 0x2b2f52));
+        parts.push(bx(0.14, 0.86, 0.14, 0.42, 0.43, z, 0x2b2f52));
+      }
+      // Cups, in two rows down the table. Small, but a dozen white dots on a
+      // mint cloth is the read even once the cups themselves are one pixel.
+      for (let i = 0; i < 14; i++) {
+        parts.push(cyl(0.10, 0.08, 0.20, 6, -0.26 + (i % 2) * 0.5, 1.12,
+          -2.4 + Math.floor(i / 2) * 0.72, 0xfffdf5));
+      }
+      // Crates of stock under and behind the table.
+      parts.push(bx(0.9, 0.7, 1.1, 0.9, 0.35, -1.6, 0x1f9f78));
+      parts.push(bx(0.9, 0.7, 1.1, 0.9, 0.35, 1.9, 0x1f9f78));
+      parts.push(bx(0.94, 0.14, 1.14, 0.9, 0.76, 1.9, 0x86eec0));
+      // Two volunteers on the road side, the near one reaching out with a cup.
+      const vol = [
+        { z: -1.5, skin: 0xffc79a, reach: 1 },
+        { z: 1.7, skin: 0xb87a4e, reach: 0 },
+      ];
+      for (const v of vol) {
+        parts.push(bx(0.34, 0.66, 0.26, -0.85, 0.33, v.z, 0x2b2f52));
+        parts.push(bx(0.52, 0.66, 0.34, -0.85, 0.99, v.z, CLOTH));
+        parts.push(bx(0.30, 0.30, 0.28, -0.85, 1.47, v.z, v.skin));
+        parts.push(bx(0.34, 0.12, 0.32, -0.85, 1.64, v.z, 0xfffdf5));
+        if (v.reach) {
+          parts.push(bx(0.60, 0.14, 0.14, -1.25, 1.22, v.z, v.skin, 0, 0, 0.25));
+          parts.push(cyl(0.11, 0.09, 0.22, 6, -1.58, 1.34, v.z, 0xfffdf5));
+        } else {
+          parts.push(bx(0.14, 0.50, 0.14, -1.10, 1.10, v.z, v.skin));
+        }
+      }
+      // The sign: a post on the road side of the table carrying a board that
+      // faces back down the course. It is the only part of the prop the player
+      // sees before they are level with it, so it carries the whole distance
+      // read -- see aidSignTex.
+      parts.push(bx(0.20, 3.4, 0.20, -1.0, 1.7, -2.9, 0x1f7f62));
+      parts.push(bx(0.20, 3.4, 0.20, -1.0, 1.7, 2.9, 0x1f7f62));
+      parts.push(bx(0.24, 0.24, 6.2, -1.0, 3.5, 0, 0x1f7f62));
+      // A pennant above the sign: movement-free, but tall and mint, and the
+      // first thing over the crowd line.
+      parts.push(bx(0.14, 1.6, 0.14, -1.0, 4.4, -2.9, 0x1f7f62));
+      parts.push(bx(0.10, 0.7, 1.3, -1.0, 4.9, -2.2, 0x86eec0));
+      return merge(parts);
+    })();
+
+    // One texture and one material for every table -- only the mesh is per
+    // instance. A word beats any icon at 90 units, and no hazard in this game
+    // carries text, so the sign is unambiguous before the cups resolve at all.
+    const aidSignTex = labelTexture('WATER', '#0f5c46', '#eafff8', 512, 128);
+    const aidSignMat = new THREE.MeshBasicMaterial({ map: aidSignTex });
+    const aidSignGeo = new THREE.PlaneGeometry(4.6, 1.15);
+
+    const aidTablePool = Pool(function () {
+      const g = new THREE.Group();
+      g.add(S.outlined(aidTableGeo, mats.prop, S.INK.prop));
+      const sign = new THREE.Mesh(aidSignGeo, aidSignMat);
+      // Hung under the rail and turned back down the course, canted toward the
+      // road so it is square-on to a runner still 60 units away.
+      sign.position.set(-1.06, 2.80, -3.06);
+      sign.rotation.y = Math.PI + 0.45;
+      g.add(sign);
+      return g;
     }, group);
 
     // ---- biome set pieces -------------------------------------------------
@@ -1482,6 +1628,299 @@ MR.World = (function () {
       return S.outlined(standGeo, mats.prop, S.INK.scenery);
     }, group);
 
+    // ---- landmarks --------------------------------------------------------
+    /**
+     * The oversized set dressing: things too big to fit in frame.
+     *
+     * This is the layer the reference frames have and this game did not.
+     * Subway Surfers runs a giant sushi chef and a stacked burger straight
+     * through the frame edge; Sonic gives you the loop and the Golden Gate to
+     * aim at. What they buy is not detail, it is SPEED -- a 30-unit object
+     * sweeping past the edge of the lens is the only thing in a runner that
+     * conveys how fast the ground is moving, because the road itself is a
+     * repeating texture and the horizon does not move at all.
+     *
+     * Everything here is built to one convention so a single geometry can serve
+     * both sides of the road: local -x is the road, and a landmark on the far
+     * side is the same mesh turned a half-turn. They stand at LANDMARK_IN or
+     * beyond -- outside the corridor, outside the crowd line, outside the
+     * grandstands -- and where one reaches back over the road it does so above
+     * OVERHEAD_Y. Nothing here may ever be between the camera and the next gate.
+     *
+     * One draw each: they are merged, and scenery ink is off, so a 4,000
+     * triangle clock tower costs exactly what a tree does.
+     */
+
+    /**
+     * Railway viaduct, CITY START. The road runs through the arch, so it is a
+     * landmark you aim at for twenty seconds and then pass under -- the single
+     * most effective shape in the reference set. The arch springs at 9.5 and
+     * the deck sits at 13, which is well above the overpass clearance the
+     * camera has never reached.
+     */
+    const viaductGeo = (function () {
+      const parts = [];
+      const BRICK = 0xb4705a, BRICK2 = 0x8f5546, CAP = 0xd9a48a;
+      for (const sx of [-1, 1]) {
+        parts.push(bx(5.0, 13.0, 8.4, sx * 13.5, 6.5, 0, BRICK));
+        parts.push(bx(5.6, 0.8, 9.0, sx * 13.5, 12.2, 0, BRICK2));
+        parts.push(bx(5.0, 11.0, 8.4, sx * 24.0, 5.5, 0, BRICK2));
+      }
+      // Segmental arch over the road, in stone-sized voussoirs.
+      const N = 7;
+      for (let i = 0; i < N; i++) {
+        const a0 = (i / N) * Math.PI, a1 = ((i + 1) / N) * Math.PI;
+        const x0 = -11.5 * Math.cos(a0), y0 = 10.0 + 3.0 * Math.sin(a0);
+        const x1 = -11.5 * Math.cos(a1), y1 = 10.0 + 3.0 * Math.sin(a1);
+        parts.push(bx(Math.hypot(x1 - x0, y1 - y0) + 0.35, 1.1, 8.6,
+          (x0 + x1) / 2, (y0 + y1) / 2, 0, i % 2 ? BRICK : CAP,
+          0, 0, Math.atan2(y1 - y0, x1 - x0)));
+      }
+      parts.push(bx(62, 2.2, 8.6, 0, 14.1, 0, BRICK2));
+      parts.push(bx(63, 0.9, 9.4, 0, 15.5, 0, CAP));
+      for (const sz of [-1, 1]) {
+        parts.push(bx(63, 1.1, 0.6, 0, 16.4, sz * 4.4, CAP));
+      }
+      // A train standing on it, because a bridge with nothing on it is a wall.
+      const cars = [0x37d6ff, 0xf0f4ff, 0x37d6ff];
+      for (let i = 0; i < 3; i++) {
+        const x = -11 + i * 11;
+        parts.push(bx(10.2, 2.8, 3.2, x, 18.3, 0, cars[i]));
+        parts.push(bx(10.4, 0.9, 3.3, x, 19.1, 0, 0x1b3350));
+        parts.push(bx(9.4, 0.4, 3.0, x, 19.9, 0, 0xd8dcf0));
+      }
+      return merge(parts);
+    })();
+
+    /**
+     * Clock tower, CITY START and FINAL MILE. A race is a clock, so the city's
+     * clock is the landmark that means something here rather than merely being
+     * tall. It stands close enough to be cropped by the top and the side of the
+     * frame at the same time, which is the reference framing exactly.
+     */
+    const clockGeo = (function () {
+      const parts = [];
+      const STONE = 0xe3d3b6, STONE2 = 0xc3ae8e;
+      parts.push(bx(7.4, 1.2, 7.4, 0, 0.6, 0, STONE2));
+      parts.push(bx(6.4, 21, 6.4, 0, 11.0, 0, STONE));
+      // Window slots, on the two faces that can be seen from the road.
+      for (let i = 0; i < 4; i++) {
+        const y = 4.5 + i * 4.2;
+        parts.push(bx(0.3, 2.6, 1.5, -3.25, y, 0, 0x4a4664));
+        parts.push(bx(1.5, 2.6, 0.3, 0, y, -3.25, 0x4a4664));
+      }
+      parts.push(bx(7.2, 1.0, 7.2, 0, 22.0, 0, STONE2));
+      parts.push(bx(5.8, 4.8, 5.8, 0, 24.8, 0, STONE));
+      for (const f of [[-3.0, 0, 0.34, 3.3], [0, -3.0, 3.3, 0.34]]) {
+        parts.push(bx(f[2], 3.3, f[3], f[0], 24.8, f[1], 0xfffdf5));
+      }
+      parts.push(bx(0.30, 1.4, 0.16, -3.2, 25.4, 0, 0x2b2f52));
+      parts.push(bx(0.16, 0.30, 1.1, -3.2, 24.8, 0.4, 0x2b2f52));
+      parts.push(bx(0.16, 1.4, 0.30, 0, 25.4, -3.2, 0x2b2f52));
+      parts.push(bx(1.1, 0.30, 0.16, 0.4, 24.8, -3.2, 0x2b2f52));
+      parts.push(bx(6.6, 0.8, 6.6, 0, 27.4, 0, STONE2));
+      parts.push(cone(4.6, 6.4, 4, 0, 31.0, 0, 0x2f9f8a));
+      parts.push(bx(0.30, 2.4, 0.30, 0, 35.2, 0, 0xffe45e));
+      return merge(parts);
+    })();
+
+    /**
+     * Quayside crane, RIVERSIDE. Built with the jib toward local +x so it
+     * reaches out over the water, away from the road.
+     */
+    const craneGeo = (function () {
+      const parts = [];
+      const RUST = 0xe8543f, DARK = 0x2b2f52;
+      for (const sz of [-1, 1]) {
+        parts.push(bx(9.6, 1.0, 1.4, 0, 0.5, sz * 3.2, DARK));
+        parts.push(bx(1.0, 18, 1.0, -3.4, 9.0, sz * 3.2, RUST, 0, 0, 0.13));
+        parts.push(bx(1.0, 18, 1.0, 3.4, 9.0, sz * 3.2, RUST, 0, 0, -0.13));
+        parts.push(bx(9.0, 0.7, 0.7, 0, 10.0, sz * 3.2, RUST));
+      }
+      parts.push(bx(7.4, 3.8, 7.4, 0, 19.8, 0, RUST));
+      parts.push(bx(7.8, 0.8, 7.8, 0, 22.0, 0, DARK));
+      parts.push(bx(2.2, 2.2, 2.4, -3.2, 18.4, 0, 0xf0f4ff));
+      parts.push(bx(24, 1.2, 1.8, 12.5, 23.4, 0, RUST, 0, 0, -0.09));
+      parts.push(bx(9.0, 1.0, 1.6, -7.0, 22.6, 0, RUST));
+      parts.push(bx(3.4, 2.4, 3.4, -10.5, 22.2, 0, DARK));
+      parts.push(bx(0.22, 9.0, 0.22, 18.0, 17.6, 0, DARK));
+      parts.push(bx(1.6, 1.2, 1.6, 18.0, 12.6, 0, 0xffe45e));
+      // Containers on the quay, which is what makes it a quay.
+      const box = [0x37d6ff, 0xff9ad5, 0x59d47a];
+      for (let i = 0; i < 3; i++) {
+        parts.push(bx(6.4, 2.7, 2.7, -8 + (i % 2) * 3, 1.35 + Math.floor(i / 2) * 2.8,
+          -8 - i * 0.6, box[i]));
+      }
+      return merge(parts);
+    })();
+
+    /**
+     * A ship. On the river in RIVERSIDE, and out on the open water under THE
+     * BRIDGE, where it is the only thing that gives the drop below the deck a
+     * scale. Waterline is local y = 0, so the caller sets the height from
+     * whatever the water is doing at that z.
+     */
+    const shipGeo = (function () {
+      const parts = [];
+      const HULL = 0x1f3f6e, TOP = 0xd8552f, WHITE = 0xf0f4ff;
+      parts.push(bx(9.0, 3.6, 34, 0, -1.0, 0, HULL));
+      parts.push(bx(9.3, 0.6, 34, 0, 1.0, 0, TOP));
+      // Bow, faked with two canted plates rather than a taper.
+      parts.push(bx(6.0, 3.6, 6.0, 0, -1.0, 18.0, HULL, 0, 0.5));
+      parts.push(bx(6.0, 3.6, 6.0, 0, -1.0, 18.0, HULL, 0, -0.5));
+      parts.push(bx(7.6, 4.4, 7.0, 0, 3.4, -12.0, WHITE));
+      parts.push(bx(7.8, 1.0, 7.2, 0, 4.6, -12.0, 0x2b3350));
+      parts.push(bx(6.6, 0.6, 6.2, 0, 5.9, -12.0, TOP));
+      parts.push(cyl(1.5, 1.7, 3.6, 8, 0, 7.6, -14.0, TOP));
+      parts.push(cyl(1.6, 1.6, 0.8, 8, 0, 8.6, -14.0, 0x2b2f52));
+      parts.push(bx(0.30, 7.0, 0.30, 0, 9.4, -8.0, WHITE));
+      const box = [0x37d6ff, 0xff4d5e, 0x59d47a, 0xffe45e, 0x9a7bff];
+      for (let i = 0; i < 12; i++) {
+        parts.push(bx(7.4, 2.5, 5.4, 0, 2.55 + Math.floor(i / 4) * 2.6,
+          -2 + (i % 4) * 6.0, box[i % box.length]));
+      }
+      return merge(parts);
+    })();
+
+    /**
+     * A single enormous tree, PARKLAND. The groves fill the middle distance;
+     * this is the one that fills the frame. Its canopy reaches back toward the
+     * road (local -x) and is cropped by the top of the lens as you pass it, but
+     * it stops short of the corridor by a wide margin.
+     */
+    const oakGeo = (function () {
+      const parts = [];
+      const BARK = 0x7a5236, BARK2 = 0x6a452c;
+      parts.push(cyl(2.2, 3.6, 1.6, 8, 0, 0.6, 0, BARK2));
+      parts.push(cyl(1.1, 2.1, 11.0, 8, 0, 6.0, 0, BARK));
+      parts.push(bx(0.9, 6.0, 0.9, -2.6, 11.0, 0, BARK, 0, 0, 0.7));
+      parts.push(bx(0.8, 5.0, 0.8, 2.4, 11.6, 1.0, BARK, 0, 0, -0.6));
+      const green = [0x2f9f52, 0x35a855, 0x3fbf63, 0x59d47a];
+      // The inner reach is the number that matters. The furthest any blob gets
+      // toward the road is centre minus radius = -10.4, and an oak is never
+      // placed nearer than 15, so the canopy stops at world x = 4.6 -- outside
+      // CORRIDOR_HALF with room to spare, and at that extremity it is 14 units
+      // up regardless.
+      const blobs = [
+        [-6.0, 14.0, 0.5, 4.4], [-3.0, 15.6, -2.0, 5.2], [0.5, 16.8, 1.2, 5.6],
+        [4.2, 15.2, -1.4, 4.8], [6.6, 12.8, 1.8, 4.0], [-1.0, 12.6, 3.6, 4.2],
+        [1.6, 13.0, -4.2, 4.4],
+      ];
+      for (let i = 0; i < blobs.length; i++) {
+        const b = blobs[i];
+        parts.push(sph(b[3], 7, b[0], b[1], b[2], green[i % green.length]));
+      }
+      return merge(parts);
+    })();
+
+    /**
+     * A boating lake, PARKLAND. The player asked for water and RIVERSIDE was
+     * the only leg that had any. Opaque, deliberately: a transparent 26x30
+     * sheet is the most expensive surface this renderer could be asked to draw
+     * and it would buy nothing a flat toy-blue does not already say.
+     */
+    const pondGeo = (function () {
+      const parts = [];
+      parts.push(bx(26, 0.30, 30, 0, -0.17, 0, 0x37a8d8));
+      // A stone rim, so the water does not simply stop against the grass.
+      for (const sz of [-1, 1]) {
+        parts.push(bx(27.6, 0.34, 0.9, 0, 0.02, sz * 15.2, 0xcfc6ae));
+        parts.push(bx(0.9, 0.34, 30.8, sz * 13.2, 0.02, 0, 0xcfc6ae));
+      }
+      // Reeds, a jetty, a rowing boat and two ducks: the props are what make a
+      // blue rectangle read as a lake.
+      let s = 991;
+      const r = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+      for (let i = 0; i < 14; i++) {
+        const a = r() * 6.3, rad = 11.5 + r() * 2.4;
+        parts.push(cone(0.55 + r() * 0.4, 1.5 + r() * 1.2, 5,
+          Math.cos(a) * rad, 0.6, Math.sin(a) * rad, r() > 0.5 ? 0x2f9f52 : 0x8f9a3e));
+      }
+      parts.push(bx(2.0, 0.26, 7.0, -11.5, 0.35, 4.0, 0x8a5a3c));
+      parts.push(bx(0.22, 0.8, 0.22, -10.7, 0.7, 7.0, 0x8a5a3c));
+      parts.push(bx(0.22, 0.8, 0.22, -12.3, 0.7, 7.0, 0x8a5a3c));
+      parts.push(bx(1.5, 0.5, 4.2, -6.0, 0.15, -2.0, 0xfff2e0, 0, 0.25));
+      parts.push(bx(1.2, 0.2, 3.4, -6.0, 0.38, -2.0, 0xff4d5e, 0, 0.25));
+      for (const d of [[3.0, 6.0], [4.4, 7.2]]) {
+        parts.push(bx(0.5, 0.34, 0.8, d[0], 0.12, d[1], 0xfffdf5));
+        parts.push(bx(0.3, 0.4, 0.3, d[0], 0.34, d[1] + 0.4, 0xfffdf5));
+        parts.push(bx(0.2, 0.16, 0.3, d[0], 0.34, d[1] + 0.65, 0xffb020));
+      }
+      return merge(parts);
+    })();
+
+    /**
+     * Roadside hoarding, THE WALL and CITY START. Sixteen units of billboard on
+     * two legs, canted toward the road by the caller. It is the cheapest way to
+     * get one enormous saturated shape into the frame edge, and on THE WALL --
+     * a leg with no crowd and no colour -- it is the only bright thing there is.
+     */
+    const hoardingGeo = (function () {
+      const parts = [];
+      for (const sz of [-1, 1]) {
+        parts.push(bx(1.0, 9.0, 1.0, 0.2, 4.5, sz * 5.0, 0x2b2f52));
+        parts.push(bx(0.6, 0.6, 9.0, 0.2, 7.5, 0, 0x2b2f52));
+      }
+      parts.push(bx(0.7, 7.2, 16.4, -0.5, 11.6, 0, 0xf6f2e8));
+      parts.push(bx(0.9, 0.6, 17.0, -0.5, 15.4, 0, 0x2b2f52));
+      parts.push(bx(0.9, 0.6, 17.0, -0.5, 7.9, 0, 0x2b2f52));
+      // Poster, in flat blocks: a disc, a bar and a wedge read as graphic
+      // design at any distance and never as an object standing in the road.
+      parts.push(cyl(2.8, 2.8, 0.24, 14, -0.95, 12.6, -4.2, 0xff3b6b, 0, 0, Math.PI / 2));
+      parts.push(bx(0.24, 1.5, 9.6, -0.95, 9.6, 2.2, 0x2b2f52));
+      parts.push(bx(0.24, 1.0, 6.4, -0.95, 11.4, 3.4, 0xffb020));
+      parts.push(bx(0.24, 4.4, 4.4, -0.95, 13.6, 3.6, 0x37d6ff, Math.PI / 4));
+      // Floodlights on the top rail.
+      for (const z of [-5.5, 0, 5.5]) {
+        parts.push(bx(0.7, 0.5, 1.4, -1.1, 16.0, z, 0xffe45e));
+      }
+      return merge(parts);
+    })();
+
+    /**
+     * Big screen on a truss, FINAL MILE. The last mile of a real marathon is
+     * lined with them, and it gives the closing leg a vertical landmark to run
+     * at that the grandstands -- which are long and low -- cannot provide.
+     */
+    const jumboGeo = (function () {
+      const parts = [];
+      const DARK = 0x1b1633;
+      for (const sz of [-1, 1]) {
+        parts.push(bx(1.2, 13.0, 1.2, 0.6, 6.5, sz * 5.0, DARK));
+        parts.push(bx(1.6, 1.0, 1.6, 0.6, 0.5, sz * 5.0, 0x2b2f52));
+      }
+      for (let i = 0; i < 3; i++) {
+        parts.push(bx(0.5, 0.5, 10.6, 0.6, 3.0 + i * 3.6, 0, 0x2b2f52, 0.36));
+      }
+      parts.push(bx(1.4, 7.6, 13.4, 0, 15.4, 0, 0x2b2f52));
+      parts.push(bx(0.5, 6.6, 12.4, -0.8, 15.4, 0, 0x0d1030));
+      // What is on the screen: the race, in blocks. Bright, because a dark
+      // rectangle at this size just reads as a hole in the sky.
+      parts.push(bx(0.24, 3.4, 12.0, -1.08, 16.6, 0, 0x37d6ff));
+      parts.push(bx(0.24, 2.2, 5.4, -1.10, 14.2, -3.0, 0xff4d5e));
+      parts.push(bx(0.24, 1.0, 5.0, -1.10, 13.0, 3.0, 0xffe45e));
+      parts.push(bx(0.24, 1.6, 1.6, -1.10, 16.9, -4.2, 0xfffdf5));
+      // Speaker stacks and a pair of flags, so the truss has a base and a top.
+      for (const sz of [-1, 1]) {
+        parts.push(bx(2.2, 2.6, 2.2, 0.6, 11.0, sz * 7.2, DARK));
+        parts.push(bx(0.24, 3.2, 0.24, 0.6, 20.8, sz * 5.0, 0x2b2f52));
+        parts.push(bx(0.12, 1.3, 2.0, 0.6, 21.6, sz * 5.0 + (sz > 0 ? 1.0 : -1.0),
+          sz > 0 ? 0xff3b6b : 0x37d6ff));
+      }
+      return merge(parts);
+    })();
+
+    const landmarkPools = {
+      viaduct: Pool(function () { return S.outlined(viaductGeo, mats.prop, S.INK.scenery); }, group),
+      clock: Pool(function () { return S.outlined(clockGeo, mats.prop, S.INK.scenery); }, group),
+      crane: Pool(function () { return S.outlined(craneGeo, mats.prop, S.INK.scenery); }, group),
+      ship: Pool(function () { return S.outlined(shipGeo, mats.prop, S.INK.scenery); }, group),
+      oak: Pool(function () { return S.outlined(oakGeo, mats.prop, S.INK.scenery); }, group),
+      pond: Pool(function () { return S.outlined(pondGeo, mats.prop, S.INK.scenery); }, group),
+      hoarding: Pool(function () { return S.outlined(hoardingGeo, mats.prop, S.INK.scenery); }, group),
+      jumbo: Pool(function () { return S.outlined(jumboGeo, mats.prop, S.INK.scenery); }, group),
+    };
+
     // ---- mile banners ---------------------------------------------------
     // A banner is a gantry, not a floating card: legs, a truss, a lit header
     // and a stripe painted across the road so the moment of passing it is
@@ -1574,7 +2013,7 @@ MR.World = (function () {
         let side = rnd.chance(0.5) ? -1 : 1;
         let kind = total > 0 ? rnd.weighted(PROP_KINDS, w) : null;
         // Anything with foundations goes on the dry side of a river leg.
-        if (look.bank === side && kind !== 'crowd' && kind !== 'rival') side = -side;
+        if (look.bank === side && kind !== 'crowd') side = -side;
         // A zero-weighted kind must never slip through the fallback branch of
         // weighted(); a building standing in the middle of the river is the
         // kind of thing nobody notices until a screenshot.
@@ -1620,6 +2059,110 @@ MR.World = (function () {
         }
       }
     }
+
+    /**
+     * Place one landmark. `x` is the distance out from the centre line and is
+     * always positive; `side` decides which shoulder it stands on and turns the
+     * mesh a half-turn so its road-facing side (local -x, by convention above)
+     * still faces the road. Nothing may be placed inside LANDMARK_IN.
+     */
+    function landmark(z, kind, side, x, y, rz) {
+      structures.push({
+        z, kind, side,
+        x: side * Math.max(x, LANDMARK_IN),
+        y: y || 0,
+        ry: side < 0 ? Math.PI : 0,
+        rz: (rz || 0) * side,
+      });
+    }
+    // Spanning pieces are symmetric and sit on the centre line.
+    function landmarkOver(z, kind) {
+      structures.push({ z, kind, side: 1, x: 0, y: 0, ry: 0, rz: 0 });
+    }
+
+    // Hand-placed, one biome at a time, and spaced so at most two are ever in
+    // the 210-unit spawn window at once. They are the most expensive thing in
+    // the frame in fill terms, and a skyline of them would read as clutter
+    // rather than as landmarks anyway.
+    landmark(180, 'hoarding', -1, 13.0, 0, -0.13);
+    landmark(300, 'clock', 1, 14.5);
+    landmarkOver(560, 'viaduct');
+    landmark(700, 'hoarding', 1, 13.0, 0, -0.13);
+    landmark(880, 'clock', -1, 15.0);
+    landmarkOver(1010, 'viaduct');
+
+    landmark(1150, 'ship', -1, 34.0, -0.12);
+    landmark(1230, 'crane', -1, 13.0);
+    landmark(1380, 'oak', 1, 15.0);
+    landmark(1520, 'pond', 1, 27.0);
+    landmark(1640, 'ship', -1, 38.0, -0.12);
+    landmark(1880, 'crane', -1, 13.0);
+    landmark(2000, 'oak', 1, 15.0);
+
+    // Under the bridge the water is WATER_DROP below the road, so the ships sit
+    // there rather than at zero -- and being able to see how far down that is,
+    // on an object of known size, is the whole reason they are out there. They
+    // are also the only objects on this leg: with the shoulders gone the deck
+    // is a ribbon over an empty plane, and a ribbon over nothing has no speed.
+    for (let i = 0; i < 6; i++) {
+      const sd = i % 2 ? 1 : -1;
+      landmark(2200 + i * 155, 'ship', sd, 24 + (i % 3) * 8, -0.34 - WATER_DROP);
+    }
+
+    landmark(3160, 'oak', -1, 15.0);
+    landmark(3280, 'oak', 1, 15.0);
+    // The lake has to stand off further than anything else: its stone rim is
+    // 13.8 out from its own centre, and the PARKLAND verge carries eight units
+    // of pavement to x = 11.75 that it may not cut through.
+    landmark(3480, 'pond', -1, 27.0);
+    landmark(3620, 'oak', 1, 16.0);
+    landmark(3900, 'oak', -1, 15.0);
+    landmark(4060, 'oak', 1, 15.0);
+    landmark(4200, 'pond', 1, 27.0);
+    landmark(4400, 'oak', -1, 15.0);
+
+    // Closer in than the rest: THE WALL boxes the road in with a 6.5-unit
+    // hoarding at 11.35, so anything standing further out only shows its top.
+    // These are meant to loom over that wall, which is also the only relief the
+    // leg gets.
+    landmark(4700, 'hoarding', 1, 12.6, 0, -0.16);
+    landmark(4930, 'hoarding', -1, 12.6, 0, -0.16);
+    landmark(5150, 'hoarding', 1, 12.6, 0, -0.16);
+    landmark(5380, 'hoarding', -1, 12.6, 0, -0.16);
+    landmark(5620, 'hoarding', 1, 12.6, 0, -0.16);
+
+    landmark(5860, 'jumbo', 1, 13.5);
+    landmark(6020, 'jumbo', -1, 13.5);
+    landmark(6180, 'clock', 1, 15.5);
+
+    /**
+     * Water tables, derived from the aid the course generated rather than
+     * placed independently -- the props and the pickups have to be telling the
+     * same story. course.js emits a table as a run of consecutive water items
+     * in one lane, so that run is what gets grouped back up here.
+     */
+    {
+      const aid = course.aid || [];
+      let i = 0;
+      while (i < aid.length) {
+        if (aid[i].kind !== 'water') { i++; continue; }
+        let j = i;
+        while (j + 1 < aid.length && aid[j + 1].kind === 'water'
+          && aid[j + 1].lane === aid[i].lane && aid[j + 1].z - aid[j].z < 8) j++;
+        // The nearer shoulder to the lane being served. A centre-lane run has
+        // no nearer side, so the course's own z picks one -- still identical
+        // for every player, which is the only property that matters.
+        const lx = K.LANE_X[aid[i].lane];
+        const side = lx > 0.05 ? 1 : lx < -0.05 ? -1 : ((Math.round(aid[i].z) & 1) ? 1 : -1);
+        structures.push({
+          z: (aid[i].z + aid[j].z) / 2, kind: 'aidTable', side,
+          x: side * (K.TRACK_HALF_WIDTH + 3.4), y: 0,
+          ry: side < 0 ? Math.PI : 0, rz: 0,
+        });
+        i = j + 1;
+      }
+    }
+
     structures.sort((p, q) => p.z - q.z);
 
     const banners = course.mileMarkers.map((m) => ({ m, tex: null }));
@@ -1631,6 +2174,7 @@ MR.World = (function () {
       sceneIdx: 0,
       structIdx: 0,
       bannerIdx: 0,
+      aidIdx: 0,
       biome: null,
       look: BIOME_LOOK['CITY START'],
     };
@@ -1640,7 +2184,7 @@ MR.World = (function () {
     const activeStruct = [];  // { st, obj }
     const activeBanner = [];  // { b, obj }
     const activeRoad = [];    // { z, obj }
-    const activeRivals = [];  // { obj, z, speed, phase }
+    const activeAid = [];     // { it, obj, pool, pop }
 
     function hazardObject(kind) {
       if (kind === K.JUMP) return jumpPool.claim();
@@ -1657,10 +2201,9 @@ MR.World = (function () {
     function sceneryPool(s) {
       if (s.kind === 'building') return buildingPool;
       if (s.kind === 'tree') return treePool;
-      if (s.kind === 'station') return stationPool;
       if (s.kind === 'grove') return grovePool[Math.floor(s.b * grovePool.length) % grovePool.length];
       if (s.kind === 'crowd') return crowdPool[Math.floor(s.a * crowdPool.length) % crowdPool.length];
-      return null;   // rivals live in their own list
+      return null;
     }
     function structPool(kind) {
       if (kind === 'tower') return towerPool;
@@ -1669,7 +2212,8 @@ MR.World = (function () {
       if (kind === 'overpass') return overpassPool;
       if (kind === 'stand') return standPool;
       if (kind === 'arch') return archPool;
-      return null;
+      if (kind === 'aidTable') return aidTablePool;
+      return landmarkPools[kind] || null;
     }
 
     // routeLane is exposed so it can be asserted against the course rather than
@@ -1798,19 +2342,6 @@ MR.World = (function () {
       // roadside props
       while (state.sceneIdx < scenery.length && scenery[state.sceneIdx].z < ahead) {
         const s = scenery[state.sceneIdx++];
-        if (s.kind === 'rival') {
-          const pool = rivalPool[Math.floor(s.a * rivalPool.length) % rivalPool.length];
-          const obj = pool.claim();
-          obj.userData.pool = pool;
-          const baseX = s.side * (RIVAL_IN + s.b * (RIVAL_OUT - RIVAL_IN));
-          obj.position.set(baseX, 0, s.z);
-          activeRivals.push({
-            obj, z: s.z, baseX,
-            speed: 15 + s.c * 5,   // slower than the player: they get passed
-            phase: s.a * 6.3,
-          });
-          continue;
-        }
         const pool = sceneryPool(s);
         if (!pool) continue;
         const obj = pool.claim();
@@ -1833,9 +2364,6 @@ MR.World = (function () {
         } else if (s.kind === 'grove') {
           obj.position.set(s.x + s.side * 10, 0, s.z);
           obj.rotation.y = s.a * 6.3;
-        } else if (s.kind === 'station') {
-          obj.position.set(s.side * (K.TRACK_HALF_WIDTH + 2.4), 0, s.z);
-          obj.rotation.y = s.side > 0 ? Math.PI : 0;
         } else {
           // Crowd packs against the barrier line; the far side of a wide road
           // is where a real course puts the overflow.
@@ -1850,32 +2378,62 @@ MR.World = (function () {
         e.pool.release(e.obj);
       }
 
-      // Rivals move, so their release test reads the live position rather than
-      // the layout z. The step is a fixed 1/60 rather than dt because update()
-      // is not given one; a rival being a metre out after a frame hitch is
-      // invisible, and it keeps this loop off the delta-time plumbing.
-      for (let i = activeRivals.length - 1; i >= 0; i--) {
-        const r = activeRivals[i];
-        r.z += r.speed * (1 / 60);
-        r.obj.position.z = r.z;
-        // Yield. The chase camera trails barely four units, so a rival holding
-        // its own line through a pass ends up a stride from the lens, where a
-        // 1.9-unit body covers a third of the frame -- and nothing in this file
-        // may ever hide an upcoming gate, because one contact costs the record.
-        // Road races solve it the same way and it costs nothing to borrow: the
-        // runner being caught gives way, so the closest approach is also the
-        // widest point and the pass happens out beyond the kerb.
-        const close = 1 - Math.min(1, Math.abs(r.z - z) / RIVAL_YIELD_Z);
-        const side = r.baseX < 0 ? -1 : 1;
-        r.obj.position.x = r.baseX + side * (RIVAL_YIELD_X - Math.abs(r.baseX)) * close * close;
-        // Cheap run cycle: a bob and a matching roll sell stride at speed.
-        const ph = now * 5.5 + r.phase;
-        r.obj.position.y = Math.abs(Math.sin(ph)) * 0.09;
-        r.obj.rotation.z = Math.sin(ph * 2) * 0.035;
-        r.obj.rotation.x = -0.09;
-        if (r.z < back) {
-          r.obj.userData.pool.release(r.obj);
-          activeRivals.splice(i, 1);
+      // ---- aid ----------------------------------------------------------
+      // Spawned on the same windowed cursor as everything else; the pop is
+      // driven from here rather than plumbed in from main.js, because the rule
+      // that decides it is one line and duplicating it is cheaper than a new
+      // callback the renderer would have to be trusted to fire.
+      while (state.aidIdx < aidItems.length && aidItems[state.aidIdx].z < ahead) {
+        const it = aidItems[state.aidIdx++];
+        const pool = it.kind === 'banana' ? bananaPool : waterPool;
+        const obj = pool.claim();
+        obj.position.set(K.LANE_X[it.lane], 0, it.z);
+        obj.scale.setScalar(1);
+        activeAid.push({ it, obj, pool, pop: -1 });
+      }
+      for (let i = activeAid.length - 1; i >= 0; i--) {
+        const e = activeAid[i];
+        if (e.pop < 0) {
+          // Lane match only -- exactly what player.js resolves on, so the pop
+          // can never disagree with the streak the player was just granted.
+          // The 6-unit gate is what stops a whole table popping at once when a
+          // ?skip= jump spawns a run that is already behind the runner.
+          if (playerLane !== undefined && e.it.lane === playerLane
+            && e.it.z <= z && z - e.it.z < 6) {
+            e.pop = now;
+          } else if (e.it.z < z - AID_BEHIND) {
+            e.pool.release(e.obj);
+            activeAid.splice(i, 1);
+            continue;
+          } else {
+            // The turn. Phase comes off the item's own z so a table's bottles
+            // are out of step with each other and the run reads as a scatter of
+            // objects rather than as one rigid comb.
+            e.obj.rotation.y = now * 1.5 + e.it.z * 0.9;
+          }
+        }
+        if (e.pop >= 0) {
+          const t = (now - e.pop) / AID_POP_TIME;
+          if (t >= 1) {
+            e.pool.release(e.obj);
+            activeAid.splice(i, 1);
+            continue;
+          }
+          // Punch out, then away. Scale and lift only: a fade would need a
+          // material per item, and transparent surfaces are the one thing this
+          // renderer genuinely cannot spare.
+          //
+          // It climbs, and climbs fast. Collection happens at the runner's own
+          // z with the camera four units behind, so the pop goes off almost at
+          // the lens: a burst that swelled in place would sit across the road
+          // the player is reading, and a water table fires five of them in a
+          // second and a half. Lifting it out of the road read in the first
+          // tenth is what makes it a flourish instead of a blindfold -- and the
+          // swell is kept to 1.35, which is noticed rather than looked at.
+          const s = (1 + 0.55 * Math.sin(Math.PI * t)) * (1 - t * t);
+          e.obj.scale.setScalar(Math.max(0.001, s));
+          e.obj.position.y = 3.4 * Math.sqrt(t);
+          e.obj.rotation.y += 0.3;
         }
       }
 
@@ -1885,8 +2443,11 @@ MR.World = (function () {
         const pool = structPool(st.kind);
         if (!pool) continue;
         const obj = pool.claim();
-        obj.position.set(0, 0, st.z);
-        obj.rotation.y = 0;
+        // Pooled, so every transform a set piece can carry has to be written
+        // on every claim -- a landmark inheriting the previous tenant's cant is
+        // the kind of thing that only shows up in one screenshot in twenty.
+        obj.position.set(st.x || 0, st.y || 0, st.z);
+        obj.rotation.set(0, st.ry || 0, st.rz || 0);
         if (st.kind === 'stand') {
           obj.position.x = st.side * (K.TRACK_HALF_WIDTH + 1.3);
           obj.rotation.y = st.side < 0 ? Math.PI : 0;
@@ -1942,16 +2503,17 @@ MR.World = (function () {
     api.reset = function () {
       roadPool.releaseAll(); jumpPool.releaseAll(); duckPool.releaseAll();
       blockPool.releaseAll(); buildingPool.releaseAll(); treePool.releaseAll();
-      stationPool.releaseAll(); bannerPool.releaseAll(); archPool.releaseAll();
+      aidTablePool.releaseAll(); bannerPool.releaseAll(); archPool.releaseAll();
       towerPool.releaseAll(); abutPool.releaseAll(); riverPool.releaseAll();
       overpassPool.releaseAll(); standPool.releaseAll();
+      waterPool.releaseAll(); bananaPool.releaseAll();
+      for (const k in landmarkPools) landmarkPools[k].releaseAll();
       for (const p of crowdPool) p.releaseAll();
-      for (const p of rivalPool) p.releaseAll();
       for (const p of grovePool) p.releaseAll();
       activeGates.length = 0; activeScene.length = 0; activeStruct.length = 0;
-      activeBanner.length = 0; activeRoad.length = 0; activeRivals.length = 0;
+      activeBanner.length = 0; activeRoad.length = 0; activeAid.length = 0;
       state.roadFrom = 0; state.gateIdx = 0; state.sceneIdx = 0;
-      state.structIdx = 0; state.bannerIdx = 0;
+      state.structIdx = 0; state.bannerIdx = 0; state.aidIdx = 0;
     };
 
     api.stats = function () {
@@ -1959,7 +2521,7 @@ MR.World = (function () {
         gates: activeGates.length,
         scenery: activeScene.length,
         structures: activeStruct.length,
-        rivals: activeRivals.length,
+        aid: activeAid.length,
         road: activeRoad.length,
       };
     };

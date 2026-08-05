@@ -27,12 +27,16 @@
  *      the camera axis from here, so the cycle drives the elbows sideways
  *      and lets the pale shoes, gloves and wristbands flash against the
  *      road; those are the parts the eye can actually track from behind.
- *   4. State has to read as SILHOUETTE WIDTH, not as pose detail. Measured
- *      dead astern, running is 1.0, a jump is 1.8 and a duck is 0.9 -- and
- *      the jump is a horizontal bar where the other two are columns, so it
- *      is told apart in a single frame at speed. An arm tuck and a leg
- *      extension are not, because both point straight down the camera axis
- *      where there is nothing to see.
+ *   4. State has to read as SILHOUETTE, not as pose detail, and no two states
+ *      may differ on the SAME axis. Measured in pixels dead astern through
+ *      one lens, against the run: a jump is 1.92 wide and its crown sits 1.07
+ *      up -- a horizontal bar. A committed slide is 1.06 wide and its crown
+ *      sits 0.71 up, over a contact shadow 2.4x deeper than the run's. So
+ *      width alone separates the jump from both others, and height alone
+ *      separates the slide from the run; neither test can return the wrong
+ *      answer for the other state. An arm tuck is not readable at all,
+ *      because it points straight down the camera axis where there is
+ *      nothing to see -- which is what the old head-first duck relied on.
  *
  * Pivot layout (all rotations are local X unless noted):
  *   root -> body -> hips -> thigh -> shin -> foot
@@ -530,6 +534,16 @@ MR.Runner = (function () {
       const spread = air * air * (3 - 2 * air);
       const cycA = 1 - spread * 0.88;
 
+      // How far into the slide. Smoothstepped for the same reason the jump is:
+      // half a slide is a shape the player cannot name, and a DUCK gate gives
+      // them one glance to name it. duck01 itself already ramps in fast and out
+      // slowly (player.js), so this shapes that ramp rather than replacing it.
+      const slid = duck * duck * (3 - 2 * duck);
+      // The run cycle has to be damped almost out, not blended with: a scissor
+      // still running under a body lying on its back reads as a fall, and the
+      // residual 8% is only there to keep the pose from looking frozen.
+      const cycD = cycA * (1 - slid * 0.92);
+
       // ---- legs: contralateral swing with a knee tuck on the recovery leg
       for (let i = 0; i < legs.length; i++) {
         const L = legs[i];
@@ -542,21 +556,55 @@ MR.Runner = (function () {
         // legs this short balls the whole lower body into one lump that
         // fights the spread above it instead of supporting it.
         const tuck = spread * (i === 0 ? 0.80 : 0.70);
-        const cyc = 1 - air * 0.75;
+        const cyc = (1 - air * 0.75) * (1 - slid * 0.92);
+
+        // Which leg leads the slide. Both go forward -- a slide with one leg
+        // folded under, the way a real baseball slide runs, loses the second
+        // shin out of the silhouette entirely from behind -- but the lead leg
+        // is straighter and rides higher, and that offset is the difference
+        // between a slide and a mannequin tipped onto its back.
+        const lead = i === 0 ? 1 : 0;
 
         // Larger angles than the old rig ran, because the legs are a third
         // shorter and the same rotation covers a third less ground. Angle is
         // what the back view measures, not length.
-        L.hip.rotation.x = -s * swing * 0.86 * cyc + tuck * 0.70 + duck * 0.76;
+        //
+        // The slide term is NEGATIVE where the old duck's was positive, and
+        // that sign is the whole fix: +x at the hip swings the foot toward -z,
+        // which is back toward the camera, so the old pose tucked the knees up
+        // under a body folding head-first at the bar. -x throws the feet down
+        // +z, the way the runner is travelling, and puts the shoes at the
+        // obstacle first. Past 1.5rad the thigh is a hair above horizontal,
+        // which is what keeps the heels skimming the road instead of buried
+        // in it once the body has dropped.
+        L.hip.rotation.x = -s * swing * 0.86 * cyc + tuck * 0.70
+          - slid * (1.62 + lead * 0.12);
         // Knee only bends one way; bias so it flexes hardest on recovery.
         const bend = Math.max(0, -c * 0.5 + 0.5);
-        L.knee.rotation.x = 0.18 + bend * (1.22 + 0.26 * sp01) * cyc + tuck * 1.25 + duck * 1.25;
-        // Dorsiflex through recovery, plantarflex off the toe.
-        L.ankle.rotation.x = -0.16 + s * 0.34 * cyc - tuck * 0.45 + duck * 0.30;
+        L.knee.rotation.x = 0.18 + bend * (1.22 + 0.26 * sp01) * cyc + tuck * 1.25
+          + slid * (0.30 - lead * 0.20);
+        // Dorsiflex through recovery, plantarflex off the toe -- and hard
+        // dorsiflexion in the slide, toes up, which is both what a slider
+        // actually does and what turns the biggest pale face on the character
+        // away from the road and into the light.
+        L.ankle.rotation.x = -0.16 + s * 0.34 * cyc - tuck * 0.45
+          - slid * (0.12 + lead * 0.18);
         // A little splay keeps the two legs from overlapping into one shape
         // when they pass each other at midstride, and opens further in the
         // air so the tuck reads as two legs rather than as one mass.
-        L.hip.rotation.z = L.side * (0.05 + spread * 0.30);
+        //
+        // The slide needs far more of it than either, and this is the single
+        // value the whole pose turned on. The chase camera is only about four
+        // degrees above the runner, so legs thrown forward along the view axis
+        // sit at almost exactly the torso's screen height and vanish behind
+        // it -- the first version of this pose had no visible legs at all.
+        // Splaying to 0.70 walks the shoes out to x ~0.50 and takes the rig to
+        // 0.57 half-width, clear of the 0.38 deltoid line, so the two of them
+        // read as shoes flanking the vest rather than as one stump behind it.
+        // 0.70 is also the ceiling: MEASUREMENTS.md derives the lane's own
+        // limit at 0.70 from the lane centre, so this pose spends the width
+        // budget the gloves' 0.543 run swing had already proved is there.
+        L.hip.rotation.z = L.side * (0.05 + spread * 0.30 + slid * 0.70);
       }
 
       // ---- arms ----------------------------------------------------------
@@ -576,6 +624,21 @@ MR.Runner = (function () {
       // the forearm and the mitt to the span, and damping the cycle terms out
       // means every jump makes the same shape rather than whichever half of
       // the stride takeoff happened to land on.
+      //
+      // Sliding sweeps both arms back and in, so the gloves trail behind the
+      // hips at road level like a slider bracing. Back is the only place they
+      // can go: the shoulders end up barely 0.3 above the road once the body
+      // drops and reclines, so an arm left hanging goes through the tarmac,
+      // and near-horizontal is the only angle that keeps a 0.64 arm out of it.
+      // Swept back they also sit NEARER the camera than anything else on the
+      // figure, which is what stops the low pose from reading as small.
+      //
+      // IN, though, not out -- and that was not the first answer. Arms held
+      // wide put the gloves in exactly the screen band the splayed shoes need,
+      // and being closer to the lens they win it, which left a slide whose
+      // legs were invisible and whose only wide pale objects were its hands.
+      // Tucked in they read as one trailing tail and leave the flanks to the
+      // feet, which is the half of the pose that has to say "feet first".
       for (let i = 0; i < arms.length; i++) {
         const A = arms[i];
         const ph = p + (i === 0 ? Math.PI : 0);
@@ -583,13 +646,22 @@ MR.Runner = (function () {
         const fwd = Math.max(0, -s);
         const back = Math.max(0, s);
 
-        A.shoulder.rotation.x = (s * swing * 0.95 - duck * 0.25) * cycA - spread * 0.26;
+        // 2.06 is measured against the reclined chest, not the world: the
+        // torso is already 0.78 back, so this lands the upper arm a little
+        // under horizontal in world space with the elbow behind the hip.
+        A.shoulder.rotation.x = s * swing * 0.95 * cycD - spread * 0.26 + slid * 2.06;
         // Abduction. The running band is deliberately tighter than it used to
         // be: the mitts got big enough to break the outline on their own, so
         // the elbows no longer have to be held out to do it -- and every
         // degree taken off the run widens the gap the jump has to clear.
-        A.shoulder.rotation.z = A.side * ((0.13 + back * 0.15 + duck * 0.14) * cycA + spread * 1.56);
-        A.shoulder.rotation.y = -A.side * (0.16 + fwd * 0.22) * cycA;
+        //
+        // The slide term reads backwards and is not a typo: rotation.z abducts
+        // an arm that hangs DOWN, and the slide has already swung this one
+        // past horizontal to point up-and-back, so the sign that opens a
+        // running arm outboard closes a sliding one inboard. That is the
+        // direction wanted here -- see the note above the loop.
+        A.shoulder.rotation.z = A.side * ((0.13 + back * 0.15) * cycD + spread * 1.56 + slid * 0.16);
+        A.shoulder.rotation.y = -A.side * (0.16 + fwd * 0.22) * cycD;
         // Ride the whole shoulder outboard in the air as well as rotating it.
         // Worth 0.09 of span for nothing, and it keeps the arm root buried in
         // the deltoid instead of tearing a gap at the seam.
@@ -597,21 +669,36 @@ MR.Runner = (function () {
         // Flexion peaks with the arm forward -- glove up by the chest at the
         // front of the swing, forearm opening out past the hip at the back,
         // which is exactly when the pale glove clears the torso silhouette.
-        // A duck folds it tighter still, so duck and jump are opposite
-        // silhouettes and can never be confused: narrow and low against wide.
-        A.elbow.rotation.x = (-1.32 - fwd * 0.46 - duck * 0.55) * (1 - spread * 0.95);
+        // A slide straightens it instead, so the whole arm becomes one long
+        // brace trailing behind the body -- flat and low against the jump's
+        // wide, and neither of them the run.
+        A.elbow.rotation.x =
+          (-1.32 - fwd * 0.46) * (1 - spread * 0.95) * (1 - slid * 0.86) - slid * 0.10;
       }
 
       // ---- torso: forward lean, vertical bob, and a lateral bank on turns
       // Two bobs per stride, lowest at each footstrike.
-      const bob = -Math.abs(Math.cos(p)) * BOB * (1 - air) + BOB;
+      // A body on the ground does not bob -- the bob is the cost of landing on
+      // alternate feet, and in a slide neither foot is carrying anything.
+      const bob = -Math.abs(Math.cos(p)) * BOB * (1 - air) * (1 - slid * 0.90) + BOB;
       body.position.y = bob + air * 0.09;
 
       // Straightens up in the air. A runner still folded forward at the apex
       // reads as a stumble, the reference jump is upright with the chest
       // open, and standing up is also what stops the spread arms from being
       // foreshortened back into the body by the lean.
-      const leanFwd = 0.26 + 0.12 * sp01 + duck * 0.74 + stumble * 0.5 - spread * 0.30;
+      //
+      // The slide term is the other half of the sign fix at the hip. A run
+      // leans the chest forward; a slide reclines it BACK toward the camera,
+      // over the hips it is sitting on, so the body forms one long diagonal
+      // from the trailing shoulders up to the leading feet. Folding forward as
+      // well as dropping -- which is what the old duck did -- put the crown of
+      // the head at the front of the figure, closest to the thing it was
+      // trying to get under, and that is exactly what the playtest read as
+      // "diving into it".
+      const leanFwd = (0.26 + 0.12 * sp01 + stumble * 0.5) * (1 - slid * 0.94)
+        - spread * 0.30
+        - slid * 0.78;
       spine.rotation.x = leanFwd;
       spine.rotation.z = -lean * 0.30;
       spine.rotation.y = lean * 0.16;
@@ -620,17 +707,20 @@ MR.Runner = (function () {
       // most separates a run cycle from a march, and the only thing the back
       // view sees the torso do at all. Damped in the air with the rest of the
       // cycle, so the spread pose stays square to the camera.
-      chest.rotation.y = Math.sin(p) * 0.21 * cycA;
-      chest.rotation.z = -Math.sin(p) * 0.055 * cycA;
-      hips.rotation.y = -Math.sin(p) * 0.14 * cycA;
+      chest.rotation.y = Math.sin(p) * 0.21 * cycD;
+      chest.rotation.z = -Math.sin(p) * 0.055 * cycD;
+      hips.rotation.y = -Math.sin(p) * 0.14 * cycD;
       // Pelvic drop toward the swinging leg: small, but it stops the hips
       // from reading as a rigid block bolted to the spine.
-      hips.rotation.z = Math.sin(p) * 0.055 * cycA;
+      hips.rotation.z = Math.sin(p) * 0.055 * cycD;
 
-      // Head stays level: cancel most of the spine lean, add a small lag.
-      // Ducking is the exception -- keeping the head up there would defeat
-      // the point of the pose, so the cancel fades out as the player folds.
-      neck.rotation.x = -leanFwd * 0.86 * (1 - duck * 0.55) + Math.sin(p * 2) * 0.035;
+      // Head stays level: cancel most of the spine lean, add a small lag. The
+      // cancel is what the slide needs too, and for once it needs it at full
+      // strength -- the recline is nearly 45 degrees, and a head left in line
+      // with it stares at the sky and reads as falling over backwards. Level
+      // keeps the eyeline down the road and, incidentally, presents the hair
+      // and headband to the camera instead of the underside of a chin.
+      neck.rotation.x = -leanFwd * 0.86 + Math.sin(p * 2) * 0.035 * (1 - slid * 0.9);
       neck.rotation.z = lean * 0.14;
       neck.rotation.y = -Math.sin(p) * 0.10;
 
@@ -641,19 +731,37 @@ MR.Runner = (function () {
       // the collision capsule and the silhouette agree. The 0.42 matches
       // Collision.PLAYER_DUCK_DROP; changing it here would silently break
       // that module's audit.
+      //
+      // Deliberately driven by the raw duck01 and not by `slid`, because 0.42
+      // is a contract with a module that models the drop as linear in duck01,
+      // and a smoothstep here would make collision.js's arithmetic wrong at
+      // every value between the ends.
+      //
+      // 0.42 is now the smaller half of the truth, though, and worth knowing:
+      // the recline tips the crown down again on top of the drop, so at the
+      // DUCK_CLEAR threshold the head measures 1.15 where audit() computes
+      // 1.60 - 0.42*0.90 = 1.22 against a bar at 1.41. The error is 0.07 in
+      // the only direction it is allowed to point -- the real head is LOWER
+      // than collision.js believes, never higher -- so the audit stays honest
+      // while understating the daylight it is buying.
       body.position.y -= duck * 0.42;
       api.duckDrop = duck * 0.42;
 
       // Shadow footprint, handed to onBeforeRender above. Wider than deep
       // because the runner is, and it tightens and darkens on each footstrike
       // with the bob -- a blob of constant size under a body that is visibly
-      // rising and falling reads as a sticker travelling with it. A duck
-      // spreads it, which is the only thing that sells the fold from directly
-      // behind, where the fold itself is pointing away from the camera.
-      const plant = 1 - Math.abs(Math.cos(p)) * 0.10 * (1 - air);
-      shadowW = (1.30 + duck * 0.20) * plant;
-      shadowD = (0.96 + duck * 0.12) * plant;
-      shadowA = (1 + duck * 0.14) * (2 - plant);
+      // rising and falling reads as a sticker travelling with it.
+      //
+      // The slide is where the blob earns its place: the body is flat and
+      // pointing away from the camera, so almost none of its length is
+      // visible, and the shadow is the only thing in frame that can be long.
+      // It goes the opposite way to the old duck's -- narrower and much
+      // deeper, roughly the footprint of a body lying down -- and the plant
+      // pulse is damped out with the bob that caused it.
+      const plant = 1 - Math.abs(Math.cos(p)) * 0.10 * (1 - air) * (1 - slid * 0.90);
+      shadowW = (1.30 - slid * 0.18) * plant;
+      shadowD = (0.96 + slid * 1.34) * plant;
+      shadowA = (1 + slid * 0.48) * (2 - plant);
     };
 
     api.update(0, {});

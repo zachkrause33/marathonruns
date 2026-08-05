@@ -271,8 +271,19 @@ MR.shading = (function () {
   // far alone does exactly that -- the near field is crisp, and the fade over
   // the remaining 145 units is steeper than it was, so distance reads harder
   // than before rather than softer.
-  const FOG_NEAR = 45;
-  const FOG_FAR = 190;
+  // Aerial perspective has to lose an argument to gameplay here. At 45/190 a
+  // gate 150 units out was 72% washed into the haze, while World spawns
+  // hazards 210 units ahead -- so the far half of the spawn window was scenery
+  // the player could not read, and planning was limited to the next gate. In a
+  // game where one contact costs the record, the player has to be able to see
+  // two or three gates out and choose a line.
+  //
+  // Pushed to 60/300: a gate at 100 units goes 38% -> 17% hazed and one at 150
+  // goes 72% -> 37%, while anything past 200 still sits deep enough in the
+  // haze to read as distance. The depth cue survives; the far half of the
+  // spawn window becomes usable.
+  const FOG_NEAR = 60;
+  const FOG_FAR = 300;
 
   const fogU = {
     inkFogColor: { value: new THREE.Color(1, 1, 1) },

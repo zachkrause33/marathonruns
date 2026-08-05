@@ -1474,8 +1474,19 @@ MR.shading = (function () {
   // far alone does exactly that -- the near field is crisp, and the fade over
   // the remaining 145 units is steeper than it was, so distance reads harder
   // than before rather than softer.
-  const FOG_NEAR = 45;
-  const FOG_FAR = 190;
+  // Aerial perspective has to lose an argument to gameplay here. At 45/190 a
+  // gate 150 units out was 72% washed into the haze, while World spawns
+  // hazards 210 units ahead -- so the far half of the spawn window was scenery
+  // the player could not read, and planning was limited to the next gate. In a
+  // game where one contact costs the record, the player has to be able to see
+  // two or three gates out and choose a line.
+  //
+  // Pushed to 60/300: a gate at 100 units goes 38% -> 17% hazed and one at 150
+  // goes 72% -> 37%, while anything past 200 still sits deep enough in the
+  // haze to read as distance. The depth cue survives; the far half of the
+  // spawn window becomes usable.
+  const FOG_NEAR = 60;
+  const FOG_FAR = 300;
 
   const fogU = {
     inkFogColor: { value: new THREE.Color(1, 1, 1) },
@@ -2063,17 +2074,20 @@ MR.shading = (function () {
  * pivot hierarchy, and the cycle is driven by phase rather than keyframes so
  * it stays locked to ground speed at any pace.
  *
- * Proportions are deliberately cartoon: the head is about 3.4 heads into the
- * total height, limbs are short and thick, hands and feet are oversized. That
- * is what reads as "toy" at a low tight camera rather than "small human".
+ * Proportions are measured off the Subway Surfers and Sonic frames in
+ * reference/, because that is where "toy" is actually defined: the head is a
+ * third of the whole figure, the neck is a stub, the legs are barely another
+ * third, and the shoes and mitts are far bigger than the limbs carrying them.
+ * This one is a shade under three heads tall. Anything nearer human reads as
+ * "small person" at a low tight camera no matter how good the shading is.
  *
  * EVERYTHING here is designed for the back view, because that is the only
- * view the player ever gets. The three rules that came out of looking at it
+ * view the player ever gets. The four rules that came out of looking at it
  * in motion:
- *   1. The head must pinch away from the shoulders. A big skull sitting
- *      straight on a big torso is one blob at 200px tall no matter how good
- *      the shading is, so the trunk stops well below the skull and a bare
- *      skin neck bridges the gap.
+ *   1. The head must pinch away from the shoulders, and the gap has to GROW
+ *      with the head rather than stay fixed. The chase camera looks DOWN, so
+ *      a fatter skull hangs more of its own silhouette into the gap before
+ *      the neck gets any use of it -- at this head size about 0.05 of it.
  *   2. The back needs its own value structure, and the order matters.
  *      Top to bottom it runs dark hair / bright headband / dark hair /
  *      light neck / red vest / white race bib. Hair on the crown with a
@@ -2083,11 +2097,17 @@ MR.shading = (function () {
  *      the camera axis from here, so the cycle drives the elbows sideways
  *      and lets the pale shoes, gloves and wristbands flash against the
  *      road; those are the parts the eye can actually track from behind.
+ *   4. State has to read as SILHOUETTE WIDTH, not as pose detail. Running is
+ *      shoulder-wide, a jump throws the arms out to twice that, a duck is
+ *      narrow and low. Those three are told apart in one frame at speed.
+ *      An arm tuck and a leg extension are not, because both of them point
+ *      straight down the camera axis where there is nothing to see.
  *
  * Pivot layout (all rotations are local X unless noted):
  *   root -> body -> hips -> thigh -> shin -> foot
  *                -> spine -> chest -> neck -> head
  *                                  -> shoulder -> upperArm -> forearm+hand
+ *        -> shadowPivot -> contact shadow   (cancels the jump and the bank)
  */
 MR.Runner = (function () {
   const S = MR.shading;
@@ -2100,16 +2120,51 @@ MR.Runner = (function () {
   const SPEED_LO = (K.UNITS_PER_MILE * K.TIME_SCALE) / K.START_PACE;
   const SPEED_HI = (K.UNITS_PER_MILE * K.TIME_SCALE) / K.FLOOR_PACE;
 
-  const HEIGHT = 1.78;
+  // ---- the height ladder -------------------------------------------------
+  // Every joint hangs off these, in world units above the road with the body
+  // at rest, so a proportion change is one edit rather than a hunt through
+  // the file. The stride bobs the whole body over the range [0, BOB].
+  //
+  // HEIGHT is the crown at the TOP of that bob, not at rest, because
+  // MR.Collision.audit() reads it as the worst case a committed duck has to
+  // fit under. Quoting the resting height there would let the audit pass on a
+  // character that still clips the bar on the up-beat of its own stride.
+  //
+  // The figure got 10% shorter in the wave-2 pass without getting any
+  // narrower: the shoulder line is pinned at 0.78 because constants.js cuts
+  // the lane width from it, so height is the only axis left to make the
+  // character chunkier on, and the reference characters are chunky mostly by
+  // being short. Collision has 0.20 of headroom at the duck threshold either
+  // way (1.60 - 0.42*0.90 = 1.22 against a bar starting at 1.41).
+  const HIP_Y = 0.552;     // pelvis pivot
+  const CHEST_Y = 0.767;   // shoulder girdle pivot
+  const NECK_Y = 0.907;    // base of the neck; the head rotates from here
+  const HEAD_Y = 1.274;    // centre of the skull
+  const BOB = 0.040;
+  const HEIGHT = 1.60;
+
   const OUTLINE = MR.shading.INK.character;
 
   // Accent that ties the silhouette together: headband, wristbands, shoe
-  // soles -- top, middle and bottom of the figure. Repeating one bright
+  // midsoles -- top, middle and bottom of the figure. Repeating one bright
   // colour on a rhythm is what makes a pile of primitives look like a
   // designed character instead of assorted parts. A fourth hit on the vest
   // hem put three yellows at the same height and just read as clutter.
   const TRIM = P.accent;
   const GLOVE = P.runnerShoe;
+
+  // The outsole is the one deliberately dark thing on the shoe, and it is the
+  // fix for a bug that had been visible in every gameplay screenshot: the
+  // whole underside used to be TRIM. The recovery ankle plantarflexes until
+  // the sole faces the camera square-on, so the largest flat face on the
+  // character was presenting a saturated yellow rectangle bigger than its own
+  // head -- and because that foot swings up right under the opposite glove,
+  // the review read it as a slab held in the runner's left hand. Every
+  // reference shoe shows a DARK underside; the bright part is the upper, and
+  // the upper is what should be flashing for cadence. TRIM survives as a thin
+  // midsole stripe, which is visible from behind and near-invisible from
+  // below -- exactly the wrong way round from where it was.
+  const SOLE = 0x3b3557;
 
   /**
    * Weld several primitives into one geometry, baking each piece's colour
@@ -2117,9 +2172,9 @@ MR.Runner = (function () {
    *
    * Every part is outlined, so a part costs two draw calls. Welding the
    * pieces that never move relative to each other -- skull + hair + band +
-   * ears + neck, vest + shoulders + blades, shoe + sole -- is what pays for
-   * the extra detail this silhouette needs while staying inside the budget.
-   * The whole character is 28 draws and about 8k triangles.
+   * ears + neck, vest + shoulders, shoe + soles -- is what pays for the extra
+   * detail this silhouette needs while staying inside the budget. The whole
+   * character is 28 draws plus one for the shadow.
    *
    * Piece: { g, c, x,y,z, rx,ry,rz, sx,sy,sz }.
    */
@@ -2212,6 +2267,64 @@ MR.Runner = (function () {
     return bibTex;
   }
 
+  // ---- contact shadow ----------------------------------------------------
+  //
+  // Every reference frame grounds its character with one and this one floated.
+  // It is a painted blob on a ground quad, never a shadow map: the renderer
+  // runs no shadow pass at all, and turning one on for a single character
+  // would cost a whole extra render of the scene to get something a hand-drawn
+  // gradient does better -- soft, cheap, and free to lie about its own size
+  // when the runner leaves the ground.
+  //
+  // shading.js grew a shared contactShadow() while this was being written.
+  // Prefer it, so the player, the record ghost and any prop that takes one all
+  // get the same blob; keep the local copy so this file still builds against a
+  // shading.js that predates it.
+  let blobTex = null;
+  function blobTexture() {
+    if (blobTex) return blobTex;
+    const N = 96;
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = N;
+    const g = cv.getContext('2d');
+    const grd = g.createRadialGradient(N / 2, N / 2, 0, N / 2, N / 2, N / 2);
+    // Four stops, not two. A straight linear ramp reads as a grey disc with a
+    // visible rim, and the rim is the thing that gives a painted shadow away;
+    // holding it near-solid to a third of the radius and then falling off
+    // fast is what makes it read as contact rather than as a decal.
+    grd.addColorStop(0.00, 'rgba(255,255,255,1)');
+    grd.addColorStop(0.34, 'rgba(255,255,255,0.88)');
+    grd.addColorStop(0.66, 'rgba(255,255,255,0.30)');
+    grd.addColorStop(1.00, 'rgba(255,255,255,0)');
+    g.fillStyle = grd;
+    g.fillRect(0, 0, N, N);
+    blobTex = new THREE.CanvasTexture(cv);
+    blobTex.minFilter = blobTex.magFilter = THREE.LinearFilter;
+    blobTex.generateMipmaps = false;
+    return blobTex;
+  }
+
+  const SHADOW_R = 0.46;
+  function groundShadow() {
+    if (typeof S.contactShadow === 'function') {
+      return S.contactShadow(SHADOW_R, { opacity: 0.50 });
+    }
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(SHADOW_R * 2, SHADOW_R * 2).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({
+        color: P.contact === undefined ? 0x241d3d : P.contact,
+        map: blobTexture(),
+        transparent: true,
+        opacity: 0.50,
+        depthWrite: false,     // overlapping blobs blend instead of z-fighting
+        side: THREE.DoubleSide,
+      })
+    );
+    mesh.position.y = 0.015;   // clear of the road paint, which sits at 0.006
+    mesh.renderOrder = 2;
+    return mesh;
+  }
+
   function create() {
     const root = new THREE.Group();
     const body = pivot(root, 0, 0, 0);
@@ -2221,32 +2334,32 @@ MR.Runner = (function () {
     // wider than the head is half of what separates the two from behind.
     // Shorts sit inside the vest where they overlap, in both x and z, or the
     // vest's hem shows only at the hips and reads as two yellow pockets.
-    const hips = pivot(body, 0, 0.78, 0);
+    const hips = pivot(body, 0, HIP_Y, 0);
     const spine = pivot(hips, 0, 0, 0);
 
     const pelvis = multi([
-      { g: new THREE.CylinderGeometry(0.230, 0.222, 0.25, 12), c: P.runnerShort, y: -0.005, sz: 0.78 },
+      { g: new THREE.CylinderGeometry(0.228, 0.220, 0.25, 12), c: P.runnerShort, y: -0.020, sz: 0.78 },
     ]);
     spine.add(pelvis);
 
     // The whole silhouette is built backwards from one measurement: the
-    // shoulder line has to stop 0.15 below the skull. The chase camera looks
-    // DOWN on the runner, so a gap smaller than that is swallowed by the
-    // head's own projected silhouette and the neck disappears again.
-    const chest = pivot(spine, 0, 0.24, 0);
+    // shoulder line has to stop 0.135 below the skull. See rule 1 in the
+    // header -- the number went UP with the head, not down.
+    const chest = pivot(spine, 0, CHEST_Y - HIP_Y, 0);
     const trunk = multi([
-      // Vest. Top edge at world 1.12. Nothing on the trunk may reach above
-      // it -- an earlier deltoid that poked 0.03 higher closed the gap on
-      // its own and the head went straight back to sitting on the shoulders.
-      // It barely tapers on purpose: a singlet worn over the waistband, so
-      // red owns two thirds of the trunk. Tapering it to a narrow hem let the
-      // navy shorts read as the biggest single shape on the character.
-      { g: new THREE.CylinderGeometry(0.262, 0.238, 0.30, 12), c: P.runnerVest, y: -0.05, sz: 0.78 },
+      // Vest. Nothing on the trunk may reach above the deltoids -- an earlier
+      // version had it poking 0.03 higher and the head went straight back to
+      // sitting on the shoulders. Short and barely tapered on purpose: a
+      // singlet worn over the waistband, so the red reads as one wide squat
+      // block the way the reference shirts do rather than as a torso.
+      { g: new THREE.CylinderGeometry(0.262, 0.238, 0.28, 12), c: P.runnerVest, y: -0.055, sz: 0.78 },
       // Deltoids. These are what make the shoulder line read wider than the
       // head; without them the trunk cone tapers into the skull. Flattened
-      // hard in Y so they widen the shoulders without raising them.
-      { g: new THREE.SphereGeometry(0.134, 10, 8), c: P.runnerVest, x: -0.244, y: -0.020, sy: 0.78, sz: 0.84 },
-      { g: new THREE.SphereGeometry(0.134, 10, 8), c: P.runnerVest, x: 0.244, y: -0.020, sy: 0.78, sz: 0.84 },
+      // hard in Y so they widen the shoulders without raising them. Their
+      // outer edge is the 0.78 shoulder measurement constants.js cuts the
+      // lane width from -- move them and the whole track has to move.
+      { g: new THREE.SphereGeometry(0.140, 10, 8), c: P.runnerVest, x: -0.244, y: -0.016, sy: 0.76, sz: 0.84 },
+      { g: new THREE.SphereGeometry(0.140, 10, 8), c: P.runnerVest, x: 0.244, y: -0.016, sy: 0.76, sz: 0.84 },
       // No shoulder-blade bumps: the race bib is a panel standing proud of
       // the vest and it covers the entire area they would have shown in.
     ]);
@@ -2257,40 +2370,42 @@ MR.Runner = (function () {
     const bib = new THREE.Mesh(
       // Cone, not cylinder: matched to the vest's taper. A constant-radius
       // panel let the wider top of the vest poke through the number.
-      new THREE.CylinderGeometry(0.266, 0.254, 0.17, 10, 1, true, Math.PI - 0.52, 1.04),
+      new THREE.CylinderGeometry(0.266, 0.256, 0.16, 10, 1, true, Math.PI - 0.52, 1.04),
       S.toon(0xffffff, 3)
     );
     bib.material.map = raceBib();
-    bib.position.y = -0.018;
+    bib.position.y = -0.038;
     bib.scale.z = 0.78;
     chest.add(bib);
 
     // ---- head -----------------------------------------------------------
     // The neck pivot sits at the top of the trunk so head tilt rotates from
     // the base of the neck; the neck column itself rides with the head.
-    const neck = pivot(chest, 0, 0.13, 0);
+    const neck = pivot(chest, 0, NECK_Y - CHEST_Y, 0);
     const head = pivot(neck, 0, 0, 0);
+    const HY = HEAD_Y - NECK_Y;
 
     const headMesh = multi([
-      // Bare neck: 0.18 across against a 0.73 shoulder line, and lit skin
-      // between the dark hair above and the red vest below. The order of
-      // those three values is the entire fix. Leaving the nape skin and the
-      // hair on the crown gave a light head sitting on a light neck -- one
-      // continuous mass with no pinch. Dark / light / saturated reads.
-      { g: new THREE.CylinderGeometry(0.097, 0.110, 0.30, 10), c: P.runnerSkin, y: 0.10 },
-      { g: new THREE.SphereGeometry(0.25, 16, 12), c: P.runnerSkin, y: 0.38, sy: 1.02, sz: 0.97 },
+      // Bare neck: 0.22 across against a 0.78 shoulder line and a 0.57 skull,
+      // and lit skin between the dark hair above and the red vest below. The
+      // order of those three values is the entire fix. Leaving the nape skin
+      // and the hair on the crown gave a light head sitting on a light neck --
+      // one continuous mass with no pinch. Dark / light / saturated reads.
+      // Long enough to start inside the vest so no gap opens on a head tilt.
+      { g: new THREE.CylinderGeometry(0.104, 0.122, 0.32, 10), c: P.runnerSkin, y: HY - 0.300 },
+      { g: new THREE.SphereGeometry(0.266, 16, 12), c: P.runnerSkin, y: HY, sy: 1.06, sz: 0.97 },
       // Crown cap for the top of the skull...
-      { g: new THREE.SphereGeometry(0.264, 14, 6, 0, Math.PI * 2, 0, Math.PI * 0.42), c: P.runnerHair, y: 0.375 },
+      { g: new THREE.SphereGeometry(0.280, 14, 6, 0, Math.PI * 2, 0, Math.PI * 0.42), c: P.runnerHair, y: HY },
       // ...and a rear-only shell that carries the hair down to the nape but
       // leaves the face clear. Restricting phi to the back 210 degrees is
       // what lets one primitive do a haircut.
-      { g: new THREE.SphereGeometry(0.271, 14, 8, Math.PI * 1.5 - 1.83, 3.66, Math.PI * 0.33, Math.PI * 0.44), c: P.runnerHair, y: 0.375 },
+      { g: new THREE.SphereGeometry(0.286, 14, 8, Math.PI * 1.5 - 1.83, 3.66, Math.PI * 0.33, Math.PI * 0.44), c: P.runnerHair, y: HY },
       // Headband sits above the eye line -- lower and it reads as goggles.
       // Radius has to clear the hair everywhere: shells this close together
       // interpenetrate on their facets and the crown grew a row of teeth.
-      { g: new THREE.CylinderGeometry(0.279, 0.279, 0.070, 14), c: TRIM, y: 0.436 },
-      { g: new THREE.SphereGeometry(0.076, 8, 6), c: P.runnerSkin, x: -0.238, y: 0.360, z: -0.012, sx: 0.48, sz: 0.82 },
-      { g: new THREE.SphereGeometry(0.076, 8, 6), c: P.runnerSkin, x: 0.238, y: 0.360, z: -0.012, sx: 0.48, sz: 0.82 },
+      { g: new THREE.CylinderGeometry(0.294, 0.294, 0.074, 14), c: TRIM, y: HY + 0.060 },
+      { g: new THREE.SphereGeometry(0.080, 8, 6), c: P.runnerSkin, x: -0.254, y: HY - 0.020, z: -0.013, sx: 0.48, sz: 0.82 },
+      { g: new THREE.SphereGeometry(0.080, 8, 6), c: P.runnerSkin, x: 0.254, y: HY - 0.020, z: -0.013, sx: 0.48, sz: 0.82 },
     ]);
     head.add(headMesh);
 
@@ -2298,72 +2413,123 @@ MR.Runner = (function () {
     // Welded into one mesh -- they are a single draw the back view never
     // spends, but the character still needs a face for the finish framing.
     const eyes = new THREE.Mesh(weld([
-      { g: new THREE.CircleGeometry(0.053, 12), c: P.ink, x: -0.094, y: 0.365, z: 0.243 },
-      { g: new THREE.CircleGeometry(0.053, 12), c: P.ink, x: 0.094, y: 0.365, z: 0.243 },
+      { g: new THREE.CircleGeometry(0.056, 12), c: P.ink, x: -0.100, y: HY - 0.016, z: 0.262 },
+      { g: new THREE.CircleGeometry(0.056, 12), c: P.ink, x: 0.100, y: HY - 0.016, z: 0.262 },
     ]), S.flat(0xffffff, { vertexColors: true }));
     head.add(eyes);
 
     // ---- limbs ----------------------------------------------------------
+    // Short bones, oversized terminals. That split is the whole trick in the
+    // reference characters: the limbs themselves are unremarkable tubes and
+    // it is the mitts and the trainers on the ends of them that carry both
+    // the toy read and, from behind, all of the readable motion. Thickening
+    // the bones instead just makes a stocky adult.
     const legs = [];
     const arms = [];
 
     for (const side of [-1, 1]) {
       // leg
-      const hip = pivot(hips, side * 0.135, -0.04, 0);
-      const thigh = part(new THREE.CapsuleGeometry(0.125, 0.17, 3, 10), P.runnerSkin);
-      thigh.position.y = -0.185;
+      const hip = pivot(hips, side * 0.128, -0.045, 0);
+      const thigh = part(new THREE.CapsuleGeometry(0.114, 0.100, 3, 10), P.runnerSkin);
+      thigh.position.y = -0.108;
       hip.add(thigh);
 
-      const knee = pivot(hip, 0, -0.365, 0);
+      const knee = pivot(hip, 0, -0.215, 0);
       // Sock welded onto the shin: a pale band low on the leg makes the
       // scissor of the run cycle legible from directly behind.
       const shin = multi([
-        { g: new THREE.CapsuleGeometry(0.100, 0.16, 3, 10), c: P.runnerSkin, y: -0.160 },
-        { g: new THREE.CylinderGeometry(0.112, 0.105, 0.10, 10), c: P.runnerShoe, y: -0.265 },
+        { g: new THREE.CapsuleGeometry(0.096, 0.085, 3, 10), c: P.runnerSkin, y: -0.098 },
+        { g: new THREE.CylinderGeometry(0.110, 0.102, 0.095, 10), c: P.runnerShoe, y: -0.152 },
       ]);
       knee.add(shin);
 
-      const ankle = pivot(knee, 0, -0.315, 0);
-      // Oversized shoe with a trim sole. Two flashing soles are the clearest
-      // read the back view gets, both for cadence and for a jump tuck.
+      const ankle = pivot(knee, 0, -0.175, 0);
+      // Oversized trainer, and domed rather than a bare box. A box presents a
+      // hard rectangle to the camera the instant the recovery foot rotates
+      // sole-on, which is most of what made the old shoe read as a held
+      // object; a rounded toe and heel keep it a shoe from every angle the
+      // cycle puts it in. Bright upper, thin accent midsole, dark outsole --
+      // see SOLE for why that order and not the other one.
       const foot = multi([
-        { g: new THREE.BoxGeometry(0.165, 0.105, 0.30), c: P.runnerShoe, y: -0.008, z: 0.050 },
-        { g: new THREE.BoxGeometry(0.178, 0.056, 0.315), c: TRIM, y: -0.068, z: 0.055 },
+        { g: new THREE.BoxGeometry(0.190, 0.115, 0.252), c: P.runnerShoe, y: -0.038, z: 0.042 },
+        { g: new THREE.SphereGeometry(0.095, 10, 8), c: P.runnerShoe, y: -0.038, z: 0.168, sy: 0.80, sz: 0.66 },
+        { g: new THREE.SphereGeometry(0.092, 8, 6), c: P.runnerShoe, y: -0.028, z: -0.078, sy: 0.86, sz: 0.74 },
+        { g: new THREE.BoxGeometry(0.198, 0.032, 0.270), c: TRIM, y: -0.110, z: 0.042 },
+        { g: new THREE.BoxGeometry(0.192, 0.034, 0.266), c: SOLE, y: -0.143, z: 0.042 },
       ], 2);
       ankle.add(foot);
 
       legs.push({ side, hip, knee, ankle });
 
       // arm
-      const shoulder = pivot(chest, side * 0.245, -0.025, 0);
+      const shoulder = pivot(chest, side * 0.222, -0.022, 0);
       // ZXY so the twist happens along the arm before it is swung and then
       // abducted. With the default XYZ the yaw fired after the outward tilt
-      // and dragged the whole arm across the back of the vest.
+      // and dragged the whole arm across the back of the vest. It also leaves
+      // rotation.z as a clean abduction angle measured from straight down,
+      // which is the single number the jump pose steers.
       shoulder.rotation.order = 'ZXY';
-      const upper = part(new THREE.CapsuleGeometry(0.088, 0.15, 3, 10), P.runnerSkin);
-      upper.position.y = -0.145;
+      const upper = part(new THREE.CapsuleGeometry(0.086, 0.095, 3, 10), P.runnerSkin);
+      upper.position.y = -0.122;
       shoulder.add(upper);
 
-      const elbow = pivot(shoulder, 0, -0.27, 0);
-      // Short forearm ending in a pale glove over a trim wristband. Arms and
+      const elbow = pivot(shoulder, 0, -0.245, 0);
+      // Short forearm ending in a pale mitt over a trim wristband. Arms and
       // thighs are both skin, and from behind they overlap for most of the
       // stride -- without a bright break at the wrist the whole lower half of
-      // the character reads as one undifferentiated mass.
+      // the character reads as one undifferentiated mass. The mitt is 0.22
+      // across against a 0.57 head, which is the ratio Sonic's gloves run at
+      // and is what makes both the arm swing and the spread jump pose land.
       const fore = multi([
-        { g: new THREE.CapsuleGeometry(0.078, 0.12, 3, 10), c: P.runnerSkin, y: -0.115 },
-        { g: new THREE.CylinderGeometry(0.086, 0.086, 0.05, 10), c: TRIM, y: -0.203 },
-        { g: new THREE.SphereGeometry(0.096, 10, 8), c: GLOVE, y: -0.262, sx: 0.90, sz: 1.10 },
+        { g: new THREE.CapsuleGeometry(0.078, 0.080, 3, 10), c: P.runnerSkin, y: -0.098 },
+        { g: new THREE.CylinderGeometry(0.088, 0.088, 0.048, 10), c: TRIM, y: -0.176 },
+        { g: new THREE.SphereGeometry(0.112, 10, 8), c: GLOVE, y: -0.244, sx: 0.90, sz: 1.06 },
       ]);
       elbow.add(fore);
 
       arms.push({ side, shoulder, elbow });
     }
 
+    // ---- contact shadow --------------------------------------------------
+    // Its own pivot, a direct child of root, so it can cancel the two things
+    // the body does that the road does not: rise on a jump, and bank on a
+    // lane change. A blob that tips with the runner gives the trick away in
+    // one frame.
+    const shadowPivot = pivot(root, 0, 0, 0);
+    const shadow = groundShadow();
+    const shadowMat = shadow.material;
+    const shadowY = shadow.position.y;
+    shadowPivot.add(shadow);
+
+    let shadowW = 1, shadowD = 1, shadowA = 1;
+
+    // main.js moves the group AFTER calling update(), so update() only ever
+    // sees the PREVIOUS frame's jump height -- a whole frame of float at
+    // takeoff, which is the one moment the shadow has to be exact. r160 runs
+    // onBeforeRender before it reads matrixWorld, so re-seating the quad from
+    // here lands on the same frame the runner leaves the ground.
+    const LIFT = K.JUMP_HEIGHT;
+    shadow.onBeforeRender = function () {
+      const h = Math.max(0, root.position.y);
+      const t = Math.min(1, h / LIFT);
+      // Shrink and fade with height. This is most of what makes a jump read
+      // as leaving the ground: the runner's own rise is a few dozen pixels
+      // against a road that is already rushing past, but a blob collapsing
+      // away underneath him is unambiguous and needs no frame of reference.
+      const k = 1 - t * 0.62;
+      shadowPivot.position.y = shadowY - h;
+      shadowPivot.rotation.z = -root.rotation.z;
+      shadow.scale.set(shadowW * k, 1, shadowD * k);
+      shadowMat.opacity = 0.50 * shadowA * (1 - t * 0.80);
+      shadowPivot.updateMatrixWorld(true);
+    };
+
     // ---------------------------------------------------------------------
 
     const api = {
       group: root,
       height: HEIGHT,
+      shadow,
       parts: { body, hips, spine, chest, neck, head, legs, arms },
       phase: 0,
     };
@@ -2382,6 +2548,13 @@ MR.Runner = (function () {
       const lean = st.lean || 0;
       const stumble = st.stumble || 0;
 
+      // ghost.js re-materials every mesh under this rig to draw the record
+      // runner as one translucent body. That is right for limbs and wrong for
+      // a painted shadow -- it would swap the soft blob for a solid quad lying
+      // on the road -- so the shadow reclaims its own material here rather
+      // than depending on another module to know it should be skipped.
+      if (shadow.material !== shadowMat) shadow.material = shadowMat;
+
       // Stride frequency scales with ground speed so the feet never skate.
       // Start pace is the reference; the exponent keeps cadence rising more
       // slowly than speed, which is how real runners gain pace -- the rest
@@ -2397,6 +2570,13 @@ MR.Runner = (function () {
       const sp01 = Math.max(0, Math.min(1, (speed - SPEED_LO) / (SPEED_HI - SPEED_LO)));
       const swing = 0.94 + 0.20 * sp01;
 
+      // How far into the airborne pose everything is. Smoothstepped rather
+      // than linear so the spread snaps open just after takeoff and holds,
+      // instead of easing through a half-open shape that looks like neither
+      // state -- which is the frame a player would have to read to react.
+      const spread = air * air * (3 - 2 * air);
+      const cycA = 1 - spread * 0.88;
+
       // ---- legs: contralateral swing with a knee tuck on the recovery leg
       for (let i = 0; i < legs.length; i++) {
         const L = legs[i];
@@ -2404,28 +2584,45 @@ MR.Runner = (function () {
         const s = Math.sin(ph);
         const c = Math.cos(ph);
 
-        // Airborne: tuck both knees so the soles turn toward the camera, and
-        // damp the scissor while doing it. The back view cannot see a leg
-        // extend, but two bright soles swinging up read instantly.
-        const tuck = air * (i === 0 ? 1.05 : 0.95);
+        // Airborne: tuck both knees under. Deliberately gentler than it was.
+        // The arms carry the airborne read now, and a hard double tuck on
+        // legs this short balls the whole lower body into one lump that
+        // fights the spread above it instead of supporting it.
+        const tuck = spread * (i === 0 ? 0.80 : 0.70);
         const cyc = 1 - air * 0.75;
 
-        L.hip.rotation.x = -s * swing * 0.72 * cyc + tuck * 0.70 + duck * 0.72;
+        // Larger angles than the old rig ran, because the legs are a third
+        // shorter and the same rotation covers a third less ground. Angle is
+        // what the back view measures, not length.
+        L.hip.rotation.x = -s * swing * 0.86 * cyc + tuck * 0.70 + duck * 0.76;
         // Knee only bends one way; bias so it flexes hardest on recovery.
         const bend = Math.max(0, -c * 0.5 + 0.5);
-        L.knee.rotation.x = 0.18 + bend * (1.15 + 0.25 * sp01) * cyc + tuck * 1.35 + duck * 1.25;
+        L.knee.rotation.x = 0.18 + bend * (1.22 + 0.26 * sp01) * cyc + tuck * 1.25 + duck * 1.25;
         // Dorsiflex through recovery, plantarflex off the toe.
-        L.ankle.rotation.x = -0.16 + s * 0.34 * cyc - tuck * 0.60 + duck * 0.30;
+        L.ankle.rotation.x = -0.16 + s * 0.34 * cyc - tuck * 0.45 + duck * 0.30;
         // A little splay keeps the two legs from overlapping into one shape
-        // when they pass each other at midstride.
-        L.hip.rotation.z = L.side * (0.05 + air * 0.10);
+        // when they pass each other at midstride, and opens further in the
+        // air so the tuck reads as two legs rather than as one mass.
+        L.hip.rotation.z = L.side * (0.05 + spread * 0.20);
       }
 
-      // ---- arms: opposite the legs, elbows out so they break the outline
-      // Fore-and-aft swing points straight down the camera axis and is
-      // almost invisible from behind, so the cycle is deliberately built out
-      // of the two components the back view CAN see: how far the elbow
+      // ---- arms ----------------------------------------------------------
+      // Running: fore-and-aft swing points straight down the camera axis and
+      // is almost invisible from behind, so the cycle is deliberately built
+      // out of the two components the back view CAN see -- how far the elbow
       // travels sideways, and how high the glove rides.
+      //
+      // Jumping throws that away and goes for width. Temple Run's airborne
+      // pose flings both arms out until the figure is more than twice as wide
+      // as it runs, and that is the right answer here for a harder reason
+      // than style: a mistimed jump costs the player the record, so being
+      // airborne has to be legible from a silhouette forty pixels tall at
+      // race speed. The old pose tucked, which is NARROWER than the run cycle
+      // and from directly behind essentially invisible. Abducting to ~1.55rad
+      // puts the arms a hair above horizontal, straightening the elbow adds
+      // the forearm and the mitt to the span, and damping the cycle terms out
+      // means every jump makes the same shape rather than whichever half of
+      // the stride takeoff happened to land on.
       for (let i = 0; i < arms.length; i++) {
         const A = arms[i];
         const ph = p + (i === 0 ? Math.PI : 0);
@@ -2433,34 +2630,41 @@ MR.Runner = (function () {
         const fwd = Math.max(0, -s);
         const back = Math.max(0, s);
 
-        A.shoulder.rotation.x = s * swing * 0.95 - duck * 0.25 + air * 0.30;
-        A.shoulder.rotation.z = A.side * (0.19 + back * 0.20 + duck * 0.14 + air * 0.50);
-        A.shoulder.rotation.y = -A.side * (0.16 + fwd * 0.22);
+        A.shoulder.rotation.x = (s * swing * 0.95 - duck * 0.25) * cycA - spread * 0.26;
+        A.shoulder.rotation.z = A.side * ((0.19 + back * 0.20 + duck * 0.14) * cycA + spread * 1.55);
+        A.shoulder.rotation.y = -A.side * (0.16 + fwd * 0.22) * cycA;
         // Flexion peaks with the arm forward -- glove up by the chest at the
         // front of the swing, forearm opening out past the hip at the back,
         // which is exactly when the pale glove clears the torso silhouette.
-        A.elbow.rotation.x = -1.32 - fwd * 0.46 - air * 0.30 - duck * 0.55;
+        // A duck folds it tighter still, so duck and jump are opposite
+        // silhouettes and can never be confused: narrow and low against wide.
+        A.elbow.rotation.x = (-1.32 - fwd * 0.46 - duck * 0.55) * (1 - spread * 0.95);
       }
 
       // ---- torso: forward lean, vertical bob, and a lateral bank on turns
       // Two bobs per stride, lowest at each footstrike.
-      const bob = -Math.abs(Math.cos(p)) * 0.050 * (1 - air) + 0.050;
+      const bob = -Math.abs(Math.cos(p)) * BOB * (1 - air) + BOB;
       body.position.y = bob + air * 0.09;
 
-      const leanFwd = 0.26 + 0.12 * sp01 + duck * 0.74 + stumble * 0.5 - air * 0.09;
+      // Straightens up in the air. A runner still folded forward at the apex
+      // reads as a stumble, the reference jump is upright with the chest
+      // open, and standing up is also what stops the spread arms from being
+      // foreshortened back into the body by the lean.
+      const leanFwd = 0.26 + 0.12 * sp01 + duck * 0.74 + stumble * 0.5 - spread * 0.30;
       spine.rotation.x = leanFwd;
       spine.rotation.z = -lean * 0.30;
       spine.rotation.y = lean * 0.16;
 
       // Counter-rotate the shoulders against the hips -- the single cue that
       // most separates a run cycle from a march, and the only thing the back
-      // view sees the torso do at all.
-      chest.rotation.y = Math.sin(p) * 0.21;
-      chest.rotation.z = -Math.sin(p) * 0.055;
-      hips.rotation.y = -Math.sin(p) * 0.14;
+      // view sees the torso do at all. Damped in the air with the rest of the
+      // cycle, so the spread pose stays square to the camera.
+      chest.rotation.y = Math.sin(p) * 0.21 * cycA;
+      chest.rotation.z = -Math.sin(p) * 0.055 * cycA;
+      hips.rotation.y = -Math.sin(p) * 0.14 * cycA;
       // Pelvic drop toward the swinging leg: small, but it stops the hips
       // from reading as a rigid block bolted to the spine.
-      hips.rotation.z = Math.sin(p) * 0.055;
+      hips.rotation.z = Math.sin(p) * 0.055 * cycA;
 
       // Head stays level: cancel most of the spine lean, add a small lag.
       // Ducking is the exception -- keeping the head up there would defeat
@@ -2478,6 +2682,17 @@ MR.Runner = (function () {
       // that module's audit.
       body.position.y -= duck * 0.42;
       api.duckDrop = duck * 0.42;
+
+      // Shadow footprint, handed to onBeforeRender above. Wider than deep
+      // because the runner is, and it tightens and darkens on each footstrike
+      // with the bob -- a blob of constant size under a body that is visibly
+      // rising and falling reads as a sticker travelling with it. A duck
+      // spreads it, which is the only thing that sells the fold from directly
+      // behind, where the fold itself is pointing away from the camera.
+      const plant = 1 - Math.abs(Math.cos(p)) * 0.10 * (1 - air);
+      shadowW = (1.06 + duck * 0.18) * plant;
+      shadowD = (0.84 + duck * 0.10) * plant;
+      shadowA = (1 + duck * 0.14) * (2 - plant);
     };
 
     api.update(0, {});
@@ -3262,6 +3477,109 @@ MR.World = (function () {
       return t;
     }, group);
 
+    // ---- the racing line ------------------------------------------------
+    /**
+     * A blue line, painted on the road, showing the lane the next few gates
+     * have to be taken in.
+     *
+     * The whole mechanic here is holding one unbroken clean line, and until now
+     * the game gave the player no forward read of where that line was: every
+     * gate was solved on its own, on sight, with no way to see that the lane
+     * you are about to take is the one that runs into a train two gates later.
+     * Both reference runners telegraph the route several gates out with a coin
+     * or ring trail. A marathon already has the perfect version of that idea --
+     * real courses paint the measured shortest route on the tarmac -- so this
+     * is a borrow that costs the game nothing in tone.
+     *
+     * Cost is one draw call. The ribbon is a single mesh whose vertices are
+     * rewritten in place each frame as the route scrolls past, so it never
+     * allocates and never grows with the length of the course.
+     *
+     * It hints the LANE and nothing else: which action a gate wants, and when
+     * to commit to it, are still entirely the player's read.
+     */
+    const ROUTE_NEAR = 5;      // starts clear of the runner's own feet
+    const ROUTE_FAR = 124;     // three to five gates -- as far as the fog allows
+    const ROUTE_SEGS = 44;
+    const ROUTE_W = 0.17;      // half-width
+    const ROUTE_UV = 1 / 14;   // one texture tile per 14 units of road
+
+    const routeLane = racingLine(course.gates);
+    const routeGeo = new THREE.BufferGeometry();
+    const routePos = new Float32Array(ROUTE_SEGS * 6 * 3);
+    const routeUvs = new Float32Array(ROUTE_SEGS * 6 * 2);
+    routeGeo.setAttribute('position', new THREE.BufferAttribute(routePos, 3));
+    routeGeo.setAttribute('uv', new THREE.BufferAttribute(routeUvs, 2));
+    const routeMesh = new THREE.Mesh(routeGeo, new THREE.MeshBasicMaterial({
+      map: routeTexture(),
+      color: 0x5ff0a6,          // the one hue no hazard owns; amber, cyan and
+      transparent: true,        // red are all spoken for, and green reads "go"
+      depthWrite: false,
+      side: THREE.DoubleSide,   // the ribbon is rebuilt every frame; not
+    }));                        // depending on winding is one less way to fail
+    // Below the hazard telegraph mats (5) and the finish checker (4): where the
+    // line runs across a gate's own mat, the hazard has to win.
+    routeMesh.renderOrder = 3;
+    routeMesh.frustumCulled = false;   // its bounds change every frame
+    routeMesh.visible = !!routeLane;
+    group.add(routeMesh);
+
+    // Sampling walks z forwards, so the gate lookup is a cursor rather than a
+    // search. It rewinds at the start of each frame and costs nothing after.
+    let routeCursor = 0;
+    function routeX(zz) {
+      const gates = course.gates;
+      while (routeCursor > 0 && gates[routeCursor - 1].z >= zz) routeCursor--;
+      while (routeCursor < gates.length && gates[routeCursor].z < zz) routeCursor++;
+      const i = routeCursor;
+      if (i >= gates.length) return K.LANE_X[routeLane[gates.length - 1]];
+      const to = K.LANE_X[routeLane[i]];
+      const from = i > 0 ? K.LANE_X[routeLane[i - 1]] : to;
+      const gz = gates[i].z;
+      const pz = i > 0 ? gates[i - 1].z : gz - 40;
+      // Cross over into the new lane before the gate, never across it: by the
+      // gate line the paint is already where the player has to be.
+      const cross = Math.min(18, Math.max(8, (gz - pz) * 0.55));
+      const t = Math.max(0, Math.min(1, (zz - (gz - cross)) / cross));
+      return from + (to - from) * t * t * (3 - 2 * t);
+    }
+
+    function updateRoute(z, now) {
+      if (!routeLane) return;
+      const step = (ROUTE_FAR - ROUTE_NEAR) / ROUTE_SEGS;
+      let z0 = z + ROUTE_NEAR;
+      let x0 = routeX(z0);
+      for (let i = 0; i < ROUTE_SEGS; i++) {
+        const z1 = z + ROUTE_NEAR + (i + 1) * step;
+        const x1 = routeX(z1);
+        // Taper away with distance, so the far end thins into the fog rather
+        // than stopping on a cut edge in the middle of the road.
+        const w0 = ROUTE_W * (1 - 0.5 * (i / ROUTE_SEGS));
+        const w1 = ROUTE_W * (1 - 0.5 * ((i + 1) / ROUTE_SEGS));
+        const v0 = z0 * ROUTE_UV, v1 = z1 * ROUTE_UV;
+        const p = i * 18, u = i * 12;
+        // l0, r1, r0 -- then l0, l1, r1.
+        routePos[p] = x0 - w0; routePos[p + 1] = 0.010; routePos[p + 2] = z0;
+        routePos[p + 3] = x1 + w1; routePos[p + 4] = 0.010; routePos[p + 5] = z1;
+        routePos[p + 6] = x0 + w0; routePos[p + 7] = 0.010; routePos[p + 8] = z0;
+        routePos[p + 9] = x0 - w0; routePos[p + 10] = 0.010; routePos[p + 11] = z0;
+        routePos[p + 12] = x1 - w1; routePos[p + 13] = 0.010; routePos[p + 14] = z1;
+        routePos[p + 15] = x1 + w1; routePos[p + 16] = 0.010; routePos[p + 17] = z1;
+        routeUvs[u] = 0; routeUvs[u + 1] = v0;
+        routeUvs[u + 2] = 1; routeUvs[u + 3] = v1;
+        routeUvs[u + 4] = 1; routeUvs[u + 5] = v0;
+        routeUvs[u + 6] = 0; routeUvs[u + 7] = v0;
+        routeUvs[u + 8] = 0; routeUvs[u + 9] = v1;
+        routeUvs[u + 10] = 1; routeUvs[u + 11] = v1;
+        z0 = z1; x0 = x1;
+      }
+      routeGeo.attributes.position.needsUpdate = true;
+      routeGeo.attributes.uv.needsUpdate = true;
+      // The pulse runs forward, away from the runner, so the line leads the eye
+      // down the course instead of washing back over it.
+      routeTexture().offset.y = -(now * 0.45) % 1;
+    }
+
     // ---- hazards --------------------------------------------------------
     // Visual extents are pinned to MR.Collision.BOX: JUMP tops out at 0.80,
     // the DUCK bar spans 1.41-1.83, BLOCK is 2.80 tall and 1.30 deep. Anything
@@ -3888,7 +4206,9 @@ MR.World = (function () {
       return null;
     }
 
-    const api = { group, sky, mats, course };
+    // routeLane is exposed so it can be asserted against the course rather than
+    // taken on trust: the lane it names at every gate must never be a BLOCK.
+    const api = { group, sky, mats, course, routeLane };
 
     /** Recolour shared materials for the biome at progress f. */
     api.fogColor = new THREE.Color(BIOME_LOOK['CITY START'].fog);
@@ -4136,6 +4456,8 @@ MR.World = (function () {
         if (e.s.kind !== 'crowd') continue;
         e.obj.position.y = Math.abs(Math.sin(now * 4 + e.obj.userData.bounce * 6.3)) * 0.13;
       }
+
+      updateRoute(z, now);
 
       api.applyBiome(Math.min(1, z / K.TOTAL_UNITS));
     };

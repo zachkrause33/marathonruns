@@ -131,11 +131,6 @@ MR.Runner = (function () {
     g.textBaseline = 'middle';
     g.fillText('26.2', c.width / 2, c.height / 2 + 4);
     bibTex = new THREE.CanvasTexture(c);
-    // The panel is a cylinder wedge, so its U runs the wrong way when seen
-    // from outside; flip it here rather than mirroring the canvas.
-    bibTex.wrapS = THREE.RepeatWrapping;
-    bibTex.repeat.x = -1;
-    bibTex.offset.x = 1;
     return bibTex;
   }
 
@@ -156,28 +151,31 @@ MR.Runner = (function () {
 
     const chest = pivot(spine, 0, 0.28, 0);
     const trunk = multi([
-      // Vest. Top edge at world 1.16, a clear 0.10 below the skull.
-      { g: new THREE.CylinderGeometry(0.262, 0.198, 0.38, 12), c: P.runnerVest, y: -0.09, sz: 0.72 },
+      // Vest. Top edge at world 1.16, a clear 0.10 below the skull. Nothing
+      // on the trunk may reach higher than this or the neck gap closes.
+      { g: new THREE.CylinderGeometry(0.262, 0.198, 0.44, 12), c: P.runnerVest, y: -0.12, sz: 0.72 },
       // Hem stripe -- stops the red mass from running straight into the shorts.
-      { g: new THREE.CylinderGeometry(0.204, 0.200, 0.055, 12), c: TRIM, y: -0.255, sz: 0.74 },
+      { g: new THREE.CylinderGeometry(0.204, 0.200, 0.055, 12), c: TRIM, y: -0.315, sz: 0.74 },
       // Deltoids. These are what make the shoulder line read wider than the
-      // head; without them the trunk cone tapers into the skull.
-      { g: new THREE.SphereGeometry(0.132, 10, 8), c: P.runnerVest, x: -0.232, y: 0.055, sy: 0.88, sz: 0.86 },
-      { g: new THREE.SphereGeometry(0.132, 10, 8), c: P.runnerVest, x: 0.232, y: 0.055, sy: 0.88, sz: 0.86 },
+      // head; without them the trunk cone tapers into the skull. Flattened
+      // hard in Y so they widen the shoulders without raising them.
+      { g: new THREE.SphereGeometry(0.128, 10, 8), c: P.runnerVest, x: -0.234, y: 0.005, sy: 0.80, sz: 0.86 },
+      { g: new THREE.SphereGeometry(0.128, 10, 8), c: P.runnerVest, x: 0.234, y: 0.005, sy: 0.80, sz: 0.86 },
       // Shoulder blades: a shallow pair of bumps so the back is not a blank
       // curve. Barely visible individually, but they catch the terminator.
-      { g: new THREE.SphereGeometry(0.085, 8, 6), c: P.runnerVest, x: -0.105, y: -0.01, z: -0.135, sz: 0.55 },
-      { g: new THREE.SphereGeometry(0.085, 8, 6), c: P.runnerVest, x: 0.105, y: -0.01, z: -0.135, sz: 0.55 },
+      { g: new THREE.SphereGeometry(0.085, 8, 6), c: P.runnerVest, x: -0.105, y: -0.04, z: -0.135, sz: 0.55 },
+      { g: new THREE.SphereGeometry(0.085, 8, 6), c: P.runnerVest, x: 0.105, y: -0.04, z: -0.135, sz: 0.55 },
     ]);
     chest.add(trunk);
 
-    // Curved panel rather than a flat card so it hugs the vest at this size.
+    // Curved panel rather than a flat card so it hugs the vest at this size,
+    // and high on the back so it never straddles the shorts line.
     const bib = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.248, 0.248, 0.20, 10, 1, true, Math.PI - 0.60, 1.20),
+      new THREE.CylinderGeometry(0.250, 0.250, 0.22, 10, 1, true, Math.PI - 0.66, 1.32),
       S.toon(0xffffff, 3)
     );
     bib.material.map = raceBib();
-    bib.position.y = -0.075;
+    bib.position.y = -0.055;
     bib.scale.z = 0.72;
     chest.add(bib);
 

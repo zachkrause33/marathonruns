@@ -1,0 +1,222 @@
+/* Broadcast-graphics HUD.
+ *
+ * The deliberate tension in this game is a cartoon runner under a completely
+ * unsentimental race readout, so the HUD borrows from track-and-field
+ * television rather than from mobile games: tabular figures that never
+ * reflow, hard rectangles, one accent colour, no rounded-friendly styling.
+ * Nothing here animates except the numbers themselves.
+ */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: #0e1230;
+  touch-action: none;
+  -webkit-user-select: none; user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#gl { display: block; width: 100%; height: 100%; }
+
+#ui {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  color: #fffdf5;
+  --accent: #ffe45e;
+  --ahead: #4dfba0;
+  --behind: #ff6b84;
+  --ink: rgba(14, 18, 48, 0.82);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: -0.01em;
+}
+
+/* ---- top bar: race clock + record delta ---- */
+#top {
+  position: absolute; top: 0; left: 50%;
+  transform: translateX(-50%);
+  display: flex; align-items: stretch;
+  background: var(--ink);
+  border: 2px solid rgba(255, 253, 245, 0.14);
+  border-top: none;
+  backdrop-filter: blur(6px);
+}
+#top > div { padding: 7px 16px 8px; text-align: center; }
+#top .lab {
+  font-size: 9px; font-weight: 800; letter-spacing: 0.16em;
+  opacity: 0.62; text-transform: uppercase;
+}
+#top .val { font-size: 25px; font-weight: 800; line-height: 1.05; }
+
+#clockBox { min-width: 128px; }
+#deltaBox { min-width: 128px; border-left: 2px solid rgba(255,253,245,0.14); }
+#deltaBox .val.ahead  { color: var(--ahead); }
+#deltaBox .val.behind { color: var(--behind); }
+
+/* ---- pace, left ---- */
+#pace {
+  position: absolute; left: 14px; top: 78px;
+  background: var(--ink);
+  border-left: 4px solid var(--accent);
+  padding: 9px 15px 10px;
+  min-width: 132px;
+}
+#pace .lab { font-size: 9px; font-weight: 800; letter-spacing: 0.15em; opacity: 0.62; }
+#pace .val { font-size: 37px; font-weight: 800; line-height: 1; }
+#pace .unit { font-size: 12px; font-weight: 700; opacity: 0.62; margin-left: 3px; }
+#pace .sub { font-size: 10px; font-weight: 700; opacity: 0.72; margin-top: 3px; }
+
+/* ---- distance + projection, right ---- */
+#dist {
+  position: absolute; right: 14px; top: 78px;
+  background: var(--ink);
+  border-right: 4px solid var(--accent);
+  padding: 9px 15px 10px;
+  min-width: 132px; text-align: right;
+}
+#dist .lab { font-size: 9px; font-weight: 800; letter-spacing: 0.15em; opacity: 0.62; }
+#dist .val { font-size: 37px; font-weight: 800; line-height: 1; }
+#dist .unit { font-size: 12px; font-weight: 700; opacity: 0.62; margin-left: 3px; }
+#dist .sub { font-size: 10px; font-weight: 700; opacity: 0.72; margin-top: 3px; }
+
+/* ---- streak ---- */
+#streak {
+  position: absolute; left: 50%; top: 92px;
+  transform: translateX(-50%);
+  text-align: center;
+  transition: opacity 0.25s;
+}
+#streak .val {
+  font-size: 30px; font-weight: 900; line-height: 1;
+  color: var(--accent);
+  text-shadow: 0 2px 0 rgba(14,18,48,0.6);
+}
+#streak .lab {
+  font-size: 9px; font-weight: 800; letter-spacing: 0.2em;
+  opacity: 0.8; margin-top: 2px;
+}
+#streak.broken .val { color: var(--behind); }
+
+/* ---- progress rail ---- */
+#rail {
+  position: absolute; left: 50%; bottom: 16px;
+  transform: translateX(-50%);
+  width: min(620px, 82vw); height: 22px;
+}
+#railBg {
+  position: absolute; inset: 6px 0 6px 0;
+  background: rgba(14,18,48,0.78);
+  border: 1px solid rgba(255,253,245,0.16);
+}
+#railFill {
+  position: absolute; top: 7px; bottom: 7px; left: 1px;
+  background: var(--accent); width: 0;
+}
+#railGhost {
+  position: absolute; top: 2px; bottom: 2px;
+  width: 2px; background: #fffdf5;
+  box-shadow: 0 0 0 1px rgba(14,18,48,0.8);
+}
+.railTick {
+  position: absolute; top: 8px; bottom: 8px;
+  width: 1px; background: rgba(255,253,245,0.3);
+}
+.railTick.major { top: 4px; bottom: 4px; background: rgba(255,253,245,0.55); }
+
+/* ---- toast (mile splits) ---- */
+/* Sits high in the frame: at 46% it landed straight across the runner, which
+ * hid the exact moment a mile split is most worth watching. */
+#toast {
+  position: absolute; left: 50%; top: 25%;
+  transform: translateX(-50%);
+  text-align: center;
+  opacity: 0; transition: opacity 0.3s;
+}
+#toast .big { font-size: 42px; font-weight: 900; letter-spacing: -0.02em; }
+#toast .small { font-size: 15px; font-weight: 800; opacity: 0.9; }
+#toast.show { opacity: 1; }
+
+/* ---- overlays ---- */
+.panel {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: rgba(10, 13, 36, 0.86);
+  pointer-events: auto;
+  text-align: center; padding: 22px;
+}
+.panel.hidden { display: none; }
+.panel h1 {
+  font-size: clamp(30px, 7vw, 58px); font-weight: 900;
+  letter-spacing: -0.03em; line-height: 0.98;
+}
+.panel .date {
+  font-size: 12px; font-weight: 800; letter-spacing: 0.2em;
+  color: var(--accent); margin-bottom: 10px;
+}
+.panel .blurb {
+  font-size: 14px; font-weight: 600; opacity: 0.82;
+  max-width: 430px; margin-top: 14px; line-height: 1.5;
+}
+.panel .keys {
+  margin-top: 20px; font-size: 12px; font-weight: 700;
+  opacity: 0.7; line-height: 1.9;
+}
+.panel .keys kbd {
+  background: rgba(255,253,245,0.12);
+  border: 1px solid rgba(255,253,245,0.25);
+  padding: 2px 7px; font-family: inherit; font-size: 11px;
+}
+.cta {
+  margin-top: 24px;
+  background: var(--accent); color: #14183a;
+  font-size: 15px; font-weight: 900; letter-spacing: 0.1em;
+  padding: 13px 34px; border: none; cursor: pointer;
+  pointer-events: auto;
+}
+.cta:active { transform: translateY(1px); }
+
+/* results table */
+#resultStats {
+  margin-top: 18px;
+  display: grid; grid-template-columns: auto auto;
+  gap: 5px 26px; font-size: 13px; font-weight: 700;
+}
+#resultStats .k { opacity: 0.6; text-align: right; }
+#resultStats .v { text-align: left; }
+#verdict { font-size: 15px; font-weight: 900; letter-spacing: 0.08em; margin-top: 12px; }
+#verdict.beat { color: var(--ahead); }
+#verdict.miss { color: var(--behind); }
+
+/* ---- countdown ---- */
+#count {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 96px; font-weight: 900;
+  text-shadow: 0 4px 0 rgba(14,18,48,0.55);
+}
+#count.hidden { display: none; }
+
+/* ---- small screens ---- */
+@media (max-width: 560px) {
+  #pace, #dist { top: 70px; min-width: 106px; padding: 7px 11px 8px; }
+  #pace .val, #dist .val { font-size: 28px; }
+  #top .val { font-size: 20px; }
+  #top > div { min-width: 104px; padding: 6px 11px 7px; }
+  #streak { top: 76px; }
+  #streak .val { font-size: 24px; }
+}
+
+/* ---- fps / debug ---- */
+#perf {
+  position: absolute; right: 12px; bottom: 46px;
+  font-size: 10px; font-weight: 700; opacity: 0.45;
+  display: none;
+}
+#perf.on { display: block; }

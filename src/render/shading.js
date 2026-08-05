@@ -278,7 +278,10 @@ MR.shading = (function () {
   let cloudTex = null;
   function clouds() {
     if (cloudTex) return cloudTex;
-    const N = 512;
+    // 1024 rather than 512: one tile is stretched across most of the visible
+    // sky, so at 512 the clouds were magnified past their own texels and the
+    // hard cel edge turned into a soft airbrushed smudge.
+    const N = 1024;
     const cv = document.createElement('canvas');
     cv.width = cv.height = N;
     const g = cv.getContext('2d');
@@ -393,10 +396,10 @@ MR.shading = (function () {
       // sun, not a lens flare. Drawn before the clouds so cover passes in
       // front of it.
       float sd = max(dot(d, sunDir), 0.0);
-      col += glowColor * pow(sd, 6.0) * 0.14;
-      col = mix(col, glowColor, smoothstep(0.99545, 0.99600, sd) * 0.30);
-      col = mix(col, mix(glowColor, sunColor, 0.6), smoothstep(0.99835, 0.99855, sd) * 0.55);
-      col = mix(col, sunColor, smoothstep(0.99915, 0.99930, sd));
+      col += glowColor * pow(sd, 5.0) * 0.16;
+      col = mix(col, glowColor, smoothstep(0.99340, 0.99380, sd) * 0.26);
+      col = mix(col, mix(glowColor, sunColor, 0.55), smoothstep(0.99720, 0.99745, sd) * 0.55);
+      col = mix(col, sunColor, smoothstep(0.99855, 0.99872, sd));
 
       // Horizon haze. Zero exactly at the horizon so the sky meets the fogged
       // ground with no step, peaking a few degrees above it. Driven by the
@@ -416,13 +419,16 @@ MR.shading = (function () {
       // this the last few degrees above the horizon boil into grey stipple.
       float reach = (1.0 - smoothstep(2.4, 5.6, r)) * smoothstep(0.07, 0.24, h);
 
-      vec3 lit = mix(vec3(1.0), bottom, 0.12);
-      vec3 shd = mix(bottom, top, 0.44);
+      // The shaded half is derived from the LIT cloud colour, not from the sky
+      // top uniform: tying it to that painted navy blobs into a pale blue sky,
+      // which read as holes rather than as cloud.
+      vec3 lit = mix(vec3(1.0), bottom, 0.10);
+      vec3 shd = mix(lit * 0.60, bottom, 0.35);
 
-      vec4 lo = texture2D(cloudMap, p * 0.105 + vec2(0.41 - time * 0.0022, 0.63));
-      col = mix(col, mix(shd, lit, smoothstep(0.35, 0.65, lo.r)), lo.a * reach * 0.55);
+      vec4 lo = texture2D(cloudMap, p * 0.125 + vec2(0.41 - time * 0.0022, 0.63));
+      col = mix(col, mix(shd, lit, smoothstep(0.35, 0.65, lo.r)), lo.a * reach * 0.42);
 
-      vec4 hi = texture2D(cloudMap, p * 0.245 + vec2(time * 0.0055, 0.0));
+      vec4 hi = texture2D(cloudMap, p * 0.300 + vec2(time * 0.0055, 0.0));
       col = mix(col, mix(shd, lit, smoothstep(0.35, 0.65, hi.r)), hi.a * reach);
 
       gl_FragColor = vec4(lin2srgb(col), 1.0);

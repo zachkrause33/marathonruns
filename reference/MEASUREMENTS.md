@@ -1,73 +1,85 @@
-# Reference measurements — Temple Run
+# Reference measurements
 
-Five frames supplied by the user, cropped to the game viewport (520 × 1159)
-and used as the comparison target. **All five are Temple Run; none are Subway
-Surfers.** That matters for how far they should be trusted: Temple Run is a
-textured, semi-realistic look, so it is a strong reference for *framing,
-composition and readability* and a weak one for the toy cel-shaded art
-direction this game is actually going for.
+Ten frames supplied by the user, cropped to the game viewport and used as the
+comparison target.
 
-Frames: `tr-run-01/02` running, `tr-jump-01/02` mid-jump, `tr-turn-01` cornering.
+| File | Game | Shows |
+|---|---|---|
+| `tr-run-01/02` | Temple Run | running |
+| `tr-jump-01/02` | Temple Run | mid-jump |
+| `tr-turn-01` | Temple Run | cornering |
+| `ss-run-01/02/03` | Subway Surfers | running, hoverboard, wild-west biome |
+| `sonic-01/02` | Sonic Forces Speed Battle | loop landmark, Golden Gate track |
+
+**Subway Surfers and Sonic are the art-direction target.** Temple Run is
+textured semi-realism and is a strong reference for framing and readability
+only. Where they disagree, the toy games win.
 
 ## The problem with comparing frame-height fractions
 
-Temple Run is portrait (0.45:1). This game is landscape (1.57:1). "Character
-occupies N% of frame height" is therefore not comparable between them — the
-same character at the same camera distance scores wildly differently just from
-the aspect ratio. Two metrics below are aspect-independent and those are the
-ones worth acting on.
+All three references are portrait (~0.45:1); this game is landscape (1.57:1).
+"Character is N% of frame height" is not comparable across those — the same
+character at the same camera distance scores completely differently just from
+aspect. The ratios below marked **aspect-independent** are the actionable ones.
 
 ## Measured
 
-| Metric | Temple Run | This game | Comparable? |
-|---|---|---|---|
-| Character width ÷ path width at the character's depth | **20%** | **8%** | yes |
-| Character width ÷ one lane width | **~60%** | **23%** | yes |
-| Character height ÷ frame height (running) | 14.5% | 36% | no — aspect |
-| Character centre, fraction down the frame (running) | **77%** | **52%** | partly |
-| Character centre, fraction down the frame (jumping) | **50%** | — | partly |
-| Vanishing point, fraction down from top | 28% | ~48% | partly |
+| Metric | Temple Run | Subway Surfers | Sonic | This game |
+|---|---|---|---|---|
+| **Character ÷ lane width** (aspect-independent) | 60% | **37–43%** | ~40% | **23%** |
+| Character centre, fraction down the frame | 77% | 70–75% | 64–78% | **52%** |
+| Character ÷ frame height | 14.5% | 21–33% | 18–21% | 36% (not comparable) |
+| Ink outlines | none | **none** | **none** | heavy |
+| Contact shadow under character | yes | yes | **yes, strong** | **none** |
 
-## The finding that matters
+## Findings, in priority order
 
-**The track is roughly 2.5× too wide relative to the runner.** Temple Run's
-character fills about 60% of a lane; ours fills 23%. This is a pure geometry
-ratio — it is invariant to camera distance, so it cannot be fixed by moving
-the camera in. It has to come from narrowing the track (`LANE_X`,
-`TRACK_HALF_WIDTH`, and the hazard widths that match them) or from scaling the
-runner up.
+1. **The track is ~1.7× too wide relative to the runner.** Target
+   character-to-lane of ~40%; we are at 23%. This is a pure geometry ratio,
+   invariant to camera distance, so no camera change fixes it. It needs
+   `LANE_X` / `TRACK_HALF_WIDTH` narrowed with matching hazard widths — which
+   touches the thresholds `src/game/collision.js` audits. (Temple Run's 60% is
+   the outlier; the toy games sit near 40%, so 40% is the target, not 60%.)
 
-Narrowing the track is the safer lever: scaling the runner up 2× would break
-its relationship with hazard geometry, which is tuned against the collision
-thresholds in `src/game/collision.js`.
+2. **None of the three reference games use ink outlines.** They read as "toy"
+   through saturated flat colour, soft shading, chunky proportions and a
+   strong contact shadow — silhouette separation comes from colour contrast,
+   not a black line. This game currently leans hard on outlines. That is a
+   real divergence from the stated target and needs a deliberate decision
+   rather than drift: the defensible middle is to keep a light outline on the
+   runner and hazards, where it buys gameplay readability, and drop it from
+   scenery, where it is only costing draw calls and flattening depth.
 
-## Composition notes, in priority order
+3. **No contact shadow.** Every reference grounds its character with one. Ours
+   floats. Cheap to add, disproportionately effective.
 
-1. **The character sits low.** Temple Run keeps the running character at ~77%
-   down the frame, giving the road the upper two thirds. Ours sits at ~52% —
-   dead centre — which spends screen space on sky instead of on the thing the
-   player has to read.
-2. **A jump is a big compositional event.** The character rises from 77% to
-   ~50% down the frame, and the arms fling out horizontally, roughly tripling
-   the silhouette width. The pose is unmistakable at a glance. Ours tucks.
-3. **Foreground occlusion on every frame.** Rocks, path edges and enemies
-   break the bottom of the frame and pass close to the lens. This is most of
-   where the sense of speed comes from, and this game has none.
-4. **Corridor framing.** Walls, statues and vines sit close on both sides,
-   making a tunnel. Our open road with distant scenery reads as much slower
-   for the same ground speed.
-5. **The route is telegraphed.** A line of coins shows the safe path several
-   gates ahead. This game's whole mechanic is holding a clean line and it
-   currently gives the player no forward read of where that line is.
-6. **Two-hue palette.** Gold/tan path against teal water and sky, held for the
-   entire level. Ours currently runs green ground, purple road, orange sky and
-   three hazard hues at once.
+4. **The character sits too high in frame.** References place the runner
+   64–78% down; we are at 52%, spending the upper half on sky rather than on
+   the road the player has to read.
 
-## What is deliberately not copied
+5. **Oversized foreground props cropped by the frame edge.** Subway Surfers
+   runs a giant sushi chef and a stacked burger straight through the frame
+   edge; Sonic has the loop and the Golden Gate. This is where their sense of
+   speed and their "wow" both come from, and we have nothing in that layer.
 
-- Texture density. Theirs is photographic stone and moss; this game is
-  flat-shaded cel by design. The lesson to take is that untextured surfaces
-  need *some* variation to avoid reading as raw primitives, not that we should
-  add stone textures.
-- The HUD. Temple Run uses carved-gold ornamental framing. This game's readout
-  is deliberately a broadcast race clock and should not converge on it.
+6. **The route is telegraphed several gates ahead** by coin and ring trails.
+   This game's entire mechanic is holding a clean line and it gives the player
+   no forward read of where that line is. This is the most direct mechanical
+   borrow available.
+
+7. **Rivals are physical characters on the track with floating name labels**
+   (Sonic: "Tails", "Shadow", "Knuckles", plus a "4th" position badge). Our
+   1:59:30 record ghost exists only as a number on the HUD. Putting it on the
+   road as a runner you can see ahead of you — and watch fall behind when you
+   pass it around mile 20 — would make the entire record chase physical. This
+   is the single strongest idea in the reference set for this specific game.
+
+## Deliberately not copied
+
+- Texture density. Temple Run's photographic stone; Subway Surfers' painted
+  detail. This game is flat-shaded by design. The lesson is that flat surfaces
+  still need *some* variation to avoid reading as raw primitives.
+- The HUD. All three use ornamental game UI; this game's readout is
+  deliberately a broadcast race clock and should not converge on them.
+- Coins as a score currency. The reward here is pace, not pickups — but see
+  finding 6 for the part worth taking.

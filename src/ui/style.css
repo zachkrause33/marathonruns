@@ -93,6 +93,11 @@ html, body {
   display: flex; align-items: center; justify-content: space-between;
   gap: 12px; margin-bottom: 1px;
 }
+/* The bug is shrink-to-fit against the middle of the screen, so anything that
+ * is allowed to wrap will wrap on a phone the moment the chip gets longer --
+ * "RECORD GONE" was breaking the label across two lines and pushing the
+ * headline number down with it. */
+#projCell .cap .lab, #projCell .val, #projCell .sub { white-space: nowrap; }
 #projCell .val { font-size: 40px; font-weight: 900; line-height: 1.02; }
 #projCell .sub { font-size: 11px; font-weight: 800; opacity: 0.7; margin-top: 1px; }
 
@@ -286,7 +291,7 @@ html, body {
   overflow-y: auto;
 }
 .panel.hidden { display: none; }
-.panelInner { margin: auto; width: 100%; max-width: 480px; }
+.panelInner { margin: auto; width: 100%; max-width: 540px; }
 .panel h1 {
   font-size: clamp(34px, 7vw, 58px); font-weight: 900;
   letter-spacing: -0.03em; line-height: 0.98;
@@ -437,14 +442,68 @@ html, body {
   .mech { font-size: 12px; }
 }
 
-/* Landscape phones have almost no vertical room, so the panels give up the
- * explanatory blocks rather than push the button off the bottom. */
+/* ---- big screens ----
+ * The readout is sized in pixels so it stays crisp, which leaves it stranded
+ * on a desktop monitor: at 1920 the rail covered a third of the frame and the
+ * ghost gap was too small to read from a normal viewing distance. Everything
+ * steps up together so the hierarchy is unchanged, only larger. */
+@media (min-width: 1500px) {
+  .lab { font-size: 10px; }
+  .chip { font-size: 10px; padding: 3px 7px; }
+
+  #clockCell { min-width: 142px; padding: 10px 19px 12px; }
+  #clockCell .val { font-size: 31px; }
+  #projCell { min-width: 272px; padding: 9px 19px 12px; }
+  #projCell .val { font-size: 50px; }
+  #projCell .sub { font-size: 13px; }
+
+  #leftCol { left: 20px; top: 102px; gap: 11px; }
+  #engine { min-width: 190px; max-width: 220px; padding: 10px 17px 12px; }
+  #engine #streakVal { font-size: 45px; }
+  #engine .val { font-size: 33px; }
+  #engine .unit { font-size: 13px; }
+  #engine .sub, #why { font-size: 11px; }
+  .gauge { height: 9px; }
+
+  #dist { right: 20px; top: 102px; min-width: 172px; padding: 10px 17px 12px; }
+  #dist .val { font-size: 42px; }
+  #dist .unit { font-size: 14px; }
+  #dist .sub { font-size: 12px; }
+
+  #toast { min-width: 190px; padding: 9px 16px 11px; }
+  #toast .big { font-size: 33px; }
+  #toast .unit { font-size: 13px; }
+  #toast .small { font-size: 13px; }
+
+  #railWrap { width: min(1000px, 62vw); bottom: 20px; }
+  #rail { height: 28px; }
+  #gapLine { margin-bottom: 17px; gap: 12px; }
+  #gapVal { font-size: 21px; }
+  #gapTrend { font-size: 11px; }
+  #railCaps { font-size: 10px; margin-top: 4px; }
+  .railTick { top: 8px; bottom: 8px; }
+  .railTick.major { top: 3px; bottom: 3px; }
+
+  #perf { top: 212px; font-size: 12px; }
+}
+
+/* Landscape phones have almost no vertical room, so the readout tightens up
+ * and the panels give up their explanatory blocks rather than push the button
+ * off the bottom of the screen. */
 @media (max-height: 430px) {
   .panel h1 { font-size: clamp(26px, 6vh, 40px); }
   .panel .blurb, .rule, .mech { display: none; }
   .panel .keys { margin-top: 10px; }
   .cta { margin-top: 12px; padding: 10px 26px; }
   #endCols { margin-top: 10px; gap: 8px 24px; }
+
+  #leftCol { top: 64px; gap: 6px; }
+  #engine { padding: 5px 10px 6px; }
+  #engine #streakVal { font-size: 23px; }
+  #engine .val { font-size: 18px; }
+  .gauge { margin: 4px 0 5px; }
+  #toast { padding: 5px 10px 6px; }
+  #toast .big { font-size: 18px; }
 }
 
 /* ---- fps / debug ----

@@ -84,7 +84,8 @@ MR.Camera = (function () {
       accel: 0,        // smoothed d(speed)/dt -- the surge signal
 
       shake: 0,        // trauma, 0..1
-      punch: 0,        // one-shot impact lurch
+      punch: 0,        // one-shot impact roll
+      lurch: 0,        // one-shot impact sidestep
       winded: 0,       // long tail after a hit: the camera loses its nerve
       dip: 0, dipV: 0, // sprung landing compression
       kick: 0,         // short FOV punch (landing)
@@ -160,9 +161,10 @@ MR.Camera = (function () {
       // Underdamped on purpose (zeta ~0.6): the camera arrives at the new lane
       // slightly late and overshoots a hair, which is the weight the old
       // exponential follow was missing.
-      const tgtX = p.x * 0.78;
+      const tgtX = p.x * 0.78 + s.lurch;
       s.vx += ((tgtX - s.x) * 200 - s.vx * 17) * d;
       s.x += s.vx * d;
+      s.lurch -= s.lurch * Math.min(1, d * 5.0);
 
       // ---- stride ---------------------------------------------------------
       // Same cadence curve as the runner so the bob lands on the footfalls.
@@ -176,12 +178,16 @@ MR.Camera = (function () {
       const bobAmp = (0.020 + 0.026 * drive) * (1 - air) * (1 - fin);
       const bobY = -Math.abs(Math.sin(ph)) * bobAmp;        // fall on footfall
       const bobX = Math.sin(ph) * bobAmp * 0.55;
+      // A footfall also eats a little of the gap: the camera surges in on the
+      // drive phase and drifts back on the float. Tiny, but it turns a smooth
+      // dolly into something being pushed by legs.
+      const bobZ = Math.sin(ph * 2) * (0.014 + 0.030 * drive) * (1 - air) * (1 - fin);
 
       // ---- shake ----------------------------------------------------------
       // Trauma squared, plus a permanent tremble at top gear: at the pace
       // floor the frame should never be completely still.
       const tr = s.shake * s.shake;
-      const rumble = gear * 0.055 * (1 - fin);
+      const rumble = gear * 0.045 * (1 - fin);
       const shX = wobble(s.t, 0.0) * (tr * 0.20 + rumble);
       const shY = wobble(s.t, 1.7) * (tr * 0.16 + rumble * 0.7);
       const shR = wobble(s.t, 3.1) * (tr * 0.030 + rumble * 0.10);
@@ -199,6 +205,7 @@ MR.Camera = (function () {
         - s.gearT * s.gearT * 0.45
         + s.mileT * 0.45
         + s.winded * 0.28
+        + bobZ
         + fin * 3.4;
 
       const hgt = BASE_Y
@@ -220,17 +227,19 @@ MR.Camera = (function () {
       // 0.42/0.30 split had the camera chasing the arc and cancelled it.
       look.set(
         s.x * 0.55,
-        LOOK_Y + (p.y || 0) * 0.46 - duck * 0.26 - drive * 0.10 + fin * 0.55,
+        LOOK_Y + (p.y || 0) * 0.46 - duck * 0.26 - drive * 0.22 + fin * 0.55,
         p.z + LOOK_AHEAD + (p.y || 0) * 1.1 - drive * 0.5
       );
       cam.lookAt(look);
 
       // Roll: the lean term is the body, the camera's own lateral velocity is
-      // the whip that outlasts it. Old value was 0.055 * lean -- about two
-      // degrees, which is below the threshold of being felt at all.
-      const whip = Math.max(-1, Math.min(1, s.vx / 26));
-      const rollTgt = -((p.lean || 0) * 0.105 + whip * 0.055) * (1 - fin);
-      s.roll += (rollTgt - s.roll) * (1 - Math.pow(0.0008, d));
+      // the whip that outlasts it. Old value was 0.055 * lean -- barely two
+      // degrees, below the threshold of being felt at all. This peaks around
+      // seven, which is a bank; the response is fast because a lane change is
+      // over in 0.16s and a slow filter would smooth the whole event away.
+      const whip = Math.max(-1, Math.min(1, s.vx / 20));
+      const rollTgt = -((p.lean || 0) * 0.16 + whip * 0.07) * (1 - fin);
+      s.roll += (rollTgt - s.roll) * (1 - Math.pow(0.00002, d));
       cam.rotation.z += s.roll + shR - s.punch * 0.055;
 
       // ---- fov ------------------------------------------------------------
@@ -274,6 +283,10 @@ MR.Camera = (function () {
       s.winded = Math.min(1, s.winded + 0.85 * a);
       s.dipV -= 5.5 * a;
       s.kick = Math.min(1, s.kick + 0.3 * a);
+      // Knocked off the racing line. The side alternates with the clock so a
+      // player who hits three gates in a mile does not see the same canned
+      // stagger three times.
+      s.lurch = (Math.sin(s.t * 12.9) >= 0 ? 1 : -1) * 0.42 * a;
     };
 
     /** Landing: compression into the road, then a rebound. */
@@ -291,7 +304,8 @@ MR.Camera = (function () {
     s.reset = function () {
       s.x = 0; s.vx = 0; s.roll = 0; s.fov = BASE_FOV;
       s.t = 0; s.stride = 0; s.primed = false; s.sp = SPEED_LO; s.accel = 0;
-      s.shake = 0; s.punch = 0; s.winded = 0; s.dip = 0; s.dipV = 0; s.kick = 0;
+      s.shake = 0; s.punch = 0; s.lurch = 0; s.winded = 0;
+      s.dip = 0; s.dipV = 0; s.kick = 0;
       s.mile = -1; s.mileT = 0; s.gearT = 0; s.gearArmed = true; s.finish = 0;
       cam.fov = BASE_FOV;
       cam.updateProjectionMatrix();

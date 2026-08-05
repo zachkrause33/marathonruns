@@ -276,7 +276,7 @@ MR.Runner = (function () {
       const elbow = pivot(shoulder, 0, -0.30, 0);
       const fore = multi([
         { g: new THREE.CapsuleGeometry(0.080, 0.15, 3, 10), c: P.runnerSkin, y: -0.13 },
-        { g: new THREE.SphereGeometry(0.105, 10, 8), c: GLOVE, y: -0.295, sx: 0.92, sz: 1.06 },
+        { g: new THREE.SphereGeometry(0.098, 10, 8), c: GLOVE, y: -0.290, sx: 0.90, sz: 1.10 },
       ]);
       elbow.add(fore);
 
@@ -327,36 +327,42 @@ MR.Runner = (function () {
         const s = Math.sin(ph);
         const c = Math.cos(ph);
 
-        // Airborne: tuck both knees so the soles turn toward the camera. The
-        // back view cannot see a leg extend, but it can see two bright soles.
-        const tuck = air * (i === 0 ? 1.15 : 0.85);
+        // Airborne: tuck both knees so the soles turn toward the camera, and
+        // damp the scissor while doing it. The back view cannot see a leg
+        // extend, but two bright soles swinging up read instantly.
+        const tuck = air * (i === 0 ? 1.05 : 0.95);
+        const cyc = 1 - air * 0.75;
 
-        L.hip.rotation.x = -s * swing * 0.72 + tuck * 0.62 + duck * 0.72;
+        L.hip.rotation.x = -s * swing * 0.72 * cyc + tuck * 0.70 + duck * 0.72;
         // Knee only bends one way; bias so it flexes hardest on recovery.
         const bend = Math.max(0, -c * 0.5 + 0.5);
-        L.knee.rotation.x = 0.18 + bend * (1.15 + 0.25 * sp01) + tuck * 1.05 + duck * 1.25;
+        L.knee.rotation.x = 0.18 + bend * (1.15 + 0.25 * sp01) * cyc + tuck * 1.35 + duck * 1.25;
         // Dorsiflex through recovery, plantarflex off the toe.
-        L.ankle.rotation.x = -0.16 + s * 0.34 - tuck * 0.55 + duck * 0.30;
+        L.ankle.rotation.x = -0.16 + s * 0.34 * cyc - tuck * 0.60 + duck * 0.30;
         // A little splay keeps the two legs from overlapping into one shape
         // when they pass each other at midstride.
-        L.hip.rotation.z = L.side * 0.05;
+        L.hip.rotation.z = L.side * (0.05 + air * 0.10);
       }
 
       // ---- arms: opposite the legs, elbows out so they break the outline
+      // Fore-and-aft swing points straight down the camera axis and is
+      // almost invisible from behind, so the cycle is deliberately built out
+      // of the two components the back view CAN see: how far the elbow
+      // travels sideways, and how high the glove rides.
       for (let i = 0; i < arms.length; i++) {
         const A = arms[i];
         const ph = p + (i === 0 ? Math.PI : 0);
-        const s = Math.sin(ph);
+        const s = Math.sin(ph);   // > 0 with the arm swung back
+        const fwd = Math.max(0, -s);
+        const back = Math.max(0, s);
 
-        A.shoulder.rotation.x = s * swing * 0.85 - air * 0.95 - duck * 0.30;
-        // Elbows ride outside the torso silhouette, wider on the back swing.
-        // From behind this is the only limb motion that crosses the outline,
-        // so it does most of the work of selling effort.
-        A.shoulder.rotation.z = A.side * (0.21 + Math.max(0, -s) * 0.13 + duck * 0.14);
-        // Rotating the whole arm inward brings the glove across the chest,
-        // which is what a racer's swing looks like from behind.
-        A.shoulder.rotation.y = -A.side * 0.20;
-        A.elbow.rotation.x = -1.18 - Math.max(0, s) * 0.48 - air * 0.30 - duck * 0.40;
+        A.shoulder.rotation.x = s * swing * 0.95 - duck * 0.25 + air * 0.30;
+        A.shoulder.rotation.z = A.side * (0.19 + back * 0.28 + duck * 0.14 + air * 0.50);
+        A.shoulder.rotation.y = -A.side * (0.16 + fwd * 0.22);
+        // Flexion peaks with the arm forward -- glove up by the chest at the
+        // front of the swing, forearm opening out past the hip at the back,
+        // which is exactly when the pale glove clears the torso silhouette.
+        A.elbow.rotation.x = -1.02 - fwd * 0.62 - air * 0.30 - duck * 0.55;
       }
 
       // ---- torso: forward lean, vertical bob, and a lateral bank on turns

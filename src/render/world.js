@@ -47,12 +47,15 @@ MR.World = (function () {
     'CITY START': {
       sky: [0x2b3fa8, 0x9fdcff], ground: 0x63c96b, road: 0x50557d, fog: 0x9fdcff,
       edge: 'barrier',
-      mix: { building: 2.6, tree: 0.55, crowd: 2.3, rival: 0.5, station: 0.10 },
+      mix: { building: 2.6, tree: 0.55, grove: 0.15, crowd: 2.3, rival: 0.5, station: 0.10 },
     },
+    // `bank` cuts the shoulder back on one side so the water can come right up
+    // to the road; at full shoulder width the river sat 35 units out and read
+    // as a smear on the horizon.
     'RIVERSIDE': {
       sky: [0x1f6fb8, 0xbdf0ff], ground: 0x57c7a8, road: 0x4d5a80, fog: 0xbdf0ff,
-      edge: 'hedge',
-      mix: { building: 0.45, tree: 1.9, crowd: 1.0, rival: 0.45, station: 0.12 },
+      edge: 'hedge', bank: -1,
+      mix: { building: 0.45, tree: 1.5, grove: 1.3, crowd: 1.0, rival: 0.45, station: 0.12 },
     },
     // Nothing stands beside a bridge deck -- the emptiness is the point, and a
     // spectator out there would be standing on the river.
@@ -64,7 +67,7 @@ MR.World = (function () {
     'PARKLAND': {
       sky: [0x2e8fd0, 0xcdf5c0], ground: 0x6fd46a, road: 0x53587f, fog: 0xcdf5c0,
       edge: 'hedge',
-      mix: { building: 0.15, tree: 3.4, crowd: 1.1, rival: 0.45, station: 0.12 },
+      mix: { building: 0.12, tree: 2.2, grove: 3.2, crowd: 1.1, rival: 0.45, station: 0.12 },
     },
     'THE WALL': {
       sky: [0x8a3a6b, 0xffb27a], ground: 0x8f9a5e, road: 0x5a4f66, fog: 0xffb27a,
@@ -78,7 +81,7 @@ MR.World = (function () {
     },
   };
 
-  const PROP_KINDS = ['building', 'tree', 'crowd', 'rival', 'station'];
+  const PROP_KINDS = ['building', 'tree', 'grove', 'crowd', 'rival', 'station'];
 
   // Scratch colours: applyBiome runs every frame and must not allocate.
   const _cA = new THREE.Color();
@@ -141,10 +144,10 @@ MR.World = (function () {
     const g = c.getContext('2d');
     // A dark wash under the icons: the road is mid-value, the icons are
     // bright, and without this the edges of the mat vanish into it.
-    g.fillStyle = 'rgba(10,10,30,0.42)';
+    g.fillStyle = 'rgba(10,10,30,0.34)';
     g.fillRect(0, 0, 128, 256);
     g.fillStyle = tint;
-    g.fillRect(0, 0, 9, 256); g.fillRect(119, 0, 9, 256);
+    g.fillRect(0, 0, 8, 256); g.fillRect(120, 0, 8, 256);
 
     for (let i = 0; i < 3; i++) {
       const cy = 42 + i * 86;
@@ -167,7 +170,7 @@ MR.World = (function () {
       }
     }
     const t = texture(c, true);
-    t.repeat.set(1, 3);
+    t.repeat.set(1, 5);
     return t;
   }
 
@@ -575,7 +578,9 @@ MR.World = (function () {
 
     // Lane telegraph mats. Transparent, unlit, and laid a hair above the road
     // paint so they never z-fight with the lane dashes.
-    const matGeo = new THREE.PlaneGeometry(2.24, 11);
+    // 14 units of run-up: the mat has to be readable while the lane choice is
+    // still open, which is 3-4 gate-lengths out, not 1.
+    const matGeo = new THREE.PlaneGeometry(2.24, 14);
     const matMat = {};
     matMat[K.JUMP] = new THREE.MeshBasicMaterial({ map: matTexture(K.JUMP, '#ffc23a'), transparent: true, depthWrite: false });
     matMat[K.DUCK] = new THREE.MeshBasicMaterial({ map: matTexture(K.DUCK, '#4fdcff'), transparent: true, depthWrite: false });
@@ -584,7 +589,7 @@ MR.World = (function () {
     function telegraph(kind) {
       const m = new THREE.Mesh(matGeo, matMat[kind]);
       m.rotation.x = -Math.PI / 2;
-      m.position.set(0, 0.012, -6.6);
+      m.position.set(0, 0.012, -8.3);
       m.renderOrder = 5;
       return m;
     }
@@ -709,6 +714,36 @@ MR.World = (function () {
     }, group);
 
     /**
+     * A grove: five trees and undergrowth in one mesh. Single trees at the
+     * density the seeded stream can afford left PARKLAND reading as a mown
+     * field; a clump costs the same draw and fills the middle distance.
+     */
+    function groveGeo(seed) {
+      const parts = [];
+      let s = seed;
+      const r = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+      const greens = [0x2f9f52, 0x35a855, 0x3fbf63, 0x59d47a, 0x2b8f6a];
+      for (let i = 0; i < 5; i++) {
+        const x = -5 + r() * 10, z = -6 + r() * 12;
+        const k = 0.75 + r() * 0.85;
+        const g0 = greens[Math.floor(r() * greens.length)];
+        parts.push(cyl(0.17 * k, 0.28 * k, 1.4 * k, 6, x, 0.7 * k, z, 0x8a5a3c));
+        parts.push(cone(1.45 * k, 1.9 * k, 8, x, 2.1 * k, z, g0));
+        parts.push(cone(1.15 * k, 1.6 * k, 8, x, 3.0 * k, z, g0));
+        parts.push(cone(0.80 * k, 1.3 * k, 8, x, 3.9 * k, z, 0x59d47a));
+      }
+      for (let i = 0; i < 6; i++) {
+        parts.push(cone(0.8 + r() * 0.5, 1.0 + r() * 0.6, 6, -6 + r() * 12, 0.4, -7 + r() * 14,
+          greens[Math.floor(r() * greens.length)]));
+      }
+      return merge(parts);
+    }
+    const groveGeos = [groveGeo(5), groveGeo(29), groveGeo(97)];
+    const grovePool = groveGeos.map((geo) => Pool(function () {
+      return S.outlined(geo, mats.prop, S.INK.prop);
+    }, group));
+
+    /**
      * A knot of spectators, merged. Individual capsules read as pills and cost
      * a draw each; eight little figures with legs, raised arms and different
      * shirts cost the same one draw and read as a crowd.
@@ -719,23 +754,30 @@ MR.World = (function () {
       const skins = [0xffc79a, 0xe0a173, 0xb87a4e, 0x8a5a3c];
       let s = seed * 9301 + 49297;
       const r = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
-      for (let i = 0; i < 8; i++) {
-        const x = -1.1 + (i % 4) * 0.78 + r() * 0.22;
-        const z = -1.9 + Math.floor(i / 4) * 2.0 + r() * 0.7;
-        const y = 0;
-        const h = 0.90 + r() * 0.22;
+      const signs = [0xffe45e, 0xfffdf5, 0x37d6ff, 0xff9ad5];
+      for (let i = 0; i < 9; i++) {
+        const x = -1.5 + (i % 3) * 1.15 + r() * 0.35;
+        const z = -2.6 + Math.floor(i / 3) * 2.4 + r() * 0.9;
+        const h = 1.02 + r() * 0.26;
         const shirt = shirts[Math.floor(r() * shirts.length)];
         const skin = skins[Math.floor(r() * skins.length)];
-        parts.push(bx(0.30, 0.62 * h, 0.22, x, 0.31 * h, z, 0x2b2f52));
-        parts.push(bx(0.44, 0.60 * h, 0.30, x, 0.92 * h, z, shirt));
-        parts.push(bx(0.26, 0.26, 0.24, x, 1.36 * h, z, skin));
-        // Every third spectator has both arms up -- a still crowd looks dead.
+        parts.push(bx(0.32, 0.60 * h, 0.24, x, 0.30 * h, z, 0x2b2f52));
+        parts.push(bx(0.46, 0.62 * h, 0.32, x, 0.92 * h, z, shirt));
+        parts.push(bx(0.28, 0.28, 0.26, x, 1.38 * h, z, skin));
+        parts.push(bx(0.30, 0.10, 0.28, x, 1.52 * h, z, 0x3a2b46));
+        // Arms up, or holding a placard -- a still crowd looks dead, and the
+        // placards are what read as "spectators" at the distance the figures
+        // themselves have collapsed to two pixels.
         if (i % 3 === 0) {
-          parts.push(bx(0.11, 0.52, 0.11, x - 0.28, 1.20 * h, z, skin, 0, 0, 0.30));
-          parts.push(bx(0.11, 0.52, 0.11, x + 0.28, 1.20 * h, z, skin, 0, 0, -0.30));
+          parts.push(bx(0.12, 0.56, 0.12, x - 0.30, 1.22 * h, z, skin, 0, 0, 0.32));
+          parts.push(bx(0.12, 0.56, 0.12, x + 0.30, 1.22 * h, z, skin, 0, 0, -0.32));
+        } else if (i % 4 === 1) {
+          parts.push(bx(0.12, 0.70, 0.12, x + 0.26, 1.35 * h, z, skin));
+          parts.push(bx(0.10, 0.9, 0.10, x + 0.26, 1.9 * h, z, 0x8a5a3c));
+          parts.push(bx(0.86, 0.62, 0.08, x + 0.26, 2.45 * h, z, signs[Math.floor(r() * signs.length)]));
         } else {
-          parts.push(bx(0.11, 0.44, 0.11, x - 0.26, 0.92 * h, z, shirt));
-          parts.push(bx(0.11, 0.44, 0.11, x + 0.26, 0.92 * h, z, shirt));
+          parts.push(bx(0.12, 0.46, 0.12, x - 0.28, 0.92 * h, z, shirt));
+          parts.push(bx(0.12, 0.46, 0.12, x + 0.28, 0.92 * h, z, shirt));
         }
       }
       return merge(parts);
@@ -847,16 +889,17 @@ MR.World = (function () {
      * fight over the same ground.
      */
     const riverGeo = merge([
-      part(new THREE.PlaneGeometry(70, 58), 0x2f8fc4, -72, 0.06, 0, -Math.PI / 2),
-      bx(4.5, 0.5, 58, -36.5, 0.06, 0, 0xe6d9a8),
-      bx(1.4, 0.6, 11, -40.5, 0.36, -14, 0x8a5a3c),
-      bx(6.5, 0.6, 1.6, -44, 0.36, -19, 0x8a5a3c),
-      bx(2.2, 0.9, 5.4, -47, 0.35, 6, 0xfff2e0),
-      bx(0.32, 3.4, 0.32, -47, 2.1, 6, 0xfff2e0),
-      bx(2.0, 2.4, 0.12, -46.0, 2.6, 6, 0xff4d5e),
-      bx(2.2, 0.9, 5.4, -55, 0.35, 24, 0xffe45e),
-      bx(0.32, 3.0, 0.32, -55, 1.9, 24, 0xfff2e0),
-      bx(1.8, 2.0, 0.12, -54.1, 2.3, 24, 0x37d6ff),
+      part(new THREE.PlaneGeometry(94, 58), 0x2f8fc4, -60, -0.12, 0, -Math.PI / 2),
+      bx(2.4, 0.34, 58, -12.6, -0.12, 0, 0xe6d9a8),
+      bx(1.4, 0.5, 12, -16.5, 0.10, -14, 0x8a5a3c),
+      bx(7.5, 0.5, 1.6, -20, 0.10, -19.5, 0x8a5a3c),
+      bx(0.24, 1.1, 0.24, -23.5, 0.4, -19.5, 0x8a5a3c),
+      bx(2.2, 0.8, 5.4, -21, 0.14, 6, 0xfff2e0),
+      bx(0.32, 3.4, 0.32, -21, 1.9, 6, 0xfff2e0),
+      bx(2.0, 2.4, 0.12, -20.0, 2.4, 6, 0xff4d5e),
+      bx(2.2, 0.8, 5.4, -31, 0.14, 24, 0xffe45e),
+      bx(0.32, 3.0, 0.32, -31, 1.7, 24, 0xfff2e0),
+      bx(1.8, 2.0, 0.12, -30.1, 2.1, 24, 0x37d6ff),
     ]);
     const riverPool = Pool(function () {
       return S.outlined(riverGeo, mats.prop, S.INK.prop);
@@ -991,8 +1034,10 @@ MR.World = (function () {
         const look = lookAtZ(Math.max(0, z)).look;
         const w = PROP_KINDS.map((k) => look.mix[k] || 0);
         const total = w.reduce((a, b) => a + b, 0);
-        const side = rnd.chance(0.5) ? -1 : 1;
+        let side = rnd.chance(0.5) ? -1 : 1;
         let kind = total > 0 ? rnd.weighted(PROP_KINDS, w) : null;
+        // Anything with foundations goes on the dry side of a river leg.
+        if (look.bank === side && kind !== 'crowd' && kind !== 'rival') side = -side;
         // A zero-weighted kind must never slip through the fallback branch of
         // weighted(); a building standing in the middle of the river is the
         // kind of thing nobody notices until a screenshot.
@@ -1072,6 +1117,7 @@ MR.World = (function () {
       if (s.kind === 'building') return buildingPool;
       if (s.kind === 'tree') return treePool;
       if (s.kind === 'station') return stationPool;
+      if (s.kind === 'grove') return grovePool[Math.floor(s.b * grovePool.length) % grovePool.length];
       if (s.kind === 'crowd') return crowdPool[Math.floor(s.a * crowdPool.length) % crowdPool.length];
       return null;   // rivals live in their own list
     }
@@ -1147,7 +1193,17 @@ MR.World = (function () {
         // over water. Tiles are claimed 210 units out, so the swap always
         // happens well beyond anything the player can see change.
         const deck = deckLift(tz + TILE / 2) > 0.55;
-        for (const sh of obj.userData.shoulders) sh.visible = !deck;
+        const bank = lookAtZ(tz).look.bank || 0;
+        for (let i = 0; i < 2; i++) {
+          const sh = obj.userData.shoulders[i];
+          const sx = i === 0 ? -1 : 1;
+          sh.visible = !deck;
+          // Cut the shoulder back to a 9-unit verge where a river runs, so the
+          // water starts at x = 13 instead of past the 34-unit shoulder edge.
+          const cut = (bank === sx);
+          sh.scale.x = cut ? 0.30 : 1;
+          sh.position.x = sx * (cut ? 8.9 : K.TRACK_HALF_WIDTH + 15);
+        }
         activeRoad.push({ z: tz, obj });
         state.roadFrom++;
       }
@@ -1216,6 +1272,9 @@ MR.World = (function () {
           obj.scale.setScalar(0.7 + s.a * 0.75);
           obj.position.set(s.x, 0, s.z);
           obj.rotation.y = s.b * 6.3;
+        } else if (s.kind === 'grove') {
+          obj.position.set(s.x + s.side * 10, 0, s.z);
+          obj.rotation.y = s.a * 6.3;
         } else if (s.kind === 'station') {
           obj.position.set(s.side * (K.TRACK_HALF_WIDTH + 2.4), 0, s.z);
           obj.rotation.y = s.side > 0 ? Math.PI : 0;
@@ -1315,6 +1374,7 @@ MR.World = (function () {
       overpassPool.releaseAll(); standPool.releaseAll();
       for (const p of crowdPool) p.releaseAll();
       for (const p of rivalPool) p.releaseAll();
+      for (const p of grovePool) p.releaseAll();
       activeGates.length = 0; activeScene.length = 0; activeStruct.length = 0;
       activeBanner.length = 0; activeRoad.length = 0; activeRivals.length = 0;
       state.roadFrom = 0; state.gateIdx = 0; state.sceneIdx = 0;

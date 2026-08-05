@@ -1,90 +1,249 @@
 /**
  * Chase camera: low, tight, and behind the shoulder.
  *
- * The reference framing is a runner filling roughly the lower third of the
- * screen with the road converging above them -- close enough that lane
- * changes feel like body movement, high enough to read three lanes and the
- * next two gates. Every dynamic term (FOV, height, shake, roll) is small on
- * purpose: at this distance a large camera move reads as a bug, not energy.
+ * The reference framing (Subway Surfers, Temple Run) puts the character at
+ * roughly a third of frame height with the road opening out above them --
+ * close enough that a lane change is body movement, high enough that the next
+ * two gates still read. The first pass sat at 3.0 up / 6.55 back and the
+ * runner was a distant sprite; this sits at 1.98 / 4.42 and the character is
+ * something you are *inside* of rather than watching.
  *
- * Perceived speed is the hard problem. Pace only varies 5:30 -> 4:20 per mile,
- * a 21% change in ground speed, which is barely legible on its own. The FOV
- * widening, the slight drop and pull-in, and the roll into lane changes are
- * what turn that 21% into something the player can feel -- the distance math
- * stays honest and the camera does the selling.
+ * Perceived speed is the hard problem and this file owns all of it. Ground
+ * speed only moves 21.8 -> 27.7 units/sec across the whole race, because
+ * 5:30/mi to 4:20/mi really is only 21%, and the distance maths is not
+ * negotiable. So the camera multiplies that 21% instead of faking it:
+ *
+ *   - a widen-and-close (FOV out, camera in) as pace rises. Peripheral
+ *     geometry sweeps far faster while the runner stays the same size on
+ *     screen, which is the strongest speed cue available without touching
+ *     the simulation.
+ *   - the camera drops toward the road at pace, so nearby tarmac is closer
+ *     to the lens and its angular rate climbs much faster than 21%.
+ *   - a stride bob locked to the same cadence formula the runner uses, so
+ *     the whole frame quickens with the footfalls.
+ *   - a top-gear band: the last quarter of the pace range gets extra FOV and
+ *     a permanent low rumble, so "finding another gear" is a state change and
+ *     not just a slightly bigger number.
+ *   - surge, from the derivative of pace. Streak-driven acceleration is up to
+ *     ~4 u/s^2, which is very legible even though the speed change is not:
+ *     the camera trails and widens while you are gaining, and closes in and
+ *     narrows while a hit bleeds the pace away.
+ *
+ * Every effect is bounded so it can never hide the next gate: shake is a
+ * damped oscillation rather than per-frame noise (noise reads as static and
+ * makes obstacles unreadable), the punish state *narrows* FOV, and the mile
+ * and gear flourishes only ever show more of the road, never less.
  */
 MR.Camera = (function () {
   const K = MR.K;
 
-  const BASE_FOV = 66;
-  const MAX_FOV_KICK = 11;
-  // Low and close: the runner should fill roughly a third of frame height.
-  // The first pass sat at 3.0 up / 6.55 back and the character read as a
-  // distant sprite -- fine for a top-down racer, wrong for this genre.
-  const BASE_Y = 2.28;
-  const BASE_BACK = 5.10;
-  const LOOK_AHEAD = 8.0;
+  // ---- framing ----------------------------------------------------------
+  const BASE_FOV = 61;
+  const SPEED_FOV = 12.5;        // widening across the honest pace band
+  const GEAR_FOV = 3.5;          // extra, only in the top of the band
+  const FOV_MIN = 50, FOV_MAX = 80;
+
+  const BASE_Y = 1.98;
+  const BASE_BACK = 4.42;
+  const LOOK_Y = 1.06;
+  const LOOK_AHEAD = 7.6;
+
+  // The honest band, in world units/sec. Derived rather than typed in, so a
+  // pace retune moves the camera response with it.
+  const SPEED_LO = (K.UNITS_PER_MILE * K.TIME_SCALE) / K.START_PACE;
+  const SPEED_HI = (K.UNITS_PER_MILE * K.TIME_SCALE) / K.FLOOR_PACE;
+
+  function clamp01(x) { return x < 0 ? 0 : x > 1 ? 1 : x; }
+  function smoothstep(a, b, x) { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); }
+
+  // Two incommensurate sines: shake that is smooth in time. Per-frame
+  // Math.random() jitter looks like video static at 60fps and genuinely hides
+  // obstacles; a wobble of the same amplitude reads twice as heavy and stays
+  // readable because the eye can track it.
+  function wobble(t, seed) {
+    return Math.sin(t * 33.7 + seed) * 0.62 + Math.sin(t * 18.3 + seed * 2.7) * 0.38;
+  }
 
   function create(aspect) {
     const cam = new THREE.PerspectiveCamera(BASE_FOV, aspect, 0.1, 1200);
+    const look = new THREE.Vector3();   // hoisted: this runs 60x a second
 
     const s = {
       camera: cam,
-      x: 0,          // smoothed lateral follow
-      shake: 0,
+      x: 0, vx: 0,     // lateral follow, sprung so a lane change whips
       roll: 0,
-      kick: 0,       // forward punch on landing/impact
       fov: BASE_FOV,
+
+      t: 0,            // clock for the wobble functions
+      stride: 0,       // stride phase, mirrors the runner's cadence
+      sp: SPEED_LO,    // smoothed ground speed
+      accel: 0,        // smoothed d(speed)/dt -- the surge signal
+
+      shake: 0,        // trauma, 0..1
+      punch: 0,        // one-shot impact lurch
+      winded: 0,       // long tail after a hit: the camera loses its nerve
+      dip: 0, dipV: 0, // sprung landing compression
+      kick: 0,         // short FOV punch (landing)
+
+      mile: -1,        // last whole mile crossed
+      mileT: 0,
+      gearT: 0, gearArmed: true,
+      finish: 0,
     };
 
     /**
      * @param dt  real seconds
-     * @param p   { z, x, y, speed, lean, airborne, duck01 }
+     * @param p   { z, x, y, speed, lean, duck01 }
      */
     s.update = function (dt, p) {
-      // Lateral follow lags the runner so a lane change is a movement the
-      // camera reacts to rather than one it performs simultaneously.
-      const followLag = 1 - Math.pow(0.0016, dt);
-      s.x += (p.x * 0.72 - s.x) * followLag;
+      // A long frame must not be allowed to detonate the springs.
+      const d = Math.min(dt, 1 / 25);
+      s.t += d;
 
-      // Speed 0..1 across the honest pace band.
-      const lo = (K.UNITS_PER_MILE * K.TIME_SCALE) / K.START_PACE;
-      const hi = (K.UNITS_PER_MILE * K.TIME_SCALE) / K.FLOOR_PACE;
-      const sp01 = Math.max(0, Math.min(1, (p.speed - lo) / (hi - lo)));
+      // ---- speed signals -------------------------------------------------
+      // Smoothing is deliberately slow: pace itself eases, and an unsmoothed
+      // derivative would make the camera twitch on every pace step.
+      const prev = s.sp;
+      s.sp += (p.speed - s.sp) * (1 - Math.pow(0.02, d));
+      const rawAccel = d > 0 ? (s.sp - prev) / d : 0;
+      s.accel += (rawAccel - s.accel) * (1 - Math.pow(0.05, d));
 
-      const targetFov = BASE_FOV + MAX_FOV_KICK * Math.pow(sp01, 1.25) + s.kick * 7;
-      s.fov += (targetFov - s.fov) * (1 - Math.pow(0.005, dt));
+      const sp01 = clamp01((s.sp - SPEED_LO) / (SPEED_HI - SPEED_LO));
+      // Most of a good run is spent in the upper half of the band, so bias the
+      // response there: the difference the player should feel is between
+      // "quick" and "flat out", not between the start line and mile 3.
+      const drive = Math.pow(sp01, 0.85);
+      const gear = smoothstep(0.70, 0.99, sp01);      // the top-gear state
+      // +/- 1 over the range the pace ease can actually produce.
+      const surge = Math.max(-1, Math.min(1, s.accel / 3.2));
 
-      // Camera drops and tucks in as pace rises -- ground rushes past closer.
-      const back = BASE_BACK - sp01 * 0.55;
-      const hgt = BASE_Y - sp01 * 0.22 - (p.duck01 || 0) * 0.30;
+      // ---- one-shot beats ------------------------------------------------
+      // Mile marker: a short lift and pull-back, so the milestone is a breath
+      // in the camera and not only a line of HUD text.
+      const mileNow = Math.floor(p.z / K.UNITS_PER_MILE);
+      if (s.mile < 0) s.mile = mileNow;                // fresh start or ?skip=
+      else if (mileNow > s.mile) { s.mile = mileNow; s.mileT = 1; }
+      s.mileT = Math.max(0, s.mileT - d * 0.95);
 
-      s.shake = Math.max(0, s.shake - dt * 3.6);
-      s.kick = Math.max(0, s.kick - dt * 4.2);
+      // Top gear: fire once when the pace floor is essentially reached, and
+      // re-arm only if a hit drags the run back out of it. This is the moment
+      // the 21% is supposed to feel like a different race.
+      if (s.gearArmed && sp01 > 0.93) { s.gearArmed = false; s.gearT = 1; }
+      if (!s.gearArmed && sp01 < 0.72) s.gearArmed = true;
+      s.gearT = Math.max(0, s.gearT - d * 1.15);
 
-      const sh = s.shake * s.shake;
-      const jitterX = (Math.random() - 0.5) * sh * 0.55;
-      const jitterY = (Math.random() - 0.5) * sh * 0.42;
+      // Finish: the only place the camera is allowed to abandon the chase.
+      if (p.z >= K.TOTAL_UNITS - 0.25) s.finish = Math.min(1, s.finish + d / 1.5);
+      const fin = s.finish * s.finish * (3 - 2 * s.finish);
 
-      // A tiny vertical trail on jumps: the camera does not fully follow the
-      // arc, which is what makes a jump feel like leaving the ground.
-      const airTrail = (p.y || 0) * 0.42;
+      // ---- decays ---------------------------------------------------------
+      s.shake = Math.max(0, s.shake - d * 2.1);
+      s.punch = Math.max(0, s.punch - d * 3.4);
+      s.winded = Math.max(0, s.winded - d * 0.45);
+      s.kick = Math.max(0, s.kick - d * 4.2);
 
-      cam.position.set(
-        s.x + jitterX,
-        hgt + airTrail + jitterY,
-        p.z - back
-      );
+      // Landing compression, as a spring rather than a decay so it rebounds.
+      s.dipV += (-s.dip * 340 - s.dipV * 24) * d;
+      s.dip += s.dipV * d;
 
-      s.roll += ((p.lean || 0) * -0.055 - s.roll) * (1 - Math.pow(0.004, dt));
+      // ---- lateral --------------------------------------------------------
+      // Underdamped on purpose (zeta ~0.6): the camera arrives at the new lane
+      // slightly late and overshoots a hair, which is the weight the old
+      // exponential follow was missing.
+      const tgtX = p.x * 0.78;
+      s.vx += ((tgtX - s.x) * 200 - s.vx * 17) * d;
+      s.x += s.vx * d;
 
-      const look = new THREE.Vector3(
+      // ---- stride ---------------------------------------------------------
+      // Same cadence curve as the runner so the bob lands on the footfalls.
+      // Cadence rises ~16% across the band; on its own that is nothing, but
+      // under a camera that is also lower and wider it is the difference
+      // between a jog and a hunt.
+      const air = clamp01((p.y || 0) / 1.2);
+      const cadence = 2.55 * Math.pow(s.sp / 22, 0.72);
+      s.stride = (s.stride + d * cadence) % 1;
+      const ph = s.stride * Math.PI * 2;
+      const bobAmp = (0.020 + 0.026 * drive) * (1 - air) * (1 - fin);
+      const bobY = -Math.abs(Math.sin(ph)) * bobAmp;        // fall on footfall
+      const bobX = Math.sin(ph) * bobAmp * 0.55;
+
+      // ---- shake ----------------------------------------------------------
+      // Trauma squared, plus a permanent tremble at top gear: at the pace
+      // floor the frame should never be completely still.
+      const tr = s.shake * s.shake;
+      const rumble = gear * 0.055 * (1 - fin);
+      const shX = wobble(s.t, 0.0) * (tr * 0.20 + rumble);
+      const shY = wobble(s.t, 1.7) * (tr * 0.16 + rumble * 0.7);
+      const shR = wobble(s.t, 3.1) * (tr * 0.030 + rumble * 0.10);
+
+      // ---- placement ------------------------------------------------------
+      const duck = p.duck01 || 0;
+
+      // Closer and lower with pace; the ground is what sells it, so the drop
+      // is worth more than the pull-in. Surge trails the camera while the
+      // streak is buying speed and reels it in while a hit bleeds it away.
+      const back = BASE_BACK
+        - drive * 0.62
+        + surge * 0.30
+        - duck * 0.22
+        - s.gearT * s.gearT * 0.45
+        + s.mileT * 0.45
+        + s.winded * 0.28
+        + fin * 3.4;
+
+      const hgt = BASE_Y
+        - drive * 0.34
+        - duck * 0.34
+        + (p.y || 0) * 0.22            // barely follows the arc -- see below
+        + s.dip
+        + s.mileT * 0.24
+        + s.winded * 0.12
+        + bobY + shY
+        + fin * 1.7;
+
+      cam.position.set(s.x + bobX + shX, hgt, p.z - back);
+
+      // ---- aim ------------------------------------------------------------
+      // The look point follows the jump arc *more* than the camera does, so
+      // the camera pitches up as the runner rises: the road falls away in
+      // frame, which is what leaving the ground actually looks like. The old
+      // 0.42/0.30 split had the camera chasing the arc and cancelled it.
+      look.set(
         s.x * 0.55,
-        1.22 + (p.y || 0) * 0.30 - (p.duck01 || 0) * 0.22,
-        p.z + LOOK_AHEAD
+        LOOK_Y + (p.y || 0) * 0.46 - duck * 0.26 - drive * 0.10 + fin * 0.55,
+        p.z + LOOK_AHEAD + (p.y || 0) * 1.1 - drive * 0.5
       );
       cam.lookAt(look);
-      cam.rotation.z += s.roll + jitterX * 0.02;
+
+      // Roll: the lean term is the body, the camera's own lateral velocity is
+      // the whip that outlasts it. Old value was 0.055 * lean -- about two
+      // degrees, which is below the threshold of being felt at all.
+      const whip = Math.max(-1, Math.min(1, s.vx / 26));
+      const rollTgt = -((p.lean || 0) * 0.105 + whip * 0.055) * (1 - fin);
+      s.roll += (rollTgt - s.roll) * (1 - Math.pow(0.0008, d));
+      cam.rotation.z += s.roll + shR - s.punch * 0.055;
+
+      // ---- fov ------------------------------------------------------------
+      // Widening while pulling in keeps the runner the same size on screen and
+      // accelerates everything around them. The winded term narrows instead,
+      // so a hit reads as the world closing in -- and, importantly, a punished
+      // player can still see the gate they have to make.
+      const targetFov = BASE_FOV
+        + SPEED_FOV * drive
+        + GEAR_FOV * gear
+        + s.gearT * 5.0
+        + surge * 3.5
+        + duck * 2.5
+        + air * 1.6
+        + s.kick * 6
+        - s.winded * 5.0
+        - s.mileT * 1.5
+        - fin * 9.0;
+      // Fast toward a wider frame, slower back: gaining speed should feel
+      // immediate, losing it should feel like it is being taken away.
+      const fovRate = targetFov > s.fov ? 0.02 : 0.12;
+      s.fov += (Math.max(FOV_MIN, Math.min(FOV_MAX, targetFov)) - s.fov)
+             * (1 - Math.pow(fovRate, d));
 
       if (Math.abs(cam.fov - s.fov) > 0.01) {
         cam.fov = s.fov;
@@ -92,12 +251,26 @@ MR.Camera = (function () {
       }
     };
 
+    /**
+     * Contact. This costs the player their record, so it gets the whole
+     * vocabulary: a lurch, heavy damped shake, and a two-second winded tail
+     * where the camera sits back, lifts, and narrows while the pace bleeds.
+     */
     s.impact = function (amount) {
-      s.shake = Math.min(1.4, s.shake + (amount === undefined ? 1 : amount));
-      s.kick = Math.min(1, s.kick + 0.55);
+      const a = amount === undefined ? 1 : amount;
+      s.shake = Math.min(1.5, s.shake + 1.15 * a);
+      s.punch = Math.min(1.2, s.punch + 0.9 * a);
+      s.winded = Math.min(1, s.winded + 0.85 * a);
+      s.dipV -= 5.5 * a;
+      s.kick = Math.min(1, s.kick + 0.3 * a);
     };
 
-    s.land = function () { s.shake = Math.min(1.4, s.shake + 0.22); };
+    /** Landing: compression into the road, then a rebound. */
+    s.land = function () {
+      s.dipV -= 3.6;
+      s.shake = Math.min(1.5, s.shake + 0.30);
+      s.kick = Math.min(1, s.kick + 0.35);
+    };
 
     s.resize = function (aspect) {
       cam.aspect = aspect;
@@ -105,7 +278,12 @@ MR.Camera = (function () {
     };
 
     s.reset = function () {
-      s.x = 0; s.shake = 0; s.roll = 0; s.kick = 0; s.fov = BASE_FOV;
+      s.x = 0; s.vx = 0; s.roll = 0; s.fov = BASE_FOV;
+      s.t = 0; s.stride = 0; s.sp = SPEED_LO; s.accel = 0;
+      s.shake = 0; s.punch = 0; s.winded = 0; s.dip = 0; s.dipV = 0; s.kick = 0;
+      s.mile = -1; s.mileT = 0; s.gearT = 0; s.gearArmed = true; s.finish = 0;
+      cam.fov = BASE_FOV;
+      cam.updateProjectionMatrix();
     };
 
     return s;

@@ -73,14 +73,19 @@ MR.shading = (function () {
     //
     // Mid-value on purpose: the road sits around 0x50557d, so anything much
     // darker than these merges with it at distance once the haze lands.
+    // Kept light for their chroma: a facade is a vertical face, so it lives
+    // in the ramp's dark band and takes only half the hemisphere fill. A tint
+    // chosen by eye at full brightness lands about 40% darker than that once
+    // it is on the wall, and the saturated mid-tones that looked right in a
+    // swatch turned into slabs.
     building: [
-      0xff8a6e,  // coral
-      0x4fc4d8,  // teal
-      0xffc247,  // mustard
-      0xa98ae8,  // violet
-      0x5fd08c,  // mint
+      0xff9c7a,  // coral
+      0x6fd8e8,  // teal
+      0xffcf62,  // mustard
+      0xc0a4f4,  // violet
+      0x7ee0a4,  // mint
       0xfff1dc,  // cream
-      0xff9fc4,  // candy pink
+      0xffabcb,  // candy pink
       0xd8e6f5,  // pale steel
     ],
     accent: 0xffe45e,
@@ -258,7 +263,15 @@ MR.shading = (function () {
   // materials mix fog AFTER the colour-space conversion. Matching that is what
   // keeps an outline fading into exactly the same haze as the surface it wraps
   // rather than into a darker version of it.
-  const FOG_NEAR = 26;
+  // The curve matters as much as the range. At near=26 the haze started
+  // eating colour out of a building only 30 units away, which is why the
+  // midground used to read as grey no matter what tint it was given; the
+  // references keep everything in the first third of the depth fully
+  // saturated and then let go quickly. Pushing near out to 45 while leaving
+  // far alone does exactly that -- the near field is crisp, and the fade over
+  // the remaining 145 units is steeper than it was, so distance reads harder
+  // than before rather than softer.
+  const FOG_NEAR = 45;
   const FOG_FAR = 190;
 
   const fogU = {
@@ -747,36 +760,60 @@ MR.shading = (function () {
    * keep the darkest ramp band from closing up: between them they are what
    * gives shaded faces a blue cast rather than a grey one.
    *
-   * The BALANCE between the three is the other half of losing the outlines.
-   * Fill light is what collapses a banded ramp: every unit of ambient adds
-   * equally to the lit face and the shaded one, so it shrinks the ratio
-   * between them, and the old rig spent 1.25 of its ~3.3 units of exposure on
-   * fill. That is fine under a black rim -- the rim was doing the separating.
-   * With no rim it read as unshaded. Fill is down by a third and the key is up
-   * to match, so total exposure lands within a couple of percent of where it
-   * was while the light/shade step is visibly wider.
+   * The SHAPE OF THE FILL is the other half of losing the outlines, and it is
+   * where most of the work went. Fill light is what collapses a banded ramp:
+   * a unit of ambient adds equally to the lit face and the shaded one, so it
+   * shrinks the ratio between them. The old rig spent 1.25 of its ~3.3 units
+   * of exposure on flat fill -- fine under a black rim, because the rim was
+   * doing the separating, but with no rim a building read as one flat slab of
+   * colour whichever way its faces pointed.
    *
-   * The same move is most of what puts colour back in the frame: a cool fill
-   * that large washes every camera-facing surface toward the same pale blue,
-   * which is exactly the "everything is a lavender-grey slab" the references
-   * do not have. Less fill, warmer key, and a coral facade stays coral.
+   * So the flat ambient is gone, replaced by a hemisphere. That is not a
+   * cosmetic swap. A hemisphere's contribution falls off with normal.y, which
+   * means:
+   *
+   *   - the road, the shoulder and every prop's top face take the full sky
+   *     fill on top of a full key, and stay bright and saturated;
+   *   - the vertical faces around them -- buildings, walls, barriers, and the
+   *     runner's own back -- take roughly half of it;
+   *
+   * and the gap between those two is the play surface separating from its
+   * surroundings without a single colour being changed. It is also free
+   * ambient occlusion: undersides go to the warm ground term instead of the
+   * cool sky one, so a hazard's overhang darkens and warms on its own.
+   *
+   * Net effect on a plain box, top face against camera-facing face: the two
+   * used to sit at a display ratio of about 0.78 -- a step you had to look
+   * for. They now sit near 0.66, which reads as shading. Total exposure on a
+   * flat-lit road is within 2% of where it was, so nothing else has to move.
    */
   function lights(scene) {
     // Along skyDome's sunDir so the drawn sun and the shading agree, but
     // lifted: at the sun's true 14-degree elevation the terminator ran across
     // the runner's waist and the legs went dark.
-    const key = new THREE.DirectionalLight(0xfff2d8, 2.42);
+    const key = new THREE.DirectionalLight(0xfff2d8, 2.30);
     key.position.set(7.0, 9.0, 11.0);
 
     // Aimed back down the camera axis on purpose: the player is seen from
     // behind, so without this the one surface that matters most -- the
-    // runner's back -- would sit in the ramp's darkest band all race.
-    const bounce = new THREE.DirectionalLight(0x86aeff, 0.58);
+    // runner's back -- would sit in the ramp's darkest band for the whole
+    // race. Half its old strength; the hemisphere took over the rest, and
+    // this is now only doing the job the hemisphere cannot, which is putting
+    // SOME light on a surface pointing straight at the camera.
+    const bounce = new THREE.DirectionalLight(0x86aeff, 0.42);
     bounce.position.set(-6, 2, -9);
 
-    const amb = new THREE.AmbientLight(0xa8c4ff, 0.34);
+    // Cool sky over a warm ground, which is the whole trick: it puts a
+    // warm/cool split across every curved or angled surface for the price of
+    // one light, and that split is most of what makes the references' shading
+    // read as coloured rather than as grey applied at different strengths.
+    const hemi = new THREE.HemisphereLight(0xbcd8ff, 0x4a4030, 0.55);
 
-    scene.add(key, bounce, amb);
+    // Kept, but only as a floor -- just enough that nothing in the frame can
+    // reach zero and turn into a black hole in a saturated picture.
+    const amb = new THREE.AmbientLight(0xa8c4ff, 0.10);
+
+    scene.add(key, bounce, hemi, amb);
 
     // Haze range is a look decision, so it lives with the rest of the look.
     // main.js owns the fog COLOUR (it cross-fades per biome); the distances
@@ -797,7 +834,7 @@ MR.shading = (function () {
     };
     syncFog(scene.fog);
 
-    return { key, bounce, amb };
+    return { key, bounce, hemi, amb };
   }
 
   return {

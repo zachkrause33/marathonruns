@@ -39,6 +39,24 @@ MR.World = (function () {
   const BEHIND = 34;     // release distance behind
   const TILE = 24;       // road tile length
 
+  // ---- lane fit ---------------------------------------------------------
+  // Every hazard below was drawn to fill a lane, and was authored against the
+  // 2.35-unit lane the track used to have. LANE_FIT rescales those numbers to
+  // whatever K.LANE_W is now, so a hazard stays exactly as wide *relative to
+  // its lane* as it was drawn and a track retune can never leave one hanging
+  // over its neighbour.
+  //
+  // It touches x ONLY. The y and z extents are what MR.Collision.BOX records
+  // and audits against the jump arc and the duck pose; moving either would
+  // break an agreement this file cannot see. Nothing here may change a height.
+  const LANE = K.LANE_X[1] - K.LANE_X[0];
+  const LANE_FIT = LANE / 2.35;
+
+  // The widest point of any hazard, measured from its lane centre: the duck
+  // frame's foot. Anything that has to stand clear of the lanes -- a rival
+  // runner, a set piece -- starts from here rather than from a literal.
+  const HAZARD_HALF = 1.41 * LANE_FIT;
+
   // ---- biome palettes ---------------------------------------------------
   // `edge` names the roadside furniture the road tile wears; `mix` weights the
   // roadside prop lottery. Together they are what distinguishes a biome, the
@@ -321,6 +339,19 @@ MR.World = (function () {
   }
   function cone(r, h, seg, x, y, z, color) {
     return part(new THREE.ConeGeometry(r, h, seg), color, x, y, z);
+  }
+
+  /**
+   * bx() for hazard parts. Width and lateral offset follow the lane; height
+   * and depth are passed straight through, because those are the numbers
+   * MR.Collision.BOX mirrors and this file is not allowed to move them.
+   */
+  function hbx(w, h, d, x, y, z, color, rx, ry, rz) {
+    return bx(w * LANE_FIT, h, d, (x || 0) * LANE_FIT, y, z, color, rx, ry, rz);
+  }
+  /** Flat quad sized to the lane, for the striped faces hazards turn forward. */
+  function hplane(w, h) {
+    return new THREE.PlaneGeometry(w * LANE_FIT, h);
   }
 
   /** Vertex-coloured toon material -- the workhorse for merged props. */
@@ -1262,15 +1293,15 @@ MR.World = (function () {
       mats.road.color.copy(lerpInto(_road, prev.road, look.road, t));
       mats.shoulder.color.copy(lerpInto(_shoulder, prev.ground, look.ground, t));
       if (mats.ground) mats.ground.color.copy(mats.shoulder.color);
-      // Hills take the ground hue knocked back toward the fog, so they read as
-      // the same land seen through a lot of air.
-      hillsMat.color.copy(mats.shoulder.color).lerp(api.fogColor, 0.45);
       sky.material.uniforms.top.value.copy(lerpInto(_skyTop, prev.sky[0], look.sky[0], t));
       sky.material.uniforms.bottom.value.copy(lerpInto(_skyBot, prev.sky[1], look.sky[1], t));
 
       state.biome = b;
       state.look = look;
       lerpInto(api.fogColor, prev.fog, look.fog, t);
+      // Hills take the ground hue knocked back toward the fog, so they read as
+      // the same land seen through a great deal of air.
+      hillsMat.color.copy(mats.shoulder.color).lerp(api.fogColor, 0.45);
       return b;
     };
 

@@ -829,9 +829,10 @@ MR.World = (function () {
      * real courses paint the measured shortest route on the tarmac -- so this
      * is a borrow that costs the game nothing in tone.
      *
-     * Cost is one draw call. The ribbon is a single mesh whose vertices are
-     * rewritten in place each frame as the route scrolls past, so it never
-     * allocates and never grows with the length of the course.
+     * Cost is one draw call, and a second for the rings below. Each is a single
+     * mesh whose vertices are rewritten in place every frame as the route
+     * scrolls past, so neither allocates and neither grows with the length of
+     * the course.
      *
      * It hints the LANE and nothing else: which action a gate wants, and when
      * to commit to it, are still entirely the player's read.
@@ -867,35 +868,38 @@ MR.World = (function () {
     group.add(routeMesh);
 
     /**
-     * The floating half of the hint: a trail of rings leading into each of the
-     * next few gates, in the lane that gate has to be taken in.
+     * The floating half of the hint: a trail of rings riding the same line.
      *
      * Paint alone cannot do this job. The chase camera sits low and directly
      * behind, so the runner's own body covers the centre of the road from about
      * 35 units out all the way to the horizon -- a line painted in the lane the
      * player is already in is invisible exactly where the forward read has to
-     * happen. Rings float at 1.15, which clears the head in frame at every
-     * useful distance, sits above a JUMP kerb and below a DUCK bar, and is the
-     * same answer both reference games arrived at.
+     * happen. Rings sit high enough off the tarmac to clear the head in frame,
+     * which is the same answer both reference games arrived at.
      *
      * A ring is a hollow circle and nothing else in this game is round, so it
      * cannot be mistaken for a fifth kind of obstacle. It marks the LANE only:
      * which action a gate wants, and when to commit, are still the player's.
+     *
+     * Evenly spaced along the line and anchored to a world grid rather than
+     * hung off the gates: a trail has to be a trail. Gate spacing runs 46 units
+     * early and 24 late, so per-gate clusters would have left the opening miles
+     * with three rings and a long nothing, which reads as a row of separate
+     * markers rather than a path.
      */
-    // Evenly spaced along the line and anchored to a world grid rather than to
-    // the gates: a trail has to be a trail. Gate spacing runs 46 units early
-    // and 24 late, so hanging the rings off the gates alone would have left the
-    // opening miles with three rings and a long nothing, which reads as a set
-    // of separate markers instead of a path.
     const RING_SPACE = 11;
     const RING_FROM = 10;
-    const RING_N = 11;
-    // 1.30 is the one height that works: above a JUMP kerb (0.80), clear below
-    // a DUCK bar (1.41) so a ring never floats at bar height and reads as
-    // "through here", and high enough that at 40 units the whole ring clears
-    // the top of the runner's head in frame. The radius is set the same way --
-    // 0.36 is 42% of a lane, big enough to survive the fog and small enough
-    // that the trail never looks like something in the way.
+    // Two slots more than the fade can reach, so the far end of the trail is
+    // always already at zero when the world grid shifts a new ring into it.
+    // Sized to the window rather than to the fade and a ring would wink into
+    // existence at a third opacity, 120 units out, every few seconds.
+    const RING_N = 14;
+    const RING_FADE = 122;
+    // 1.30 is the one height that works: above a JUMP kerb (0.80) and clear
+    // below a DUCK bar (1.41), so a ring never floats at bar height where it
+    // would read as "through here". The radius is chosen the same way -- 0.36
+    // is 42% of a lane, big enough to survive the fog and small enough that the
+    // trail never looks like something in the way.
     const RING_Y = 1.30;
     const RING_R = 0.36;
 
@@ -992,7 +996,7 @@ MR.World = (function () {
         const p = n * 18, c = n * 24;
         // Alpha falls away down the trail, so the eye is pulled to the next
         // gate first and the far end stays a suggestion, not a second read.
-        const a = 0.95 * Math.min(1, Math.max(0, 1 - (cz - z) / (ROUTE_FAR * 1.6)));
+        const a = 0.95 * Math.max(0, 1 - Math.pow(Math.min(1, (cz - z) / RING_FADE), 2.2));
         if (a <= 0.01) { for (let v = 0; v < 18; v++) ringPos[p + v] = 0; continue; }
         const cx = routeX(cz);
         const cy = RING_Y + Math.sin(now * 1.9 + n * 1.1) * 0.045;

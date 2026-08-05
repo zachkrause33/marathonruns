@@ -130,6 +130,28 @@ MR.Audio = (function () {
       if (streak && streak % 25 === 0) tone(base * 1.5, 0.16, 0.06, 'sine');
     };
 
+    /**
+     * The crossover: the instant the player passes the 1:59:30 ghost, or is
+     * passed back by it. Every other beat in this game already had a sound --
+     * clean gate, mile, contact, finish -- and the one moment the whole ghost
+     * exists for had only a white flash and a label turning over.
+     *
+     * Rising for a pass, falling for being caught, because the direction is
+     * the entire message and it has to land without reading the HUD.
+     */
+    s.crossover = function (ahead) {
+      const root = ahead ? 392 : 523;
+      const steps = ahead ? [1, 1.26, 1.5, 2] : [1, 0.84, 0.67, 0.5];
+      steps.forEach(function (m, i) {
+        setTimeout(function () {
+          tone(root * m, 0.42, 0.085 - i * 0.008, 'triangle');
+          if (i === steps.length - 1) tone(root * m * 2, 0.5, 0.035, 'sine');
+        }, i * 85);
+      });
+      // A short swell underneath so it feels like the crowd noticed.
+      noise(0.55, ahead ? 900 : 420, 0.7, 0.09, 'bandpass');
+    };
+
     s.mile = function (mile) {
       tone(660, 0.5, 0.10, 'sine');
       tone(990, 0.55, 0.06, 'sine');

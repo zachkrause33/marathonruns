@@ -169,6 +169,7 @@
   // ---- loop -------------------------------------------------------------
   let last = performance.now();
   let fps = 60, fpsAcc = 0, fpsN = 0;
+  let lastFlash = 0;   // edge-detect the ghost crossover for its audio cue
 
   function frame(now) {
     requestAnimationFrame(frame);
@@ -294,6 +295,16 @@
     // frame's lens (position, fov, aspect), and a frame of lag there shows up
     // as the tag swimming during a lane change.
     ghost.update(dt, { pace, camera: cam.camera, playerX: player.x });
+
+    // The crossover is the moment the whole ghost exists for, so it gets a
+    // sound like every other beat in the race. Ghost owns the detection (it
+    // fires on the sign change, not on a distance threshold); this only
+    // watches the flash going from cold to hot and reads the direction off
+    // the gap it just crossed.
+    if (state === RUN && ghost.flash > 0.85 && lastFlash <= 0.85) {
+      audio.crossover(ghost.gap <= 0);
+    }
+    lastFlash = ghost.flash;
 
     hud.update(pace, DEBUG ? { fps, draws: renderer.info.render.calls } : null);
     renderer.render(scene, cam.camera);

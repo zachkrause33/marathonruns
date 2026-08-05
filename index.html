@@ -13,6 +13,17 @@
  * television rather than from mobile games: tabular figures that never
  * reflow, hard rectangles, one accent colour, no rounded-friendly styling.
  * Nothing here animates except the numbers themselves.
+ *
+ * Colour carries meaning and nothing else, so it stays a closed set:
+ *   accent  the speed engine -- streak, gauge, rail fill. What you are buying.
+ *   ahead   beating the record.
+ *   behind  losing the record.
+ *   ink     plain fact -- clock, distance.
+ * A number is never tinted for emphasis alone.
+ *
+ * Layout rule: the middle of the frame belongs to the road and the next gate.
+ * Everything here lives on the edges, and the split card comes in at the side
+ * rather than across the runner.
  */
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -37,6 +48,7 @@ html, body {
   --ahead: #4dfba0;
   --behind: #ff6b84;
   --ink: rgba(14, 18, 48, 0.82);
+  --hair: rgba(255, 253, 245, 0.14);
 }
 
 .num {
@@ -45,144 +57,281 @@ html, body {
   letter-spacing: -0.01em;
 }
 
-/* ---- top bar: race clock + record delta ---- */
-#top {
+.lab {
+  font-size: 9px; font-weight: 800; letter-spacing: 0.16em;
+  opacity: 0.6; text-transform: uppercase;
+}
+
+/* While a panel is up the live readout would show through the overlay and
+ * read as a rendering fault, so it steps out of the way entirely. */
+#ui.panelOpen #bug,
+#ui.panelOpen #leftCol,
+#ui.panelOpen #dist,
+#ui.panelOpen #railWrap,
+#ui.panelOpen #perf {
+  opacity: 0; visibility: hidden;
+}
+#bug, #leftCol, #dist, #railWrap { transition: opacity 0.22s, visibility 0.22s; }
+
+/* ---- top bug: race clock + the verdict ----
+ * The projected finish is the headline because it is the only number that
+ * answers "is the record still alive". The race clock keeps its place but
+ * gives up the size. */
+#bug {
   position: absolute; top: 0; left: 50%;
   transform: translateX(-50%);
   display: flex; align-items: stretch;
   background: var(--ink);
-  border: 2px solid rgba(255, 253, 245, 0.14);
+  border: 2px solid var(--hair);
   border-top: none;
   backdrop-filter: blur(6px);
 }
-#top > div { padding: 7px 16px 8px; text-align: center; }
-#top .lab {
-  font-size: 9px; font-weight: 800; letter-spacing: 0.16em;
-  opacity: 0.62; text-transform: uppercase;
+
+#clockCell {
+  padding: 8px 15px 9px; min-width: 116px;
+  display: flex; flex-direction: column; justify-content: center;
 }
-#top .val { font-size: 25px; font-weight: 800; line-height: 1.05; }
+#clockCell .val { font-size: 25px; font-weight: 800; line-height: 1.05; margin-top: 1px; }
 
-#clockBox { min-width: 128px; }
-#deltaBox { min-width: 128px; border-left: 2px solid rgba(255,253,245,0.14); }
-#deltaBox .val.ahead  { color: var(--ahead); }
-#deltaBox .val.behind { color: var(--behind); }
+#projCell {
+  padding: 7px 15px 9px; min-width: 214px;
+  border-left: 2px solid var(--hair);
+}
+#projCell .cap {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: 1px;
+}
+#projCell .val { font-size: 40px; font-weight: 900; line-height: 1.02; }
+#projCell .sub { font-size: 11px; font-weight: 800; opacity: 0.7; margin-top: 1px; }
 
-/* ---- pace, left ---- */
-#pace {
-  position: absolute; left: 14px; top: 78px;
+#projCell.on  .val, #projCell.on  .sub { color: var(--ahead); opacity: 1; }
+#projCell.off .val, #projCell.off .sub { color: var(--behind); opacity: 1; }
+#projCell.on .sub, #projCell.off .sub { opacity: 0.92; }
+
+/* The chip is the plain-language version of the same judgement. It is an
+ * outline while the estimate is still moving under the player and a solid
+ * badge once it has become a verdict. */
+.chip {
+  font-size: 9px; font-weight: 900; letter-spacing: 0.1em;
+  padding: 2px 6px; white-space: nowrap;
+}
+.chip.est { color: var(--accent); border: 1px solid rgba(255, 228, 94, 0.55); }
+.chip.on  { background: var(--ahead);  color: #06301c; }
+.chip.off { background: var(--behind); color: #35060f; }
+
+/* ---- left column: the mechanic, read top to bottom ----
+ * Clean gates buy speed; the gauge shows how much of the 5:30 -> 4:20 range
+ * has been bought; the pace is the result. Putting them in one plate in that
+ * order is the only place the game explains itself. */
+#leftCol {
+  position: absolute; left: 14px; top: 82px;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 9px;
+}
+
+#engine {
   background: var(--ink);
   border-left: 4px solid var(--accent);
-  padding: 9px 15px 10px;
-  min-width: 132px;
+  padding: 8px 14px 9px;
+  min-width: 152px;
 }
-#pace .lab { font-size: 9px; font-weight: 800; letter-spacing: 0.15em; opacity: 0.62; }
-#pace .val { font-size: 37px; font-weight: 800; line-height: 1; }
-#pace .unit { font-size: 12px; font-weight: 700; opacity: 0.62; margin-left: 3px; }
-#pace .sub { font-size: 10px; font-weight: 700; opacity: 0.72; margin-top: 3px; }
+#engine #streakVal {
+  font-size: 36px; font-weight: 900; line-height: 1;
+  color: var(--accent);
+  text-shadow: 0 2px 0 rgba(14, 18, 48, 0.6);
+}
+#engine #paceLab { margin-top: 1px; }
+#engine .val { font-size: 27px; font-weight: 800; line-height: 1.05; }
+#engine .val.ahead { color: var(--ahead); }
+#engine .unit { font-size: 11px; font-weight: 700; opacity: 0.6; margin-left: 3px; }
+#engine .sub { font-size: 9px; font-weight: 700; opacity: 0.55; margin-top: 2px; }
 
-/* ---- distance + projection, right ---- */
+/* Contact flashes the whole plate, not just the number: the cost is the
+ * streak and the speed together, and they live in the same box. */
+#engine.broken { border-left-color: var(--behind); background: rgba(58, 14, 32, 0.86); }
+#engine.broken #streakVal { color: var(--behind); }
+
+.gauge {
+  position: relative;
+  height: 7px; width: 100%;
+  margin: 6px 0 7px;
+  background: rgba(255, 253, 245, 0.13);
+  border: 1px solid rgba(255, 253, 245, 0.16);
+}
+.gaugeFill { position: absolute; inset: 0 auto 0 0; background: var(--accent); width: 0; }
+/* Record pace as a mark on the range you are unlocking: once the fill passes
+ * it, you are running faster than 1:59:30 needs. */
+.gaugeRec {
+  position: absolute; top: -3px; bottom: -3px; width: 2px;
+  background: #fffdf5; box-shadow: 0 0 0 1px rgba(14, 18, 48, 0.85);
+}
+
+#why {
+  font-size: 9px; font-weight: 800; letter-spacing: 0.08em;
+  margin-top: 6px; color: var(--accent);
+  transition: opacity 0.3s;
+}
+#why.off { opacity: 0; }
+#why.cut { color: var(--behind); }
+
+/* ---- distance, right ---- */
 #dist {
-  position: absolute; right: 14px; top: 78px;
+  position: absolute; right: 14px; top: 82px;
   background: var(--ink);
   border-right: 4px solid var(--accent);
-  padding: 9px 15px 10px;
-  min-width: 132px; text-align: right;
+  padding: 8px 14px 9px;
+  min-width: 138px; text-align: right;
 }
-#dist .lab { font-size: 9px; font-weight: 800; letter-spacing: 0.15em; opacity: 0.62; }
-#dist .val { font-size: 37px; font-weight: 800; line-height: 1; }
-#dist .unit { font-size: 12px; font-weight: 700; opacity: 0.62; margin-left: 3px; }
-#dist .sub { font-size: 10px; font-weight: 700; opacity: 0.72; margin-top: 3px; }
+#dist .val { font-size: 34px; font-weight: 800; line-height: 1; }
+#dist .unit { font-size: 12px; font-weight: 700; opacity: 0.6; margin-left: 3px; }
+#dist .sub { font-size: 10px; font-weight: 700; opacity: 0.62; margin-top: 3px; }
 
-/* ---- streak ---- */
-#streak {
-  position: absolute; left: 50%; top: 92px;
-  transform: translateX(-50%);
-  text-align: center;
-  transition: opacity 0.25s;
+/* ---- mile split card ----
+ * Docked under the left plate instead of thrown across the middle of the
+ * screen: a split is worth reading, but never at the price of the gate the
+ * player is about to hit. It shows the mile's own time, which is what a
+ * runner means by a split. */
+#toast {
+  background: var(--ink);
+  border-left: 4px solid #fffdf5;
+  padding: 7px 13px 8px;
+  min-width: 152px;
+  opacity: 0; transform: translateX(-14px);
+  transition: opacity 0.22s ease-out, transform 0.22s ease-out;
 }
-#streak .val {
-  font-size: 30px; font-weight: 900; line-height: 1;
-  color: var(--accent);
-  text-shadow: 0 2px 0 rgba(14,18,48,0.6);
-}
-#streak .lab {
-  font-size: 9px; font-weight: 800; letter-spacing: 0.2em;
-  opacity: 0.8; margin-top: 2px;
-}
-#streak.broken .val { color: var(--behind); }
+#toast.show { opacity: 1; transform: none; }
+#toast .lab { opacity: 0.85; color: #fffdf5; }
+#toast .big { font-size: 27px; font-weight: 900; line-height: 1.05; }
+#toast .unit { font-size: 11px; font-weight: 700; opacity: 0.6; margin-left: 3px; }
+#toast .small { font-size: 11px; font-weight: 800; margin-top: 1px; }
+#toast .small.ahead { color: var(--ahead); }
+#toast .small.behind { color: var(--behind); }
 
-/* ---- progress rail ---- */
-#rail {
-  position: absolute; left: 50%; bottom: 16px;
+/* ---- progress rail ----
+ * You, the ghost, and the road between you. The honest split lives here
+ * rather than in the headline, because next to the marker it describes it
+ * reads as a position on the course instead of as a grade. */
+#railWrap {
+  position: absolute; left: 50%; bottom: 13px;
   transform: translateX(-50%);
-  width: min(620px, 82vw); height: 22px;
+  width: min(660px, 88vw);
 }
+#gapLine {
+  display: flex; align-items: baseline; justify-content: center; gap: 9px;
+  margin-bottom: 5px;
+  text-shadow: 0 1px 3px rgba(14, 18, 48, 0.9);
+}
+#gapLine .lab { opacity: 0.75; }
+#gapVal { font-size: 17px; font-weight: 900; line-height: 1; }
+#gapTrend { font-size: 9px; font-weight: 900; letter-spacing: 0.12em; }
+.ahead { color: var(--ahead); }
+.behind { color: var(--behind); }
+
+#rail { position: relative; height: 22px; }
 #railBg {
-  position: absolute; inset: 6px 0 6px 0;
-  background: rgba(14,18,48,0.78);
-  border: 1px solid rgba(255,253,245,0.16);
+  position: absolute; inset: 0;
+  background: rgba(14, 18, 48, 0.8);
+  border: 1px solid rgba(255, 253, 245, 0.22);
 }
 #railFill {
-  position: absolute; top: 7px; bottom: 7px; left: 1px;
+  position: absolute; top: 1px; bottom: 1px; left: 1px;
   background: var(--accent); width: 0;
 }
-#railGhost {
-  position: absolute; top: 2px; bottom: 2px;
-  width: 2px; background: #fffdf5;
-  box-shadow: 0 0 0 1px rgba(14,18,48,0.8);
-}
-.railTick {
-  position: absolute; top: 8px; bottom: 8px;
-  width: 1px; background: rgba(255,253,245,0.3);
-}
-.railTick.major { top: 4px; bottom: 4px; background: rgba(255,253,245,0.55); }
+/* The stretch of course between the runner and the ghost, tinted by who is
+ * winning it. This is the same fact as the number above, drawn as distance. */
+#railGap { position: absolute; top: 1px; bottom: 1px; }
+#railGap.behind { background: rgba(255, 107, 132, 0.42); }
+#railGap.ahead  { background: rgba(77, 251, 160, 0.42); }
 
-/* ---- toast (mile splits) ---- */
-/* Sits high in the frame: at 46% it landed straight across the runner, which
- * hid the exact moment a mile split is most worth watching. */
-#toast {
-  position: absolute; left: 50%; top: 25%;
-  transform: translateX(-50%);
-  text-align: center;
-  opacity: 0; transition: opacity 0.3s;
+#railGhost {
+  position: absolute; top: -5px; bottom: -5px;
+  width: 3px; background: #fffdf5;
+  box-shadow: 0 0 0 1.5px rgba(14, 18, 48, 0.9);
 }
-#toast .big { font-size: 42px; font-weight: 900; letter-spacing: -0.02em; }
-#toast .small { font-size: 15px; font-weight: 800; opacity: 0.9; }
-#toast.show { opacity: 1; }
+/* A cap above the line, so the marker is findable at a glance against both
+ * the yellow fill and the dark road ahead of it. */
+#railGhost::after {
+  content: ''; position: absolute; left: 50%; top: -5px;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #fffdf5; border-bottom: none;
+  filter: drop-shadow(0 0 1px rgba(14, 18, 48, 0.9));
+}
+
+.railTick {
+  position: absolute; top: 6px; bottom: 6px;
+  width: 1px; background: rgba(255, 253, 245, 0.28);
+}
+.railTick.major { top: 2px; bottom: 2px; background: rgba(255, 253, 245, 0.5); }
+
+#railCaps {
+  position: relative;
+  display: flex; justify-content: space-between;
+  font-size: 9px; font-weight: 800; letter-spacing: 0.1em;
+  opacity: 0.45; margin-top: 3px;
+  text-shadow: 0 1px 3px rgba(14, 18, 48, 0.9);
+}
+#railHalf { position: absolute; left: 50%; transform: translateX(-50%); }
 
 /* ---- overlays ---- */
 .panel {
   position: absolute; inset: 0;
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  background: rgba(10, 13, 36, 0.86);
+  display: flex;
+  background: rgba(10, 13, 36, 0.9);
   pointer-events: auto;
-  text-align: center; padding: 22px;
+  text-align: center;
+  padding: 20px 18px;
+  overflow-y: auto;
 }
 .panel.hidden { display: none; }
+.panelInner { margin: auto; width: 100%; max-width: 480px; }
 .panel h1 {
-  font-size: clamp(30px, 7vw, 58px); font-weight: 900;
+  font-size: clamp(34px, 7vw, 58px); font-weight: 900;
   letter-spacing: -0.03em; line-height: 0.98;
+  font-variant-numeric: tabular-nums;
 }
 .panel .date {
-  font-size: 12px; font-weight: 800; letter-spacing: 0.2em;
-  color: var(--accent); margin-bottom: 10px;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.2em;
+  color: var(--accent); margin-bottom: 8px;
 }
 .panel .blurb {
-  font-size: 14px; font-weight: 600; opacity: 0.82;
-  max-width: 430px; margin-top: 14px; line-height: 1.5;
+  font-size: 13px; font-weight: 600; opacity: 0.8;
+  max-width: 380px; margin: 10px auto 0; line-height: 1.5;
 }
+
+/* A labelled hairline instead of a heading: it separates without competing
+ * with the one big number each panel is built around. */
+.rule {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 9px; font-weight: 900; letter-spacing: 0.2em;
+  opacity: 0.5; margin: 18px 0 9px;
+}
+.rule::before, .rule::after {
+  content: ''; flex: 1; height: 1px; background: rgba(255, 253, 245, 0.22);
+}
+
+.mech { font-size: 12.5px; font-weight: 600; line-height: 1.5; opacity: 0.86; }
+.mech p { margin-top: 8px; }
+.mech b { font-weight: 900; opacity: 1; }
+.mechPace {
+  display: flex; align-items: baseline; justify-content: center; gap: 9px;
+  font-variant-numeric: tabular-nums;
+}
+.mechPace b { font-size: 26px; font-weight: 900; color: var(--accent); }
+.mechPace span { font-size: 17px; opacity: 0.55; }
+.mechPace i { font-size: 11px; font-style: normal; font-weight: 800; opacity: 0.55; }
+.mech .gauge { max-width: 260px; margin: 8px auto 0; }
+
 .panel .keys {
-  margin-top: 20px; font-size: 12px; font-weight: 700;
+  margin-top: 18px; font-size: 12px; font-weight: 700;
   opacity: 0.7; line-height: 1.9;
 }
 .panel .keys kbd {
-  background: rgba(255,253,245,0.12);
-  border: 1px solid rgba(255,253,245,0.25);
+  background: rgba(255, 253, 245, 0.12);
+  border: 1px solid rgba(255, 253, 245, 0.25);
   padding: 2px 7px; font-family: inherit; font-size: 11px;
 }
 .cta {
-  margin-top: 24px;
+  margin-top: 20px;
   background: var(--accent); color: #14183a;
   font-size: 15px; font-weight: 900; letter-spacing: 0.1em;
   padding: 13px 34px; border: none; cursor: pointer;
@@ -190,41 +339,109 @@ html, body {
 }
 .cta:active { transform: translateY(1px); }
 
-/* results table */
-#resultStats {
-  margin-top: 18px;
-  display: grid; grid-template-columns: auto auto;
-  gap: 5px 26px; font-size: 13px; font-weight: 700;
+/* ---- finish panel ---- */
+.finLab {
+  font-size: 10px; font-weight: 900; letter-spacing: 0.24em;
+  opacity: 0.5; margin-bottom: 2px;
 }
-#resultStats .k { opacity: 0.6; text-align: right; }
+/* The verdict is the point of the screen, so it is a solid band rather than
+ * coloured text -- it should be legible from across a room. */
+#verdict {
+  display: inline-block; margin-top: 10px;
+  font-size: 13px; font-weight: 900; letter-spacing: 0.1em;
+  padding: 6px 14px;
+}
+#verdict.beat { background: var(--ahead); color: #06301c; }
+#verdict.miss { background: var(--behind); color: #35060f; }
+
+#endCols {
+  display: flex; flex-wrap: wrap; gap: 14px 30px;
+  justify-content: center; align-items: flex-start;
+  margin-top: 18px;
+}
+#resultStats {
+  display: grid; grid-template-columns: auto auto;
+  gap: 4px 20px; font-size: 12.5px; font-weight: 700;
+}
+#resultStats .k { opacity: 0.55; text-align: right; }
 #resultStats .v { text-align: left; }
-#verdict { font-size: 15px; font-weight: 900; letter-spacing: 0.08em; margin-top: 12px; }
-#verdict.beat { color: var(--ahead); }
-#verdict.miss { color: var(--behind); }
+
+#splitTable {
+  display: grid; grid-template-columns: auto auto auto;
+  gap: 4px 16px; font-size: 12.5px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+#splitTable .k {
+  font-size: 9px; font-weight: 900; letter-spacing: 0.14em;
+  opacity: 0.45; text-align: right; padding-bottom: 2px;
+}
+#splitTable .v { text-align: right; }
+#splitTable .v.fin {
+  border-top: 1px solid rgba(255, 253, 245, 0.25);
+  padding-top: 4px; margin-top: 2px; font-weight: 900;
+}
 
 /* ---- countdown ---- */
 #count {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
   font-size: 96px; font-weight: 900;
-  text-shadow: 0 4px 0 rgba(14,18,48,0.55);
+  text-shadow: 0 4px 0 rgba(14, 18, 48, 0.55);
 }
 #count.hidden { display: none; }
 
-/* ---- small screens ---- */
-@media (max-width: 560px) {
-  #pace, #dist { top: 70px; min-width: 106px; padding: 7px 11px 8px; }
-  #pace .val, #dist .val { font-size: 28px; }
-  #top .val { font-size: 20px; }
-  #top > div { min-width: 104px; padding: 6px 11px 7px; }
-  #streak { top: 76px; }
-  #streak .val { font-size: 24px; }
+/* ---- small screens ----
+ * A phone is played with a thumb, so the plates shrink but the hierarchy does
+ * not change: the projection stays the biggest thing on the screen and the
+ * middle band stays empty from the top plate down to the rail. */
+@media (max-width: 620px) {
+  #clockCell { min-width: 78px; padding: 6px 10px 7px; }
+  #clockCell .val { font-size: 19px; }
+  #projCell { min-width: 172px; padding: 5px 11px 7px; }
+  #projCell .val { font-size: 31px; }
+  #projCell .sub { font-size: 10px; }
+  #projCell .cap { gap: 7px; }
+  .lab { font-size: 8px; letter-spacing: 0.12em; }
+  .chip { font-size: 8px; padding: 2px 4px; letter-spacing: 0.06em; }
+
+  #leftCol { left: 9px; top: 70px; gap: 7px; }
+  #engine { min-width: 124px; padding: 6px 11px 7px; }
+  #engine #streakVal { font-size: 27px; }
+  #engine .val { font-size: 21px; }
+  #engine .sub { font-size: 8px; }
+  #why { font-size: 8px; margin-top: 4px; }
+
+  #dist { right: 9px; top: 70px; min-width: 112px; padding: 6px 11px 7px; }
+  #dist .val { font-size: 25px; }
+  #dist .sub { font-size: 9px; }
+
+  #toast { min-width: 124px; padding: 6px 11px 7px; }
+  #toast .big { font-size: 21px; }
+  #toast .small { font-size: 10px; }
+
+  #railWrap { width: 92vw; bottom: 10px; }
+  #rail { height: 17px; }
+  #gapVal { font-size: 15px; }
+  #count { font-size: 76px; }
+  .panel { padding: 16px 14px; }
+  .mech { font-size: 12px; }
+}
+
+/* Landscape phones have almost no vertical room, so the panels give up the
+ * explanatory blocks rather than push the button off the bottom. */
+@media (max-height: 430px) {
+  .panel h1 { font-size: clamp(26px, 6vh, 40px); }
+  .panel .blurb, .rule, .mech { display: none; }
+  .panel .keys { margin-top: 10px; }
+  .cta { margin-top: 12px; padding: 10px 26px; }
+  #endCols { margin-top: 10px; gap: 8px 24px; }
 }
 
 /* ---- fps / debug ---- */
 #perf {
-  position: absolute; right: 12px; bottom: 46px;
+  position: absolute; right: 14px; top: 158px;
   font-size: 10px; font-weight: 700; opacity: 0.45;
+  text-align: right;
   display: none;
 }
 #perf.on { display: block; }
@@ -884,7 +1101,7 @@ MR.shading = (function () {
       const k = i / (n - 1);
       // Bias the darkest band up so shadows stay colourful, never muddy.
       const v = 0.42 + 0.58 * k;
-      const cool = (1 - k) * (1 - k) * 0.26;   // strongest in the deepest band
+      const cool = (1 - k) * (1 - k) * 0.34;   // strongest in the deepest band
       const rgb = [v * (1 - cool * 1.05), v * (1 - cool * 0.40), v * (1 + cool * 0.70)];
       for (let c = 0; c < 3; c++) {
         data[i * 4 + c] = Math.round(Math.max(0, Math.min(1, rgb[c])) * 255);
@@ -1066,17 +1283,20 @@ MR.shading = (function () {
     let s = 0x2f6f2b1d;
     const rnd = function () { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
 
+    // Few and large, with a wide size spread. A dense field of small puffs
+    // tiles visibly -- the eye finds the grid immediately once the same shape
+    // shows up four times across the frame.
     const puffs = [];
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 9; i++) {
       const cx = rnd() * N, cy = rnd() * N;
-      const w = N * (0.045 + rnd() * 0.070);
+      const w = N * (0.075 + rnd() * rnd() * 0.170);
       const n = 4 + Math.floor(rnd() * 4);
       const lobes = [];
       for (let j = 0; j < n; j++) {
         const u = n === 1 ? 0.5 : j / (n - 1);
         lobes.push({
           x: (u - 0.5) * w * 2.1 + (rnd() - 0.5) * w * 0.35,
-          y: (rnd() - 0.5) * w * 0.30,
+          y: (rnd() - 0.5) * w * 0.26,
           // Taper the ends so a cluster of circles reads as one cloud.
           r: w * (0.40 + rnd() * 0.45) * (1.0 - Math.abs(u - 0.5) * 1.1),
         });
@@ -1089,16 +1309,16 @@ MR.shading = (function () {
       for (let oy = -1; oy <= 1; oy++) {
         for (const p of puffs) {
           const bx = p.cx + ox * N, by = p.cy + oy * N;
-          g.fillStyle = 'rgba(92,92,92,1)';
+          g.fillStyle = 'rgba(70,70,70,1)';
           for (const l of p.lobes) {
             g.beginPath();
-            g.arc(bx + l.x, by + l.y + l.r * 0.34, Math.max(1, l.r), 0, 6.2832);
+            g.arc(bx + l.x, by + l.y + l.r * 0.40, Math.max(1, l.r), 0, 6.2832);
             g.fill();
           }
           g.fillStyle = 'rgba(255,255,255,1)';
           for (const l of p.lobes) {
             g.beginPath();
-            g.arc(bx + l.x, by + l.y - l.r * 0.06, Math.max(1, l.r * 0.96), 0, 6.2832);
+            g.arc(bx + l.x, by + l.y - l.r * 0.10, Math.max(1, l.r * 0.92), 0, 6.2832);
             g.fill();
           }
         }
@@ -1143,36 +1363,60 @@ MR.shading = (function () {
       vec3 d = normalize(vWorld - cameraPosition);
       float h = d.y;
 
-      float t = clamp(h * 1.45 + 0.06, 0.0, 1.0);
+      // Bands are driven by y/z, not by elevation. Elevation isolines are
+      // cones around the eye and project to CURVES -- which is the whole
+      // complaint about the old sky, and moving the maths off the dome's
+      // vertices only shrank the arcs rather than removing them. Isolines of
+      // y/z are planes through the eye, and a plane through the eye always
+      // projects to a dead straight line, whatever the camera is doing. The
+      // ratio is still world-locked, so the bands roll with a lane change
+      // instead of sticking to the screen like a decal.
+      float sy = d.y / max(d.z, 0.30);
+      float t = clamp(sy * 1.55 + 0.06, 0.0, 1.0);
 
-      // Cel steps, blended part-way and antialiased: a hard floor() turns any
-      // residual curvature back into an arc, but a pure gradient loses the
-      // poster look the rest of the game is drawn in.
-      float b = t * 5.0;
+      // Cel steps, blended part-way and antialiased with fwidth: a bare
+      // floor() aliases into a staircase wherever the band edge is not exactly
+      // horizontal.
+      float b = t * 6.0;
       float aa = fwidth(b) * 0.6 + 0.002;
-      float stepped = (floor(b) + smoothstep(0.5 - aa, 0.5 + aa, fract(b))) / 5.0;
-      vec3 col = mix(bottom, top, mix(t, stepped, 0.62));
+      float stepped = (floor(b) + smoothstep(0.5 - aa, 0.5 + aa, fract(b))) / 6.0;
+      vec3 col = mix(bottom, top, mix(t, stepped, 0.85));
 
-      // Sun: broad bloom, one quantised corona ring, hard disc. Drawn before
-      // the clouds so cover can pass in front of it.
+      // Sun: broad bloom, two quantised corona steps, hard disc -- a poster
+      // sun, not a lens flare. Drawn before the clouds so cover passes in
+      // front of it.
       float sd = max(dot(d, sunDir), 0.0);
-      col += glowColor * (pow(sd, 5.0) * 0.16 + pow(sd, 180.0) * 0.55);
-      col = mix(col, mix(glowColor, sunColor, 0.5), smoothstep(0.9962, 0.9970, sd) * 0.6);
-      col = mix(col, sunColor, smoothstep(0.99885, 0.99905, sd));
+      col += glowColor * pow(sd, 6.0) * 0.14;
+      col = mix(col, glowColor, smoothstep(0.99545, 0.99600, sd) * 0.30);
+      col = mix(col, mix(glowColor, sunColor, 0.6), smoothstep(0.99835, 0.99855, sd) * 0.55);
+      col = mix(col, sunColor, smoothstep(0.99915, 0.99930, sd));
 
-      // Horizon haze. Zero exactly at h = 0 so the sky meets the fogged ground
-      // with no step, peaking a few degrees above it.
-      float hz = smoothstep(0.0, 0.05, h) * exp(-max(h, 0.0) * 9.0);
+      // Horizon haze. Zero exactly at the horizon so the sky meets the fogged
+      // ground with no step, peaking a few degrees above it. Driven by the
+      // same straight-line coordinate as the bands so its thickness is even
+      // across the frame.
+      float hz = smoothstep(0.0, 0.055, sy) * exp(-max(sy, 0.0) * 8.0);
       col = mix(col, mix(bottom, vec3(1.0), 0.42), hz * 0.85);
 
       // Clouds ride a virtual plane overhead, so they converge toward the
       // horizon the way real ones do instead of being pasted on the dome.
-      vec2 uv = d.xz / max(h, 0.05) * 0.30 + vec2(time * 0.006, time * 0.0015);
-      vec4 cl = texture2D(cloudMap, uv);
-      float cover = cl.a * smoothstep(0.06, 0.22, h);
+      // Two layers at different scales and drift speeds: one sheet repeats
+      // obviously across a 47-degree field, two beating against each other do
+      // not, and the parallax between them gives the sky depth for free.
+      vec2 p = d.xz / max(h, 0.035);
+      float r = length(p);
+      // Nothing survives out where one texel spans a degree of sky -- without
+      // this the last few degrees above the horizon boil into grey stipple.
+      float reach = (1.0 - smoothstep(2.4, 5.6, r)) * smoothstep(0.07, 0.24, h);
+
       vec3 lit = mix(vec3(1.0), bottom, 0.12);
-      vec3 shd = mix(bottom, top, 0.42);
-      col = mix(col, mix(shd, lit, smoothstep(0.35, 0.65, cl.r)), cover);
+      vec3 shd = mix(bottom, top, 0.44);
+
+      vec4 lo = texture2D(cloudMap, p * 0.105 + vec2(0.41 - time * 0.0022, 0.63));
+      col = mix(col, mix(shd, lit, smoothstep(0.35, 0.65, lo.r)), lo.a * reach * 0.55);
+
+      vec4 hi = texture2D(cloudMap, p * 0.245 + vec2(time * 0.0055, 0.0));
+      col = mix(col, mix(shd, lit, smoothstep(0.35, 0.65, hi.r)), hi.a * reach);
 
       gl_FragColor = vec4(lin2srgb(col), 1.0);
     }`;
@@ -1185,9 +1429,11 @@ MR.shading = (function () {
         bottom: { value: new THREE.Color(bottom === undefined ? PALETTE.skyBot : bottom) },
         sunColor: { value: new THREE.Color(PALETTE.sun) },
         glowColor: { value: new THREE.Color(PALETTE.sunGlow) },
-        // Up-and-forward on the camera's left, matching the key light so the
-        // lit side of the runner points back at the visible sun.
-        sunDir: { value: new THREE.Vector3(-0.52, 0.40, 0.76).normalize() },
+        // Up-and-forward, matching the key light so the lit side of the runner
+        // points back at the visible sun. World +x is SCREEN LEFT for a camera
+        // looking down +z, and the elevation is low (~14 degrees) because the
+        // chase camera is pitched down: anything higher leaves the frame.
+        sunDir: { value: new THREE.Vector3(0.42, 0.25, 0.87).normalize() },
         cloudMap: { value: clouds() },
         time: { value: 0 },
       },
@@ -1220,12 +1466,14 @@ MR.shading = (function () {
    * gives shaded faces a blue cast rather than a grey one.
    */
   function lights(scene) {
-    // Matches skyDome's sunDir so the drawn sun and the shading agree.
+    // Along skyDome's sunDir so the drawn sun and the shading agree, but
+    // lifted: at the sun's true 14-degree elevation the terminator ran across
+    // the runner's waist and the legs went dark.
     const key = new THREE.DirectionalLight(0xfff4e0, 2.05);
-    key.position.set(-7.5, 6.0, 11.0);
+    key.position.set(7.0, 9.0, 11.0);
 
     const bounce = new THREE.DirectionalLight(0x7fa8ff, 0.75);
-    bounce.position.set(6, 2, -9);
+    bounce.position.set(-6, 2, -9);
 
     const amb = new THREE.AmbientLight(0xa8c4ff, 0.50);
 
@@ -1380,24 +1628,26 @@ MR.Runner = (function () {
   function raceBib() {
     if (bibTex) return bibTex;
     const c = document.createElement('canvas');
-    c.width = 128; c.height = 96;
+    c.width = 160; c.height = 96;
     const g = c.getContext('2d');
     g.fillStyle = '#fffdf5';
     g.fillRect(0, 0, c.width, c.height);
     g.fillStyle = '#' + new THREE.Color(P.runnerVest).getHexString();
-    g.fillRect(0, 0, c.width, 9);
-    g.fillRect(0, c.height - 9, c.width, 9);
+    g.fillRect(0, 0, c.width, 8);
+    g.fillRect(0, c.height - 8, c.width, 8);
     g.fillStyle = '#1b1633';
-    g.font = 'bold 62px Helvetica, Arial, sans-serif';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.fillText('26.2', c.width / 2, c.height / 2 + 4);
+    // Fit rather than trust: the first version hard-coded 62px and the
+    // string overflowed the canvas on a machine without Helvetica, so the
+    // back of the vest read "6." instead of a race number.
+    let px = 64;
+    do {
+      g.font = 'bold ' + px + 'px Helvetica, Arial, sans-serif';
+      px -= 2;
+    } while (px > 20 && g.measureText('26.2').width > c.width * 0.82);
+    g.fillText('26.2', c.width / 2, c.height / 2 + 3);
     bibTex = new THREE.CanvasTexture(c);
-    // The panel is a cylinder wedge, so its U runs the wrong way when seen
-    // from outside; flip it here rather than mirroring the canvas.
-    bibTex.wrapS = THREE.RepeatWrapping;
-    bibTex.repeat.x = -1;
-    bibTex.offset.x = 1;
     return bibTex;
   }
 
@@ -1416,53 +1666,65 @@ MR.Runner = (function () {
     ]);
     spine.add(pelvis);
 
-    const chest = pivot(spine, 0, 0.28, 0);
+    // The whole silhouette is built backwards from one measurement: the
+    // shoulder line has to stop 0.15 below the skull. The chase camera looks
+    // DOWN on the runner, so a gap smaller than that is swallowed by the
+    // head's own projected silhouette and the neck disappears again.
+    const chest = pivot(spine, 0, 0.24, 0);
     const trunk = multi([
-      // Vest. Top edge at world 1.16, a clear 0.10 below the skull.
-      { g: new THREE.CylinderGeometry(0.262, 0.198, 0.38, 12), c: P.runnerVest, y: -0.09, sz: 0.72 },
+      // Vest. Top edge at world 1.12. Nothing on the trunk may reach above
+      // it -- an earlier deltoid that poked 0.03 higher closed the gap on
+      // its own and the head went straight back to sitting on the shoulders.
+      { g: new THREE.CylinderGeometry(0.262, 0.198, 0.42, 12), c: P.runnerVest, y: -0.11, sz: 0.72 },
       // Hem stripe -- stops the red mass from running straight into the shorts.
-      { g: new THREE.CylinderGeometry(0.204, 0.200, 0.055, 12), c: TRIM, y: -0.255, sz: 0.74 },
+      { g: new THREE.CylinderGeometry(0.204, 0.200, 0.055, 12), c: TRIM, y: -0.295, sz: 0.74 },
       // Deltoids. These are what make the shoulder line read wider than the
-      // head; without them the trunk cone tapers into the skull.
-      { g: new THREE.SphereGeometry(0.132, 10, 8), c: P.runnerVest, x: -0.232, y: 0.055, sy: 0.88, sz: 0.86 },
-      { g: new THREE.SphereGeometry(0.132, 10, 8), c: P.runnerVest, x: 0.232, y: 0.055, sy: 0.88, sz: 0.86 },
+      // head; without them the trunk cone tapers into the skull. Flattened
+      // hard in Y so they widen the shoulders without raising them.
+      { g: new THREE.SphereGeometry(0.130, 10, 8), c: P.runnerVest, x: -0.236, y: -0.015, sy: 0.78, sz: 0.86 },
+      { g: new THREE.SphereGeometry(0.130, 10, 8), c: P.runnerVest, x: 0.236, y: -0.015, sy: 0.78, sz: 0.86 },
       // Shoulder blades: a shallow pair of bumps so the back is not a blank
       // curve. Barely visible individually, but they catch the terminator.
-      { g: new THREE.SphereGeometry(0.085, 8, 6), c: P.runnerVest, x: -0.105, y: -0.01, z: -0.135, sz: 0.55 },
-      { g: new THREE.SphereGeometry(0.085, 8, 6), c: P.runnerVest, x: 0.105, y: -0.01, z: -0.135, sz: 0.55 },
+      { g: new THREE.SphereGeometry(0.085, 8, 6), c: P.runnerVest, x: -0.105, y: -0.07, z: -0.135, sz: 0.55 },
+      { g: new THREE.SphereGeometry(0.085, 8, 6), c: P.runnerVest, x: 0.105, y: -0.07, z: -0.135, sz: 0.55 },
     ]);
     chest.add(trunk);
 
-    // Curved panel rather than a flat card so it hugs the vest at this size.
+    // Curved panel rather than a flat card so it hugs the vest at this size,
+    // and high on the back so it never straddles the shorts line.
     const bib = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.248, 0.248, 0.20, 10, 1, true, Math.PI - 0.60, 1.20),
+      new THREE.CylinderGeometry(0.252, 0.252, 0.22, 10, 1, true, Math.PI - 0.62, 1.24),
       S.toon(0xffffff, 3)
     );
     bib.material.map = raceBib();
-    bib.position.y = -0.075;
+    bib.position.y = -0.035;
     bib.scale.z = 0.72;
     chest.add(bib);
 
     // ---- head -----------------------------------------------------------
     // The neck pivot sits at the top of the trunk so head tilt rotates from
     // the base of the neck; the neck column itself rides with the head.
-    const neck = pivot(chest, 0, 0.19, 0);
+    const neck = pivot(chest, 0, 0.13, 0);
     const head = pivot(neck, 0, 0, 0);
 
     const headMesh = multi([
-      // Bare neck. Narrow (0.18 across against a 0.73 shoulder line) and
-      // skin-coloured against a red vest -- the pinch plus the value jump is
-      // the whole reason the head separates at gameplay distance.
-      { g: new THREE.CylinderGeometry(0.088, 0.098, 0.26, 10), c: P.runnerSkin, y: 0.03 },
-      { g: new THREE.SphereGeometry(0.26, 16, 12), c: P.runnerSkin, y: 0.27, sy: 1.02, sz: 0.97 },
-      // Hair is a crown cap only. Letting it wrap the nape put dark hair
-      // directly against the vest and the head vanished into the torso.
-      { g: new THREE.SphereGeometry(0.268, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.52), c: P.runnerHair, y: 0.275 },
-      // Headband over the hair edge: one bright horizontal band across the
-      // back of the skull, which is the single loudest "that is a head" cue.
-      { g: new THREE.CylinderGeometry(0.277, 0.277, 0.085, 14), c: TRIM, y: 0.262, sz: 0.97 },
-      { g: new THREE.SphereGeometry(0.078, 8, 6), c: P.runnerSkin, x: -0.246, y: 0.245, z: -0.012, sx: 0.48, sz: 0.82 },
-      { g: new THREE.SphereGeometry(0.078, 8, 6), c: P.runnerSkin, x: 0.246, y: 0.245, z: -0.012, sx: 0.48, sz: 0.82 },
+      // Bare neck: 0.18 across against a 0.73 shoulder line, and lit skin
+      // between the dark hair above and the red vest below. The order of
+      // those three values is the entire fix. Leaving the nape skin and the
+      // hair on the crown gave a light head sitting on a light neck -- one
+      // continuous mass with no pinch. Dark / light / saturated reads.
+      { g: new THREE.CylinderGeometry(0.088, 0.100, 0.30, 10), c: P.runnerSkin, y: 0.10 },
+      { g: new THREE.SphereGeometry(0.25, 16, 12), c: P.runnerSkin, y: 0.38, sy: 1.02, sz: 0.97 },
+      // Crown cap for the top of the skull...
+      { g: new THREE.SphereGeometry(0.254, 14, 6, 0, Math.PI * 2, 0, Math.PI * 0.42), c: P.runnerHair, y: 0.38 },
+      // ...and a rear-only shell that carries the hair down to the nape but
+      // leaves the face clear. Restricting phi to the back 210 degrees is
+      // what lets one primitive do a haircut.
+      { g: new THREE.SphereGeometry(0.256, 14, 8, Math.PI * 1.5 - 1.83, 3.66, Math.PI * 0.20, Math.PI * 0.57), c: P.runnerHair, y: 0.38 },
+      // Headband sits above the eye line -- lower and it reads as goggles.
+      { g: new THREE.CylinderGeometry(0.268, 0.268, 0.072, 14), c: TRIM, y: 0.432, sz: 0.96 },
+      { g: new THREE.SphereGeometry(0.076, 8, 6), c: P.runnerSkin, x: -0.238, y: 0.360, z: -0.012, sx: 0.48, sz: 0.82 },
+      { g: new THREE.SphereGeometry(0.076, 8, 6), c: P.runnerSkin, x: 0.238, y: 0.360, z: -0.012, sx: 0.48, sz: 0.82 },
     ]);
     head.add(headMesh);
 
@@ -1470,8 +1732,8 @@ MR.Runner = (function () {
     // Welded into one mesh -- they are a single draw the back view never
     // spends, but the character still needs a face for the finish framing.
     const eyes = new THREE.Mesh(weld([
-      { g: new THREE.CircleGeometry(0.055, 12), c: P.ink, x: -0.098, y: 0.30, z: 0.246 },
-      { g: new THREE.CircleGeometry(0.055, 12), c: P.ink, x: 0.098, y: 0.30, z: 0.246 },
+      { g: new THREE.CircleGeometry(0.053, 12), c: P.ink, x: -0.094, y: 0.365, z: 0.243 },
+      { g: new THREE.CircleGeometry(0.053, 12), c: P.ink, x: 0.094, y: 0.365, z: 0.243 },
     ]), S.flat(0xffffff, { vertexColors: true }));
     head.add(eyes);
 
@@ -1507,7 +1769,11 @@ MR.Runner = (function () {
       legs.push({ side, hip, knee, ankle });
 
       // arm
-      const shoulder = pivot(chest, side * 0.235, 0.07, 0);
+      const shoulder = pivot(chest, side * 0.236, -0.02, 0);
+      // ZXY so the twist happens along the arm before it is swung and then
+      // abducted. With the default XYZ the yaw fired after the outward tilt
+      // and dragged the whole arm across the back of the vest.
+      shoulder.rotation.order = 'ZXY';
       const upper = part(new THREE.CapsuleGeometry(0.088, 0.17, 3, 10), P.runnerSkin);
       upper.position.y = -0.16;
       shoulder.add(upper);
@@ -1649,13 +1915,32 @@ MR.Runner = (function () {
  *
  * A marathon course is 6,293 world units long; instantiating it would mean
  * tens of thousands of meshes. Everything here is therefore pooled and
- * recycled around a moving window: road tiles, hazards, scenery and mile
- * banners are claimed as they enter VIEW ahead and released as they fall
- * behind BEHIND. Pool objects are reused in place, so steady-state allocation
- * is zero and the frame time does not sawtooth.
+ * recycled around a moving window: road tiles, hazards, scenery, structures
+ * and mile banners are claimed as they enter VIEW ahead and released as they
+ * fall behind BEHIND. Pool objects are reused in place, so steady-state
+ * allocation is zero and the frame time does not sawtooth.
+ *
+ * Two things drive almost every decision below.
+ *
+ *  1. READABILITY. One hit ends the record attempt, so a gate has to be
+ *     solved with the eyes at 60+ units, not reacted to at 15. Every hazard
+ *     therefore paints its lane: a coloured, iconised mat lies on the road in
+ *     front of it, sized so it is still several pixels tall when the hazard
+ *     itself is a speck. Shape carries the action (triangles = jump, rungs =
+ *     duck, crosses = impassable) so the read survives colour-blindness and
+ *     the fog, which is fully opaque by 235 units.
+ *
+ *  2. DRAW CALLS, not triangles. SwiftShader at 1100x700 dies on draw count.
+ *     Props are therefore merged into single vertex-coloured meshes -- a knot
+ *     of eight spectators, a bridge tower with its cables, a whole 24-unit run
+ *     of crowd barrier -- so richness costs geometry, which is free, instead
+ *     of submissions, which are not.
  *
  * Biomes recolour the shared materials rather than swapping meshes, which is
  * what lets the palette cross-fade over a mile instead of popping at a seam.
+ * But palette alone never made a place: each biome also picks the roadside
+ * furniture the road tiles wear and the set pieces that get spawned beside it,
+ * so THE BRIDGE actually has a bridge and RIVERSIDE actually has water.
  */
 MR.World = (function () {
   const K = MR.K;
@@ -1666,34 +1951,273 @@ MR.World = (function () {
   const BEHIND = 34;     // release distance behind
   const TILE = 24;       // road tile length
 
+  // Small props are pointless at the far edge of the window -- the fog has
+  // already eaten them -- so they spawn late and buy back draw calls that the
+  // hazards and set pieces actually need.
+  const VIEW_PROP = 152;
+
   // ---- biome palettes ---------------------------------------------------
+  // `edge` names the roadside furniture the road tile wears; `mix` weights the
+  // roadside prop lottery. Together they are what distinguishes a biome, the
+  // colours only agree with it.
   const BIOME_LOOK = {
-    'CITY START': { sky: [0x2b3fa8, 0x9fdcff], ground: 0x63c96b, road: 0x50557d, fog: 0x9fdcff },
-    'RIVERSIDE': { sky: [0x1f6fb8, 0xbdf0ff], ground: 0x57c7a8, road: 0x4d5a80, fog: 0xbdf0ff },
-    'THE BRIDGE': { sky: [0x3a4fc0, 0xffd9a8], ground: 0x4fa8c9, road: 0x5b5f88, fog: 0xffd9a8 },
-    'PARKLAND': { sky: [0x2e8fd0, 0xcdf5c0], ground: 0x6fd46a, road: 0x53587f, fog: 0xcdf5c0 },
-    'THE WALL': { sky: [0x8a3a6b, 0xffb27a], ground: 0x8f9a5e, road: 0x5a4f66, fog: 0xffb27a },
-    'FINAL MILE': { sky: [0x24306e, 0xffcf6b], ground: 0x5cb46a, road: 0x4a4f78, fog: 0xffcf6b },
+    'CITY START': {
+      sky: [0x2b3fa8, 0x9fdcff], ground: 0x63c96b, road: 0x50557d, fog: 0x9fdcff,
+      edge: 'barrier',
+      mix: { building: 2.6, tree: 0.55, crowd: 2.3, rival: 0.5, station: 0.10 },
+    },
+    'RIVERSIDE': {
+      sky: [0x1f6fb8, 0xbdf0ff], ground: 0x57c7a8, road: 0x4d5a80, fog: 0xbdf0ff,
+      edge: 'hedge',
+      mix: { building: 0.45, tree: 1.9, crowd: 1.0, rival: 0.45, station: 0.12 },
+    },
+    'THE BRIDGE': {
+      sky: [0x3a4fc0, 0xffd9a8], ground: 0x2f8fc4, road: 0x5b5f88, fog: 0xffd9a8,
+      edge: 'rail',
+      mix: { building: 0.0, tree: 0.0, crowd: 0.75, rival: 0.55, station: 0.0 },
+    },
+    'PARKLAND': {
+      sky: [0x2e8fd0, 0xcdf5c0], ground: 0x6fd46a, road: 0x53587f, fog: 0xcdf5c0,
+      edge: 'hedge',
+      mix: { building: 0.15, tree: 3.4, crowd: 1.1, rival: 0.45, station: 0.12 },
+    },
+    'THE WALL': {
+      sky: [0x8a3a6b, 0xffb27a], ground: 0x8f9a5e, road: 0x5a4f66, fog: 0xffb27a,
+      edge: 'barrier',
+      mix: { building: 1.6, tree: 0.7, crowd: 0.8, rival: 0.35, station: 0.14 },
+    },
+    'FINAL MILE': {
+      sky: [0x24306e, 0xffcf6b], ground: 0x5cb46a, road: 0x4a4f78, fog: 0xffcf6b,
+      edge: 'barrier',
+      mix: { building: 1.1, tree: 0.3, crowd: 3.4, rival: 0.6, station: 0.0 },
+    },
   };
 
-  function lerpColor(a, b, t) {
-    const c = new THREE.Color(a);
-    return c.lerp(new THREE.Color(b), t);
+  const PROP_KINDS = ['building', 'tree', 'crowd', 'rival', 'station'];
+
+  // Scratch colours: applyBiome runs every frame and must not allocate.
+  const _cA = new THREE.Color();
+  const _cB = new THREE.Color();
+  function lerpInto(out, a, b, t) {
+    _cA.set(a); _cB.set(b);
+    return out.copy(_cA).lerp(_cB, t);
   }
 
-  /** Canvas-drawn label texture. Generated at runtime -- still no assets. */
-  function labelTexture(text, bg, fg, w, h) {
+  // ---- canvas textures --------------------------------------------------
+  // Generated at runtime -- still no assets.
+
+  function canvas(w, h) {
     const c = document.createElement('canvas');
-    c.width = w || 256; c.height = h || 128;
-    const g = c.getContext('2d');
-    g.fillStyle = bg; g.fillRect(0, 0, c.width, c.height);
-    g.fillStyle = fg;
-    g.font = `900 ${Math.floor(c.height * 0.62)}px ui-sans-serif, system-ui, -apple-system, Arial, sans-serif`;
-    g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillText(text, c.width / 2, c.height / 2 + c.height * 0.03);
+    c.width = w; c.height = h;
+    return c;
+  }
+  function texture(c, repeat) {
     const t = new THREE.CanvasTexture(c);
     t.anisotropy = 4;
+    if (repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; }
     return t;
+  }
+
+  /** Canvas-drawn label texture, used by the mile banners. */
+  function labelTexture(text, bg, fg, w, h, sub) {
+    const c = canvas(w || 512, h || 128);
+    const g = c.getContext('2d');
+    g.fillStyle = bg; g.fillRect(0, 0, c.width, c.height);
+    // A bright inner keyline stops the panel reading as a floating rectangle
+    // at distance -- it is the frame that says "sign", not the text.
+    g.strokeStyle = fg; g.lineWidth = Math.max(3, c.height * 0.045);
+    g.strokeRect(c.height * 0.07, c.height * 0.07, c.width - c.height * 0.14, c.height - c.height * 0.14);
+    g.fillStyle = fg;
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    const fam = 'ui-sans-serif, system-ui, -apple-system, Arial, sans-serif';
+    if (sub) {
+      g.font = `900 ${Math.floor(c.height * 0.46)}px ${fam}`;
+      g.fillText(text, c.width / 2, c.height * 0.40);
+      g.font = `800 ${Math.floor(c.height * 0.20)}px ${fam}`;
+      g.fillText(sub, c.width / 2, c.height * 0.76);
+    } else {
+      g.font = `900 ${Math.floor(c.height * 0.60)}px ${fam}`;
+      g.fillText(text, c.width / 2, c.height / 2 + c.height * 0.03);
+    }
+    return texture(c);
+  }
+
+  /**
+   * The lane telegraph that lies on the road ahead of a hazard.
+   *
+   * The icon is a SHAPE first and a colour second: solid up-triangles for
+   * JUMP, stacked rungs for DUCK, crosses for BLOCK. At 90 units the mat is
+   * about a dozen pixels tall, which is enough for shape but not for reading
+   * a small hazard mesh -- which is exactly the distance the lane choice has
+   * to be made at.
+   */
+  function matTexture(kind, tint) {
+    const c = canvas(128, 256);
+    const g = c.getContext('2d');
+    // A dark wash under the icons: the road is mid-value, the icons are
+    // bright, and without this the edges of the mat vanish into it.
+    g.fillStyle = 'rgba(10,10,30,0.42)';
+    g.fillRect(0, 0, 128, 256);
+    g.fillStyle = tint;
+    g.fillRect(0, 0, 9, 256); g.fillRect(119, 0, 9, 256);
+
+    for (let i = 0; i < 3; i++) {
+      const cy = 42 + i * 86;
+      if (kind === K.JUMP) {
+        // Apex points down-canvas, which after the -90deg lay-down points
+        // AWAY from the runner: a ramp read, not a "stop" read.
+        g.beginPath();
+        g.moveTo(64, cy + 30); g.lineTo(108, cy - 28); g.lineTo(20, cy - 28);
+        g.closePath(); g.fill();
+      } else if (kind === K.DUCK) {
+        g.fillRect(20, cy - 30, 88, 15);
+        g.fillRect(20, cy - 4, 88, 15);
+        g.fillRect(20, cy + 22, 88, 15);
+      } else {
+        g.lineWidth = 17; g.strokeStyle = tint; g.lineCap = 'butt';
+        g.beginPath();
+        g.moveTo(24, cy - 30); g.lineTo(104, cy + 30);
+        g.moveTo(104, cy - 30); g.lineTo(24, cy + 30);
+        g.stroke();
+      }
+    }
+    const t = texture(c, true);
+    t.repeat.set(1, 3);
+    return t;
+  }
+
+  /** Diagonal caution stripes for the face a hazard turns toward the player. */
+  function stripeTexture(a, b) {
+    const c = canvas(128, 64);
+    const g = c.getContext('2d');
+    g.fillStyle = a; g.fillRect(0, 0, 128, 64);
+    g.fillStyle = b;
+    for (let x = -64; x < 160; x += 32) {
+      g.beginPath();
+      g.moveTo(x, 0); g.lineTo(x + 16, 0); g.lineTo(x + 16 + 64, 64); g.lineTo(x + 64, 64);
+      g.closePath(); g.fill();
+    }
+    const t = texture(c, true);
+    t.repeat.set(2, 1);
+    return t;
+  }
+
+  /** Window grid for buildings. Repeat is set per instance so windows keep a
+   *  constant world size no matter how the box is scaled. */
+  function windowTexture() {
+    const c = canvas(64, 64);
+    const g = c.getContext('2d');
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, 64, 64);
+    const lit = ['#ffe9a8', '#cfe4ff', '#8fa6cc', '#6f86b4'];
+    for (let ry = 0; ry < 2; ry++) {
+      for (let rx = 0; rx < 2; rx++) {
+        g.fillStyle = lit[(rx * 2 + ry * 3) % lit.length];
+        g.fillRect(rx * 32 + 7, ry * 32 + 8, 18, 15);
+        g.fillStyle = 'rgba(30,25,60,0.30)';
+        g.fillRect(rx * 32 + 7, ry * 32 + 8, 18, 4);
+      }
+    }
+    return texture(c, true);
+  }
+
+  /** Pale banded ripples, laid over the water plane on the bridge. */
+  function rippleTexture() {
+    const c = canvas(128, 128);
+    const g = c.getContext('2d');
+    g.clearRect(0, 0, 128, 128);
+    g.fillStyle = 'rgba(255,255,255,0.30)';
+    for (let i = 0; i < 7; i++) {
+      const y = 8 + i * 17, w = 24 + ((i * 37) % 60);
+      g.fillRect(((i * 53) % 100), y, w, 4);
+      g.fillRect(((i * 29) % 90) + 20, y + 7, w * 0.6, 3);
+    }
+    return texture(c, true);
+  }
+
+  /** Checker band for the finish gantry. */
+  function checkerTexture() {
+    const c = canvas(128, 32);
+    const g = c.getContext('2d');
+    for (let x = 0; x < 8; x++) {
+      for (let y = 0; y < 2; y++) {
+        g.fillStyle = ((x + y) & 1) ? '#1b1633' : '#fffdf5';
+        g.fillRect(x * 16, y * 16, 16, 16);
+      }
+    }
+    const t = texture(c, true);
+    t.repeat.set(6, 1);
+    return t;
+  }
+
+  // ---- geometry merging -------------------------------------------------
+  /**
+   * Fold a list of transformed primitives into one vertex-coloured geometry.
+   *
+   * A spectator built from seven boxes as seven meshes costs seven draws and
+   * there can be a hundred of them beside the road. Baking colour into the
+   * vertices means a whole knot of them, or a bridge tower with its cables,
+   * ships as one mesh under one shared material.
+   */
+  function merge(parts) {
+    let n = 0;
+    const prepared = [];
+    for (const p of parts) {
+      const g = p.geo.index ? p.geo.toNonIndexed() : p.geo.clone();
+      if (p.matrix) g.applyMatrix4(p.matrix);
+      prepared.push({ g, color: p.color });
+      n += g.attributes.position.count;
+    }
+    const pos = new Float32Array(n * 3);
+    const nor = new Float32Array(n * 3);
+    const col = new Float32Array(n * 3);
+    const uv = new Float32Array(n * 2);
+    let o = 0;
+    for (const item of prepared) {
+      const g = item.g;
+      const count = g.attributes.position.count;
+      pos.set(g.attributes.position.array, o * 3);
+      nor.set(g.attributes.normal.array, o * 3);
+      if (g.attributes.uv) uv.set(g.attributes.uv.array, o * 2);
+      _cA.set(item.color === undefined ? 0xffffff : item.color);
+      for (let i = 0; i < count; i++) {
+        col[(o + i) * 3] = _cA.r;
+        col[(o + i) * 3 + 1] = _cA.g;
+        col[(o + i) * 3 + 2] = _cA.b;
+      }
+      o += count;
+      g.dispose();
+    }
+    const out = new THREE.BufferGeometry();
+    out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    out.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    out.computeBoundingSphere();
+    return out;
+  }
+
+  const _euler = new THREE.Euler();
+  function part(geo, color, x, y, z, rx, ry, rz) {
+    const m = new THREE.Matrix4();
+    if (rx || ry || rz) m.makeRotationFromEuler(_euler.set(rx || 0, ry || 0, rz || 0));
+    m.setPosition(x || 0, y || 0, z || 0);
+    return { geo, color, matrix: m };
+  }
+  function bx(w, h, d, x, y, z, color, rx, ry, rz) {
+    return part(new THREE.BoxGeometry(w, h, d), color, x, y, z, rx, ry, rz);
+  }
+  function cyl(rt, rb, h, seg, x, y, z, color, rx, ry, rz) {
+    return part(new THREE.CylinderGeometry(rt, rb, h, seg), color, x, y, z, rx, ry, rz);
+  }
+  function cone(r, h, seg, x, y, z, color) {
+    return part(new THREE.ConeGeometry(r, h, seg), color, x, y, z);
+  }
+
+  /** Vertex-coloured toon material -- the workhorse for merged props. */
+  function vtoon(steps) {
+    const m = S.toon(0xffffff, steps || 2);
+    m.vertexColors = true;
+    return m;
   }
 
   // ---- generic pool -----------------------------------------------------
@@ -1724,14 +2248,43 @@ MR.World = (function () {
 
   function create(course) {
     const group = new THREE.Group();
-    const rnd = MR.rng.stream(course.key, 'scenery/v1');
+    const rnd = MR.rng.stream(course.key, 'scenery/v2');
+
+    // Biome spans in world units, so road tiles and set pieces can ask "where
+    // am I" without reconstructing the fraction every time.
+    const BI = MR.Course.BIOMES.map((b, i) => ({
+      name: b.name,
+      from: b.from * K.TOTAL_UNITS,
+      to: (i + 1 < MR.Course.BIOMES.length ? MR.Course.BIOMES[i + 1].from : 1) * K.TOTAL_UNITS,
+      look: BIOME_LOOK[b.name],
+    }));
+    function lookAtZ(z) {
+      let b = BI[0];
+      for (const x of BI) if (z >= x.from) b = x;
+      return b;
+    }
+    const BRIDGE = BI.find((b) => b.name === 'THE BRIDGE');
+
+    // The deck is inset from the biome boundary so the abutments have room to
+    // cap the ends; the water sinks over a 190-unit ramp on each side, which
+    // is long enough that the ground never visibly pops down.
+    const DECK_FROM = BRIDGE.from + 40;
+    const DECK_TO = BRIDGE.to - 40;
+    const WATER_DROP = 2.3;
+    function deckLift(z) {
+      if (z < DECK_FROM) return Math.max(0, 1 - (DECK_FROM - z) / 190);
+      if (z > DECK_TO) return Math.max(0, 1 - (z - DECK_TO) / 190);
+      return 1;
+    }
 
     // Shared materials: recoloured per biome, never reallocated.
     const mats = {
       road: S.toon(P.road, 2),
       shoulder: S.toon(P.ground, 2),
-      line: S.flat(P.laneLine),
-      edge: S.flat(P.roadEdge),
+      paint: new THREE.MeshBasicMaterial({ vertexColors: true }),
+      prop: vtoon(2),
+      propLit: vtoon(3),
+      water: new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, depthWrite: false }),
     };
 
     // ---- sky + fog ------------------------------------------------------
@@ -1742,7 +2295,8 @@ MR.World = (function () {
     // this the terrain simply stopped and the sky dome showed through as a
     // hard band across the middle of the frame. It rides with the runner so a
     // finite plane can stand in for an infinite one, and it sits below the
-    // road surface so the road always wins the depth test.
+    // road surface so the road always wins the depth test. On the bridge it
+    // drops away and becomes the river.
     const groundMat = S.toon(P.ground, 2);
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(1400, 1400), groundMat);
     ground.rotation.x = -Math.PI / 2;
@@ -1751,11 +2305,88 @@ MR.World = (function () {
     group.add(ground);
     mats.ground = groundMat;
 
+    // Ripples ride just above the water surface and are only shown when the
+    // ground is acting as a river, so still terrain never shimmers.
+    const rippleTex = rippleTexture();
+    rippleTex.repeat.set(26, 26);
+    const ripples = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), new THREE.MeshBasicMaterial({
+      map: rippleTex, transparent: true, depthWrite: false,
+    }));
+    ripples.rotation.x = -Math.PI / 2;
+    ripples.renderOrder = -480;
+    ripples.visible = false;
+    group.add(ripples);
+
     // ---- road tiles -----------------------------------------------------
     const roadGeo = new THREE.BoxGeometry(K.TRACK_HALF_WIDTH * 2, 0.5, TILE);
     const shoulderGeo = new THREE.BoxGeometry(30, 0.42, TILE);
-    const lineGeo = new THREE.PlaneGeometry(0.14, TILE * 0.52);
-    const edgeGeo = new THREE.PlaneGeometry(0.22, TILE);
+
+    // All the road paint in one merged mesh: two solid edge lines and two
+    // dashed lane dividers were four draws per tile for four flat quads.
+    const paintGeo = (function () {
+      const parts = [];
+      const flat = -Math.PI / 2;
+      for (const sx of [-1, 1]) {
+        parts.push(part(new THREE.PlaneGeometry(0.26, TILE), 0xf2f4ff,
+          sx * (K.TRACK_HALF_WIDTH - 0.16), 0.006, 0, flat));
+      }
+      for (const lx of [-1.175, 1.175]) {
+        parts.push(part(new THREE.PlaneGeometry(0.16, TILE * 0.52), 0xfff6d8, lx, 0.006, 0, flat));
+      }
+      return merge(parts);
+    })();
+
+    /** Crowd-control barrier: the single strongest "this is a road race" cue. */
+    const barrierGeo = (function () {
+      const parts = [];
+      for (const sx of [-1, 1]) {
+        const x = sx * (K.TRACK_HALF_WIDTH + 0.85);
+        parts.push(bx(0.10, 0.09, TILE, x, 0.92, 0, 0xf2f4ff));
+        parts.push(bx(0.09, 0.07, TILE, x, 0.60, 0, 0xdfe6ff));
+        for (let i = 0; i < 8; i++) {
+          const z = -TILE / 2 + 1.5 + i * 3;
+          parts.push(bx(0.13, 1.0, 0.13, x, 0.5, z, 0x2b2f52));
+          // Sponsor-ish colour panel between posts: reads as printed hoarding.
+          if (i % 2 === 0) parts.push(bx(0.06, 0.30, 2.6, x - sx * 0.03, 0.74, z + 1.5, 0xff3b6b));
+        }
+      }
+      return merge(parts);
+    })();
+
+    /** Park/river edge: a clipped hedge with the odd bollard. */
+    const hedgeGeo = (function () {
+      const parts = [];
+      for (const sx of [-1, 1]) {
+        const x = sx * (K.TRACK_HALF_WIDTH + 1.4);
+        parts.push(bx(1.5, 0.78, TILE, x, 0.28, 0, 0x2f9f52));
+        parts.push(bx(1.62, 0.16, TILE, x, 0.68, 0, 0x49c96b));
+        for (let i = 0; i < 4; i++) {
+          parts.push(cyl(0.10, 0.12, 0.7, 6, sx * (K.TRACK_HALF_WIDTH + 0.35), 0.35,
+            -TILE / 2 + 3 + i * 6, 0xfff2e0));
+        }
+      }
+      return merge(parts);
+    })();
+
+    /** Bridge deck edge: fascia, balusters, top rail, lamp standards. */
+    const railGeo = (function () {
+      const parts = [];
+      for (const sx of [-1, 1]) {
+        const x = sx * (K.TRACK_HALF_WIDTH + 0.55);
+        parts.push(bx(1.3, 0.55, TILE, sx * (K.TRACK_HALF_WIDTH + 0.35), -0.45, 0, 0x3a4570));
+        parts.push(bx(0.16, 0.16, TILE, x, 1.30, 0, 0xf2f4ff));
+        parts.push(bx(0.12, 0.10, TILE, x, 0.78, 0, 0xc9d4ff));
+        for (let i = 0; i < 12; i++) {
+          parts.push(bx(0.09, 1.3, 0.09, x, 0.65, -TILE / 2 + 1 + i * 2, 0xdfe6ff));
+        }
+        for (let i = 0; i < 2; i++) {
+          const z = -TILE / 2 + 6 + i * 12;
+          parts.push(bx(0.16, 3.4, 0.16, x, 1.7, z, 0x2b2f52));
+          parts.push(bx(0.5, 0.24, 0.5, x, 3.5, z, 0xffe45e));
+        }
+      }
+      return merge(parts);
+    })();
 
     const roadPool = Pool(function () {
       const t = new THREE.Group();
@@ -1763,153 +2394,507 @@ MR.World = (function () {
       road.position.y = -0.25;
       t.add(road);
 
+      const shoulders = [];
       for (const sx of [-1, 1]) {
         const sh = new THREE.Mesh(shoulderGeo, mats.shoulder);
         sh.position.set(sx * (K.TRACK_HALF_WIDTH + 15), -0.30, 0);
         t.add(sh);
+        shoulders.push(sh);
+      }
+      const paint = new THREE.Mesh(paintGeo, mats.paint);
+      t.add(paint);
 
-        const ed = new THREE.Mesh(edgeGeo, mats.edge);
-        ed.rotation.x = -Math.PI / 2;
-        ed.position.set(sx * (K.TRACK_HALF_WIDTH - 0.14), 0.003, 0);
-        t.add(ed);
-      }
-      // Dashed lane dividers.
-      for (const lx of [-1.175, 1.175]) {
-        const ln = new THREE.Mesh(lineGeo, mats.line);
-        ln.rotation.x = -Math.PI / 2;
-        ln.position.set(lx, 0.004, 0);
-        t.add(ln);
-      }
+      // One of these is shown at a time; keeping all three built means a
+      // biome change is a visibility flip rather than a rebuild.
+      const edges = {
+        barrier: S.outlined(barrierGeo, mats.prop, S.INK.prop),
+        hedge: S.outlined(hedgeGeo, mats.prop, S.INK.prop),
+        rail: S.outlined(railGeo, mats.prop, S.INK.prop),
+      };
+      for (const k in edges) { edges[k].visible = false; t.add(edges[k]); }
+      t.userData.shoulders = shoulders;
+      t.userData.edges = edges;
       return t;
     }, group);
 
     // ---- hazards --------------------------------------------------------
-    const hazGeo = {
-      jump: new THREE.BoxGeometry(1.95, 0.80, 1.05),
-      duckBar: new THREE.BoxGeometry(2.30, 0.42, 0.60),
-      duckPost: new THREE.BoxGeometry(0.16, 2.35, 0.20),
-      block: new THREE.BoxGeometry(2.10, 2.80, 1.30),
+    // Visual extents are pinned to MR.Collision.BOX: JUMP tops out at 0.80,
+    // the DUCK bar spans 1.41-1.83, BLOCK is 2.80 tall and 1.30 deep. Anything
+    // added for readability lives outside the runner's corridor or above the
+    // top of a full jump (2.05 + 1.78 = 3.83), so nothing here can make the
+    // player clip something they legitimately cleared.
+
+    const stripeTex = {
+      jump: stripeTexture('#ffb020', '#2b2f52'),
+      duck: stripeTexture('#37d6ff', '#0d2b36'),
+      block: stripeTexture('#ff3b6b', '#fff2e0'),
     };
-    const hazMat = {
-      jump: S.toon(P.jump, 3),
-      duck: S.toon(P.duck, 3),
-      block: S.toon(P.block, 3),
-      dark: S.toon(0x2b2f52, 2),
+    const faceMat = {
+      jump: new THREE.MeshBasicMaterial({ map: stripeTex.jump }),
+      duck: new THREE.MeshBasicMaterial({ map: stripeTex.duck }),
+      block: new THREE.MeshBasicMaterial({ map: stripeTex.block }),
     };
+
+    // Lane telegraph mats. Transparent, unlit, and laid a hair above the road
+    // paint so they never z-fight with the lane dashes.
+    const matGeo = new THREE.PlaneGeometry(2.24, 11);
+    const matMat = {};
+    matMat[K.JUMP] = new THREE.MeshBasicMaterial({ map: matTexture(K.JUMP, '#ffc23a'), transparent: true, depthWrite: false });
+    matMat[K.DUCK] = new THREE.MeshBasicMaterial({ map: matTexture(K.DUCK, '#4fdcff'), transparent: true, depthWrite: false });
+    matMat[K.BLOCK] = new THREE.MeshBasicMaterial({ map: matTexture(K.BLOCK, '#ff4f78'), transparent: true, depthWrite: false });
+
+    function telegraph(kind) {
+      const m = new THREE.Mesh(matGeo, matMat[kind]);
+      m.rotation.x = -Math.PI / 2;
+      m.position.set(0, 0.012, -6.6);
+      m.renderOrder = 5;
+      return m;
+    }
+
+    // JUMP: a wide amber kerb with a cream cap. The cap is what survives the
+    // fog -- a light band on a dark road at 100 units is still a light band.
+    // Nothing here rises past 0.80 or reaches past halfZ 0.52.
+    const jumpGeo = merge([
+      bx(2.24, 0.66, 1.04, 0, 0.33, 0, 0xffb020),
+      bx(2.34, 0.14, 1.04, 0, 0.73, 0, 0xfff2e0),
+      bx(0.30, 0.80, 1.04, -1.16, 0.40, 0, 0xe07f12),
+      bx(0.30, 0.80, 1.04, 1.16, 0.40, 0, 0xe07f12),
+    ]);
 
     const jumpPool = Pool(function () {
       const g = new THREE.Group();
-      const b = S.outlined(hazGeo.jump, hazMat.jump, S.INK.hazard);
-      b.position.y = 0.40;
-      g.add(b);
-      // Chevron stripe so the "go over" read is instant.
-      const stripe = new THREE.Mesh(new THREE.PlaneGeometry(1.85, 0.20), S.flat(0x2b2f52));
-      stripe.position.set(0, 0.58, 0.531);
-      g.add(stripe);
+      g.add(S.outlined(jumpGeo, mats.propLit, S.INK.hazard));
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 0.62), faceMat.jump);
+      face.position.set(0, 0.36, -0.531);
+      face.rotation.y = Math.PI;
+      g.add(face);
+      g.add(telegraph(K.JUMP));
       return g;
     }, group);
+
+    // DUCK: the bar itself is only 0.42 tall, which is nothing at distance, so
+    // the assembly carries a tall header and a pennant above it. The gap under
+    // the bar stays completely open -- that void is the read.
+    const duckGeo = merge([
+      bx(2.30, 0.42, 0.60, 0, 1.62, 0, 0x37d6ff),
+      bx(2.42, 0.10, 0.70, 0, 1.86, 0, 0xd8f8ff),
+      bx(0.22, 2.62, 0.26, -1.20, 1.31, 0, 0x2b2f52),
+      bx(0.22, 2.62, 0.26, 1.20, 1.31, 0, 0x2b2f52),
+      bx(0.42, 0.16, 0.42, -1.20, 0.08, 0, 0x2b2f52),
+      bx(0.42, 0.16, 0.42, 1.20, 0.08, 0, 0x2b2f52),
+      bx(2.70, 0.34, 0.24, 0, 2.44, 0, 0x37d6ff),
+      bx(2.70, 0.10, 0.30, 0, 2.63, 0, 0xd8f8ff),
+      bx(0.36, 0.36, 0.10, -0.75, 2.02, 0.16, 0xffe45e, 0, 0, Math.PI / 4),
+      bx(0.36, 0.36, 0.10, 0.75, 2.02, 0.16, 0xffe45e, 0, 0, Math.PI / 4),
+    ]);
 
     const duckPool = Pool(function () {
       const g = new THREE.Group();
-      const bar = S.outlined(hazGeo.duckBar, hazMat.duck, S.INK.hazard);
-      bar.position.y = 1.62;
-      g.add(bar);
-      for (const sx of [-1, 1]) {
-        const post = S.outlined(hazGeo.duckPost, hazMat.dark, S.INK.prop);
-        post.position.set(sx * 1.10, 1.17, 0);
-        g.add(post);
-      }
-      const stripe = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 0.12), S.flat(0x0d2b36));
-      stripe.position.set(0, 1.62, 0.301);
-      g.add(stripe);
+      g.add(S.outlined(duckGeo, mats.propLit, S.INK.hazard));
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(2.26, 0.38), faceMat.duck);
+      face.position.set(0, 1.62, -0.302);
+      face.rotation.y = Math.PI;
+      g.add(face);
+      const head = new THREE.Mesh(new THREE.PlaneGeometry(2.62, 0.30), faceMat.duck);
+      head.position.set(0, 2.44, -0.122);
+      head.rotation.y = Math.PI;
+      g.add(head);
+      g.add(telegraph(K.DUCK));
       return g;
     }, group);
 
+    // BLOCK: a barricaded works truck. Trains scale it along z, so every baked
+    // feature is either a horizontal band or sits at the front face, which the
+    // scale leaves in place.
+    const blockGeo = merge([
+      bx(2.10, 2.30, 1.30, 0, 1.50, 0, 0xff3b6b),
+      bx(2.20, 0.44, 1.30, 0, 0.22, 0, 0x2b2f52),
+      bx(2.24, 0.26, 1.34, 0, 2.24, 0, 0xfff2e0),
+      bx(2.20, 0.20, 1.34, 0, 2.70, 0, 0xd42a55),
+      bx(0.34, 0.34, 0.34, -0.72, 2.92, 0, 0xffe45e),
+      bx(0.34, 0.34, 0.34, 0.72, 2.92, 0, 0xffe45e),
+    ]);
+
     const blockPool = Pool(function () {
       const g = new THREE.Group();
-      const b = S.outlined(hazGeo.block, hazMat.block, S.INK.hazard);
-      b.position.y = 1.40;
-      g.add(b);
-      const stripe = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 0.30), S.flat(0xfff2e0));
-      stripe.position.set(0, 2.15, 0.651);
-      g.add(stripe);
-      g.userData.body = b;
+      const body = S.outlined(blockGeo, mats.propLit, S.INK.hazard);
+      g.add(body);
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(2.06, 1.9), faceMat.block);
+      face.position.set(0, 1.42, -0.661);
+      face.rotation.y = Math.PI;
+      g.add(face);
+      const tel = telegraph(K.BLOCK);
+      g.add(tel);
+      g.userData.body = body;
       return g;
     }, group);
 
     // ---- scenery --------------------------------------------------------
-    const bldGeo = new THREE.BoxGeometry(1, 1, 1);
-    const treeTrunk = new THREE.CylinderGeometry(0.16, 0.22, 1.1, 7);
-    const treeTop = new THREE.ConeGeometry(1.05, 2.2, 8);
+
+    const winTex = windowTexture();
+    const unitBox = new THREE.BoxGeometry(1, 1, 1);
 
     const buildingPool = Pool(function () {
       const g = new THREE.Group();
-      const b = S.outlined(bldGeo, S.toon(0xffffff, 2), S.INK.scenery);
-      g.add(b);
-      g.userData.body = b;
+      // Each building owns its texture so `repeat` can hold the window size
+      // constant while the box is scaled to any height -- one shared texture
+      // would smear a 30-unit tower's windows into stripes.
+      const tex = winTex.clone();
+      tex.needsUpdate = true;
+      const mat = S.toon(0xffffff, 2);
+      mat.map = tex;
+      const body = new THREE.Mesh(unitBox, mat);
+      const line = new THREE.Mesh(unitBox, S.outlineMaterial(S.INK.scenery));
+      line.renderOrder = -1;
+      const capMat = S.toon(0xffffff, 2);
+      const parapet = S.outlined(unitBox, capMat, S.INK.banner);
+      g.add(line, body, parapet);
+      g.userData.body = body;
+      g.userData.line = line;
+      g.userData.tex = tex;
+      g.userData.mat = mat;
+      g.userData.capMat = capMat;
+      g.userData.parapet = parapet;
       return g;
     }, group);
 
+    // Trees: three stacked cones and a trunk in one mesh.
+    const treeGeo = merge([
+      cyl(0.17, 0.26, 1.3, 6, 0, 0.65, 0, 0x8a5a3c),
+      cone(1.30, 1.7, 8, 0, 2.0, 0, 0x35a855),
+      cone(1.05, 1.5, 8, 0, 2.9, 0, 0x3fbf63),
+      cone(0.75, 1.2, 8, 0, 3.7, 0, 0x59d47a),
+    ]);
     const treePool = Pool(function () {
-      const g = new THREE.Group();
-      const t = S.outlined(treeTrunk, S.toon(0x8a5a3c, 2), S.INK.prop);
-      t.position.y = 0.55;
-      const c = S.outlined(treeTop, S.toon(0x3fbf63, 2), S.INK.prop);
-      c.position.y = 2.0;
-      g.add(t, c);
-      g.userData.crown = c;
+      const g = S.outlined(treeGeo, mats.prop, S.INK.prop);
       return g;
     }, group);
 
-    // Crowd: capsule spectators in bright colours. Cheap, but the motion of a
-    // lined course is most of what sells "race" over "obstacle corridor".
-    const crowdGeo = new THREE.CapsuleGeometry(0.20, 0.44, 3, 7);
-    const crowdPool = Pool(function () {
-      const g = new THREE.Group();
-      const m = S.outlined(crowdGeo, S.toon(0xffffff, 2), S.INK.prop);
-      m.position.y = 0.52;
-      g.add(m);
-      g.userData.body = m;
-      return g;
+    /**
+     * A knot of spectators, merged. Individual capsules read as pills and cost
+     * a draw each; eight little figures with legs, raised arms and different
+     * shirts cost the same one draw and read as a crowd.
+     */
+    function crowdGeo(seed) {
+      const parts = [];
+      const shirts = [0xff4d5e, 0x37d6ff, 0xffe45e, 0x59d47a, 0xff9ad5, 0xfff2e0, 0xffb020, 0x9a7bff];
+      const skins = [0xffc79a, 0xe0a173, 0xb87a4e, 0x8a5a3c];
+      let s = seed * 9301 + 49297;
+      const r = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+      for (let i = 0; i < 8; i++) {
+        const x = -1.1 + (i % 4) * 0.78 + r() * 0.22;
+        const z = -1.9 + Math.floor(i / 4) * 2.0 + r() * 0.7;
+        const y = 0;
+        const h = 0.90 + r() * 0.22;
+        const shirt = shirts[Math.floor(r() * shirts.length)];
+        const skin = skins[Math.floor(r() * skins.length)];
+        parts.push(bx(0.30, 0.62 * h, 0.22, x, 0.31 * h, z, 0x2b2f52));
+        parts.push(bx(0.44, 0.60 * h, 0.30, x, 0.92 * h, z, shirt));
+        parts.push(bx(0.26, 0.26, 0.24, x, 1.36 * h, z, skin));
+        // Every third spectator has both arms up -- a still crowd looks dead.
+        if (i % 3 === 0) {
+          parts.push(bx(0.11, 0.52, 0.11, x - 0.28, 1.20 * h, z, skin, 0, 0, 0.30));
+          parts.push(bx(0.11, 0.52, 0.11, x + 0.28, 1.20 * h, z, skin, 0, 0, -0.30));
+        } else {
+          parts.push(bx(0.11, 0.44, 0.11, x - 0.26, 0.92 * h, z, shirt));
+          parts.push(bx(0.11, 0.44, 0.11, x + 0.26, 0.92 * h, z, shirt));
+        }
+      }
+      return merge(parts);
+    }
+    const crowdGeos = [crowdGeo(3), crowdGeo(17), crowdGeo(41), crowdGeo(88)];
+    const crowdPool = crowdGeos.map((geo) => Pool(function () {
+      return S.outlined(geo, mats.prop, S.INK.prop);
+    }, group));
+
+    /**
+     * Rival runners. They live on the road but outside the three lanes, so the
+     * player can be passing bodies all race without any chance of a phantom
+     * collision. They drift forward at a slower pace than the player, which is
+     * what makes overtaking read as overtaking rather than as scenery.
+     */
+    function rivalGeo(vest, skin, shorts) {
+      return merge([
+        bx(0.24, 0.14, 0.34, -0.16, 0.07, 0.02, 0xfff2e0),
+        bx(0.24, 0.14, 0.34, 0.16, 0.07, -0.02, 0xfff2e0),
+        bx(0.20, 0.62, 0.20, -0.16, 0.45, 0, skin),
+        bx(0.20, 0.62, 0.20, 0.16, 0.45, 0, skin),
+        bx(0.50, 0.34, 0.30, 0, 0.90, 0, shorts),
+        bx(0.52, 0.52, 0.32, 0, 1.32, 0, vest),
+        bx(0.14, 0.50, 0.14, -0.33, 1.28, 0.06, skin, 0.45),
+        bx(0.14, 0.50, 0.14, 0.33, 1.28, -0.06, skin, -0.45),
+        bx(0.30, 0.30, 0.28, 0, 1.72, 0, skin),
+        bx(0.32, 0.14, 0.30, 0, 1.87, 0, 0x3a2b46),
+        bx(0.26, 0.16, 0.02, 0, 1.30, 0.17, 0xfffdf5),
+      ]);
+    }
+    const rivalGeos = [
+      rivalGeo(0x37d6ff, 0xffc79a, 0x2b2f52),
+      rivalGeo(0xffe45e, 0xb87a4e, 0x1b1633),
+      rivalGeo(0x59d47a, 0xe0a173, 0x2b2f52),
+      rivalGeo(0xff9ad5, 0x8a5a3c, 0x1b1633),
+    ];
+    const rivalPool = rivalGeos.map((geo) => Pool(function () {
+      return S.outlined(geo, mats.propLit, S.INK.character);
+    }, group));
+
+    /** Aid station: trestle table, cups, and a volunteer holding one out. */
+    const stationGeo = merge([
+      bx(2.6, 0.12, 0.9, 0, 0.86, 0, 0xfff2e0),
+      bx(0.12, 0.86, 0.12, -1.15, 0.43, -0.32, 0x2b2f52),
+      bx(0.12, 0.86, 0.12, 1.15, 0.43, -0.32, 0x2b2f52),
+      bx(0.12, 0.86, 0.12, -1.15, 0.43, 0.32, 0x2b2f52),
+      bx(0.12, 0.86, 0.12, 1.15, 0.43, 0.32, 0x2b2f52),
+      bx(2.7, 0.5, 0.06, 0, 0.55, -0.48, 0x37d6ff),
+      cyl(0.09, 0.07, 0.16, 6, -0.9, 1.0, 0.1, 0xfffdf5),
+      cyl(0.09, 0.07, 0.16, 6, -0.6, 1.0, -0.1, 0xfffdf5),
+      cyl(0.09, 0.07, 0.16, 6, -0.3, 1.0, 0.15, 0xfffdf5),
+      cyl(0.09, 0.07, 0.16, 6, 0.05, 1.0, -0.05, 0xfffdf5),
+      cyl(0.09, 0.07, 0.16, 6, 0.4, 1.0, 0.12, 0xfffdf5),
+      cyl(0.09, 0.07, 0.16, 6, 0.75, 1.0, -0.12, 0xfffdf5),
+      bx(0.44, 0.60, 0.28, 0.05, 1.30, -0.85, 0xffe45e),
+      bx(0.30, 0.66, 0.22, 0.05, 0.66, -0.85, 0x2b2f52),
+      bx(0.26, 0.26, 0.24, 0.05, 1.72, -0.85, 0xffc79a),
+      bx(0.12, 0.46, 0.12, -0.24, 1.34, -0.70, 0xffc79a, 0, 0, 0.9),
+    ]);
+    const stationPool = Pool(function () {
+      return S.outlined(stationGeo, mats.prop, S.INK.prop);
+    }, group);
+
+    // ---- biome set pieces -------------------------------------------------
+
+    /** Suspension tower with its main cables, straddling the deck. */
+    const towerGeo = (function () {
+      const parts = [];
+      for (const sx of [-1, 1]) {
+        const x = sx * 9.6;
+        parts.push(bx(2.4, 30, 2.4, x, 12.5, 0, 0xff6a5e));
+        parts.push(bx(2.9, 1.0, 2.9, x, 27.0, 0, 0xd8455e));
+        parts.push(bx(2.9, 1.0, 2.9, x, 16.0, 0, 0xd8455e));
+        parts.push(bx(3.1, 1.2, 3.1, x, -1.0, 0, 0x3a4570));
+        // Catenary, approximated in straight segments either side of the tower.
+        for (let i = 0; i < 8; i++) {
+          const z0 = i * 13, z1 = (i + 1) * 13;
+          const y0 = 26 - Math.pow(i / 8, 1.7) * 22;
+          const y1 = 26 - Math.pow((i + 1) / 8, 1.7) * 22;
+          const len = Math.hypot(z1 - z0, y1 - y0);
+          const ang = Math.atan2(y1 - y0, z1 - z0);
+          for (const sz of [-1, 1]) {
+            parts.push(bx(0.34, 0.34, len, x, (y0 + y1) / 2, sz * (z0 + z1) / 2, 0xffe45e, -sz * ang));
+          }
+        }
+      }
+      parts.push(bx(21, 1.6, 2.0, 0, 26.4, 0, 0xff6a5e));
+      parts.push(bx(21, 1.0, 1.6, 0, 21.0, 0, 0xd8455e));
+      return merge(parts);
+    })();
+    const towerPool = Pool(function () {
+      return S.outlined(towerGeo, mats.prop, S.INK.scenery);
+    }, group);
+
+    /** Abutment: caps the end of the deck so the water does not just stop. */
+    const abutGeo = merge([
+      bx(46, 4.0, 9, 0, -2.0, 0, 0x6f7aa8),
+      bx(48, 0.7, 10, 0, 0.1, 0, 0x8e99c6),
+      bx(3.0, 2.6, 9.4, -13, 1.2, 0, 0x8e99c6),
+      bx(3.0, 2.6, 9.4, 13, 1.2, 0, 0x8e99c6),
+    ]);
+    const abutPool = Pool(function () {
+      return S.outlined(abutGeo, mats.prop, S.INK.scenery);
+    }, group);
+
+    /**
+     * The river itself, on the left bank of the RIVERSIDE leg. It starts just
+     * beyond the pooled shoulders (which reach |x| = 34.4) so the two never
+     * fight over the same ground.
+     */
+    const riverGeo = merge([
+      part(new THREE.PlaneGeometry(70, 58), 0x2f8fc4, -72, 0.06, 0, -Math.PI / 2),
+      bx(4.5, 0.5, 58, -36.5, 0.06, 0, 0xe6d9a8),
+      bx(1.4, 0.6, 11, -40.5, 0.36, -14, 0x8a5a3c),
+      bx(6.5, 0.6, 1.6, -44, 0.36, -19, 0x8a5a3c),
+      bx(2.2, 0.9, 5.4, -47, 0.35, 6, 0xfff2e0),
+      bx(0.32, 3.4, 0.32, -47, 2.1, 6, 0xfff2e0),
+      bx(2.0, 2.4, 0.12, -46.0, 2.6, 6, 0xff4d5e),
+      bx(2.2, 0.9, 5.4, -55, 0.35, 24, 0xffe45e),
+      bx(0.32, 3.0, 0.32, -55, 1.9, 24, 0xfff2e0),
+      bx(1.8, 2.0, 0.12, -54.1, 2.3, 24, 0x37d6ff),
+    ]);
+    const riverPool = Pool(function () {
+      return S.outlined(riverGeo, mats.prop, S.INK.prop);
+    }, group);
+
+    /** Overpass: THE WALL runs under a string of these, so the light drops. */
+    const overpassGeo = merge([
+      bx(3.4, 8.2, 5.0, -10.5, 4.1, 0, 0x6f6580),
+      bx(3.4, 8.2, 5.0, 10.5, 4.1, 0, 0x6f6580),
+      bx(26, 1.9, 6.0, 0, 9.0, 0, 0x8b7f9c),
+      bx(27, 0.7, 6.4, 0, 10.2, 0, 0x5a4f66),
+      bx(26, 0.5, 0.4, 0, 8.0, -3.0, 0x2b2f52),
+      bx(26, 0.5, 0.4, 0, 8.0, 3.0, 0x2b2f52),
+      bx(27, 1.0, 0.35, 0, 11.0, -3.2, 0xffb020),
+      bx(27, 1.0, 0.35, 0, 11.0, 3.2, 0xffb020),
+    ]);
+    const overpassPool = Pool(function () {
+      return S.outlined(overpassGeo, mats.prop, S.INK.scenery);
+    }, group);
+
+    /**
+     * Grandstand: stepped seating packed with spectators, for FINAL MILE.
+     * Built on +x and rotated a half-turn for the other side rather than
+     * mirrored with a negative scale, which would invert its normals.
+     */
+    const standGeo = (function () {
+      const parts = [];
+      const shirts = [0xff4d5e, 0x37d6ff, 0xffe45e, 0x59d47a, 0xff9ad5, 0xffb020];
+      let s = 7717;
+      const r = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+      for (let row = 0; row < 5; row++) {
+        const y = row * 0.74;
+        const x = 0.9 + row * 1.10;
+        parts.push(bx(1.10, 0.74, TILE, x, y + 0.37, 0, row % 2 ? 0x8e99c6 : 0x6f7aa8));
+        for (let i = 0; i < 11; i++) {
+          const z = -TILE / 2 + 1.2 + i * 2.15 + r() * 0.5;
+          parts.push(bx(0.40, 0.48, 0.28, x - 0.1, y + 0.98, z, shirts[Math.floor(r() * shirts.length)]));
+          parts.push(bx(0.22, 0.22, 0.20, x - 0.1, y + 1.33, z, 0xffc79a));
+        }
+      }
+      for (const z of [-TILE / 2 + 1, TILE / 2 - 1]) {
+        parts.push(bx(0.28, 7.2, 0.28, 0.2, 3.6, z, 0x2b2f52));
+        parts.push(bx(0.14, 1.7, 2.3, 0.2, 6.4, z, z < 0 ? 0xff3b6b : 0x37d6ff));
+      }
+      return merge(parts);
+    })();
+    const standPool = Pool(function () {
+      return S.outlined(standGeo, mats.prop, S.INK.scenery);
     }, group);
 
     // ---- mile banners ---------------------------------------------------
+    // A banner is a gantry, not a floating card: legs, a truss, a lit header
+    // and a stripe painted across the road so the moment of passing it is
+    // marked on the ground as well as overhead.
+    const bannerFrameGeo = (function () {
+      const parts = [];
+      for (const sx of [-1, 1]) {
+        parts.push(bx(0.42, 6.0, 0.42, sx * 5.6, 3.0, 0, 0x2b2f52));
+        parts.push(bx(0.90, 0.30, 0.90, sx * 5.6, 0.15, 0, 0x1b1633));
+        parts.push(bx(0.30, 0.30, 1.8, sx * 5.6, 5.4, 0, 0x2b2f52, 0, 0, 0));
+      }
+      parts.push(bx(11.6, 0.40, 0.40, 0, 5.95, 0, 0x2b2f52));
+      parts.push(bx(11.6, 0.30, 0.30, 0, 3.65, 0, 0x2b2f52));
+      for (let i = -4; i <= 4; i++) {
+        parts.push(bx(0.16, 2.4, 0.16, i * 1.25, 4.8, 0, 0x3a4570, 0, 0, i % 2 ? 0.45 : -0.45));
+      }
+      parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, 0.7), 0xfffdf5, 0, 0.011, 0, -Math.PI / 2));
+      return merge(parts);
+    })();
+
     const bannerPool = Pool(function () {
       const g = new THREE.Group();
-      for (const sx of [-1, 1]) {
-        const post = S.outlined(new THREE.BoxGeometry(0.24, 5.4, 0.24), S.toon(0x2b2f52, 2), S.INK.banner);
-        post.position.set(sx * 5.0, 2.7, 0);
-        g.add(post);
-      }
-      const panel = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 1.5), S.flat(0xffffff));
-      panel.position.y = 4.75;
+      g.add(S.outlined(bannerFrameGeo, mats.prop, S.INK.banner));
+      const mat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const panel = new THREE.Mesh(new THREE.PlaneGeometry(10.6, 2.1), mat);
+      panel.position.y = 4.78; panel.rotation.y = Math.PI;
       g.add(panel);
-      const back = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 1.5), S.flat(0xffffff));
-      back.position.y = 4.75; back.rotation.y = Math.PI;
+      const back = new THREE.Mesh(new THREE.PlaneGeometry(10.6, 2.1), mat);
+      back.position.y = 4.78;
       g.add(back);
       g.userData.panel = panel;
-      g.userData.back = back;
+      g.userData.mat = mat;
+      return g;
+    }, group);
+
+    // Start and finish get a heavier arch with a checker band.
+    const checkTex = checkerTexture();
+    const archGeo = merge([
+      bx(1.5, 9.0, 1.5, -7.4, 4.5, 0, 0xff3b6b),
+      bx(1.5, 9.0, 1.5, 7.4, 4.5, 0, 0xff3b6b),
+      bx(2.3, 0.6, 2.3, -7.4, 0.3, 0, 0x1b1633),
+      bx(2.3, 0.6, 2.3, 7.4, 0.3, 0, 0x1b1633),
+      bx(17.2, 1.3, 1.6, 0, 8.7, 0, 0xff3b6b),
+      bx(17.2, 0.5, 1.2, 0, 6.2, 0, 0xd42a55),
+      bx(0.9, 4.2, 0.9, -6.2, 10.9, 0, 0x2b2f52),
+      bx(0.9, 4.2, 0.9, 6.2, 10.9, 0, 0x2b2f52),
+      bx(2.6, 1.8, 0.12, -5.0, 12.4, 0, 0xffe45e),
+      bx(2.6, 1.8, 0.12, 5.0, 12.4, 0, 0xffe45e),
+    ]);
+    const archPool = Pool(function () {
+      const g = new THREE.Group();
+      g.add(S.outlined(archGeo, mats.prop, S.INK.banner));
+      const mat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const panel = new THREE.Mesh(new THREE.PlaneGeometry(15.4, 2.4), mat);
+      panel.position.y = 7.45; panel.rotation.y = Math.PI;
+      g.add(panel);
+      const back = new THREE.Mesh(new THREE.PlaneGeometry(15.4, 2.4), mat);
+      back.position.y = 7.45;
+      g.add(back);
+      const band = new THREE.Mesh(new THREE.PlaneGeometry(15.4, 0.55), new THREE.MeshBasicMaterial({ map: checkTex }));
+      band.position.set(0, 5.95, 0.1); band.rotation.y = Math.PI;
+      g.add(band);
+      // Checker laid across the road: the line you actually cross.
+      const line = new THREE.Mesh(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, 1.2),
+        new THREE.MeshBasicMaterial({ map: checkTex }));
+      line.rotation.x = -Math.PI / 2;
+      line.position.y = 0.013;
+      line.renderOrder = 4;
+      g.add(line);
+      g.userData.panel = panel;
+      g.userData.mat = mat;
       return g;
     }, group);
 
     // ---------------------------------------------------------------------
-    // Scenery layout is drawn once from the seeded stream so it is identical
-    // for every player, then indexed by z for windowed spawning.
+    // Layout is drawn once from the seeded stream so it is identical for every
+    // player, then indexed by z for windowed spawning.
     const scenery = [];
     {
       let z = -60;
       while (z < K.TOTAL_UNITS + 120) {
+        const look = lookAtZ(Math.max(0, z)).look;
+        const w = PROP_KINDS.map((k) => look.mix[k] || 0);
+        const total = w.reduce((a, b) => a + b, 0);
         const side = rnd.chance(0.5) ? -1 : 1;
-        const kind = rnd.weighted(['building', 'tree', 'crowd'], [1.0, 1.35, 2.2]);
-        scenery.push({
-          z, side, kind,
-          x: side * rnd.range(7.5, 26),
-          a: rnd.next(), b: rnd.next(), c: rnd.next(),
-        });
-        z += rnd.range(3.2, 9.0);
+        let kind = total > 0 ? rnd.weighted(PROP_KINDS, w) : null;
+        // A zero-weighted kind must never slip through the fallback branch of
+        // weighted(); a building standing in the middle of the river is the
+        // kind of thing nobody notices until a screenshot.
+        if (kind && !look.mix[kind]) kind = null;
+        if (kind) {
+          scenery.push({
+            z, side, kind,
+            x: side * rnd.range(7.5, 26),
+            a: rnd.next(), b: rnd.next(), c: rnd.next(),
+          });
+        }
+        z += rnd.range(3.4, 9.5);
       }
       scenery.sort((p, q) => p.z - q.z);
     }
+
+    // Set pieces: deterministic, biome-specific, and placed by hand rather
+    // than rolled, because a bridge tower in the wrong place is not a bridge.
+    const structures = [];
+    structures.push({ z: 4, kind: 'arch', label: 'START', sub: course.key, bg: '#1b1633', fg: '#ffe45e' });
+    for (let z = BRIDGE.from + 140; z < BRIDGE.to - 120; z += 235) {
+      structures.push({ z, kind: 'tower' });
+    }
+    structures.push({ z: DECK_FROM - 5, kind: 'abut' });
+    structures.push({ z: DECK_TO + 5, kind: 'abut' });
+    for (const b of BI) {
+      if (b.name === 'RIVERSIDE') {
+        for (let z = b.from; z < b.to; z += 58) structures.push({ z, kind: 'river', side: -1 });
+      }
+      if (b.name === 'THE WALL') {
+        for (let z = b.from + 90; z < b.to - 40; z += 168) structures.push({ z, kind: 'overpass' });
+      }
+      if (b.name === 'FINAL MILE') {
+        for (let z = b.from; z < K.TOTAL_UNITS + 30; z += TILE) {
+          structures.push({ z, kind: 'stand', side: -1 });
+          structures.push({ z, kind: 'stand', side: 1 });
+        }
+      }
+    }
+    structures.sort((p, q) => p.z - q.z);
 
     const banners = course.mileMarkers.map((m) => ({ m, tex: null }));
 
@@ -1918,6 +2903,7 @@ MR.World = (function () {
       roadFrom: 0,
       gateIdx: 0,
       sceneIdx: 0,
+      structIdx: 0,
       bannerIdx: 0,
       biome: null,
       look: BIOME_LOOK['CITY START'],
@@ -1925,8 +2911,10 @@ MR.World = (function () {
 
     const activeGates = [];   // { gate, objs:[] }
     const activeScene = [];   // { s, obj }
+    const activeStruct = [];  // { st, obj }
     const activeBanner = [];  // { b, obj }
     const activeRoad = [];    // { z, obj }
+    const activeRivals = [];  // { obj, z, speed, phase }
 
     function hazardObject(kind) {
       if (kind === K.JUMP) return jumpPool.claim();
@@ -1940,27 +2928,48 @@ MR.World = (function () {
       else if (kind === K.BLOCK) blockPool.release(obj);
     }
 
+    function sceneryPool(s) {
+      if (s.kind === 'building') return buildingPool;
+      if (s.kind === 'tree') return treePool;
+      if (s.kind === 'station') return stationPool;
+      if (s.kind === 'crowd') return crowdPool[Math.floor(s.a * crowdPool.length) % crowdPool.length];
+      return null;   // rivals live in their own list
+    }
+    function structPool(kind) {
+      if (kind === 'tower') return towerPool;
+      if (kind === 'abut') return abutPool;
+      if (kind === 'river') return riverPool;
+      if (kind === 'overpass') return overpassPool;
+      if (kind === 'stand') return standPool;
+      if (kind === 'arch') return archPool;
+      return null;
+    }
+
     const api = { group, sky, mats, course };
 
     /** Recolour shared materials for the biome at progress f. */
+    api.fogColor = new THREE.Color(BIOME_LOOK['CITY START'].fog);
+    const _road = new THREE.Color(), _shoulder = new THREE.Color();
+    const _skyTop = new THREE.Color(), _skyBot = new THREE.Color();
+
     api.applyBiome = function (f) {
       const b = MR.Course.biomeAt(f);
       const look = BIOME_LOOK[b.name] || BIOME_LOOK['CITY START'];
-
-      // Cross-fade over the first 0.03 of a biome instead of popping.
       const idx = MR.Course.BIOMES.indexOf(b);
       const prev = idx > 0 ? BIOME_LOOK[MR.Course.BIOMES[idx - 1].name] : look;
+
+      // Cross-fade over the first 0.03 of a biome instead of popping.
       const t = Math.min(1, (f - b.from) / 0.03);
 
-      mats.road.color.copy(lerpColor(prev.road, look.road, t));
-      mats.shoulder.color.copy(lerpColor(prev.ground, look.ground, t));
+      mats.road.color.copy(lerpInto(_road, prev.road, look.road, t));
+      mats.shoulder.color.copy(lerpInto(_shoulder, prev.ground, look.ground, t));
       if (mats.ground) mats.ground.color.copy(mats.shoulder.color);
-      sky.material.uniforms.top.value.copy(lerpColor(prev.sky[0], look.sky[0], t));
-      sky.material.uniforms.bottom.value.copy(lerpColor(prev.sky[1], look.sky[1], t));
+      sky.material.uniforms.top.value.copy(lerpInto(_skyTop, prev.sky[0], look.sky[0], t));
+      sky.material.uniforms.bottom.value.copy(lerpInto(_skyBot, prev.sky[1], look.sky[1], t));
 
       state.biome = b;
       state.look = look;
-      api.fogColor = lerpColor(prev.fog, look.fog, t);
+      lerpInto(api.fogColor, prev.fog, look.fog, t);
       return b;
     };
 
@@ -1970,18 +2979,36 @@ MR.World = (function () {
      */
     api.update = function (z) {
       const ahead = z + VIEW;
+      const aheadProp = z + VIEW_PROP;
       const back = z - BEHIND;
+      const now = performance.now() * 0.001;
 
       // Keep the ground under the runner; the sky dome likewise, so the
       // gradient never slides off as the race progresses.
+      const lift = deckLift(z);
       ground.position.z = z;
+      ground.position.y = -0.34 - WATER_DROP * lift;
       sky.position.z = z;
+      ripples.visible = lift > 0.02;
+      if (ripples.visible) {
+        ripples.position.set(0, ground.position.y + 0.05, z);
+        ripples.material.opacity = 0.9 * lift;
+        // A slow crawl is all a flat plane needs to stop reading as lino.
+        rippleTex.offset.y = (now * 0.014) % 1;
+      }
 
       // road
       while (state.roadFrom * TILE < ahead) {
         const tz = state.roadFrom * TILE;
         const obj = roadPool.claim();
         obj.position.z = tz;
+        const edge = lookAtZ(tz).look.edge;
+        for (const k in obj.userData.edges) obj.userData.edges[k].visible = (k === edge);
+        // On the deck the shoulders come off and the road becomes a ribbon
+        // over water. Tiles are claimed 210 units out, so the swap always
+        // happens well beyond anything the player can see change.
+        const deck = deckLift(tz + TILE / 2) > 0.55;
+        for (const sh of obj.userData.shoulders) sh.visible = !deck;
         activeRoad.push({ z: tz, obj });
         state.roadFrom++;
       }
@@ -1998,13 +3025,12 @@ MR.World = (function () {
           if (kind === K.CLEAR) { objs.push(null); continue; }
           const o = hazardObject(kind);
           o.position.set(K.LANE_X[l], 0, gate.z);
-          if (kind === K.BLOCK && gate.train) {
-            // Stretch a train along z rather than repeating blocks.
-            const span = 1 + gate.train * 0.9;
+          if (kind === K.BLOCK) {
+            // Stretch a train backwards along z rather than repeating blocks;
+            // the front face and the telegraph stay put on the gate line.
+            const span = gate.train ? 1 + gate.train * 0.9 : 1;
             o.userData.body.scale.z = span;
-            o.position.z = gate.z + (span - 1) * 0.65;
-          } else if (kind === K.BLOCK) {
-            o.userData.body.scale.z = 1;
+            o.userData.body.position.z = (span - 1) * 0.65;
           }
           objs.push(o);
         }
@@ -2015,67 +3041,127 @@ MR.World = (function () {
         for (let l = 0; l < 3; l++) if (g.objs[l]) releaseHazard(g.gate.lanes[l], g.objs[l]);
       }
 
-      // scenery
-      while (state.sceneIdx < scenery.length && scenery[state.sceneIdx].z < ahead) {
+      // roadside props
+      while (state.sceneIdx < scenery.length && scenery[state.sceneIdx].z < aheadProp) {
         const s = scenery[state.sceneIdx++];
-        let obj;
+        if (s.kind === 'rival') {
+          const pool = rivalPool[Math.floor(s.a * rivalPool.length) % rivalPool.length];
+          const obj = pool.claim();
+          obj.userData.pool = pool;
+          // Just outside the outermost lane but still on the tarmac.
+          obj.position.set(s.side * (3.35 + s.b * 0.75), 0, s.z);
+          activeRivals.push({
+            obj, z: s.z,
+            speed: 15 + s.c * 5,   // slower than the player: they get passed
+            phase: s.a * 6.3,
+          });
+          continue;
+        }
+        const pool = sceneryPool(s);
+        if (!pool) continue;
+        const obj = pool.claim();
         if (s.kind === 'building') {
-          obj = buildingPool.claim();
-          const w = 4 + s.a * 9, h = 6 + s.b * 26, d = 4 + s.c * 8;
+          const w = 5 + s.a * 10, h = 7 + s.b * 26, d = 5 + s.c * 8;
           obj.userData.body.scale.set(w, h, d);
-          obj.userData.body.userData.fill.material = obj.userData.body.userData.fill.material;
-          obj.userData.body.userData.fill.material.color.set(P.building[Math.floor(s.a * P.building.length)]);
-          obj.position.set(s.x + s.side * 14, h / 2, s.z);
+          obj.userData.line.scale.set(w, h, d);
+          const tint = P.building[Math.floor(s.a * P.building.length)];
+          obj.userData.mat.color.set(tint);
+          obj.userData.capMat.color.set(tint);
+          // Windows keep a constant world size whatever the box is scaled to.
+          obj.userData.tex.repeat.set(Math.max(1, Math.round(w / 4.5)), Math.max(1, Math.round(h / 4.5)));
+          obj.userData.parapet.scale.set(w + 0.7, 0.6 + s.c * 0.8, d + 0.7);
+          obj.userData.parapet.position.y = h / 2 + 0.3;
+          obj.position.set(s.x + s.side * 13, h / 2, s.z);
         } else if (s.kind === 'tree') {
-          obj = treePool.claim();
-          const k = 0.75 + s.a * 0.7;
-          obj.scale.setScalar(k);
-          obj.userData.crown.userData.fill.material.color.set(s.b > 0.5 ? 0x3fbf63 : 0x59d47a);
+          obj.scale.setScalar(0.7 + s.a * 0.75);
           obj.position.set(s.x, 0, s.z);
+          obj.rotation.y = s.b * 6.3;
+        } else if (s.kind === 'station') {
+          obj.position.set(s.side * (K.TRACK_HALF_WIDTH + 2.4), 0, s.z);
+          obj.rotation.y = s.side > 0 ? Math.PI : 0;
         } else {
-          obj = crowdPool.claim();
-          obj.userData.body.userData.fill.material.color.setHSL(s.a, 0.72, 0.62);
-          obj.position.set(s.side * (K.TRACK_HALF_WIDTH + 0.9 + s.b * 1.6), 0, s.z);
+          // Crowd packs against the barrier line; the far side of a wide road
+          // is where a real course puts the overflow.
+          obj.position.set(s.side * (K.TRACK_HALF_WIDTH + 1.9 + s.b * 3.4), 0, s.z);
+          obj.rotation.y = s.side > 0 ? Math.PI : 0;
           obj.userData.bounce = s.c;
         }
-        activeScene.push({ s, obj });
+        activeScene.push({ s, obj, pool });
       }
       while (activeScene.length && activeScene[0].s.z < back) {
         const e = activeScene.shift();
-        if (e.s.kind === 'building') buildingPool.release(e.obj);
-        else if (e.s.kind === 'tree') treePool.release(e.obj);
-        else crowdPool.release(e.obj);
+        e.pool.release(e.obj);
+      }
+
+      // rivals -- they move, so their release test reads the live position
+      for (let i = activeRivals.length - 1; i >= 0; i--) {
+        const r = activeRivals[i];
+        r.z += r.speed * 0.016;
+        r.obj.position.z = r.z;
+        // Cheap run cycle: a bob and a matching roll sell stride at speed.
+        const ph = now * 5.5 + r.phase;
+        r.obj.position.y = Math.abs(Math.sin(ph)) * 0.09;
+        r.obj.rotation.z = Math.sin(ph * 2) * 0.035;
+        r.obj.rotation.x = -0.09;
+        if (r.z < back) {
+          r.obj.userData.pool.release(r.obj);
+          activeRivals.splice(i, 1);
+        }
+      }
+
+      // biome set pieces
+      while (state.structIdx < structures.length && structures[state.structIdx].z < ahead) {
+        const st = structures[state.structIdx++];
+        const pool = structPool(st.kind);
+        if (!pool) continue;
+        const obj = pool.claim();
+        obj.position.set(0, 0, st.z);
+        obj.rotation.y = 0;
+        if (st.kind === 'stand') {
+          obj.position.x = st.side * (K.TRACK_HALF_WIDTH + 1.3);
+          obj.rotation.y = st.side < 0 ? Math.PI : 0;
+        }
+        if (st.kind === 'arch' && obj.userData.mat) {
+          if (!st.tex) st.tex = labelTexture(st.label, st.bg, st.fg, 768, 128, st.sub);
+          obj.userData.mat.map = st.tex;
+          obj.userData.mat.needsUpdate = true;
+        }
+        activeStruct.push({ st, obj, pool });
+      }
+      while (activeStruct.length && activeStruct[0].st.z < back - 60) {
+        const e = activeStruct.shift();
+        e.pool.release(e.obj);
       }
 
       // mile banners
       while (state.bannerIdx < banners.length && banners[state.bannerIdx].m.z < ahead) {
         const b = banners[state.bannerIdx++];
+        const finish = b.m.finish;
+        const wall = b.m.mile === 20;
         if (!b.tex) {
-          const finish = b.m.finish;
-          b.tex = labelTexture(
-            finish ? 'FINISH' : `MILE ${b.m.mile}`,
-            finish ? '#ff3b6b' : '#1b1633',
-            finish ? '#fffdf5' : '#ffe45e',
-            512, 120
-          );
+          b.tex = finish
+            ? labelTexture('FINISH', '#ff3b6b', '#fffdf5', 768, 128)
+            : wall
+              ? labelTexture('MILE 20', '#7a1030', '#ff9ab0', 768, 128, 'THE WALL')
+              : labelTexture(`MILE ${b.m.mile}`, '#1b1633', '#ffe45e', 768, 128);
         }
-        const obj = bannerPool.claim();
-        obj.position.z = b.m.z;
-        obj.userData.panel.material.map = b.tex;
-        obj.userData.panel.material.color.set(0xffffff);
-        obj.userData.panel.material.needsUpdate = true;
-        obj.userData.back.material = obj.userData.panel.material;
-        activeBanner.push({ b, obj });
+        const pool = finish ? archPool : bannerPool;
+        const obj = pool.claim();
+        obj.position.set(0, 0, b.m.z);
+        obj.userData.mat.map = b.tex;
+        obj.userData.mat.color.set(0xffffff);
+        obj.userData.mat.needsUpdate = true;
+        activeBanner.push({ b, obj, pool });
       }
       while (activeBanner.length && activeBanner[0].b.m.z < back) {
-        bannerPool.release(activeBanner.shift().obj);
+        const e = activeBanner.shift();
+        e.pool.release(e.obj);
       }
 
       // Crowd idle: a cheap bob keeps the roadside alive without animation data.
-      const t = performance.now() * 0.004;
       for (const e of activeScene) {
         if (e.s.kind !== 'crowd') continue;
-        e.obj.position.y = Math.abs(Math.sin(t + e.obj.userData.bounce * 6.3)) * 0.16;
+        e.obj.position.y = Math.abs(Math.sin(now * 4 + e.obj.userData.bounce * 6.3)) * 0.13;
       }
 
       api.applyBiome(Math.min(1, z / K.TOTAL_UNITS));
@@ -2084,16 +3170,23 @@ MR.World = (function () {
     api.reset = function () {
       roadPool.releaseAll(); jumpPool.releaseAll(); duckPool.releaseAll();
       blockPool.releaseAll(); buildingPool.releaseAll(); treePool.releaseAll();
-      crowdPool.releaseAll(); bannerPool.releaseAll();
-      activeGates.length = 0; activeScene.length = 0;
-      activeBanner.length = 0; activeRoad.length = 0;
-      state.roadFrom = 0; state.gateIdx = 0; state.sceneIdx = 0; state.bannerIdx = 0;
+      stationPool.releaseAll(); bannerPool.releaseAll(); archPool.releaseAll();
+      towerPool.releaseAll(); abutPool.releaseAll(); riverPool.releaseAll();
+      overpassPool.releaseAll(); standPool.releaseAll();
+      for (const p of crowdPool) p.releaseAll();
+      for (const p of rivalPool) p.releaseAll();
+      activeGates.length = 0; activeScene.length = 0; activeStruct.length = 0;
+      activeBanner.length = 0; activeRoad.length = 0; activeRivals.length = 0;
+      state.roadFrom = 0; state.gateIdx = 0; state.sceneIdx = 0;
+      state.structIdx = 0; state.bannerIdx = 0;
     };
 
     api.stats = function () {
       return {
         gates: activeGates.length,
         scenery: activeScene.length,
+        structures: activeStruct.length,
+        rivals: activeRivals.length,
         road: activeRoad.length,
       };
     };
@@ -2145,15 +3238,18 @@ MR.Camera = (function () {
   const K = MR.K;
 
   // ---- framing ----------------------------------------------------------
-  const BASE_FOV = 61;
-  const SPEED_FOV = 12.5;        // widening across the honest pace band
-  const GEAR_FOV = 3.5;          // extra, only in the top of the band
-  const FOV_MIN = 50, FOV_MAX = 80;
+  // The FOV *swing* is the cue, not the absolute value: past about 74 degrees
+  // vertical the far road collapses into a band and gates stop being readable
+  // early enough to react to, which is a bug however fast it feels.
+  const BASE_FOV = 58;
+  const SPEED_FOV = 10.5;        // widening across the honest pace band
+  const GEAR_FOV = 2.5;          // extra, only in the top of the band
+  const FOV_MIN = 48, FOV_MAX = 76;
 
-  const BASE_Y = 1.98;
-  const BASE_BACK = 4.42;
-  const LOOK_Y = 1.06;
-  const LOOK_AHEAD = 7.6;
+  const BASE_Y = 2.02;
+  const BASE_BACK = 4.35;
+  const LOOK_Y = 1.16;
+  const LOOK_AHEAD = 8.0;
 
   // The honest band, in world units/sec. Derived rather than typed in, so a
   // pace retune moves the camera response with it.
@@ -2183,6 +3279,7 @@ MR.Camera = (function () {
 
       t: 0,            // clock for the wobble functions
       stride: 0,       // stride phase, mirrors the runner's cadence
+      primed: false,   // first frame snaps the speed filter
       sp: SPEED_LO,    // smoothed ground speed
       accel: 0,        // smoothed d(speed)/dt -- the surge signal
 
@@ -2210,6 +3307,11 @@ MR.Camera = (function () {
       // ---- speed signals -------------------------------------------------
       // Smoothing is deliberately slow: pace itself eases, and an unsmoothed
       // derivative would make the camera twitch on every pace step.
+      // The first frame snaps instead of easing, or ?skip= would start every
+      // deep-race screenshot with a phantom 6 u/s surge that never happens in
+      // a real run.
+      const first = !s.primed;
+      if (first) { s.primed = true; s.sp = p.speed; }
       const prev = s.sp;
       s.sp += (p.speed - s.sp) * (1 - Math.pow(0.02, d));
       const rawAccel = d > 0 ? (s.sp - prev) / d : 0;
@@ -2235,7 +3337,8 @@ MR.Camera = (function () {
       // Top gear: fire once when the pace floor is essentially reached, and
       // re-arm only if a hit drags the run back out of it. This is the moment
       // the 21% is supposed to feel like a different race.
-      if (s.gearArmed && sp01 > 0.93) { s.gearArmed = false; s.gearT = 1; }
+      if (first) s.gearArmed = sp01 < 0.93;             // no flourish for ?skip=
+      else if (s.gearArmed && sp01 > 0.93) { s.gearArmed = false; s.gearT = 1; }
       if (!s.gearArmed && sp01 < 0.72) s.gearArmed = true;
       s.gearT = Math.max(0, s.gearT - d * 1.15);
 
@@ -2349,8 +3452,9 @@ MR.Camera = (function () {
       // Fast toward a wider frame, slower back: gaining speed should feel
       // immediate, losing it should feel like it is being taken away.
       const fovRate = targetFov > s.fov ? 0.02 : 0.12;
-      s.fov += (Math.max(FOV_MIN, Math.min(FOV_MAX, targetFov)) - s.fov)
-             * (1 - Math.pow(fovRate, d));
+      const fovGoal = Math.max(FOV_MIN, Math.min(FOV_MAX, targetFov));
+      if (first) s.fov = fovGoal;                       // ?skip= starts settled
+      else s.fov += (fovGoal - s.fov) * (1 - Math.pow(fovRate, d));
 
       if (Math.abs(cam.fov - s.fov) > 0.01) {
         cam.fov = s.fov;
@@ -2386,7 +3490,7 @@ MR.Camera = (function () {
 
     s.reset = function () {
       s.x = 0; s.vx = 0; s.roll = 0; s.fov = BASE_FOV;
-      s.t = 0; s.stride = 0; s.sp = SPEED_LO; s.accel = 0;
+      s.t = 0; s.stride = 0; s.primed = false; s.sp = SPEED_LO; s.accel = 0;
       s.shake = 0; s.punch = 0; s.winded = 0; s.dip = 0; s.dipV = 0; s.kick = 0;
       s.mile = -1; s.mileT = 0; s.gearT = 0; s.gearArmed = true; s.finish = 0;
       cam.fov = BASE_FOV;
@@ -2939,7 +4043,8 @@ MR.Audio = (function () {
 
 /* ==================== src/ui/hud.js ==================== */
 /**
- * HUD: the race readout, plus the start/finish panels.
+ * HUD: the race readout, the mile splits, the progress rail, and the
+ * start/finish panels.
  *
  * DOM rather than canvas, because tabular-figure text at small sizes is
  * sharper through the browser's own rasteriser than anything drawn into a
@@ -2948,10 +4053,40 @@ MR.Audio = (function () {
  * The numbers update every frame but are written only when their rendered
  * string actually changes -- a race clock re-flowing 60 times a second is
  * both a layout cost and a readability problem.
+ *
+ * ---- why the readout is arranged the way it is ----
+ *
+ * deltaVsRecord() is the honest split, and it is also the most misleading
+ * thing on the screen if it is given the headline. The player starts at
+ * 5:30/mi and only the clean streak buys the speed back, so a flawless run is
+ * two and a half minutes down on the ghost for the first third of the race
+ * while actually heading for 1:58:16. Shown big and red at the top, that told
+ * every good player they were failing. So the split is not the headline:
+ *
+ *   - the headline is the PROJECTED FINISH measured against 1:59:30, which is
+ *     the number that answers "is the record still alive";
+ *   - the split moves down to the progress rail and sits with the ghost marker
+ *     it describes, so "the ghost is 1:52 up the road" reads as geography
+ *     rather than as a grade -- it is a position, not a verdict;
+ *   - the streak gets the weight it earns. It sits directly above the pace it
+ *     causes with the speed gauge between them, so the panel reads top to
+ *     bottom as the mechanic: clean gates -> speed unlocked -> pace.
+ *
+ * The projection has a trap of its own: it assumes the current pace holds to
+ * the line, and on a clean run the current pace is still falling, so early on
+ * it reads far worse than the run deserves (2:24:12 at the first mile). It is
+ * therefore not presented as a verdict until the streak has spent most of the
+ * speed it can buy. Until then the chip says so in as many words, and the
+ * estimate is shown in neutral ink rather than in red.
  */
 MR.HUD = (function () {
   const K = MR.K;
   const Pace = MR.Pace;
+
+  // Where record pace sits inside the 5:30 -> 4:20 range the streak unlocks.
+  // Everything that draws the speed gauge shares this so the tick, the fill
+  // and the copy can never drift apart.
+  const REC_MARK = (K.START_PACE - K.RECORD_PACE) / (K.START_PACE - K.FLOOR_PACE);
 
   function el(tag, cls, html) {
     const n = document.createElement(tag);
@@ -2960,91 +4095,142 @@ MR.HUD = (function () {
     return n;
   }
 
+  function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+
   function create(root, opts) {
     opts = opts || {};
     root.innerHTML = `
-      <div id="top">
-        <div id="clockBox">
+      <div id="bug">
+        <div id="clockCell">
           <div class="lab">RACE TIME</div>
           <div class="val num" id="clock">0:00</div>
         </div>
-        <div id="deltaBox">
-          <div class="lab">VS ${K.RECORD_LABEL}</div>
-          <div class="val num" id="delta">+0:00.0</div>
+        <div id="projCell">
+          <div class="cap"><span class="lab">PROJECTED FINISH</span><span class="chip" id="status">BUYING SPEED</span></div>
+          <div class="val num" id="projVal">--:--</div>
+          <div class="sub num" id="margin">VS ${K.RECORD_LABEL}</div>
         </div>
       </div>
 
-      <div id="pace">
-        <div class="lab">CURRENT PACE</div>
-        <div><span class="val num" id="paceVal">5:30</span><span class="unit">/MI</span></div>
-        <div class="sub num" id="paceSub">TARGET 4:33/MI</div>
+      <div id="leftCol">
+        <div id="engine">
+          <div class="lab">CLEAN GATES</div>
+          <div class="val num" id="streakVal">0</div>
+          <div class="gauge" id="paceGauge">
+            <div class="gaugeFill" id="gaugeFill"></div>
+            <div class="gaugeRec"></div>
+          </div>
+          <div class="lab" id="paceLab">PACE</div>
+          <div><span class="val num" id="paceVal">5:30</span><span class="unit">/MI</span></div>
+          <div class="sub num">RECORD ${Pace.pace(K.RECORD_PACE)} &middot; TOP ${Pace.pace(K.FLOOR_PACE)}</div>
+          <div id="why">EACH CLEAN GATE BUYS SPEED</div>
+        </div>
+
+        <div id="toast">
+          <div class="lab" id="toastLab">MILE 1</div>
+          <div><span class="big num" id="toastBig">--:--</span><span class="unit">/MI</span></div>
+          <div class="small num" id="toastSmall"></div>
+        </div>
       </div>
 
       <div id="dist">
         <div class="lab">DISTANCE</div>
         <div><span class="val num" id="distVal">0.00</span><span class="unit">MI</span></div>
-        <div class="sub num" id="proj">PROJ --:--</div>
+        <div class="sub num" id="toGo">26.22 MI TO GO</div>
       </div>
 
-      <div id="streak">
-        <div class="val num" id="streakVal">0</div>
-        <div class="lab">CLEAN</div>
+      <div id="railWrap">
+        <div id="gapLine">
+          <span class="lab">RECORD GHOST</span>
+          <span class="num" id="gapVal">+0:00.0</span>
+          <span id="gapTrend">GAINING</span>
+        </div>
+        <div id="rail">
+          <div id="railBg"></div>
+          <div id="railFill"></div>
+          <div id="railGap"></div>
+          <div id="railGhost"></div>
+        </div>
+        <div id="railCaps"><span>0</span><span id="railHalf">13.1</span><span>26.2</span></div>
       </div>
 
-      <div id="rail">
-        <div id="railBg"></div>
-        <div id="railFill"></div>
-        <div id="railGhost"></div>
-      </div>
-
-      <div id="toast"><div class="big num" id="toastBig"></div><div class="small num" id="toastSmall"></div></div>
       <div id="perf" class="num"></div>
 
-      <div class="panel" id="startPanel">
+      <div class="panel" id="startPanel"><div class="panelInner">
         <div class="date" id="startDate"></div>
         <h1>DAILY MARATHON</h1>
         <div class="blurb">
           One course. Same for everyone, everywhere, today.
-          26.2 miles at ${Pace.pace(K.START_PACE)}/mi &mdash; and the only thing
-          that makes you faster is an unbroken clean line.
-          <br><br>
-          The record is <b>${K.RECORD_LABEL}</b>. It needs ${Pace.pace(K.RECORD_PACE)}/mi.
+          26.2 miles, about four minutes.
         </div>
+
+        <div class="rule">HOW YOU GET FASTER</div>
+        <div class="mech">
+          <div class="mechPace"><b>${Pace.pace(K.START_PACE)}</b><span>&rarr;</span><b>${Pace.pace(K.FLOOR_PACE)}</b><i>/MI</i></div>
+          <div class="gauge" id="startGauge">
+            <div class="gaugeFill" style="width:100%"></div>
+            <div class="gaugeRec"></div>
+          </div>
+          <p>Clear a gate cleanly and you speed up. Every clean gate in a row buys
+             more. Touch one and you lose three quarters of the streak, and the
+             pace bleeds back down.</p>
+        </div>
+
+        <div class="rule">THE RECORD</div>
+        <div class="mech">
+          <p><b>${K.RECORD_LABEL}</b> needs ${Pace.pace(K.RECORD_PACE)}/mi. You start slower than
+             that and reel it in, so the ghost leads for the first few miles by
+             design. <b>PROJECTED FINISH</b> is the number that tells you whether
+             the record is still on.</p>
+        </div>
+
         <div class="keys">
           <kbd>&larr;</kbd> <kbd>&rarr;</kbd> lanes &nbsp;&middot;&nbsp;
           <kbd>&uarr;</kbd> jump &nbsp;&middot;&nbsp; <kbd>&darr;</kbd> duck
-          <br>or swipe
+          &nbsp;&middot;&nbsp; or swipe
         </div>
         <button class="cta" id="startBtn">TOE THE LINE</button>
-      </div>
+      </div></div>
 
-      <div class="panel hidden" id="endPanel">
+      <div class="panel hidden" id="endPanel"><div class="panelInner">
         <div class="date" id="endDate"></div>
-        <h1 id="endTime">—</h1>
+        <div class="finLab">FINAL TIME</div>
+        <h1 id="endTime">&mdash;</h1>
         <div id="verdict"></div>
-        <div id="resultStats"></div>
+        <div id="endCols">
+          <div id="resultStats"></div>
+          <div id="splitTable"></div>
+        </div>
         <button class="cta" id="againBtn">RUN IT AGAIN</button>
-      </div>
+      </div></div>
 
       <div id="count" class="hidden"><span id="countVal"></span></div>
     `;
 
     const q = (id) => root.querySelector('#' + id);
     const n = {
-      clock: q('clock'), delta: q('delta'), deltaBox: q('deltaBox'),
-      paceVal: q('paceVal'), paceSub: q('paceSub'),
-      distVal: q('distVal'), proj: q('proj'),
-      streak: q('streak'), streakVal: q('streakVal'),
-      railFill: q('railFill'), railGhost: q('railGhost'), rail: q('rail'),
-      toast: q('toast'), toastBig: q('toastBig'), toastSmall: q('toastSmall'),
+      clock: q('clock'),
+      projCell: q('projCell'), projVal: q('projVal'), margin: q('margin'), status: q('status'),
+      engine: q('engine'), streakVal: q('streakVal'), why: q('why'),
+      gaugeFill: q('gaugeFill'), paceVal: q('paceVal'),
+      distVal: q('distVal'), toGo: q('toGo'),
+      rail: q('rail'), railFill: q('railFill'), railGap: q('railGap'), railGhost: q('railGhost'),
+      gapVal: q('gapVal'), gapTrend: q('gapTrend'),
+      toast: q('toast'), toastLab: q('toastLab'), toastBig: q('toastBig'), toastSmall: q('toastSmall'),
       startPanel: q('startPanel'), startBtn: q('startBtn'), startDate: q('startDate'),
       endPanel: q('endPanel'), endTime: q('endTime'), endDate: q('endDate'),
-      verdict: q('verdict'), stats: q('resultStats'), againBtn: q('againBtn'),
+      verdict: q('verdict'), stats: q('resultStats'), splitTable: q('splitTable'),
+      againBtn: q('againBtn'),
       count: q('count'), countVal: q('countVal'),
       perf: q('perf'),
     };
 
-    // Mile ticks on the rail; every 5th is major, plus the finish.
+    // Record pace is a fixed point in the unlockable range, so both gauges get
+    // their tick from the same number rather than a hand-placed percentage.
+    root.querySelectorAll('.gaugeRec').forEach((t) => { t.style.left = (REC_MARK * 100) + '%'; });
+
+    // Mile ticks on the rail; every 5th is major. The half-marathon lands at
+    // 13.109 mi, which is within a pixel of the midpoint at any rail width.
     for (let m = 1; m <= 26; m++) {
       const t = el('div', 'railTick' + (m % 5 === 0 ? ' major' : ''));
       t.style.left = ((m / K.MARATHON_MILES) * 100) + '%';
@@ -3057,6 +4243,22 @@ MR.HUD = (function () {
       cache[key] = text;
       node.textContent = text;
     }
+    function cls(node, key, name) {
+      if (cache[key] === name) return;
+      cache[key] = name;
+      node.className = name;
+    }
+
+    // The live readout is hidden behind either panel. It used to show through
+    // the overlay, which made the finish screen read as a rendering fault.
+    function syncPanels() {
+      const open = !n.startPanel.classList.contains('hidden')
+                || !n.endPanel.classList.contains('hidden');
+      root.classList.toggle('panelOpen', open);
+    }
+
+    let lastP = null;      // last state seen, so the split card can read splits
+    let hintUntil = 0;     // while set, the why-line shows the streak-cut message
 
     const api = { nodes: n };
 
@@ -3066,25 +4268,81 @@ MR.HUD = (function () {
     };
 
     api.update = function (p, extra) {
-      set(n.clock, 'clock', Pace.clock(p.raceTime));
+      lastP = p;
 
-      const d = p.deltaVsRecord();
-      set(n.delta, 'delta', Pace.delta(d));
-      const ahead = d < 0;
-      if (cache.aheadState !== ahead) {
-        cache.aheadState = ahead;
-        n.delta.className = 'val num ' + (ahead ? 'ahead' : 'behind');
+      set(n.clock, 'clock', Pace.clock(p.raceTime));
+      set(n.distVal, 'dist', p.miles.toFixed(2));
+      set(n.toGo, 'toGo', Math.max(0, K.MARATHON_MILES - p.miles).toFixed(2) + ' MI TO GO');
+
+      // ---- the headline: is the record still alive ----------------------
+      const proj = p.projected();
+      const margin = K.RECORD_SECONDS - proj;         // positive = under the record
+      set(n.projVal, 'proj', Pace.clock(proj));
+      set(n.margin, 'margin',
+        Pace.clock(Math.abs(margin)) + (margin >= 0 ? ' UNDER ' : ' OVER ') + K.RECORD_LABEL);
+
+      // Share of the 5:30 -> 4:20 range the streak has already bought. While a
+      // lot of it is still unspent the projection is falling under the player
+      // every second, so it is an estimate and is labelled as one.
+      const unlocked = (K.START_PACE - p.targetPace()) / (K.START_PACE - K.FLOOR_PACE);
+      // Past the 14-mile mark there is not enough road left for the streak to
+      // rewrite the answer, so the verdict hardens whatever the streak is doing
+      // -- otherwise a run that never strings anything together would sit on
+      // "still buying speed" all the way to a 2:10 finish.
+      const settled = unlocked >= 0.94 || p.miles > K.MARATHON_MILES * 0.55;
+      const bleeding = p.targetPace() - p.pace > 1.5; // streak was cut, pace sliding back
+
+      let state, chip;
+      if (!settled) {
+        state = 'est';
+        chip = bleeding ? 'BLEEDING SPEED ▲' : 'BUYING SPEED ▼';
+      } else if (margin > 0) {
+        state = 'on';  chip = 'RECORD ON';
+      } else {
+        state = 'off'; chip = 'RECORD OFF';
+      }
+      set(n.status, 'chip', chip);
+      cls(n.status, 'chipCls', 'chip ' + state);
+      cls(n.projCell, 'projCls', state);
+
+      // ---- the engine: streak -> speed unlocked -> pace ------------------
+      set(n.streakVal, 'streak', String(p.streak));
+      n.gaugeFill.style.width =
+        (clamp01((K.START_PACE - p.pace) / (K.START_PACE - K.FLOOR_PACE)) * 100) + '%';
+      set(n.paceVal, 'pace', Pace.pace(p.pace));
+      cls(n.paceVal, 'paceCls', 'val num' + (p.pace <= K.RECORD_PACE ? ' ahead' : ''));
+
+      // Nothing else on screen says why the pace moves, so the line stays up
+      // until the player has plainly felt it, and comes back on every break.
+      const hint = performance.now() < hintUntil ? 'cut'
+        : (p.streak < 12 && p.miles < 2.5) ? 'teach' : 'off';
+      if (cache.hint !== hint) {
+        cache.hint = hint;
+        n.why.textContent = hint === 'cut'
+          ? 'STREAK CUT · +' + K.HIT_TIME_PENALTY + 'S · SPEED BLEEDING'
+          : 'EACH CLEAN GATE BUYS SPEED';
+        n.why.className = hint === 'off' ? 'off' : hint;
       }
 
-      set(n.paceVal, 'pace', Pace.pace(p.pace));
-      set(n.paceSub, 'paceSub', 'TARGET ' + Pace.pace(p.targetPace()) + '/MI');
-      set(n.distVal, 'dist', p.miles.toFixed(2));
-      set(n.proj, 'proj', 'PROJ ' + Pace.clock(p.projected()));
-      set(n.streakVal, 'streak', String(p.streak));
+      // ---- the rail: you, the ghost, and the road between you ------------
+      const you = clamp01(p.miles / K.MARATHON_MILES) * 100;
+      const gh = clamp01(p.ghostMiles() / K.MARATHON_MILES) * 100;
+      n.railFill.style.width = you + '%';
+      n.railGhost.style.left = gh + '%';
+      n.railGap.style.left = Math.min(you, gh) + '%';
+      n.railGap.style.width = Math.abs(you - gh) + '%';
 
-      const f = p.miles / K.MARATHON_MILES;
-      n.railFill.style.width = (f * 100) + '%';
-      n.railGhost.style.left = ((p.ghostMiles() / K.MARATHON_MILES) * 100) + '%';
+      const d = p.deltaVsRecord();
+      const ahead = d < 0;
+      set(n.gapVal, 'gap', Pace.delta(d));
+      cls(n.gapVal, 'gapCls', 'num ' + (ahead ? 'ahead' : 'behind'));
+      cls(n.railGap, 'railGapCls', ahead ? 'ahead' : 'behind');
+
+      // Whether the gap is opening or closing is exactly whether the current
+      // pace beats record pace, so it needs no smoothing to be honest.
+      const gaining = p.pace < K.RECORD_PACE;
+      set(n.gapTrend, 'trend', gaining ? 'GAINING' : 'LOSING');
+      cls(n.gapTrend, 'trendCls', gaining ? 'ahead' : 'behind');
 
       if (extra && extra.fps !== undefined) {
         set(n.perf, 'perf', extra.fps.toFixed(0) + ' FPS · ' + (extra.draws || 0) + ' DRAWS');
@@ -3092,20 +4350,45 @@ MR.HUD = (function () {
     };
 
     api.flashBroken = function () {
-      n.streak.classList.add('broken');
-      setTimeout(() => n.streak.classList.remove('broken'), 420);
+      n.engine.classList.add('broken');
+      setTimeout(() => n.engine.classList.remove('broken'), 520);
+      hintUntil = performance.now() + 2200;
     };
 
+    // ---- mile splits ----------------------------------------------------
+    // A runner's mile split is the time that mile took, which the caller does
+    // not pass; it is one subtraction away in splits[], so the card composes
+    // its own line from the state it already sees and falls back to whatever
+    // strings it was handed.
     let toastTimer = null;
     api.toast = function (big, small, ms) {
-      n.toastBig.textContent = big;
-      n.toastSmall.textContent = small || '';
+      const sp = lastP && lastP.splits.length
+        ? lastP.splits[lastP.splits.length - 1] : null;
+      if (sp) {
+        const i = lastP.splits.length;
+        const prev = i > 1 ? lastP.splits[i - 2].time : 0;
+        const d = sp.time - sp.mile * K.RECORD_PACE;
+        n.toastLab.textContent = 'MILE ' + sp.mile;
+        n.toastBig.textContent = Pace.pace(sp.time - prev);
+        n.toastSmall.textContent = Pace.clock(sp.time) + '  ' + Pace.delta(d);
+        n.toastSmall.className = 'small num ' + (d < 0 ? 'ahead' : 'behind');
+      } else {
+        n.toastLab.textContent = big || '';
+        n.toastBig.textContent = '';
+        n.toastSmall.textContent = small || '';
+        n.toastSmall.className = 'small num';
+      }
       n.toast.classList.add('show');
       clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => n.toast.classList.remove('show'), ms || 1400);
+      // Splits arrive every nine or ten real seconds at record pace, so the
+      // card can sit long enough to be read without ever stacking up.
+      toastTimer = setTimeout(() => n.toast.classList.remove('show'), ms || 2000);
     };
 
-    api.showStart = function (show) { n.startPanel.classList.toggle('hidden', !show); };
+    api.showStart = function (show) {
+      n.startPanel.classList.toggle('hidden', !show);
+      syncPanels();
+    };
 
     api.countdown = function (text) {
       n.count.classList.toggle('hidden', text === null);
@@ -3122,23 +4405,49 @@ MR.HUD = (function () {
 
       const rows = [
         ['AVG PACE', Pace.pace(p.finishTime / K.MARATHON_MILES) + '/mi'],
-        ['BEST PACE', Pace.pace(p.pace) + '/mi'],
+        // p.pace at the line is the pace held into the finish, not the best of
+        // the race -- a run that broke late finishes slower than it ever ran.
+        ['FINAL PACE', Pace.pace(p.pace) + '/mi'],
         ['LONGEST CLEAN', String(p.bestStreak) + ' gates'],
-        ['MISTAKES', String(p.hits)],
+        ['CONTACTS', String(p.hits)],
+        ['TIME LOST', '+' + Pace.clock(p.hits * K.HIT_TIME_PENALTY)],
         ['RECORD', K.RECORD_LABEL],
       ];
       n.stats.innerHTML = rows
         .map(([k, v]) => `<div class="k">${k}</div><div class="v num">${v}</div>`)
         .join('');
+
+      // Five-mile splits plus the line: the shape of the race in six rows,
+      // which is the one thing the finish screen can show that the live
+      // readout never could.
+      let table = '<div class="k">MI</div><div class="k">TIME</div><div class="k">VS REC</div>';
+      const marks = p.splits.filter((s) => s.mile % 5 === 0);
+      for (const s of marks) {
+        const d = s.time - s.mile * K.RECORD_PACE;
+        table += `<div class="v num">${s.mile}</div>`
+              + `<div class="v num">${Pace.clock(s.time)}</div>`
+              + `<div class="v num ${d < 0 ? 'ahead' : 'behind'}">${Pace.delta(d)}</div>`;
+      }
+      const fd = p.finishTime - K.RECORD_SECONDS;
+      table += `<div class="v num fin">${K.MARATHON_LABEL}</div>`
+            + `<div class="v num fin">${Pace.clock(p.finishTime)}</div>`
+            + `<div class="v num fin ${fd < 0 ? 'ahead' : 'behind'}">${Pace.delta(fd)}</div>`;
+      n.splitTable.innerHTML = table;
+
       n.endPanel.classList.remove('hidden');
+      syncPanels();
     };
 
-    api.hideEnd = function () { n.endPanel.classList.add('hidden'); };
+    api.hideEnd = function () {
+      n.endPanel.classList.add('hidden');
+      syncPanels();
+    };
 
     api.onStart = function (fn) { n.startBtn.addEventListener('click', fn); };
     api.onAgain = function (fn) { n.againBtn.addEventListener('click', fn); };
     api.showPerf = function (on) { n.perf.classList.toggle('on', on); };
 
+    syncPanels();
     return api;
   }
 

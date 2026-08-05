@@ -38,15 +38,18 @@ MR.Camera = (function () {
   const K = MR.K;
 
   // ---- framing ----------------------------------------------------------
-  const BASE_FOV = 61;
-  const SPEED_FOV = 12.5;        // widening across the honest pace band
-  const GEAR_FOV = 3.5;          // extra, only in the top of the band
-  const FOV_MIN = 50, FOV_MAX = 80;
+  // The FOV *swing* is the cue, not the absolute value: past about 74 degrees
+  // vertical the far road collapses into a band and gates stop being readable
+  // early enough to react to, which is a bug however fast it feels.
+  const BASE_FOV = 58;
+  const SPEED_FOV = 10.5;        // widening across the honest pace band
+  const GEAR_FOV = 2.5;          // extra, only in the top of the band
+  const FOV_MIN = 48, FOV_MAX = 76;
 
-  const BASE_Y = 1.98;
-  const BASE_BACK = 4.42;
-  const LOOK_Y = 1.06;
-  const LOOK_AHEAD = 7.6;
+  const BASE_Y = 2.02;
+  const BASE_BACK = 4.35;
+  const LOOK_Y = 1.16;
+  const LOOK_AHEAD = 8.0;
 
   // The honest band, in world units/sec. Derived rather than typed in, so a
   // pace retune moves the camera response with it.
@@ -76,6 +79,7 @@ MR.Camera = (function () {
 
       t: 0,            // clock for the wobble functions
       stride: 0,       // stride phase, mirrors the runner's cadence
+      primed: false,   // first frame snaps the speed filter
       sp: SPEED_LO,    // smoothed ground speed
       accel: 0,        // smoothed d(speed)/dt -- the surge signal
 
@@ -103,6 +107,11 @@ MR.Camera = (function () {
       // ---- speed signals -------------------------------------------------
       // Smoothing is deliberately slow: pace itself eases, and an unsmoothed
       // derivative would make the camera twitch on every pace step.
+      // The first frame snaps instead of easing, or ?skip= would start every
+      // deep-race screenshot with a phantom 6 u/s surge that never happens in
+      // a real run.
+      const first = !s.primed;
+      if (first) { s.primed = true; s.sp = p.speed; }
       const prev = s.sp;
       s.sp += (p.speed - s.sp) * (1 - Math.pow(0.02, d));
       const rawAccel = d > 0 ? (s.sp - prev) / d : 0;
@@ -128,7 +137,8 @@ MR.Camera = (function () {
       // Top gear: fire once when the pace floor is essentially reached, and
       // re-arm only if a hit drags the run back out of it. This is the moment
       // the 21% is supposed to feel like a different race.
-      if (s.gearArmed && sp01 > 0.93) { s.gearArmed = false; s.gearT = 1; }
+      if (first) s.gearArmed = sp01 < 0.93;             // no flourish for ?skip=
+      else if (s.gearArmed && sp01 > 0.93) { s.gearArmed = false; s.gearT = 1; }
       if (!s.gearArmed && sp01 < 0.72) s.gearArmed = true;
       s.gearT = Math.max(0, s.gearT - d * 1.15);
 
@@ -242,8 +252,9 @@ MR.Camera = (function () {
       // Fast toward a wider frame, slower back: gaining speed should feel
       // immediate, losing it should feel like it is being taken away.
       const fovRate = targetFov > s.fov ? 0.02 : 0.12;
-      s.fov += (Math.max(FOV_MIN, Math.min(FOV_MAX, targetFov)) - s.fov)
-             * (1 - Math.pow(fovRate, d));
+      const fovGoal = Math.max(FOV_MIN, Math.min(FOV_MAX, targetFov));
+      if (first) s.fov = fovGoal;                       // ?skip= starts settled
+      else s.fov += (fovGoal - s.fov) * (1 - Math.pow(fovRate, d));
 
       if (Math.abs(cam.fov - s.fov) > 0.01) {
         cam.fov = s.fov;
@@ -279,7 +290,7 @@ MR.Camera = (function () {
 
     s.reset = function () {
       s.x = 0; s.vx = 0; s.roll = 0; s.fov = BASE_FOV;
-      s.t = 0; s.stride = 0; s.sp = SPEED_LO; s.accel = 0;
+      s.t = 0; s.stride = 0; s.primed = false; s.sp = SPEED_LO; s.accel = 0;
       s.shake = 0; s.punch = 0; s.winded = 0; s.dip = 0; s.dipV = 0; s.kick = 0;
       s.mile = -1; s.mileT = 0; s.gearT = 0; s.gearArmed = true; s.finish = 0;
       cam.fov = BASE_FOV;

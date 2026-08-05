@@ -104,7 +104,7 @@ MR.shading = (function () {
       const k = i / (n - 1);
       // Bias the darkest band up so shadows stay colourful, never muddy.
       const v = 0.42 + 0.58 * k;
-      const cool = (1 - k) * (1 - k) * 0.26;   // strongest in the deepest band
+      const cool = (1 - k) * (1 - k) * 0.34;   // strongest in the deepest band
       const rgb = [v * (1 - cool * 1.05), v * (1 - cool * 0.40), v * (1 + cool * 0.70)];
       for (let c = 0; c < 3; c++) {
         data[i * 4 + c] = Math.round(Math.max(0, Math.min(1, rgb[c])) * 255);
@@ -286,17 +286,20 @@ MR.shading = (function () {
     let s = 0x2f6f2b1d;
     const rnd = function () { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
 
+    // Few and large, with a wide size spread. A dense field of small puffs
+    // tiles visibly -- the eye finds the grid immediately once the same shape
+    // shows up four times across the frame.
     const puffs = [];
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 9; i++) {
       const cx = rnd() * N, cy = rnd() * N;
-      const w = N * (0.045 + rnd() * 0.070);
+      const w = N * (0.075 + rnd() * rnd() * 0.170);
       const n = 4 + Math.floor(rnd() * 4);
       const lobes = [];
       for (let j = 0; j < n; j++) {
         const u = n === 1 ? 0.5 : j / (n - 1);
         lobes.push({
           x: (u - 0.5) * w * 2.1 + (rnd() - 0.5) * w * 0.35,
-          y: (rnd() - 0.5) * w * 0.30,
+          y: (rnd() - 0.5) * w * 0.26,
           // Taper the ends so a cluster of circles reads as one cloud.
           r: w * (0.40 + rnd() * 0.45) * (1.0 - Math.abs(u - 0.5) * 1.1),
         });
@@ -309,16 +312,16 @@ MR.shading = (function () {
       for (let oy = -1; oy <= 1; oy++) {
         for (const p of puffs) {
           const bx = p.cx + ox * N, by = p.cy + oy * N;
-          g.fillStyle = 'rgba(92,92,92,1)';
+          g.fillStyle = 'rgba(70,70,70,1)';
           for (const l of p.lobes) {
             g.beginPath();
-            g.arc(bx + l.x, by + l.y + l.r * 0.34, Math.max(1, l.r), 0, 6.2832);
+            g.arc(bx + l.x, by + l.y + l.r * 0.40, Math.max(1, l.r), 0, 6.2832);
             g.fill();
           }
           g.fillStyle = 'rgba(255,255,255,1)';
           for (const l of p.lobes) {
             g.beginPath();
-            g.arc(bx + l.x, by + l.y - l.r * 0.06, Math.max(1, l.r * 0.96), 0, 6.2832);
+            g.arc(bx + l.x, by + l.y - l.r * 0.10, Math.max(1, l.r * 0.92), 0, 6.2832);
             g.fill();
           }
         }
@@ -363,36 +366,60 @@ MR.shading = (function () {
       vec3 d = normalize(vWorld - cameraPosition);
       float h = d.y;
 
-      float t = clamp(h * 1.45 + 0.06, 0.0, 1.0);
+      // Bands are driven by y/z, not by elevation. Elevation isolines are
+      // cones around the eye and project to CURVES -- which is the whole
+      // complaint about the old sky, and moving the maths off the dome's
+      // vertices only shrank the arcs rather than removing them. Isolines of
+      // y/z are planes through the eye, and a plane through the eye always
+      // projects to a dead straight line, whatever the camera is doing. The
+      // ratio is still world-locked, so the bands roll with a lane change
+      // instead of sticking to the screen like a decal.
+      float sy = d.y / max(d.z, 0.30);
+      float t = clamp(sy * 1.55 + 0.06, 0.0, 1.0);
 
-      // Cel steps, blended part-way and antialiased: a hard floor() turns any
-      // residual curvature back into an arc, but a pure gradient loses the
-      // poster look the rest of the game is drawn in.
-      float b = t * 5.0;
+      // Cel steps, blended part-way and antialiased with fwidth: a bare
+      // floor() aliases into a staircase wherever the band edge is not exactly
+      // horizontal.
+      float b = t * 6.0;
       float aa = fwidth(b) * 0.6 + 0.002;
-      float stepped = (floor(b) + smoothstep(0.5 - aa, 0.5 + aa, fract(b))) / 5.0;
-      vec3 col = mix(bottom, top, mix(t, stepped, 0.62));
+      float stepped = (floor(b) + smoothstep(0.5 - aa, 0.5 + aa, fract(b))) / 6.0;
+      vec3 col = mix(bottom, top, mix(t, stepped, 0.85));
 
-      // Sun: broad bloom, one quantised corona ring, hard disc. Drawn before
-      // the clouds so cover can pass in front of it.
+      // Sun: broad bloom, two quantised corona steps, hard disc -- a poster
+      // sun, not a lens flare. Drawn before the clouds so cover passes in
+      // front of it.
       float sd = max(dot(d, sunDir), 0.0);
-      col += glowColor * (pow(sd, 5.0) * 0.16 + pow(sd, 180.0) * 0.55);
-      col = mix(col, mix(glowColor, sunColor, 0.5), smoothstep(0.9962, 0.9970, sd) * 0.6);
-      col = mix(col, sunColor, smoothstep(0.99885, 0.99905, sd));
+      col += glowColor * pow(sd, 6.0) * 0.14;
+      col = mix(col, glowColor, smoothstep(0.99545, 0.99600, sd) * 0.30);
+      col = mix(col, mix(glowColor, sunColor, 0.6), smoothstep(0.99835, 0.99855, sd) * 0.55);
+      col = mix(col, sunColor, smoothstep(0.99915, 0.99930, sd));
 
-      // Horizon haze. Zero exactly at h = 0 so the sky meets the fogged ground
-      // with no step, peaking a few degrees above it.
-      float hz = smoothstep(0.0, 0.05, h) * exp(-max(h, 0.0) * 9.0);
+      // Horizon haze. Zero exactly at the horizon so the sky meets the fogged
+      // ground with no step, peaking a few degrees above it. Driven by the
+      // same straight-line coordinate as the bands so its thickness is even
+      // across the frame.
+      float hz = smoothstep(0.0, 0.055, sy) * exp(-max(sy, 0.0) * 8.0);
       col = mix(col, mix(bottom, vec3(1.0), 0.42), hz * 0.85);
 
       // Clouds ride a virtual plane overhead, so they converge toward the
       // horizon the way real ones do instead of being pasted on the dome.
-      vec2 uv = d.xz / max(h, 0.05) * 0.30 + vec2(time * 0.006, time * 0.0015);
-      vec4 cl = texture2D(cloudMap, uv);
-      float cover = cl.a * smoothstep(0.06, 0.22, h);
+      // Two layers at different scales and drift speeds: one sheet repeats
+      // obviously across a 47-degree field, two beating against each other do
+      // not, and the parallax between them gives the sky depth for free.
+      vec2 p = d.xz / max(h, 0.035);
+      float r = length(p);
+      // Nothing survives out where one texel spans a degree of sky -- without
+      // this the last few degrees above the horizon boil into grey stipple.
+      float reach = (1.0 - smoothstep(2.4, 5.6, r)) * smoothstep(0.07, 0.24, h);
+
       vec3 lit = mix(vec3(1.0), bottom, 0.12);
-      vec3 shd = mix(bottom, top, 0.42);
-      col = mix(col, mix(shd, lit, smoothstep(0.35, 0.65, cl.r)), cover);
+      vec3 shd = mix(bottom, top, 0.44);
+
+      vec4 lo = texture2D(cloudMap, p * 0.105 + vec2(0.41 - time * 0.0022, 0.63));
+      col = mix(col, mix(shd, lit, smoothstep(0.35, 0.65, lo.r)), lo.a * reach * 0.55);
+
+      vec4 hi = texture2D(cloudMap, p * 0.245 + vec2(time * 0.0055, 0.0));
+      col = mix(col, mix(shd, lit, smoothstep(0.35, 0.65, hi.r)), hi.a * reach);
 
       gl_FragColor = vec4(lin2srgb(col), 1.0);
     }`;
@@ -405,9 +432,11 @@ MR.shading = (function () {
         bottom: { value: new THREE.Color(bottom === undefined ? PALETTE.skyBot : bottom) },
         sunColor: { value: new THREE.Color(PALETTE.sun) },
         glowColor: { value: new THREE.Color(PALETTE.sunGlow) },
-        // Up-and-forward on the camera's left, matching the key light so the
-        // lit side of the runner points back at the visible sun.
-        sunDir: { value: new THREE.Vector3(-0.52, 0.40, 0.76).normalize() },
+        // Up-and-forward, matching the key light so the lit side of the runner
+        // points back at the visible sun. World +x is SCREEN LEFT for a camera
+        // looking down +z, and the elevation is low (~14 degrees) because the
+        // chase camera is pitched down: anything higher leaves the frame.
+        sunDir: { value: new THREE.Vector3(0.42, 0.25, 0.87).normalize() },
         cloudMap: { value: clouds() },
         time: { value: 0 },
       },
@@ -440,12 +469,14 @@ MR.shading = (function () {
    * gives shaded faces a blue cast rather than a grey one.
    */
   function lights(scene) {
-    // Matches skyDome's sunDir so the drawn sun and the shading agree.
+    // Along skyDome's sunDir so the drawn sun and the shading agree, but
+    // lifted: at the sun's true 14-degree elevation the terminator ran across
+    // the runner's waist and the legs went dark.
     const key = new THREE.DirectionalLight(0xfff4e0, 2.05);
-    key.position.set(-7.5, 6.0, 11.0);
+    key.position.set(7.0, 9.0, 11.0);
 
     const bounce = new THREE.DirectionalLight(0x7fa8ff, 0.75);
-    bounce.position.set(6, 2, -9);
+    bounce.position.set(-6, 2, -9);
 
     const amb = new THREE.AmbientLight(0xa8c4ff, 0.50);
 

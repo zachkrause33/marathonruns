@@ -5,6 +5,17 @@
  * television rather than from mobile games: tabular figures that never
  * reflow, hard rectangles, one accent colour, no rounded-friendly styling.
  * Nothing here animates except the numbers themselves.
+ *
+ * Colour carries meaning and nothing else, so it stays a closed set:
+ *   accent  the speed engine -- streak, gauge, rail fill. What you are buying.
+ *   ahead   beating the record.
+ *   behind  losing the record.
+ *   ink     plain fact -- clock, distance.
+ * A number is never tinted for emphasis alone.
+ *
+ * Layout rule: the middle of the frame belongs to the road and the next gate.
+ * Everything here lives on the edges, and the split card comes in at the side
+ * rather than across the runner.
  */
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -29,6 +40,7 @@ html, body {
   --ahead: #4dfba0;
   --behind: #ff6b84;
   --ink: rgba(14, 18, 48, 0.82);
+  --hair: rgba(255, 253, 245, 0.14);
 }
 
 .num {
@@ -37,144 +49,281 @@ html, body {
   letter-spacing: -0.01em;
 }
 
-/* ---- top bar: race clock + record delta ---- */
-#top {
+.lab {
+  font-size: 9px; font-weight: 800; letter-spacing: 0.16em;
+  opacity: 0.6; text-transform: uppercase;
+}
+
+/* While a panel is up the live readout would show through the overlay and
+ * read as a rendering fault, so it steps out of the way entirely. */
+#ui.panelOpen #bug,
+#ui.panelOpen #leftCol,
+#ui.panelOpen #dist,
+#ui.panelOpen #railWrap,
+#ui.panelOpen #perf {
+  opacity: 0; visibility: hidden;
+}
+#bug, #leftCol, #dist, #railWrap { transition: opacity 0.22s, visibility 0.22s; }
+
+/* ---- top bug: race clock + the verdict ----
+ * The projected finish is the headline because it is the only number that
+ * answers "is the record still alive". The race clock keeps its place but
+ * gives up the size. */
+#bug {
   position: absolute; top: 0; left: 50%;
   transform: translateX(-50%);
   display: flex; align-items: stretch;
   background: var(--ink);
-  border: 2px solid rgba(255, 253, 245, 0.14);
+  border: 2px solid var(--hair);
   border-top: none;
   backdrop-filter: blur(6px);
 }
-#top > div { padding: 7px 16px 8px; text-align: center; }
-#top .lab {
-  font-size: 9px; font-weight: 800; letter-spacing: 0.16em;
-  opacity: 0.62; text-transform: uppercase;
+
+#clockCell {
+  padding: 8px 15px 9px; min-width: 116px;
+  display: flex; flex-direction: column; justify-content: center;
 }
-#top .val { font-size: 25px; font-weight: 800; line-height: 1.05; }
+#clockCell .val { font-size: 25px; font-weight: 800; line-height: 1.05; margin-top: 1px; }
 
-#clockBox { min-width: 128px; }
-#deltaBox { min-width: 128px; border-left: 2px solid rgba(255,253,245,0.14); }
-#deltaBox .val.ahead  { color: var(--ahead); }
-#deltaBox .val.behind { color: var(--behind); }
+#projCell {
+  padding: 7px 15px 9px; min-width: 214px;
+  border-left: 2px solid var(--hair);
+}
+#projCell .cap {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: 1px;
+}
+#projCell .val { font-size: 40px; font-weight: 900; line-height: 1.02; }
+#projCell .sub { font-size: 11px; font-weight: 800; opacity: 0.7; margin-top: 1px; }
 
-/* ---- pace, left ---- */
-#pace {
-  position: absolute; left: 14px; top: 78px;
+#projCell.on  .val, #projCell.on  .sub { color: var(--ahead); opacity: 1; }
+#projCell.off .val, #projCell.off .sub { color: var(--behind); opacity: 1; }
+#projCell.on .sub, #projCell.off .sub { opacity: 0.92; }
+
+/* The chip is the plain-language version of the same judgement. It is an
+ * outline while the estimate is still moving under the player and a solid
+ * badge once it has become a verdict. */
+.chip {
+  font-size: 9px; font-weight: 900; letter-spacing: 0.1em;
+  padding: 2px 6px; white-space: nowrap;
+}
+.chip.est { color: var(--accent); border: 1px solid rgba(255, 228, 94, 0.55); }
+.chip.on  { background: var(--ahead);  color: #06301c; }
+.chip.off { background: var(--behind); color: #35060f; }
+
+/* ---- left column: the mechanic, read top to bottom ----
+ * Clean gates buy speed; the gauge shows how much of the 5:30 -> 4:20 range
+ * has been bought; the pace is the result. Putting them in one plate in that
+ * order is the only place the game explains itself. */
+#leftCol {
+  position: absolute; left: 14px; top: 82px;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 9px;
+}
+
+#engine {
   background: var(--ink);
   border-left: 4px solid var(--accent);
-  padding: 9px 15px 10px;
-  min-width: 132px;
+  padding: 8px 14px 9px;
+  min-width: 152px;
 }
-#pace .lab { font-size: 9px; font-weight: 800; letter-spacing: 0.15em; opacity: 0.62; }
-#pace .val { font-size: 37px; font-weight: 800; line-height: 1; }
-#pace .unit { font-size: 12px; font-weight: 700; opacity: 0.62; margin-left: 3px; }
-#pace .sub { font-size: 10px; font-weight: 700; opacity: 0.72; margin-top: 3px; }
+#engine #streakVal {
+  font-size: 36px; font-weight: 900; line-height: 1;
+  color: var(--accent);
+  text-shadow: 0 2px 0 rgba(14, 18, 48, 0.6);
+}
+#engine #paceLab { margin-top: 1px; }
+#engine .val { font-size: 27px; font-weight: 800; line-height: 1.05; }
+#engine .val.ahead { color: var(--ahead); }
+#engine .unit { font-size: 11px; font-weight: 700; opacity: 0.6; margin-left: 3px; }
+#engine .sub { font-size: 9px; font-weight: 700; opacity: 0.55; margin-top: 2px; }
 
-/* ---- distance + projection, right ---- */
+/* Contact flashes the whole plate, not just the number: the cost is the
+ * streak and the speed together, and they live in the same box. */
+#engine.broken { border-left-color: var(--behind); background: rgba(58, 14, 32, 0.86); }
+#engine.broken #streakVal { color: var(--behind); }
+
+.gauge {
+  position: relative;
+  height: 7px; width: 100%;
+  margin: 6px 0 7px;
+  background: rgba(255, 253, 245, 0.13);
+  border: 1px solid rgba(255, 253, 245, 0.16);
+}
+.gaugeFill { position: absolute; inset: 0 auto 0 0; background: var(--accent); width: 0; }
+/* Record pace as a mark on the range you are unlocking: once the fill passes
+ * it, you are running faster than 1:59:30 needs. */
+.gaugeRec {
+  position: absolute; top: -3px; bottom: -3px; width: 2px;
+  background: #fffdf5; box-shadow: 0 0 0 1px rgba(14, 18, 48, 0.85);
+}
+
+#why {
+  font-size: 9px; font-weight: 800; letter-spacing: 0.08em;
+  margin-top: 6px; color: var(--accent);
+  transition: opacity 0.3s;
+}
+#why.off { opacity: 0; }
+#why.cut { color: var(--behind); }
+
+/* ---- distance, right ---- */
 #dist {
-  position: absolute; right: 14px; top: 78px;
+  position: absolute; right: 14px; top: 82px;
   background: var(--ink);
   border-right: 4px solid var(--accent);
-  padding: 9px 15px 10px;
-  min-width: 132px; text-align: right;
+  padding: 8px 14px 9px;
+  min-width: 138px; text-align: right;
 }
-#dist .lab { font-size: 9px; font-weight: 800; letter-spacing: 0.15em; opacity: 0.62; }
-#dist .val { font-size: 37px; font-weight: 800; line-height: 1; }
-#dist .unit { font-size: 12px; font-weight: 700; opacity: 0.62; margin-left: 3px; }
-#dist .sub { font-size: 10px; font-weight: 700; opacity: 0.72; margin-top: 3px; }
+#dist .val { font-size: 34px; font-weight: 800; line-height: 1; }
+#dist .unit { font-size: 12px; font-weight: 700; opacity: 0.6; margin-left: 3px; }
+#dist .sub { font-size: 10px; font-weight: 700; opacity: 0.62; margin-top: 3px; }
 
-/* ---- streak ---- */
-#streak {
-  position: absolute; left: 50%; top: 92px;
-  transform: translateX(-50%);
-  text-align: center;
-  transition: opacity 0.25s;
+/* ---- mile split card ----
+ * Docked under the left plate instead of thrown across the middle of the
+ * screen: a split is worth reading, but never at the price of the gate the
+ * player is about to hit. It shows the mile's own time, which is what a
+ * runner means by a split. */
+#toast {
+  background: var(--ink);
+  border-left: 4px solid #fffdf5;
+  padding: 7px 13px 8px;
+  min-width: 152px;
+  opacity: 0; transform: translateX(-14px);
+  transition: opacity 0.22s ease-out, transform 0.22s ease-out;
 }
-#streak .val {
-  font-size: 30px; font-weight: 900; line-height: 1;
-  color: var(--accent);
-  text-shadow: 0 2px 0 rgba(14,18,48,0.6);
-}
-#streak .lab {
-  font-size: 9px; font-weight: 800; letter-spacing: 0.2em;
-  opacity: 0.8; margin-top: 2px;
-}
-#streak.broken .val { color: var(--behind); }
+#toast.show { opacity: 1; transform: none; }
+#toast .lab { opacity: 0.85; color: #fffdf5; }
+#toast .big { font-size: 27px; font-weight: 900; line-height: 1.05; }
+#toast .unit { font-size: 11px; font-weight: 700; opacity: 0.6; margin-left: 3px; }
+#toast .small { font-size: 11px; font-weight: 800; margin-top: 1px; }
+#toast .small.ahead { color: var(--ahead); }
+#toast .small.behind { color: var(--behind); }
 
-/* ---- progress rail ---- */
-#rail {
-  position: absolute; left: 50%; bottom: 16px;
+/* ---- progress rail ----
+ * You, the ghost, and the road between you. The honest split lives here
+ * rather than in the headline, because next to the marker it describes it
+ * reads as a position on the course instead of as a grade. */
+#railWrap {
+  position: absolute; left: 50%; bottom: 13px;
   transform: translateX(-50%);
-  width: min(620px, 82vw); height: 22px;
+  width: min(660px, 88vw);
 }
+#gapLine {
+  display: flex; align-items: baseline; justify-content: center; gap: 9px;
+  margin-bottom: 5px;
+  text-shadow: 0 1px 3px rgba(14, 18, 48, 0.9);
+}
+#gapLine .lab { opacity: 0.75; }
+#gapVal { font-size: 17px; font-weight: 900; line-height: 1; }
+#gapTrend { font-size: 9px; font-weight: 900; letter-spacing: 0.12em; }
+.ahead { color: var(--ahead); }
+.behind { color: var(--behind); }
+
+#rail { position: relative; height: 22px; }
 #railBg {
-  position: absolute; inset: 6px 0 6px 0;
-  background: rgba(14,18,48,0.78);
-  border: 1px solid rgba(255,253,245,0.16);
+  position: absolute; inset: 0;
+  background: rgba(14, 18, 48, 0.8);
+  border: 1px solid rgba(255, 253, 245, 0.22);
 }
 #railFill {
-  position: absolute; top: 7px; bottom: 7px; left: 1px;
+  position: absolute; top: 1px; bottom: 1px; left: 1px;
   background: var(--accent); width: 0;
 }
-#railGhost {
-  position: absolute; top: 2px; bottom: 2px;
-  width: 2px; background: #fffdf5;
-  box-shadow: 0 0 0 1px rgba(14,18,48,0.8);
-}
-.railTick {
-  position: absolute; top: 8px; bottom: 8px;
-  width: 1px; background: rgba(255,253,245,0.3);
-}
-.railTick.major { top: 4px; bottom: 4px; background: rgba(255,253,245,0.55); }
+/* The stretch of course between the runner and the ghost, tinted by who is
+ * winning it. This is the same fact as the number above, drawn as distance. */
+#railGap { position: absolute; top: 1px; bottom: 1px; }
+#railGap.behind { background: rgba(255, 107, 132, 0.42); }
+#railGap.ahead  { background: rgba(77, 251, 160, 0.42); }
 
-/* ---- toast (mile splits) ---- */
-/* Sits high in the frame: at 46% it landed straight across the runner, which
- * hid the exact moment a mile split is most worth watching. */
-#toast {
-  position: absolute; left: 50%; top: 25%;
-  transform: translateX(-50%);
-  text-align: center;
-  opacity: 0; transition: opacity 0.3s;
+#railGhost {
+  position: absolute; top: -5px; bottom: -5px;
+  width: 3px; background: #fffdf5;
+  box-shadow: 0 0 0 1.5px rgba(14, 18, 48, 0.9);
 }
-#toast .big { font-size: 42px; font-weight: 900; letter-spacing: -0.02em; }
-#toast .small { font-size: 15px; font-weight: 800; opacity: 0.9; }
-#toast.show { opacity: 1; }
+/* A cap above the line, so the marker is findable at a glance against both
+ * the yellow fill and the dark road ahead of it. */
+#railGhost::after {
+  content: ''; position: absolute; left: 50%; top: -5px;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #fffdf5; border-bottom: none;
+  filter: drop-shadow(0 0 1px rgba(14, 18, 48, 0.9));
+}
+
+.railTick {
+  position: absolute; top: 6px; bottom: 6px;
+  width: 1px; background: rgba(255, 253, 245, 0.28);
+}
+.railTick.major { top: 2px; bottom: 2px; background: rgba(255, 253, 245, 0.5); }
+
+#railCaps {
+  position: relative;
+  display: flex; justify-content: space-between;
+  font-size: 9px; font-weight: 800; letter-spacing: 0.1em;
+  opacity: 0.45; margin-top: 3px;
+  text-shadow: 0 1px 3px rgba(14, 18, 48, 0.9);
+}
+#railHalf { position: absolute; left: 50%; transform: translateX(-50%); }
 
 /* ---- overlays ---- */
 .panel {
   position: absolute; inset: 0;
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  background: rgba(10, 13, 36, 0.86);
+  display: flex;
+  background: rgba(10, 13, 36, 0.9);
   pointer-events: auto;
-  text-align: center; padding: 22px;
+  text-align: center;
+  padding: 20px 18px;
+  overflow-y: auto;
 }
 .panel.hidden { display: none; }
+.panelInner { margin: auto; width: 100%; max-width: 480px; }
 .panel h1 {
-  font-size: clamp(30px, 7vw, 58px); font-weight: 900;
+  font-size: clamp(34px, 7vw, 58px); font-weight: 900;
   letter-spacing: -0.03em; line-height: 0.98;
+  font-variant-numeric: tabular-nums;
 }
 .panel .date {
-  font-size: 12px; font-weight: 800; letter-spacing: 0.2em;
-  color: var(--accent); margin-bottom: 10px;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.2em;
+  color: var(--accent); margin-bottom: 8px;
 }
 .panel .blurb {
-  font-size: 14px; font-weight: 600; opacity: 0.82;
-  max-width: 430px; margin-top: 14px; line-height: 1.5;
+  font-size: 13px; font-weight: 600; opacity: 0.8;
+  max-width: 380px; margin: 10px auto 0; line-height: 1.5;
 }
+
+/* A labelled hairline instead of a heading: it separates without competing
+ * with the one big number each panel is built around. */
+.rule {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 9px; font-weight: 900; letter-spacing: 0.2em;
+  opacity: 0.5; margin: 18px 0 9px;
+}
+.rule::before, .rule::after {
+  content: ''; flex: 1; height: 1px; background: rgba(255, 253, 245, 0.22);
+}
+
+.mech { font-size: 12.5px; font-weight: 600; line-height: 1.5; opacity: 0.86; }
+.mech p { margin-top: 8px; }
+.mech b { font-weight: 900; opacity: 1; }
+.mechPace {
+  display: flex; align-items: baseline; justify-content: center; gap: 9px;
+  font-variant-numeric: tabular-nums;
+}
+.mechPace b { font-size: 26px; font-weight: 900; color: var(--accent); }
+.mechPace span { font-size: 17px; opacity: 0.55; }
+.mechPace i { font-size: 11px; font-style: normal; font-weight: 800; opacity: 0.55; }
+.mech .gauge { max-width: 260px; margin: 8px auto 0; }
+
 .panel .keys {
-  margin-top: 20px; font-size: 12px; font-weight: 700;
+  margin-top: 18px; font-size: 12px; font-weight: 700;
   opacity: 0.7; line-height: 1.9;
 }
 .panel .keys kbd {
-  background: rgba(255,253,245,0.12);
-  border: 1px solid rgba(255,253,245,0.25);
+  background: rgba(255, 253, 245, 0.12);
+  border: 1px solid rgba(255, 253, 245, 0.25);
   padding: 2px 7px; font-family: inherit; font-size: 11px;
 }
 .cta {
-  margin-top: 24px;
+  margin-top: 20px;
   background: var(--accent); color: #14183a;
   font-size: 15px; font-weight: 900; letter-spacing: 0.1em;
   padding: 13px 34px; border: none; cursor: pointer;
@@ -182,41 +331,109 @@ html, body {
 }
 .cta:active { transform: translateY(1px); }
 
-/* results table */
-#resultStats {
-  margin-top: 18px;
-  display: grid; grid-template-columns: auto auto;
-  gap: 5px 26px; font-size: 13px; font-weight: 700;
+/* ---- finish panel ---- */
+.finLab {
+  font-size: 10px; font-weight: 900; letter-spacing: 0.24em;
+  opacity: 0.5; margin-bottom: 2px;
 }
-#resultStats .k { opacity: 0.6; text-align: right; }
+/* The verdict is the point of the screen, so it is a solid band rather than
+ * coloured text -- it should be legible from across a room. */
+#verdict {
+  display: inline-block; margin-top: 10px;
+  font-size: 13px; font-weight: 900; letter-spacing: 0.1em;
+  padding: 6px 14px;
+}
+#verdict.beat { background: var(--ahead); color: #06301c; }
+#verdict.miss { background: var(--behind); color: #35060f; }
+
+#endCols {
+  display: flex; flex-wrap: wrap; gap: 14px 30px;
+  justify-content: center; align-items: flex-start;
+  margin-top: 18px;
+}
+#resultStats {
+  display: grid; grid-template-columns: auto auto;
+  gap: 4px 20px; font-size: 12.5px; font-weight: 700;
+}
+#resultStats .k { opacity: 0.55; text-align: right; }
 #resultStats .v { text-align: left; }
-#verdict { font-size: 15px; font-weight: 900; letter-spacing: 0.08em; margin-top: 12px; }
-#verdict.beat { color: var(--ahead); }
-#verdict.miss { color: var(--behind); }
+
+#splitTable {
+  display: grid; grid-template-columns: auto auto auto;
+  gap: 4px 16px; font-size: 12.5px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+#splitTable .k {
+  font-size: 9px; font-weight: 900; letter-spacing: 0.14em;
+  opacity: 0.45; text-align: right; padding-bottom: 2px;
+}
+#splitTable .v { text-align: right; }
+#splitTable .v.fin {
+  border-top: 1px solid rgba(255, 253, 245, 0.25);
+  padding-top: 4px; margin-top: 2px; font-weight: 900;
+}
 
 /* ---- countdown ---- */
 #count {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
   font-size: 96px; font-weight: 900;
-  text-shadow: 0 4px 0 rgba(14,18,48,0.55);
+  text-shadow: 0 4px 0 rgba(14, 18, 48, 0.55);
 }
 #count.hidden { display: none; }
 
-/* ---- small screens ---- */
-@media (max-width: 560px) {
-  #pace, #dist { top: 70px; min-width: 106px; padding: 7px 11px 8px; }
-  #pace .val, #dist .val { font-size: 28px; }
-  #top .val { font-size: 20px; }
-  #top > div { min-width: 104px; padding: 6px 11px 7px; }
-  #streak { top: 76px; }
-  #streak .val { font-size: 24px; }
+/* ---- small screens ----
+ * A phone is played with a thumb, so the plates shrink but the hierarchy does
+ * not change: the projection stays the biggest thing on the screen and the
+ * middle band stays empty from the top plate down to the rail. */
+@media (max-width: 620px) {
+  #clockCell { min-width: 78px; padding: 6px 10px 7px; }
+  #clockCell .val { font-size: 19px; }
+  #projCell { min-width: 172px; padding: 5px 11px 7px; }
+  #projCell .val { font-size: 31px; }
+  #projCell .sub { font-size: 10px; }
+  #projCell .cap { gap: 7px; }
+  .lab { font-size: 8px; letter-spacing: 0.12em; }
+  .chip { font-size: 8px; padding: 2px 4px; letter-spacing: 0.06em; }
+
+  #leftCol { left: 9px; top: 70px; gap: 7px; }
+  #engine { min-width: 124px; padding: 6px 11px 7px; }
+  #engine #streakVal { font-size: 27px; }
+  #engine .val { font-size: 21px; }
+  #engine .sub { font-size: 8px; }
+  #why { font-size: 8px; margin-top: 4px; }
+
+  #dist { right: 9px; top: 70px; min-width: 112px; padding: 6px 11px 7px; }
+  #dist .val { font-size: 25px; }
+  #dist .sub { font-size: 9px; }
+
+  #toast { min-width: 124px; padding: 6px 11px 7px; }
+  #toast .big { font-size: 21px; }
+  #toast .small { font-size: 10px; }
+
+  #railWrap { width: 92vw; bottom: 10px; }
+  #rail { height: 17px; }
+  #gapVal { font-size: 15px; }
+  #count { font-size: 76px; }
+  .panel { padding: 16px 14px; }
+  .mech { font-size: 12px; }
+}
+
+/* Landscape phones have almost no vertical room, so the panels give up the
+ * explanatory blocks rather than push the button off the bottom. */
+@media (max-height: 430px) {
+  .panel h1 { font-size: clamp(26px, 6vh, 40px); }
+  .panel .blurb, .rule, .mech { display: none; }
+  .panel .keys { margin-top: 10px; }
+  .cta { margin-top: 12px; padding: 10px 26px; }
+  #endCols { margin-top: 10px; gap: 8px 24px; }
 }
 
 /* ---- fps / debug ---- */
 #perf {
-  position: absolute; right: 12px; bottom: 46px;
+  position: absolute; right: 14px; top: 158px;
   font-size: 10px; font-weight: 700; opacity: 0.45;
+  text-align: right;
   display: none;
 }
 #perf.on { display: block; }

@@ -118,18 +118,25 @@ MR.Runner = (function () {
   function raceBib() {
     if (bibTex) return bibTex;
     const c = document.createElement('canvas');
-    c.width = 128; c.height = 96;
+    c.width = 160; c.height = 96;
     const g = c.getContext('2d');
     g.fillStyle = '#fffdf5';
     g.fillRect(0, 0, c.width, c.height);
     g.fillStyle = '#' + new THREE.Color(P.runnerVest).getHexString();
-    g.fillRect(0, 0, c.width, 9);
-    g.fillRect(0, c.height - 9, c.width, 9);
+    g.fillRect(0, 0, c.width, 8);
+    g.fillRect(0, c.height - 8, c.width, 8);
     g.fillStyle = '#1b1633';
-    g.font = 'bold 62px Helvetica, Arial, sans-serif';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.fillText('26.2', c.width / 2, c.height / 2 + 4);
+    // Fit rather than trust: the first version hard-coded 62px and the
+    // string overflowed the canvas on a machine without Helvetica, so the
+    // back of the vest read "6." instead of a race number.
+    let px = 64;
+    do {
+      g.font = 'bold ' + px + 'px Helvetica, Arial, sans-serif';
+      px -= 2;
+    } while (px > 20 && g.measureText('26.2').width > c.width * 0.82);
+    g.fillText('26.2', c.width / 2, c.height / 2 + 3);
     bibTex = new THREE.CanvasTexture(c);
     return bibTex;
   }
@@ -145,60 +152,74 @@ MR.Runner = (function () {
     const spine = pivot(hips, 0, 0, 0);
 
     const pelvis = multi([
-      { g: new THREE.CylinderGeometry(0.235, 0.215, 0.30, 12), c: P.runnerShort, y: -0.03, sz: 0.80 },
+      { g: new THREE.CylinderGeometry(0.228, 0.220, 0.30, 12), c: P.runnerShort, y: -0.025, sz: 0.82 },
     ]);
     spine.add(pelvis);
 
-    const chest = pivot(spine, 0, 0.28, 0);
+    // The whole silhouette is built backwards from one measurement: the
+    // shoulder line has to stop 0.15 below the skull. The chase camera looks
+    // DOWN on the runner, so a gap smaller than that is swallowed by the
+    // head's own projected silhouette and the neck disappears again.
+    const chest = pivot(spine, 0, 0.24, 0);
     const trunk = multi([
-      // Vest. Top edge at world 1.16, a clear 0.10 below the skull. Nothing
-      // on the trunk may reach higher than this or the neck gap closes.
-      { g: new THREE.CylinderGeometry(0.262, 0.198, 0.44, 12), c: P.runnerVest, y: -0.12, sz: 0.72 },
+      // Vest. Top edge at world 1.12. Nothing on the trunk may reach above
+      // it -- an earlier deltoid that poked 0.03 higher closed the gap on
+      // its own and the head went straight back to sitting on the shoulders.
+      // It barely tapers on purpose: a singlet worn over the waistband, so
+      // red owns two thirds of the trunk. Tapering it to a narrow hem let the
+      // navy shorts read as the biggest single shape on the character.
+      { g: new THREE.CylinderGeometry(0.262, 0.236, 0.34, 12), c: P.runnerVest, y: -0.07, sz: 0.72 },
       // Hem stripe -- stops the red mass from running straight into the shorts.
-      { g: new THREE.CylinderGeometry(0.204, 0.200, 0.055, 12), c: TRIM, y: -0.315, sz: 0.74 },
+      { g: new THREE.CylinderGeometry(0.240, 0.236, 0.05, 12), c: TRIM, y: -0.216, sz: 0.73 },
       // Deltoids. These are what make the shoulder line read wider than the
       // head; without them the trunk cone tapers into the skull. Flattened
       // hard in Y so they widen the shoulders without raising them.
-      { g: new THREE.SphereGeometry(0.128, 10, 8), c: P.runnerVest, x: -0.234, y: 0.005, sy: 0.80, sz: 0.86 },
-      { g: new THREE.SphereGeometry(0.128, 10, 8), c: P.runnerVest, x: 0.234, y: 0.005, sy: 0.80, sz: 0.86 },
+      { g: new THREE.SphereGeometry(0.130, 10, 8), c: P.runnerVest, x: -0.236, y: -0.015, sy: 0.78, sz: 0.86 },
+      { g: new THREE.SphereGeometry(0.130, 10, 8), c: P.runnerVest, x: 0.236, y: -0.015, sy: 0.78, sz: 0.86 },
       // Shoulder blades: a shallow pair of bumps so the back is not a blank
       // curve. Barely visible individually, but they catch the terminator.
-      { g: new THREE.SphereGeometry(0.085, 8, 6), c: P.runnerVest, x: -0.105, y: -0.04, z: -0.135, sz: 0.55 },
-      { g: new THREE.SphereGeometry(0.085, 8, 6), c: P.runnerVest, x: 0.105, y: -0.04, z: -0.135, sz: 0.55 },
+      { g: new THREE.SphereGeometry(0.085, 8, 6), c: P.runnerVest, x: -0.105, y: -0.07, z: -0.135, sz: 0.55 },
+      { g: new THREE.SphereGeometry(0.085, 8, 6), c: P.runnerVest, x: 0.105, y: -0.07, z: -0.135, sz: 0.55 },
     ]);
     chest.add(trunk);
 
     // Curved panel rather than a flat card so it hugs the vest at this size,
     // and high on the back so it never straddles the shorts line.
     const bib = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.250, 0.250, 0.22, 10, 1, true, Math.PI - 0.66, 1.32),
+      new THREE.CylinderGeometry(0.252, 0.252, 0.22, 10, 1, true, Math.PI - 0.62, 1.24),
       S.toon(0xffffff, 3)
     );
     bib.material.map = raceBib();
-    bib.position.y = -0.055;
+    bib.position.y = -0.035;
     bib.scale.z = 0.72;
     chest.add(bib);
 
     // ---- head -----------------------------------------------------------
     // The neck pivot sits at the top of the trunk so head tilt rotates from
     // the base of the neck; the neck column itself rides with the head.
-    const neck = pivot(chest, 0, 0.19, 0);
+    const neck = pivot(chest, 0, 0.13, 0);
     const head = pivot(neck, 0, 0, 0);
 
     const headMesh = multi([
-      // Bare neck. Narrow (0.18 across against a 0.73 shoulder line) and
-      // skin-coloured against a red vest -- the pinch plus the value jump is
-      // the whole reason the head separates at gameplay distance.
-      { g: new THREE.CylinderGeometry(0.088, 0.098, 0.26, 10), c: P.runnerSkin, y: 0.03 },
-      { g: new THREE.SphereGeometry(0.26, 16, 12), c: P.runnerSkin, y: 0.27, sy: 1.02, sz: 0.97 },
-      // Hair is a crown cap only. Letting it wrap the nape put dark hair
-      // directly against the vest and the head vanished into the torso.
-      { g: new THREE.SphereGeometry(0.268, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.52), c: P.runnerHair, y: 0.275 },
-      // Headband over the hair edge: one bright horizontal band across the
-      // back of the skull, which is the single loudest "that is a head" cue.
-      { g: new THREE.CylinderGeometry(0.277, 0.277, 0.085, 14), c: TRIM, y: 0.262, sz: 0.97 },
-      { g: new THREE.SphereGeometry(0.078, 8, 6), c: P.runnerSkin, x: -0.246, y: 0.245, z: -0.012, sx: 0.48, sz: 0.82 },
-      { g: new THREE.SphereGeometry(0.078, 8, 6), c: P.runnerSkin, x: 0.246, y: 0.245, z: -0.012, sx: 0.48, sz: 0.82 },
+      // Bare neck: 0.18 across against a 0.73 shoulder line, and lit skin
+      // between the dark hair above and the red vest below. The order of
+      // those three values is the entire fix. Leaving the nape skin and the
+      // hair on the crown gave a light head sitting on a light neck -- one
+      // continuous mass with no pinch. Dark / light / saturated reads.
+      { g: new THREE.CylinderGeometry(0.088, 0.100, 0.30, 10), c: P.runnerSkin, y: 0.10 },
+      { g: new THREE.SphereGeometry(0.25, 16, 12), c: P.runnerSkin, y: 0.38, sy: 1.02, sz: 0.97 },
+      // Crown cap for the top of the skull...
+      { g: new THREE.SphereGeometry(0.264, 14, 6, 0, Math.PI * 2, 0, Math.PI * 0.42), c: P.runnerHair, y: 0.375 },
+      // ...and a rear-only shell that carries the hair down to the nape but
+      // leaves the face clear. Restricting phi to the back 210 degrees is
+      // what lets one primitive do a haircut.
+      { g: new THREE.SphereGeometry(0.271, 14, 8, Math.PI * 1.5 - 1.83, 3.66, Math.PI * 0.33, Math.PI * 0.44), c: P.runnerHair, y: 0.375 },
+      // Headband sits above the eye line -- lower and it reads as goggles.
+      // Radius has to clear the hair everywhere: shells this close together
+      // interpenetrate on their facets and the crown grew a row of teeth.
+      { g: new THREE.CylinderGeometry(0.279, 0.279, 0.070, 14), c: TRIM, y: 0.436 },
+      { g: new THREE.SphereGeometry(0.076, 8, 6), c: P.runnerSkin, x: -0.238, y: 0.360, z: -0.012, sx: 0.48, sz: 0.82 },
+      { g: new THREE.SphereGeometry(0.076, 8, 6), c: P.runnerSkin, x: 0.238, y: 0.360, z: -0.012, sx: 0.48, sz: 0.82 },
     ]);
     head.add(headMesh);
 
@@ -206,8 +227,8 @@ MR.Runner = (function () {
     // Welded into one mesh -- they are a single draw the back view never
     // spends, but the character still needs a face for the finish framing.
     const eyes = new THREE.Mesh(weld([
-      { g: new THREE.CircleGeometry(0.055, 12), c: P.ink, x: -0.098, y: 0.30, z: 0.246 },
-      { g: new THREE.CircleGeometry(0.055, 12), c: P.ink, x: 0.098, y: 0.30, z: 0.246 },
+      { g: new THREE.CircleGeometry(0.053, 12), c: P.ink, x: -0.094, y: 0.365, z: 0.243 },
+      { g: new THREE.CircleGeometry(0.053, 12), c: P.ink, x: 0.094, y: 0.365, z: 0.243 },
     ]), S.flat(0xffffff, { vertexColors: true }));
     head.add(eyes);
 
@@ -243,7 +264,11 @@ MR.Runner = (function () {
       legs.push({ side, hip, knee, ankle });
 
       // arm
-      const shoulder = pivot(chest, side * 0.235, 0.07, 0);
+      const shoulder = pivot(chest, side * 0.236, -0.02, 0);
+      // ZXY so the twist happens along the arm before it is swung and then
+      // abducted. With the default XYZ the yaw fired after the outward tilt
+      // and dragged the whole arm across the back of the vest.
+      shoulder.rotation.order = 'ZXY';
       const upper = part(new THREE.CapsuleGeometry(0.088, 0.17, 3, 10), P.runnerSkin);
       upper.position.y = -0.16;
       shoulder.add(upper);

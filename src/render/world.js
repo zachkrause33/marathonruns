@@ -397,6 +397,94 @@ MR.World = (function () {
     };
   }
 
+  /**
+   * The racing line: one concrete lane path that survives the whole course.
+   *
+   * course.js already proves a path EXISTS -- generate() retries a gate until
+   * `solvable()` still says yes. This walks the identical state space, keeps
+   * the cheapest survivor instead of the first, and hands back the lane to be
+   * in at every gate. Identical rules means the line drawn on the road is a
+   * line the player can actually hold, not a suggestion that runs into a train
+   * two gates later.
+   *
+   * Cost is lane changes first and actions second, which is the line a runner
+   * would pick rather than merely a legal one: hold what you have, move only
+   * when the gate makes you, and prefer the lane you can run straight through.
+   *
+   * It is a property of the course, so it is the same for every player on the
+   * same day -- exactly like the course itself.
+   */
+  function racingLine(gates) {
+    if (!gates.length) return null;
+    const AW = MR.Course.ACTION_WINDOW;
+    // Same state collapse as Course.solvable: lane, the action still committed
+    // to, and whether that action is recent enough to conflict.
+    let states = [{ lane: 1, act: K.CLEAR, z: -1e9, cost: 0, prev: null }];
+
+    for (let i = 0; i < gates.length; i++) {
+      const g = gates[i];
+      const next = new Map();
+      for (const s of states) {
+        for (let l = 0; l < 3; l++) {
+          const h = g.lanes[l];
+          if (h === K.BLOCK) continue;
+          if (h !== K.CLEAR && s.act !== K.CLEAR && h !== s.act && g.z - s.z < AW) continue;
+          const act = h === K.CLEAR ? s.act : h;
+          const az = h === K.CLEAR ? s.z : g.z;
+          const tag = l + ':' + act + ':' + (g.z - az < AW ? 1 : 0);
+          const cost = s.cost + Math.abs(l - s.lane) * 10 + (h === K.CLEAR ? 0 : 1);
+          const cur = next.get(tag);
+          if (!cur || cost < cur.cost) next.set(tag, { lane: l, act, z: az, cost, prev: s });
+        }
+      }
+      // Unreachable: generate() would have rejected the gate. Fail soft rather
+      // than throw -- a missing line is a missing hint, not a broken race.
+      if (!next.size) return null;
+      states = Array.from(next.values());
+    }
+
+    let best = states[0];
+    for (const s of states) if (s.cost < best.cost) best = s;
+    const lanes = new Array(gates.length);
+    for (let i = gates.length - 1; i >= 0; i--) { lanes[i] = best.lane; best = best.prev; }
+    return lanes;
+  }
+
+  /**
+   * The stripe the racing line is painted with: soft-edged, with a pulse
+   * running along it.
+   *
+   * Deliberately paint and not floating pickups. Anything hovering in a lane at
+   * this camera height has to be read and then ruled out as a hazard, and the
+   * entire point of the hint is to reduce what the player has to parse, not to
+   * add a fifth thing on the road that looks like the other four.
+   */
+  let routeTex = null;
+  function routeTexture() {
+    if (routeTex) return routeTex;
+    const c = canvas(32, 128);
+    const g = c.getContext('2d');
+    const img = g.createImageData(32, 128);
+    for (let y = 0; y < 128; y++) {
+      // Two pulses per tile and never fully dark: a line that breaks stops
+      // reading as a path and starts reading as a row of objects.
+      const v = y / 128;
+      const flow = 0.54 + 0.46 * Math.pow(0.5 + 0.5 * Math.sin(v * Math.PI * 4 - 1.6), 2.4);
+      for (let x = 0; x < 32; x++) {
+        // Soft shoulders. A hard-edged stripe aliases into a dotted line at the
+        // far end of the run-up, which is the end that has to carry the read.
+        const u = Math.abs(x - 15.5) / 15.5;
+        const core = Math.max(0, 1 - Math.pow(u, 2.6));
+        const i = (y * 32 + x) * 4;
+        img.data[i] = 255; img.data[i + 1] = 255; img.data[i + 2] = 255;
+        img.data[i + 3] = Math.round(255 * core * flow);
+      }
+    }
+    g.putImageData(img, 0, 0);
+    routeTex = texture(c, true);
+    return routeTex;
+  }
+
   function create(course) {
     const group = new THREE.Group();
     const rnd = MR.rng.stream(course.key, 'scenery/v2');
@@ -683,6 +771,109 @@ MR.World = (function () {
       t.userData.edges = edges;
       return t;
     }, group);
+
+    // ---- the racing line ------------------------------------------------
+    /**
+     * A blue line, painted on the road, showing the lane the next few gates
+     * have to be taken in.
+     *
+     * The whole mechanic here is holding one unbroken clean line, and until now
+     * the game gave the player no forward read of where that line was: every
+     * gate was solved on its own, on sight, with no way to see that the lane
+     * you are about to take is the one that runs into a train two gates later.
+     * Both reference runners telegraph the route several gates out with a coin
+     * or ring trail. A marathon already has the perfect version of that idea --
+     * real courses paint the measured shortest route on the tarmac -- so this
+     * is a borrow that costs the game nothing in tone.
+     *
+     * Cost is one draw call. The ribbon is a single mesh whose vertices are
+     * rewritten in place each frame as the route scrolls past, so it never
+     * allocates and never grows with the length of the course.
+     *
+     * It hints the LANE and nothing else: which action a gate wants, and when
+     * to commit to it, are still entirely the player's read.
+     */
+    const ROUTE_NEAR = 5;      // starts clear of the runner's own feet
+    const ROUTE_FAR = 124;     // three to five gates -- as far as the fog allows
+    const ROUTE_SEGS = 44;
+    const ROUTE_W = 0.17;      // half-width
+    const ROUTE_UV = 1 / 14;   // one texture tile per 14 units of road
+
+    const routeLane = racingLine(course.gates);
+    const routeGeo = new THREE.BufferGeometry();
+    const routePos = new Float32Array(ROUTE_SEGS * 6 * 3);
+    const routeUvs = new Float32Array(ROUTE_SEGS * 6 * 2);
+    routeGeo.setAttribute('position', new THREE.BufferAttribute(routePos, 3));
+    routeGeo.setAttribute('uv', new THREE.BufferAttribute(routeUvs, 2));
+    const routeMesh = new THREE.Mesh(routeGeo, new THREE.MeshBasicMaterial({
+      map: routeTexture(),
+      color: 0x5ff0a6,          // the one hue no hazard owns; amber, cyan and
+      transparent: true,        // red are all spoken for, and green reads "go"
+      depthWrite: false,
+      side: THREE.DoubleSide,   // the ribbon is rebuilt every frame; not
+    }));                        // depending on winding is one less way to fail
+    // Below the hazard telegraph mats (5) and the finish checker (4): where the
+    // line runs across a gate's own mat, the hazard has to win.
+    routeMesh.renderOrder = 3;
+    routeMesh.frustumCulled = false;   // its bounds change every frame
+    routeMesh.visible = !!routeLane;
+    group.add(routeMesh);
+
+    // Sampling walks z forwards, so the gate lookup is a cursor rather than a
+    // search. It rewinds at the start of each frame and costs nothing after.
+    let routeCursor = 0;
+    function routeX(zz) {
+      const gates = course.gates;
+      while (routeCursor > 0 && gates[routeCursor - 1].z >= zz) routeCursor--;
+      while (routeCursor < gates.length && gates[routeCursor].z < zz) routeCursor++;
+      const i = routeCursor;
+      if (i >= gates.length) return K.LANE_X[routeLane[gates.length - 1]];
+      const to = K.LANE_X[routeLane[i]];
+      const from = i > 0 ? K.LANE_X[routeLane[i - 1]] : to;
+      const gz = gates[i].z;
+      const pz = i > 0 ? gates[i - 1].z : gz - 40;
+      // Cross over into the new lane before the gate, never across it: by the
+      // gate line the paint is already where the player has to be.
+      const cross = Math.min(18, Math.max(8, (gz - pz) * 0.55));
+      const t = Math.max(0, Math.min(1, (zz - (gz - cross)) / cross));
+      return from + (to - from) * t * t * (3 - 2 * t);
+    }
+
+    function updateRoute(z, now) {
+      if (!routeLane) return;
+      const step = (ROUTE_FAR - ROUTE_NEAR) / ROUTE_SEGS;
+      let z0 = z + ROUTE_NEAR;
+      let x0 = routeX(z0);
+      for (let i = 0; i < ROUTE_SEGS; i++) {
+        const z1 = z + ROUTE_NEAR + (i + 1) * step;
+        const x1 = routeX(z1);
+        // Taper away with distance, so the far end thins into the fog rather
+        // than stopping on a cut edge in the middle of the road.
+        const w0 = ROUTE_W * (1 - 0.5 * (i / ROUTE_SEGS));
+        const w1 = ROUTE_W * (1 - 0.5 * ((i + 1) / ROUTE_SEGS));
+        const v0 = z0 * ROUTE_UV, v1 = z1 * ROUTE_UV;
+        const p = i * 18, u = i * 12;
+        // l0, r1, r0 -- then l0, l1, r1.
+        routePos[p] = x0 - w0; routePos[p + 1] = 0.010; routePos[p + 2] = z0;
+        routePos[p + 3] = x1 + w1; routePos[p + 4] = 0.010; routePos[p + 5] = z1;
+        routePos[p + 6] = x0 + w0; routePos[p + 7] = 0.010; routePos[p + 8] = z0;
+        routePos[p + 9] = x0 - w0; routePos[p + 10] = 0.010; routePos[p + 11] = z0;
+        routePos[p + 12] = x1 - w1; routePos[p + 13] = 0.010; routePos[p + 14] = z1;
+        routePos[p + 15] = x1 + w1; routePos[p + 16] = 0.010; routePos[p + 17] = z1;
+        routeUvs[u] = 0; routeUvs[u + 1] = v0;
+        routeUvs[u + 2] = 1; routeUvs[u + 3] = v1;
+        routeUvs[u + 4] = 1; routeUvs[u + 5] = v0;
+        routeUvs[u + 6] = 0; routeUvs[u + 7] = v0;
+        routeUvs[u + 8] = 0; routeUvs[u + 9] = v1;
+        routeUvs[u + 10] = 1; routeUvs[u + 11] = v1;
+        z0 = z1; x0 = x1;
+      }
+      routeGeo.attributes.position.needsUpdate = true;
+      routeGeo.attributes.uv.needsUpdate = true;
+      // The pulse runs forward, away from the runner, so the line leads the eye
+      // down the course instead of washing back over it.
+      routeTexture().offset.y = -(now * 0.45) % 1;
+    }
 
     // ---- hazards --------------------------------------------------------
     // Visual extents are pinned to MR.Collision.BOX: JUMP tops out at 0.80,
@@ -1310,7 +1501,9 @@ MR.World = (function () {
       return null;
     }
 
-    const api = { group, sky, mats, course };
+    // routeLane is exposed so it can be asserted against the course rather than
+    // taken on trust: the lane it names at every gate must never be a BLOCK.
+    const api = { group, sky, mats, course, routeLane };
 
     /** Recolour shared materials for the biome at progress f. */
     api.fogColor = new THREE.Color(BIOME_LOOK['CITY START'].fog);
@@ -1558,6 +1751,8 @@ MR.World = (function () {
         if (e.s.kind !== 'crowd') continue;
         e.obj.position.y = Math.abs(Math.sin(now * 4 + e.obj.userData.bounce * 6.3)) * 0.13;
       }
+
+      updateRoute(z, now);
 
       api.applyBiome(Math.min(1, z / K.TOTAL_UNITS));
     };

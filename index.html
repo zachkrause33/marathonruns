@@ -1842,12 +1842,16 @@ MR.shading = (function () {
    * carries the shape; rgb is left white so the material's own `color` is the
    * only thing tinting it.
    *
-   * The profile is squared rather than linear -- a linear radial gradient has
-   * a soft, evenly-thinning edge that reads as a smudge, while squaring holds
-   * a dense core out to about half the radius and then lets go, which is the
-   * shape an occluder actually casts and the shape the references draw. The
-   * canvas is only 96px because it is never seen larger than a couple of
-   * hundred screen pixels and it is magnified with linear filtering.
+   * The profile is a SOLID CORE with a smooth rim, not a plain radial
+   * gradient. A linear or squared falloff thins evenly from the middle and
+   * reads as a smudge under the character; what the references draw is an
+   * almost flat dark ellipse that gives up quickly at its edge, because that
+   * is what a body-sized occluder close to the ground actually casts. Held
+   * full out to 30% of the radius, then smoothstepped to nothing.
+   *
+   * The canvas is only 96px: it is never seen larger than a couple of hundred
+   * screen pixels and it is magnified with linear filtering, so the smooth
+   * part of the profile costs nothing to resolve.
    */
   function blobTexture() {
     if (blobTex) return blobTex;
@@ -1862,10 +1866,11 @@ MR.shading = (function () {
       for (let x = 0; x < N; x++) {
         const dx = (x - c) / c, dy = (y - c) / c;
         const r = Math.sqrt(dx * dx + dy * dy);
-        const a = Math.max(0, 1 - r);
+        const u = Math.max(0, Math.min(1, (r - 0.30) / 0.70));
+        const a = 1 - u * u * (3 - 2 * u);
         const i = (y * N + x) * 4;
         d[i] = d[i + 1] = d[i + 2] = 255;
-        d[i + 3] = Math.round(a * a * 255);
+        d[i + 3] = Math.round(a * 255);
       }
     }
     g.putImageData(img, 0, 0);
@@ -1921,7 +1926,12 @@ MR.shading = (function () {
       map: blobTexture(),
       color: o.color === undefined ? PALETTE.contact : o.color,
       transparent: true,
-      opacity: o.opacity === undefined ? 0.50 : o.opacity,
+      // Measured against the road rather than guessed: at 0.5 the core came
+      // out only 25% darker than the tarmac under it, which is a smudge, not
+      // a shadow, and the runner still read as floating. 0.72 lands the core
+      // about 40% down, which is where the references sit. Anything on light
+      // ground wants less -- pass it in.
+      opacity: o.opacity === undefined ? 0.72 : o.opacity,
       depthWrite: false,
       side: THREE.DoubleSide,
     });
@@ -2877,6 +2887,94 @@ MR.World = (function () {
     };
   }
 
+  /**
+   * The racing line: one concrete lane path that survives the whole course.
+   *
+   * course.js already proves a path EXISTS -- generate() retries a gate until
+   * `solvable()` still says yes. This walks the identical state space, keeps
+   * the cheapest survivor instead of the first, and hands back the lane to be
+   * in at every gate. Identical rules means the line drawn on the road is a
+   * line the player can actually hold, not a suggestion that runs into a train
+   * two gates later.
+   *
+   * Cost is lane changes first and actions second, which is the line a runner
+   * would pick rather than merely a legal one: hold what you have, move only
+   * when the gate makes you, and prefer the lane you can run straight through.
+   *
+   * It is a property of the course, so it is the same for every player on the
+   * same day -- exactly like the course itself.
+   */
+  function racingLine(gates) {
+    if (!gates.length) return null;
+    const AW = MR.Course.ACTION_WINDOW;
+    // Same state collapse as Course.solvable: lane, the action still committed
+    // to, and whether that action is recent enough to conflict.
+    let states = [{ lane: 1, act: K.CLEAR, z: -1e9, cost: 0, prev: null }];
+
+    for (let i = 0; i < gates.length; i++) {
+      const g = gates[i];
+      const next = new Map();
+      for (const s of states) {
+        for (let l = 0; l < 3; l++) {
+          const h = g.lanes[l];
+          if (h === K.BLOCK) continue;
+          if (h !== K.CLEAR && s.act !== K.CLEAR && h !== s.act && g.z - s.z < AW) continue;
+          const act = h === K.CLEAR ? s.act : h;
+          const az = h === K.CLEAR ? s.z : g.z;
+          const tag = l + ':' + act + ':' + (g.z - az < AW ? 1 : 0);
+          const cost = s.cost + Math.abs(l - s.lane) * 10 + (h === K.CLEAR ? 0 : 1);
+          const cur = next.get(tag);
+          if (!cur || cost < cur.cost) next.set(tag, { lane: l, act, z: az, cost, prev: s });
+        }
+      }
+      // Unreachable: generate() would have rejected the gate. Fail soft rather
+      // than throw -- a missing line is a missing hint, not a broken race.
+      if (!next.size) return null;
+      states = Array.from(next.values());
+    }
+
+    let best = states[0];
+    for (const s of states) if (s.cost < best.cost) best = s;
+    const lanes = new Array(gates.length);
+    for (let i = gates.length - 1; i >= 0; i--) { lanes[i] = best.lane; best = best.prev; }
+    return lanes;
+  }
+
+  /**
+   * The stripe the racing line is painted with: soft-edged, with a pulse
+   * running along it.
+   *
+   * Deliberately paint and not floating pickups. Anything hovering in a lane at
+   * this camera height has to be read and then ruled out as a hazard, and the
+   * entire point of the hint is to reduce what the player has to parse, not to
+   * add a fifth thing on the road that looks like the other four.
+   */
+  let routeTex = null;
+  function routeTexture() {
+    if (routeTex) return routeTex;
+    const c = canvas(32, 128);
+    const g = c.getContext('2d');
+    const img = g.createImageData(32, 128);
+    for (let y = 0; y < 128; y++) {
+      // Two pulses per tile and never fully dark: a line that breaks stops
+      // reading as a path and starts reading as a row of objects.
+      const v = y / 128;
+      const flow = 0.54 + 0.46 * Math.pow(0.5 + 0.5 * Math.sin(v * Math.PI * 4 - 1.6), 2.4);
+      for (let x = 0; x < 32; x++) {
+        // Soft shoulders. A hard-edged stripe aliases into a dotted line at the
+        // far end of the run-up, which is the end that has to carry the read.
+        const u = Math.abs(x - 15.5) / 15.5;
+        const core = Math.max(0, 1 - Math.pow(u, 2.6));
+        const i = (y * 32 + x) * 4;
+        img.data[i] = 255; img.data[i + 1] = 255; img.data[i + 2] = 255;
+        img.data[i + 3] = Math.round(255 * core * flow);
+      }
+    }
+    g.putImageData(img, 0, 0);
+    routeTex = texture(c, true);
+    return routeTex;
+  }
+
   function create(course) {
     const group = new THREE.Group();
     const rnd = MR.rng.stream(course.key, 'scenery/v2');
@@ -3604,17 +3702,21 @@ MR.World = (function () {
     // A banner is a gantry, not a floating card: legs, a truss, a lit header
     // and a stripe painted across the road so the moment of passing it is
     // marked on the ground as well as overhead.
+    // A gantry straddles the road, so its legs are pinned a fixed step outside
+    // the kerb rather than to a literal. Narrow the track and the banner comes
+    // in with it, instead of being left standing out among the spectators.
+    const GANTRY = K.TRACK_HALF_WIDTH + 1.2;
     const bannerFrameGeo = (function () {
       const parts = [];
       for (const sx of [-1, 1]) {
-        parts.push(bx(0.42, 6.0, 0.42, sx * 5.6, 3.0, 0, 0x2b2f52));
-        parts.push(bx(0.90, 0.30, 0.90, sx * 5.6, 0.15, 0, 0x1b1633));
-        parts.push(bx(0.30, 0.30, 1.8, sx * 5.6, 5.4, 0, 0x2b2f52, 0, 0, 0));
+        parts.push(bx(0.42, 6.0, 0.42, sx * GANTRY, 3.0, 0, 0x2b2f52));
+        parts.push(bx(0.90, 0.30, 0.90, sx * GANTRY, 0.15, 0, 0x1b1633));
+        parts.push(bx(0.30, 0.30, 1.8, sx * GANTRY, 5.4, 0, 0x2b2f52, 0, 0, 0));
       }
-      parts.push(bx(11.6, 0.40, 0.40, 0, 5.95, 0, 0x2b2f52));
-      parts.push(bx(11.6, 0.30, 0.30, 0, 3.65, 0, 0x2b2f52));
+      parts.push(bx(GANTRY * 2 + 0.4, 0.40, 0.40, 0, 5.95, 0, 0x2b2f52));
+      parts.push(bx(GANTRY * 2 + 0.4, 0.30, 0.30, 0, 3.65, 0, 0x2b2f52));
       for (let i = -4; i <= 4; i++) {
-        parts.push(bx(0.16, 2.4, 0.16, i * 1.25, 4.8, 0, 0x3a4570, 0, 0, i % 2 ? 0.45 : -0.45));
+        parts.push(bx(0.16, 2.4, 0.16, i * (GANTRY - 0.6) / 4, 4.8, 0, 0x3a4570, 0, 0, i % 2 ? 0.45 : -0.45));
       }
       parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, 0.7), 0xfffdf5, 0, 0.011, 0, -Math.PI / 2));
       return merge(parts);
@@ -3624,10 +3726,10 @@ MR.World = (function () {
       const g = new THREE.Group();
       g.add(S.outlined(bannerFrameGeo, mats.prop, S.INK.banner));
       const mat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-      const panel = new THREE.Mesh(new THREE.PlaneGeometry(10.6, 2.1), mat);
+      const panel = new THREE.Mesh(new THREE.PlaneGeometry(GANTRY * 2 - 0.6, 2.1), mat);
       panel.position.y = 4.78; panel.rotation.y = Math.PI;
       g.add(panel);
-      const back = new THREE.Mesh(new THREE.PlaneGeometry(10.6, 2.1), mat);
+      const back = new THREE.Mesh(new THREE.PlaneGeometry(GANTRY * 2 - 0.6, 2.1), mat);
       back.position.y = 4.78;
       g.add(back);
       g.userData.panel = panel;
@@ -3637,29 +3739,30 @@ MR.World = (function () {
 
     // Start and finish get a heavier arch with a checker band.
     const checkTex = checkerTexture();
+    const ARCH = K.TRACK_HALF_WIDTH + 3.0;   // heavier gantry, set further back
     const archGeo = merge([
-      bx(1.5, 9.0, 1.5, -7.4, 4.5, 0, 0xff3b6b),
-      bx(1.5, 9.0, 1.5, 7.4, 4.5, 0, 0xff3b6b),
-      bx(2.3, 0.6, 2.3, -7.4, 0.3, 0, 0x1b1633),
-      bx(2.3, 0.6, 2.3, 7.4, 0.3, 0, 0x1b1633),
-      bx(17.2, 1.3, 1.6, 0, 8.7, 0, 0xff3b6b),
-      bx(17.2, 0.5, 1.2, 0, 6.2, 0, 0xd42a55),
-      bx(0.9, 4.2, 0.9, -6.2, 10.9, 0, 0x2b2f52),
-      bx(0.9, 4.2, 0.9, 6.2, 10.9, 0, 0x2b2f52),
-      bx(2.6, 1.8, 0.12, -5.0, 12.4, 0, 0xffe45e),
-      bx(2.6, 1.8, 0.12, 5.0, 12.4, 0, 0xffe45e),
+      bx(1.5, 9.0, 1.5, -ARCH, 4.5, 0, 0xff3b6b),
+      bx(1.5, 9.0, 1.5, ARCH, 4.5, 0, 0xff3b6b),
+      bx(2.3, 0.6, 2.3, -ARCH, 0.3, 0, 0x1b1633),
+      bx(2.3, 0.6, 2.3, ARCH, 0.3, 0, 0x1b1633),
+      bx(ARCH * 2 + 2.4, 1.3, 1.6, 0, 8.7, 0, 0xff3b6b),
+      bx(ARCH * 2 + 2.4, 0.5, 1.2, 0, 6.2, 0, 0xd42a55),
+      bx(0.9, 4.2, 0.9, -(ARCH - 1.2), 10.9, 0, 0x2b2f52),
+      bx(0.9, 4.2, 0.9, ARCH - 1.2, 10.9, 0, 0x2b2f52),
+      bx(2.6, 1.8, 0.12, -(ARCH - 2.4), 12.4, 0, 0xffe45e),
+      bx(2.6, 1.8, 0.12, ARCH - 2.4, 12.4, 0, 0xffe45e),
     ]);
     const archPool = Pool(function () {
       const g = new THREE.Group();
       g.add(S.outlined(archGeo, mats.prop, S.INK.banner));
       const mat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-      const panel = new THREE.Mesh(new THREE.PlaneGeometry(15.4, 2.4), mat);
+      const panel = new THREE.Mesh(new THREE.PlaneGeometry(ARCH * 2 + 0.6, 2.4), mat);
       panel.position.y = 7.45; panel.rotation.y = Math.PI;
       g.add(panel);
-      const back = new THREE.Mesh(new THREE.PlaneGeometry(15.4, 2.4), mat);
+      const back = new THREE.Mesh(new THREE.PlaneGeometry(ARCH * 2 + 0.6, 2.4), mat);
       back.position.y = 7.45;
       g.add(back);
-      const band = new THREE.Mesh(new THREE.PlaneGeometry(15.4, 0.55), new THREE.MeshBasicMaterial({ map: checkTex }));
+      const band = new THREE.Mesh(new THREE.PlaneGeometry(ARCH * 2 + 0.6, 0.55), new THREE.MeshBasicMaterial({ map: checkTex }));
       band.position.set(0, 5.95, 0.1); band.rotation.y = Math.PI;
       g.add(band);
       // Checker laid across the road: the line you actually cross.
@@ -4134,10 +4237,9 @@ MR.Ghost = (function () {
   // translucent figure parked there is the one placement that could cost
   // someone a gate.
   const HOME_X = K.LANE_X[0];
-  // Halfway between that lane and the kerb. Derived rather than typed, so the
-  // pending track-narrowing work carries the ghost with it instead of leaving
-  // it running along the verge.
-  const WIDE_X = (HOME_X - K.TRACK_HALF_WIDTH) * 0.5;
+  // Derived rather than typed, so the pending track-narrowing work carries the
+  // ghost's station with it instead of leaving it running along the verge.
+  const LANE_W = K.LANE_X[1] - K.LANE_X[0];
 
   // The ghost never varies -- it IS record pace, by definition. Feeding the
   // rig a constant is also the cheapest way to sell the pass: at the crossover
@@ -4353,12 +4455,33 @@ MR.Ghost = (function () {
       s.flash = Math.max(0, s.flash - dt / 1.7);
 
       // ---- lateral -------------------------------------------------------
-      // No course-solving: it holds one lane for twenty-six miles. The single
-      // exception is the pass, where the player arriving in its lane would put
-      // two bodies inside each other -- so it eases toward the kerb, over
-      // about a second, and eases back. A drift, not a dodge.
-      const crowded = Math.abs((st.playerX || 0) - HOME_X) < 1.3 && Math.abs(gap) < 30;
-      s.x += ((crowded ? WIDE_X : HOME_X) - s.x) * (1 - Math.pow(0.35, dt));
+      // No course-solving and no reading of gates: for twenty-odd miles the
+      // ghost simply holds the outside lane.
+      //
+      // What it does do is take station for the pass. A record holder would
+      // hold their own line, and with the player out on the opposite lane the
+      // overtake would then happen across the full width of the road -- at
+      // three units from the lens that is a lateral angle of over 60 degrees,
+      // so the moment the record actually changes hands would happen off the
+      // edge of the frame. So inside the last forty units the ghost eases to
+      // the lane off the player's inside shoulder, which puts the pass in the
+      // middle of the screen from any lane and can never end with two bodies
+      // in the same strip of road. It is a fiction, and it is the fiction this
+      // whole feature exists to deliver.
+      const px = st.playerX || 0;
+      const post = Math.abs(px) > 0.6 ? px - Math.sign(px) * LANE_W : HOME_X;
+      const close = 1 - smoothstep(22, 44, Math.abs(gap));
+      s.x += ((HOME_X + (post - HOME_X) * close) - s.x) * (1 - Math.pow(0.30, dt));
+
+      // Belt to that brace. However lazily the drift is easing, and whatever
+      // the player does with the last second before the pass, the two are
+      // never allowed to overlap while they are level. The push is toward the
+      // station rather than away from the current overlap, so it always agrees
+      // with the direction the drift was already going.
+      const clear = LANE_W * 0.72;
+      if (Math.abs(gap) < 9 && Math.abs(s.x - px) < clear) {
+        s.x = px + (post < px ? -clear : clear);
+      }
 
       // ---- body ----------------------------------------------------------
       const camZ = cam.position.z;
@@ -4420,8 +4543,10 @@ MR.Ghost = (function () {
         _v.set(-e[8], -e[9], -e[10]);
         const d = 6;
         const tan = Math.tan(cam.fov * Math.PI / 360);
-        // Lane 0 is screen-right for this camera, which is where the ghost went.
-        const nx = 0.58, ny = -0.58;
+        // World -x is screen RIGHT for a camera looking down +z, so lane 0 is
+        // the side the ghost went out on. Far enough into the corner to clear
+        // the racing line; the rail and the split card own the bottom middle.
+        const nx = 0.70, ny = -0.62;
         tagRear.scale.set(TAG_SIZE * TAG_ASPECT * pulse * 0.86, TAG_SIZE * pulse * 0.86, 1);
         tagRear.position.copy(cam.position)
           .addScaledVector(_v, d)

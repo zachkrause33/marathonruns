@@ -723,7 +723,12 @@ MR.shading = (function () {
       map: blobTexture(),
       color: o.color === undefined ? PALETTE.contact : o.color,
       transparent: true,
-      opacity: o.opacity === undefined ? 0.50 : o.opacity,
+      // Measured against the road rather than guessed: at 0.5 the core came
+      // out only 25% darker than the tarmac under it, which is a smudge, not
+      // a shadow, and the runner still read as floating. 0.72 lands the core
+      // about 40% down, which is where the references sit. Anything on light
+      // ground wants less -- pass it in.
+      opacity: o.opacity === undefined ? 0.72 : o.opacity,
       depthWrite: false,
       side: THREE.DoubleSide,
     });

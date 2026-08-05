@@ -6022,7 +6022,22 @@ MR.Camera = (function () {
   const GEAR_FOV = 2.5;          // extra, only in the top of the band
   const FOV_MIN = 48, FOV_MAX = 76;
 
-  const BASE_Y = 2.05;
+  // Height is set by a sightline, not by taste.
+  //
+  // The road in the player's own lane only rises above their own head on
+  // screen beyond d > 6.96 / (camY - 1.60), where 1.60 is the runner's crown
+  // and 4.35 the chase distance. At the old BASE_Y of 2.05 -- which the pace
+  // drop below took to 1.70 at race pace, a mere 0.10 above the crown -- that
+  // put the horizon of usable information at 62 units. Gates are 24-46 units
+  // apart, so the runner's own body was hiding the next one to two gates in
+  // the lane they were standing in. Playtest verdict, exactly: "it's hard to
+  // see what is in front of you."
+  //
+  // 2.62 lands ~2.30 at full pace, which brings that sightline in to about 10
+  // units -- the road immediately ahead is visible again -- and drops the
+  // runner from 47% down the frame to roughly 65%, which is also where the
+  // Subway Surfers and Sonic references put theirs (see reference/).
+  const BASE_Y = 2.62;
   const BASE_BACK = 4.35;
   const LOOK_Y = 1.16;
   const LOOK_AHEAD = 8.0;
@@ -6213,8 +6228,12 @@ MR.Camera = (function () {
         + bobZ
         + fin * 3.4;
 
+      // The pace drop is halved from 0.41. Dropping toward the road is a good
+      // speed cue, but it was spending the sightline computed above at exactly
+      // the moment the player is fastest and most needs to read ahead -- the
+      // camera was lowest, and the gates tightest, on the same stretch.
       const hgt = BASE_Y
-        - drive * 0.41
+        - drive * 0.20
         - duck * 0.34
         + (p.y || 0) * 0.30            // keeps a third of the arc -- see aim
         + s.dip

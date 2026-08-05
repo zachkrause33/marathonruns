@@ -245,7 +245,9 @@
 
       // Player events -> audio.
       for (const e of player.drainEvents()) {
-        if (e === 'jump') audio.jump();
+        if (e === 'bounce') cam.impact(1.35);
+        else if (e === 'trip') cam.impact(0.55);
+        else if (e === 'jump') audio.jump();
         else if (e === 'land') { audio.land(); cam.land(); }
         else if (e === 'duck') audio.duck();
         else if (e === 'hit') audio.hit();
@@ -288,6 +290,8 @@
       speed: pace.speed(),
       air01: player.airborne ? Math.sin(Math.min(1, player.airT) * Math.PI) : 0,
       duck01: player.duck01,
+      trip: player.tripT,
+      bounce: player.bounce,
       lean: player.lean,
       stumble: player.stumble,
     });

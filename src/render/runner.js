@@ -504,6 +504,12 @@ MR.Runner = (function () {
       const duck = st.duck01 || 0;
       const lean = st.lean || 0;
       const stumble = st.stumble || 0;
+      // A trip is a stagger, not a pause: the body pitches forward and the
+      // arms fly out to catch it. Kept separate from `stumble` so the wall
+      // bounce (which is a lateral throw) and the kerb trip (which is a
+      // forward pitch) do not collapse into the same animation.
+      const trip = st.trip || 0;
+      const knock = st.bounce || 0;
 
       // ghost.js re-materials every mesh under this rig to draw the record
       // runner as one translucent body. That is right for limbs and wrong for
@@ -578,11 +584,11 @@ MR.Runner = (function () {
         // which is what keeps the heels skimming the road instead of buried
         // in it once the body has dropped.
         L.hip.rotation.x = -s * swing * 0.86 * cyc + tuck * 0.70
-          - slid * (1.62 + lead * 0.12);
+          - slid * (1.72 + lead * 0.10);
         // Knee only bends one way; bias so it flexes hardest on recovery.
         const bend = Math.max(0, -c * 0.5 + 0.5);
         L.knee.rotation.x = 0.18 + bend * (1.22 + 0.26 * sp01) * cyc + tuck * 1.25
-          + slid * (0.30 - lead * 0.20);
+          + slid * (0.04 - lead * 0.02);
         // Dorsiflex through recovery, plantarflex off the toe -- and hard
         // dorsiflexion in the slide, toes up, which is both what a slider
         // actually does and what turns the biggest pale face on the character
@@ -604,7 +610,7 @@ MR.Runner = (function () {
         // 0.70 is also the ceiling: MEASUREMENTS.md derives the lane's own
         // limit at 0.70 from the lane centre, so this pose spends the width
         // budget the gloves' 0.543 run swing had already proved is there.
-        L.hip.rotation.z = L.side * (0.05 + spread * 0.30 + slid * 0.70);
+        L.hip.rotation.z = L.side * (0.05 + spread * 0.30 + slid * 0.26);
       }
 
       // ---- arms ----------------------------------------------------------
@@ -698,9 +704,21 @@ MR.Runner = (function () {
       // "diving into it".
       const leanFwd = (0.26 + 0.12 * sp01 + stumble * 0.5) * (1 - slid * 0.94)
         - spread * 0.30
-        - slid * 0.78;
-      spine.rotation.x = leanFwd;
-      spine.rotation.z = -lean * 0.30;
+        - slid * 1.12;
+      spine.rotation.x = leanFwd + trip * 0.46;
+      // Slide the whole torso BACK along the direction of travel, not just
+      // recline it.
+      //
+      // Throwing the legs further forward does not work: hip.rotation.z opens
+      // 0.70rad of splay in the slide (without it the legs vanish behind the
+      // torso at this camera angle), and that splay converts most of the
+      // forward throw into lateral -- pushing the hip term from 1.62 to 2.05
+      // moved the feet only 0.06 further ahead of the head while lifting them
+      // off the road. Translating the spine pivot is direct: legs hang off
+      // `hips` and are untouched, torso and head hang off `spine` and move,
+      // so the gap between shoes and crown opens without distorting either.
+      spine.position.z = -slid * 0.14;
+      spine.rotation.z = -lean * 0.30 - knock * 0.34;
       spine.rotation.y = lean * 0.16;
 
       // Counter-rotate the shoulders against the hips -- the single cue that
@@ -725,7 +743,7 @@ MR.Runner = (function () {
       neck.rotation.y = -Math.sin(p) * 0.10;
 
       // Whole-body bank into a lane change reads as weight, not a slide.
-      root.rotation.z = -lean * 0.13;
+      root.rotation.z = -lean * 0.13 - knock * 0.16;
 
       // Ducking drops the whole body rather than only folding the spine, so
       // the collision capsule and the silhouette agree. The 0.42 matches

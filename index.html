@@ -1178,54 +1178,64 @@ MR.Course = (function () {
    * gates, so taking one is never entangled with a jump or a duck the player
    * is already committed to.
    *
-   * Water tables cluster the way real ones do -- a short run of bottles you
-   * sweep through -- while fruit is a single item and rarer. Density rises
-   * slightly with distance, because that is where a broken run most needs a
-   * road back.
+   * One item per aid point, never a cluster. An earlier version put out a
+   * table of 3-5 bottles, which fired five pickups inside a second and a half
+   * and read as a single smear rather than as a decision -- and the decision
+   * is the whole point, because the aid lane is often not the lane the racing
+   * line wants.
+   *
+   * Sparse early and dense late, with fruit getting commoner as the race goes
+   * on. A run is rarely broken in the first mile; the back half is where the
+   * wall is, where the streak is worth most, and where a rescue is worth
+   * having.
    */
   function generateAid(key, gates) {
-    const rnd = MR.rng.stream(key, 'aid/v1');
+    const rnd = MR.rng.stream(key, 'aid/v2');
     const items = [];
     if (!gates.length) return items;
 
     let gi = 0;
-    // One aid opportunity roughly every 1.6 miles, jittered.
-    let z = START_GRACE + rnd.range(180, 320);
+    let z = START_GRACE + rnd.range(200, 340);
     const end = K.TOTAL_UNITS - FINISH_GRACE - 60;
+    let guard = 0;
 
-    while (z < end) {
+    while (z < end && guard++ < 4000) {
       while (gi < gates.length - 1 && gates[gi + 1].z < z) gi++;
+      const f = z / K.TOTAL_UNITS;
 
       // Sit in the gap between this gate and the next, never on a gate line.
-      const a = gates[gi].z, b = gi + 1 < gates.length ? gates[gi + 1].z : a + 40;
-      if (b - a > 14) {
-        const at = a + (b - a) * rnd.range(0.35, 0.65);
-
-        // Only lanes that are passable at the gates either side of the gap.
+      const a = gates[gi].z;
+      const b = gi + 1 < gates.length ? gates[gi + 1].z : a + 40;
+      if (b - a > 12) {
+        // Only lanes passable at the gates either side of the gap, so aid can
+        // never be dangled somewhere the player is not allowed to go.
         const open = [];
         for (let l = 0; l < 3; l++) {
           const here = gates[gi].lanes[l];
           const next = gi + 1 < gates.length ? gates[gi + 1].lanes[l] : K.CLEAR;
           if (here !== K.BLOCK && next !== K.BLOCK) open.push(l);
         }
-
         if (open.length) {
+          // ONE item, never a cluster. A run of five bottles fired five
+          // pickups inside a second and a half, which read as a single smear
+          // rather than as a decision -- and the decision is the whole point,
+          // because the aid lane is often not the lane the racing line wants.
           const lane = open[rnd.int(0, open.length - 1)];
-          const f = at / K.TOTAL_UNITS;
-          const fruit = rnd.chance(0.24 + 0.16 * f);
-          if (fruit) {
-            items.push({ z: at, lane, kind: 'banana', gain: K.AID_BANANA });
-          } else {
-            // A table is a short run of bottles through one lane.
-            const n = rnd.int(3, 5);
-            for (let i = 0; i < n; i++) {
-              const bz = at + i * 3.4;
-              if (bz < b - 3) items.push({ z: bz, lane, kind: 'water', gain: K.AID_WATER });
-            }
-          }
+          // Fruit gets commoner as the race goes on: it is the bigger top-up,
+          // and the late race is where a broken run needs it.
+          const fruit = rnd.chance(0.12 + 0.46 * f * f);
+          items.push(fruit
+            ? { z, lane, kind: 'banana', gain: K.AID_BANANA }
+            : { z, lane, kind: 'water', gain: K.AID_WATER });
         }
       }
-      z += rnd.range(320, 470);
+
+      // Sparse early, dense late. Aid exists to rescue a broken run, and a run
+      // is rarely broken in the first mile, so the opening stays clean and the
+      // back half -- where the wall is and where the streak is worth most --
+      // carries most of the help.
+      const spacing = 620 - 400 * f;
+      z += spacing * rnd.range(0.82, 1.18);
     }
     items.sort(function (p, q) { return p.z - q.z; });
     return items;
@@ -2719,6 +2729,12 @@ MR.Runner = (function () {
       const duck = st.duck01 || 0;
       const lean = st.lean || 0;
       const stumble = st.stumble || 0;
+      // A trip is a stagger, not a pause: the body pitches forward and the
+      // arms fly out to catch it. Kept separate from `stumble` so the wall
+      // bounce (which is a lateral throw) and the kerb trip (which is a
+      // forward pitch) do not collapse into the same animation.
+      const trip = st.trip || 0;
+      const knock = st.bounce || 0;
 
       // ghost.js re-materials every mesh under this rig to draw the record
       // runner as one translucent body. That is right for limbs and wrong for
@@ -2793,11 +2809,11 @@ MR.Runner = (function () {
         // which is what keeps the heels skimming the road instead of buried
         // in it once the body has dropped.
         L.hip.rotation.x = -s * swing * 0.86 * cyc + tuck * 0.70
-          - slid * (1.62 + lead * 0.12);
+          - slid * (1.72 + lead * 0.10);
         // Knee only bends one way; bias so it flexes hardest on recovery.
         const bend = Math.max(0, -c * 0.5 + 0.5);
         L.knee.rotation.x = 0.18 + bend * (1.22 + 0.26 * sp01) * cyc + tuck * 1.25
-          + slid * (0.30 - lead * 0.20);
+          + slid * (0.04 - lead * 0.02);
         // Dorsiflex through recovery, plantarflex off the toe -- and hard
         // dorsiflexion in the slide, toes up, which is both what a slider
         // actually does and what turns the biggest pale face on the character
@@ -2819,7 +2835,7 @@ MR.Runner = (function () {
         // 0.70 is also the ceiling: MEASUREMENTS.md derives the lane's own
         // limit at 0.70 from the lane centre, so this pose spends the width
         // budget the gloves' 0.543 run swing had already proved is there.
-        L.hip.rotation.z = L.side * (0.05 + spread * 0.30 + slid * 0.70);
+        L.hip.rotation.z = L.side * (0.05 + spread * 0.30 + slid * 0.26);
       }
 
       // ---- arms ----------------------------------------------------------
@@ -2913,9 +2929,21 @@ MR.Runner = (function () {
       // "diving into it".
       const leanFwd = (0.26 + 0.12 * sp01 + stumble * 0.5) * (1 - slid * 0.94)
         - spread * 0.30
-        - slid * 0.78;
-      spine.rotation.x = leanFwd;
-      spine.rotation.z = -lean * 0.30;
+        - slid * 1.12;
+      spine.rotation.x = leanFwd + trip * 0.46;
+      // Slide the whole torso BACK along the direction of travel, not just
+      // recline it.
+      //
+      // Throwing the legs further forward does not work: hip.rotation.z opens
+      // 0.70rad of splay in the slide (without it the legs vanish behind the
+      // torso at this camera angle), and that splay converts most of the
+      // forward throw into lateral -- pushing the hip term from 1.62 to 2.05
+      // moved the feet only 0.06 further ahead of the head while lifting them
+      // off the road. Translating the spine pivot is direct: legs hang off
+      // `hips` and are untouched, torso and head hang off `spine` and move,
+      // so the gap between shoes and crown opens without distorting either.
+      spine.position.z = -slid * 0.14;
+      spine.rotation.z = -lean * 0.30 - knock * 0.34;
       spine.rotation.y = lean * 0.16;
 
       // Counter-rotate the shoulders against the hips -- the single cue that
@@ -2940,7 +2968,7 @@ MR.Runner = (function () {
       neck.rotation.y = -Math.sin(p) * 0.10;
 
       // Whole-body bank into a lane change reads as weight, not a slide.
-      root.rotation.z = -lean * 0.13;
+      root.rotation.z = -lean * 0.13 - knock * 0.16;
 
       // Ducking drops the whole body rather than only folding the spine, so
       // the collision capsule and the silhouette agree. The 0.42 matches
@@ -6221,7 +6249,13 @@ MR.Camera = (function () {
       const back = BASE_BACK * s.fr.back
         - drive * 0.62
         + surge * 0.30
-        - duck * 0.22
+        // Pull BACK in a slide rather than closing in. The feet-first pose is
+        // nearly a metre longer along the travel axis than a run, and at the
+        // old -0.22 the camera closed on it at exactly the wrong moment: the
+        // figure sat 87% down the frame with its legs clipped off the bottom
+        // edge. Backing off frames the whole body and shows more of the bar
+        // being cleared.
+        + duck * 0.95
         - s.gearT * s.gearT * 0.45
         + s.mileT * 0.45
         + s.winded * 0.28
@@ -6234,7 +6268,13 @@ MR.Camera = (function () {
       // camera was lowest, and the gates tightest, on the same stretch.
       const hgt = BASE_Y
         - drive * 0.20
-        - duck * 0.34
+        // A slide RAISES the camera instead of lowering it. The old -0.34 was
+        // written for a head-first duck that stayed compact under the lens;
+        // the feet-first slide extends the body nearly a metre back along the
+        // travel axis, so dropping with it pushed the whole runner off the
+        // bottom of the frame just as the player needs to see both their own
+        // clearance and the road past it.
+        + duck * 0.16
         + (p.y || 0) * 0.30            // keeps a third of the arc -- see aim
         + s.dip
         + s.mileT * 0.24
@@ -6602,6 +6642,8 @@ MR.Player = (function () {
       duck01: 0,
       lean: 0,
       stumble: 0,
+      bounce: 0,        // signed lateral knock from a BLOCK, decays
+      tripT: 0,         // 0..1 through a trip on a small obstacle
       gateIdx: 0,
       aidIdx: 0,
       lastResult: null,  // 'clean' | 'hit'
@@ -6612,7 +6654,8 @@ MR.Player = (function () {
     s.reset = function () {
       s.lane = 1; s.laneFrom = 1; s.laneT = 1; s.x = 0; s.y = 0;
       s.airT = 0; s.airborne = false; s.duckT = 0; s.ducking = false;
-      s.duck01 = 0; s.lean = 0; s.stumble = 0; s.gateIdx = 0; s.aidIdx = 0;
+      s.duck01 = 0; s.lean = 0; s.stumble = 0; s.bounce = 0; s.tripT = 0;
+      s.gateIdx = 0; s.aidIdx = 0;
       s.lastResult = null; s.events.length = 0;
     };
 
@@ -6691,6 +6734,9 @@ MR.Player = (function () {
       s.duck01 += (target - s.duck01) * Math.min(1, rate * dt);
 
       s.stumble = Math.max(0, s.stumble - dt * 2.2);
+      s.bounce -= s.bounce * Math.min(1, dt * 5.5);
+      if (Math.abs(s.bounce) < 0.001) s.bounce = 0;
+      if (s.tripT > 0) s.tripT = Math.max(0, s.tripT - dt / 0.55);
     };
 
     /**
@@ -6707,7 +6753,43 @@ MR.Player = (function () {
         const kind = gate.lanes[s.lane];
         const clean = C.clears(kind, s);
         if (!clean) {
-          s.stumble = 1;
+          // Contact is not one thing. Running into a wall and clipping a kerb
+          // used to produce the identical result -- pass straight through,
+          // lose the streak -- which is why a hit read as the game glitching
+          // rather than as the runner hitting something.
+          if (kind === K.BLOCK) {
+            // A wall you cannot clear THROWS you out of its lane. Pick the
+            // side that is actually open at this gate, preferring the middle
+            // so a knock never puts the player somewhere they cannot recover
+            // from, and never leaves them still inside the thing they hit.
+            const cands = [];
+            for (const d of [-1, 1]) {
+              const t = s.lane + d;
+              if (t < 0 || t > 2) continue;
+              if (gate.lanes[t] === K.BLOCK) continue;
+              cands.push(t);
+            }
+            const to = cands.length
+              ? cands.reduce((a, b) => (Math.abs(b - 1) < Math.abs(a - 1) ? b : a))
+              : s.lane;
+            if (to !== s.lane) {
+              s.bounce = to > s.lane ? 1 : -1;
+              s.laneFrom = s.lane;
+              s.lane = to;
+              // Snap most of the way across: this is a knock, not a choice.
+              s.laneT = 0.35;
+            }
+            s.stumble = 1;
+            s.airborne = false; s.airT = 0;
+            s.ducking = false; s.duckT = 0;
+            s.events.push('bounce');
+          } else {
+            // A kerb or a bar trips you. You keep your lane and you keep
+            // going -- the cost is the streak and the seconds, not control.
+            s.tripT = 1;
+            s.stumble = 0.75;
+            s.events.push('trip');
+          }
           s.events.push('hit');
         }
         s.lastResult = clean ? 'clean' : 'hit';
@@ -7672,7 +7754,9 @@ MR.HUD = (function () {
 
       // Player events -> audio.
       for (const e of player.drainEvents()) {
-        if (e === 'jump') audio.jump();
+        if (e === 'bounce') cam.impact(1.35);
+        else if (e === 'trip') cam.impact(0.55);
+        else if (e === 'jump') audio.jump();
         else if (e === 'land') { audio.land(); cam.land(); }
         else if (e === 'duck') audio.duck();
         else if (e === 'hit') audio.hit();
@@ -7715,6 +7799,8 @@ MR.HUD = (function () {
       speed: pace.speed(),
       air01: player.airborne ? Math.sin(Math.min(1, player.airT) * Math.PI) : 0,
       duck01: player.duck01,
+      trip: player.tripT,
+      bounce: player.bounce,
       lean: player.lean,
       stumble: player.stumble,
     });

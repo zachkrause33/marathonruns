@@ -29,6 +29,8 @@ MR.Player = (function () {
       duck01: 0,
       lean: 0,
       stumble: 0,
+      bounce: 0,        // signed lateral knock from a BLOCK, decays
+      tripT: 0,         // 0..1 through a trip on a small obstacle
       gateIdx: 0,
       aidIdx: 0,
       lastResult: null,  // 'clean' | 'hit'
@@ -39,7 +41,8 @@ MR.Player = (function () {
     s.reset = function () {
       s.lane = 1; s.laneFrom = 1; s.laneT = 1; s.x = 0; s.y = 0;
       s.airT = 0; s.airborne = false; s.duckT = 0; s.ducking = false;
-      s.duck01 = 0; s.lean = 0; s.stumble = 0; s.gateIdx = 0; s.aidIdx = 0;
+      s.duck01 = 0; s.lean = 0; s.stumble = 0; s.bounce = 0; s.tripT = 0;
+      s.gateIdx = 0; s.aidIdx = 0;
       s.lastResult = null; s.events.length = 0;
     };
 
@@ -118,6 +121,9 @@ MR.Player = (function () {
       s.duck01 += (target - s.duck01) * Math.min(1, rate * dt);
 
       s.stumble = Math.max(0, s.stumble - dt * 2.2);
+      s.bounce -= s.bounce * Math.min(1, dt * 5.5);
+      if (Math.abs(s.bounce) < 0.001) s.bounce = 0;
+      if (s.tripT > 0) s.tripT = Math.max(0, s.tripT - dt / 0.55);
     };
 
     /**
@@ -134,7 +140,43 @@ MR.Player = (function () {
         const kind = gate.lanes[s.lane];
         const clean = C.clears(kind, s);
         if (!clean) {
-          s.stumble = 1;
+          // Contact is not one thing. Running into a wall and clipping a kerb
+          // used to produce the identical result -- pass straight through,
+          // lose the streak -- which is why a hit read as the game glitching
+          // rather than as the runner hitting something.
+          if (kind === K.BLOCK) {
+            // A wall you cannot clear THROWS you out of its lane. Pick the
+            // side that is actually open at this gate, preferring the middle
+            // so a knock never puts the player somewhere they cannot recover
+            // from, and never leaves them still inside the thing they hit.
+            const cands = [];
+            for (const d of [-1, 1]) {
+              const t = s.lane + d;
+              if (t < 0 || t > 2) continue;
+              if (gate.lanes[t] === K.BLOCK) continue;
+              cands.push(t);
+            }
+            const to = cands.length
+              ? cands.reduce((a, b) => (Math.abs(b - 1) < Math.abs(a - 1) ? b : a))
+              : s.lane;
+            if (to !== s.lane) {
+              s.bounce = to > s.lane ? 1 : -1;
+              s.laneFrom = s.lane;
+              s.lane = to;
+              // Snap most of the way across: this is a knock, not a choice.
+              s.laneT = 0.35;
+            }
+            s.stumble = 1;
+            s.airborne = false; s.airT = 0;
+            s.ducking = false; s.duckT = 0;
+            s.events.push('bounce');
+          } else {
+            // A kerb or a bar trips you. You keep your lane and you keep
+            // going -- the cost is the streak and the seconds, not control.
+            s.tripT = 1;
+            s.stumble = 0.75;
+            s.events.push('trip');
+          }
           s.events.push('hit');
         }
         s.lastResult = clean ? 'clean' : 'hit';

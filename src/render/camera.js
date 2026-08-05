@@ -247,7 +247,13 @@ MR.Camera = (function () {
       const back = BASE_BACK * s.fr.back
         - drive * 0.62
         + surge * 0.30
-        - duck * 0.22
+        // Pull BACK in a slide rather than closing in. The feet-first pose is
+        // nearly a metre longer along the travel axis than a run, and at the
+        // old -0.22 the camera closed on it at exactly the wrong moment: the
+        // figure sat 87% down the frame with its legs clipped off the bottom
+        // edge. Backing off frames the whole body and shows more of the bar
+        // being cleared.
+        + duck * 0.95
         - s.gearT * s.gearT * 0.45
         + s.mileT * 0.45
         + s.winded * 0.28
@@ -260,7 +266,13 @@ MR.Camera = (function () {
       // camera was lowest, and the gates tightest, on the same stretch.
       const hgt = BASE_Y
         - drive * 0.20
-        - duck * 0.34
+        // A slide RAISES the camera instead of lowering it. The old -0.34 was
+        // written for a head-first duck that stayed compact under the lens;
+        // the feet-first slide extends the body nearly a metre back along the
+        // travel axis, so dropping with it pushed the whole runner off the
+        // bottom of the frame just as the player needs to see both their own
+        // clearance and the road past it.
+        + duck * 0.16
         + (p.y || 0) * 0.30            // keeps a third of the arc -- see aim
         + s.dip
         + s.mileT * 0.24

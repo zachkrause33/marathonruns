@@ -130,54 +130,64 @@ MR.Course = (function () {
    * gates, so taking one is never entangled with a jump or a duck the player
    * is already committed to.
    *
-   * Water tables cluster the way real ones do -- a short run of bottles you
-   * sweep through -- while fruit is a single item and rarer. Density rises
-   * slightly with distance, because that is where a broken run most needs a
-   * road back.
+   * One item per aid point, never a cluster. An earlier version put out a
+   * table of 3-5 bottles, which fired five pickups inside a second and a half
+   * and read as a single smear rather than as a decision -- and the decision
+   * is the whole point, because the aid lane is often not the lane the racing
+   * line wants.
+   *
+   * Sparse early and dense late, with fruit getting commoner as the race goes
+   * on. A run is rarely broken in the first mile; the back half is where the
+   * wall is, where the streak is worth most, and where a rescue is worth
+   * having.
    */
   function generateAid(key, gates) {
-    const rnd = MR.rng.stream(key, 'aid/v1');
+    const rnd = MR.rng.stream(key, 'aid/v2');
     const items = [];
     if (!gates.length) return items;
 
     let gi = 0;
-    // One aid opportunity roughly every 1.6 miles, jittered.
-    let z = START_GRACE + rnd.range(180, 320);
+    let z = START_GRACE + rnd.range(200, 340);
     const end = K.TOTAL_UNITS - FINISH_GRACE - 60;
+    let guard = 0;
 
-    while (z < end) {
+    while (z < end && guard++ < 4000) {
       while (gi < gates.length - 1 && gates[gi + 1].z < z) gi++;
+      const f = z / K.TOTAL_UNITS;
 
       // Sit in the gap between this gate and the next, never on a gate line.
-      const a = gates[gi].z, b = gi + 1 < gates.length ? gates[gi + 1].z : a + 40;
-      if (b - a > 14) {
-        const at = a + (b - a) * rnd.range(0.35, 0.65);
-
-        // Only lanes that are passable at the gates either side of the gap.
+      const a = gates[gi].z;
+      const b = gi + 1 < gates.length ? gates[gi + 1].z : a + 40;
+      if (b - a > 12) {
+        // Only lanes passable at the gates either side of the gap, so aid can
+        // never be dangled somewhere the player is not allowed to go.
         const open = [];
         for (let l = 0; l < 3; l++) {
           const here = gates[gi].lanes[l];
           const next = gi + 1 < gates.length ? gates[gi + 1].lanes[l] : K.CLEAR;
           if (here !== K.BLOCK && next !== K.BLOCK) open.push(l);
         }
-
         if (open.length) {
+          // ONE item, never a cluster. A run of five bottles fired five
+          // pickups inside a second and a half, which read as a single smear
+          // rather than as a decision -- and the decision is the whole point,
+          // because the aid lane is often not the lane the racing line wants.
           const lane = open[rnd.int(0, open.length - 1)];
-          const f = at / K.TOTAL_UNITS;
-          const fruit = rnd.chance(0.24 + 0.16 * f);
-          if (fruit) {
-            items.push({ z: at, lane, kind: 'banana', gain: K.AID_BANANA });
-          } else {
-            // A table is a short run of bottles through one lane.
-            const n = rnd.int(3, 5);
-            for (let i = 0; i < n; i++) {
-              const bz = at + i * 3.4;
-              if (bz < b - 3) items.push({ z: bz, lane, kind: 'water', gain: K.AID_WATER });
-            }
-          }
+          // Fruit gets commoner as the race goes on: it is the bigger top-up,
+          // and the late race is where a broken run needs it.
+          const fruit = rnd.chance(0.12 + 0.46 * f * f);
+          items.push(fruit
+            ? { z, lane, kind: 'banana', gain: K.AID_BANANA }
+            : { z, lane, kind: 'water', gain: K.AID_WATER });
         }
       }
-      z += rnd.range(320, 470);
+
+      // Sparse early, dense late. Aid exists to rescue a broken run, and a run
+      // is rarely broken in the first mile, so the opening stays clean and the
+      // back half -- where the wall is and where the streak is worth most --
+      // carries most of the help.
+      const spacing = 620 - 400 * f;
+      z += spacing * rnd.range(0.82, 1.18);
     }
     items.sort(function (p, q) { return p.z - q.z; });
     return items;

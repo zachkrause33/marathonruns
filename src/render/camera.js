@@ -5,8 +5,8 @@
  * roughly a third of frame height with the road opening out above them --
  * close enough that a lane change is body movement, high enough that the next
  * two gates still read. The first pass sat at 3.0 up / 6.55 back and the
- * runner was a distant sprite; this sits at 1.98 / 4.42 and the character is
- * something you are *inside* of rather than watching.
+ * runner was a distant sprite at a quarter of frame height; this sits at
+ * 2.02 / 4.35 and fills about a third, dropping to 1.68 / 3.73 at full pace.
  *
  * Perceived speed is the hard problem and this file owns all of it. Ground
  * speed only moves 21.8 -> 27.7 units/sec across the whole race, because
@@ -67,12 +67,30 @@ MR.Camera = (function () {
     return Math.sin(t * 33.7 + seed) * 0.62 + Math.sin(t * 18.3 + seed * 2.7) * 0.38;
   }
 
+  /**
+   * Framing is aspect-dependent because three's FOV is vertical: a phone in
+   * portrait sees barely a third of the horizontal angle a laptop does. The
+   * lateral lag that reads as weight on a wide screen throws the runner onto
+   * the edge of a portrait frame, so narrow screens follow harder, sit further
+   * back, and bank less.
+   */
+  function frameFor(aspect) {
+    const wide = clamp01((aspect - 0.55) / 0.80);   // 0 = phone portrait, 1 = desktop
+    return {
+      follow: 0.95 - 0.17 * wide,
+      lookX: 0.85 - 0.30 * wide,
+      back: 1.18 - 0.18 * wide,
+      roll: 0.70 + 0.30 * wide,
+    };
+  }
+
   function create(aspect) {
     const cam = new THREE.PerspectiveCamera(BASE_FOV, aspect, 0.1, 1200);
     const look = new THREE.Vector3();   // hoisted: this runs 60x a second
 
     const s = {
       camera: cam,
+      fr: frameFor(aspect),
       x: 0, vx: 0,     // lateral follow, sprung so a lane change whips
       roll: 0,
       fov: BASE_FOV,
@@ -101,8 +119,13 @@ MR.Camera = (function () {
      * @param p   { z, x, y, speed, lean, duck01 }
      */
     s.update = function (dt, p) {
-      // A long frame must not be allowed to detonate the springs.
-      const d = Math.min(dt, 1 / 25);
+      // A long frame must not be allowed to detonate the springs -- and the
+      // first frame can arrive with a *negative* dt, because the rAF timestamp
+      // is the moment the frame began, which on a slow boot is earlier than
+      // the clock main.js took when it started. Integrating a spring backwards
+      // through 1.5 seconds throws the camera tens of units sideways, and the
+      // recovery is slow enough to be caught by a screenshot.
+      const d = dt > 0 ? Math.min(dt, 1 / 25) : 0;
       s.t += d;
 
       // ---- speed signals -------------------------------------------------
@@ -161,7 +184,8 @@ MR.Camera = (function () {
       // Underdamped on purpose (zeta ~0.6): the camera arrives at the new lane
       // slightly late and overshoots a hair, which is the weight the old
       // exponential follow was missing.
-      const tgtX = p.x * 0.78 + s.lurch;
+      const tgtX = p.x * s.fr.follow + s.lurch;
+      if (first) s.x = tgtX;        // a real race starts centred; ?skip= may not
       s.vx += ((tgtX - s.x) * 200 - s.vx * 17) * d;
       s.x += s.vx * d;
       s.lurch -= s.lurch * Math.min(1, d * 5.0);
@@ -198,7 +222,7 @@ MR.Camera = (function () {
       // Closer and lower with pace; the ground is what sells it, so the drop
       // is worth more than the pull-in. Surge trails the camera while the
       // streak is buying speed and reels it in while a hit bleeds it away.
-      const back = BASE_BACK
+      const back = BASE_BACK * s.fr.back
         - drive * 0.62
         + surge * 0.30
         - duck * 0.22
@@ -211,7 +235,7 @@ MR.Camera = (function () {
       const hgt = BASE_Y
         - drive * 0.34
         - duck * 0.34
-        + (p.y || 0) * 0.22            // barely follows the arc -- see below
+        + (p.y || 0) * 0.30            // barely follows the arc -- see below
         + s.dip
         + s.mileT * 0.24
         + s.winded * 0.12
@@ -226,8 +250,8 @@ MR.Camera = (function () {
       // frame, which is what leaving the ground actually looks like. The old
       // 0.42/0.30 split had the camera chasing the arc and cancelled it.
       look.set(
-        s.x * 0.55,
-        LOOK_Y + (p.y || 0) * 0.46 - duck * 0.26 - drive * 0.22 + fin * 0.55,
+        s.x * s.fr.lookX,
+        LOOK_Y + (p.y || 0) * 0.50 - duck * 0.26 - drive * 0.22 + fin * 0.55,
         p.z + LOOK_AHEAD + (p.y || 0) * 1.1 - drive * 0.5
       );
       cam.lookAt(look);
@@ -238,7 +262,7 @@ MR.Camera = (function () {
       // seven, which is a bank; the response is fast because a lane change is
       // over in 0.16s and a slow filter would smooth the whole event away.
       const whip = Math.max(-1, Math.min(1, s.vx / 20));
-      const rollTgt = -((p.lean || 0) * 0.16 + whip * 0.07) * (1 - fin);
+      const rollTgt = -((p.lean || 0) * 0.16 + whip * 0.07) * s.fr.roll * (1 - fin);
       s.roll += (rollTgt - s.roll) * (1 - Math.pow(0.00002, d));
       cam.rotation.z += s.roll + shR - s.punch * 0.055;
 
@@ -298,6 +322,7 @@ MR.Camera = (function () {
 
     s.resize = function (aspect) {
       cam.aspect = aspect;
+      s.fr = frameFor(aspect);
       cam.updateProjectionMatrix();
     };
 

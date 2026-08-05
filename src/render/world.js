@@ -139,12 +139,14 @@ MR.World = (function () {
    * a small hazard mesh -- which is exactly the distance the lane choice has
    * to be made at.
    */
-  function matTexture(kind, tint) {
+  function matTexture(kind, tint, wash) {
     const c = canvas(128, 256);
     const g = c.getContext('2d');
-    // A dark wash under the icons: the road is mid-value, the icons are
-    // bright, and without this the edges of the mat vanish into it.
-    g.fillStyle = 'rgba(10,10,30,0.34)';
+    // A wash under the icons: the road is mid-value, the icons are bright, and
+    // without this the edges of the mat vanish into it. The wash is a dark
+    // version of the hazard's own hue, not neutral -- at the faded near end a
+    // neutral wash read as a dirty grey smear on the tarmac.
+    g.fillStyle = wash;
     g.fillRect(0, 0, 128, 256);
     g.fillStyle = tint;
     g.fillRect(0, 0, 8, 256); g.fillRect(120, 0, 8, 256);
@@ -218,6 +220,26 @@ MR.World = (function () {
       const y = 8 + i * 17, w = 24 + ((i * 37) % 60);
       g.fillRect(((i * 53) % 100), y, w, 4);
       g.fillRect(((i * 29) % 90) + 20, y + 7, w * 0.6, 3);
+    }
+    return texture(c, true);
+  }
+
+  /**
+   * Faint irregular patchwork for the ground and the verges. A single flat
+   * colour over a 1,400-unit plane reads as coloured paper; a few percent of
+   * banded variation is enough to give the eye somewhere to land without
+   * breaking the cel-shaded flatness.
+   */
+  function groundTexture() {
+    const c = canvas(64, 64);
+    const g = c.getContext('2d');
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, 64, 64);
+    const shades = ['rgba(0,0,0,0.05)', 'rgba(255,255,255,0.07)', 'rgba(0,0,0,0.025)'];
+    let s = 1337;
+    const r = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+    for (let i = 0; i < 14; i++) {
+      g.fillStyle = shades[Math.floor(r() * shades.length)];
+      g.fillRect(r() * 64 - 8, r() * 64 - 8, 10 + r() * 26, 8 + r() * 20);
     }
     return texture(c, true);
   }
@@ -366,6 +388,15 @@ MR.World = (function () {
     }
 
     // Shared materials: recoloured per biome, never reallocated.
+    const groundTex = groundTexture();
+    groundTex.repeat.set(48, 48);
+    const vergeTex = groundTex.clone();
+    vergeTex.repeat.set(5, 4);
+    vergeTex.needsUpdate = true;
+    const roadTex = groundTex.clone();
+    roadTex.repeat.set(3, 3);
+    roadTex.needsUpdate = true;
+
     const mats = {
       road: S.toon(P.road, 2),
       shoulder: S.toon(P.ground, 2),
@@ -386,12 +417,47 @@ MR.World = (function () {
     // road surface so the road always wins the depth test. On the bridge it
     // drops away and becomes the river.
     const groundMat = S.toon(P.ground, 2);
+    groundMat.map = groundTex;
+    mats.shoulder.map = vergeTex;
+    mats.road.map = roadTex;
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(1400, 1400), groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.34;
     ground.renderOrder = -500;
     group.add(ground);
     mats.ground = groundMat;
+
+    /**
+     * A ring of distant hills, riding with the runner like the ground does.
+     *
+     * They sit at 200 units, just inside the fog's far plane, so they arrive
+     * about three-quarters dissolved -- which is exactly the read wanted: a
+     * suggestion of land beyond the course rather than scenery you can
+     * inspect. The forward 60 degrees is left open so nothing ever appears to
+     * stand across the road at the vanishing point.
+     */
+    const hillsGeo = (function () {
+      const parts = [];
+      let s = 4242;
+      const r = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+      for (let i = 0; i < 46; i++) {
+        const a = (i / 46) * Math.PI * 2;
+        const forward = Math.abs(((a + Math.PI) % (Math.PI * 2)) - Math.PI);
+        if (forward < 0.52) continue;                      // keep the road open
+        const rad = 190 + r() * 60;
+        const h = 12 + r() * 26;
+        // Baked shading: the far side of each hill is a band darker, which is
+        // all a fully-fogged silhouette needs to stop reading as a flat cutout.
+        parts.push(cone(24 + r() * 26, h, 5, Math.sin(a) * rad, h / 2 - 4, Math.cos(a) * rad,
+          r() > 0.5 ? 0xd0d0d0 : 0xa8a8a8));
+      }
+      return merge(parts);
+    })();
+    const hillsMat = vtoon(2);
+    const hills = new THREE.Mesh(hillsGeo, hillsMat);
+    hills.renderOrder = -490;
+    hills.frustumCulled = false;
+    group.add(hills);
 
     // Ripples ride just above the water surface and are only shown when the
     // ground is acting as a river, so still terrain never shimmers.
@@ -578,18 +644,41 @@ MR.World = (function () {
 
     // Lane telegraph mats. Transparent, unlit, and laid a hair above the road
     // paint so they never z-fight with the lane dashes.
-    // 14 units of run-up: the mat has to be readable while the lane choice is
-    // still open, which is 3-4 gate-lengths out, not 1.
-    const matGeo = new THREE.PlaneGeometry(2.24, 14);
+    /**
+     * The telegraph mat: 14 units of run-up, because the lane choice has to be
+     * made 3-4 gate-lengths out, not 1.
+     *
+     * The end nearest the player fades to nothing through a per-vertex alpha
+     * ramp. Without it the mat is informative at 60 units and then swells into
+     * a screen-filling slab of saturated colour in the last quarter-second,
+     * which is precisely when the player needs to see the hazard instead.
+     */
+    const matGeo = (function () {
+      const g = new THREE.PlaneGeometry(1.95, 16, 1, 16);
+      const pos = g.attributes.position;
+      const col = new Float32Array(pos.count * 4);
+      for (let i = 0; i < pos.count; i++) {
+        // Local +Y lays down toward -Z, i.e. toward the approaching runner, so
+        // the ramp runs over most of the mat's length and only the last few
+        // units before the hazard reach full strength.
+        const t = Math.max(0, Math.min(1, (8.0 - pos.getY(i)) / 11.0));
+        const a = Math.pow(t, 1.5);
+        col[i * 4] = 1; col[i * 4 + 1] = 1; col[i * 4 + 2] = 1; col[i * 4 + 3] = a;
+      }
+      g.setAttribute('color', new THREE.BufferAttribute(col, 4));
+      return g;
+    })();
     const matMat = {};
-    matMat[K.JUMP] = new THREE.MeshBasicMaterial({ map: matTexture(K.JUMP, '#ffc23a'), transparent: true, depthWrite: false });
-    matMat[K.DUCK] = new THREE.MeshBasicMaterial({ map: matTexture(K.DUCK, '#4fdcff'), transparent: true, depthWrite: false });
-    matMat[K.BLOCK] = new THREE.MeshBasicMaterial({ map: matTexture(K.BLOCK, '#ff4f78'), transparent: true, depthWrite: false });
+    matMat[K.JUMP] = new THREE.MeshBasicMaterial({ map: matTexture(K.JUMP, '#ffc23a', 'rgba(58,34,0,0.40)'), transparent: true, depthWrite: false, vertexColors: true });
+    matMat[K.DUCK] = new THREE.MeshBasicMaterial({ map: matTexture(K.DUCK, '#4fdcff', 'rgba(0,36,54,0.40)'), transparent: true, depthWrite: false, vertexColors: true });
+    matMat[K.BLOCK] = new THREE.MeshBasicMaterial({ map: matTexture(K.BLOCK, '#ff4f78', 'rgba(62,0,22,0.44)'), transparent: true, depthWrite: false, vertexColors: true });
 
     function telegraph(kind) {
       const m = new THREE.Mesh(matGeo, matMat[kind]);
       m.rotation.x = -Math.PI / 2;
-      m.position.set(0, 0.012, -8.3);
+      // Runs a little past the gate line so the paint shows through the open
+      // gap under a DUCK bar -- colour at the exact spot of the hazard.
+      m.position.set(0, 0.012, -7.2);
       m.renderOrder = 5;
       return m;
     }
@@ -615,33 +704,40 @@ MR.World = (function () {
       return g;
     }, group);
 
-    // DUCK: the bar itself is only 0.42 tall, which is nothing at distance, so
-    // the assembly carries a tall header and a pennant above it. The gap under
-    // the bar stays completely open -- that void is the read.
+    /**
+     * DUCK: the bar is only 0.42 tall, which is nothing at distance, so the
+     * height comes from tall cyan standards rather than from anything spanning
+     * the lane.
+     *
+     * That distinction is not cosmetic. The chase camera trails 5.1 units and
+     * carries 42% of the jump arc, so it sweeps y = 1.76 to 3.14 right through
+     * a gate's lane. An earlier version had a header board at 2.44 and the
+     * camera flew straight into it -- one frame of full-screen cyan stripes.
+     * Above the bar only thin members are allowed, so the worst a clip can
+     * ever be is a sliver of post.
+     */
     const duckGeo = merge([
-      bx(2.30, 0.42, 0.60, 0, 1.62, 0, 0x37d6ff),
-      bx(2.42, 0.10, 0.70, 0, 1.86, 0, 0xd8f8ff),
-      bx(0.22, 2.62, 0.26, -1.20, 1.31, 0, 0x2b2f52),
-      bx(0.22, 2.62, 0.26, 1.20, 1.31, 0, 0x2b2f52),
-      bx(0.42, 0.16, 0.42, -1.20, 0.08, 0, 0x2b2f52),
-      bx(0.42, 0.16, 0.42, 1.20, 0.08, 0, 0x2b2f52),
-      bx(2.70, 0.34, 0.24, 0, 2.44, 0, 0x37d6ff),
-      bx(2.70, 0.10, 0.30, 0, 2.63, 0, 0xd8f8ff),
-      bx(0.36, 0.36, 0.10, -0.75, 2.02, 0.16, 0xffe45e, 0, 0, Math.PI / 4),
-      bx(0.36, 0.36, 0.10, 0.75, 2.02, 0.16, 0xffe45e, 0, 0, Math.PI / 4),
+      bx(2.30, 0.30, 0.60, 0, 1.56, 0, 0x37d6ff),
+      bx(2.36, 0.12, 0.62, 0, 1.77, 0, 0xd8f8ff),
+      bx(0.26, 3.30, 0.30, -1.20, 1.65, 0, 0x37d6ff),
+      bx(0.26, 3.30, 0.30, 1.20, 1.65, 0, 0x37d6ff),
+      bx(0.30, 0.26, 0.34, -1.20, 2.35, 0, 0x0d2b36),
+      bx(0.30, 0.26, 0.34, 1.20, 2.35, 0, 0x0d2b36),
+      bx(0.30, 0.26, 0.34, -1.20, 2.90, 0, 0x0d2b36),
+      bx(0.30, 0.26, 0.34, 1.20, 2.90, 0, 0x0d2b36),
+      bx(0.40, 0.22, 0.40, -1.20, 3.41, 0, 0xd8f8ff),
+      bx(0.40, 0.22, 0.40, 1.20, 3.41, 0, 0xd8f8ff),
+      bx(0.50, 0.22, 0.50, -1.20, 0.11, 0, 0x2b2f52),
+      bx(0.50, 0.22, 0.50, 1.20, 0.11, 0, 0x2b2f52),
     ]);
 
     const duckPool = Pool(function () {
       const g = new THREE.Group();
       g.add(S.outlined(duckGeo, mats.propLit, S.INK.hazard));
-      const face = new THREE.Mesh(new THREE.PlaneGeometry(2.26, 0.38), faceMat.duck);
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(2.26, 0.40), faceMat.duck);
       face.position.set(0, 1.62, -0.302);
       face.rotation.y = Math.PI;
       g.add(face);
-      const head = new THREE.Mesh(new THREE.PlaneGeometry(2.62, 0.30), faceMat.duck);
-      head.position.set(0, 2.44, -0.122);
-      head.rotation.y = Math.PI;
-      g.add(head);
       g.add(telegraph(K.DUCK));
       return g;
     }, group);
@@ -1150,6 +1246,9 @@ MR.World = (function () {
       mats.road.color.copy(lerpInto(_road, prev.road, look.road, t));
       mats.shoulder.color.copy(lerpInto(_shoulder, prev.ground, look.ground, t));
       if (mats.ground) mats.ground.color.copy(mats.shoulder.color);
+      // Hills take the ground hue knocked back toward the fog, so they read as
+      // the same land seen through a lot of air.
+      hillsMat.color.copy(mats.shoulder.color).lerp(api.fogColor, 0.45);
       sky.material.uniforms.top.value.copy(lerpInto(_skyTop, prev.sky[0], look.sky[0], t));
       sky.material.uniforms.bottom.value.copy(lerpInto(_skyBot, prev.sky[1], look.sky[1], t));
 
@@ -1174,6 +1273,9 @@ MR.World = (function () {
       ground.position.z = z;
       ground.position.y = -0.34 - WATER_DROP * lift;
       sky.position.z = z;
+      hills.position.z = z;
+      // On the bridge there is no land to see, only water to the horizon.
+      hills.visible = lift < 0.6;
       ripples.visible = lift > 0.02;
       if (ripples.visible) {
         ripples.position.set(0, ground.position.y + 0.05, z);

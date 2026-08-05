@@ -1,15 +1,33 @@
 /**
  * Cel-shading toolkit: banded toon ramps, normal-extruded ink outlines, the
- * atmosphere (sky dome + aerial perspective), and the palette everything else
- * draws from.
+ * atmosphere (sky dome + aerial perspective), the contact shadow, and the
+ * palette everything else draws from.
  *
  * The look is toy-plastic: few, wide bands; saturated mid-tones; a warm key
  * and a cool bounce so shadowed sides read blue rather than grey; and a
- * constant-width dark outline on every silhouette. Outlines are extruded
- * along the vertex normal in view space and scaled by depth, which keeps them
- * the same thickness on screen whether the runner is under the camera or a
- * building is 300 units away -- a plain scaled inverted hull would balloon on
- * large geometry and vanish on small.
+ * strong contact shadow grounding anything that stands on the road.
+ *
+ * OUTLINE POLICY, because it is the one place this build knowingly disagrees
+ * with its own references. Subway Surfers and Sonic Forces -- the stated art
+ * target -- use NO ink lines at all. They read as toys through saturated flat
+ * colour, a wide soft light/shade step, chunky proportions and a contact
+ * shadow; silhouettes separate on colour contrast, not on a black rim. An
+ * earlier version of this file inked everything, which flattened depth (a
+ * constant-width line ignores distance the way nothing else in the frame
+ * does) and turned the skyline into a sheet of stickers.
+ *
+ * The line is therefore kept only where it buys GAMEPLAY readability -- the
+ * player, the rivals and the hazards, which have to be picked out instantly
+ * at distance and while moving -- and at about two thirds of its old weight.
+ * Everything else (props, scenery, banners) is INK weight 0 and separates on
+ * colour, band contrast and haze instead. See INK below; the weights are the
+ * single control, so restoring lines anywhere is a one-number change.
+ *
+ * Where a line does survive it is extruded along the vertex normal in view
+ * space and scaled by depth, which keeps it the same thickness on screen
+ * whether the runner is under the camera or a rival is 60 units away -- a
+ * plain scaled inverted hull would balloon on large geometry and vanish on
+ * small.
  *
  * COLOUR SPACE, because it bites every shader in here: the renderer is in
  * SRGBColorSpace and ColorManagement is on, so a THREE.Color built from a hex
@@ -44,22 +62,66 @@ MR.shading = (function () {
     block: 0xff3b6b,  // impassable
 
     ground: 0x63c96b,
-    building: [0xf6f0e4, 0xffd9a0, 0xc9dcff, 0xffc2cf, 0xbdf0d8],
+
+    // Building tints, picked at random per block. These carry most of the
+    // load now that scenery has no outline: a skyline separates from the road
+    // and from itself on HUE, so the set is spread right round the wheel
+    // rather than being five variations on cream. Two pales are kept because
+    // a wall of saturated blocks reads as noise -- the references alternate
+    // vivid facades with light ones, and the light ones are what let the
+    // vivid ones look vivid.
+    //
+    // Mid-value on purpose: the road sits around 0x50557d, so anything much
+    // darker than these merges with it at distance once the haze lands.
+    building: [
+      0xff8a6e,  // coral
+      0x4fc4d8,  // teal
+      0xffc247,  // mustard
+      0xa98ae8,  // violet
+      0x5fd08c,  // mint
+      0xfff1dc,  // cream
+      0xff9fc4,  // candy pink
+      0xd8e6f5,  // pale steel
+    ],
     accent: 0xffe45e,
+
+    // Contact-shadow tint. Deliberately a deep blue-violet rather than black:
+    // it has to sit on grass, tarmac and sand across six biomes, and a neutral
+    // black blob reads as a hole in every one of them.
+    contact: 0x241d3d,
   };
 
   /**
-   * Outline weights in world units, by what the object is. Small parts need a
-   * thin line or the fill disappears; large scenery needs a heavy one or the
-   * silhouette reads as untreated flat-shaded geometry. The number is the
-   * width at the camera; OUTLINE_VS grows it with depth (see there).
+   * Outline weights in WORLD UNITS, by what the object is. Zero means no line
+   * at all, and costs nothing -- see outlineMaterial() and outlined(), which
+   * both short-circuit on it. The number is the width at the camera;
+   * OUTLINE_VS grows it with depth (see there).
+   *
+   * The references carry no ink whatsoever (see the outline policy at the top
+   * of the file), so every non-zero weight here has to earn itself back in
+   * READABILITY. Two classes do:
+   *
+   *   character  the player and the rivals. The runner has to stay legible
+   *              against a road that is sometimes close to its own value,
+   *              while both are moving. Thin, because the limbs are ~0.07
+   *              units across and anything heavier starts eating the fill.
+   *   hazard     jump blocks, duck bars, impassable walls. This is the one
+   *              class of object the player LOSES the race by misreading, and
+   *              it is read at 30-50 units out where the fill is a few pixels
+   *              tall and the haze has already taken half its contrast.
+   *
+   * Everything else is 0. Props, scenery and banners are set dressing: the
+   * line bought them nothing that saturated colour, the band step and the
+   * aerial perspective do not already do, while costing a second draw call
+   * each and painting a constant-width black rim that flattened exactly the
+   * depth the haze was there to create.
    */
   const INK = {
-    character: 0.021,
-    hazard: 0.036,
-    prop: 0.030,
-    scenery: 0.090,
-    banner: 0.045,
+    character: 0.014,   // was 0.021 -- kept, lightened
+    hazard: 0.025,      // was 0.036 -- kept, lightened
+    prop: 0,            // was 0.030 -- dropped
+    scenery: 0,         // was 0.090 -- dropped
+    banner: 0,          // was 0.045 -- dropped
   };
 
   // Linear working value -> what the sRGB framebuffer expects. Used wherever a
@@ -95,6 +157,13 @@ MR.shading = (function () {
    * gradient lookup only reads the red channel, so patchToonRamp() below
    * widens it to rgb -- if that patch ever fails to apply the red channel
    * still carries a sensible luminance and the look degrades to greyscale.
+   *
+   * This ramp is the whole of the shading now that scenery carries no ink, so
+   * it is deliberately harder than it was: a box has to show three distinct
+   * tones on its three visible faces, because that step is the ONLY thing
+   * left separating its top from its front. Both numbers below were pulled
+   * further apart when the outlines came off -- a ramp tuned to sit politely
+   * underneath a black rim reads as unshaded once the rim is gone.
    */
   function ramp(steps) {
     if (ramps.has(steps)) return ramps.get(steps);
@@ -102,10 +171,20 @@ MR.shading = (function () {
     const data = new Uint8Array(n * 4);
     for (let i = 0; i < n; i++) {
       const k = i / (n - 1);
-      // Bias the darkest band up so shadows stay colourful, never muddy.
-      const v = 0.42 + 0.58 * k;
-      const cool = (1 - k) * (1 - k) * 0.34;   // strongest in the deepest band
-      const rgb = [v * (1 - cool * 1.05), v * (1 - cool * 0.40), v * (1 + cool * 0.70)];
+      // Bias the darkest band up so shadows stay colourful, never muddy, and
+      // curve the ramp so the mid band sits nearer the shadow than the light:
+      // an evenly spaced ramp puts the terminator's wide middle band close to
+      // full brightness and the form stops reading. 0.31 is as low as this can
+      // go before the ambient can no longer keep a shaded red vest from
+      // reading as brown.
+      const v = 0.31 + 0.69 * Math.pow(k, 1.22);
+      // Cool the dark end. Pushed too far this desaturates the base colour to
+      // blue-grey instead of shading it, so it falls off fast toward the light.
+      // The exponent is what keeps a 3-band ramp's MIDDLE band only slightly
+      // cool: cooling the terminator as hard as the core shadow tints the
+      // whole object blue rather than tinting its shadow.
+      const cool = Math.pow(1 - k, 1.55) * 0.38;
+      const rgb = [v * (1 - cool * 1.05), v * (1 - cool * 0.40), v * (1 + cool * 0.72)];
       for (let c = 0; c < 3; c++) {
         data[i * 4 + c] = Math.round(Math.max(0, Math.min(1, rgb[c])) * 255);
       }
@@ -119,14 +198,36 @@ MR.shading = (function () {
     return tex;
   }
 
-  // One shared function object so every toon material hashes to the same
-  // program cache key -- otherwise each material would compile its own copy.
-  const GRAD_GREY = 'return vec3( texture2D( gradientMap, coord ).r );';
-  const GRAD_RGB = 'return texture2D( gradientMap, coord ).rgb;';
+  // three's stock gradient lookup returns vec3(texel.r), throwing away the
+  // colour in the ramp. This swaps in an rgb version.
+  //
+  // It replaces the #include LINE, not the resolved chunk body: onBeforeCompile
+  // runs BEFORE resolveIncludes, so the shader it hands you still says
+  // "#include <gradientmap_pars_fragment>" and a patch written against the
+  // expanded source silently matches nothing -- which is exactly how the first
+  // attempt shipped a ramp whose blue was never read.
+  //
+  // One shared function object, so every toon material hashes to the same
+  // program cache key instead of compiling its own copy.
+  const GRAD_INCLUDE = '#include <gradientmap_pars_fragment>';
+  const GRAD_RGB = [
+    '#ifdef USE_GRADIENTMAP',
+    '  uniform sampler2D gradientMap;',
+    '#endif',
+    'vec3 getGradientIrradiance( vec3 normal, vec3 lightDirection ) {',
+    '  float dotNL = dot( normal, lightDirection );',
+    '  vec2 coord = vec2( dotNL * 0.5 + 0.5, 0.0 );',
+    '  #ifdef USE_GRADIENTMAP',
+    '    return texture2D( gradientMap, coord ).rgb;',
+    '  #else',
+    '    vec2 fw = fwidth( coord ) * 0.5;',
+    '    return mix( vec3( 0.7 ), vec3( 1.0 ), smoothstep( 0.7 - fw.x, 0.7 + fw.x, coord.x ) );',
+    '  #endif',
+    '}',
+  ].join('\n');
+
   function patchToonRamp(shader) {
-    if (shader.fragmentShader.indexOf(GRAD_GREY) >= 0) {
-      shader.fragmentShader = shader.fragmentShader.replace(GRAD_GREY, GRAD_RGB);
-    }
+    shader.fragmentShader = shader.fragmentShader.replace(GRAD_INCLUDE, GRAD_RGB);
   }
 
   /** Standard toon material. `steps` 2 for props, 3 for characters. */
@@ -153,9 +254,10 @@ MR.shading = (function () {
   // it by hand. These uniform objects are SHARED by every outline material, so
   // one write per frame updates all of them.
   //
-  // fogColor is stored already encoded, because three mixes fog AFTER the
-  // colour-space conversion -- matching that is what keeps an outline fading
-  // into exactly the same haze as the surface it wraps.
+  // inkFogColor is stored already encoded for display, because three's own
+  // materials mix fog AFTER the colour-space conversion. Matching that is what
+  // keeps an outline fading into exactly the same haze as the surface it wraps
+  // rather than into a darker version of it.
   const FOG_NEAR = 26;
   const FOG_FAR = 190;
 
@@ -168,8 +270,10 @@ MR.shading = (function () {
 
   function syncFog(fog) {
     if (!fog) return;
+    // getHex() quantises to 8 bits, so a per-frame biome cross-fade only trips
+    // this on the handful of frames where the haze visibly moves.
     const hex = fog.color.getHex();
-    if (hex === fogHex && fogU.inkFogNear.value === fog.near) return;
+    if (hex === fogHex && fogU.inkFogNear.value === fog.near && fogU.inkFogFar.value === fog.far) return;
     fogHex = hex;
     fogU.inkFogColor.value.setRGB(encode(fog.color.r), encode(fog.color.g), encode(fog.color.b));
     fogU.inkFogNear.value = fog.near;
@@ -224,9 +328,30 @@ MR.shading = (function () {
   // objects used to carry hundreds of identical ShaderMaterials.
   const outlineMats = new Map();
 
-  /** @param thickness world units of extrusion (see OUTLINE_VS). */
+  // An INK weight of 0 has to mean "no line", not "a line of zero width" --
+  // a zero extrusion leaves the shell exactly coincident with the fill and
+  // z-fights it into a shimmering mess. Callers pass a weight straight out of
+  // INK without checking, so the check lives here: weight 0 hands back one
+  // shared material with visible=false, which WebGLRenderer.projectObject
+  // filters out before it ever reaches a draw call. Zero draws, zero state
+  // changes, and every caller keeps working untouched.
+  let hiddenInk = null;
+  function hiddenInkMaterial() {
+    if (!hiddenInk) {
+      hiddenInk = new THREE.MeshBasicMaterial();
+      hiddenInk.visible = false;
+      hiddenInk.name = 'ink/none';
+    }
+    return hiddenInk;
+  }
+
+  /**
+   * @param thickness world units of extrusion (see OUTLINE_VS). 0 or less
+   *        returns a shared invisible material -- see above.
+   */
   function outlineMaterial(thickness, color) {
     const t = thickness === undefined ? INK.character : thickness;
+    if (!(t > 0)) return hiddenInkMaterial();
     const c = color === undefined ? PALETTE.ink : color;
     const key = t + '/' + c;
     let m = outlineMats.get(key);
@@ -251,12 +376,21 @@ MR.shading = (function () {
    * Wrap a mesh in its own outline shell. Returns a Group holding both, so
    * animating the group moves silhouette and fill together and they can never
    * drift apart.
+   *
+   * At INK weight 0 the shell mesh is still built and still parented, but it
+   * is switched off. That is on purpose: callers hold on to
+   * `group.userData.line` and scale or reposition it alongside the fill (a
+   * pooled building does exactly this every time it is claimed), so removing
+   * the object would turn a weight change into a crash. An invisible child is
+   * one matrix update per frame and no draw call.
    */
   function outlined(geometry, material, thickness) {
+    const t = thickness === undefined ? INK.character : thickness;
     const g = new THREE.Group();
     const fill = new THREE.Mesh(geometry, material);
-    const line = new THREE.Mesh(geometry, outlineMaterial(thickness));
+    const line = new THREE.Mesh(geometry, outlineMaterial(t));
     line.renderOrder = -1;
+    line.visible = t > 0;
     g.add(line, fill);
     g.userData.fill = fill;
     g.userData.line = line;
@@ -481,18 +615,35 @@ MR.shading = (function () {
    * The bounce is deliberately cool and the ambient only just strong enough to
    * keep the darkest ramp band from closing up: between them they are what
    * gives shaded faces a blue cast rather than a grey one.
+   *
+   * The BALANCE between the three is the other half of losing the outlines.
+   * Fill light is what collapses a banded ramp: every unit of ambient adds
+   * equally to the lit face and the shaded one, so it shrinks the ratio
+   * between them, and the old rig spent 1.25 of its ~3.3 units of exposure on
+   * fill. That is fine under a black rim -- the rim was doing the separating.
+   * With no rim it read as unshaded. Fill is down by a third and the key is up
+   * to match, so total exposure lands within a couple of percent of where it
+   * was while the light/shade step is visibly wider.
+   *
+   * The same move is most of what puts colour back in the frame: a cool fill
+   * that large washes every camera-facing surface toward the same pale blue,
+   * which is exactly the "everything is a lavender-grey slab" the references
+   * do not have. Less fill, warmer key, and a coral facade stays coral.
    */
   function lights(scene) {
     // Along skyDome's sunDir so the drawn sun and the shading agree, but
     // lifted: at the sun's true 14-degree elevation the terminator ran across
     // the runner's waist and the legs went dark.
-    const key = new THREE.DirectionalLight(0xfff4e0, 2.05);
+    const key = new THREE.DirectionalLight(0xfff2d8, 2.42);
     key.position.set(7.0, 9.0, 11.0);
 
-    const bounce = new THREE.DirectionalLight(0x7fa8ff, 0.75);
+    // Aimed back down the camera axis on purpose: the player is seen from
+    // behind, so without this the one surface that matters most -- the
+    // runner's back -- would sit in the ramp's darkest band all race.
+    const bounce = new THREE.DirectionalLight(0x86aeff, 0.58);
     bounce.position.set(-6, 2, -9);
 
-    const amb = new THREE.AmbientLight(0xa8c4ff, 0.50);
+    const amb = new THREE.AmbientLight(0xa8c4ff, 0.34);
 
     scene.add(key, bounce, amb);
 

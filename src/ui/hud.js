@@ -85,7 +85,7 @@ MR.HUD = (function () {
         <div id="toast">
           <div class="lab" id="toastLab">MILE 1</div>
           <div id="toastRow"><span class="big num" id="toastBig">--:--</span><span class="unit">/MI</span></div>
-          <div class="small num" id="toastSmall"></div>
+          <div class="small num"><span id="toastCum"></span> <span id="toastDelta"></span></div>
         </div>
       </div>
 
@@ -173,7 +173,8 @@ MR.HUD = (function () {
       distVal: q('distVal'), toGo: q('toGo'),
       rail: q('rail'), railFill: q('railFill'), railGap: q('railGap'), railGhost: q('railGhost'),
       gapVal: q('gapVal'), gapTrend: q('gapTrend'),
-      toast: q('toast'), toastLab: q('toastLab'), toastBig: q('toastBig'), toastSmall: q('toastSmall'),
+      toast: q('toast'), toastLab: q('toastLab'), toastBig: q('toastBig'),
+      toastCum: q('toastCum'), toastDelta: q('toastDelta'),
       startPanel: q('startPanel'), startBtn: q('startBtn'), startDate: q('startDate'),
       endPanel: q('endPanel'), endTime: q('endTime'), endDate: q('endDate'),
       verdict: q('verdict'), stats: q('resultStats'), splitTable: q('splitTable'),
@@ -308,9 +309,11 @@ MR.HUD = (function () {
       cls(n.railGap, 'railGapCls', ahead ? 'ahead' : 'behind');
 
       // Whether the gap is opening or closing is exactly whether the current
-      // pace beats record pace, so it needs no smoothing to be honest.
+      // pace beats record pace, so it needs no smoothing to be honest. Under a
+      // second there is no gap worth describing, and calling the start line
+      // "LOSING" is a scold rather than information.
       const gaining = p.pace < K.RECORD_PACE;
-      set(n.gapTrend, 'trend', gaining ? 'GAINING' : 'LOSING');
+      set(n.gapTrend, 'trend', Math.abs(d) < 1 ? '' : gaining ? 'GAINING' : 'LOSING');
       cls(n.gapTrend, 'trendCls', gaining ? 'ahead' : 'behind');
 
       if (extra && extra.fps !== undefined) {
@@ -339,13 +342,16 @@ MR.HUD = (function () {
         const d = sp.time - sp.mile * K.RECORD_PACE;
         n.toastLab.textContent = 'MILE ' + sp.mile;
         n.toastBig.textContent = Pace.pace(sp.time - prev);
-        n.toastSmall.textContent = Pace.clock(sp.time) + '  ' + Pace.delta(d);
-        n.toastSmall.className = 'small num ' + (d < 0 ? 'ahead' : 'behind');
+        // Only the delta is tinted. The elapsed clock is a plain fact and
+        // colouring it too made the whole line read as a warning.
+        n.toastCum.textContent = Pace.clock(sp.time);
+        n.toastDelta.textContent = Pace.delta(d);
+        n.toastDelta.className = d < 0 ? 'ahead' : 'behind';
       } else {
         n.toastLab.textContent = big || '';
         n.toastBig.textContent = '';
-        n.toastSmall.textContent = small || '';
-        n.toastSmall.className = 'small num';
+        n.toastCum.textContent = small || '';
+        n.toastDelta.textContent = '';
       }
       // Without split data there is no mile time to headline, so the card
       // drops that row rather than showing a bare "/MI".

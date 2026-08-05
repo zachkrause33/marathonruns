@@ -208,8 +208,7 @@ html, body {
 #toast .big { font-size: 27px; font-weight: 900; line-height: 1.05; }
 #toast .unit { font-size: 11px; font-weight: 700; opacity: 0.6; margin-left: 3px; }
 #toast .small { font-size: 11px; font-weight: 800; margin-top: 1px; }
-#toast .small.ahead { color: var(--ahead); }
-#toast .small.behind { color: var(--behind); }
+#toast .small #toastCum { opacity: 0.8; }
 
 /* ---- progress rail ----
  * You, the ghost, and the road between you. The honest split lives here
@@ -497,6 +496,27 @@ html, body {
   .railTick.major { top: 3px; bottom: 3px; }
 
   #perf { top: 212px; font-size: 12px; }
+
+  /* The panels are the only full-screen moments in the game, so on a desktop
+   * monitor they have to fill it rather than sit in it as a small dialog. */
+  .panelInner { max-width: 700px; }
+  .panel h1 { font-size: 80px; }
+  .panel .date { font-size: 13px; }
+  .finLab { font-size: 12px; }
+  .panel .blurb { font-size: 16px; max-width: 500px; }
+  .rule { font-size: 11px; margin: 24px 0 12px; }
+  .mech { font-size: 15px; }
+  .mechPace b { font-size: 33px; }
+  .mechPace span { font-size: 21px; }
+  .mech .gauge { max-width: 340px; }
+  .gaugeLeg { font-size: 12px; }
+  .panel .keys { font-size: 14px; margin-top: 24px; }
+  .panel .keys kbd { font-size: 13px; }
+  #verdict { font-size: 17px; padding: 8px 20px; margin-top: 14px; }
+  #endCols { margin-top: 24px; gap: 18px 46px; }
+  #resultStats, #splitTable { font-size: 16px; gap: 6px 26px; }
+  #splitTable .k { font-size: 11px; }
+  .cta { font-size: 18px; padding: 16px 44px; margin-top: 28px; }
 }
 
 /* Landscape phones have almost no vertical room, so the readout tightens up

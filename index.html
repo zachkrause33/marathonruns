@@ -216,8 +216,7 @@ html, body {
 #toast .big { font-size: 27px; font-weight: 900; line-height: 1.05; }
 #toast .unit { font-size: 11px; font-weight: 700; opacity: 0.6; margin-left: 3px; }
 #toast .small { font-size: 11px; font-weight: 800; margin-top: 1px; }
-#toast .small.ahead { color: var(--ahead); }
-#toast .small.behind { color: var(--behind); }
+#toast .small #toastCum { opacity: 0.8; }
 
 /* ---- progress rail ----
  * You, the ghost, and the road between you. The honest split lives here
@@ -505,6 +504,27 @@ html, body {
   .railTick.major { top: 3px; bottom: 3px; }
 
   #perf { top: 212px; font-size: 12px; }
+
+  /* The panels are the only full-screen moments in the game, so on a desktop
+   * monitor they have to fill it rather than sit in it as a small dialog. */
+  .panelInner { max-width: 700px; }
+  .panel h1 { font-size: 80px; }
+  .panel .date { font-size: 13px; }
+  .finLab { font-size: 12px; }
+  .panel .blurb { font-size: 16px; max-width: 500px; }
+  .rule { font-size: 11px; margin: 24px 0 12px; }
+  .mech { font-size: 15px; }
+  .mechPace b { font-size: 33px; }
+  .mechPace span { font-size: 21px; }
+  .mech .gauge { max-width: 340px; }
+  .gaugeLeg { font-size: 12px; }
+  .panel .keys { font-size: 14px; margin-top: 24px; }
+  .panel .keys kbd { font-size: 13px; }
+  #verdict { font-size: 17px; padding: 8px 20px; margin-top: 14px; }
+  #endCols { margin-top: 24px; gap: 18px 46px; }
+  #resultStats, #splitTable { font-size: 16px; gap: 6px 26px; }
+  #splitTable .k { font-size: 11px; }
+  .cta { font-size: 18px; padding: 16px 44px; margin-top: 28px; }
 }
 
 /* Landscape phones have almost no vertical room, so the readout tightens up
@@ -1078,16 +1098,34 @@ MR.Course = (function () {
 /* ==================== src/render/shading.js ==================== */
 /**
  * Cel-shading toolkit: banded toon ramps, normal-extruded ink outlines, the
- * atmosphere (sky dome + aerial perspective), and the palette everything else
- * draws from.
+ * atmosphere (sky dome + aerial perspective), the contact shadow, and the
+ * palette everything else draws from.
  *
  * The look is toy-plastic: few, wide bands; saturated mid-tones; a warm key
  * and a cool bounce so shadowed sides read blue rather than grey; and a
- * constant-width dark outline on every silhouette. Outlines are extruded
- * along the vertex normal in view space and scaled by depth, which keeps them
- * the same thickness on screen whether the runner is under the camera or a
- * building is 300 units away -- a plain scaled inverted hull would balloon on
- * large geometry and vanish on small.
+ * strong contact shadow grounding anything that stands on the road.
+ *
+ * OUTLINE POLICY, because it is the one place this build knowingly disagrees
+ * with its own references. Subway Surfers and Sonic Forces -- the stated art
+ * target -- use NO ink lines at all. They read as toys through saturated flat
+ * colour, a wide soft light/shade step, chunky proportions and a contact
+ * shadow; silhouettes separate on colour contrast, not on a black rim. An
+ * earlier version of this file inked everything, which flattened depth (a
+ * constant-width line ignores distance the way nothing else in the frame
+ * does) and turned the skyline into a sheet of stickers.
+ *
+ * The line is therefore kept only where it buys GAMEPLAY readability -- the
+ * player, the rivals and the hazards, which have to be picked out instantly
+ * at distance and while moving -- and at about two thirds of its old weight.
+ * Everything else (props, scenery, banners) is INK weight 0 and separates on
+ * colour, band contrast and haze instead. See INK below; the weights are the
+ * single control, so restoring lines anywhere is a one-number change.
+ *
+ * Where a line does survive it is extruded along the vertex normal in view
+ * space and scaled by depth, which keeps it the same thickness on screen
+ * whether the runner is under the camera or a rival is 60 units away -- a
+ * plain scaled inverted hull would balloon on large geometry and vanish on
+ * small.
  *
  * COLOUR SPACE, because it bites every shader in here: the renderer is in
  * SRGBColorSpace and ColorManagement is on, so a THREE.Color built from a hex
@@ -1122,22 +1160,66 @@ MR.shading = (function () {
     block: 0xff3b6b,  // impassable
 
     ground: 0x63c96b,
-    building: [0xf6f0e4, 0xffd9a0, 0xc9dcff, 0xffc2cf, 0xbdf0d8],
+
+    // Building tints, picked at random per block. These carry most of the
+    // load now that scenery has no outline: a skyline separates from the road
+    // and from itself on HUE, so the set is spread right round the wheel
+    // rather than being five variations on cream. Two pales are kept because
+    // a wall of saturated blocks reads as noise -- the references alternate
+    // vivid facades with light ones, and the light ones are what let the
+    // vivid ones look vivid.
+    //
+    // Mid-value on purpose: the road sits around 0x50557d, so anything much
+    // darker than these merges with it at distance once the haze lands.
+    building: [
+      0xff8a6e,  // coral
+      0x4fc4d8,  // teal
+      0xffc247,  // mustard
+      0xa98ae8,  // violet
+      0x5fd08c,  // mint
+      0xfff1dc,  // cream
+      0xff9fc4,  // candy pink
+      0xd8e6f5,  // pale steel
+    ],
     accent: 0xffe45e,
+
+    // Contact-shadow tint. Deliberately a deep blue-violet rather than black:
+    // it has to sit on grass, tarmac and sand across six biomes, and a neutral
+    // black blob reads as a hole in every one of them.
+    contact: 0x241d3d,
   };
 
   /**
-   * Outline weights in world units, by what the object is. Small parts need a
-   * thin line or the fill disappears; large scenery needs a heavy one or the
-   * silhouette reads as untreated flat-shaded geometry. The number is the
-   * width at the camera; OUTLINE_VS grows it with depth (see there).
+   * Outline weights in WORLD UNITS, by what the object is. Zero means no line
+   * at all, and costs nothing -- see outlineMaterial() and outlined(), which
+   * both short-circuit on it. The number is the width at the camera;
+   * OUTLINE_VS grows it with depth (see there).
+   *
+   * The references carry no ink whatsoever (see the outline policy at the top
+   * of the file), so every non-zero weight here has to earn itself back in
+   * READABILITY. Two classes do:
+   *
+   *   character  the player and the rivals. The runner has to stay legible
+   *              against a road that is sometimes close to its own value,
+   *              while both are moving. Thin, because the limbs are ~0.07
+   *              units across and anything heavier starts eating the fill.
+   *   hazard     jump blocks, duck bars, impassable walls. This is the one
+   *              class of object the player LOSES the race by misreading, and
+   *              it is read at 30-50 units out where the fill is a few pixels
+   *              tall and the haze has already taken half its contrast.
+   *
+   * Everything else is 0. Props, scenery and banners are set dressing: the
+   * line bought them nothing that saturated colour, the band step and the
+   * aerial perspective do not already do, while costing a second draw call
+   * each and painting a constant-width black rim that flattened exactly the
+   * depth the haze was there to create.
    */
   const INK = {
-    character: 0.021,
-    hazard: 0.036,
-    prop: 0.030,
-    scenery: 0.090,
-    banner: 0.045,
+    character: 0.014,   // was 0.021 -- kept, lightened
+    hazard: 0.025,      // was 0.036 -- kept, lightened
+    prop: 0,            // was 0.030 -- dropped
+    scenery: 0,         // was 0.090 -- dropped
+    banner: 0,          // was 0.045 -- dropped
   };
 
   // Linear working value -> what the sRGB framebuffer expects. Used wherever a
@@ -1180,10 +1262,15 @@ MR.shading = (function () {
     const data = new Uint8Array(n * 4);
     for (let i = 0; i < n; i++) {
       const k = i / (n - 1);
-      // Bias the darkest band up so shadows stay colourful, never muddy.
-      const v = 0.42 + 0.58 * k;
-      const cool = (1 - k) * (1 - k) * 0.34;   // strongest in the deepest band
-      const rgb = [v * (1 - cool * 1.05), v * (1 - cool * 0.40), v * (1 + cool * 0.70)];
+      // Bias the darkest band up so shadows stay colourful, never muddy, and
+      // curve the ramp so the mid band sits nearer the shadow than the light:
+      // an evenly spaced ramp puts the terminator's wide middle band close to
+      // full brightness and the form stops reading.
+      const v = 0.38 + 0.62 * Math.pow(k, 1.25);
+      // Cool the dark end. Pushed too far this desaturates the base colour to
+      // blue-grey instead of shading it, so it falls off fast toward the light.
+      const cool = Math.pow(1 - k, 1.6) * 0.30;
+      const rgb = [v * (1 - cool * 1.05), v * (1 - cool * 0.40), v * (1 + cool * 0.72)];
       for (let c = 0; c < 3; c++) {
         data[i * 4 + c] = Math.round(Math.max(0, Math.min(1, rgb[c])) * 255);
       }
@@ -1197,14 +1284,36 @@ MR.shading = (function () {
     return tex;
   }
 
-  // One shared function object so every toon material hashes to the same
-  // program cache key -- otherwise each material would compile its own copy.
-  const GRAD_GREY = 'return vec3( texture2D( gradientMap, coord ).r );';
-  const GRAD_RGB = 'return texture2D( gradientMap, coord ).rgb;';
+  // three's stock gradient lookup returns vec3(texel.r), throwing away the
+  // colour in the ramp. This swaps in an rgb version.
+  //
+  // It replaces the #include LINE, not the resolved chunk body: onBeforeCompile
+  // runs BEFORE resolveIncludes, so the shader it hands you still says
+  // "#include <gradientmap_pars_fragment>" and a patch written against the
+  // expanded source silently matches nothing -- which is exactly how the first
+  // attempt shipped a ramp whose blue was never read.
+  //
+  // One shared function object, so every toon material hashes to the same
+  // program cache key instead of compiling its own copy.
+  const GRAD_INCLUDE = '#include <gradientmap_pars_fragment>';
+  const GRAD_RGB = [
+    '#ifdef USE_GRADIENTMAP',
+    '  uniform sampler2D gradientMap;',
+    '#endif',
+    'vec3 getGradientIrradiance( vec3 normal, vec3 lightDirection ) {',
+    '  float dotNL = dot( normal, lightDirection );',
+    '  vec2 coord = vec2( dotNL * 0.5 + 0.5, 0.0 );',
+    '  #ifdef USE_GRADIENTMAP',
+    '    return texture2D( gradientMap, coord ).rgb;',
+    '  #else',
+    '    vec2 fw = fwidth( coord ) * 0.5;',
+    '    return mix( vec3( 0.7 ), vec3( 1.0 ), smoothstep( 0.7 - fw.x, 0.7 + fw.x, coord.x ) );',
+    '  #endif',
+    '}',
+  ].join('\n');
+
   function patchToonRamp(shader) {
-    if (shader.fragmentShader.indexOf(GRAD_GREY) >= 0) {
-      shader.fragmentShader = shader.fragmentShader.replace(GRAD_GREY, GRAD_RGB);
-    }
+    shader.fragmentShader = shader.fragmentShader.replace(GRAD_INCLUDE, GRAD_RGB);
   }
 
   /** Standard toon material. `steps` 2 for props, 3 for characters. */
@@ -1231,9 +1340,10 @@ MR.shading = (function () {
   // it by hand. These uniform objects are SHARED by every outline material, so
   // one write per frame updates all of them.
   //
-  // fogColor is stored already encoded, because three mixes fog AFTER the
-  // colour-space conversion -- matching that is what keeps an outline fading
-  // into exactly the same haze as the surface it wraps.
+  // inkFogColor is stored already encoded for display, because three's own
+  // materials mix fog AFTER the colour-space conversion. Matching that is what
+  // keeps an outline fading into exactly the same haze as the surface it wraps
+  // rather than into a darker version of it.
   const FOG_NEAR = 26;
   const FOG_FAR = 190;
 
@@ -1246,8 +1356,10 @@ MR.shading = (function () {
 
   function syncFog(fog) {
     if (!fog) return;
+    // getHex() quantises to 8 bits, so a per-frame biome cross-fade only trips
+    // this on the handful of frames where the haze visibly moves.
     const hex = fog.color.getHex();
-    if (hex === fogHex && fogU.inkFogNear.value === fog.near) return;
+    if (hex === fogHex && fogU.inkFogNear.value === fog.near && fogU.inkFogFar.value === fog.far) return;
     fogHex = hex;
     fogU.inkFogColor.value.setRGB(encode(fog.color.r), encode(fog.color.g), encode(fog.color.b));
     fogU.inkFogNear.value = fog.near;
@@ -1620,12 +1732,15 @@ MR.shading = (function () {
  *      straight on a big torso is one blob at 200px tall no matter how good
  *      the shading is, so the trunk stops well below the skull and a bare
  *      skin neck bridges the gap.
- *   2. The back needs its own value structure. Reading top to bottom it goes
- *      dark hair / bright headband / light skin / red vest / white race bib
- *      -- five bands, so the character never flattens into one shape.
- *   3. Motion has to break the outline. Elbows swing outside the torso and
- *      the pale shoes and gloves flash against the road; those are the parts
- *      the eye actually tracks from behind.
+ *   2. The back needs its own value structure, and the order matters.
+ *      Top to bottom it runs dark hair / bright headband / dark hair /
+ *      light neck / red vest / white race bib. Hair on the crown with a
+ *      bare nape put light on light and the head merged again; the dark
+ *      mass has to sit directly above the lit neck for the pinch to read.
+ *   3. Motion has to break the outline. Arm swing is almost entirely along
+ *      the camera axis from here, so the cycle drives the elbows sideways
+ *      and lets the pale shoes, gloves and wristbands flash against the
+ *      road; those are the parts the eye can actually track from behind.
  *
  * Pivot layout (all rotations are local X unless noted):
  *   root -> body -> hips -> thigh -> shin -> foot
@@ -1639,9 +1754,11 @@ MR.Runner = (function () {
   const HEIGHT = 1.78;
   const OUTLINE = MR.shading.INK.character;
 
-  // Accent that ties the silhouette together: headband, shoe soles, vest hem.
-  // Repeating one bright colour in three places is what makes a pile of
-  // primitives look like a designed character instead of assorted parts.
+  // Accent that ties the silhouette together: headband, wristbands, shoe
+  // soles -- top, middle and bottom of the figure. Repeating one bright
+  // colour on a rhythm is what makes a pile of primitives look like a
+  // designed character instead of assorted parts. A fourth hit on the vest
+  // hem put three yellows at the same height and just read as clutter.
   const TRIM = P.accent;
   const GLOVE = P.runnerShoe;
 
@@ -1651,9 +1768,9 @@ MR.Runner = (function () {
    *
    * Every part is outlined, so a part costs two draw calls. Welding the
    * pieces that never move relative to each other -- skull + hair + band +
-   * ears + neck, vest + shoulders + hem, shoe + sole -- is what pays for the
-   * extra detail this silhouette needs while staying inside the budget. The
-   * whole character is 28 draws.
+   * ears + neck, vest + shoulders + blades, shoe + sole -- is what pays for
+   * the extra detail this silhouette needs while staying inside the budget.
+   * The whole character is 28 draws and about 8k triangles.
    *
    * Piece: { g, c, x,y,z, rx,ry,rz, sx,sy,sz }.
    */
@@ -1753,11 +1870,13 @@ MR.Runner = (function () {
     // ---- torso ----------------------------------------------------------
     // The trunk is a truncated cone, not a capsule: a hard flat shoulder line
     // wider than the head is half of what separates the two from behind.
+    // Shorts sit inside the vest where they overlap, in both x and z, or the
+    // vest's hem shows only at the hips and reads as two yellow pockets.
     const hips = pivot(body, 0, 0.78, 0);
     const spine = pivot(hips, 0, 0, 0);
 
     const pelvis = multi([
-      { g: new THREE.CylinderGeometry(0.222, 0.216, 0.22, 12), c: P.runnerShort, y: -0.015, sz: 0.84 },
+      { g: new THREE.CylinderGeometry(0.230, 0.222, 0.25, 12), c: P.runnerShort, y: -0.005, sz: 0.78 },
     ]);
     spine.add(pelvis);
 
@@ -1773,30 +1892,28 @@ MR.Runner = (function () {
       // It barely tapers on purpose: a singlet worn over the waistband, so
       // red owns two thirds of the trunk. Tapering it to a narrow hem let the
       // navy shorts read as the biggest single shape on the character.
-      { g: new THREE.CylinderGeometry(0.262, 0.230, 0.38, 12), c: P.runnerVest, y: -0.09, sz: 0.72 },
-      // Hem stripe -- stops the red mass from running straight into the shorts.
-      { g: new THREE.CylinderGeometry(0.234, 0.231, 0.05, 12), c: TRIM, y: -0.255, sz: 0.73 },
+      { g: new THREE.CylinderGeometry(0.262, 0.238, 0.30, 12), c: P.runnerVest, y: -0.05, sz: 0.78 },
       // Deltoids. These are what make the shoulder line read wider than the
       // head; without them the trunk cone tapers into the skull. Flattened
       // hard in Y so they widen the shoulders without raising them.
       { g: new THREE.SphereGeometry(0.134, 10, 8), c: P.runnerVest, x: -0.244, y: -0.020, sy: 0.78, sz: 0.84 },
       { g: new THREE.SphereGeometry(0.134, 10, 8), c: P.runnerVest, x: 0.244, y: -0.020, sy: 0.78, sz: 0.84 },
-      // Shoulder blades: a shallow pair of bumps so the back is not a blank
-      // curve. Barely visible individually, but they catch the terminator.
-      { g: new THREE.SphereGeometry(0.085, 8, 6), c: P.runnerVest, x: -0.105, y: -0.07, z: -0.135, sz: 0.55 },
-      { g: new THREE.SphereGeometry(0.085, 8, 6), c: P.runnerVest, x: 0.105, y: -0.07, z: -0.135, sz: 0.55 },
+      // No shoulder-blade bumps: the race bib is a panel standing proud of
+      // the vest and it covers the entire area they would have shown in.
     ]);
     chest.add(trunk);
 
     // Curved panel rather than a flat card so it hugs the vest at this size,
     // and high on the back so it never straddles the shorts line.
     const bib = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.253, 0.253, 0.185, 10, 1, true, Math.PI - 0.52, 1.04),
+      // Cone, not cylinder: matched to the vest's taper. A constant-radius
+      // panel let the wider top of the vest poke through the number.
+      new THREE.CylinderGeometry(0.266, 0.254, 0.17, 10, 1, true, Math.PI - 0.52, 1.04),
       S.toon(0xffffff, 3)
     );
     bib.material.map = raceBib();
-    bib.position.y = -0.030;
-    bib.scale.z = 0.72;
+    bib.position.y = -0.018;
+    bib.scale.z = 0.78;
     chest.add(bib);
 
     // ---- head -----------------------------------------------------------
@@ -1844,25 +1961,25 @@ MR.Runner = (function () {
     for (const side of [-1, 1]) {
       // leg
       const hip = pivot(hips, side * 0.135, -0.04, 0);
-      const thigh = part(new THREE.CapsuleGeometry(0.125, 0.20, 3, 10), P.runnerSkin);
-      thigh.position.y = -0.20;
+      const thigh = part(new THREE.CapsuleGeometry(0.125, 0.17, 3, 10), P.runnerSkin);
+      thigh.position.y = -0.185;
       hip.add(thigh);
 
-      const knee = pivot(hip, 0, -0.40, 0);
+      const knee = pivot(hip, 0, -0.365, 0);
       // Sock welded onto the shin: a pale band low on the leg makes the
       // scissor of the run cycle legible from directly behind.
       const shin = multi([
-        { g: new THREE.CapsuleGeometry(0.100, 0.19, 3, 10), c: P.runnerSkin, y: -0.175 },
-        { g: new THREE.CylinderGeometry(0.112, 0.105, 0.11, 10), c: P.runnerShoe, y: -0.295 },
+        { g: new THREE.CapsuleGeometry(0.100, 0.16, 3, 10), c: P.runnerSkin, y: -0.160 },
+        { g: new THREE.CylinderGeometry(0.112, 0.105, 0.10, 10), c: P.runnerShoe, y: -0.265 },
       ]);
       knee.add(shin);
 
-      const ankle = pivot(knee, 0, -0.35, 0);
+      const ankle = pivot(knee, 0, -0.315, 0);
       // Oversized shoe with a trim sole. Two flashing soles are the clearest
       // read the back view gets, both for cadence and for a jump tuck.
       const foot = multi([
-        { g: new THREE.BoxGeometry(0.165, 0.105, 0.30), c: P.runnerShoe, y: -0.020, z: 0.050 },
-        { g: new THREE.BoxGeometry(0.178, 0.058, 0.315), c: TRIM, y: -0.082, z: 0.055 },
+        { g: new THREE.BoxGeometry(0.165, 0.105, 0.30), c: P.runnerShoe, y: -0.008, z: 0.050 },
+        { g: new THREE.BoxGeometry(0.178, 0.056, 0.315), c: TRIM, y: -0.068, z: 0.055 },
       ], 2);
       ankle.add(foot);
 
@@ -1874,14 +1991,19 @@ MR.Runner = (function () {
       // abducted. With the default XYZ the yaw fired after the outward tilt
       // and dragged the whole arm across the back of the vest.
       shoulder.rotation.order = 'ZXY';
-      const upper = part(new THREE.CapsuleGeometry(0.088, 0.17, 3, 10), P.runnerSkin);
-      upper.position.y = -0.16;
+      const upper = part(new THREE.CapsuleGeometry(0.088, 0.15, 3, 10), P.runnerSkin);
+      upper.position.y = -0.145;
       shoulder.add(upper);
 
-      const elbow = pivot(shoulder, 0, -0.30, 0);
+      const elbow = pivot(shoulder, 0, -0.27, 0);
+      // Short forearm ending in a pale glove over a trim wristband. Arms and
+      // thighs are both skin, and from behind they overlap for most of the
+      // stride -- without a bright break at the wrist the whole lower half of
+      // the character reads as one undifferentiated mass.
       const fore = multi([
-        { g: new THREE.CapsuleGeometry(0.080, 0.15, 3, 10), c: P.runnerSkin, y: -0.13 },
-        { g: new THREE.SphereGeometry(0.098, 10, 8), c: GLOVE, y: -0.290, sx: 0.90, sz: 1.10 },
+        { g: new THREE.CapsuleGeometry(0.078, 0.12, 3, 10), c: P.runnerSkin, y: -0.115 },
+        { g: new THREE.CylinderGeometry(0.086, 0.086, 0.05, 10), c: TRIM, y: -0.203 },
+        { g: new THREE.SphereGeometry(0.096, 10, 8), c: GLOVE, y: -0.262, sx: 0.90, sz: 1.10 },
       ]);
       elbow.add(fore);
 
@@ -1967,7 +2089,7 @@ MR.Runner = (function () {
         // Flexion peaks with the arm forward -- glove up by the chest at the
         // front of the swing, forearm opening out past the hip at the back,
         // which is exactly when the pale glove clears the torso silhouette.
-        A.elbow.rotation.x = -1.16 - fwd * 0.52 - air * 0.30 - duck * 0.55;
+        A.elbow.rotation.x = -1.32 - fwd * 0.46 - air * 0.30 - duck * 0.55;
       }
 
       // ---- torso: forward lean, vertical bob, and a lateral bank on turns
@@ -2240,6 +2362,26 @@ MR.World = (function () {
     return texture(c, true);
   }
 
+  /**
+   * Faint irregular patchwork for the ground and the verges. A single flat
+   * colour over a 1,400-unit plane reads as coloured paper; a few percent of
+   * banded variation is enough to give the eye somewhere to land without
+   * breaking the cel-shaded flatness.
+   */
+  function groundTexture() {
+    const c = canvas(64, 64);
+    const g = c.getContext('2d');
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, 64, 64);
+    const shades = ['rgba(0,0,0,0.05)', 'rgba(255,255,255,0.07)', 'rgba(0,0,0,0.025)'];
+    let s = 1337;
+    const r = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+    for (let i = 0; i < 14; i++) {
+      g.fillStyle = shades[Math.floor(r() * shades.length)];
+      g.fillRect(r() * 64 - 8, r() * 64 - 8, 10 + r() * 26, 8 + r() * 20);
+    }
+    return texture(c, true);
+  }
+
   /** Checker band for the finish gantry. */
   function checkerTexture() {
     const c = canvas(128, 32);
@@ -2384,6 +2526,12 @@ MR.World = (function () {
     }
 
     // Shared materials: recoloured per biome, never reallocated.
+    const groundTex = groundTexture();
+    groundTex.repeat.set(48, 48);
+    const vergeTex = groundTex.clone();
+    vergeTex.repeat.set(5, 4);
+    vergeTex.needsUpdate = true;
+
     const mats = {
       road: S.toon(P.road, 2),
       shoulder: S.toon(P.ground, 2),
@@ -2404,12 +2552,46 @@ MR.World = (function () {
     // road surface so the road always wins the depth test. On the bridge it
     // drops away and becomes the river.
     const groundMat = S.toon(P.ground, 2);
+    groundMat.map = groundTex;
+    mats.shoulder.map = vergeTex;
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(1400, 1400), groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.34;
     ground.renderOrder = -500;
     group.add(ground);
     mats.ground = groundMat;
+
+    /**
+     * A ring of distant hills, riding with the runner like the ground does.
+     *
+     * They sit at 200 units, just inside the fog's far plane, so they arrive
+     * about three-quarters dissolved -- which is exactly the read wanted: a
+     * suggestion of land beyond the course rather than scenery you can
+     * inspect. The forward 60 degrees is left open so nothing ever appears to
+     * stand across the road at the vanishing point.
+     */
+    const hillsGeo = (function () {
+      const parts = [];
+      let s = 4242;
+      const r = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+      for (let i = 0; i < 46; i++) {
+        const a = (i / 46) * Math.PI * 2;
+        const forward = Math.abs(((a + Math.PI) % (Math.PI * 2)) - Math.PI);
+        if (forward < 0.52) continue;                      // keep the road open
+        const rad = 190 + r() * 60;
+        const h = 12 + r() * 26;
+        // Baked shading: the far side of each hill is a band darker, which is
+        // all a fully-fogged silhouette needs to stop reading as a flat cutout.
+        parts.push(cone(24 + r() * 26, h, 5, Math.sin(a) * rad, h / 2 - 4, Math.cos(a) * rad,
+          r() > 0.5 ? 0xd0d0d0 : 0xa8a8a8));
+      }
+      return merge(parts);
+    })();
+    const hillsMat = vtoon(2);
+    const hills = new THREE.Mesh(hillsGeo, hillsMat);
+    hills.renderOrder = -490;
+    hills.frustumCulled = false;
+    group.add(hills);
 
     // Ripples ride just above the water surface and are only shown when the
     // ground is acting as a river, so still terrain never shimmers.
@@ -2596,13 +2778,34 @@ MR.World = (function () {
 
     // Lane telegraph mats. Transparent, unlit, and laid a hair above the road
     // paint so they never z-fight with the lane dashes.
-    // 14 units of run-up: the mat has to be readable while the lane choice is
-    // still open, which is 3-4 gate-lengths out, not 1.
-    const matGeo = new THREE.PlaneGeometry(2.24, 14);
+    /**
+     * The telegraph mat: 14 units of run-up, because the lane choice has to be
+     * made 3-4 gate-lengths out, not 1.
+     *
+     * The end nearest the player fades to nothing through a per-vertex alpha
+     * ramp. Without it the mat is informative at 60 units and then swells into
+     * a screen-filling slab of saturated colour in the last quarter-second,
+     * which is precisely when the player needs to see the hazard instead.
+     */
+    const matGeo = (function () {
+      const g = new THREE.PlaneGeometry(1.95, 14, 1, 14);
+      const pos = g.attributes.position;
+      const col = new Float32Array(pos.count * 4);
+      for (let i = 0; i < pos.count; i++) {
+        // Local +Y lays down toward -Z, i.e. toward the approaching runner, so
+        // the ramp runs over most of the mat's length and only the last few
+        // units before the hazard reach full strength.
+        const t = Math.max(0, Math.min(1, (7.0 - pos.getY(i)) / 9.5));
+        const a = Math.pow(t, 1.5);
+        col[i * 4] = 1; col[i * 4 + 1] = 1; col[i * 4 + 2] = 1; col[i * 4 + 3] = a;
+      }
+      g.setAttribute('color', new THREE.BufferAttribute(col, 4));
+      return g;
+    })();
     const matMat = {};
-    matMat[K.JUMP] = new THREE.MeshBasicMaterial({ map: matTexture(K.JUMP, '#ffc23a'), transparent: true, depthWrite: false });
-    matMat[K.DUCK] = new THREE.MeshBasicMaterial({ map: matTexture(K.DUCK, '#4fdcff'), transparent: true, depthWrite: false });
-    matMat[K.BLOCK] = new THREE.MeshBasicMaterial({ map: matTexture(K.BLOCK, '#ff4f78'), transparent: true, depthWrite: false });
+    matMat[K.JUMP] = new THREE.MeshBasicMaterial({ map: matTexture(K.JUMP, '#ffc23a'), transparent: true, depthWrite: false, vertexColors: true });
+    matMat[K.DUCK] = new THREE.MeshBasicMaterial({ map: matTexture(K.DUCK, '#4fdcff'), transparent: true, depthWrite: false, vertexColors: true });
+    matMat[K.BLOCK] = new THREE.MeshBasicMaterial({ map: matTexture(K.BLOCK, '#ff4f78'), transparent: true, depthWrite: false, vertexColors: true });
 
     function telegraph(kind) {
       const m = new THREE.Mesh(matGeo, matMat[kind]);
@@ -3168,6 +3371,9 @@ MR.World = (function () {
       mats.road.color.copy(lerpInto(_road, prev.road, look.road, t));
       mats.shoulder.color.copy(lerpInto(_shoulder, prev.ground, look.ground, t));
       if (mats.ground) mats.ground.color.copy(mats.shoulder.color);
+      // Hills take the ground hue knocked back toward the fog, so they read as
+      // the same land seen through a lot of air.
+      hillsMat.color.copy(mats.shoulder.color).lerp(api.fogColor, 0.45);
       sky.material.uniforms.top.value.copy(lerpInto(_skyTop, prev.sky[0], look.sky[0], t));
       sky.material.uniforms.bottom.value.copy(lerpInto(_skyBot, prev.sky[1], look.sky[1], t));
 
@@ -3192,6 +3398,9 @@ MR.World = (function () {
       ground.position.z = z;
       ground.position.y = -0.34 - WATER_DROP * lift;
       sky.position.z = z;
+      hills.position.z = z;
+      // On the bridge there is no land to see, only water to the horizon.
+      hills.visible = lift < 0.6;
       ripples.visible = lift > 0.02;
       if (ripples.visible) {
         ripples.position.set(0, ground.position.y + 0.05, z);
@@ -3485,12 +3694,30 @@ MR.Camera = (function () {
     return Math.sin(t * 33.7 + seed) * 0.62 + Math.sin(t * 18.3 + seed * 2.7) * 0.38;
   }
 
+  /**
+   * Framing is aspect-dependent because three's FOV is vertical: a phone in
+   * portrait sees barely a third of the horizontal angle a laptop does. The
+   * lateral lag that reads as weight on a wide screen throws the runner onto
+   * the edge of a portrait frame, so narrow screens follow harder, sit further
+   * back, and bank less.
+   */
+  function frameFor(aspect) {
+    const wide = clamp01((aspect - 0.55) / 0.80);   // 0 = phone portrait, 1 = desktop
+    return {
+      follow: 0.95 - 0.17 * wide,
+      lookX: 0.85 - 0.30 * wide,
+      back: 1.18 - 0.18 * wide,
+      roll: 0.70 + 0.30 * wide,
+    };
+  }
+
   function create(aspect) {
     const cam = new THREE.PerspectiveCamera(BASE_FOV, aspect, 0.1, 1200);
     const look = new THREE.Vector3();   // hoisted: this runs 60x a second
 
     const s = {
       camera: cam,
+      fr: frameFor(aspect),
       x: 0, vx: 0,     // lateral follow, sprung so a lane change whips
       roll: 0,
       fov: BASE_FOV,
@@ -3519,8 +3746,13 @@ MR.Camera = (function () {
      * @param p   { z, x, y, speed, lean, duck01 }
      */
     s.update = function (dt, p) {
-      // A long frame must not be allowed to detonate the springs.
-      const d = Math.min(dt, 1 / 25);
+      // A long frame must not be allowed to detonate the springs -- and the
+      // first frame can arrive with a *negative* dt, because the rAF timestamp
+      // is the moment the frame began, which on a slow boot is earlier than
+      // the clock main.js took when it started. Integrating a spring backwards
+      // through 1.5 seconds throws the camera tens of units sideways, and the
+      // recovery is slow enough to be caught by a screenshot.
+      const d = dt > 0 ? Math.min(dt, 1 / 25) : 0;
       s.t += d;
 
       // ---- speed signals -------------------------------------------------
@@ -3579,7 +3811,8 @@ MR.Camera = (function () {
       // Underdamped on purpose (zeta ~0.6): the camera arrives at the new lane
       // slightly late and overshoots a hair, which is the weight the old
       // exponential follow was missing.
-      const tgtX = p.x * 0.78 + s.lurch;
+      const tgtX = p.x * s.fr.follow + s.lurch;
+      if (first) s.x = tgtX;        // a real race starts centred; ?skip= may not
       s.vx += ((tgtX - s.x) * 200 - s.vx * 17) * d;
       s.x += s.vx * d;
       s.lurch -= s.lurch * Math.min(1, d * 5.0);
@@ -3616,7 +3849,7 @@ MR.Camera = (function () {
       // Closer and lower with pace; the ground is what sells it, so the drop
       // is worth more than the pull-in. Surge trails the camera while the
       // streak is buying speed and reels it in while a hit bleeds it away.
-      const back = BASE_BACK
+      const back = BASE_BACK * s.fr.back
         - drive * 0.62
         + surge * 0.30
         - duck * 0.22
@@ -3629,7 +3862,7 @@ MR.Camera = (function () {
       const hgt = BASE_Y
         - drive * 0.34
         - duck * 0.34
-        + (p.y || 0) * 0.22            // barely follows the arc -- see below
+        + (p.y || 0) * 0.30            // barely follows the arc -- see below
         + s.dip
         + s.mileT * 0.24
         + s.winded * 0.12
@@ -3644,8 +3877,8 @@ MR.Camera = (function () {
       // frame, which is what leaving the ground actually looks like. The old
       // 0.42/0.30 split had the camera chasing the arc and cancelled it.
       look.set(
-        s.x * 0.55,
-        LOOK_Y + (p.y || 0) * 0.46 - duck * 0.26 - drive * 0.22 + fin * 0.55,
+        s.x * s.fr.lookX,
+        LOOK_Y + (p.y || 0) * 0.50 - duck * 0.26 - drive * 0.22 + fin * 0.55,
         p.z + LOOK_AHEAD + (p.y || 0) * 1.1 - drive * 0.5
       );
       cam.lookAt(look);
@@ -3656,7 +3889,7 @@ MR.Camera = (function () {
       // seven, which is a bank; the response is fast because a lane change is
       // over in 0.16s and a slow filter would smooth the whole event away.
       const whip = Math.max(-1, Math.min(1, s.vx / 20));
-      const rollTgt = -((p.lean || 0) * 0.16 + whip * 0.07) * (1 - fin);
+      const rollTgt = -((p.lean || 0) * 0.16 + whip * 0.07) * s.fr.roll * (1 - fin);
       s.roll += (rollTgt - s.roll) * (1 - Math.pow(0.00002, d));
       cam.rotation.z += s.roll + shR - s.punch * 0.055;
 
@@ -3716,6 +3949,7 @@ MR.Camera = (function () {
 
     s.resize = function (aspect) {
       cam.aspect = aspect;
+      s.fr = frameFor(aspect);
       cam.updateProjectionMatrix();
     };
 
@@ -4374,7 +4608,7 @@ MR.HUD = (function () {
         <div id="toast">
           <div class="lab" id="toastLab">MILE 1</div>
           <div id="toastRow"><span class="big num" id="toastBig">--:--</span><span class="unit">/MI</span></div>
-          <div class="small num" id="toastSmall"></div>
+          <div class="small num"><span id="toastCum"></span> <span id="toastDelta"></span></div>
         </div>
       </div>
 
@@ -4462,7 +4696,8 @@ MR.HUD = (function () {
       distVal: q('distVal'), toGo: q('toGo'),
       rail: q('rail'), railFill: q('railFill'), railGap: q('railGap'), railGhost: q('railGhost'),
       gapVal: q('gapVal'), gapTrend: q('gapTrend'),
-      toast: q('toast'), toastLab: q('toastLab'), toastBig: q('toastBig'), toastSmall: q('toastSmall'),
+      toast: q('toast'), toastLab: q('toastLab'), toastBig: q('toastBig'),
+      toastCum: q('toastCum'), toastDelta: q('toastDelta'),
       startPanel: q('startPanel'), startBtn: q('startBtn'), startDate: q('startDate'),
       endPanel: q('endPanel'), endTime: q('endTime'), endDate: q('endDate'),
       verdict: q('verdict'), stats: q('resultStats'), splitTable: q('splitTable'),
@@ -4597,9 +4832,11 @@ MR.HUD = (function () {
       cls(n.railGap, 'railGapCls', ahead ? 'ahead' : 'behind');
 
       // Whether the gap is opening or closing is exactly whether the current
-      // pace beats record pace, so it needs no smoothing to be honest.
+      // pace beats record pace, so it needs no smoothing to be honest. Under a
+      // second there is no gap worth describing, and calling the start line
+      // "LOSING" is a scold rather than information.
       const gaining = p.pace < K.RECORD_PACE;
-      set(n.gapTrend, 'trend', gaining ? 'GAINING' : 'LOSING');
+      set(n.gapTrend, 'trend', Math.abs(d) < 1 ? '' : gaining ? 'GAINING' : 'LOSING');
       cls(n.gapTrend, 'trendCls', gaining ? 'ahead' : 'behind');
 
       if (extra && extra.fps !== undefined) {
@@ -4628,13 +4865,16 @@ MR.HUD = (function () {
         const d = sp.time - sp.mile * K.RECORD_PACE;
         n.toastLab.textContent = 'MILE ' + sp.mile;
         n.toastBig.textContent = Pace.pace(sp.time - prev);
-        n.toastSmall.textContent = Pace.clock(sp.time) + '  ' + Pace.delta(d);
-        n.toastSmall.className = 'small num ' + (d < 0 ? 'ahead' : 'behind');
+        // Only the delta is tinted. The elapsed clock is a plain fact and
+        // colouring it too made the whole line read as a warning.
+        n.toastCum.textContent = Pace.clock(sp.time);
+        n.toastDelta.textContent = Pace.delta(d);
+        n.toastDelta.className = d < 0 ? 'ahead' : 'behind';
       } else {
         n.toastLab.textContent = big || '';
         n.toastBig.textContent = '';
-        n.toastSmall.textContent = small || '';
-        n.toastSmall.className = 'small num';
+        n.toastCum.textContent = small || '';
+        n.toastDelta.textContent = '';
       }
       // Without split data there is no mile time to headline, so the card
       // drops that row rather than showing a bare "/MI".

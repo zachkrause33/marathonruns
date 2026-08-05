@@ -485,6 +485,29 @@ MR.World = (function () {
     return routeTex;
   }
 
+  /**
+   * A ring, for the floating half of the route hint.
+   *
+   * The hard stroke is under a pixel wide by 90 units, so it carries a much
+   * softer halo underneath it -- that is what is actually still visible at the
+   * far end of the trail, where the hint has to do its work.
+   */
+  let ringTex = null;
+  function ringTexture() {
+    if (ringTex) return ringTex;
+    const c = canvas(64, 64);
+    const g = c.getContext('2d');
+    g.strokeStyle = '#ffffff';
+    g.globalAlpha = 0.34;
+    g.lineWidth = 22;
+    g.beginPath(); g.arc(32, 32, 21, 0, Math.PI * 2); g.stroke();
+    g.globalAlpha = 1;
+    g.lineWidth = 9;
+    g.beginPath(); g.arc(32, 32, 21, 0, Math.PI * 2); g.stroke();
+    ringTex = texture(c);
+    return ringTex;
+  }
+
   function create(course) {
     const group = new THREE.Group();
     const rnd = MR.rng.stream(course.key, 'scenery/v2');

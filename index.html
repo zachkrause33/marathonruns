@@ -1274,13 +1274,13 @@ MR.shading = (function () {
     // vivid facades with light ones, and the light ones are what let the
     // vivid ones look vivid.
     //
-    // Mid-value on purpose: the road sits around 0x50557d, so anything much
-    // darker than these merges with it at distance once the haze lands.
-    // Kept light for their chroma: a facade is a vertical face, so it lives
-    // in the ramp's dark band and takes only half the hemisphere fill. A tint
-    // chosen by eye at full brightness lands about 40% darker than that once
-    // it is on the wall, and the saturated mid-tones that looked right in a
-    // swatch turned into slabs.
+    // They are all lighter than they look here, on purpose. A facade is a
+    // vertical face, so it lives in the ramp's dark band and takes only half
+    // the hemisphere fill: a tint picked by eye from a swatch lands about 40%
+    // darker once it is on a wall, and the first pass at this list -- chosen
+    // at full brightness -- turned the skyline into slabs. Nothing is allowed
+    // near the road's own value (~0x50557d) either, or it merges with the
+    // tarmac as soon as the haze reaches it.
     building: [
       0xff9c7a,  // coral
       0x6fd8e8,  // teal
@@ -1366,12 +1366,13 @@ MR.shading = (function () {
    * widens it to rgb -- if that patch ever fails to apply the red channel
    * still carries a sensible luminance and the look degrades to greyscale.
    *
-   * This ramp is the whole of the shading now that scenery carries no ink, so
-   * it is deliberately harder than it was: a box has to show three distinct
-   * tones on its three visible faces, because that step is the ONLY thing
-   * left separating its top from its front. Both numbers below were pulled
-   * further apart when the outlines came off -- a ramp tuned to sit politely
-   * underneath a black rim reads as unshaded once the rim is gone.
+   * This ramp plus the hemisphere in lights() is now the whole of the shading
+   * on anything without an outline, so it is deliberately harder than it was.
+   * A ramp tuned to sit politely underneath a black rim reads as unshaded the
+   * moment the rim comes off: both numbers below were pulled apart when the
+   * scenery lines were dropped, the floor down and the cool up, so that a
+   * building's lit side and its shaded side are two colours rather than two
+   * strengths of one.
    */
   function ramp(steps) {
     if (ramps.has(steps)) return ramps.get(steps);
@@ -3190,6 +3191,29 @@ MR.World = (function () {
     return routeTex;
   }
 
+  /**
+   * A ring, for the floating half of the route hint.
+   *
+   * The hard stroke is under a pixel wide by 90 units, so it carries a much
+   * softer halo underneath it -- that is what is actually still visible at the
+   * far end of the trail, where the hint has to do its work.
+   */
+  let ringTex = null;
+  function ringTexture() {
+    if (ringTex) return ringTex;
+    const c = canvas(64, 64);
+    const g = c.getContext('2d');
+    g.strokeStyle = '#ffffff';
+    g.globalAlpha = 0.34;
+    g.lineWidth = 22;
+    g.beginPath(); g.arc(32, 32, 21, 0, Math.PI * 2); g.stroke();
+    g.globalAlpha = 1;
+    g.lineWidth = 9;
+    g.beginPath(); g.arc(32, 32, 21, 0, Math.PI * 2); g.stroke();
+    ringTex = texture(c);
+    return ringTex;
+  }
+
   function create(course) {
     const group = new THREE.Group();
     const rnd = MR.rng.stream(course.key, 'scenery/v2');
@@ -4736,7 +4760,9 @@ MR.Ghost = (function () {
 
     // Two sprites rather than one that swaps texture: the hand-off from "over
     // its head" to "pinned in the corner" happens while both are on screen, so
-    // it has to be a cross-fade or it reads as a glitch.
+    // it has to be a cross-fade or it reads as a glitch. It carries the BEHIND
+    // YOU plate by then, so the fade is between two identical images and the
+    // move is invisible.
     const tagWorld = sprite(texRide);
     const tagRear = sprite(texRear);
     group.add(tagWorld, tagRear);
@@ -4774,7 +4800,7 @@ MR.Ghost = (function () {
       if (!s.primed) { s.primed = true; s.gap = gap; s.x = HOME_X; }
       else if (s.gap > 0 && gap <= 0) s.flash = 1;
       s.gap = gap;
-      s.flash = Math.max(0, s.flash - dt / 1.7);
+      s.flash = Math.max(0, s.flash - dt / 2.1);
 
       // ---- lateral -------------------------------------------------------
       // No course-solving and no reading of gates: for twenty-odd miles the
@@ -4816,13 +4842,13 @@ MR.Ghost = (function () {
       // Shoulder to shoulder is the moment the whole feature exists for, so it
       // gets a lift of its own on top of the crossover flash.
       const level = 1 - smoothstep(5, 22, Math.abs(gap));
-      alpha = Math.min(1, alpha + s.flash * 0.5 + level * 0.10);
+      alpha = Math.min(1, alpha + s.flash * 0.55 + level * 0.10);
 
       const bodyOn = ahead > 1.2 && alpha > 0.02;
       body.group.visible = bodyOn;
       if (bodyOn) {
         mat.opacity = alpha;
-        mat.color.set(COOL).lerp(HOT, s.flash * 0.75);
+        mat.color.set(COOL).lerp(HOT, s.flash * 0.85);
         body.update(dt, { speed: SPEED });
         body.group.position.set(s.x, 0, gz);
       }

@@ -1,15 +1,15 @@
 {
   "updated": "2026-08-05",
-  "wave": 1,
+  "wave": 2,
   "branch": "claude/effort-estimation-emdxm8",
-  "headline": "All five wave-1 builders have landed and are committed, verified running at 60fps with 163 draw calls. The HUD now leads with <b>projected finish</b>, which fixed a readout that told flawless players they were failing. User-supplied <b>Temple Run reference frames</b> are in <code>reference/</code> and turned the comparison into measurement: the track is about <b>2.5&times; too wide relative to the runner</b> &mdash; a geometry ratio no camera move can fix.",
+  "headline": "Wave 2 landed. Hazards now paint <b>shape-coded telegraph mats</b> on the road ahead, so a blocked lane reads from a long way out &mdash; the clean-line mechanic finally has a forward read. The record ghost is on the road, the track is narrowed to the measured reference ratio, and the projection was rebuilt: it read <b>2:24:12</b> at the gun on a run heading for 1:58:14, and now reads <b>1:57:48</b>. Outstanding: <b>27fps under software rendering</b>, diagnosed to per-frame scene traversal, not fill rate.",
   "pieces": [
     {
       "name": "Pace &amp; record model",
       "state": "done",
-      "wave": 1,
-      "verdict": "Verified by tools/simulate.js against real courses",
-      "gap": "Tuning is locked: flawless 1:58:16, one mistake 1:59:21, two mistakes 2:00:52"
+      "wave": 2,
+      "verdict": "projectClean() exact from mile 3; verified vs real runs",
+      "gap": "None &mdash; in-browser run matches sim to 2s"
     },
     {
       "name": "Course generation",
@@ -21,50 +21,50 @@
     {
       "name": "Collision &amp; fairness",
       "state": "done",
-      "wave": 1,
-      "verdict": "State thresholds audited against visual geometry at load",
-      "gap": "Forgiveness windows never tuned against real play"
+      "wave": 2,
+      "verdict": "Thresholds fixed; audit now gates every screenshot",
+      "gap": "Forgiveness windows still untuned against human play"
     },
     {
       "name": "Runner character",
-      "state": "review",
-      "wave": 1,
-      "verdict": "Head now separates; race number on the back",
-      "gap": "Left forearm renders as a yellow slab \u2014 visible geometry bug"
+      "state": "building",
+      "wave": 2,
+      "verdict": "Head separates, 28 draws, bib on the back",
+      "gap": "Wristbands read as slabs; no landing squash"
     },
     {
       "name": "Cel-shading &amp; sky",
-      "state": "review",
-      "wave": 1,
-      "verdict": "Colour-space bug fixed; sun, clouds, aerial haze",
-      "gap": "Outlines and fog agree, but palette runs too many hues at once"
+      "state": "done",
+      "wave": 2,
+      "verdict": "Sky rewritten, colour-space fixed, outlines reweighted",
+      "gap": "Nothing casts occlusion &mdash; no contact shadow yet"
     },
     {
       "name": "World &amp; obstacles",
-      "state": "review",
-      "wave": 1,
-      "verdict": "Biomes differ by content now, not tint",
-      "gap": "Hazards still not readable far enough ahead to plan a line"
+      "state": "done",
+      "wave": 2,
+      "verdict": "Telegraph mats; biomes differ in substance",
+      "gap": "No silhouette language above the fog line"
     },
     {
       "name": "Camera &amp; speed feel",
-      "state": "review",
-      "wave": 1,
-      "verdict": "Framing to 1.98/4.42; surge, stride bob, top-gear band",
-      "gap": "No foreground occlusion, so speed has nothing to rush past"
+      "state": "done",
+      "wave": 2,
+      "verdict": "Honest +15% speed turned into +37% screen flow",
+      "gap": "Road surface carries no motion signal between dashes"
     },
     {
       "name": "HUD &amp; typography",
-      "state": "review",
-      "wave": 1,
-      "verdict": "Projected finish is the headline; split moved to the rail",
-      "gap": "Finish panel still unreviewed at phone width"
+      "state": "done",
+      "wave": 2,
+      "verdict": "Projected finish leads; exact RECORD GONE bound",
+      "gap": "Finish panel FINAL PACE is not BEST PACE"
     },
     {
       "name": "Controls &amp; game feel",
       "state": "queued",
       "wave": 0,
-      "verdict": "Buffering and swipe implemented, never play-tested",
+      "verdict": "Never play-tested by a human",
       "gap": "No human has played it yet"
     },
     {
@@ -76,10 +76,24 @@
     },
     {
       "name": "Track geometry ratio",
+      "state": "done",
+      "wave": 2,
+      "verdict": "LANE_W seeds lanes, tarmac and every hazard width",
+      "gap": "Ratio hit; needs a human eye to confirm it feels right"
+    },
+    {
+      "name": "Frame rate",
       "state": "blocked",
-      "wave": 1,
-      "verdict": "Measured against Temple Run: 23% vs 60% character-to-lane width",
-      "gap": "Needs track narrowed or runner scaled; touches hazards and collision"
+      "wave": 2,
+      "verdict": "27fps under SwiftShader, down from 60",
+      "gap": "render() 15ms; not fill rate, not game logic. 491 scene objects need matrixAutoUpdate=false"
+    },
+    {
+      "name": "Record ghost on road",
+      "state": "review",
+      "wave": 2,
+      "verdict": "Renders as a marker travelling at exact record pace",
+      "gap": "Reads as a sign, not yet as a runner you race"
     }
   ]
 }

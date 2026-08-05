@@ -71,13 +71,13 @@ MR.shading = (function () {
     // vivid facades with light ones, and the light ones are what let the
     // vivid ones look vivid.
     //
-    // Mid-value on purpose: the road sits around 0x50557d, so anything much
-    // darker than these merges with it at distance once the haze lands.
-    // Kept light for their chroma: a facade is a vertical face, so it lives
-    // in the ramp's dark band and takes only half the hemisphere fill. A tint
-    // chosen by eye at full brightness lands about 40% darker than that once
-    // it is on the wall, and the saturated mid-tones that looked right in a
-    // swatch turned into slabs.
+    // They are all lighter than they look here, on purpose. A facade is a
+    // vertical face, so it lives in the ramp's dark band and takes only half
+    // the hemisphere fill: a tint picked by eye from a swatch lands about 40%
+    // darker once it is on a wall, and the first pass at this list -- chosen
+    // at full brightness -- turned the skyline into slabs. Nothing is allowed
+    // near the road's own value (~0x50557d) either, or it merges with the
+    // tarmac as soon as the haze reaches it.
     building: [
       0xff9c7a,  // coral
       0x6fd8e8,  // teal
@@ -163,12 +163,13 @@ MR.shading = (function () {
    * widens it to rgb -- if that patch ever fails to apply the red channel
    * still carries a sensible luminance and the look degrades to greyscale.
    *
-   * This ramp is the whole of the shading now that scenery carries no ink, so
-   * it is deliberately harder than it was: a box has to show three distinct
-   * tones on its three visible faces, because that step is the ONLY thing
-   * left separating its top from its front. Both numbers below were pulled
-   * further apart when the outlines came off -- a ramp tuned to sit politely
-   * underneath a black rim reads as unshaded once the rim is gone.
+   * This ramp plus the hemisphere in lights() is now the whole of the shading
+   * on anything without an outline, so it is deliberately harder than it was.
+   * A ramp tuned to sit politely underneath a black rim reads as unshaded the
+   * moment the rim comes off: both numbers below were pulled apart when the
+   * scenery lines were dropped, the floor down and the cool up, so that a
+   * building's lit side and its shaded side are two colours rather than two
+   * strengths of one.
    */
   function ramp(steps) {
     if (ramps.has(steps)) return ramps.get(steps);

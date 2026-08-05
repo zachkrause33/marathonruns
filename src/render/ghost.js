@@ -240,7 +240,9 @@ MR.Ghost = (function () {
 
     // Two sprites rather than one that swaps texture: the hand-off from "over
     // its head" to "pinned in the corner" happens while both are on screen, so
-    // it has to be a cross-fade or it reads as a glitch.
+    // it has to be a cross-fade or it reads as a glitch. It carries the BEHIND
+    // YOU plate by then, so the fade is between two identical images and the
+    // move is invisible.
     const tagWorld = sprite(texRide);
     const tagRear = sprite(texRear);
     group.add(tagWorld, tagRear);
@@ -278,7 +280,7 @@ MR.Ghost = (function () {
       if (!s.primed) { s.primed = true; s.gap = gap; s.x = HOME_X; }
       else if (s.gap > 0 && gap <= 0) s.flash = 1;
       s.gap = gap;
-      s.flash = Math.max(0, s.flash - dt / 1.7);
+      s.flash = Math.max(0, s.flash - dt / 2.1);
 
       // ---- lateral -------------------------------------------------------
       // No course-solving and no reading of gates: for twenty-odd miles the
@@ -320,13 +322,13 @@ MR.Ghost = (function () {
       // Shoulder to shoulder is the moment the whole feature exists for, so it
       // gets a lift of its own on top of the crossover flash.
       const level = 1 - smoothstep(5, 22, Math.abs(gap));
-      alpha = Math.min(1, alpha + s.flash * 0.5 + level * 0.10);
+      alpha = Math.min(1, alpha + s.flash * 0.55 + level * 0.10);
 
       const bodyOn = ahead > 1.2 && alpha > 0.02;
       body.group.visible = bodyOn;
       if (bodyOn) {
         mat.opacity = alpha;
-        mat.color.set(COOL).lerp(HOT, s.flash * 0.75);
+        mat.color.set(COOL).lerp(HOT, s.flash * 0.85);
         body.update(dt, { speed: SPEED });
         body.group.position.set(s.x, 0, gz);
       }

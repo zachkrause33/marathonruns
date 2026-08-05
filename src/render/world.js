@@ -446,7 +446,13 @@ MR.World = (function () {
           const act = h === K.CLEAR ? s.act : h;
           const az = h === K.CLEAR ? s.z : g.z;
           const tag = l + ':' + act + ':' + (g.z - az < AW ? 1 : 0);
-          const cost = s.cost + Math.abs(l - s.lane) * 10 + (h === K.CLEAR ? 0 : 1);
+          // Lane changes dominate; an action is a small tax; and sitting in an
+          // outer lane costs a little every gate, so once a hazard has pushed
+          // the line wide it drifts back to the middle instead of camping out
+          // there. The middle is where a line has an escape on both sides, and
+          // a hint that keeps sending the player to the edge of the road for no
+          // reason is a hint they stop believing.
+          const cost = s.cost + Math.abs(l - s.lane) * 12 + (h === K.CLEAR ? 0 : 1) + (l === 1 ? 0 : 2);
           const cur = next.get(tag);
           if (!cur || cost < cur.cost) next.set(tag, { lane: l, act, z: az, cost, prev: s });
         }
@@ -846,6 +852,10 @@ MR.World = (function () {
       map: routeTexture(),
       color: 0x5ff0a6,          // the one hue no hazard owns; amber, cyan and
       transparent: true,        // red are all spoken for, and green reads "go"
+      // Held under the rings: the paint is the connective tissue, the rings are
+      // what the eye is meant to land on. At full strength the line reads as a
+      // beam being fired down the road rather than as a marking on it.
+      opacity: 0.62,
       depthWrite: false,
       side: THREE.DoubleSide,   // the ribbon is rebuilt every frame; not
     }));                        // depending on winding is one less way to fail
@@ -872,8 +882,14 @@ MR.World = (function () {
      * cannot be mistaken for a fifth kind of obstacle. It marks the LANE only:
      * which action a gate wants, and when to commit, are still the player's.
      */
-    const RING_GATES = 4;
-    const RING_AT = [-12.5, -7.5, -3.0];   // run-up offsets from the gate line
+    // Evenly spaced along the line and anchored to a world grid rather than to
+    // the gates: a trail has to be a trail. Gate spacing runs 46 units early
+    // and 24 late, so hanging the rings off the gates alone would have left the
+    // opening miles with three rings and a long nothing, which reads as a set
+    // of separate markers instead of a path.
+    const RING_SPACE = 11;
+    const RING_FROM = 10;
+    const RING_N = 11;
     // 1.30 is the one height that works: above a JUMP kerb (0.80), clear below
     // a DUCK bar (1.41) so a ring never floats at bar height and reads as
     // "through here", and high enough that at 40 units the whole ring clears
@@ -882,7 +898,6 @@ MR.World = (function () {
     // that the trail never looks like something in the way.
     const RING_Y = 1.30;
     const RING_R = 0.36;
-    const RING_N = RING_GATES * RING_AT.length;
 
     const ringGeo = new THREE.BufferGeometry();
     const ringPos = new Float32Array(RING_N * 6 * 3);
@@ -901,6 +916,11 @@ MR.World = (function () {
     const ringMesh = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({
       map: ringTexture(), color: 0x5ff0a6, transparent: true, depthWrite: false,
       vertexColors: true, side: THREE.DoubleSide,
+      // The only thing in the scene exempt from aerial perspective. Its job is
+      // to be legible at 100 units, which is exactly where the fog is taking
+      // half the contrast out of everything else; the trail carries its own
+      // distance cue in the alpha ramp below instead.
+      fog: false,
     }));
     ringMesh.renderOrder = 6;   // over the telegraph mats, never under them
     ringMesh.frustumCulled = false;
@@ -910,7 +930,6 @@ MR.World = (function () {
     // Sampling walks z forwards, so the gate lookup is a cursor rather than a
     // search. It rewinds at the start of each frame and costs nothing after.
     let routeCursor = 0;
-    let ringCursor = 0;
     function routeX(zz) {
       const gates = course.gates;
       while (routeCursor > 0 && gates[routeCursor - 1].z >= zz) routeCursor--;
@@ -964,33 +983,21 @@ MR.World = (function () {
       routeTexture().offset.y = -(now * 0.45) % 1;
 
       // ---- rings -------------------------------------------------------
-      const gates = course.gates;
-      while (ringCursor > 0 && gates[ringCursor - 1].z >= z) ringCursor--;
-      while (ringCursor < gates.length && gates[ringCursor].z < z) ringCursor++;
-      let n = 0;
-      for (let gi = ringCursor; gi < gates.length && gi < ringCursor + RING_GATES; gi++) {
-        const cx = K.LANE_X[routeLane[gi]];
-        for (let k = 0; k < RING_AT.length; k++) {
-          const cz = gates[gi].z + RING_AT[k];
-          // Anything already level with the runner is behind their shoulder and
-          // cannot be read; drop it rather than let it swell across the lens.
-          if (cz < z + 9) continue;
-          // Alpha falls away down the trail so the eye is pulled to the next
-          // gate first and the far ones stay a suggestion, not a second read.
-          const a = 0.92 * Math.max(0.18, 1 - (cz - z) / (ROUTE_FAR * 1.15));
-          const cy = RING_Y + Math.sin(now * 1.9 + gi * 1.3 + k) * 0.045;
-          const p = n * 18, c = n * 24;
-          const l = cx - RING_R, r = cx + RING_R;
-          const b = cy - RING_R, t = cy + RING_R;
-          routeQuad(ringPos, p, l, b, r, t, cz);
-          for (let v = 0; v < 6; v++) ringCol[c + v * 4 + 3] = a;
-          n++;
-        }
-      }
-      // Unused slots collapse to a point, which submits no pixels.
-      for (; n < RING_N; n++) {
-        const p = n * 18;
-        for (let v = 0; v < 18; v++) ringPos[p + v] = 0;
+      // Anchored to a world grid, so a ring holds still on the road and slides
+      // toward the runner instead of the whole trail crawling forward with the
+      // camera. New ones therefore only ever appear at the far end, where the
+      // alpha ramp has already faded them to nothing.
+      let cz = Math.ceil((z + RING_FROM) / RING_SPACE) * RING_SPACE;
+      for (let n = 0; n < RING_N; n++, cz += RING_SPACE) {
+        const p = n * 18, c = n * 24;
+        // Alpha falls away down the trail, so the eye is pulled to the next
+        // gate first and the far end stays a suggestion, not a second read.
+        const a = 0.95 * Math.min(1, Math.max(0, 1 - (cz - z) / (ROUTE_FAR * 1.6)));
+        if (a <= 0.01) { for (let v = 0; v < 18; v++) ringPos[p + v] = 0; continue; }
+        const cx = routeX(cz);
+        const cy = RING_Y + Math.sin(now * 1.9 + n * 1.1) * 0.045;
+        routeQuad(ringPos, p, cx - RING_R, cy - RING_R, cx + RING_R, cy + RING_R, cz);
+        for (let v = 0; v < 6; v++) ringCol[c + v * 4 + 3] = a;
       }
       ringGeo.attributes.position.needsUpdate = true;
       ringGeo.attributes.color.needsUpdate = true;

@@ -175,6 +175,7 @@
 
     let dt = (now - last) / 1000;
     last = now;
+    const raw = Math.max(0, dt);   // true wall time, before the clamp below
     // Clamp so an alt-tab or a GC pause cannot teleport the runner through a
     // gate; better to lose a little race time than to skip collision.
     //
@@ -185,7 +186,14 @@
     // the view sideways. Time in this game only ever moves forward.
     dt = Math.max(0, Math.min(dt, 1 / 25));
 
-    fpsAcc += dt; fpsN++;
+    // Accumulate RAW wall time, never the clamped dt. Using the clamped value
+    // made this counter mathematically incapable of reading below 25: once a
+    // frame ran longer than the 1/25 clamp, every frame contributed exactly
+    // 0.04 and fpsN/fpsAcc pinned at 25 however bad it really was. It reported
+    // "27fps" on frames that were genuinely far slower, and reported 60 when a
+    // short sampling window happened to catch only fast frames -- which sent a
+    // performance investigation chasing biomes that were never the variable.
+    fpsAcc += raw; fpsN++;
     if (fpsAcc >= 0.5) { fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; }
 
     controls.tick(dt);

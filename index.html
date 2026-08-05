@@ -2101,11 +2101,12 @@ MR.shading = (function () {
  *      the camera axis from here, so the cycle drives the elbows sideways
  *      and lets the pale shoes, gloves and wristbands flash against the
  *      road; those are the parts the eye can actually track from behind.
- *   4. State has to read as SILHOUETTE WIDTH, not as pose detail. Running is
- *      shoulder-wide, a jump throws the arms out to twice that, a duck is
- *      narrow and low. Those three are told apart in one frame at speed.
- *      An arm tuck and a leg extension are not, because both of them point
- *      straight down the camera axis where there is nothing to see.
+ *   4. State has to read as SILHOUETTE WIDTH, not as pose detail. Measured
+ *      dead astern, running is 1.0, a jump is 1.8 and a duck is 0.9 -- and
+ *      the jump is a horizontal bar where the other two are columns, so it
+ *      is told apart in a single frame at speed. An arm tuck and a leg
+ *      extension are not, because both point straight down the camera axis
+ *      where there is nothing to see.
  *
  * Pivot layout (all rotations are local X unless noted):
  *   root -> body -> hips -> thigh -> shin -> foot
@@ -2138,8 +2139,9 @@ MR.Runner = (function () {
   // narrower: the shoulder line is pinned at 0.78 because constants.js cuts
   // the lane width from it, so height is the only axis left to make the
   // character chunkier on, and the reference characters are chunky mostly by
-  // being short. Collision has 0.20 of headroom at the duck threshold either
-  // way (1.60 - 0.42*0.90 = 1.22 against a bar starting at 1.41).
+  // being short. Collision gains by it rather than losing: at the duck
+  // threshold the head reaches 1.60 - 0.42*0.90 = 1.22 against a bar starting
+  // at 1.41, which is 0.19 of daylight where 1.78 left only 0.01.
   const HIP_Y = 0.552;     // pelvis pivot
   const CHEST_Y = 0.767;   // shoulder girdle pivot
   const NECK_Y = 0.907;    // base of the neck; the head rotates from here
@@ -2354,8 +2356,9 @@ MR.Runner = (function () {
     spine.add(pelvis);
 
     // The whole silhouette is built backwards from one measurement: the
-    // shoulder line has to stop 0.135 below the skull. See rule 1 in the
-    // header -- the number went UP with the head, not down.
+    // shoulder line has to stop 0.11 below the skull. See rule 1 in the
+    // header -- roughly half of that is spent on the skull's own projected
+    // overhang before the neck sees any of it.
     const chest = pivot(spine, 0, CHEST_Y - HIP_Y, 0);
     const trunk = multi([
       // Vest. Nothing on the trunk may reach above the deltoids -- an earlier
@@ -2397,7 +2400,7 @@ MR.Runner = (function () {
     const HY = HEAD_Y - NECK_Y;
 
     const headMesh = multi([
-      // Bare neck: 0.22 across against a 0.78 shoulder line and a 0.57 skull,
+      // Bare neck: 0.24 across against a 0.78 shoulder line and a 0.57 skull,
       // and lit skin between the dark hair above and the red vest below. The
       // order of those three values is the entire fix. Leaving the nape skin
       // and the hair on the crown gave a light head sitting on a light neck --
@@ -2490,18 +2493,19 @@ MR.Runner = (function () {
       upper.position.y = -0.122;
       shoulder.add(upper);
 
-      // Arms are the one place the toy proportion is knowingly broken: they
-      // are about a head longer than the reference characters carry, because
-      // reach is the only term in the spread jump pose and short arms cannot
-      // buy enough width to make the airborne state unmistakable. At rest the
-      // extra length is absorbed by the elbow's flexion and does not show.
+      // Arms are the one place the toy proportion is knowingly broken: shoulder
+      // to fingertip is 1.1 head-lengths where the reference characters run
+      // nearer 0.9, because reach is the ONLY term in the spread jump pose and
+      // stubby arms cannot buy enough width to make the airborne state
+      // unmistakable. At rest the extra is absorbed by the elbow's flexion and
+      // never shows.
       const elbow = pivot(shoulder, 0, -0.262, 0);
       // Forearm ending in a pale mitt over a trim wristband. Arms and thighs
       // are both skin, and from behind they overlap for most of the stride --
       // without a bright break at the wrist the whole lower half of the
-      // character reads as one undifferentiated mass. The mitt is 0.24 across
-      // against a 0.57 head, which is the ratio Sonic's gloves run at, and it
-      // is what makes both the arm swing and the spread jump pose land.
+      // character reads as one undifferentiated mass. The mitt is 0.21 across
+      // against a 0.57 head, near the ratio Sonic's gloves run at, and it is
+      // what makes both the arm swing and the spread jump pose land.
       const fore = multi([
         { g: new THREE.CapsuleGeometry(0.078, 0.090, 3, 10), c: P.runnerSkin, y: -0.103 },
         { g: new THREE.CylinderGeometry(0.088, 0.088, 0.048, 10), c: TRIM, y: -0.188 },
@@ -3182,7 +3186,13 @@ MR.World = (function () {
           const act = h === K.CLEAR ? s.act : h;
           const az = h === K.CLEAR ? s.z : g.z;
           const tag = l + ':' + act + ':' + (g.z - az < AW ? 1 : 0);
-          const cost = s.cost + Math.abs(l - s.lane) * 10 + (h === K.CLEAR ? 0 : 1);
+          // Lane changes dominate; an action is a small tax; and sitting in an
+          // outer lane costs a little every gate, so once a hazard has pushed
+          // the line wide it drifts back to the middle instead of camping out
+          // there. The middle is where a line has an escape on both sides, and
+          // a hint that keeps sending the player to the edge of the road for no
+          // reason is a hint they stop believing.
+          const cost = s.cost + Math.abs(l - s.lane) * 12 + (h === K.CLEAR ? 0 : 1) + (l === 1 ? 0 : 2);
           const cur = next.get(tag);
           if (!cur || cost < cur.cost) next.set(tag, { lane: l, act, z: az, cost, prev: s });
         }
@@ -3582,6 +3592,10 @@ MR.World = (function () {
       map: routeTexture(),
       color: 0x5ff0a6,          // the one hue no hazard owns; amber, cyan and
       transparent: true,        // red are all spoken for, and green reads "go"
+      // Held under the rings: the paint is the connective tissue, the rings are
+      // what the eye is meant to land on. At full strength the line reads as a
+      // beam being fired down the road rather than as a marking on it.
+      opacity: 0.62,
       depthWrite: false,
       side: THREE.DoubleSide,   // the ribbon is rebuilt every frame; not
     }));                        // depending on winding is one less way to fail
@@ -3608,8 +3622,14 @@ MR.World = (function () {
      * cannot be mistaken for a fifth kind of obstacle. It marks the LANE only:
      * which action a gate wants, and when to commit, are still the player's.
      */
-    const RING_GATES = 4;
-    const RING_AT = [-12.5, -7.5, -3.0];   // run-up offsets from the gate line
+    // Evenly spaced along the line and anchored to a world grid rather than to
+    // the gates: a trail has to be a trail. Gate spacing runs 46 units early
+    // and 24 late, so hanging the rings off the gates alone would have left the
+    // opening miles with three rings and a long nothing, which reads as a set
+    // of separate markers instead of a path.
+    const RING_SPACE = 11;
+    const RING_FROM = 10;
+    const RING_N = 11;
     // 1.30 is the one height that works: above a JUMP kerb (0.80), clear below
     // a DUCK bar (1.41) so a ring never floats at bar height and reads as
     // "through here", and high enough that at 40 units the whole ring clears
@@ -3618,7 +3638,6 @@ MR.World = (function () {
     // that the trail never looks like something in the way.
     const RING_Y = 1.30;
     const RING_R = 0.36;
-    const RING_N = RING_GATES * RING_AT.length;
 
     const ringGeo = new THREE.BufferGeometry();
     const ringPos = new Float32Array(RING_N * 6 * 3);
@@ -3637,6 +3656,11 @@ MR.World = (function () {
     const ringMesh = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({
       map: ringTexture(), color: 0x5ff0a6, transparent: true, depthWrite: false,
       vertexColors: true, side: THREE.DoubleSide,
+      // The only thing in the scene exempt from aerial perspective. Its job is
+      // to be legible at 100 units, which is exactly where the fog is taking
+      // half the contrast out of everything else; the trail carries its own
+      // distance cue in the alpha ramp below instead.
+      fog: false,
     }));
     ringMesh.renderOrder = 6;   // over the telegraph mats, never under them
     ringMesh.frustumCulled = false;
@@ -3646,7 +3670,6 @@ MR.World = (function () {
     // Sampling walks z forwards, so the gate lookup is a cursor rather than a
     // search. It rewinds at the start of each frame and costs nothing after.
     let routeCursor = 0;
-    let ringCursor = 0;
     function routeX(zz) {
       const gates = course.gates;
       while (routeCursor > 0 && gates[routeCursor - 1].z >= zz) routeCursor--;
@@ -3700,33 +3723,21 @@ MR.World = (function () {
       routeTexture().offset.y = -(now * 0.45) % 1;
 
       // ---- rings -------------------------------------------------------
-      const gates = course.gates;
-      while (ringCursor > 0 && gates[ringCursor - 1].z >= z) ringCursor--;
-      while (ringCursor < gates.length && gates[ringCursor].z < z) ringCursor++;
-      let n = 0;
-      for (let gi = ringCursor; gi < gates.length && gi < ringCursor + RING_GATES; gi++) {
-        const cx = K.LANE_X[routeLane[gi]];
-        for (let k = 0; k < RING_AT.length; k++) {
-          const cz = gates[gi].z + RING_AT[k];
-          // Anything already level with the runner is behind their shoulder and
-          // cannot be read; drop it rather than let it swell across the lens.
-          if (cz < z + 9) continue;
-          // Alpha falls away down the trail so the eye is pulled to the next
-          // gate first and the far ones stay a suggestion, not a second read.
-          const a = 0.92 * Math.max(0.18, 1 - (cz - z) / (ROUTE_FAR * 1.15));
-          const cy = RING_Y + Math.sin(now * 1.9 + gi * 1.3 + k) * 0.045;
-          const p = n * 18, c = n * 24;
-          const l = cx - RING_R, r = cx + RING_R;
-          const b = cy - RING_R, t = cy + RING_R;
-          routeQuad(ringPos, p, l, b, r, t, cz);
-          for (let v = 0; v < 6; v++) ringCol[c + v * 4 + 3] = a;
-          n++;
-        }
-      }
-      // Unused slots collapse to a point, which submits no pixels.
-      for (; n < RING_N; n++) {
-        const p = n * 18;
-        for (let v = 0; v < 18; v++) ringPos[p + v] = 0;
+      // Anchored to a world grid, so a ring holds still on the road and slides
+      // toward the runner instead of the whole trail crawling forward with the
+      // camera. New ones therefore only ever appear at the far end, where the
+      // alpha ramp has already faded them to nothing.
+      let cz = Math.ceil((z + RING_FROM) / RING_SPACE) * RING_SPACE;
+      for (let n = 0; n < RING_N; n++, cz += RING_SPACE) {
+        const p = n * 18, c = n * 24;
+        // Alpha falls away down the trail, so the eye is pulled to the next
+        // gate first and the far end stays a suggestion, not a second read.
+        const a = 0.95 * Math.min(1, Math.max(0, 1 - (cz - z) / (ROUTE_FAR * 1.6)));
+        if (a <= 0.01) { for (let v = 0; v < 18; v++) ringPos[p + v] = 0; continue; }
+        const cx = routeX(cz);
+        const cy = RING_Y + Math.sin(now * 1.9 + n * 1.1) * 0.045;
+        routeQuad(ringPos, p, cx - RING_R, cy - RING_R, cx + RING_R, cy + RING_R, cz);
+        for (let v = 0; v < 6; v++) ringCol[c + v * 4 + 3] = a;
       }
       ringGeo.attributes.position.needsUpdate = true;
       ringGeo.attributes.color.needsUpdate = true;
@@ -4716,6 +4727,13 @@ MR.World = (function () {
  *    The tag has size attenuation off, so it is the same size on screen from
  *    three units away or a hundred and ninety. Its POSITION carries the
  *    distance; its legibility never does.
+ *
+ * That division of labour is also the answer to traffic. The body is depth
+ * tested like everything else, so a block train in its lane hides it for a
+ * second or two -- which is what chasing someone through traffic looks like,
+ * and is far less alarming than a runner composited on top of solid geometry.
+ * The tag is not depth tested and never goes away, so the position read
+ * survives even while the body does not.
  */
 MR.Ghost = (function () {
   const K = MR.K;
@@ -4886,14 +4904,27 @@ MR.Ghost = (function () {
 
     const ink = [];
     body.group.traverse(function (o) {
-      if (!o.isMesh) return;
+      if (!o.isMesh || !o.material) return;
       // shading.outlined() tags its own shell; the raw ShaderMaterial test is
       // the belt to that braces. Recolouring the outline is not an option --
       // those materials are cached and shared with the player.
       const par = o.parent;
-      const isInk = (par && par.userData && par.userData.line === o)
-        || (o.material && o.material.isShaderMaterial);
-      if (isInk) ink.push(o); else o.material = mat;
+      if ((par && par.userData && par.userData.line === o) || o.material.isShaderMaterial) {
+        ink.push(o);
+        return;
+      }
+      // Anything already transparent is not a lit body part. Today that is the
+      // contact shadow, which the rig drives by writing its own opacity every
+      // frame -- overwrite the material and the blob turns into a flat quad.
+      // It is left alone deliberately: the ghost is the one thing on the road
+      // whose exact position the player has to judge, and a shadow is how you
+      // read where a body's feet are. Tinted rather than darkened, so it
+      // belongs to the ghost instead of pretending it blocks the sun.
+      if (o.material.transparent) {
+        if (o.material.color) o.material.color.set(COOL).multiplyScalar(0.42);
+        return;
+      }
+      o.material = mat;
     });
     for (const m of ink) if (m.parent) m.parent.remove(m);
 
@@ -4937,13 +4968,19 @@ MR.Ghost = (function () {
       const gz = pace.ghostMiles() * K.UNITS_PER_MILE;
       const gap = gz - z;
       s.z = gz;
+      // ghostMiles() clamps at the line, so on any run slower than 1:59:30 the
+      // record finishes first and then sits at 26.2 while the player comes in.
+      // Everything below has to know that, or the ghost spends the last minute
+      // of a bad race running on the spot in the finish chute and then throws a
+      // celebration when the player finally reaches it.
+      const running = gz < K.TOTAL_UNITS - 0.01;
 
       // The crossover. Detected on the sign change rather than on a threshold,
       // so it fires exactly once and exactly where the record is beaten. The
       // primed flag is why ?skip= past mile 20 does not open with a phantom
       // celebration -- same trick the camera plays with its speed filter.
       if (!s.primed) { s.primed = true; s.gap = gap; s.x = HOME_X; }
-      else if (s.gap > 0 && gap <= 0) s.flash = 1;
+      else if (running && s.gap > 0 && gap <= 0) s.flash = 1;
       s.gap = gap;
       s.flash = Math.max(0, s.flash - dt / 2.1);
 
@@ -4989,7 +5026,9 @@ MR.Ghost = (function () {
       const level = 1 - smoothstep(5, 22, Math.abs(gap));
       alpha = Math.min(1, alpha + s.flash * 0.55 + level * 0.10);
 
-      const bodyOn = ahead > 1.2 && alpha > 0.02;
+      // Once the record is home there is no body to draw -- only the tag, left
+      // standing over the finish line where it crossed.
+      const bodyOn = running && ahead > 1.2 && alpha > 0.02;
       body.group.visible = bodyOn;
       if (bodyOn) {
         mat.opacity = alpha;
@@ -6613,6 +6652,7 @@ MR.HUD = (function () {
 
     let dt = (now - last) / 1000;
     last = now;
+    const raw = Math.max(0, dt);   // true wall time, before the clamp below
     // Clamp so an alt-tab or a GC pause cannot teleport the runner through a
     // gate; better to lose a little race time than to skip collision.
     //
@@ -6623,7 +6663,14 @@ MR.HUD = (function () {
     // the view sideways. Time in this game only ever moves forward.
     dt = Math.max(0, Math.min(dt, 1 / 25));
 
-    fpsAcc += dt; fpsN++;
+    // Accumulate RAW wall time, never the clamped dt. Using the clamped value
+    // made this counter mathematically incapable of reading below 25: once a
+    // frame ran longer than the 1/25 clamp, every frame contributed exactly
+    // 0.04 and fpsN/fpsAcc pinned at 25 however bad it really was. It reported
+    // "27fps" on frames that were genuinely far slower, and reported 60 when a
+    // short sampling window happened to catch only fast frames -- which sent a
+    // performance investigation chasing biomes that were never the variable.
+    fpsAcc += raw; fpsN++;
     if (fpsAcc >= 0.5) { fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; }
 
     controls.tick(dt);

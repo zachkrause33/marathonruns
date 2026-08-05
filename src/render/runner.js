@@ -27,11 +27,12 @@
  *      the camera axis from here, so the cycle drives the elbows sideways
  *      and lets the pale shoes, gloves and wristbands flash against the
  *      road; those are the parts the eye can actually track from behind.
- *   4. State has to read as SILHOUETTE WIDTH, not as pose detail. Running is
- *      shoulder-wide, a jump throws the arms out to twice that, a duck is
- *      narrow and low. Those three are told apart in one frame at speed.
- *      An arm tuck and a leg extension are not, because both of them point
- *      straight down the camera axis where there is nothing to see.
+ *   4. State has to read as SILHOUETTE WIDTH, not as pose detail. Measured
+ *      dead astern, running is 1.0, a jump is 1.8 and a duck is 0.9 -- and
+ *      the jump is a horizontal bar where the other two are columns, so it
+ *      is told apart in a single frame at speed. An arm tuck and a leg
+ *      extension are not, because both point straight down the camera axis
+ *      where there is nothing to see.
  *
  * Pivot layout (all rotations are local X unless noted):
  *   root -> body -> hips -> thigh -> shin -> foot
@@ -64,8 +65,9 @@ MR.Runner = (function () {
   // narrower: the shoulder line is pinned at 0.78 because constants.js cuts
   // the lane width from it, so height is the only axis left to make the
   // character chunkier on, and the reference characters are chunky mostly by
-  // being short. Collision has 0.20 of headroom at the duck threshold either
-  // way (1.60 - 0.42*0.90 = 1.22 against a bar starting at 1.41).
+  // being short. Collision gains by it rather than losing: at the duck
+  // threshold the head reaches 1.60 - 0.42*0.90 = 1.22 against a bar starting
+  // at 1.41, which is 0.19 of daylight where 1.78 left only 0.01.
   const HIP_Y = 0.552;     // pelvis pivot
   const CHEST_Y = 0.767;   // shoulder girdle pivot
   const NECK_Y = 0.907;    // base of the neck; the head rotates from here
@@ -280,8 +282,9 @@ MR.Runner = (function () {
     spine.add(pelvis);
 
     // The whole silhouette is built backwards from one measurement: the
-    // shoulder line has to stop 0.135 below the skull. See rule 1 in the
-    // header -- the number went UP with the head, not down.
+    // shoulder line has to stop 0.11 below the skull. See rule 1 in the
+    // header -- roughly half of that is spent on the skull's own projected
+    // overhang before the neck sees any of it.
     const chest = pivot(spine, 0, CHEST_Y - HIP_Y, 0);
     const trunk = multi([
       // Vest. Nothing on the trunk may reach above the deltoids -- an earlier
@@ -323,7 +326,7 @@ MR.Runner = (function () {
     const HY = HEAD_Y - NECK_Y;
 
     const headMesh = multi([
-      // Bare neck: 0.22 across against a 0.78 shoulder line and a 0.57 skull,
+      // Bare neck: 0.24 across against a 0.78 shoulder line and a 0.57 skull,
       // and lit skin between the dark hair above and the red vest below. The
       // order of those three values is the entire fix. Leaving the nape skin
       // and the hair on the crown gave a light head sitting on a light neck --
@@ -416,18 +419,19 @@ MR.Runner = (function () {
       upper.position.y = -0.122;
       shoulder.add(upper);
 
-      // Arms are the one place the toy proportion is knowingly broken: they
-      // are about a head longer than the reference characters carry, because
-      // reach is the only term in the spread jump pose and short arms cannot
-      // buy enough width to make the airborne state unmistakable. At rest the
-      // extra length is absorbed by the elbow's flexion and does not show.
+      // Arms are the one place the toy proportion is knowingly broken: shoulder
+      // to fingertip is 1.1 head-lengths where the reference characters run
+      // nearer 0.9, because reach is the ONLY term in the spread jump pose and
+      // stubby arms cannot buy enough width to make the airborne state
+      // unmistakable. At rest the extra is absorbed by the elbow's flexion and
+      // never shows.
       const elbow = pivot(shoulder, 0, -0.262, 0);
       // Forearm ending in a pale mitt over a trim wristband. Arms and thighs
       // are both skin, and from behind they overlap for most of the stride --
       // without a bright break at the wrist the whole lower half of the
-      // character reads as one undifferentiated mass. The mitt is 0.24 across
-      // against a 0.57 head, which is the ratio Sonic's gloves run at, and it
-      // is what makes both the arm swing and the spread jump pose land.
+      // character reads as one undifferentiated mass. The mitt is 0.21 across
+      // against a 0.57 head, near the ratio Sonic's gloves run at, and it is
+      // what makes both the arm swing and the spread jump pose land.
       const fore = multi([
         { g: new THREE.CapsuleGeometry(0.078, 0.090, 3, 10), c: P.runnerSkin, y: -0.103 },
         { g: new THREE.CylinderGeometry(0.088, 0.088, 0.048, 10), c: TRIM, y: -0.188 },

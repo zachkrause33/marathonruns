@@ -51,6 +51,13 @@
  *    The tag has size attenuation off, so it is the same size on screen from
  *    three units away or a hundred and ninety. Its POSITION carries the
  *    distance; its legibility never does.
+ *
+ * That division of labour is also the answer to traffic. The body is depth
+ * tested like everything else, so a block train in its lane hides it for a
+ * second or two -- which is what chasing someone through traffic looks like,
+ * and is far less alarming than a runner composited on top of solid geometry.
+ * The tag is not depth tested and never goes away, so the position read
+ * survives even while the body does not.
  */
 MR.Ghost = (function () {
   const K = MR.K;
@@ -221,14 +228,27 @@ MR.Ghost = (function () {
 
     const ink = [];
     body.group.traverse(function (o) {
-      if (!o.isMesh) return;
+      if (!o.isMesh || !o.material) return;
       // shading.outlined() tags its own shell; the raw ShaderMaterial test is
       // the belt to that braces. Recolouring the outline is not an option --
       // those materials are cached and shared with the player.
       const par = o.parent;
-      const isInk = (par && par.userData && par.userData.line === o)
-        || (o.material && o.material.isShaderMaterial);
-      if (isInk) ink.push(o); else o.material = mat;
+      if ((par && par.userData && par.userData.line === o) || o.material.isShaderMaterial) {
+        ink.push(o);
+        return;
+      }
+      // Anything already transparent is not a lit body part. Today that is the
+      // contact shadow, which the rig drives by writing its own opacity every
+      // frame -- overwrite the material and the blob turns into a flat quad.
+      // It is left alone deliberately: the ghost is the one thing on the road
+      // whose exact position the player has to judge, and a shadow is how you
+      // read where a body's feet are. Tinted rather than darkened, so it
+      // belongs to the ghost instead of pretending it blocks the sun.
+      if (o.material.transparent) {
+        if (o.material.color) o.material.color.set(COOL).multiplyScalar(0.42);
+        return;
+      }
+      o.material = mat;
     });
     for (const m of ink) if (m.parent) m.parent.remove(m);
 
@@ -272,13 +292,19 @@ MR.Ghost = (function () {
       const gz = pace.ghostMiles() * K.UNITS_PER_MILE;
       const gap = gz - z;
       s.z = gz;
+      // ghostMiles() clamps at the line, so on any run slower than 1:59:30 the
+      // record finishes first and then sits at 26.2 while the player comes in.
+      // Everything below has to know that, or the ghost spends the last minute
+      // of a bad race running on the spot in the finish chute and then throws a
+      // celebration when the player finally reaches it.
+      const running = gz < K.TOTAL_UNITS - 0.01;
 
       // The crossover. Detected on the sign change rather than on a threshold,
       // so it fires exactly once and exactly where the record is beaten. The
       // primed flag is why ?skip= past mile 20 does not open with a phantom
       // celebration -- same trick the camera plays with its speed filter.
       if (!s.primed) { s.primed = true; s.gap = gap; s.x = HOME_X; }
-      else if (s.gap > 0 && gap <= 0) s.flash = 1;
+      else if (running && s.gap > 0 && gap <= 0) s.flash = 1;
       s.gap = gap;
       s.flash = Math.max(0, s.flash - dt / 2.1);
 
@@ -324,7 +350,9 @@ MR.Ghost = (function () {
       const level = 1 - smoothstep(5, 22, Math.abs(gap));
       alpha = Math.min(1, alpha + s.flash * 0.55 + level * 0.10);
 
-      const bodyOn = ahead > 1.2 && alpha > 0.02;
+      // Once the record is home there is no body to draw -- only the tag, left
+      // standing over the finish line where it crossed.
+      const bodyOn = running && ahead > 1.2 && alpha > 0.02;
       body.group.visible = bodyOn;
       if (bodyOn) {
         mat.opacity = alpha;

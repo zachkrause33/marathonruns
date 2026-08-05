@@ -245,6 +245,76 @@ MR.Runner = (function () {
     return blobTex;
   }
 
+  // ---- the skid ----------------------------------------------------------
+  //
+  // Three passes at the slide pose all failed for the same reason, and it is
+  // worth writing down because it is a geometry fact and not a matter of
+  // taste: a feet-first slide points the legs straight down the view axis.
+  // Measured on this rig, at this camera, throwing the feet a full 0.65 ahead
+  // of the head moves them 0.027 of frame height up the screen. Every unit of
+  // forward extension is worth almost nothing from directly behind, so no pose
+  // can win this -- the axis is wrong, not the pose.
+  //
+  // What the axis is GOOD for is the other direction. Anything the runner
+  // leaves BEHIND travels toward the lens, where perspective magnifies it
+  // instead of collapsing it: a trail eleven units long fills the bottom third
+  // of a portrait frame and widens as it comes. So the slide is sold by what
+  // it puts on the road rather than by the silhouette -- a skid ribbon laid
+  // down in world space under the hips, and dust thrown up off it.
+  //
+  // Both are single dynamic meshes with no outline pass, one draw call each,
+  // and neither touches the collision silhouette or the pose the audit reads.
+  const SKID_N = 22;          // ribbon samples kept
+  const SKID_STEP = 0.52;     // world units between samples -- ~11 of trail
+  const DUST_N = 34;
+  // Road dust, not sparks. Warm enough to separate from the purple tarmac,
+  // desaturated enough that it never reads as fire on the wild-west biome.
+  const DUST_COLOR = 0xe8dcc4;
+
+  // Gradient along the ribbon: dense at the contact point, gone by the tail,
+  // with a soft edge across the width so it never shows a rim. The streaks are
+  // the difference between a smear and a skid -- a plain gradient reads as a
+  // shadow, and grit lines running along the direction of travel are what say
+  // the ground is moving under something.
+  let skidTex = null;
+  function skidTexture() {
+    if (skidTex) return skidTex;
+    const W = 128, H = 64;
+    const cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    const g = cv.getContext('2d');
+    const img = g.createImageData(W, H);
+    // Deterministic streaks: a texture that changes between runs would make
+    // two screenshots of the same pose impossible to compare.
+    const streak = [];
+    for (let i = 0; i < 9; i++) streak.push(0.12 + (i * 0.37) % 0.76);
+    for (let y = 0; y < H; y++) {
+      const v = y / (H - 1);
+      // Across the width: full in the middle, feathered at both edges.
+      let across = Math.sin(Math.PI * v);
+      across = across * across;
+      let grit = 0;
+      for (const s of streak) {
+        const d = Math.abs(v - s);
+        if (d < 0.035) grit += (1 - d / 0.035) * 0.55;
+      }
+      for (let x = 0; x < W; x++) {
+        // u = 0 at the contact point, 1 at the oldest sample.
+        const u = x / (W - 1);
+        const along = Math.pow(1 - u, 1.15) * (0.45 + 0.55 * Math.min(1, u * 6));
+        const a = Math.min(1, across * (0.72 + grit) * along);
+        const i = (y * W + x) * 4;
+        img.data[i] = img.data[i + 1] = img.data[i + 2] = 255;
+        img.data[i + 3] = Math.round(a * 255);
+      }
+    }
+    g.putImageData(img, 0, 0);
+    skidTex = new THREE.CanvasTexture(cv);
+    skidTex.minFilter = skidTex.magFilter = THREE.LinearFilter;
+    skidTex.generateMipmaps = false;
+    return skidTex;
+  }
+
   // Sonic's shadow is the strongest of the three references and it is the one
   // to copy: at half strength over this road the blob was there in a still and
   // gone in motion, which buys nothing.
@@ -481,6 +551,243 @@ MR.Runner = (function () {
       shadow.scale.set(shadowW * k, 1, shadowD * k);
       shadowMat.opacity = BASE_ALPHA * shadowA * (1 - t * 0.80);
       shadowPivot.updateMatrixWorld(true);
+    };
+
+    // ---- skid ribbon and dust --------------------------------------------
+    //
+    // Everything under this pivot lives in WORLD space, not rig space: the
+    // marks a slide leaves have to stay on the road the runner has already
+    // gone past. The pivot cancels root's transform outright by inverting its
+    // world matrix rather than approximating it the way the shadow does --
+    // root banks on a lane change, and a skid that banked with it would be
+    // painted on the runner instead of on the tarmac.
+    //
+    // It is hidden, not merely faded, whenever there is no slide, so the two
+    // meshes cost nothing at all for the 99% of a race that is running.
+    const fxPivot = pivot(root, 0, 0, 0);
+    fxPivot.matrixAutoUpdate = false;
+    fxPivot.visible = false;
+
+    // Ribbon: an indexed strip, two vertices per sample. Only the positions
+    // move -- the UVs are fixed, so the texture's own gradient does the ageing
+    // and no per-vertex alpha is needed.
+    const SKID_PTS = SKID_N + 1;                 // + the live contact point
+    const skidGeo = new THREE.BufferGeometry();
+    const skidPos = new Float32Array(SKID_PTS * 2 * 3);
+    const skidUv = new Float32Array(SKID_PTS * 2 * 2);
+    const skidIdx = new Uint16Array((SKID_PTS - 1) * 6);
+    for (let j = 0; j < SKID_PTS; j++) {
+      const u = j / SKID_N;
+      skidUv[j * 4 + 0] = u; skidUv[j * 4 + 1] = 0;
+      skidUv[j * 4 + 2] = u; skidUv[j * 4 + 3] = 1;
+      if (j < SKID_PTS - 1) {
+        const a = j * 2, o = j * 6;
+        skidIdx[o] = a; skidIdx[o + 1] = a + 1; skidIdx[o + 2] = a + 2;
+        skidIdx[o + 3] = a + 1; skidIdx[o + 4] = a + 3; skidIdx[o + 5] = a + 2;
+      }
+    }
+    skidGeo.setAttribute('position', new THREE.BufferAttribute(skidPos, 3));
+    skidGeo.setAttribute('uv', new THREE.BufferAttribute(skidUv, 2));
+    skidGeo.setIndex(new THREE.BufferAttribute(skidIdx, 1));
+    const skidMat = new THREE.MeshBasicMaterial({
+      color: DUST_COLOR,
+      map: skidTexture(),
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      fog: true,
+    });
+    const skid = new THREE.Mesh(skidGeo, skidMat);
+    skid.frustumCulled = false;   // its bounds are world-spanning and stale
+    skid.renderOrder = 3;         // over the road paint and the contact blob
+    fxPivot.add(skid);
+
+    // Dust: camera-facing quads, per-vertex alpha so each puff fades on its
+    // own clock. One draw for the lot.
+    const dustGeo = new THREE.BufferGeometry();
+    const dustPos = new Float32Array(DUST_N * 4 * 3);
+    const dustCol = new Float32Array(DUST_N * 4 * 4);
+    const dustUv = new Float32Array(DUST_N * 4 * 2);
+    const dustIdx = new Uint16Array(DUST_N * 6);
+    for (let i = 0; i < DUST_N; i++) {
+      const v = i * 8, o = i * 6, a = i * 4;
+      dustUv[v] = 0; dustUv[v + 1] = 0;
+      dustUv[v + 2] = 1; dustUv[v + 3] = 0;
+      dustUv[v + 4] = 0; dustUv[v + 5] = 1;
+      dustUv[v + 6] = 1; dustUv[v + 7] = 1;
+      dustIdx[o] = a; dustIdx[o + 1] = a + 1; dustIdx[o + 2] = a + 2;
+      dustIdx[o + 3] = a + 1; dustIdx[o + 4] = a + 3; dustIdx[o + 5] = a + 2;
+    }
+    dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+    dustGeo.setAttribute('uv', new THREE.BufferAttribute(dustUv, 2));
+    // itemSize 4: three switches the shader to USE_COLOR_ALPHA on that alone,
+    // which is what lets one mesh hold puffs at different ages.
+    dustGeo.setAttribute('color', new THREE.BufferAttribute(dustCol, 4));
+    dustGeo.setIndex(new THREE.BufferAttribute(dustIdx, 1));
+    const dustMat = new THREE.MeshBasicMaterial({
+      color: DUST_COLOR,
+      map: blobTexture(),
+      transparent: true,
+      vertexColors: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      fog: true,
+    });
+    const dust = new THREE.Mesh(dustGeo, dustMat);
+    dust.frustumCulled = false;
+    dust.renderOrder = 4;
+    fxPivot.add(dust);
+
+    // Deterministic noise. Math.random here would make two screenshots of the
+    // same frame differ, and the review loop is screenshots.
+    let fxSeed = 1;
+    function rnd() {
+      fxSeed = (fxSeed * 1664525 + 1013904223) & 0x7fffffff;
+      return fxSeed / 0x7fffffff;
+    }
+
+    let fxDt = 0, fxSlid = 0, fxLive = 0, fxEmit = 0, fxBurst = 0;
+    let skidN = 0, lastX = 0, lastZ = 0;
+    const skidX = new Float32Array(SKID_N);
+    const skidZ = new Float32Array(SKID_N);
+
+    const dPx = new Float32Array(DUST_N), dPy = new Float32Array(DUST_N), dPz = new Float32Array(DUST_N);
+    const dVx = new Float32Array(DUST_N), dVy = new Float32Array(DUST_N), dVz = new Float32Array(DUST_N);
+    const dAge = new Float32Array(DUST_N), dTtl = new Float32Array(DUST_N);
+    let dCur = 0;
+
+    function fxReset() {
+      skidN = 0; fxEmit = 0;
+      for (let i = 0; i < DUST_N; i++) dTtl[i] = 0;
+    }
+
+    function spawn(cx, cz, power) {
+      const i = dCur; dCur = (dCur + 1) % DUST_N;
+      const side = rnd() < 0.5 ? -1 : 1;
+      dPx[i] = cx + side * (0.14 + rnd() * 0.32);
+      dPy[i] = 0.05 + rnd() * 0.07;
+      dPz[i] = cz - rnd() * 0.36;
+      // Out and up off the road. The forward term is drag, not thrust: the
+      // runner is doing ~25 u/s and the cloud keeps only a fraction of it,
+      // which is precisely why it falls behind and becomes a trail.
+      dVx[i] = side * (0.85 + rnd() * 1.5);
+      dVy[i] = (1.0 + rnd() * 1.45) * power;
+      dVz[i] = 2.1 + rnd() * 4.2;
+      dAge[i] = 0;
+      dTtl[i] = 0.50 + rnd() * 0.30;
+    }
+
+    // The whole effect is simulated here rather than in update(), because
+    // main.js moves the group AFTER calling update() -- the same frame of lag
+    // the shadow works around above. A skid mark placed a frame late is placed
+    // a whole unit up the road at race pace, and the head of the ribbon would
+    // visibly detach from the runner it is supposed to be coming out of.
+    skid.onBeforeRender = function (renderer, scene, camera) {
+      const dt = fxDt;
+      fxPivot.matrix.copy(root.matrixWorld).invert();
+      fxPivot.updateMatrixWorld(true);
+
+      // Contact point: under the hips and a hair behind them, which is where
+      // the body is actually on the road once the recline has tipped it back.
+      const cx = root.position.x, cz = root.position.z - 0.12;
+      const live = fxSlid > 0.05;
+
+      if (live && skidN === 0) { lastX = cx; lastZ = cz; }
+      // Sample by DISTANCE, never per frame: at 7fps under SwiftShader and at
+      // 60 on a phone the runner covers wildly different ground per frame, and
+      // a per-frame history would make the trail eleven units long in one and
+      // one unit long in the other.
+      for (let guard = 0; live && guard < 8; guard++) {
+        const ddx = cx - lastX, ddz = cz - lastZ;
+        const d = Math.sqrt(ddx * ddx + ddz * ddz);
+        if (d < SKID_STEP) break;
+        const k = SKID_STEP / d;
+        lastX += ddx * k; lastZ += ddz * k;
+        skidX.copyWithin(1, 0, SKID_N - 1);
+        skidZ.copyWithin(1, 0, SKID_N - 1);
+        skidX[0] = lastX; skidZ[0] = lastZ;
+        if (skidN < SKID_N) skidN++;
+      }
+
+      // Head of the ribbon: the live contact point while the body is down, the
+      // last sample once it is up, so releasing the slide stops laying rubber
+      // instead of stretching the mark forward with the runner.
+      const hx = live ? cx : lastX;
+      const hz = live ? cz : lastZ;
+      const M = skidN + 1;
+      for (let j = 0; j < M; j++) {
+        const px = j === 0 ? hx : skidX[j - 1];
+        const pz = j === 0 ? hz : skidZ[j - 1];
+        // Perpendicular to the local direction of travel. The runner is mostly
+        // going +z, so this is near enough (1,0,0) except through a lane
+        // change, where the mark should and does curve with the body.
+        const qx = j + 1 < M ? (j === 0 ? skidX[0] : skidX[j]) : px;
+        const qz = j + 1 < M ? (j === 0 ? skidZ[0] : skidZ[j]) : pz;
+        let ex = px - qx, ez = pz - qz;
+        const el = Math.sqrt(ex * ex + ez * ez) || 1;
+        ex /= el; ez /= el;
+        // Widens as it ages: a skid does not stay the width of the hip that
+        // made it, and a plume opening toward the camera is the single most
+        // legible thing in the frame.
+        const u = j / SKID_N;
+        const half = 0.24 + 0.34 * u;
+        const nx = ez * half, nz = -ex * half;
+        const o = j * 6;
+        skidPos[o] = px + nx; skidPos[o + 1] = 0.022; skidPos[o + 2] = pz + nz;
+        skidPos[o + 3] = px - nx; skidPos[o + 4] = 0.022; skidPos[o + 5] = pz - nz;
+      }
+      skidGeo.setDrawRange(0, Math.max(0, (M - 1) * 6));
+      skidGeo.attributes.position.needsUpdate = true;
+
+      // ---- dust ----------------------------------------------------------
+      if (fxBurst > 0) { for (let i = 0; i < fxBurst; i++) spawn(cx, cz, 1.55); fxBurst = 0; }
+      if (live) {
+        fxEmit += dt * 46;
+        while (fxEmit >= 1) { fxEmit -= 1; spawn(cx, cz, 1); }
+      }
+
+      // Billboard off the lens, so a puff is a puff whatever the camera roll
+      // is doing. Reading the basis here is the whole reason the sim lives in
+      // onBeforeRender -- update() has no camera.
+      const e = camera.matrixWorld.elements;
+      const rx = e[0], ry = e[1], rz = e[2];
+      const ux = e[4], uy = e[5], uz = e[6];
+      const dragK = Math.min(1, dt * 2.4);
+      for (let i = 0; i < DUST_N; i++) {
+        const o = i * 12, c = i * 16;
+        if (dTtl[i] <= 0) {
+          // Dead puffs collapse to a point with zero alpha rather than being
+          // skipped, so the draw stays one call and one buffer upload.
+          for (let k = 0; k < 12; k++) dustPos[o + k] = 0;
+          for (let k = 3; k < 16; k += 4) dustCol[c + k] = 0;
+          continue;
+        }
+        dAge[i] += dt;
+        if (dAge[i] >= dTtl[i]) { dTtl[i] = 0; continue; }
+        dVy[i] -= 5.4 * dt;
+        dVx[i] -= dVx[i] * dragK; dVz[i] -= dVz[i] * dragK;
+        dPx[i] += dVx[i] * dt; dPy[i] += dVy[i] * dt; dPz[i] += dVz[i] * dt;
+        if (dPy[i] < 0.04) { dPy[i] = 0.04; dVy[i] = 0; }
+
+        const t = dAge[i] / dTtl[i];
+        // Dust expands as it dissipates; a puff that shrinks reads as a spark.
+        const s = 0.15 + 0.44 * Math.pow(t, 0.65);
+        const a = Math.min(1, t * 7) * Math.pow(1 - t, 1.4) * 0.92;
+        const ax = rx * s, ay = ry * s, az = rz * s;
+        const bx = ux * s, by = uy * s, bz = uz * s;
+        const px = dPx[i], py = dPy[i], pz = dPz[i];
+        dustPos[o] = px - ax - bx; dustPos[o + 1] = py - ay - by; dustPos[o + 2] = pz - az - bz;
+        dustPos[o + 3] = px + ax - bx; dustPos[o + 4] = py + ay - by; dustPos[o + 5] = pz + az - bz;
+        dustPos[o + 6] = px - ax + bx; dustPos[o + 7] = py - ay + by; dustPos[o + 8] = pz - az + bz;
+        dustPos[o + 9] = px + ax + bx; dustPos[o + 10] = py + ay + by; dustPos[o + 11] = pz + az + bz;
+        for (let k = 0; k < 4; k++) {
+          dustCol[c + k * 4] = 1; dustCol[c + k * 4 + 1] = 1; dustCol[c + k * 4 + 2] = 1;
+          dustCol[c + k * 4 + 3] = a;
+        }
+      }
+      dustGeo.attributes.position.needsUpdate = true;
+      dustGeo.attributes.color.needsUpdate = true;
     };
 
     // ---------------------------------------------------------------------
@@ -799,6 +1106,29 @@ MR.Runner = (function () {
       shadowW = (1.30 - slid * 0.18) * plant;
       shadowD = (0.96 + slid * 1.34) * plant;
       shadowA = (1 + slid * 0.48) * (2 - plant);
+
+      // ---- skid ------------------------------------------------------------
+      // Only the state lives here; the simulation runs in onBeforeRender where
+      // the group's position for THIS frame is finally known. See the hook.
+      fxDt = dt;
+      fxSlid = slid;
+      if (slid > 0.02) {
+        // Rising edge. Clear the previous slide's marks -- a trail that
+        // survived to the next one would be laid down between two points the
+        // runner never travelled between -- and throw the entry burst.
+        //
+        // The burst is doing as much work as the trail. Entry is the one
+        // moment a slide is unambiguous from any angle: the body drops and the
+        // road erupts under it. A held frame cannot make that argument, and
+        // the pose the player actually has to name is the one they saw arrive.
+        if (fxLive <= 0) { fxReset(); fxBurst = 12; }
+        fxLive = 1;
+      } else {
+        fxLive = Math.max(0, fxLive - dt * 1.7);
+      }
+      fxPivot.visible = fxLive > 0.01;
+      skidMat.opacity = 0.86 * fxLive;
+      dustMat.opacity = fxLive;
     };
 
     api.update(0, {});

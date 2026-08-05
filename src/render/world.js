@@ -1483,9 +1483,8 @@ MR.World = (function () {
      * The pool of light under an item, as GEOMETRY rather than as a soft
      * transparent sprite. A glow sprite is the obvious way to draw this and it
      * is the wrong one here: large transparent surfaces are the single most
-     * expensive thing this renderer does, and there can be five bottles on
-     * screen at once. Two flat opaque discs of a pale mint cost nothing and
-     * read the same at the distance that matters.
+     * expensive thing this renderer does. Two flat opaque discs of a pale mint
+     * cost nothing and read the same at the distance that matters.
      *
      * Both discs are rotationally symmetric on purpose -- the whole item is one
      * mesh and one draw, so the spin below turns the pickup while leaving the
@@ -1498,26 +1497,92 @@ MR.World = (function () {
       ];
     }
 
-    // A bottle, drawn as a chunky box rather than a cylinder: a cylinder is its
-    // own axis of rotation and the spin would be invisible on it. 0.36 across is
-    // 21% of a lane -- big enough to be an object rather than a speck, and a
-    // quarter of the 95% a hazard fills, which is the ratio doing the work.
+    /**
+     * A BOTTLE, and it has to actually look like one. Aid arrives alone now --
+     * one item per point, roughly fourteen in a whole marathon -- so each one
+     * gets the frame to itself for a second and has to say what it is on its
+     * own. The old chunky box did not: it read as "small pale cube", which is
+     * a shape this game otherwise only uses for things you must not touch.
+     *
+     * The identity is entirely in the SILHOUETTE, because at the 20-40 units
+     * where the lane is chosen the whole item is about twenty pixels across and
+     * nothing else survives. So: a wide base, a shoulder that steps in, a
+     * distinctly narrow neck, and a cap wider than the neck in a contrasting
+     * mint. Four steps is what turns a rectangle into a bottle; three is a
+     * bottle with the cap missing.
+     *
+     * Still square in section rather than turned, and that is not laziness: a
+     * body of revolution is its own axis of rotation, so the spin -- the one
+     * signal in this world that says "pickup, not obstacle" -- would be
+     * invisible on it. A 0.34 x 0.26 section swings visibly.
+     */
     const waterGeo = merge(aidPool(0.54).concat([
-      bx(0.36, 0.56, 0.30, 0, AID_Y, 0, 0xf6fffb),
-      bx(0.39, 0.18, 0.33, 0, AID_Y - 0.04, 0, 0x2fd39a),
-      bx(0.19, 0.16, 0.19, 0, AID_Y + 0.36, 0, 0x2fd39a),
+      bx(0.34, 0.42, 0.26, 0, 0.85, 0, 0xf6fffb),   // body, 0.64 -> 1.06
+      bx(0.36, 0.14, 0.28, 0, 0.82, 0, 0x2fd39a),   // label band
+      bx(0.24, 0.12, 0.19, 0, 1.12, 0, 0xf6fffb),   // shoulder
+      bx(0.14, 0.10, 0.12, 0, 1.23, 0, 0xf6fffb),   // neck
+      bx(0.20, 0.13, 0.17, 0, 1.345, 0, 0x2fd39a),  // cap, proud of the neck
     ]));
 
-    // Fruit is the rare one and worth more than twice a bottle, so it is bigger,
-    // sits in a wider pool and carries its own hue. Lemon yellow rather than the
-    // JUMP amber, and on a mint pool it never joins that family.
-    const bananaGeo = merge(aidPool(0.70).concat([
-      bx(0.58, 0.21, 0.21, 0, AID_Y + 0.15, 0, 0xffe45e),
-      bx(0.30, 0.21, 0.21, -0.38, AID_Y, 0, 0xffe45e, 0, 0, 0.6),
-      bx(0.30, 0.21, 0.21, 0.38, AID_Y, 0, 0xffe45e, 0, 0, -0.6),
-      bx(0.11, 0.15, 0.15, -0.53, AID_Y - 0.17, 0, 0x6b4f1f),
-      bx(0.11, 0.15, 0.15, 0.53, AID_Y - 0.17, 0, 0x6b4f1f),
-    ]));
+    /**
+     * A BANANA, and the curve is the whole identity -- a yellow box is a
+     * yellow box. It is built as a real circular arc: five short segments laid
+     * on a radius 0.42 circle over +/-1.0 radians, each turned to the tangent
+     * at its own station, fat in the middle and tapering to the ends the way
+     * the fruit does. Five is the fewest that reads as a curve rather than as a
+     * chevron at the distance this is seen from.
+     *
+     * The crescent lies in the vertical plane, which is the only orientation
+     * that survives this camera: the eye sits at y ~2.7 and the item at ~1.0
+     * some 30 units out, so the view is within a few degrees of level and a
+     * crescent laid flat would read as a bar. It does go edge-on twice per
+     * turn; the asymmetric ends are what carry it through those frames, which
+     * is also why there is a dark blossom tip at one end and a stem at the
+     * other rather than the old matching pair.
+     *
+     * Fruit is the rare one and worth more than twice a bottle, so it is bigger
+     * and sits in a wider pool. Lemon yellow rather than the JUMP amber, and on
+     * a mint pool it never joins that family.
+     */
+    const bananaGeo = (function () {
+      const parts = aidPool(0.70);
+      const R = 0.42, SPAN = 1.0, N = 5;
+      // Centre of curvature above, so the arc hangs as a smile with the tips
+      // lifted. The lowest point sits just under AID_Y.
+      const yc = AID_Y - 0.10 + R;
+      const pt = (a) => [R * Math.sin(a), yc - R * Math.cos(a)];
+      for (let i = 0; i < N; i++) {
+        const a = -SPAN + (i + 0.5) * (2 * SPAN / N);
+        const p = pt(a);
+        // Taper: 0.21 through the belly down to 0.155 at the ends.
+        const th = 0.21 - 0.055 * Math.abs(a) / SPAN;
+        // Segment length overshoots the arc step so the joints never gap, and
+        // the section is turned 45 degrees about its own long axis. That is a
+        // LIGHTING decision as much as a shape one: an upright box shows the
+        // camera one flat vertical face, which lands in the toon ramp's dark
+        // band and turned a lemon banana olive. Cornered, the two facets it
+        // shows both carry normal.y = 0.7, take most of the sky hemisphere, and
+        // the fruit comes back to yellow -- and a ridged section is what a
+        // banana has anyway.
+        parts.push(bx(0.20, th, th * 0.92, p[0], p[1], 0, 0xffe45e, Math.PI / 4, 0, a));
+        // The crease along the outer edge, in a paler yellow, sitting on the
+        // corner the turned section presents. At 30 units, where the whole
+        // fruit is eight pixels, this pale line is the part that still reads.
+        const d = th * 0.66;
+        parts.push(bx(0.20, 0.075, 0.075,
+          p[0] - Math.sin(a) * d, p[1] + Math.cos(a) * d, 0,
+          0xfff2a8, Math.PI / 4, 0, a));
+      }
+      // The ends are deliberately NOT a matching pair: a dark blossom tip at
+      // one end and a green stem with a stub at the other. The asymmetry is
+      // what still says "banana" in the two frames per turn where the crescent
+      // is edge-on to the camera and its curve has nothing to show.
+      const tip = pt(SPAN), stem = pt(-SPAN);
+      parts.push(bx(0.13, 0.12, 0.12, tip[0], tip[1], 0, 0x4a3418, Math.PI / 4, 0, SPAN));
+      parts.push(bx(0.11, 0.13, 0.13, stem[0], stem[1] + 0.01, 0, 0x8fbf3f, Math.PI / 4, 0, -SPAN));
+      parts.push(bx(0.09, 0.10, 0.09, stem[0] - 0.055, stem[1] + 0.09, 0, 0x6b4f1f));
+      return merge(parts);
+    })();
 
     const waterPool = Pool(function () {
       return S.outlined(waterGeo, mats.propLit, S.INK.prop);
@@ -1529,12 +1594,11 @@ MR.World = (function () {
     /**
      * The water table itself: trestle, cloth, cups, volunteers, and a sign.
      *
-     * This is what says the floating bottles are aid and not another thing to
-     * dodge, and it is why the bottles arrive in runs of three to five -- a
-     * table serves a stretch of road, so the props and the pickups have to
-     * agree about that. It stands on the shoulder outside CORRIDOR_HALF, on
-     * whichever side the served lane is nearest, and it is built with the road
-     * toward local -x so one geometry serves both sides under a half-turn.
+     * This is what says the floating bottle is aid and not another thing to
+     * dodge -- one station per water point, on the shoulder outside
+     * CORRIDOR_HALF, on whichever side the served lane is nearest, and built
+     * with the road toward local -x so one geometry serves both sides under a
+     * half-turn.
      *
      * Subway-Surfers chunky: few, large, saturated shapes. The volunteer
      * holding a cup out over the kerb is the whole story of the prop in one
@@ -2229,29 +2293,33 @@ MR.World = (function () {
     /**
      * Water tables, derived from the aid the course generated rather than
      * placed independently -- the props and the pickups have to be telling the
-     * same story. course.js emits a table as a run of consecutive water items
-     * in one lane, so that run is what gets grouped back up here.
+     * same story.
+     *
+     * That story changed. course.js used to emit a table as a run of three to
+     * five consecutive water items in one lane, and this loop grouped the run
+     * back up into one table; aid is now ONE item per point, spaced 620 units
+     * early to 220 late, about fourteen in a marathon. So a table is no longer
+     * a stand serving a stretch of road -- it is a single station beside a
+     * single bottle, and it is keyed straight off that bottle. There are eight
+     * or nine of them in a whole race, which is about right for a marathon and
+     * far enough apart that each one is an event.
+     *
+     * Fruit gets no prop. Every water point having a stand and every fruit
+     * point having nothing is what tells the two apart before either is close
+     * enough to identify by shape.
      */
-    {
-      const aid = course.aid || [];
-      let i = 0;
-      while (i < aid.length) {
-        if (aid[i].kind !== 'water') { i++; continue; }
-        let j = i;
-        while (j + 1 < aid.length && aid[j + 1].kind === 'water'
-          && aid[j + 1].lane === aid[i].lane && aid[j + 1].z - aid[j].z < 8) j++;
-        // The nearer shoulder to the lane being served. A centre-lane run has
-        // no nearer side, so the course's own z picks one -- still identical
-        // for every player, which is the only property that matters.
-        const lx = K.LANE_X[aid[i].lane];
-        const side = lx > 0.05 ? 1 : lx < -0.05 ? -1 : ((Math.round(aid[i].z) & 1) ? 1 : -1);
-        structures.push({
-          z: (aid[i].z + aid[j].z) / 2, kind: 'aidTable', side,
-          x: side * (K.TRACK_HALF_WIDTH + 3.4), y: 0,
-          ry: side < 0 ? Math.PI : 0, rz: 0,
-        });
-        i = j + 1;
-      }
+    for (const a of (course.aid || [])) {
+      if (a.kind !== 'water') continue;
+      // The nearer shoulder to the lane being served. A centre-lane item has
+      // no nearer side, so the course's own z picks one -- still identical for
+      // every player, which is the only property that matters.
+      const lx = K.LANE_X[a.lane];
+      const side = lx > 0.05 ? 1 : lx < -0.05 ? -1 : ((Math.round(a.z) & 1) ? 1 : -1);
+      structures.push({
+        z: a.z, kind: 'aidTable', side,
+        x: side * (K.TRACK_HALF_WIDTH + 3.4), y: 0,
+        ry: side < 0 ? Math.PI : 0, rz: 0,
+      });
     }
 
     structures.sort((p, q) => p.z - q.z);
@@ -2487,8 +2555,8 @@ MR.World = (function () {
         if (e.pop < 0) {
           // Lane match only -- exactly what player.js resolves on, so the pop
           // can never disagree with the streak the player was just granted.
-          // The 6-unit gate is what stops a whole table popping at once when a
-          // ?skip= jump spawns a run that is already behind the runner.
+          // The 6-unit gate is what stops an item popping long after the fact
+          // when a ?skip= jump spawns one that is already behind the runner.
           if (playerLane !== undefined && e.it.lane === playerLane
             && e.it.z <= z && z - e.it.z < 6) {
             e.pop = now;
@@ -2497,10 +2565,15 @@ MR.World = (function () {
             activeAid.splice(i, 1);
             continue;
           } else {
-            // The turn. Phase comes off the item's own z so a table's bottles
-            // are out of step with each other and the run reads as a scatter of
-            // objects rather than as one rigid comb.
-            e.obj.rotation.y = now * 1.5 + e.it.z * 0.9;
+            // The turn, and it now carries more than it used to: aid arrives
+            // alone rather than in runs of five, so a solo item has none of the
+            // presence a row had and the spin is most of what distinguishes it
+            // from the static world. A little quicker than the old 1.5 for the
+            // same reason -- fast enough to be seen turning in the second or so
+            // it is on screen, slow enough not to read as a spinning trap.
+            // Phase still comes off the item's own z, which keeps two items in
+            // sight of each other out of step and costs nothing.
+            e.obj.rotation.y = now * 2.0 + e.it.z * 0.9;
           }
         }
         if (e.pop >= 0) {
@@ -2517,8 +2590,7 @@ MR.World = (function () {
           // It climbs, and climbs fast. Collection happens at the runner's own
           // z with the camera four units behind, so the pop goes off almost at
           // the lens: a burst that swelled in place would sit across the road
-          // the player is reading, and a water table fires five of them in a
-          // second and a half. Lifting it out of the road read in the first
+          // the player is reading. Lifting it out of the road read in the first
           // tenth is what makes it a flourish instead of a blindfold -- and the
           // swell is kept to 1.35, which is noticed rather than looked at.
           const s = (1 + 0.55 * Math.sin(Math.PI * t)) * (1 - t * t);

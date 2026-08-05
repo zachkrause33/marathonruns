@@ -79,6 +79,16 @@ MR.K = (function () {
     // moving screen-left" is true before and after, so the bank still leans
     // into the turn the player sees.
     LANE_X: [LANE_W, 0, -LANE_W],
+    // LANE_X IS DESCENDING. Differencing it gives a NEGATIVE number, and that
+    // has already cost this project one expensive bug: world.js derived its
+    // hazard scale as `LANE_X[1] - LANE_X[0]`, got -1.70, and built every
+    // hazard with a negative width -- which mirrors the geometry and reverses
+    // the winding of every triangle, so each hazard's ink shell swallowed its
+    // own fill and rendered as a black slab. It also silently culled the lane
+    // telegraph mats, the single most important readability device in the
+    // game, for the entire race.
+    //
+    // Use LANE_W for any width or spacing. Never difference LANE_X.
     LANE_COUNT: 3,
     // Three lanes plus a fixed shoulder each side. The shoulder is deliberately
     // NOT a fraction of the lane: what it has to hold -- the kerb, the outermost

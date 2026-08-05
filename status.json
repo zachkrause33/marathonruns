@@ -2,7 +2,7 @@
   "updated": "2026-08-05",
   "wave": 1,
   "branch": "claude/effort-estimation-emdxm8",
-  "headline": "Core race engine is <b>built and verified</b> — the pace model, the record chase and course fairness are proved by headless tools, not asserted. The game is playable end to end at 60fps. Wave 1 of the builder/critic loop is now running on the five visual and feel pieces.",
+  "headline": "All five wave-1 builders have landed and are committed, verified running at 60fps with 163 draw calls. The HUD now leads with <b>projected finish</b>, which fixed a readout that told flawless players they were failing. User-supplied <b>Temple Run reference frames</b> are in <code>reference/</code> and turned the comparison into measurement: the track is about <b>2.5&times; too wide relative to the runner</b> &mdash; a geometry ratio no camera move can fix.",
   "pieces": [
     {
       "name": "Pace &amp; record model",
@@ -16,7 +16,7 @@
       "state": "done",
       "wave": 1,
       "verdict": "90 dates deterministic and provably solvable",
-      "gap": "Difficulty curve has not been judged by a human — only proved fair"
+      "gap": "Difficulty curve has not been judged by a human \u2014 only proved fair"
     },
     {
       "name": "Collision &amp; fairness",
@@ -27,38 +27,38 @@
     },
     {
       "name": "Runner character",
-      "state": "building",
+      "state": "review",
       "wave": 1,
-      "verdict": "Head does not separate from torso from behind",
-      "gap": "Reads as generic, not as a toy; run cycle never judged in motion"
+      "verdict": "Head now separates; race number on the back",
+      "gap": "Left forearm renders as a yellow slab \u2014 visible geometry bug"
     },
     {
       "name": "Cel-shading &amp; sky",
-      "state": "building",
+      "state": "review",
       "wave": 1,
-      "verdict": "Sky dome shows banding arcs; outlines ignore fog",
-      "gap": "No aerial perspective, so the world has no depth"
+      "verdict": "Colour-space bug fixed; sun, clouds, aerial haze",
+      "gap": "Outlines and fog agree, but palette runs too many hues at once"
     },
     {
       "name": "World &amp; obstacles",
-      "state": "building",
+      "state": "review",
       "wave": 1,
-      "verdict": "Hazards unreadable at distance; scenery is placeholder",
-      "gap": "Six biomes differ only by colour tint, not by content"
+      "verdict": "Biomes differ by content now, not tint",
+      "gap": "Hazards still not readable far enough ahead to plan a line"
     },
     {
       "name": "Camera &amp; speed feel",
-      "state": "building",
+      "state": "review",
       "wave": 1,
-      "verdict": "Framing too far out; speed reads as constant",
-      "gap": "The honest 21% pace gain does not feel like another gear"
+      "verdict": "Framing to 1.98/4.42; surge, stride bob, top-gear band",
+      "gap": "No foreground occlusion, so speed has nothing to rush past"
     },
     {
       "name": "HUD &amp; typography",
-      "state": "building",
+      "state": "review",
       "wave": 1,
-      "verdict": "Broadcast styling works; information hierarchy misleads",
-      "gap": "A flawless run is shown a huge red deficit while actually on record pace"
+      "verdict": "Projected finish is the headline; split moved to the rail",
+      "gap": "Finish panel still unreviewed at phone width"
     },
     {
       "name": "Controls &amp; game feel",
@@ -72,7 +72,14 @@
       "state": "queued",
       "wave": 0,
       "verdict": "Procedural mix written, never listened to",
-      "gap": "Cannot be verified by screenshot — needs a different check"
+      "gap": "Cannot be verified by screenshot"
+    },
+    {
+      "name": "Track geometry ratio",
+      "state": "blocked",
+      "wave": 1,
+      "verdict": "Measured against Temple Run: 23% vs 60% character-to-lane width",
+      "gap": "Needs track narrowed or runner scaled; touches hazards and collision"
     }
   ]
 }

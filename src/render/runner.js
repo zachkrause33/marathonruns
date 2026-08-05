@@ -174,8 +174,8 @@ MR.Runner = (function () {
       // Deltoids. These are what make the shoulder line read wider than the
       // head; without them the trunk cone tapers into the skull. Flattened
       // hard in Y so they widen the shoulders without raising them.
-      { g: new THREE.SphereGeometry(0.130, 10, 8), c: P.runnerVest, x: -0.236, y: -0.015, sy: 0.78, sz: 0.86 },
-      { g: new THREE.SphereGeometry(0.130, 10, 8), c: P.runnerVest, x: 0.236, y: -0.015, sy: 0.78, sz: 0.86 },
+      { g: new THREE.SphereGeometry(0.138, 10, 8), c: P.runnerVest, x: -0.248, y: -0.020, sy: 0.76, sz: 0.84 },
+      { g: new THREE.SphereGeometry(0.138, 10, 8), c: P.runnerVest, x: 0.248, y: -0.020, sy: 0.76, sz: 0.84 },
       // Shoulder blades: a shallow pair of bumps so the back is not a blank
       // curve. Barely visible individually, but they catch the terminator.
       { g: new THREE.SphereGeometry(0.085, 8, 6), c: P.runnerVest, x: -0.105, y: -0.07, z: -0.135, sz: 0.55 },
@@ -186,11 +186,11 @@ MR.Runner = (function () {
     // Curved panel rather than a flat card so it hugs the vest at this size,
     // and high on the back so it never straddles the shorts line.
     const bib = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.252, 0.252, 0.22, 10, 1, true, Math.PI - 0.62, 1.24),
+      new THREE.CylinderGeometry(0.253, 0.253, 0.185, 10, 1, true, Math.PI - 0.52, 1.04),
       S.toon(0xffffff, 3)
     );
     bib.material.map = raceBib();
-    bib.position.y = -0.035;
+    bib.position.y = -0.030;
     bib.scale.z = 0.72;
     chest.add(bib);
 
@@ -206,7 +206,7 @@ MR.Runner = (function () {
       // those three values is the entire fix. Leaving the nape skin and the
       // hair on the crown gave a light head sitting on a light neck -- one
       // continuous mass with no pinch. Dark / light / saturated reads.
-      { g: new THREE.CylinderGeometry(0.088, 0.100, 0.30, 10), c: P.runnerSkin, y: 0.10 },
+      { g: new THREE.CylinderGeometry(0.097, 0.110, 0.30, 10), c: P.runnerSkin, y: 0.10 },
       { g: new THREE.SphereGeometry(0.25, 16, 12), c: P.runnerSkin, y: 0.38, sy: 1.02, sz: 0.97 },
       // Crown cap for the top of the skull...
       { g: new THREE.SphereGeometry(0.264, 14, 6, 0, Math.PI * 2, 0, Math.PI * 0.42), c: P.runnerHair, y: 0.375 },
@@ -264,7 +264,7 @@ MR.Runner = (function () {
       legs.push({ side, hip, knee, ankle });
 
       // arm
-      const shoulder = pivot(chest, side * 0.236, -0.02, 0);
+      const shoulder = pivot(chest, side * 0.245, -0.025, 0);
       // ZXY so the twist happens along the arm before it is swung and then
       // abducted. With the default XYZ the yaw fired after the outward tilt
       // and dragged the whole arm across the back of the vest.

@@ -127,6 +127,7 @@ MR.HUD = (function () {
             <div class="gaugeFill" style="width:100%"></div>
             <div class="gaugeRec"></div>
           </div>
+          <div class="gaugeLeg">the mark is record pace, ${Pace.pace(K.RECORD_PACE)}/mi</div>
           <p>Clear a gate cleanly and you speed up. Every clean gate in a row buys
              more. Touch one and you lose three quarters of the streak, and the
              pace bleeds back down.</p>
@@ -400,6 +401,7 @@ MR.HUD = (function () {
               + `<div class="v num ${d < 0 ? 'ahead' : 'behind'}">${Pace.delta(d)}</div>`;
       }
       const fd = p.finishTime - K.RECORD_SECONDS;
+      table += '<div class="sep"></div>';
       table += `<div class="v num fin">${K.MARATHON_LABEL}</div>`
             + `<div class="v num fin">${Pace.clock(p.finishTime)}</div>`
             + `<div class="v num fin ${fd < 0 ? 'ahead' : 'behind'}">${Pace.delta(fd)}</div>`;

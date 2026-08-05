@@ -96,9 +96,13 @@ html, body {
 #projCell .val { font-size: 40px; font-weight: 900; line-height: 1.02; }
 #projCell .sub { font-size: 11px; font-weight: 800; opacity: 0.7; margin-top: 1px; }
 
-#projCell.on  .val, #projCell.on  .sub { color: var(--ahead); opacity: 1; }
-#projCell.off .val, #projCell.off .sub { color: var(--behind); opacity: 1; }
+#projCell.on  .val, #projCell.on  .sub { color: var(--ahead); }
+#projCell.off .val, #projCell.off .sub { color: var(--behind); }
 #projCell.on .sub, #projCell.off .sub { opacity: 0.92; }
+
+/* The short label is not an abbreviation for its own sake: at phone widths the
+ * full one wraps and pushes the headline number down a line. */
+.narrowOnly { display: none; }
 
 /* The chip is the plain-language version of the same judgement. It is an
  * outline while the estimate is still moving under the player and a solid
@@ -124,7 +128,7 @@ html, body {
   background: var(--ink);
   border-left: 4px solid var(--accent);
   padding: 8px 14px 9px;
-  min-width: 152px;
+  min-width: 152px; max-width: 178px;
 }
 #engine #streakVal {
   font-size: 36px; font-weight: 900; line-height: 1;
@@ -135,7 +139,10 @@ html, body {
 #engine .val { font-size: 27px; font-weight: 800; line-height: 1.05; }
 #engine .val.ahead { color: var(--ahead); }
 #engine .unit { font-size: 11px; font-weight: 700; opacity: 0.6; margin-left: 3px; }
-#engine .sub { font-size: 9px; font-weight: 700; opacity: 0.55; margin-top: 2px; }
+#engine .sub { font-size: 9px; font-weight: 700; opacity: 0.68; margin-top: 2px; }
+/* The required pace turning red is the moment the record stops being possible;
+ * it must not stay dimmed like an aside. */
+#engine .sub.behind { opacity: 1; }
 
 /* Contact flashes the whole plate, not just the number: the cost is the
  * streak and the speed together, and they live in the same box. */
@@ -158,7 +165,7 @@ html, body {
 }
 
 #why {
-  font-size: 9px; font-weight: 800; letter-spacing: 0.08em;
+  font-size: 9px; font-weight: 800; letter-spacing: 0.08em; line-height: 1.4;
   margin-top: 6px; color: var(--accent);
   transition: opacity 0.3s;
 }
@@ -191,6 +198,7 @@ html, body {
   transition: opacity 0.22s ease-out, transform 0.22s ease-out;
 }
 #toast.show { opacity: 1; transform: none; }
+#toast.noBig #toastRow { display: none; }
 #toast .lab { opacity: 0.85; color: #fffdf5; }
 #toast .big { font-size: 27px; font-weight: 900; line-height: 1.05; }
 #toast .unit { font-size: 11px; font-weight: 700; opacity: 0.6; margin-left: 3px; }
@@ -207,9 +215,12 @@ html, body {
   transform: translateX(-50%);
   width: min(660px, 88vw);
 }
+/* Clearance here is not slack: the ghost marker's cap sticks up out of the
+ * rail and would otherwise strike through this line whenever the ghost is
+ * near the middle of the course. */
 #gapLine {
   display: flex; align-items: baseline; justify-content: center; gap: 9px;
-  margin-bottom: 5px;
+  margin-bottom: 15px;
   text-shadow: 0 1px 3px rgba(14, 18, 48, 0.9);
 }
 #gapLine .lab { opacity: 0.75; }
@@ -312,6 +323,7 @@ html, body {
 .mechPace span { font-size: 17px; opacity: 0.55; }
 .mechPace i { font-size: 11px; font-style: normal; font-weight: 800; opacity: 0.55; }
 .mech .gauge { max-width: 260px; margin: 8px auto 0; }
+.gaugeLeg { font-size: 10px; font-weight: 700; opacity: 0.5; margin-top: 5px; }
 
 .panel .keys {
   margin-top: 18px; font-size: 12px; font-weight: 700;

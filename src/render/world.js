@@ -1012,7 +1012,9 @@ MR.World = (function () {
     // Set pieces: deterministic, biome-specific, and placed by hand rather
     // than rolled, because a bridge tower in the wrong place is not a bridge.
     const structures = [];
-    structures.push({ z: 4, kind: 'arch', label: 'START', sub: course.key, bg: '#1b1633', fg: '#ffe45e' });
+    // Far enough out that the player runs through it rather than starting
+    // underneath it, which is where the camera would never see it at all.
+    structures.push({ z: 30, kind: 'arch', label: 'START', sub: course.key, bg: '#1b1633', fg: '#ffe45e' });
     for (let z = BRIDGE.from + 140; z < BRIDGE.to - 120; z += 235) {
       structures.push({ z, kind: 'tower' });
     }
@@ -1185,8 +1187,9 @@ MR.World = (function () {
           const pool = rivalPool[Math.floor(s.a * rivalPool.length) % rivalPool.length];
           const obj = pool.claim();
           obj.userData.pool = pool;
-          // Just outside the outermost lane but still on the tarmac.
-          obj.position.set(s.side * (3.35 + s.b * 0.75), 0, s.z);
+          // Just outside the outermost lane but still on the tarmac. A hazard
+          // in lane 0 or 2 reaches x = 3.47, so 3.9 is the first honest slot.
+          obj.position.set(s.side * (3.90 + s.b * 0.40), 0, s.z);
           activeRivals.push({
             obj, z: s.z,
             speed: 15 + s.c * 5,   // slower than the player: they get passed

@@ -63,10 +63,9 @@ MR.Ghost = (function () {
   // translucent figure parked there is the one placement that could cost
   // someone a gate.
   const HOME_X = K.LANE_X[0];
-  // Halfway between that lane and the kerb. Derived rather than typed, so the
-  // pending track-narrowing work carries the ghost with it instead of leaving
-  // it running along the verge.
-  const WIDE_X = (HOME_X - K.TRACK_HALF_WIDTH) * 0.5;
+  // Derived rather than typed, so the pending track-narrowing work carries the
+  // ghost's station with it instead of leaving it running along the verge.
+  const LANE_W = K.LANE_X[1] - K.LANE_X[0];
 
   // The ghost never varies -- it IS record pace, by definition. Feeding the
   // rig a constant is also the cheapest way to sell the pass: at the crossover
@@ -282,12 +281,33 @@ MR.Ghost = (function () {
       s.flash = Math.max(0, s.flash - dt / 1.7);
 
       // ---- lateral -------------------------------------------------------
-      // No course-solving: it holds one lane for twenty-six miles. The single
-      // exception is the pass, where the player arriving in its lane would put
-      // two bodies inside each other -- so it eases toward the kerb, over
-      // about a second, and eases back. A drift, not a dodge.
-      const crowded = Math.abs((st.playerX || 0) - HOME_X) < 1.3 && Math.abs(gap) < 30;
-      s.x += ((crowded ? WIDE_X : HOME_X) - s.x) * (1 - Math.pow(0.35, dt));
+      // No course-solving and no reading of gates: for twenty-odd miles the
+      // ghost simply holds the outside lane.
+      //
+      // What it does do is take station for the pass. A record holder would
+      // hold their own line, and with the player out on the opposite lane the
+      // overtake would then happen across the full width of the road -- at
+      // three units from the lens that is a lateral angle of over 60 degrees,
+      // so the moment the record actually changes hands would happen off the
+      // edge of the frame. So inside the last forty units the ghost eases to
+      // the lane off the player's inside shoulder, which puts the pass in the
+      // middle of the screen from any lane and can never end with two bodies
+      // in the same strip of road. It is a fiction, and it is the fiction this
+      // whole feature exists to deliver.
+      const px = st.playerX || 0;
+      const post = Math.abs(px) > 0.6 ? px - Math.sign(px) * LANE_W : HOME_X;
+      const close = 1 - smoothstep(22, 44, Math.abs(gap));
+      s.x += ((HOME_X + (post - HOME_X) * close) - s.x) * (1 - Math.pow(0.30, dt));
+
+      // Belt to that brace. However lazily the drift is easing, and whatever
+      // the player does with the last second before the pass, the two are
+      // never allowed to overlap while they are level. The push is toward the
+      // station rather than away from the current overlap, so it always agrees
+      // with the direction the drift was already going.
+      const clear = LANE_W * 0.72;
+      if (Math.abs(gap) < 9 && Math.abs(s.x - px) < clear) {
+        s.x = px + (post < px ? -clear : clear);
+      }
 
       // ---- body ----------------------------------------------------------
       const camZ = cam.position.z;
@@ -349,8 +369,10 @@ MR.Ghost = (function () {
         _v.set(-e[8], -e[9], -e[10]);
         const d = 6;
         const tan = Math.tan(cam.fov * Math.PI / 360);
-        // Lane 0 is screen-right for this camera, which is where the ghost went.
-        const nx = 0.58, ny = -0.58;
+        // World -x is screen RIGHT for a camera looking down +z, so lane 0 is
+        // the side the ghost went out on. Far enough into the corner to clear
+        // the racing line; the rail and the split card own the bottom middle.
+        const nx = 0.70, ny = -0.62;
         tagRear.scale.set(TAG_SIZE * TAG_ASPECT * pulse * 0.86, TAG_SIZE * pulse * 0.86, 1);
         tagRear.position.copy(cam.position)
           .addScaledVector(_v, d)

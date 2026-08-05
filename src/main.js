@@ -177,7 +177,13 @@
     last = now;
     // Clamp so an alt-tab or a GC pause cannot teleport the runner through a
     // gate; better to lose a little race time than to skip collision.
-    dt = Math.min(dt, 1 / 25);
+    //
+    // The lower bound is not defensive padding: on a slow boot the first rAF
+    // timestamp can predate `last`, giving a NEGATIVE dt. That ran the whole
+    // simulation backwards for a frame -- the race clock opened at -0.75s and
+    // -0.0023 miles, and the camera springs integrated in reverse and threw
+    // the view sideways. Time in this game only ever moves forward.
+    dt = Math.max(0, Math.min(dt, 1 / 25));
 
     fpsAcc += dt; fpsN++;
     if (fpsAcc >= 0.5) { fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; }

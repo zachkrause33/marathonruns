@@ -6,7 +6,7 @@
  * close enough that a lane change is body movement, high enough that the next
  * two gates still read. The first pass sat at 3.0 up / 6.55 back and the
  * runner was a distant sprite at a quarter of frame height; this sits at
- * 2.02 / 4.35 and fills about a third, dropping to 1.68 / 3.73 at full pace.
+ * 2.05 / 4.35 and fills about a third, dropping to 1.64 / 3.73 at full pace.
  *
  * Perceived speed is the hard problem and this file owns all of it. Ground
  * speed only moves 21.8 -> 27.7 units/sec across the whole race, because

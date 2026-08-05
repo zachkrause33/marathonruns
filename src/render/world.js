@@ -52,10 +52,11 @@ MR.World = (function () {
   const LANE = K.LANE_X[1] - K.LANE_X[0];
   const LANE_FIT = LANE / 2.35;
 
-  // The widest point of any hazard, measured from its lane centre: the duck
-  // frame's foot. Anything that has to stand clear of the lanes -- a rival
-  // runner, a set piece -- starts from here rather than from a literal.
-  const HAZARD_HALF = 1.41 * LANE_FIT;
+  // The widest point of any hazard, measured from its lane centre: the DUCK
+  // frame's foot, 0.50 wide at 1.20 out. Anything that has to stand clear of
+  // the lanes -- a rival runner, a set piece -- starts from here rather than
+  // from a literal that goes stale the next time the track is retuned.
+  const HAZARD_HALF = 1.20 * LANE_FIT + 0.25;
 
   // ---- biome palettes ---------------------------------------------------
   // `edge` names the roadside furniture the road tile wears; `mix` weights the
@@ -353,6 +354,15 @@ MR.World = (function () {
   function hplane(w, h) {
     return new THREE.PlaneGeometry(w * LANE_FIT, h);
   }
+  /**
+   * A hazard part that keeps its own size and only moves with the lane. For
+   * the furniture -- posts, feet, lamps -- which are objects standing at a
+   * place rather than spans across it, and which read worse the thinner they
+   * get.
+   */
+  function bxAt(w, h, d, x, y, z, color, rx, ry, rz) {
+    return bx(w, h, d, (x || 0) * LANE_FIT, y, z, color, rx, ry, rz);
+  }
 
   /** Vertex-coloured toon material -- the workhorse for merged props. */
   function vtoon(steps) {
@@ -511,11 +521,18 @@ MR.World = (function () {
     const paintGeo = (function () {
       const parts = [];
       const flat = -Math.PI / 2;
+      // Carriageway edge lines, on the outer lane boundary rather than at the
+      // tarmac edge. The shoulder beyond them carries the kerb and the rival
+      // runners; painting it as road instead of as shoulder is what made three
+      // lanes read as one enormous one.
       for (const sx of [-1, 1]) {
         parts.push(part(new THREE.PlaneGeometry(0.26, TILE), 0xf2f4ff,
-          sx * (K.TRACK_HALF_WIDTH - 0.16), 0.006, 0, flat));
+          sx * (LANE * 1.5 + 0.13), 0.006, 0, flat));
       }
-      for (const lx of [-1.175, 1.175]) {
+      // Dividers sit on the lane boundaries, so they move with LANE_W. The
+      // stripe itself does not scale -- road paint is road paint whatever the
+      // lane is, and a hairline dash stops reading at 60 units.
+      for (const lx of [-LANE / 2, LANE / 2]) {
         parts.push(part(new THREE.PlaneGeometry(0.16, TILE * 0.52), 0xfff6d8, lx, 0.006, 0, flat));
       }
       return merge(parts);
@@ -697,7 +714,7 @@ MR.World = (function () {
      * which is precisely when the player needs to see the hazard instead.
      */
     const matGeo = (function () {
-      const g = new THREE.PlaneGeometry(1.95, 16, 1, 16);
+      const g = new THREE.PlaneGeometry(1.95 * LANE_FIT, 16, 1, 16);
       const pos = g.attributes.position;
       const col = new Float32Array(pos.count * 4);
       for (let i = 0; i < pos.count; i++) {
@@ -730,16 +747,16 @@ MR.World = (function () {
     // fog -- a light band on a dark road at 100 units is still a light band.
     // Nothing here rises past 0.80 or reaches past halfZ 0.52.
     const jumpGeo = merge([
-      bx(2.24, 0.66, 1.04, 0, 0.33, 0, 0xffb020),
-      bx(2.34, 0.14, 1.04, 0, 0.73, 0, 0xfff2e0),
-      bx(0.30, 0.80, 1.04, -1.16, 0.40, 0, 0xe07f12),
-      bx(0.30, 0.80, 1.04, 1.16, 0.40, 0, 0xe07f12),
+      hbx(2.24, 0.66, 1.04, 0, 0.33, 0, 0xffb020),
+      hbx(2.34, 0.14, 1.04, 0, 0.73, 0, 0xfff2e0),
+      hbx(0.30, 0.80, 1.04, -1.16, 0.40, 0, 0xe07f12),
+      hbx(0.30, 0.80, 1.04, 1.16, 0.40, 0, 0xe07f12),
     ]);
 
     const jumpPool = Pool(function () {
       const g = new THREE.Group();
       g.add(S.outlined(jumpGeo, mats.propLit, S.INK.hazard));
-      const face = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 0.62), faceMat.jump);
+      const face = new THREE.Mesh(hplane(2.2, 0.62), faceMat.jump);
       face.position.set(0, 0.36, -0.531);
       face.rotation.y = Math.PI;
       g.add(face);
@@ -760,24 +777,27 @@ MR.World = (function () {
      * ever be is a sliver of post.
      */
     const duckGeo = merge([
-      bx(2.30, 0.30, 0.60, 0, 1.56, 0, 0x37d6ff),
-      bx(2.36, 0.12, 0.62, 0, 1.77, 0, 0xd8f8ff),
-      bx(0.26, 3.30, 0.30, -1.20, 1.65, 0, 0x37d6ff),
-      bx(0.26, 3.30, 0.30, 1.20, 1.65, 0, 0x37d6ff),
-      bx(0.30, 0.26, 0.34, -1.20, 2.35, 0, 0x0d2b36),
-      bx(0.30, 0.26, 0.34, 1.20, 2.35, 0, 0x0d2b36),
-      bx(0.30, 0.26, 0.34, -1.20, 2.90, 0, 0x0d2b36),
-      bx(0.30, 0.26, 0.34, 1.20, 2.90, 0, 0x0d2b36),
-      bx(0.40, 0.22, 0.40, -1.20, 3.41, 0, 0xd8f8ff),
-      bx(0.40, 0.22, 0.40, 1.20, 3.41, 0, 0xd8f8ff),
-      bx(0.50, 0.22, 0.50, -1.20, 0.11, 0, 0x2b2f52),
-      bx(0.50, 0.22, 0.50, 1.20, 0.11, 0, 0x2b2f52),
+      hbx(2.30, 0.30, 0.60, 0, 1.56, 0, 0x37d6ff),
+      hbx(2.36, 0.12, 0.62, 0, 1.77, 0, 0xd8f8ff),
+      // The standards keep their own thickness -- only where they stand moves.
+      // Scaling a 0.26 post down with the lane would have left the tall cyan
+      // verticals, which are the whole distance read on a DUCK, as hairlines.
+      bxAt(0.26, 3.30, 0.30, -1.20, 1.65, 0, 0x37d6ff),
+      bxAt(0.26, 3.30, 0.30, 1.20, 1.65, 0, 0x37d6ff),
+      bxAt(0.30, 0.26, 0.34, -1.20, 2.35, 0, 0x0d2b36),
+      bxAt(0.30, 0.26, 0.34, 1.20, 2.35, 0, 0x0d2b36),
+      bxAt(0.30, 0.26, 0.34, -1.20, 2.90, 0, 0x0d2b36),
+      bxAt(0.30, 0.26, 0.34, 1.20, 2.90, 0, 0x0d2b36),
+      bxAt(0.40, 0.22, 0.40, -1.20, 3.41, 0, 0xd8f8ff),
+      bxAt(0.40, 0.22, 0.40, 1.20, 3.41, 0, 0xd8f8ff),
+      bxAt(0.50, 0.22, 0.50, -1.20, 0.11, 0, 0x2b2f52),
+      bxAt(0.50, 0.22, 0.50, 1.20, 0.11, 0, 0x2b2f52),
     ]);
 
     const duckPool = Pool(function () {
       const g = new THREE.Group();
       g.add(S.outlined(duckGeo, mats.propLit, S.INK.hazard));
-      const face = new THREE.Mesh(new THREE.PlaneGeometry(2.26, 0.40), faceMat.duck);
+      const face = new THREE.Mesh(hplane(2.26, 0.40), faceMat.duck);
       face.position.set(0, 1.62, -0.302);
       face.rotation.y = Math.PI;
       g.add(face);
@@ -789,19 +809,19 @@ MR.World = (function () {
     // feature is either a horizontal band or sits at the front face, which the
     // scale leaves in place.
     const blockGeo = merge([
-      bx(2.10, 2.30, 1.30, 0, 1.50, 0, 0xff3b6b),
-      bx(2.20, 0.44, 1.30, 0, 0.22, 0, 0x2b2f52),
-      bx(2.24, 0.26, 1.34, 0, 2.24, 0, 0xfff2e0),
-      bx(2.20, 0.20, 1.34, 0, 2.70, 0, 0xd42a55),
-      bx(0.34, 0.34, 0.34, -0.72, 2.92, 0, 0xffe45e),
-      bx(0.34, 0.34, 0.34, 0.72, 2.92, 0, 0xffe45e),
+      hbx(2.10, 2.30, 1.30, 0, 1.50, 0, 0xff3b6b),
+      hbx(2.20, 0.44, 1.30, 0, 0.22, 0, 0x2b2f52),
+      hbx(2.24, 0.26, 1.34, 0, 2.24, 0, 0xfff2e0),
+      hbx(2.20, 0.20, 1.34, 0, 2.70, 0, 0xd42a55),
+      bxAt(0.34, 0.34, 0.34, -0.72, 2.92, 0, 0xffe45e),
+      bxAt(0.34, 0.34, 0.34, 0.72, 2.92, 0, 0xffe45e),
     ]);
 
     const blockPool = Pool(function () {
       const g = new THREE.Group();
       const body = S.outlined(blockGeo, mats.propLit, S.INK.hazard);
       g.add(body);
-      const face = new THREE.Mesh(new THREE.PlaneGeometry(2.06, 1.9), faceMat.block);
+      const face = new THREE.Mesh(hplane(2.06, 1.9), faceMat.block);
       face.position.set(0, 1.42, -0.661);
       face.rotation.y = Math.PI;
       g.add(face);
@@ -927,11 +947,22 @@ MR.World = (function () {
     }, group));
 
     /**
-     * Rival runners. They live on the road but outside the three lanes, so the
-     * player can be passing bodies all race without any chance of a phantom
-     * collision. They drift forward at a slower pace than the player, which is
-     * what makes overtaking read as overtaking rather than as scenery.
+     * Rival runners. They live on the shoulder, outside the three lanes, so
+     * the player can be passing bodies all race without any chance of a
+     * phantom collision. They drift forward at a slower pace than the player,
+     * which is what makes overtaking read as overtaking rather than as scenery.
+     *
+     * Where they run is derived, never a literal: the inner limit is the
+     * widest point of a hazard in the outer lane, the outer limit is the
+     * tarmac. RIVAL_YIELD is the other half of the answer -- see the pass
+     * handling in update().
      */
+    const RIVAL_HALF = 0.40;                                  // arm to arm
+    const RIVAL_IN = LANE + HAZARD_HALF + RIVAL_HALF;         // nearest line
+    const RIVAL_OUT = Math.max(RIVAL_IN, K.TRACK_HALF_WIDTH - RIVAL_HALF);
+    const RIVAL_YIELD = 0.62;    // extra fraction of x at the closest approach
+    const RIVAL_YIELD_Z = 30;    // over how much ground the yield opens up
+
     function rivalGeo(vest, skin, shorts) {
       return merge([
         bx(0.24, 0.14, 0.34, -0.16, 0.07, 0.02, 0xfff2e0),
@@ -1093,17 +1124,21 @@ MR.World = (function () {
     // A banner is a gantry, not a floating card: legs, a truss, a lit header
     // and a stripe painted across the road so the moment of passing it is
     // marked on the ground as well as overhead.
+    // A gantry straddles the road, so its legs are pinned a fixed step outside
+    // the kerb rather than to a literal. Narrow the track and the banner comes
+    // in with it, instead of being left standing out among the spectators.
+    const GANTRY = K.TRACK_HALF_WIDTH + 1.2;
     const bannerFrameGeo = (function () {
       const parts = [];
       for (const sx of [-1, 1]) {
-        parts.push(bx(0.42, 6.0, 0.42, sx * 5.6, 3.0, 0, 0x2b2f52));
-        parts.push(bx(0.90, 0.30, 0.90, sx * 5.6, 0.15, 0, 0x1b1633));
-        parts.push(bx(0.30, 0.30, 1.8, sx * 5.6, 5.4, 0, 0x2b2f52, 0, 0, 0));
+        parts.push(bx(0.42, 6.0, 0.42, sx * GANTRY, 3.0, 0, 0x2b2f52));
+        parts.push(bx(0.90, 0.30, 0.90, sx * GANTRY, 0.15, 0, 0x1b1633));
+        parts.push(bx(0.30, 0.30, 1.8, sx * GANTRY, 5.4, 0, 0x2b2f52, 0, 0, 0));
       }
-      parts.push(bx(11.6, 0.40, 0.40, 0, 5.95, 0, 0x2b2f52));
-      parts.push(bx(11.6, 0.30, 0.30, 0, 3.65, 0, 0x2b2f52));
+      parts.push(bx(GANTRY * 2 + 0.4, 0.40, 0.40, 0, 5.95, 0, 0x2b2f52));
+      parts.push(bx(GANTRY * 2 + 0.4, 0.30, 0.30, 0, 3.65, 0, 0x2b2f52));
       for (let i = -4; i <= 4; i++) {
-        parts.push(bx(0.16, 2.4, 0.16, i * 1.25, 4.8, 0, 0x3a4570, 0, 0, i % 2 ? 0.45 : -0.45));
+        parts.push(bx(0.16, 2.4, 0.16, i * (GANTRY - 0.6) / 4, 4.8, 0, 0x3a4570, 0, 0, i % 2 ? 0.45 : -0.45));
       }
       parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, 0.7), 0xfffdf5, 0, 0.011, 0, -Math.PI / 2));
       return merge(parts);
@@ -1113,10 +1148,10 @@ MR.World = (function () {
       const g = new THREE.Group();
       g.add(S.outlined(bannerFrameGeo, mats.prop, S.INK.banner));
       const mat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-      const panel = new THREE.Mesh(new THREE.PlaneGeometry(10.6, 2.1), mat);
+      const panel = new THREE.Mesh(new THREE.PlaneGeometry(GANTRY * 2 - 0.6, 2.1), mat);
       panel.position.y = 4.78; panel.rotation.y = Math.PI;
       g.add(panel);
-      const back = new THREE.Mesh(new THREE.PlaneGeometry(10.6, 2.1), mat);
+      const back = new THREE.Mesh(new THREE.PlaneGeometry(GANTRY * 2 - 0.6, 2.1), mat);
       back.position.y = 4.78;
       g.add(back);
       g.userData.panel = panel;
@@ -1126,29 +1161,30 @@ MR.World = (function () {
 
     // Start and finish get a heavier arch with a checker band.
     const checkTex = checkerTexture();
+    const ARCH = K.TRACK_HALF_WIDTH + 3.0;   // heavier gantry, set further back
     const archGeo = merge([
-      bx(1.5, 9.0, 1.5, -7.4, 4.5, 0, 0xff3b6b),
-      bx(1.5, 9.0, 1.5, 7.4, 4.5, 0, 0xff3b6b),
-      bx(2.3, 0.6, 2.3, -7.4, 0.3, 0, 0x1b1633),
-      bx(2.3, 0.6, 2.3, 7.4, 0.3, 0, 0x1b1633),
-      bx(17.2, 1.3, 1.6, 0, 8.7, 0, 0xff3b6b),
-      bx(17.2, 0.5, 1.2, 0, 6.2, 0, 0xd42a55),
-      bx(0.9, 4.2, 0.9, -6.2, 10.9, 0, 0x2b2f52),
-      bx(0.9, 4.2, 0.9, 6.2, 10.9, 0, 0x2b2f52),
-      bx(2.6, 1.8, 0.12, -5.0, 12.4, 0, 0xffe45e),
-      bx(2.6, 1.8, 0.12, 5.0, 12.4, 0, 0xffe45e),
+      bx(1.5, 9.0, 1.5, -ARCH, 4.5, 0, 0xff3b6b),
+      bx(1.5, 9.0, 1.5, ARCH, 4.5, 0, 0xff3b6b),
+      bx(2.3, 0.6, 2.3, -ARCH, 0.3, 0, 0x1b1633),
+      bx(2.3, 0.6, 2.3, ARCH, 0.3, 0, 0x1b1633),
+      bx(ARCH * 2 + 2.4, 1.3, 1.6, 0, 8.7, 0, 0xff3b6b),
+      bx(ARCH * 2 + 2.4, 0.5, 1.2, 0, 6.2, 0, 0xd42a55),
+      bx(0.9, 4.2, 0.9, -(ARCH - 1.2), 10.9, 0, 0x2b2f52),
+      bx(0.9, 4.2, 0.9, ARCH - 1.2, 10.9, 0, 0x2b2f52),
+      bx(2.6, 1.8, 0.12, -(ARCH - 2.4), 12.4, 0, 0xffe45e),
+      bx(2.6, 1.8, 0.12, ARCH - 2.4, 12.4, 0, 0xffe45e),
     ]);
     const archPool = Pool(function () {
       const g = new THREE.Group();
       g.add(S.outlined(archGeo, mats.prop, S.INK.banner));
       const mat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-      const panel = new THREE.Mesh(new THREE.PlaneGeometry(15.4, 2.4), mat);
+      const panel = new THREE.Mesh(new THREE.PlaneGeometry(ARCH * 2 + 0.6, 2.4), mat);
       panel.position.y = 7.45; panel.rotation.y = Math.PI;
       g.add(panel);
-      const back = new THREE.Mesh(new THREE.PlaneGeometry(15.4, 2.4), mat);
+      const back = new THREE.Mesh(new THREE.PlaneGeometry(ARCH * 2 + 0.6, 2.4), mat);
       back.position.y = 7.45;
       g.add(back);
-      const band = new THREE.Mesh(new THREE.PlaneGeometry(15.4, 0.55), new THREE.MeshBasicMaterial({ map: checkTex }));
+      const band = new THREE.Mesh(new THREE.PlaneGeometry(ARCH * 2 + 0.6, 0.55), new THREE.MeshBasicMaterial({ map: checkTex }));
       band.position.set(0, 5.95, 0.1); band.rotation.y = Math.PI;
       g.add(band);
       // Checker laid across the road: the line you actually cross.
@@ -1392,11 +1428,10 @@ MR.World = (function () {
           const pool = rivalPool[Math.floor(s.a * rivalPool.length) % rivalPool.length];
           const obj = pool.claim();
           obj.userData.pool = pool;
-          // Just outside the outermost lane but still on the tarmac. A hazard
-          // in lane 0 or 2 reaches x = 3.47, so 3.9 is the first honest slot.
-          obj.position.set(s.side * (3.90 + s.b * 0.40), 0, s.z);
+          const baseX = s.side * (RIVAL_IN + s.b * (RIVAL_OUT - RIVAL_IN));
+          obj.position.set(baseX, 0, s.z);
           activeRivals.push({
-            obj, z: s.z,
+            obj, z: s.z, baseX,
             speed: 15 + s.c * 5,   // slower than the player: they get passed
             phase: s.a * 6.3,
           });
@@ -1449,6 +1484,15 @@ MR.World = (function () {
         const r = activeRivals[i];
         r.z += r.speed * (1 / 60);
         r.obj.position.z = r.z;
+        // Yield. The chase camera trails barely four units, so a rival holding
+        // its own line through a pass ends up a stride from the lens, where a
+        // 1.9-unit body covers a third of the frame -- and nothing in this file
+        // may ever hide an upcoming gate, because one contact costs the record.
+        // Road races solve it the same way and it costs nothing to borrow: the
+        // runner being caught gives way, so the closest approach is also the
+        // widest point and the pass happens out beyond the kerb.
+        const close = 1 - Math.min(1, Math.abs(r.z - z) / RIVAL_YIELD_Z);
+        r.obj.position.x = r.baseX * (1 + close * close * RIVAL_YIELD);
         // Cheap run cycle: a bob and a matching roll sell stride at speed.
         const ph = now * 5.5 + r.phase;
         r.obj.position.y = Math.abs(Math.sin(ph)) * 0.09;

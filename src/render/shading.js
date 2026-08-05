@@ -639,12 +639,16 @@ MR.shading = (function () {
    * carries the shape; rgb is left white so the material's own `color` is the
    * only thing tinting it.
    *
-   * The profile is squared rather than linear -- a linear radial gradient has
-   * a soft, evenly-thinning edge that reads as a smudge, while squaring holds
-   * a dense core out to about half the radius and then lets go, which is the
-   * shape an occluder actually casts and the shape the references draw. The
-   * canvas is only 96px because it is never seen larger than a couple of
-   * hundred screen pixels and it is magnified with linear filtering.
+   * The profile is a SOLID CORE with a smooth rim, not a plain radial
+   * gradient. A linear or squared falloff thins evenly from the middle and
+   * reads as a smudge under the character; what the references draw is an
+   * almost flat dark ellipse that gives up quickly at its edge, because that
+   * is what a body-sized occluder close to the ground actually casts. Held
+   * full out to 30% of the radius, then smoothstepped to nothing.
+   *
+   * The canvas is only 96px: it is never seen larger than a couple of hundred
+   * screen pixels and it is magnified with linear filtering, so the smooth
+   * part of the profile costs nothing to resolve.
    */
   function blobTexture() {
     if (blobTex) return blobTex;
@@ -659,10 +663,11 @@ MR.shading = (function () {
       for (let x = 0; x < N; x++) {
         const dx = (x - c) / c, dy = (y - c) / c;
         const r = Math.sqrt(dx * dx + dy * dy);
-        const a = Math.max(0, 1 - r);
+        const u = Math.max(0, Math.min(1, (r - 0.30) / 0.70));
+        const a = 1 - u * u * (3 - 2 * u);
         const i = (y * N + x) * 4;
         d[i] = d[i + 1] = d[i + 2] = 255;
-        d[i + 3] = Math.round(a * a * 255);
+        d[i + 3] = Math.round(a * 255);
       }
     }
     g.putImageData(img, 0, 0);

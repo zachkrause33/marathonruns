@@ -671,6 +671,10 @@ MR.K = (function () {
 
   const UNITS_PER_MILE = 240;
 
+  // Lateral spacing between lane centres. See the track geometry block below
+  // for why this number and not another.
+  const LANE_W = 1.70;
+
   return {
     MARATHON_MILES,
     MARATHON_LABEL: '26.2',
@@ -695,13 +699,35 @@ MR.K = (function () {
     UNITS_PER_MILE,
     TOTAL_UNITS: MARATHON_MILES * UNITS_PER_MILE,  // 6292.5
 
-    // Track geometry
-    LANE_X: [-2.35, 0, 2.35],
+    // Track geometry. LANE_W is the seed the whole track is cut from: the lane
+    // centres, the tarmac, and every hazard width in world.js derive from it.
+    //
+    // It is set by the character, not by taste. The runner measures 0.78 world
+    // units across the shoulders (deltoid to deltoid, live and posed -- see the
+    // trunk in render/runner.js), and the reference runners in Subway Surfers
+    // and Sonic occupy roughly 40-50% of their lane. The old 2.35 put ours at
+    // 33%, which is why the road read as a six-lane motorway with a small
+    // figure lost in the middle of it: at that ratio the lane is not a lane,
+    // it is a field the runner happens to be standing in.
+    LANE_W,
+    LANE_X: [-LANE_W, 0, LANE_W],
     LANE_COUNT: 3,
-    TRACK_HALF_WIDTH: 4.4,
+    // Three lanes plus a fixed shoulder each side. The shoulder is deliberately
+    // NOT a fraction of the lane: what it has to hold -- the kerb, the outermost
+    // hazard foot and a rival runner wide enough to be passed safely -- are all
+    // real-scale objects that do not shrink when the lane does. 1.2 is the width
+    // of one runner plus the hazard overhang, which is exactly its job.
+    TRACK_HALF_WIDTH: LANE_W * 1.5 + 1.2,
 
-    // Player motion
-    LANE_CHANGE_TIME: 0.16,         // real seconds, snappy on purpose
+    // Player motion.
+    // Shortened with the lane rather than left alone. A lane change reads as
+    // weight through the body lean and the camera bank, and both are driven by
+    // lateral SPEED (player.js derives lean from vx, camera.js from its own
+    // spring velocity) -- so holding 0.16s over a shorter hop would have
+    // quietly turned a whip into a drift. Scaled by the square root, not
+    // linearly: full proportionality lands at 0.12s, which is seven frames and
+    // starts to read as a teleport rather than a movement.
+    LANE_CHANGE_TIME: 0.16 * Math.sqrt(LANE_W / 2.35),
     JUMP_HEIGHT: 2.05,
     JUMP_TIME: 0.62,
     DUCK_TIME: 0.55,
@@ -1250,14 +1276,19 @@ MR.shading = (function () {
     //
     // Mid-value on purpose: the road sits around 0x50557d, so anything much
     // darker than these merges with it at distance once the haze lands.
+    // Kept light for their chroma: a facade is a vertical face, so it lives
+    // in the ramp's dark band and takes only half the hemisphere fill. A tint
+    // chosen by eye at full brightness lands about 40% darker than that once
+    // it is on the wall, and the saturated mid-tones that looked right in a
+    // swatch turned into slabs.
     building: [
-      0xff8a6e,  // coral
-      0x4fc4d8,  // teal
-      0xffc247,  // mustard
-      0xa98ae8,  // violet
-      0x5fd08c,  // mint
+      0xff9c7a,  // coral
+      0x6fd8e8,  // teal
+      0xffcf62,  // mustard
+      0xc0a4f4,  // violet
+      0x7ee0a4,  // mint
       0xfff1dc,  // cream
-      0xff9fc4,  // candy pink
+      0xffabcb,  // candy pink
       0xd8e6f5,  // pale steel
     ],
     accent: 0xffe45e,
@@ -1435,7 +1466,15 @@ MR.shading = (function () {
   // materials mix fog AFTER the colour-space conversion. Matching that is what
   // keeps an outline fading into exactly the same haze as the surface it wraps
   // rather than into a darker version of it.
-  const FOG_NEAR = 26;
+  // The curve matters as much as the range. At near=26 the haze started
+  // eating colour out of a building only 30 units away, which is why the
+  // midground used to read as grey no matter what tint it was given; the
+  // references keep everything in the first third of the depth fully
+  // saturated and then let go quickly. Pushing near out to 45 while leaving
+  // far alone does exactly that -- the near field is crisp, and the fade over
+  // the remaining 145 units is steeper than it was, so distance reads harder
+  // than before rather than softer.
+  const FOG_NEAR = 45;
   const FOG_FAR = 190;
 
   const fogU = {
@@ -1924,36 +1963,60 @@ MR.shading = (function () {
    * keep the darkest ramp band from closing up: between them they are what
    * gives shaded faces a blue cast rather than a grey one.
    *
-   * The BALANCE between the three is the other half of losing the outlines.
-   * Fill light is what collapses a banded ramp: every unit of ambient adds
-   * equally to the lit face and the shaded one, so it shrinks the ratio
-   * between them, and the old rig spent 1.25 of its ~3.3 units of exposure on
-   * fill. That is fine under a black rim -- the rim was doing the separating.
-   * With no rim it read as unshaded. Fill is down by a third and the key is up
-   * to match, so total exposure lands within a couple of percent of where it
-   * was while the light/shade step is visibly wider.
+   * The SHAPE OF THE FILL is the other half of losing the outlines, and it is
+   * where most of the work went. Fill light is what collapses a banded ramp:
+   * a unit of ambient adds equally to the lit face and the shaded one, so it
+   * shrinks the ratio between them. The old rig spent 1.25 of its ~3.3 units
+   * of exposure on flat fill -- fine under a black rim, because the rim was
+   * doing the separating, but with no rim a building read as one flat slab of
+   * colour whichever way its faces pointed.
    *
-   * The same move is most of what puts colour back in the frame: a cool fill
-   * that large washes every camera-facing surface toward the same pale blue,
-   * which is exactly the "everything is a lavender-grey slab" the references
-   * do not have. Less fill, warmer key, and a coral facade stays coral.
+   * So the flat ambient is gone, replaced by a hemisphere. That is not a
+   * cosmetic swap. A hemisphere's contribution falls off with normal.y, which
+   * means:
+   *
+   *   - the road, the shoulder and every prop's top face take the full sky
+   *     fill on top of a full key, and stay bright and saturated;
+   *   - the vertical faces around them -- buildings, walls, barriers, and the
+   *     runner's own back -- take roughly half of it;
+   *
+   * and the gap between those two is the play surface separating from its
+   * surroundings without a single colour being changed. It is also free
+   * ambient occlusion: undersides go to the warm ground term instead of the
+   * cool sky one, so a hazard's overhang darkens and warms on its own.
+   *
+   * Net effect on a plain box, top face against camera-facing face: the two
+   * used to sit at a display ratio of about 0.78 -- a step you had to look
+   * for. They now sit near 0.66, which reads as shading. Total exposure on a
+   * flat-lit road is within 2% of where it was, so nothing else has to move.
    */
   function lights(scene) {
     // Along skyDome's sunDir so the drawn sun and the shading agree, but
     // lifted: at the sun's true 14-degree elevation the terminator ran across
     // the runner's waist and the legs went dark.
-    const key = new THREE.DirectionalLight(0xfff2d8, 2.42);
+    const key = new THREE.DirectionalLight(0xfff2d8, 2.30);
     key.position.set(7.0, 9.0, 11.0);
 
     // Aimed back down the camera axis on purpose: the player is seen from
     // behind, so without this the one surface that matters most -- the
-    // runner's back -- would sit in the ramp's darkest band all race.
-    const bounce = new THREE.DirectionalLight(0x86aeff, 0.58);
+    // runner's back -- would sit in the ramp's darkest band for the whole
+    // race. Half its old strength; the hemisphere took over the rest, and
+    // this is now only doing the job the hemisphere cannot, which is putting
+    // SOME light on a surface pointing straight at the camera.
+    const bounce = new THREE.DirectionalLight(0x86aeff, 0.42);
     bounce.position.set(-6, 2, -9);
 
-    const amb = new THREE.AmbientLight(0xa8c4ff, 0.34);
+    // Cool sky over a warm ground, which is the whole trick: it puts a
+    // warm/cool split across every curved or angled surface for the price of
+    // one light, and that split is most of what makes the references' shading
+    // read as coloured rather than as grey applied at different strengths.
+    const hemi = new THREE.HemisphereLight(0xbcd8ff, 0x4a4030, 0.55);
 
-    scene.add(key, bounce, amb);
+    // Kept, but only as a floor -- just enough that nothing in the frame can
+    // reach zero and turn into a black hole in a saturated picture.
+    const amb = new THREE.AmbientLight(0xa8c4ff, 0.10);
+
+    scene.add(key, bounce, hemi, amb);
 
     // Haze range is a look decision, so it lives with the rest of the look.
     // main.js owns the fog COLOUR (it cross-fades per biome); the distances
@@ -1974,7 +2037,7 @@ MR.shading = (function () {
     };
     syncFog(scene.fog);
 
-    return { key, bounce, amb };
+    return { key, bounce, hemi, amb };
   }
 
   return {
@@ -2456,6 +2519,25 @@ MR.World = (function () {
   const BEHIND = 34;     // release distance behind
   const TILE = 24;       // road tile length
 
+  // ---- lane fit ---------------------------------------------------------
+  // Every hazard below was drawn to fill a lane, and was authored against the
+  // 2.35-unit lane the track used to have. LANE_FIT rescales those numbers to
+  // whatever K.LANE_W is now, so a hazard stays exactly as wide *relative to
+  // its lane* as it was drawn and a track retune can never leave one hanging
+  // over its neighbour.
+  //
+  // It touches x ONLY. The y and z extents are what MR.Collision.BOX records
+  // and audits against the jump arc and the duck pose; moving either would
+  // break an agreement this file cannot see. Nothing here may change a height.
+  const LANE = K.LANE_X[1] - K.LANE_X[0];
+  const LANE_FIT = LANE / 2.35;
+
+  // The widest point of any hazard, measured from its lane centre: the DUCK
+  // frame's foot, 0.50 wide at 1.20 out. Anything that has to stand clear of
+  // the lanes -- a rival runner, a set piece -- starts from here rather than
+  // from a literal that goes stale the next time the track is retuned.
+  const HAZARD_HALF = 1.20 * LANE_FIT + 0.25;
+
   // ---- biome palettes ---------------------------------------------------
   // `edge` names the roadside furniture the road tile wears; `mix` weights the
   // roadside prop lottery. Together they are what distinguishes a biome, the
@@ -2740,6 +2822,28 @@ MR.World = (function () {
     return part(new THREE.ConeGeometry(r, h, seg), color, x, y, z);
   }
 
+  /**
+   * bx() for hazard parts. Width and lateral offset follow the lane; height
+   * and depth are passed straight through, because those are the numbers
+   * MR.Collision.BOX mirrors and this file is not allowed to move them.
+   */
+  function hbx(w, h, d, x, y, z, color, rx, ry, rz) {
+    return bx(w * LANE_FIT, h, d, (x || 0) * LANE_FIT, y, z, color, rx, ry, rz);
+  }
+  /** Flat quad sized to the lane, for the striped faces hazards turn forward. */
+  function hplane(w, h) {
+    return new THREE.PlaneGeometry(w * LANE_FIT, h);
+  }
+  /**
+   * A hazard part that keeps its own size and only moves with the lane. For
+   * the furniture -- posts, feet, lamps -- which are objects standing at a
+   * place rather than spans across it, and which read worse the thinner they
+   * get.
+   */
+  function bxAt(w, h, d, x, y, z, color, rx, ry, rz) {
+    return bx(w, h, d, (x || 0) * LANE_FIT, y, z, color, rx, ry, rz);
+  }
+
   /** Vertex-coloured toon material -- the workhorse for merged props. */
   function vtoon(steps) {
     const m = S.toon(0xffffff, steps || 2);
@@ -2897,11 +3001,18 @@ MR.World = (function () {
     const paintGeo = (function () {
       const parts = [];
       const flat = -Math.PI / 2;
+      // Carriageway edge lines, on the outer lane boundary rather than at the
+      // tarmac edge. The shoulder beyond them carries the kerb and the rival
+      // runners; painting it as road instead of as shoulder is what made three
+      // lanes read as one enormous one.
       for (const sx of [-1, 1]) {
         parts.push(part(new THREE.PlaneGeometry(0.26, TILE), 0xf2f4ff,
-          sx * (K.TRACK_HALF_WIDTH - 0.16), 0.006, 0, flat));
+          sx * (LANE * 1.5 + 0.13), 0.006, 0, flat));
       }
-      for (const lx of [-1.175, 1.175]) {
+      // Dividers sit on the lane boundaries, so they move with LANE_W. The
+      // stripe itself does not scale -- road paint is road paint whatever the
+      // lane is, and a hairline dash stops reading at 60 units.
+      for (const lx of [-LANE / 2, LANE / 2]) {
         parts.push(part(new THREE.PlaneGeometry(0.16, TILE * 0.52), 0xfff6d8, lx, 0.006, 0, flat));
       }
       return merge(parts);
@@ -3083,7 +3194,7 @@ MR.World = (function () {
      * which is precisely when the player needs to see the hazard instead.
      */
     const matGeo = (function () {
-      const g = new THREE.PlaneGeometry(1.95, 16, 1, 16);
+      const g = new THREE.PlaneGeometry(1.95 * LANE_FIT, 16, 1, 16);
       const pos = g.attributes.position;
       const col = new Float32Array(pos.count * 4);
       for (let i = 0; i < pos.count; i++) {
@@ -3116,16 +3227,16 @@ MR.World = (function () {
     // fog -- a light band on a dark road at 100 units is still a light band.
     // Nothing here rises past 0.80 or reaches past halfZ 0.52.
     const jumpGeo = merge([
-      bx(2.24, 0.66, 1.04, 0, 0.33, 0, 0xffb020),
-      bx(2.34, 0.14, 1.04, 0, 0.73, 0, 0xfff2e0),
-      bx(0.30, 0.80, 1.04, -1.16, 0.40, 0, 0xe07f12),
-      bx(0.30, 0.80, 1.04, 1.16, 0.40, 0, 0xe07f12),
+      hbx(2.24, 0.66, 1.04, 0, 0.33, 0, 0xffb020),
+      hbx(2.34, 0.14, 1.04, 0, 0.73, 0, 0xfff2e0),
+      hbx(0.30, 0.80, 1.04, -1.16, 0.40, 0, 0xe07f12),
+      hbx(0.30, 0.80, 1.04, 1.16, 0.40, 0, 0xe07f12),
     ]);
 
     const jumpPool = Pool(function () {
       const g = new THREE.Group();
       g.add(S.outlined(jumpGeo, mats.propLit, S.INK.hazard));
-      const face = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 0.62), faceMat.jump);
+      const face = new THREE.Mesh(hplane(2.2, 0.62), faceMat.jump);
       face.position.set(0, 0.36, -0.531);
       face.rotation.y = Math.PI;
       g.add(face);
@@ -3146,24 +3257,27 @@ MR.World = (function () {
      * ever be is a sliver of post.
      */
     const duckGeo = merge([
-      bx(2.30, 0.30, 0.60, 0, 1.56, 0, 0x37d6ff),
-      bx(2.36, 0.12, 0.62, 0, 1.77, 0, 0xd8f8ff),
-      bx(0.26, 3.30, 0.30, -1.20, 1.65, 0, 0x37d6ff),
-      bx(0.26, 3.30, 0.30, 1.20, 1.65, 0, 0x37d6ff),
-      bx(0.30, 0.26, 0.34, -1.20, 2.35, 0, 0x0d2b36),
-      bx(0.30, 0.26, 0.34, 1.20, 2.35, 0, 0x0d2b36),
-      bx(0.30, 0.26, 0.34, -1.20, 2.90, 0, 0x0d2b36),
-      bx(0.30, 0.26, 0.34, 1.20, 2.90, 0, 0x0d2b36),
-      bx(0.40, 0.22, 0.40, -1.20, 3.41, 0, 0xd8f8ff),
-      bx(0.40, 0.22, 0.40, 1.20, 3.41, 0, 0xd8f8ff),
-      bx(0.50, 0.22, 0.50, -1.20, 0.11, 0, 0x2b2f52),
-      bx(0.50, 0.22, 0.50, 1.20, 0.11, 0, 0x2b2f52),
+      hbx(2.30, 0.30, 0.60, 0, 1.56, 0, 0x37d6ff),
+      hbx(2.36, 0.12, 0.62, 0, 1.77, 0, 0xd8f8ff),
+      // The standards keep their own thickness -- only where they stand moves.
+      // Scaling a 0.26 post down with the lane would have left the tall cyan
+      // verticals, which are the whole distance read on a DUCK, as hairlines.
+      bxAt(0.26, 3.30, 0.30, -1.20, 1.65, 0, 0x37d6ff),
+      bxAt(0.26, 3.30, 0.30, 1.20, 1.65, 0, 0x37d6ff),
+      bxAt(0.30, 0.26, 0.34, -1.20, 2.35, 0, 0x0d2b36),
+      bxAt(0.30, 0.26, 0.34, 1.20, 2.35, 0, 0x0d2b36),
+      bxAt(0.30, 0.26, 0.34, -1.20, 2.90, 0, 0x0d2b36),
+      bxAt(0.30, 0.26, 0.34, 1.20, 2.90, 0, 0x0d2b36),
+      bxAt(0.40, 0.22, 0.40, -1.20, 3.41, 0, 0xd8f8ff),
+      bxAt(0.40, 0.22, 0.40, 1.20, 3.41, 0, 0xd8f8ff),
+      bxAt(0.50, 0.22, 0.50, -1.20, 0.11, 0, 0x2b2f52),
+      bxAt(0.50, 0.22, 0.50, 1.20, 0.11, 0, 0x2b2f52),
     ]);
 
     const duckPool = Pool(function () {
       const g = new THREE.Group();
       g.add(S.outlined(duckGeo, mats.propLit, S.INK.hazard));
-      const face = new THREE.Mesh(new THREE.PlaneGeometry(2.26, 0.40), faceMat.duck);
+      const face = new THREE.Mesh(hplane(2.26, 0.40), faceMat.duck);
       face.position.set(0, 1.62, -0.302);
       face.rotation.y = Math.PI;
       g.add(face);
@@ -3175,19 +3289,19 @@ MR.World = (function () {
     // feature is either a horizontal band or sits at the front face, which the
     // scale leaves in place.
     const blockGeo = merge([
-      bx(2.10, 2.30, 1.30, 0, 1.50, 0, 0xff3b6b),
-      bx(2.20, 0.44, 1.30, 0, 0.22, 0, 0x2b2f52),
-      bx(2.24, 0.26, 1.34, 0, 2.24, 0, 0xfff2e0),
-      bx(2.20, 0.20, 1.34, 0, 2.70, 0, 0xd42a55),
-      bx(0.34, 0.34, 0.34, -0.72, 2.92, 0, 0xffe45e),
-      bx(0.34, 0.34, 0.34, 0.72, 2.92, 0, 0xffe45e),
+      hbx(2.10, 2.30, 1.30, 0, 1.50, 0, 0xff3b6b),
+      hbx(2.20, 0.44, 1.30, 0, 0.22, 0, 0x2b2f52),
+      hbx(2.24, 0.26, 1.34, 0, 2.24, 0, 0xfff2e0),
+      hbx(2.20, 0.20, 1.34, 0, 2.70, 0, 0xd42a55),
+      bxAt(0.34, 0.34, 0.34, -0.72, 2.92, 0, 0xffe45e),
+      bxAt(0.34, 0.34, 0.34, 0.72, 2.92, 0, 0xffe45e),
     ]);
 
     const blockPool = Pool(function () {
       const g = new THREE.Group();
       const body = S.outlined(blockGeo, mats.propLit, S.INK.hazard);
       g.add(body);
-      const face = new THREE.Mesh(new THREE.PlaneGeometry(2.06, 1.9), faceMat.block);
+      const face = new THREE.Mesh(hplane(2.06, 1.9), faceMat.block);
       face.position.set(0, 1.42, -0.661);
       face.rotation.y = Math.PI;
       g.add(face);
@@ -3313,11 +3427,22 @@ MR.World = (function () {
     }, group));
 
     /**
-     * Rival runners. They live on the road but outside the three lanes, so the
-     * player can be passing bodies all race without any chance of a phantom
-     * collision. They drift forward at a slower pace than the player, which is
-     * what makes overtaking read as overtaking rather than as scenery.
+     * Rival runners. They live on the shoulder, outside the three lanes, so
+     * the player can be passing bodies all race without any chance of a
+     * phantom collision. They drift forward at a slower pace than the player,
+     * which is what makes overtaking read as overtaking rather than as scenery.
+     *
+     * Where they run is derived, never a literal: the inner limit is the
+     * widest point of a hazard in the outer lane, the outer limit is the
+     * tarmac. RIVAL_YIELD is the other half of the answer -- see the pass
+     * handling in update().
      */
+    const RIVAL_HALF = 0.40;                                  // arm to arm
+    const RIVAL_IN = LANE + HAZARD_HALF + RIVAL_HALF;         // nearest line
+    const RIVAL_OUT = Math.max(RIVAL_IN, K.TRACK_HALF_WIDTH - RIVAL_HALF);
+    const RIVAL_YIELD = 0.62;    // extra fraction of x at the closest approach
+    const RIVAL_YIELD_Z = 30;    // over how much ground the yield opens up
+
     function rivalGeo(vest, skin, shorts) {
       return merge([
         bx(0.24, 0.14, 0.34, -0.16, 0.07, 0.02, 0xfff2e0),
@@ -3679,15 +3804,15 @@ MR.World = (function () {
       mats.road.color.copy(lerpInto(_road, prev.road, look.road, t));
       mats.shoulder.color.copy(lerpInto(_shoulder, prev.ground, look.ground, t));
       if (mats.ground) mats.ground.color.copy(mats.shoulder.color);
-      // Hills take the ground hue knocked back toward the fog, so they read as
-      // the same land seen through a lot of air.
-      hillsMat.color.copy(mats.shoulder.color).lerp(api.fogColor, 0.45);
       sky.material.uniforms.top.value.copy(lerpInto(_skyTop, prev.sky[0], look.sky[0], t));
       sky.material.uniforms.bottom.value.copy(lerpInto(_skyBot, prev.sky[1], look.sky[1], t));
 
       state.biome = b;
       state.look = look;
       lerpInto(api.fogColor, prev.fog, look.fog, t);
+      // Hills take the ground hue knocked back toward the fog, so they read as
+      // the same land seen through a great deal of air.
+      hillsMat.color.copy(mats.shoulder.color).lerp(api.fogColor, 0.45);
       return b;
     };
 
@@ -3778,11 +3903,10 @@ MR.World = (function () {
           const pool = rivalPool[Math.floor(s.a * rivalPool.length) % rivalPool.length];
           const obj = pool.claim();
           obj.userData.pool = pool;
-          // Just outside the outermost lane but still on the tarmac. A hazard
-          // in lane 0 or 2 reaches x = 3.47, so 3.9 is the first honest slot.
-          obj.position.set(s.side * (3.90 + s.b * 0.40), 0, s.z);
+          const baseX = s.side * (RIVAL_IN + s.b * (RIVAL_OUT - RIVAL_IN));
+          obj.position.set(baseX, 0, s.z);
           activeRivals.push({
-            obj, z: s.z,
+            obj, z: s.z, baseX,
             speed: 15 + s.c * 5,   // slower than the player: they get passed
             phase: s.a * 6.3,
           });
@@ -3835,6 +3959,15 @@ MR.World = (function () {
         const r = activeRivals[i];
         r.z += r.speed * (1 / 60);
         r.obj.position.z = r.z;
+        // Yield. The chase camera trails barely four units, so a rival holding
+        // its own line through a pass ends up a stride from the lens, where a
+        // 1.9-unit body covers a third of the frame -- and nothing in this file
+        // may ever hide an upcoming gate, because one contact costs the record.
+        // Road races solve it the same way and it costs nothing to borrow: the
+        // runner being caught gives way, so the closest approach is also the
+        // widest point and the pass happens out beyond the kerb.
+        const close = 1 - Math.min(1, Math.abs(r.z - z) / RIVAL_YIELD_Z);
+        r.obj.position.x = r.baseX * (1 + close * close * RIVAL_YIELD);
         // Cheap run cycle: a bob and a matching roll sell stride at speed.
         const ph = now * 5.5 + r.phase;
         r.obj.position.y = Math.abs(Math.sin(ph)) * 0.09;
@@ -4326,7 +4459,7 @@ MR.Ghost = (function () {
  * close enough that a lane change is body movement, high enough that the next
  * two gates still read. The first pass sat at 3.0 up / 6.55 back and the
  * runner was a distant sprite at a quarter of frame height; this sits at
- * 2.02 / 4.35 and fills about a third, dropping to 1.68 / 3.73 at full pace.
+ * 2.05 / 4.35 and fills about a third, dropping to 1.64 / 3.73 at full pace.
  *
  * Perceived speed is the hard problem and this file owns all of it. Ground
  * speed only moves 21.8 -> 27.7 units/sec across the whole race, because
@@ -4360,7 +4493,9 @@ MR.Camera = (function () {
   // ---- framing ----------------------------------------------------------
   // The FOV *swing* is the cue, not the absolute value: past about 74 degrees
   // vertical the far road collapses into a band and gates stop being readable
-  // early enough to react to, which is a bug however fast it feels.
+  // early enough to react to, which is a bug however fast it feels. So the
+  // steady range is 58 -> 71 and the clamp exists only to stop stacked
+  // transients (gear + duck + landing kick) from ever getting there.
   const BASE_FOV = 58;
   const SPEED_FOV = 10.5;        // widening across the honest pace band
   const GEAR_FOV = 2.5;          // extra, only in the top of the band
@@ -4560,7 +4695,7 @@ MR.Camera = (function () {
       const hgt = BASE_Y
         - drive * 0.41
         - duck * 0.34
-        + (p.y || 0) * 0.30            // barely follows the arc -- see below
+        + (p.y || 0) * 0.30            // keeps a third of the arc -- see aim
         + s.dip
         + s.mileT * 0.24
         + s.winded * 0.12
@@ -5846,7 +5981,13 @@ MR.HUD = (function () {
     last = now;
     // Clamp so an alt-tab or a GC pause cannot teleport the runner through a
     // gate; better to lose a little race time than to skip collision.
-    dt = Math.min(dt, 1 / 25);
+    //
+    // The lower bound is not defensive padding: on a slow boot the first rAF
+    // timestamp can predate `last`, giving a NEGATIVE dt. That ran the whole
+    // simulation backwards for a frame -- the race clock opened at -0.75s and
+    // -0.0023 miles, and the camera springs integrated in reverse and threw
+    // the view sideways. Time in this game only ever moves forward.
+    dt = Math.max(0, Math.min(dt, 1 / 25));
 
     fpsAcc += dt; fpsN++;
     if (fpsAcc >= 0.5) { fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; }

@@ -30,6 +30,7 @@ MR.Pace = (function () {
       pace: K.START_PACE,   // seconds per mile, instantaneous
       hits: 0,
       gatesSeen: 0,
+      aid: 0,
       finished: false,
       finishTime: 0,
       splits: [],           // race-time at each completed mile
@@ -83,6 +84,35 @@ MR.Pace = (function () {
       s.gatesSeen++;
       s.streak = Math.floor(s.streak * K.HIT_STREAK_KEEP);
       s.raceTime += K.HIT_TIME_PENALTY;
+    };
+
+    /**
+     * Aid taken. Grants streak, not pace -- speed still has exactly one
+     * source, so the rule the game is built on is untouched. See K.AID_* for
+     * why this needs no cap: the streak curve saturates, so aid is worth a
+     * great deal to a broken run and almost nothing to a clean one.
+     */
+    s.onAid = function (gain) {
+      // Three bounds, and each one is doing a job.
+      //
+      //   + gain        a bottle is worth something.
+      //   gatesSeen     but never more than a CLEAN run would already have.
+      //                 This is what makes aid worth exactly zero to a
+      //                 flawless player: their streak already equals the gates
+      //                 they have passed, so the min changes nothing. A first
+      //                 pass without this bound handed a perfect run 126
+      //                 seconds for free by shortcutting the opening ramp.
+      //   AID_CEILING   and never past record pace, so the top gear stays
+      //                 something only an unbroken line can buy.
+      //
+      // Math.max on the outside means aid can never take streak AWAY from a
+      // player already above the ceiling.
+      s.streak = Math.max(
+        s.streak,
+        Math.min(s.streak + gain, s.gatesSeen, K.AID_CEILING)
+      );
+      s.aid++;
+      if (s.streak > s.bestStreak) s.bestStreak = s.streak;
     };
 
     /**

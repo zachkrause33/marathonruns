@@ -30,6 +30,7 @@ MR.Player = (function () {
       lean: 0,
       stumble: 0,
       gateIdx: 0,
+      aidIdx: 0,
       lastResult: null,  // 'clean' | 'hit'
       lastResultAt: -99,
       events: [],        // drained by main for audio/HUD reactions
@@ -38,7 +39,7 @@ MR.Player = (function () {
     s.reset = function () {
       s.lane = 1; s.laneFrom = 1; s.laneT = 1; s.x = 0; s.y = 0;
       s.airT = 0; s.airborne = false; s.duckT = 0; s.ducking = false;
-      s.duck01 = 0; s.lean = 0; s.stumble = 0; s.gateIdx = 0;
+      s.duck01 = 0; s.lean = 0; s.stumble = 0; s.gateIdx = 0; s.aidIdx = 0;
       s.lastResult = null; s.events.length = 0;
     };
 
@@ -138,6 +139,32 @@ MR.Player = (function () {
         }
         s.lastResult = clean ? 'clean' : 'hit';
         out.push({ gate, kind, clean, lane: s.lane });
+      }
+      return out;
+    };
+
+    /**
+     * Collect any aid the player ran through this step.
+     *
+     * Lane match only -- no action required and no vertical test. Aid is a
+     * reward for choosing a line, not a fourth thing to time, and a bottle you
+     * can miss by being mid-jump would make the aid lane a trap in a game
+     * where the aid lane is supposed to be the merciful option.
+     *
+     * @returns array of collected items
+     */
+    s.resolveAid = function (course, unitsBefore, unitsNow) {
+      const out = [];
+      const aid = course.aid;
+      if (!aid) return out;
+      while (s.aidIdx < aid.length && aid[s.aidIdx].z <= unitsNow) {
+        const item = aid[s.aidIdx];
+        if (item.z < unitsBefore - 1e-6) { s.aidIdx++; continue; }
+        s.aidIdx++;
+        if (item.lane === s.lane) {
+          out.push(item);
+          s.events.push('aid');
+        }
       }
       return out;
     };

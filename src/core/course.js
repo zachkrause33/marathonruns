@@ -119,6 +119,70 @@ MR.Course = (function () {
     return rnd.int(2, d > 0.7 ? 4 : 3);   // in gate-spans
   }
 
+
+  /**
+   * Aid: water tables and fruit, placed deterministically from the same date
+   * seed as everything else.
+   *
+   * Two placement rules matter. They are only ever put in a lane that is
+   * PASSABLE at that point on the course, so aid can never be dangled somewhere
+   * a player is not allowed to go; and they are pushed to the gap BETWEEN
+   * gates, so taking one is never entangled with a jump or a duck the player
+   * is already committed to.
+   *
+   * Water tables cluster the way real ones do -- a short run of bottles you
+   * sweep through -- while fruit is a single item and rarer. Density rises
+   * slightly with distance, because that is where a broken run most needs a
+   * road back.
+   */
+  function generateAid(key, gates) {
+    const rnd = MR.rng.stream(key, 'aid/v1');
+    const items = [];
+    if (!gates.length) return items;
+
+    let gi = 0;
+    // One aid opportunity roughly every 1.6 miles, jittered.
+    let z = START_GRACE + rnd.range(180, 320);
+    const end = K.TOTAL_UNITS - FINISH_GRACE - 60;
+
+    while (z < end) {
+      while (gi < gates.length - 1 && gates[gi + 1].z < z) gi++;
+
+      // Sit in the gap between this gate and the next, never on a gate line.
+      const a = gates[gi].z, b = gi + 1 < gates.length ? gates[gi + 1].z : a + 40;
+      if (b - a > 14) {
+        const at = a + (b - a) * rnd.range(0.35, 0.65);
+
+        // Only lanes that are passable at the gates either side of the gap.
+        const open = [];
+        for (let l = 0; l < 3; l++) {
+          const here = gates[gi].lanes[l];
+          const next = gi + 1 < gates.length ? gates[gi + 1].lanes[l] : K.CLEAR;
+          if (here !== K.BLOCK && next !== K.BLOCK) open.push(l);
+        }
+
+        if (open.length) {
+          const lane = open[rnd.int(0, open.length - 1)];
+          const f = at / K.TOTAL_UNITS;
+          const fruit = rnd.chance(0.24 + 0.16 * f);
+          if (fruit) {
+            items.push({ z: at, lane, kind: 'banana', gain: K.AID_BANANA });
+          } else {
+            // A table is a short run of bottles through one lane.
+            const n = rnd.int(3, 5);
+            for (let i = 0; i < n; i++) {
+              const bz = at + i * 3.4;
+              if (bz < b - 3) items.push({ z: bz, lane, kind: 'water', gain: K.AID_WATER });
+            }
+          }
+        }
+      }
+      z += rnd.range(320, 470);
+    }
+    items.sort(function (p, q) { return p.z - q.z; });
+    return items;
+  }
+
   function generate(key) {
     const rnd = MR.rng.stream(key, 'course/v1');
     const gates = [];
@@ -172,7 +236,8 @@ MR.Course = (function () {
     for (let m = 1; m <= 26; m++) mileMarkers.push({ mile: m, z: m * K.UNITS_PER_MILE });
     mileMarkers.push({ mile: K.MARATHON_MILES, z: K.TOTAL_UNITS, finish: true });
 
-    const course = { key, gates, mileMarkers, biomes: BIOMES, length: K.TOTAL_UNITS };
+    const aid = generateAid(key, gates);
+    const course = { key, gates, aid, mileMarkers, biomes: BIOMES, length: K.TOTAL_UNITS };
     course.valid = validate(course);
     return course;
   }
@@ -225,5 +290,5 @@ MR.Course = (function () {
     return { ok: errors.length === 0, errors, gates: g.length };
   }
 
-  return { generate, validate, solvable, biomeAt, difficulty, BIOMES, ACTION_WINDOW };
+  return { generate, generateAid, validate, solvable, biomeAt, difficulty, BIOMES, ACTION_WINDOW };
 })();

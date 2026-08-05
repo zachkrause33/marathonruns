@@ -339,6 +339,24 @@ MR.HUD = (function () {
     // its own line from the state it already sees and falls back to whatever
     // strings it was handed.
     let toastTimer = null;
+
+    /**
+     * Aid taken. Deliberately reuses the split card rather than adding a
+     * fourth floating element -- the frame is already carrying a race clock, a
+     * streak plate and a ghost tag, and the middle stays clear on purpose. A
+     * bottle gets no card at all: the streak number jumping is the feedback,
+     * and five cards in a row through a water table would be noise.
+     */
+    api.toastAid = function (lab, sub) {
+      n.toastLab.textContent = lab;
+      n.toastBig.textContent = sub;
+      if (n.toastCum) n.toastCum.textContent = '';
+      if (n.toastDelta) { n.toastDelta.textContent = ''; n.toastDelta.className = ''; }
+      n.toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { n.toast.classList.remove('show'); }, 1200);
+    };
+
     api.toast = function (big, small, ms) {
       const sp = lastP && lastP.splits.length
         ? lastP.splits[lastP.splits.length - 1] : null;

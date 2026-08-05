@@ -943,8 +943,16 @@ MR.World = (function () {
     }));
     ringMesh.renderOrder = 6;   // over the telegraph mats, never under them
     ringMesh.frustumCulled = false;
-    ringMesh.visible = !!routeLane;
-    group.add(ringMesh);
+    // The floating ring trail is deliberately NOT added to the scene.
+    //
+    // Playtest verdict: a constant line of markers hovering at head height for
+    // 26 miles reads as something you are obliged to collect, and it sat in the
+    // one part of the frame the player is trying to read hazards through. The
+    // painted racing ribbon on the road carries the same information without
+    // occupying the air. The geometry is kept so a future pass can bring it
+    // back as an occasional beacon (say, only where the line must change lane)
+    // rather than as a continuous chain.
+    ringMesh.visible = false;
 
     // Sampling walks z forwards, so the gate lookup is a cursor rather than a
     // search. It rewinds at the start of each frame and costs nothing after.

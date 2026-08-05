@@ -152,6 +152,22 @@ MR.Audio = (function () {
       noise(0.55, ahead ? 900 : 420, 0.7, 0.09, 'bandpass');
     };
 
+    /**
+     * Aid taken. Deliberately small and dry -- a bottle is a sip, not a
+     * fanfare, and a water table is five of them in a row, so anything with a
+     * tail would smear into a drone.
+     */
+    s.aid = function (big) {
+      if (big) {
+        tone(660, 0.16, 0.075, 'triangle', 990);
+        tone(990, 0.22, 0.045, 'sine');
+        noise(0.18, 1400, 1.2, 0.05, 'bandpass');
+      } else {
+        tone(880, 0.07, 0.05, 'triangle');
+        noise(0.06, 2200, 1.6, 0.035, 'bandpass');
+      }
+    };
+
     s.mile = function (mile) {
       tone(660, 0.5, 0.10, 'sine');
       tone(990, 0.55, 0.06, 'sine');

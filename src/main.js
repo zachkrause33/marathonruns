@@ -236,6 +236,13 @@
         }
       }
 
+      // Aid taken this step. Streak only -- pace still has one source.
+      for (const item of player.resolveAid(course, before, after)) {
+        pace.onAid(item.gain);
+        audio.aid(item.kind === 'banana');
+        if (item.kind === 'banana') hud.toastAid('FUEL', '+' + item.gain + ' STREAK');
+      }
+
       // Player events -> audio.
       for (const e of player.drainEvents()) {
         if (e === 'jump') audio.jump();

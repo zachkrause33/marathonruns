@@ -63,7 +63,22 @@ MR.K = (function () {
     // figure lost in the middle of it: at that ratio the lane is not a lane,
     // it is a field the runner happens to be standing in.
     LANE_W,
-    LANE_X: [-LANE_W, 0, LANE_W],
+    // Lane 0 is the lane the player SEES on the left, and it has a POSITIVE
+    // world x. That inversion is not a typo, it is the coordinate system:
+    // the runner travels toward +z and the chase camera sits behind and looks
+    // toward +z as well. A camera facing +z has world +x on its left, so the
+    // whole scene is mirrored on screen. With the naive [-LANE_W, 0, LANE_W],
+    // pressing left correctly moved the player to -x and the player correctly
+    // saw them go right -- swipe and arrow keys both felt inverted, because
+    // the world was.
+    //
+    // Flipping here fixes it for everything at once -- player, hazards,
+    // telegraph mats, racing line -- because they all place off LANE_X, so
+    // they stay mutually consistent and the course stays exactly as fair. It
+    // also leaves the camera and lean maths untouched: "x increasing means
+    // moving screen-left" is true before and after, so the bank still leans
+    // into the turn the player sees.
+    LANE_X: [LANE_W, 0, -LANE_W],
     LANE_COUNT: 3,
     // Three lanes plus a fixed shoulder each side. The shoulder is deliberately
     // NOT a fraction of the lane: what it has to hold -- the kerb, the outermost
@@ -85,6 +100,37 @@ MR.K = (function () {
     JUMP_TIME: 0.62,
     DUCK_TIME: 0.55,
     INPUT_BUFFER: 0.14,             // late/early press forgiveness
+
+    // ---- aid: the way back into a race you are losing --------------------
+    //
+    // Pickups grant STREAK, never pace directly, and that distinction is the
+    // whole design. "Only an unbroken clean line makes you faster" stays
+    // literally true -- speed still comes from exactly one place -- but a
+    // player who breaks their line now has a road back instead of watching a
+    // dead record tick out over twenty miles.
+    //
+    // The exponential does NOT balance this on its own, which a first pass
+    // assumed and simulation disproved: with an uncapped grant, taking every
+    // item saved 161s on an already-flawless run and left a run with EIGHT
+    // mistakes still beating the record. The value of aid is not in exceeding
+    // the pace floor, it is in REACHING it sooner, and the ramp is where the
+    // whole race is won.
+    //
+    // So aid tops the streak up to a ceiling instead of adding to it without
+    // limit. AID_CEILING is set at the streak whose target pace is the record
+    // pace itself, which makes the rule exactly:
+    //
+    //   aid can put a broken run back on record pace. It can never buy the
+    //   top gear. That still has to be earned with an unbroken line.
+    //
+    // A player already above the ceiling gets nothing at all from a bottle,
+    // so aid is worthless to a perfect run and a lifeline to a broken one --
+    // which is the entire point of putting it in the game.
+    AID_WATER: 10,
+    AID_BANANA: 22,
+    AID_CEILING: Math.ceil(
+      -20 * Math.log((7170 / (42.195 / 1.609344) - 260) / (330 - 260))
+    ),
 
     // Hazard kinds
     CLEAR: 0,

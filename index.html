@@ -710,7 +710,22 @@ MR.K = (function () {
     // figure lost in the middle of it: at that ratio the lane is not a lane,
     // it is a field the runner happens to be standing in.
     LANE_W,
-    LANE_X: [-LANE_W, 0, LANE_W],
+    // Lane 0 is the lane the player SEES on the left, and it has a POSITIVE
+    // world x. That inversion is not a typo, it is the coordinate system:
+    // the runner travels toward +z and the chase camera sits behind and looks
+    // toward +z as well. A camera facing +z has world +x on its left, so the
+    // whole scene is mirrored on screen. With the naive [-LANE_W, 0, LANE_W],
+    // pressing left correctly moved the player to -x and the player correctly
+    // saw them go right -- swipe and arrow keys both felt inverted, because
+    // the world was.
+    //
+    // Flipping here fixes it for everything at once -- player, hazards,
+    // telegraph mats, racing line -- because they all place off LANE_X, so
+    // they stay mutually consistent and the course stays exactly as fair. It
+    // also leaves the camera and lean maths untouched: "x increasing means
+    // moving screen-left" is true before and after, so the bank still leans
+    // into the turn the player sees.
+    LANE_X: [LANE_W, 0, -LANE_W],
     LANE_COUNT: 3,
     // Three lanes plus a fixed shoulder each side. The shoulder is deliberately
     // NOT a fraction of the lane: what it has to hold -- the kerb, the outermost
@@ -732,6 +747,37 @@ MR.K = (function () {
     JUMP_TIME: 0.62,
     DUCK_TIME: 0.55,
     INPUT_BUFFER: 0.14,             // late/early press forgiveness
+
+    // ---- aid: the way back into a race you are losing --------------------
+    //
+    // Pickups grant STREAK, never pace directly, and that distinction is the
+    // whole design. "Only an unbroken clean line makes you faster" stays
+    // literally true -- speed still comes from exactly one place -- but a
+    // player who breaks their line now has a road back instead of watching a
+    // dead record tick out over twenty miles.
+    //
+    // The exponential does NOT balance this on its own, which a first pass
+    // assumed and simulation disproved: with an uncapped grant, taking every
+    // item saved 161s on an already-flawless run and left a run with EIGHT
+    // mistakes still beating the record. The value of aid is not in exceeding
+    // the pace floor, it is in REACHING it sooner, and the ramp is where the
+    // whole race is won.
+    //
+    // So aid tops the streak up to a ceiling instead of adding to it without
+    // limit. AID_CEILING is set at the streak whose target pace is the record
+    // pace itself, which makes the rule exactly:
+    //
+    //   aid can put a broken run back on record pace. It can never buy the
+    //   top gear. That still has to be earned with an unbroken line.
+    //
+    // A player already above the ceiling gets nothing at all from a bottle,
+    // so aid is worthless to a perfect run and a lifeline to a broken one --
+    // which is the entire point of putting it in the game.
+    AID_WATER: 10,
+    AID_BANANA: 22,
+    AID_CEILING: Math.ceil(
+      -20 * Math.log((7170 / (42.195 / 1.609344) - 260) / (330 - 260))
+    ),
 
     // Hazard kinds
     CLEAR: 0,
@@ -774,6 +820,7 @@ MR.Pace = (function () {
       pace: K.START_PACE,   // seconds per mile, instantaneous
       hits: 0,
       gatesSeen: 0,
+      aid: 0,
       finished: false,
       finishTime: 0,
       splits: [],           // race-time at each completed mile
@@ -827,6 +874,35 @@ MR.Pace = (function () {
       s.gatesSeen++;
       s.streak = Math.floor(s.streak * K.HIT_STREAK_KEEP);
       s.raceTime += K.HIT_TIME_PENALTY;
+    };
+
+    /**
+     * Aid taken. Grants streak, not pace -- speed still has exactly one
+     * source, so the rule the game is built on is untouched. See K.AID_* for
+     * why this needs no cap: the streak curve saturates, so aid is worth a
+     * great deal to a broken run and almost nothing to a clean one.
+     */
+    s.onAid = function (gain) {
+      // Three bounds, and each one is doing a job.
+      //
+      //   + gain        a bottle is worth something.
+      //   gatesSeen     but never more than a CLEAN run would already have.
+      //                 This is what makes aid worth exactly zero to a
+      //                 flawless player: their streak already equals the gates
+      //                 they have passed, so the min changes nothing. A first
+      //                 pass without this bound handed a perfect run 126
+      //                 seconds for free by shortcutting the opening ramp.
+      //   AID_CEILING   and never past record pace, so the top gear stays
+      //                 something only an unbroken line can buy.
+      //
+      // Math.max on the outside means aid can never take streak AWAY from a
+      // player already above the ceiling.
+      s.streak = Math.max(
+        s.streak,
+        Math.min(s.streak + gain, s.gatesSeen, K.AID_CEILING)
+      );
+      s.aid++;
+      if (s.streak > s.bestStreak) s.bestStreak = s.streak;
     };
 
     /**
@@ -1091,6 +1167,70 @@ MR.Course = (function () {
     return rnd.int(2, d > 0.7 ? 4 : 3);   // in gate-spans
   }
 
+
+  /**
+   * Aid: water tables and fruit, placed deterministically from the same date
+   * seed as everything else.
+   *
+   * Two placement rules matter. They are only ever put in a lane that is
+   * PASSABLE at that point on the course, so aid can never be dangled somewhere
+   * a player is not allowed to go; and they are pushed to the gap BETWEEN
+   * gates, so taking one is never entangled with a jump or a duck the player
+   * is already committed to.
+   *
+   * Water tables cluster the way real ones do -- a short run of bottles you
+   * sweep through -- while fruit is a single item and rarer. Density rises
+   * slightly with distance, because that is where a broken run most needs a
+   * road back.
+   */
+  function generateAid(key, gates) {
+    const rnd = MR.rng.stream(key, 'aid/v1');
+    const items = [];
+    if (!gates.length) return items;
+
+    let gi = 0;
+    // One aid opportunity roughly every 1.6 miles, jittered.
+    let z = START_GRACE + rnd.range(180, 320);
+    const end = K.TOTAL_UNITS - FINISH_GRACE - 60;
+
+    while (z < end) {
+      while (gi < gates.length - 1 && gates[gi + 1].z < z) gi++;
+
+      // Sit in the gap between this gate and the next, never on a gate line.
+      const a = gates[gi].z, b = gi + 1 < gates.length ? gates[gi + 1].z : a + 40;
+      if (b - a > 14) {
+        const at = a + (b - a) * rnd.range(0.35, 0.65);
+
+        // Only lanes that are passable at the gates either side of the gap.
+        const open = [];
+        for (let l = 0; l < 3; l++) {
+          const here = gates[gi].lanes[l];
+          const next = gi + 1 < gates.length ? gates[gi + 1].lanes[l] : K.CLEAR;
+          if (here !== K.BLOCK && next !== K.BLOCK) open.push(l);
+        }
+
+        if (open.length) {
+          const lane = open[rnd.int(0, open.length - 1)];
+          const f = at / K.TOTAL_UNITS;
+          const fruit = rnd.chance(0.24 + 0.16 * f);
+          if (fruit) {
+            items.push({ z: at, lane, kind: 'banana', gain: K.AID_BANANA });
+          } else {
+            // A table is a short run of bottles through one lane.
+            const n = rnd.int(3, 5);
+            for (let i = 0; i < n; i++) {
+              const bz = at + i * 3.4;
+              if (bz < b - 3) items.push({ z: bz, lane, kind: 'water', gain: K.AID_WATER });
+            }
+          }
+        }
+      }
+      z += rnd.range(320, 470);
+    }
+    items.sort(function (p, q) { return p.z - q.z; });
+    return items;
+  }
+
   function generate(key) {
     const rnd = MR.rng.stream(key, 'course/v1');
     const gates = [];
@@ -1144,7 +1284,8 @@ MR.Course = (function () {
     for (let m = 1; m <= 26; m++) mileMarkers.push({ mile: m, z: m * K.UNITS_PER_MILE });
     mileMarkers.push({ mile: K.MARATHON_MILES, z: K.TOTAL_UNITS, finish: true });
 
-    const course = { key, gates, mileMarkers, biomes: BIOMES, length: K.TOTAL_UNITS };
+    const aid = generateAid(key, gates);
+    const course = { key, gates, aid, mileMarkers, biomes: BIOMES, length: K.TOTAL_UNITS };
     course.valid = validate(course);
     return course;
   }
@@ -1197,7 +1338,7 @@ MR.Course = (function () {
     return { ok: errors.length === 0, errors, gates: g.length };
   }
 
-  return { generate, validate, solvable, biomeAt, difficulty, BIOMES, ACTION_WINDOW };
+  return { generate, generateAid, validate, solvable, biomeAt, difficulty, BIOMES, ACTION_WINDOW };
 })();
 
 /* ==================== src/render/shading.js ==================== */
@@ -3683,8 +3824,16 @@ MR.World = (function () {
     }));
     ringMesh.renderOrder = 6;   // over the telegraph mats, never under them
     ringMesh.frustumCulled = false;
-    ringMesh.visible = !!routeLane;
-    group.add(ringMesh);
+    // The floating ring trail is deliberately NOT added to the scene.
+    //
+    // Playtest verdict: a constant line of markers hovering at head height for
+    // 26 miles reads as something you are obliged to collect, and it sat in the
+    // one part of the frame the player is trying to read hazards through. The
+    // painted racing ribbon on the road carries the same information without
+    // occupying the air. The geometry is kept so a future pass can bring it
+    // back as an occasional beacon (say, only where the line must change lane)
+    // rather than as a continuous chain.
+    ringMesh.visible = false;
 
     // Sampling walks z forwards, so the gate lookup is a cursor rather than a
     // search. It rewinds at the start of each frame and costs nothing after.
@@ -5765,6 +5914,7 @@ MR.Player = (function () {
       lean: 0,
       stumble: 0,
       gateIdx: 0,
+      aidIdx: 0,
       lastResult: null,  // 'clean' | 'hit'
       lastResultAt: -99,
       events: [],        // drained by main for audio/HUD reactions
@@ -5773,7 +5923,7 @@ MR.Player = (function () {
     s.reset = function () {
       s.lane = 1; s.laneFrom = 1; s.laneT = 1; s.x = 0; s.y = 0;
       s.airT = 0; s.airborne = false; s.duckT = 0; s.ducking = false;
-      s.duck01 = 0; s.lean = 0; s.stumble = 0; s.gateIdx = 0;
+      s.duck01 = 0; s.lean = 0; s.stumble = 0; s.gateIdx = 0; s.aidIdx = 0;
       s.lastResult = null; s.events.length = 0;
     };
 
@@ -5873,6 +6023,32 @@ MR.Player = (function () {
         }
         s.lastResult = clean ? 'clean' : 'hit';
         out.push({ gate, kind, clean, lane: s.lane });
+      }
+      return out;
+    };
+
+    /**
+     * Collect any aid the player ran through this step.
+     *
+     * Lane match only -- no action required and no vertical test. Aid is a
+     * reward for choosing a line, not a fourth thing to time, and a bottle you
+     * can miss by being mid-jump would make the aid lane a trap in a game
+     * where the aid lane is supposed to be the merciful option.
+     *
+     * @returns array of collected items
+     */
+    s.resolveAid = function (course, unitsBefore, unitsNow) {
+      const out = [];
+      const aid = course.aid;
+      if (!aid) return out;
+      while (s.aidIdx < aid.length && aid[s.aidIdx].z <= unitsNow) {
+        const item = aid[s.aidIdx];
+        if (item.z < unitsBefore - 1e-6) { s.aidIdx++; continue; }
+        s.aidIdx++;
+        if (item.lane === s.lane) {
+          out.push(item);
+          s.events.push('aid');
+        }
       }
       return out;
     };
@@ -6042,6 +6218,22 @@ MR.Audio = (function () {
       });
       // A short swell underneath so it feels like the crowd noticed.
       noise(0.55, ahead ? 900 : 420, 0.7, 0.09, 'bandpass');
+    };
+
+    /**
+     * Aid taken. Deliberately small and dry -- a bottle is a sip, not a
+     * fanfare, and a water table is five of them in a row, so anything with a
+     * tail would smear into a drone.
+     */
+    s.aid = function (big) {
+      if (big) {
+        tone(660, 0.16, 0.075, 'triangle', 990);
+        tone(990, 0.22, 0.045, 'sine');
+        noise(0.18, 1400, 1.2, 0.05, 'bandpass');
+      } else {
+        tone(880, 0.07, 0.05, 'triangle');
+        noise(0.06, 2200, 1.6, 0.035, 'bandpass');
+      }
     };
 
     s.mile = function (mile) {
@@ -6425,6 +6617,24 @@ MR.HUD = (function () {
     // its own line from the state it already sees and falls back to whatever
     // strings it was handed.
     let toastTimer = null;
+
+    /**
+     * Aid taken. Deliberately reuses the split card rather than adding a
+     * fourth floating element -- the frame is already carrying a race clock, a
+     * streak plate and a ghost tag, and the middle stays clear on purpose. A
+     * bottle gets no card at all: the streak number jumping is the feedback,
+     * and five cards in a row through a water table would be noise.
+     */
+    api.toastAid = function (lab, sub) {
+      n.toastLab.textContent = lab;
+      n.toastBig.textContent = sub;
+      if (n.toastCum) n.toastCum.textContent = '';
+      if (n.toastDelta) { n.toastDelta.textContent = ''; n.toastDelta.className = ''; }
+      n.toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { n.toast.classList.remove('show'); }, 1200);
+    };
+
     api.toast = function (big, small, ms) {
       const sp = lastP && lastP.splits.length
         ? lastP.splits[lastP.splits.length - 1] : null;
@@ -6762,6 +6972,13 @@ MR.HUD = (function () {
           cam.impact(1);
           hud.flashBroken();
         }
+      }
+
+      // Aid taken this step. Streak only -- pace still has one source.
+      for (const item of player.resolveAid(course, before, after)) {
+        pace.onAid(item.gain);
+        audio.aid(item.kind === 'banana');
+        if (item.kind === 'banana') hud.toastAid('FUEL', '+' + item.gain + ' STREAK');
       }
 
       // Player events -> audio.

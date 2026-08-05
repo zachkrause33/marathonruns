@@ -17,12 +17,6 @@ fs.mkdirSync(OUT, { recursive: true });
 
 const VARIANTS = [
   ['a-asis', 'function(){}'],
-  ['b-own-material', 'function(){ B.forEach(function(o){ var L=o.userData.body.userData.line; L.material=L.material.clone(); L.material.needsUpdate=true; }); }'],
-  ['c-thick-0.0001', 'function(){ B.forEach(function(o){ var L=o.userData.body.userData.line; L.material.uniforms.thickness.value=0.0001; L.material.uniformsNeedUpdate=true; }); }'],
-  ['d-thick-neg', 'function(){ B.forEach(function(o){ var L=o.userData.body.userData.line; L.material.uniforms.thickness.value=-0.30; L.material.uniformsNeedUpdate=true; }); }'],
-  ['e-thick-big', 'function(){ B.forEach(function(o){ var L=o.userData.body.userData.line; L.material.uniforms.thickness.value=0.30; L.material.uniformsNeedUpdate=true; }); }'],
-  ['f-thick-std-nocolorwrite', 'function(){ B.forEach(function(o){ var L=o.userData.body.userData.line; L.material.uniforms.thickness.value=0.025; L.material.uniformsNeedUpdate=true; L.material.colorWrite=false; }); }'],
-  ['g-green-ink', 'function(){ B.forEach(function(o){ var L=o.userData.body.userData.line; L.material.colorWrite=true; L.material.uniforms.oColor.value.setRGB(0,1,0); L.material.uniforms.inkFogColor.value.setRGB(0,1,0); L.material.uniformsNeedUpdate=true; }); }'],
 ];
 
 (async () => {

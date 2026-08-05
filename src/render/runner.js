@@ -45,6 +45,8 @@
  *        -> shadowPivot -> contact shadow   (cancels the jump and the bank)
  */
 MR.Runner = (function () {
+  // Hoisted: this is measured every frame of a slide and must not allocate.
+  const _clampBox = new THREE.Box3();
   const S = MR.shading;
   const P = S.PALETTE;
   const K = MR.K;
@@ -610,7 +612,7 @@ MR.Runner = (function () {
         // 0.70 is also the ceiling: MEASUREMENTS.md derives the lane's own
         // limit at 0.70 from the lane centre, so this pose spends the width
         // budget the gloves' 0.543 run swing had already proved is there.
-        L.hip.rotation.z = L.side * (0.05 + spread * 0.30 + slid * 0.26);
+        L.hip.rotation.z = L.side * (0.05 + spread * 0.30 + slid * 0.52);
       }
 
       // ---- arms ----------------------------------------------------------
@@ -655,7 +657,7 @@ MR.Runner = (function () {
         // 2.06 is measured against the reclined chest, not the world: the
         // torso is already 0.78 back, so this lands the upper arm a little
         // under horizontal in world space with the elbow behind the hip.
-        A.shoulder.rotation.x = s * swing * 0.95 * cycD - spread * 0.26 + slid * 2.06;
+        A.shoulder.rotation.x = s * swing * 0.95 * cycD - spread * 0.26 + slid * 1.46;
         // Abduction. The running band is deliberately tighter than it used to
         // be: the mitts got big enough to break the outline on their own, so
         // the elbows no longer have to be held out to do it -- and every
@@ -763,6 +765,23 @@ MR.Runner = (function () {
       // than collision.js believes, never higher -- so the audit stays honest
       // while understating the daylight it is buying.
       body.position.y -= duck * 0.42;
+
+      // Road clamp. The slide recline plus the braced arms put the lowest
+      // welded limb 0.37 BELOW the tarmac -- limbs were passing through the
+      // road, which is most of why the pose read as broken rather than as
+      // low. Rather than hand-tune each joint until nothing pokes through
+      // (which has to be redone every time the pose changes), measure the rig
+      // once per frame and lift the whole body by however much it is buried.
+      //
+      // Cheap enough to do every frame: the rig is a handful of welded meshes,
+      // and it only runs while sliding. `body` is lifted rather than `root` so
+      // the contact shadow, which hangs off its own pivot under root, stays on
+      // the road where it belongs.
+      if (duck > 0.01) {
+        root.updateMatrixWorld(true);
+        _clampBox.setFromObject(body);
+        if (_clampBox.min.y < 0) body.position.y -= _clampBox.min.y;
+      }
       api.duckDrop = duck * 0.42;
 
       // Shadow footprint, handed to onBeforeRender above. Wider than deep

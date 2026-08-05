@@ -253,7 +253,7 @@ MR.Camera = (function () {
         // figure sat 87% down the frame with its legs clipped off the bottom
         // edge. Backing off frames the whole body and shows more of the bar
         // being cleared.
-        + duck * 0.95
+        - duck * 0.55
         - s.gearT * s.gearT * 0.45
         + s.mileT * 0.45
         + s.winded * 0.28
@@ -272,7 +272,7 @@ MR.Camera = (function () {
         // travel axis, so dropping with it pushed the whole runner off the
         // bottom of the frame just as the player needs to see both their own
         // clearance and the road past it.
-        + duck * 0.16
+        + duck * 1.20
         + (p.y || 0) * 0.30            // keeps a third of the arc -- see aim
         + s.dip
         + s.mileT * 0.24
@@ -289,8 +289,8 @@ MR.Camera = (function () {
       // 0.42/0.30 split had the camera chasing the arc and cancelled it.
       look.set(
         s.x * s.fr.lookX,
-        LOOK_Y + (p.y || 0) * 0.50 - duck * 0.26 - drive * 0.22 + fin * 0.55,
-        p.z + LOOK_AHEAD + (p.y || 0) * 1.1 - drive * 0.5
+        LOOK_Y + (p.y || 0) * 0.50 - duck * 1.05 - drive * 0.22 + fin * 0.55,
+        p.z + LOOK_AHEAD - duck * 3.2 + (p.y || 0) * 1.1 - drive * 0.5
       );
       cam.lookAt(look);
 

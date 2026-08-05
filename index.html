@@ -2270,6 +2270,8 @@ MR.shading = (function () {
  *        -> shadowPivot -> contact shadow   (cancels the jump and the bank)
  */
 MR.Runner = (function () {
+  // Hoisted: this is measured every frame of a slide and must not allocate.
+  const _clampBox = new THREE.Box3();
   const S = MR.shading;
   const P = S.PALETTE;
   const K = MR.K;
@@ -2835,7 +2837,7 @@ MR.Runner = (function () {
         // 0.70 is also the ceiling: MEASUREMENTS.md derives the lane's own
         // limit at 0.70 from the lane centre, so this pose spends the width
         // budget the gloves' 0.543 run swing had already proved is there.
-        L.hip.rotation.z = L.side * (0.05 + spread * 0.30 + slid * 0.26);
+        L.hip.rotation.z = L.side * (0.05 + spread * 0.30 + slid * 0.52);
       }
 
       // ---- arms ----------------------------------------------------------
@@ -2880,7 +2882,7 @@ MR.Runner = (function () {
         // 2.06 is measured against the reclined chest, not the world: the
         // torso is already 0.78 back, so this lands the upper arm a little
         // under horizontal in world space with the elbow behind the hip.
-        A.shoulder.rotation.x = s * swing * 0.95 * cycD - spread * 0.26 + slid * 2.06;
+        A.shoulder.rotation.x = s * swing * 0.95 * cycD - spread * 0.26 + slid * 1.46;
         // Abduction. The running band is deliberately tighter than it used to
         // be: the mitts got big enough to break the outline on their own, so
         // the elbows no longer have to be held out to do it -- and every
@@ -2988,6 +2990,23 @@ MR.Runner = (function () {
       // than collision.js believes, never higher -- so the audit stays honest
       // while understating the daylight it is buying.
       body.position.y -= duck * 0.42;
+
+      // Road clamp. The slide recline plus the braced arms put the lowest
+      // welded limb 0.37 BELOW the tarmac -- limbs were passing through the
+      // road, which is most of why the pose read as broken rather than as
+      // low. Rather than hand-tune each joint until nothing pokes through
+      // (which has to be redone every time the pose changes), measure the rig
+      // once per frame and lift the whole body by however much it is buried.
+      //
+      // Cheap enough to do every frame: the rig is a handful of welded meshes,
+      // and it only runs while sliding. `body` is lifted rather than `root` so
+      // the contact shadow, which hangs off its own pivot under root, stays on
+      // the road where it belongs.
+      if (duck > 0.01) {
+        root.updateMatrixWorld(true);
+        _clampBox.setFromObject(body);
+        if (_clampBox.min.y < 0) body.position.y -= _clampBox.min.y;
+      }
       api.duckDrop = duck * 0.42;
 
       // Shadow footprint, handed to onBeforeRender above. Wider than deep
@@ -3074,7 +3093,32 @@ MR.World = (function () {
   // It touches x ONLY. The y and z extents are what MR.Collision.BOX records
   // and audits against the jump arc and the duck pose; moving either would
   // break an agreement this file cannot see. Nothing here may change a height.
-  const LANE = K.LANE_X[1] - K.LANE_X[0];
+  //
+  // Math.abs is LOad-BEARING, and it is what made every BLOCK render as a
+  // near-black slab for as long as the flipped lane order has existed.
+  // K.LANE_X is [+LANE_W, 0, -LANE_W] -- DESCENDING, because lane 0 is the
+  // lane the player sees on the LEFT and screen-left is world +x for a camera
+  // looking down +z (see the note in constants.js). So LANE_X[1] - LANE_X[0]
+  // is -LANE_W, and every `w * LANE_FIT` below became a NEGATIVE width.
+  //
+  // A BoxGeometry or PlaneGeometry built with a negative width is not merely
+  // the same box: it is the box MIRRORED through x = 0, which reverses the
+  // winding of every triangle while leaving the authored normals alone. The
+  // consequences were all invisible in a diff and all very visible on screen:
+  //
+  //   - the toon fill (FrontSide) drew each hazard's FAR faces and the ink
+  //     shell (BackSide) drew its NEAR ones, so the shell painted the whole
+  //     silhouette in 0x1b1633 ink AND depth-occluded the fill. A BLOCK, whose
+  //     entire mass is hbx(), came out solid near-black -- worst of all as a
+  //     train, where the slab is 6 units long and fills a third of the frame.
+  //   - the caution-stripe faces (hplane) and the lane telegraph mats
+  //     (1.95 * LANE_FIT) faced DOWN through the road and were culled, which
+  //     is why the readability device this file is built around never drew.
+  //   - the carriageway edge lines sat at 2.42 instead of 2.68.
+  //
+  // The magnitude was right all along, which is why the hazards were the
+  // correct SIZE and only the wrong colour. Sign only.
+  const LANE = Math.abs(K.LANE_X[1] - K.LANE_X[0]);
   const LANE_FIT = LANE / 2.35;
 
   // The widest point of any hazard, measured from its lane centre: the DUCK
@@ -3802,26 +3846,92 @@ MR.World = (function () {
     })();
 
     /**
-     * THE WALL: concrete jersey barrier and a graffitied hoarding. The leg is
-     * meant to feel enclosed and joyless, so the roadside closes in rather
+     * THE WALL: concrete jersey barrier and a graffitied site hoarding. The leg
+     * is meant to feel enclosed and joyless, so the roadside closes in rather
      * than opening onto crowd.
+     *
+     * TWO STOREYS, and the split is the whole design of this piece.
+     *
+     * The hoarding used to be one unbroken 6.5-unit slab running the full tile
+     * at x = 11.35, on both sides, for the entire leg. That did make the road
+     * feel like a trench, but it cost more than it bought: LANDMARK_IN is
+     * 11.75, so every set piece and every building on this leg stood 0.4 units
+     * BEHIND a wall taller than they were wide on screen. The sightline over a
+     * 6.5 wall at 11.35 clears y = 6.9 at x = 12.6 and y = 9.6 at x = 20 --
+     * so the mile-20 hoardings showed a strip of poster with no legs under it
+     * and the skyline showed roofs with no buildings under them. Slivers, not
+     * masses, on the one leg that most needs somewhere to look.
+     *
+     * So the boarding below stays CONTINUOUS and the storey above it goes to a
+     * rhythm of bays:
+     *
+     *   lower  0 -> 3.4, unbroken, both sides, the whole leg. The chase camera
+     *          sits at y ~2.7, so this is above eye level: the ground beyond is
+     *          never visible and the corridor never actually opens. This is the
+     *          part that does the boxing in, and none of it is given up.
+     *   upper  3.4 -> 6.5, in 8-unit panels with a 4-unit open scaffold bay
+     *          between them, staggered a half-period between the two sides so
+     *          the road is never open on both flanks at once.
+     *
+     * What comes back through the bays is everything from y ~3.5 up: the
+     * hoarding legs and the lower two thirds of their boards, the bases of the
+     * blocks behind. And the broken top line is worth as much as the gaps --
+     * a dead straight edge running to the vanishing point on both sides gave
+     * the leg no rhythm at all, and rhythm is what a wall of this length needs
+     * to keep reading as oppressive instead of merely as grey.
      */
     const wallGeo = (function () {
       const parts = [];
+      // Solid upper bays, as [zFrom, zTo] within the tile. The two arrays are
+      // the same pattern a half-period apart, and each tiles seamlessly with
+      // its own repeat: the gap that ends at +12 is continued by the gap that
+      // starts the next tile at -12.
+      const BAYS = [
+        [[-TILE / 2, -4], [0, 8]],           // sx = -1
+        [[-8, 0], [4, TILE / 2]],            // sx = +1
+      ];
+      // Centres of the 4-unit openings left between them, in tile coordinates.
+      const GAPS = [[-2, 10], [-10, 2]];
       for (const sx of [-1, 1]) {
         pavement(parts, sx, 0x8c8a96, 0xb0aeba);
         const x = sx * (K.TRACK_HALF_WIDTH + 0.9);
         parts.push(bx(1.0, 0.55, TILE, x, 0.27, 0, 0xc8c4cc));
         parts.push(bx(0.62, 0.55, TILE, x, 0.80, 0, 0xdedae2));
         parts.push(bx(0.70, 0.12, TILE, x, 1.10, 0, 0xffb020));
+
         const wx = sx * (K.TRACK_HALF_WIDTH + 7.6);
-        parts.push(bx(0.7, 6.2, TILE, wx, 3.1, 0, 0x5f5866));
-        parts.push(bx(0.9, 0.4, TILE, wx, 6.3, 0, 0x453f4e));
-        // Fly-posted panels: the only colour on this leg, and deliberately grim.
-        const tags = [0x7a1030, 0x2b6e6a, 0x6a4f8a, 0x8a6a1f];
-        for (let i = 0; i < 4; i++) {
-          parts.push(bx(0.12, 1.6 + (i % 2) * 0.8, 3.4, wx - sx * 0.4,
-            1.6 + (i % 3) * 1.1, -TILE / 2 + 3 + i * 6, tags[(i + (sx > 0 ? 1 : 0)) % 4]));
+        // Lower boarding, plus the string course that reads as the joint
+        // between the boarding and the scaffold standing on it.
+        parts.push(bx(0.7, 3.4, TILE, wx, 1.70, 0, 0x5f5866));
+        parts.push(bx(0.86, 0.22, TILE, wx, 3.51, 0, 0x453f4e));
+
+        const bays = BAYS[sx > 0 ? 1 : 0];
+        for (const [z0, z1] of bays) {
+          const len = z1 - z0, cz = (z0 + z1) / 2;
+          parts.push(bx(0.7, 2.85, len, wx, 5.05, cz, 0x5f5866));
+          parts.push(bx(0.9, 0.4, len + 0.5, wx, 6.30, cz, 0x453f4e));
+          // Fly-posted panels: the only colour on this leg, and deliberately
+          // grim. One high on the panel, one on the boarding under it, so the
+          // colour is spread over both storeys instead of banding.
+          const tags = [0x7a1030, 0x2b6e6a, 0x6a4f8a, 0x8a6a1f];
+          const t0 = (sx > 0 ? 1 : 0) + (z0 < 0 ? 0 : 2);
+          parts.push(bx(0.12, 1.9, len * 0.55, wx - sx * 0.4, 5.1, cz - len * 0.12,
+            tags[t0 % 4]));
+          parts.push(bx(0.12, 2.2, len * 0.42, wx - sx * 0.4, 1.7, cz + len * 0.22,
+            tags[(t0 + 1) % 4]));
+        }
+        // The open bays are not empty: scaffold standards at each panel end and
+        // a lift rail across, so the line of the hoarding is still drawn at
+        // full height and the gap reads as unfinished works rather than as a
+        // hole somebody forgot to fill.
+        for (const [z0, z1] of bays) {
+          for (const pz of [z0, z1]) {
+            parts.push(bx(0.30, 3.1, 0.30, wx, 5.05, pz, 0x3d3846));
+          }
+        }
+        for (const gz of GAPS[sx > 0 ? 1 : 0]) {
+          parts.push(bx(0.22, 0.22, 4.4, wx, 6.15, gz, 0x3d3846));
+          parts.push(bx(0.22, 0.22, 4.4, wx, 4.55, gz, 0x3d3846));
         }
       }
       return merge(parts);
@@ -6255,7 +6365,7 @@ MR.Camera = (function () {
         // figure sat 87% down the frame with its legs clipped off the bottom
         // edge. Backing off frames the whole body and shows more of the bar
         // being cleared.
-        + duck * 0.95
+        - duck * 0.55
         - s.gearT * s.gearT * 0.45
         + s.mileT * 0.45
         + s.winded * 0.28
@@ -6274,7 +6384,7 @@ MR.Camera = (function () {
         // travel axis, so dropping with it pushed the whole runner off the
         // bottom of the frame just as the player needs to see both their own
         // clearance and the road past it.
-        + duck * 0.16
+        + duck * 1.20
         + (p.y || 0) * 0.30            // keeps a third of the arc -- see aim
         + s.dip
         + s.mileT * 0.24
@@ -6291,8 +6401,8 @@ MR.Camera = (function () {
       // 0.42/0.30 split had the camera chasing the arc and cancelled it.
       look.set(
         s.x * s.fr.lookX,
-        LOOK_Y + (p.y || 0) * 0.50 - duck * 0.26 - drive * 0.22 + fin * 0.55,
-        p.z + LOOK_AHEAD + (p.y || 0) * 1.1 - drive * 0.5
+        LOOK_Y + (p.y || 0) * 0.50 - duck * 1.05 - drive * 0.22 + fin * 0.55,
+        p.z + LOOK_AHEAD - duck * 3.2 + (p.y || 0) * 1.1 - drive * 0.5
       );
       cam.lookAt(look);
 

@@ -233,7 +233,11 @@ MR.HUD = (function () {
       set(n.toGo, 'toGo', Math.max(0, K.MARATHON_MILES - p.miles).toFixed(2) + ' MI TO GO');
 
       // ---- the headline: is the record still alive ----------------------
-      const proj = p.projected();
+      // projectClean() rolls the real streak/easing model forward assuming the
+      // line holds from here, rather than freezing the current pace. The
+      // frozen-pace version read 2:24:12 at the gun on a run heading for
+      // 1:58:14; this reads 1:57:48 there and is exact from about mile 3.
+      const proj = p.projectClean();
       const margin = K.RECORD_SECONDS - proj;         // positive = under the record
       set(n.projVal, 'proj', Pace.clock(proj));
       set(n.margin, 'margin',
@@ -251,11 +255,13 @@ MR.HUD = (function () {
       // lot of it is still unspent the projection is falling under the player
       // every second, so it is an estimate and is labelled as one.
       const unlocked = (K.START_PACE - p.targetPace()) / (K.START_PACE - K.FLOOR_PACE);
-      // Past the 14-mile mark there is not enough road left for the streak to
-      // rewrite the answer, so the verdict hardens whatever the streak is doing
-      // -- otherwise a run that never strings anything together would sit on
-      // "still buying speed" all the way to a 2:10 finish.
-      const settled = unlocked >= 0.94 || p.miles > K.MARATHON_MILES * 0.55;
+      // The long "still buying speed" hold existed because the frozen-pace
+      // projection was useless until the streak had spent most of its range.
+      // projectClean() is within ~30s of the truth by the first mile, so the
+      // verdict can harden almost immediately; all that is held back is the
+      // opening stretch where too few gates have been seen to measure the
+      // gate rate the projection depends on.
+      const settled = p.miles > 0.6;
       const bleeding = p.targetPace() - p.pace > 1.5; // streak was cut, pace sliding back
 
       let state, chip;
@@ -263,7 +269,7 @@ MR.HUD = (function () {
         state = 'off'; chip = 'RECORD GONE';
       } else if (!settled) {
         state = 'est';
-        chip = bleeding ? 'BLEEDING SPEED ▲' : 'BUYING SPEED ▼';
+        chip = bleeding ? 'BLEEDING SPEED ▲' : 'ESTIMATING';
       } else if (margin > 0) {
         state = 'on';  chip = 'RECORD ON';
       } else {

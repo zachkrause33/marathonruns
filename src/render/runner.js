@@ -317,7 +317,7 @@ MR.Runner = (function () {
      */
     api.update = function (dt, st) {
       st = st || {};
-      const speed = st.speed === undefined ? 22 : st.speed;
+      const speed = st.speed === undefined ? SPEED_LO : st.speed;
       const air = st.air01 || 0;
       const duck = st.duck01 || 0;
       const lean = st.lean || 0;

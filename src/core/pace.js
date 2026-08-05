@@ -29,6 +29,7 @@ MR.Pace = (function () {
       bestStreak: 0,
       pace: K.START_PACE,   // seconds per mile, instantaneous
       hits: 0,
+      gatesSeen: 0,
       finished: false,
       finishTime: 0,
       splits: [],           // race-time at each completed mile
@@ -73,13 +74,26 @@ MR.Pace = (function () {
 
     s.onClean = function () {
       s.streak++;
+      s.gatesSeen++;
       if (s.streak > s.bestStreak) s.bestStreak = s.streak;
     };
 
     s.onHit = function () {
       s.hits++;
+      s.gatesSeen++;
       s.streak = Math.floor(s.streak * K.HIT_STREAK_KEEP);
       s.raceTime += K.HIT_TIME_PENALTY;
+    };
+
+    /**
+     * Gates per mile, measured from what has actually gone past rather than
+     * passed in from the course. Courses vary (173-179 gates), and this keeps
+     * projectClean() correct without pace.js needing to know about course
+     * data or main.js needing to wire it through. Falls back to the long-run
+     * average until enough of the race has been seen to measure it.
+     */
+    s.gatesPerMile = function () {
+      return s.miles > 1.5 ? s.gatesSeen / s.miles : 6.7;
     };
 
     /** World units per real second at the current pace. */
@@ -98,6 +112,71 @@ MR.Pace = (function () {
     /** Finish time if the current pace were held to the line. */
     s.projected = function () {
       return s.raceTime + (K.MARATHON_MILES - s.miles) * s.pace;
+    };
+
+    /**
+     * Finish time if the player holds a clean line from here.
+     *
+     * `projected()` above is structurally pessimistic during the part of the
+     * race that matters most. It assumes the current pace holds, but on a
+     * clean run the pace is still falling, so at the gun a flawless player is
+     * shown 2:24:12 -- the largest number on screen tells them they are
+     * failing while they are in fact heading for 1:58:16. Relocating that
+     * number in the HUD does not fix it; the projection itself is wrong.
+     *
+     * This rolls the real model forward instead: gates keep arriving at the
+     * observed rate, every one of them is cleared, the streak grows, and the
+     * pace eases toward its target under the same PACE_EASE limit the live
+     * simulation uses. Integrating in closed form would ignore that easing lag
+     * and land ~70s optimistic, so this steps numerically -- roughly 100 steps
+     * for a whole marathon, and the result is cached per call site rather than
+     * recomputed per frame.
+     *
+     * The assumption is stated, not hidden: this is "if you stay clean", which
+     * is exactly the question a record chase asks.
+     */
+    s.projectClean = function (gatesPerMile) {
+      const g = gatesPerMile || s.gatesPerMile();
+      const STEP = 0.25;                       // miles per integration step
+
+      let t = s.raceTime;
+      let m = s.miles;
+      let pace = s.pace;
+      let streak = s.streak;
+
+      let guard = 0;
+      while (m < K.MARATHON_MILES && guard++ < 400) {
+        const dm = Math.min(STEP, K.MARATHON_MILES - m);
+        // Race seconds spent covering dm at the pace entering this step.
+        const dRace = dm * pace;
+
+        // Same easing law as update(), applied over that span.
+        const tgt = targetPace(streak);
+        const d = tgt - pace;
+        const step = K.PACE_EASE * dRace;
+        pace += Math.abs(d) <= step ? d : Math.sign(d) * step;
+
+        streak += g * dm;
+        t += dRace;
+        m += dm;
+      }
+      return t;
+    };
+
+    /**
+     * The exact question "can the record still be reached at all". FLOOR_PACE
+     * is the fastest any streak can ever make the player, so if the pace the
+     * remaining distance demands is below the floor, no run of clean gates
+     * recovers it. This is a bound, not a heuristic.
+     */
+    s.needPace = function () {
+      const left = K.MARATHON_MILES - s.miles;
+      if (left <= 0) return Infinity;
+      return (K.RECORD_SECONDS - s.raceTime) / left;
+    };
+
+    s.recordPossible = function () {
+      return s.needPace() > K.FLOOR_PACE;
     };
 
     /** Where the record ghost is right now, in miles. */

@@ -48,6 +48,12 @@
   const runner = MR.Runner.create();
   scene.add(runner.group);
 
+  // The 1:59:30 record, on the road rather than in the corner of the screen.
+  // It is a pure marker: it reads pace.ghostMiles() and draws it, and nothing
+  // below ever asks it a question that could change a race number.
+  const ghost = MR.Ghost.create();
+  scene.add(ghost.group);
+
   const cam = MR.Camera.create(window.innerWidth / window.innerHeight);
   const controls = MR.Controls.create(canvas);
   const audio = MR.Audio.create();
@@ -79,6 +85,7 @@
     mileShown = 0;
     lastStep = 0;
     runner.phase = 0;
+    ghost.reset();
     hud.hideEnd();
     world.update(0);
   }
@@ -269,6 +276,11 @@
       speed: pace.speed(), lean: player.lean, duck01: player.duck01,
     });
 
+    // After the camera, never before: the ghost's tag is placed against this
+    // frame's lens (position, fov, aspect), and a frame of lag there shows up
+    // as the tag swimming during a lane change.
+    ghost.update(dt, { pace, camera: cam.camera, playerX: player.x });
+
     hud.update(pace, DEBUG ? { fps, draws: renderer.info.render.calls } : null);
     renderer.render(scene, cam.camera);
   }
@@ -289,7 +301,7 @@
     get state() { return state; },
     get pace() { return pace; },
     get player() { return player; },
-    course, world, runner, cam, hud, audio, renderer, scene,
+    course, world, runner, ghost, cam, hud, audio, renderer, scene,
     begin,
     fps: () => fps,
     ready: false,

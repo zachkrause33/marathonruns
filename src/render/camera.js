@@ -40,13 +40,15 @@ MR.Camera = (function () {
   // ---- framing ----------------------------------------------------------
   // The FOV *swing* is the cue, not the absolute value: past about 74 degrees
   // vertical the far road collapses into a band and gates stop being readable
-  // early enough to react to, which is a bug however fast it feels.
+  // early enough to react to, which is a bug however fast it feels. So the
+  // steady range is 58 -> 71 and the clamp exists only to stop stacked
+  // transients (gear + duck + landing kick) from ever getting there.
   const BASE_FOV = 58;
   const SPEED_FOV = 10.5;        // widening across the honest pace band
   const GEAR_FOV = 2.5;          // extra, only in the top of the band
   const FOV_MIN = 48, FOV_MAX = 76;
 
-  const BASE_Y = 2.02;
+  const BASE_Y = 2.05;
   const BASE_BACK = 4.35;
   const LOOK_Y = 1.16;
   const LOOK_AHEAD = 8.0;
@@ -99,6 +101,7 @@ MR.Camera = (function () {
       stride: 0,       // stride phase, mirrors the runner's cadence
       primed: false,   // first frame snaps the speed filter
       sp: SPEED_LO,    // smoothed ground speed
+      drive: 0,        // 0..1 pace within the honest band, shaped
       accel: 0,        // smoothed d(speed)/dt -- the surge signal
 
       shake: 0,        // trauma, 0..1
@@ -147,6 +150,10 @@ MR.Camera = (function () {
       // "quick" and "flat out", not between the start line and mile 3.
       const drive = Math.pow(sp01, 0.85);
       const gear = smoothstep(0.70, 0.99, sp01);      // the top-gear state
+      // Kept for impact(): pace *is* the streak, so how fast the runner was
+      // going when they hit something is an honest measure of how much the
+      // hit just cost them. See impact().
+      s.drive = drive;
       // +/- 1 over the range the pace ease can actually produce.
       const surge = Math.max(-1, Math.min(1, s.accel / 3.2));
 
@@ -233,9 +240,9 @@ MR.Camera = (function () {
         + fin * 3.4;
 
       const hgt = BASE_Y
-        - drive * 0.34
+        - drive * 0.41
         - duck * 0.34
-        + (p.y || 0) * 0.30            // barely follows the arc -- see below
+        + (p.y || 0) * 0.30            // keeps a third of the arc -- see aim
         + s.dip
         + s.mileT * 0.24
         + s.winded * 0.12
@@ -299,9 +306,13 @@ MR.Camera = (function () {
      * Contact. This costs the player their record, so it gets the whole
      * vocabulary: a lurch, heavy damped shake, and a two-second winded tail
      * where the camera sits back, lifts, and narrows while the pace bleeds.
+     *
+     * Weighted by current pace, which is the only honest read on streak length
+     * the camera has: 4:20/mi means ~170 clean gates in a row, and losing that
+     * should not land the same as clipping the second gate of the race.
      */
     s.impact = function (amount) {
-      const a = amount === undefined ? 1 : amount;
+      const a = (amount === undefined ? 1 : amount) * (0.6 + 0.7 * s.drive);
       s.shake = Math.min(1.5, s.shake + 1.15 * a);
       s.punch = Math.min(1.2, s.punch + 0.9 * a);
       s.winded = Math.min(1, s.winded + 0.85 * a);
@@ -313,10 +324,11 @@ MR.Camera = (function () {
       s.lurch = (Math.sin(s.t * 12.9) >= 0 ? 1 : -1) * 0.42 * a;
     };
 
-    /** Landing: compression into the road, then a rebound. */
+    /** Landing: compression into the road, then a rebound. Heavier at pace. */
     s.land = function () {
-      s.dipV -= 3.6;
-      s.shake = Math.min(1.5, s.shake + 0.30);
+      const w = 0.8 + 0.4 * s.drive;
+      s.dipV -= 3.6 * w;
+      s.shake = Math.min(1.5, s.shake + 0.30 * w);
       s.kick = Math.min(1, s.kick + 0.35);
     };
 
@@ -328,7 +340,8 @@ MR.Camera = (function () {
 
     s.reset = function () {
       s.x = 0; s.vx = 0; s.roll = 0; s.fov = BASE_FOV;
-      s.t = 0; s.stride = 0; s.primed = false; s.sp = SPEED_LO; s.accel = 0;
+      s.t = 0; s.stride = 0; s.primed = false;
+      s.sp = SPEED_LO; s.drive = 0; s.accel = 0;
       s.shake = 0; s.punch = 0; s.lurch = 0; s.winded = 0;
       s.dip = 0; s.dipV = 0; s.kick = 0;
       s.mile = -1; s.mileT = 0; s.gearT = 0; s.gearArmed = true; s.finish = 0;

@@ -544,6 +544,18 @@ MR.World = (function () {
         parts.push(bx(0.16, 0.62, 2.4, bx0 + sx * 0.4, 0.72, bz, 0x8a5a3c));
         parts.push(bx(0.2, 0.42, 0.2, bx0, 0.21, bz - 0.9, 0x2b2f52));
         parts.push(bx(0.2, 0.42, 0.2, bx0, 0.21, bz + 0.9, 0x2b2f52));
+        // An avenue, planted on the tile so it costs no extra draw. Scattered
+        // single trees never made PARKLAND feel like parkland -- a regular
+        // line right at the verge does, and it is what a park boulevard is.
+        for (let i = 0; i < 2; i++) {
+          const tz = -TILE / 2 + 5 + i * 12 + (sx > 0 ? 3 : 0);
+          const k = i ? 1.15 : 0.92;
+          const tx = sx * (K.TRACK_HALF_WIDTH + 3.4);
+          parts.push(cyl(0.20 * k, 0.32 * k, 1.9 * k, 6, tx, 0.95 * k, tz, 0x8a5a3c));
+          parts.push(cone(1.55 * k, 2.1 * k, 8, tx, 2.6 * k, tz, 0x2f9f52));
+          parts.push(cone(1.20 * k, 1.7 * k, 8, tx, 3.6 * k, tz, 0x3fbf63));
+          parts.push(cone(0.82 * k, 1.4 * k, 8, tx, 4.6 * k, tz, 0x59d47a));
+        }
       }
       return merge(parts);
     })();
@@ -1167,6 +1179,10 @@ MR.World = (function () {
       }
       if (b.name === 'THE WALL') {
         for (let z = b.from + 90; z < b.to - 40; z += 168) structures.push({ z, kind: 'overpass' });
+        // One placed by hand: you go under it and the mile 20 gantry is
+        // waiting on the far side. Mile 20 is where a marathon breaks people,
+        // and the course should stage it rather than merely label it.
+        structures.push({ z: 20 * K.UNITS_PER_MILE - 34, kind: 'overpass' });
       }
       if (b.name === 'FINAL MILE') {
         for (let z = b.from; z < K.TOTAL_UNITS + 30; z += TILE) {
@@ -1394,10 +1410,13 @@ MR.World = (function () {
         e.pool.release(e.obj);
       }
 
-      // rivals -- they move, so their release test reads the live position
+      // Rivals move, so their release test reads the live position rather than
+      // the layout z. The step is a fixed 1/60 rather than dt because update()
+      // is not given one; a rival being a metre out after a frame hitch is
+      // invisible, and it keeps this loop off the delta-time plumbing.
       for (let i = activeRivals.length - 1; i >= 0; i--) {
         const r = activeRivals[i];
-        r.z += r.speed * 0.016;
+        r.z += r.speed * (1 / 60);
         r.obj.position.z = r.z;
         // Cheap run cycle: a bob and a matching roll sell stride at speed.
         const ph = now * 5.5 + r.phase;

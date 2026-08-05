@@ -606,6 +606,137 @@ MR.shading = (function () {
     return mesh;
   }
 
+  // ---- contact shadow ----------------------------------------------------
+  //
+  // Every reference frame grounds its character with a soft dark blob under
+  // the feet, and it is doing more work than it looks like: without it a
+  // figure drawn over a road has nothing tying it to a specific point on that
+  // road, and at this camera angle it reads as floating a foot in the air.
+  // It is also the cheapest depth cue in the game -- one alpha-blended quad.
+  //
+  // Deliberately NOT a real shadow. No lights cast, no shadow map, no depth
+  // pass: SwiftShader cannot afford a 1024 map at 60fps and the toy look does
+  // not want an accurate one anyway. A fake blob that is always directly under
+  // the object is what the references draw.
+
+  let blobTex = null;
+
+  /**
+   * The falloff, drawn once into a canvas and shared by every shadow. Alpha
+   * carries the shape; rgb is left white so the material's own `color` is the
+   * only thing tinting it.
+   *
+   * The profile is squared rather than linear -- a linear radial gradient has
+   * a soft, evenly-thinning edge that reads as a smudge, while squaring holds
+   * a dense core out to about half the radius and then lets go, which is the
+   * shape an occluder actually casts and the shape the references draw. The
+   * canvas is only 96px because it is never seen larger than a couple of
+   * hundred screen pixels and it is magnified with linear filtering.
+   */
+  function blobTexture() {
+    if (blobTex) return blobTex;
+    const N = 96;
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = N;
+    const g = cv.getContext('2d');
+    const img = g.createImageData(N, N);
+    const d = img.data;
+    const c = (N - 1) / 2;
+    for (let y = 0; y < N; y++) {
+      for (let x = 0; x < N; x++) {
+        const dx = (x - c) / c, dy = (y - c) / c;
+        const r = Math.sqrt(dx * dx + dy * dy);
+        const a = Math.max(0, 1 - r);
+        const i = (y * N + x) * 4;
+        d[i] = d[i + 1] = d[i + 2] = 255;
+        d[i + 3] = Math.round(a * a * 255);
+      }
+    }
+    g.putImageData(img, 0, 0);
+    blobTex = new THREE.CanvasTexture(cv);
+    blobTex.colorSpace = THREE.SRGBColorSpace;
+    blobTex.generateMipmaps = false;
+    blobTex.minFilter = blobTex.magFilter = THREE.LinearFilter;
+    blobTex.wrapS = blobTex.wrapT = THREE.ClampToEdgeWrapping;
+    return blobTex;
+  }
+
+  /**
+   * A soft contact shadow: one ground-facing quad with a radial falloff,
+   * meant to be parented to a character or a prop so it travels with it.
+   *
+   * CONTRACT
+   *   const sh = S.contactShadow(0.42);     // radius in WORLD UNITS
+   *   runner.root.add(sh);                  // parent at the object's ORIGIN
+   *
+   *   sh.position.y            already 0.015 -- just clear of the road. Set it
+   *                            to the GROUND height under the object, not to
+   *                            the object's own height: the shadow stays on
+   *                            the road while the runner jumps, so when the
+   *                            parent lifts, subtract the lift back off here.
+   *   sh.scale.setScalar(k)    k MULTIPLIES the radius asked for, so 1 is the
+   *                            size requested and no caller has to remember
+   *                            the number. Growing and fading it with jump
+   *                            height makes the jump read twice as high.
+   *   sh.material.opacity      0..1 fade. Each shadow gets its own material
+   *                            (the texture and the geometry are shared), so
+   *                            writing this affects only that one object.
+   *   sh.visible = false       switch it off; costs nothing while hidden.
+   *
+   * The quad already lies flat in XZ facing +Y, so it needs no rotation from
+   * the caller. It is unlit, writes no depth (overlapping shadows blend
+   * instead of z-fighting) and is fogged like everything else, which is what
+   * makes a distant prop's shadow fade into the haze at the same rate as the
+   * prop standing on it.
+   *
+   * CAVEAT: it inherits the parent's rotation. Parent it to a node that stays
+   * upright -- the runner's root, not its leaning torso -- or the blob tips up
+   * off the road and gives the trick away.
+   *
+   * @param radius  world units to the blob's visible edge. Default 0.42,
+   *                about right for the player.
+   * @param opts    {opacity, color} -- both optional, both also settable on
+   *                the returned mesh's material afterwards.
+   */
+  function contactShadow(radius, opts) {
+    const r = radius === undefined ? 0.42 : radius;
+    const o = opts || {};
+    const mat = new THREE.MeshBasicMaterial({
+      map: blobTexture(),
+      color: o.color === undefined ? PALETTE.contact : o.color,
+      transparent: true,
+      opacity: o.opacity === undefined ? 0.50 : o.opacity,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const mesh = new THREE.Mesh(shadowGeo(r), mat);
+    mesh.position.y = 0.015;
+    // After the water plane, which is the other transparent thing on the
+    // ground, so a shadow on the bridge deck is never sorted underneath it.
+    mesh.renderOrder = 2;
+    mesh.userData.radius = r;
+    return mesh;
+  }
+
+  // The radius is baked into the geometry so that `scale` stays free for the
+  // caller to use as a plain multiplier. PlaneGeometry is built in XY, so it
+  // is rotated flat here, once, rather than on every mesh -- which is also
+  // what lets scale.x/scale.z mean what a caller expects.
+  //
+  // Cached by radius: there are only ever a handful of distinct sizes (the
+  // player, the rivals, whatever props take one), and 4 vertices each is far
+  // cheaper than the alternative of an off-by-a-factor-of-2r scale contract.
+  const shadowGeos = new Map();
+  function shadowGeo(r) {
+    const key = Math.round(r * 1000);
+    let g = shadowGeos.get(key);
+    if (!g) {
+      g = new THREE.PlaneGeometry(r * 2, r * 2).rotateX(-Math.PI / 2);
+      shadowGeos.set(key, g);
+    }
+    return g;
+  }
+
   // ---- lighting ----------------------------------------------------------
 
   /**
@@ -671,6 +802,6 @@ MR.shading = (function () {
 
   return {
     PALETTE, INK, ramp, toon, flat, outlineMaterial, outlined, skyDome, lights,
-    clouds, syncFog,
+    clouds, syncFog, contactShadow,
   };
 })();

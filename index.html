@@ -747,6 +747,7 @@ MR.Pace = (function () {
       bestStreak: 0,
       pace: K.START_PACE,   // seconds per mile, instantaneous
       hits: 0,
+      gatesSeen: 0,
       finished: false,
       finishTime: 0,
       splits: [],           // race-time at each completed mile
@@ -791,13 +792,26 @@ MR.Pace = (function () {
 
     s.onClean = function () {
       s.streak++;
+      s.gatesSeen++;
       if (s.streak > s.bestStreak) s.bestStreak = s.streak;
     };
 
     s.onHit = function () {
       s.hits++;
+      s.gatesSeen++;
       s.streak = Math.floor(s.streak * K.HIT_STREAK_KEEP);
       s.raceTime += K.HIT_TIME_PENALTY;
+    };
+
+    /**
+     * Gates per mile, measured from what has actually gone past rather than
+     * passed in from the course. Courses vary (173-179 gates), and this keeps
+     * projectClean() correct without pace.js needing to know about course
+     * data or main.js needing to wire it through. Falls back to the long-run
+     * average until enough of the race has been seen to measure it.
+     */
+    s.gatesPerMile = function () {
+      return s.miles > 1.5 ? s.gatesSeen / s.miles : 6.7;
     };
 
     /** World units per real second at the current pace. */
@@ -816,6 +830,71 @@ MR.Pace = (function () {
     /** Finish time if the current pace were held to the line. */
     s.projected = function () {
       return s.raceTime + (K.MARATHON_MILES - s.miles) * s.pace;
+    };
+
+    /**
+     * Finish time if the player holds a clean line from here.
+     *
+     * `projected()` above is structurally pessimistic during the part of the
+     * race that matters most. It assumes the current pace holds, but on a
+     * clean run the pace is still falling, so at the gun a flawless player is
+     * shown 2:24:12 -- the largest number on screen tells them they are
+     * failing while they are in fact heading for 1:58:16. Relocating that
+     * number in the HUD does not fix it; the projection itself is wrong.
+     *
+     * This rolls the real model forward instead: gates keep arriving at the
+     * observed rate, every one of them is cleared, the streak grows, and the
+     * pace eases toward its target under the same PACE_EASE limit the live
+     * simulation uses. Integrating in closed form would ignore that easing lag
+     * and land ~70s optimistic, so this steps numerically -- roughly 100 steps
+     * for a whole marathon, and the result is cached per call site rather than
+     * recomputed per frame.
+     *
+     * The assumption is stated, not hidden: this is "if you stay clean", which
+     * is exactly the question a record chase asks.
+     */
+    s.projectClean = function (gatesPerMile) {
+      const g = gatesPerMile || s.gatesPerMile();
+      const STEP = 0.25;                       // miles per integration step
+
+      let t = s.raceTime;
+      let m = s.miles;
+      let pace = s.pace;
+      let streak = s.streak;
+
+      let guard = 0;
+      while (m < K.MARATHON_MILES && guard++ < 400) {
+        const dm = Math.min(STEP, K.MARATHON_MILES - m);
+        // Race seconds spent covering dm at the pace entering this step.
+        const dRace = dm * pace;
+
+        // Same easing law as update(), applied over that span.
+        const tgt = targetPace(streak);
+        const d = tgt - pace;
+        const step = K.PACE_EASE * dRace;
+        pace += Math.abs(d) <= step ? d : Math.sign(d) * step;
+
+        streak += g * dm;
+        t += dRace;
+        m += dm;
+      }
+      return t;
+    };
+
+    /**
+     * The exact question "can the record still be reached at all". FLOOR_PACE
+     * is the fastest any streak can ever make the player, so if the pace the
+     * remaining distance demands is below the floor, no run of clean gates
+     * recovers it. This is a bound, not a heuristic.
+     */
+    s.needPace = function () {
+      const left = K.MARATHON_MILES - s.miles;
+      if (left <= 0) return Infinity;
+      return (K.RECORD_SECONDS - s.raceTime) / left;
+    };
+
+    s.recordPossible = function () {
+      return s.needPace() > K.FLOOR_PACE;
     };
 
     /** Where the record ghost is right now, in miles. */
@@ -1255,6 +1334,13 @@ MR.shading = (function () {
    * gradient lookup only reads the red channel, so patchToonRamp() below
    * widens it to rgb -- if that patch ever fails to apply the red channel
    * still carries a sensible luminance and the look degrades to greyscale.
+   *
+   * This ramp is the whole of the shading now that scenery carries no ink, so
+   * it is deliberately harder than it was: a box has to show three distinct
+   * tones on its three visible faces, because that step is the ONLY thing
+   * left separating its top from its front. Both numbers below were pulled
+   * further apart when the outlines came off -- a ramp tuned to sit politely
+   * underneath a black rim reads as unshaded once the rim is gone.
    */
   function ramp(steps) {
     if (ramps.has(steps)) return ramps.get(steps);
@@ -1265,11 +1351,16 @@ MR.shading = (function () {
       // Bias the darkest band up so shadows stay colourful, never muddy, and
       // curve the ramp so the mid band sits nearer the shadow than the light:
       // an evenly spaced ramp puts the terminator's wide middle band close to
-      // full brightness and the form stops reading.
-      const v = 0.38 + 0.62 * Math.pow(k, 1.25);
+      // full brightness and the form stops reading. 0.31 is as low as this can
+      // go before the ambient can no longer keep a shaded red vest from
+      // reading as brown.
+      const v = 0.31 + 0.69 * Math.pow(k, 1.22);
       // Cool the dark end. Pushed too far this desaturates the base colour to
       // blue-grey instead of shading it, so it falls off fast toward the light.
-      const cool = Math.pow(1 - k, 1.6) * 0.30;
+      // The exponent is what keeps a 3-band ramp's MIDDLE band only slightly
+      // cool: cooling the terminator as hard as the core shadow tints the
+      // whole object blue rather than tinting its shadow.
+      const cool = Math.pow(1 - k, 1.55) * 0.38;
       const rgb = [v * (1 - cool * 1.05), v * (1 - cool * 0.40), v * (1 + cool * 0.72)];
       for (let c = 0; c < 3; c++) {
         data[i * 4 + c] = Math.round(Math.max(0, Math.min(1, rgb[c])) * 255);
@@ -1414,9 +1505,30 @@ MR.shading = (function () {
   // objects used to carry hundreds of identical ShaderMaterials.
   const outlineMats = new Map();
 
-  /** @param thickness world units of extrusion (see OUTLINE_VS). */
+  // An INK weight of 0 has to mean "no line", not "a line of zero width" --
+  // a zero extrusion leaves the shell exactly coincident with the fill and
+  // z-fights it into a shimmering mess. Callers pass a weight straight out of
+  // INK without checking, so the check lives here: weight 0 hands back one
+  // shared material with visible=false, which WebGLRenderer.projectObject
+  // filters out before it ever reaches a draw call. Zero draws, zero state
+  // changes, and every caller keeps working untouched.
+  let hiddenInk = null;
+  function hiddenInkMaterial() {
+    if (!hiddenInk) {
+      hiddenInk = new THREE.MeshBasicMaterial();
+      hiddenInk.visible = false;
+      hiddenInk.name = 'ink/none';
+    }
+    return hiddenInk;
+  }
+
+  /**
+   * @param thickness world units of extrusion (see OUTLINE_VS). 0 or less
+   *        returns a shared invisible material -- see above.
+   */
   function outlineMaterial(thickness, color) {
     const t = thickness === undefined ? INK.character : thickness;
+    if (!(t > 0)) return hiddenInkMaterial();
     const c = color === undefined ? PALETTE.ink : color;
     const key = t + '/' + c;
     let m = outlineMats.get(key);
@@ -1441,12 +1553,21 @@ MR.shading = (function () {
    * Wrap a mesh in its own outline shell. Returns a Group holding both, so
    * animating the group moves silhouette and fill together and they can never
    * drift apart.
+   *
+   * At INK weight 0 the shell mesh is still built and still parented, but it
+   * is switched off. That is on purpose: callers hold on to
+   * `group.userData.line` and scale or reposition it alongside the fill (a
+   * pooled building does exactly this every time it is claimed), so removing
+   * the object would turn a weight change into a crash. An invisible child is
+   * one matrix update per frame and no draw call.
    */
   function outlined(geometry, material, thickness) {
+    const t = thickness === undefined ? INK.character : thickness;
     const g = new THREE.Group();
     const fill = new THREE.Mesh(geometry, material);
-    const line = new THREE.Mesh(geometry, outlineMaterial(thickness));
+    const line = new THREE.Mesh(geometry, outlineMaterial(t));
     line.renderOrder = -1;
+    line.visible = t > 0;
     g.add(line, fill);
     g.userData.fill = fill;
     g.userData.line = line;
@@ -1662,6 +1783,137 @@ MR.shading = (function () {
     return mesh;
   }
 
+  // ---- contact shadow ----------------------------------------------------
+  //
+  // Every reference frame grounds its character with a soft dark blob under
+  // the feet, and it is doing more work than it looks like: without it a
+  // figure drawn over a road has nothing tying it to a specific point on that
+  // road, and at this camera angle it reads as floating a foot in the air.
+  // It is also the cheapest depth cue in the game -- one alpha-blended quad.
+  //
+  // Deliberately NOT a real shadow. No lights cast, no shadow map, no depth
+  // pass: SwiftShader cannot afford a 1024 map at 60fps and the toy look does
+  // not want an accurate one anyway. A fake blob that is always directly under
+  // the object is what the references draw.
+
+  let blobTex = null;
+
+  /**
+   * The falloff, drawn once into a canvas and shared by every shadow. Alpha
+   * carries the shape; rgb is left white so the material's own `color` is the
+   * only thing tinting it.
+   *
+   * The profile is squared rather than linear -- a linear radial gradient has
+   * a soft, evenly-thinning edge that reads as a smudge, while squaring holds
+   * a dense core out to about half the radius and then lets go, which is the
+   * shape an occluder actually casts and the shape the references draw. The
+   * canvas is only 96px because it is never seen larger than a couple of
+   * hundred screen pixels and it is magnified with linear filtering.
+   */
+  function blobTexture() {
+    if (blobTex) return blobTex;
+    const N = 96;
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = N;
+    const g = cv.getContext('2d');
+    const img = g.createImageData(N, N);
+    const d = img.data;
+    const c = (N - 1) / 2;
+    for (let y = 0; y < N; y++) {
+      for (let x = 0; x < N; x++) {
+        const dx = (x - c) / c, dy = (y - c) / c;
+        const r = Math.sqrt(dx * dx + dy * dy);
+        const a = Math.max(0, 1 - r);
+        const i = (y * N + x) * 4;
+        d[i] = d[i + 1] = d[i + 2] = 255;
+        d[i + 3] = Math.round(a * a * 255);
+      }
+    }
+    g.putImageData(img, 0, 0);
+    blobTex = new THREE.CanvasTexture(cv);
+    blobTex.colorSpace = THREE.SRGBColorSpace;
+    blobTex.generateMipmaps = false;
+    blobTex.minFilter = blobTex.magFilter = THREE.LinearFilter;
+    blobTex.wrapS = blobTex.wrapT = THREE.ClampToEdgeWrapping;
+    return blobTex;
+  }
+
+  /**
+   * A soft contact shadow: one ground-facing quad with a radial falloff,
+   * meant to be parented to a character or a prop so it travels with it.
+   *
+   * CONTRACT
+   *   const sh = S.contactShadow(0.42);     // radius in WORLD UNITS
+   *   runner.root.add(sh);                  // parent at the object's ORIGIN
+   *
+   *   sh.position.y            already 0.015 -- just clear of the road. Set it
+   *                            to the GROUND height under the object, not to
+   *                            the object's own height: the shadow stays on
+   *                            the road while the runner jumps, so when the
+   *                            parent lifts, subtract the lift back off here.
+   *   sh.scale.setScalar(k)    k MULTIPLIES the radius asked for, so 1 is the
+   *                            size requested and no caller has to remember
+   *                            the number. Growing and fading it with jump
+   *                            height makes the jump read twice as high.
+   *   sh.material.opacity      0..1 fade. Each shadow gets its own material
+   *                            (the texture and the geometry are shared), so
+   *                            writing this affects only that one object.
+   *   sh.visible = false       switch it off; costs nothing while hidden.
+   *
+   * The quad already lies flat in XZ facing +Y, so it needs no rotation from
+   * the caller. It is unlit, writes no depth (overlapping shadows blend
+   * instead of z-fighting) and is fogged like everything else, which is what
+   * makes a distant prop's shadow fade into the haze at the same rate as the
+   * prop standing on it.
+   *
+   * CAVEAT: it inherits the parent's rotation. Parent it to a node that stays
+   * upright -- the runner's root, not its leaning torso -- or the blob tips up
+   * off the road and gives the trick away.
+   *
+   * @param radius  world units to the blob's visible edge. Default 0.42,
+   *                about right for the player.
+   * @param opts    {opacity, color} -- both optional, both also settable on
+   *                the returned mesh's material afterwards.
+   */
+  function contactShadow(radius, opts) {
+    const r = radius === undefined ? 0.42 : radius;
+    const o = opts || {};
+    const mat = new THREE.MeshBasicMaterial({
+      map: blobTexture(),
+      color: o.color === undefined ? PALETTE.contact : o.color,
+      transparent: true,
+      opacity: o.opacity === undefined ? 0.50 : o.opacity,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const mesh = new THREE.Mesh(shadowGeo(r), mat);
+    mesh.position.y = 0.015;
+    // After the water plane, which is the other transparent thing on the
+    // ground, so a shadow on the bridge deck is never sorted underneath it.
+    mesh.renderOrder = 2;
+    mesh.userData.radius = r;
+    return mesh;
+  }
+
+  // The radius is baked into the geometry so that `scale` stays free for the
+  // caller to use as a plain multiplier. PlaneGeometry is built in XY, so it
+  // is rotated flat here, once, rather than on every mesh -- which is also
+  // what lets scale.x/scale.z mean what a caller expects.
+  //
+  // Cached by radius: there are only ever a handful of distinct sizes (the
+  // player, the rivals, whatever props take one), and 4 vertices each is far
+  // cheaper than the alternative of an off-by-a-factor-of-2r scale contract.
+  const shadowGeos = new Map();
+  function shadowGeo(r) {
+    const key = Math.round(r * 1000);
+    let g = shadowGeos.get(key);
+    if (!g) {
+      g = new THREE.PlaneGeometry(r * 2, r * 2).rotateX(-Math.PI / 2);
+      shadowGeos.set(key, g);
+    }
+    return g;
+  }
+
   // ---- lighting ----------------------------------------------------------
 
   /**
@@ -1671,18 +1923,35 @@ MR.shading = (function () {
    * The bounce is deliberately cool and the ambient only just strong enough to
    * keep the darkest ramp band from closing up: between them they are what
    * gives shaded faces a blue cast rather than a grey one.
+   *
+   * The BALANCE between the three is the other half of losing the outlines.
+   * Fill light is what collapses a banded ramp: every unit of ambient adds
+   * equally to the lit face and the shaded one, so it shrinks the ratio
+   * between them, and the old rig spent 1.25 of its ~3.3 units of exposure on
+   * fill. That is fine under a black rim -- the rim was doing the separating.
+   * With no rim it read as unshaded. Fill is down by a third and the key is up
+   * to match, so total exposure lands within a couple of percent of where it
+   * was while the light/shade step is visibly wider.
+   *
+   * The same move is most of what puts colour back in the frame: a cool fill
+   * that large washes every camera-facing surface toward the same pale blue,
+   * which is exactly the "everything is a lavender-grey slab" the references
+   * do not have. Less fill, warmer key, and a coral facade stays coral.
    */
   function lights(scene) {
     // Along skyDome's sunDir so the drawn sun and the shading agree, but
     // lifted: at the sun's true 14-degree elevation the terminator ran across
     // the runner's waist and the legs went dark.
-    const key = new THREE.DirectionalLight(0xfff4e0, 2.05);
+    const key = new THREE.DirectionalLight(0xfff2d8, 2.42);
     key.position.set(7.0, 9.0, 11.0);
 
-    const bounce = new THREE.DirectionalLight(0x7fa8ff, 0.75);
+    // Aimed back down the camera axis on purpose: the player is seen from
+    // behind, so without this the one surface that matters most -- the
+    // runner's back -- would sit in the ramp's darkest band all race.
+    const bounce = new THREE.DirectionalLight(0x86aeff, 0.58);
     bounce.position.set(-6, 2, -9);
 
-    const amb = new THREE.AmbientLight(0xa8c4ff, 0.50);
+    const amb = new THREE.AmbientLight(0xa8c4ff, 0.34);
 
     scene.add(key, bounce, amb);
 
@@ -1710,7 +1979,7 @@ MR.shading = (function () {
 
   return {
     PALETTE, INK, ramp, toon, flat, outlineMaterial, outlined, skyDome, lights,
-    clouds, syncFog,
+    clouds, syncFog, contactShadow,
   };
 })();
 
@@ -1750,6 +2019,13 @@ MR.shading = (function () {
 MR.Runner = (function () {
   const S = MR.shading;
   const P = S.PALETTE;
+  const K = MR.K;
+
+  // Ground speed at the two ends of the honest pace band. Derived rather
+  // than hard-coded so retuning START_PACE or FLOOR_PACE still lands the
+  // full range of stride and lean instead of quietly clipping it.
+  const SPEED_LO = (K.UNITS_PER_MILE * K.TIME_SCALE) / K.START_PACE;
+  const SPEED_HI = (K.UNITS_PER_MILE * K.TIME_SCALE) / K.FLOOR_PACE;
 
   const HEIGHT = 1.78;
   const OUTLINE = MR.shading.INK.character;
@@ -2027,16 +2303,17 @@ MR.Runner = (function () {
      */
     api.update = function (dt, st) {
       st = st || {};
-      const speed = st.speed === undefined ? 22 : st.speed;
+      const speed = st.speed === undefined ? SPEED_LO : st.speed;
       const air = st.air01 || 0;
       const duck = st.duck01 || 0;
       const lean = st.lean || 0;
       const stumble = st.stumble || 0;
 
       // Stride frequency scales with ground speed so the feet never skate.
-      // 22 u/s is the reference; the exponent keeps cadence rising more
-      // slowly than speed, which is how real runners gain pace.
-      const cadence = 2.55 * Math.pow(speed / 22, 0.72);
+      // Start pace is the reference; the exponent keeps cadence rising more
+      // slowly than speed, which is how real runners gain pace -- the rest
+      // of the gain shows up as stride length and lean below.
+      const cadence = 2.55 * Math.pow(speed / SPEED_LO, 0.72);
       // Bleed the cycle out over the jump instead of hard-stopping at a
       // threshold -- a frozen scissor at the moment of takeoff was visible.
       api.phase = (api.phase + dt * cadence * (1 - air * 0.92)) % 1;
@@ -2044,7 +2321,7 @@ MR.Runner = (function () {
       const p = api.phase * Math.PI * 2;
       // 0..1 across the honest pace band, used only for the terms that should
       // read as "trying harder": stride length and forward lean.
-      const sp01 = Math.max(0, Math.min(1, (speed - 20.5) / 7.5));
+      const sp01 = Math.max(0, Math.min(1, (speed - SPEED_LO) / (SPEED_HI - SPEED_LO)));
       const swing = 0.94 + 0.20 * sp01;
 
       // ---- legs: contralateral swing with a knee tuck on the recovery leg
@@ -2279,12 +2556,14 @@ MR.World = (function () {
    * a small hazard mesh -- which is exactly the distance the lane choice has
    * to be made at.
    */
-  function matTexture(kind, tint) {
+  function matTexture(kind, tint, wash) {
     const c = canvas(128, 256);
     const g = c.getContext('2d');
-    // A dark wash under the icons: the road is mid-value, the icons are
-    // bright, and without this the edges of the mat vanish into it.
-    g.fillStyle = 'rgba(10,10,30,0.34)';
+    // A wash under the icons: the road is mid-value, the icons are bright, and
+    // without this the edges of the mat vanish into it. The wash is a dark
+    // version of the hazard's own hue, not neutral -- at the faded near end a
+    // neutral wash read as a dirty grey smear on the tarmac.
+    g.fillStyle = wash;
     g.fillRect(0, 0, 128, 256);
     g.fillStyle = tint;
     g.fillRect(0, 0, 8, 256); g.fillRect(120, 0, 8, 256);
@@ -2531,6 +2810,9 @@ MR.World = (function () {
     const vergeTex = groundTex.clone();
     vergeTex.repeat.set(5, 4);
     vergeTex.needsUpdate = true;
+    const roadTex = groundTex.clone();
+    roadTex.repeat.set(3, 3);
+    roadTex.needsUpdate = true;
 
     const mats = {
       road: S.toon(P.road, 2),
@@ -2554,6 +2836,7 @@ MR.World = (function () {
     const groundMat = S.toon(P.ground, 2);
     groundMat.map = groundTex;
     mats.shoulder.map = vergeTex;
+    mats.road.map = roadTex;
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(1400, 1400), groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.34;
@@ -2678,6 +2961,18 @@ MR.World = (function () {
         parts.push(bx(0.16, 0.62, 2.4, bx0 + sx * 0.4, 0.72, bz, 0x8a5a3c));
         parts.push(bx(0.2, 0.42, 0.2, bx0, 0.21, bz - 0.9, 0x2b2f52));
         parts.push(bx(0.2, 0.42, 0.2, bx0, 0.21, bz + 0.9, 0x2b2f52));
+        // An avenue, planted on the tile so it costs no extra draw. Scattered
+        // single trees never made PARKLAND feel like parkland -- a regular
+        // line right at the verge does, and it is what a park boulevard is.
+        for (let i = 0; i < 2; i++) {
+          const tz = -TILE / 2 + 5 + i * 12 + (sx > 0 ? 3 : 0);
+          const k = i ? 1.15 : 0.92;
+          const tx = sx * (K.TRACK_HALF_WIDTH + 3.4);
+          parts.push(cyl(0.20 * k, 0.32 * k, 1.9 * k, 6, tx, 0.95 * k, tz, 0x8a5a3c));
+          parts.push(cone(1.55 * k, 2.1 * k, 8, tx, 2.6 * k, tz, 0x2f9f52));
+          parts.push(cone(1.20 * k, 1.7 * k, 8, tx, 3.6 * k, tz, 0x3fbf63));
+          parts.push(cone(0.82 * k, 1.4 * k, 8, tx, 4.6 * k, tz, 0x59d47a));
+        }
       }
       return merge(parts);
     })();
@@ -2788,14 +3083,14 @@ MR.World = (function () {
      * which is precisely when the player needs to see the hazard instead.
      */
     const matGeo = (function () {
-      const g = new THREE.PlaneGeometry(1.95, 14, 1, 14);
+      const g = new THREE.PlaneGeometry(1.95, 16, 1, 16);
       const pos = g.attributes.position;
       const col = new Float32Array(pos.count * 4);
       for (let i = 0; i < pos.count; i++) {
         // Local +Y lays down toward -Z, i.e. toward the approaching runner, so
         // the ramp runs over most of the mat's length and only the last few
         // units before the hazard reach full strength.
-        const t = Math.max(0, Math.min(1, (7.0 - pos.getY(i)) / 9.5));
+        const t = Math.max(0, Math.min(1, (8.0 - pos.getY(i)) / 11.0));
         const a = Math.pow(t, 1.5);
         col[i * 4] = 1; col[i * 4 + 1] = 1; col[i * 4 + 2] = 1; col[i * 4 + 3] = a;
       }
@@ -2803,14 +3098,16 @@ MR.World = (function () {
       return g;
     })();
     const matMat = {};
-    matMat[K.JUMP] = new THREE.MeshBasicMaterial({ map: matTexture(K.JUMP, '#ffc23a'), transparent: true, depthWrite: false, vertexColors: true });
-    matMat[K.DUCK] = new THREE.MeshBasicMaterial({ map: matTexture(K.DUCK, '#4fdcff'), transparent: true, depthWrite: false, vertexColors: true });
-    matMat[K.BLOCK] = new THREE.MeshBasicMaterial({ map: matTexture(K.BLOCK, '#ff4f78'), transparent: true, depthWrite: false, vertexColors: true });
+    matMat[K.JUMP] = new THREE.MeshBasicMaterial({ map: matTexture(K.JUMP, '#ffc23a', 'rgba(58,34,0,0.40)'), transparent: true, depthWrite: false, vertexColors: true });
+    matMat[K.DUCK] = new THREE.MeshBasicMaterial({ map: matTexture(K.DUCK, '#4fdcff', 'rgba(0,36,54,0.40)'), transparent: true, depthWrite: false, vertexColors: true });
+    matMat[K.BLOCK] = new THREE.MeshBasicMaterial({ map: matTexture(K.BLOCK, '#ff4f78', 'rgba(62,0,22,0.44)'), transparent: true, depthWrite: false, vertexColors: true });
 
     function telegraph(kind) {
       const m = new THREE.Mesh(matGeo, matMat[kind]);
       m.rotation.x = -Math.PI / 2;
-      m.position.set(0, 0.012, -8.3);
+      // Runs a little past the gate line so the paint shows through the open
+      // gap under a DUCK bar -- colour at the exact spot of the hazard.
+      m.position.set(0, 0.012, -7.2);
       m.renderOrder = 5;
       return m;
     }
@@ -2836,33 +3133,40 @@ MR.World = (function () {
       return g;
     }, group);
 
-    // DUCK: the bar itself is only 0.42 tall, which is nothing at distance, so
-    // the assembly carries a tall header and a pennant above it. The gap under
-    // the bar stays completely open -- that void is the read.
+    /**
+     * DUCK: the bar is only 0.42 tall, which is nothing at distance, so the
+     * height comes from tall cyan standards rather than from anything spanning
+     * the lane.
+     *
+     * That distinction is not cosmetic. The chase camera trails 5.1 units and
+     * carries 42% of the jump arc, so it sweeps y = 1.76 to 3.14 right through
+     * a gate's lane. An earlier version had a header board at 2.44 and the
+     * camera flew straight into it -- one frame of full-screen cyan stripes.
+     * Above the bar only thin members are allowed, so the worst a clip can
+     * ever be is a sliver of post.
+     */
     const duckGeo = merge([
-      bx(2.30, 0.42, 0.60, 0, 1.62, 0, 0x37d6ff),
-      bx(2.42, 0.10, 0.70, 0, 1.86, 0, 0xd8f8ff),
-      bx(0.22, 2.62, 0.26, -1.20, 1.31, 0, 0x2b2f52),
-      bx(0.22, 2.62, 0.26, 1.20, 1.31, 0, 0x2b2f52),
-      bx(0.42, 0.16, 0.42, -1.20, 0.08, 0, 0x2b2f52),
-      bx(0.42, 0.16, 0.42, 1.20, 0.08, 0, 0x2b2f52),
-      bx(2.70, 0.34, 0.24, 0, 2.44, 0, 0x37d6ff),
-      bx(2.70, 0.10, 0.30, 0, 2.63, 0, 0xd8f8ff),
-      bx(0.36, 0.36, 0.10, -0.75, 2.02, 0.16, 0xffe45e, 0, 0, Math.PI / 4),
-      bx(0.36, 0.36, 0.10, 0.75, 2.02, 0.16, 0xffe45e, 0, 0, Math.PI / 4),
+      bx(2.30, 0.30, 0.60, 0, 1.56, 0, 0x37d6ff),
+      bx(2.36, 0.12, 0.62, 0, 1.77, 0, 0xd8f8ff),
+      bx(0.26, 3.30, 0.30, -1.20, 1.65, 0, 0x37d6ff),
+      bx(0.26, 3.30, 0.30, 1.20, 1.65, 0, 0x37d6ff),
+      bx(0.30, 0.26, 0.34, -1.20, 2.35, 0, 0x0d2b36),
+      bx(0.30, 0.26, 0.34, 1.20, 2.35, 0, 0x0d2b36),
+      bx(0.30, 0.26, 0.34, -1.20, 2.90, 0, 0x0d2b36),
+      bx(0.30, 0.26, 0.34, 1.20, 2.90, 0, 0x0d2b36),
+      bx(0.40, 0.22, 0.40, -1.20, 3.41, 0, 0xd8f8ff),
+      bx(0.40, 0.22, 0.40, 1.20, 3.41, 0, 0xd8f8ff),
+      bx(0.50, 0.22, 0.50, -1.20, 0.11, 0, 0x2b2f52),
+      bx(0.50, 0.22, 0.50, 1.20, 0.11, 0, 0x2b2f52),
     ]);
 
     const duckPool = Pool(function () {
       const g = new THREE.Group();
       g.add(S.outlined(duckGeo, mats.propLit, S.INK.hazard));
-      const face = new THREE.Mesh(new THREE.PlaneGeometry(2.26, 0.38), faceMat.duck);
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(2.26, 0.40), faceMat.duck);
       face.position.set(0, 1.62, -0.302);
       face.rotation.y = Math.PI;
       g.add(face);
-      const head = new THREE.Mesh(new THREE.PlaneGeometry(2.62, 0.30), faceMat.duck);
-      head.position.set(0, 2.44, -0.122);
-      head.rotation.y = Math.PI;
-      g.add(head);
       g.add(telegraph(K.DUCK));
       return g;
     }, group);
@@ -3292,6 +3596,10 @@ MR.World = (function () {
       }
       if (b.name === 'THE WALL') {
         for (let z = b.from + 90; z < b.to - 40; z += 168) structures.push({ z, kind: 'overpass' });
+        // One placed by hand: you go under it and the mile 20 gantry is
+        // waiting on the far side. Mile 20 is where a marathon breaks people,
+        // and the course should stage it rather than merely label it.
+        structures.push({ z: 20 * K.UNITS_PER_MILE - 34, kind: 'overpass' });
       }
       if (b.name === 'FINAL MILE') {
         for (let z = b.from; z < K.TOTAL_UNITS + 30; z += TILE) {
@@ -3519,10 +3827,13 @@ MR.World = (function () {
         e.pool.release(e.obj);
       }
 
-      // rivals -- they move, so their release test reads the live position
+      // Rivals move, so their release test reads the live position rather than
+      // the layout z. The step is a fixed 1/60 rather than dt because update()
+      // is not given one; a rival being a metre out after a frame hitch is
+      // invisible, and it keeps this loop off the delta-time plumbing.
       for (let i = activeRivals.length - 1; i >= 0; i--) {
         const r = activeRivals[i];
-        r.z += r.speed * 0.016;
+        r.z += r.speed * (1 / 60);
         r.obj.position.z = r.z;
         // Cheap run cycle: a bob and a matching roll sell stride at speed.
         const ph = now * 5.5 + r.phase;
@@ -3624,6 +3935,388 @@ MR.World = (function () {
   return { create, VIEW, BEHIND, BIOME_LOOK };
 })();
 
+/* ==================== src/render/ghost.js ==================== */
+/**
+ * The record ghost: 1:59:30 put on the road.
+ *
+ * Until now the record existed only as a number in the corner of the screen,
+ * which is the one place a race is never actually decided. Sonic Forces Speed
+ * Battle puts its rivals on the track ahead of you with a floating name tag,
+ * and that is the model here: the ghost is a runner travelling the course at
+ * exactly RECORD_PACE, so "you are 1:52 down" stops being a split and becomes
+ * a figure up the road that you spend twenty miles reeling in.
+ *
+ * The shape of the race is what makes this worth doing at all. A flawless run
+ * peaks 131 world units behind the ghost around mile 6, closes the gap all the
+ * way through the middle third, draws level at mile 20.6, and finishes 66
+ * units clear. Because the camera sees ~210 units, that means the ghost is on
+ * screen for four fifths of a good race and the crossover happens in plain
+ * sight -- at the pass the two are closing at only 1.4 units/sec, so they run
+ * shoulder to shoulder for the best part of ten seconds.
+ *
+ * IT IS A MARKER, NOT A RACER. Nothing in this file reads or writes anything
+ * the simulation owns: it takes pace.ghostMiles() and draws it. No collision,
+ * no streak, no clock.
+ *
+ * ---- the three problems, and what they cost ----
+ *
+ * 1. IT MUST NEVER READ AS A HAZARD. Every solid thing in this game wears an
+ *    ink outline, so the ghost's outlines are stripped rather than recoloured:
+ *    the absence of ink is the loudest "not real" signal the art direction
+ *    has, and it halves the character's draw calls into the bargain. On top of
+ *    that it is translucent, it is a single cool colour with no vest red
+ *    anywhere on it, and it runs the outside lane rather than the middle one
+ *    where the eye is hunting for gates.
+ *
+ * 2. IT IS TINY EXACTLY WHEN THE GAP MATTERS MOST. At the 131-unit peak the
+ *    body is seven pixels tall against pale haze. So two things run backwards
+ *    from intuition here: the body carries NO fog (it is an instrument, not
+ *    scenery -- aerial perspective would erase it precisely when the player
+ *    needs to judge the gap), and it gets MORE opaque with distance, not less.
+ *    The "is that an obstacle?" risk only exists up close; the "can I see it
+ *    at all?" problem only exists far away, so each end of the range is tuned
+ *    for its own failure.
+ *
+ * 3. MOST OF THE TIME IT IS OFF SCREEN, IN BOTH DIRECTIONS. Handled with a
+ *    floating tag rather than more HUD, so the answer stays on the road:
+ *      - riding the ghost while it is in view, tail pointing at its head;
+ *      - clamped to the haze wall with an up-chevron once it is further away
+ *        than the player could ever see, because past 190 units the tag's
+ *        screen position stops meaning anything and it would be a lie to keep
+ *        moving it;
+ *      - pinned low and to the side, reading BEHIND YOU, once it has slipped
+ *        past the camera and cannot be shown at all.
+ *    The tag has size attenuation off, so it is the same size on screen from
+ *    three units away or a hundred and ninety. Its POSITION carries the
+ *    distance; its legibility never does.
+ */
+MR.Ghost = (function () {
+  const K = MR.K;
+  const S = MR.shading;
+
+  // ---- where it runs ----------------------------------------------------
+
+  // The outside lane, deliberately not the middle. The centre of the road is
+  // where the player's eye lives and where the next gate resolves, and a
+  // translucent figure parked there is the one placement that could cost
+  // someone a gate.
+  const HOME_X = K.LANE_X[0];
+  // Halfway between that lane and the kerb. Derived rather than typed, so the
+  // pending track-narrowing work carries the ghost with it instead of leaving
+  // it running along the verge.
+  const WIDE_X = (HOME_X - K.TRACK_HALF_WIDTH) * 0.5;
+
+  // The ghost never varies -- it IS record pace, by definition. Feeding the
+  // rig a constant is also the cheapest way to sell the pass: at the crossover
+  // the player's cadence is visibly quicker than the record's, which is the
+  // whole story of the race told by two pairs of legs.
+  const SPEED = (K.UNITS_PER_MILE * K.TIME_SCALE) / K.RECORD_PACE;
+
+  // World.VIEW is 210 and the haze closes at 190. Past that the body is a
+  // smudge whatever we do to it, so it dematerialises and the tag takes over.
+  const HAZE = 190;
+  const HEAD_Y = MR.Runner.HEIGHT + 0.16;
+
+  // ---- how it looks -----------------------------------------------------
+
+  // Periwinkle: cool, mid-value, and the one hue the game does not already
+  // spend. It has to survive two opposite backgrounds -- the dark slate road
+  // up close and the pale fog at the vanishing point -- so it sits between
+  // them in value rather than at either end. Nothing else on the road is this
+  // colour, and in particular it is none of amber/cyan/red, which are the
+  // three colours that mean "obstacle".
+  const COOL = 0x8fa4ff;
+  const HOT = new THREE.Color(0xffffff);
+
+  const NEAR_ALPHA = 0.34;   // right beside you: unmistakably not solid
+  const FAR_ALPHA = 0.90;    // seven pixels tall in haze: take every bit
+
+  // ---- the tag ----------------------------------------------------------
+  // Drawn to match the HUD's own language: hard rectangle, hairline border,
+  // tabular figures, uppercase micro-cap. It is a broadcast name-super, not a
+  // game bubble, because that is what the rest of this game's typography is.
+
+  const TAG_W = 384, TAG_H = 208, PLATE_H = 148, WING = 34;
+  const TAG_ASPECT = TAG_W / TAG_H;
+  // Sprite scale is in per-unit-of-depth terms once size attenuation is off,
+  // so this is a fraction of the viewport height: ~6% at the base FOV.
+  const TAG_SIZE = 0.086;
+
+  const FAM = 'ui-sans-serif, system-ui, -apple-system, Arial, sans-serif';
+  const PLATE = 'rgba(14, 18, 48, 0.88)';
+  const HAIR = 'rgba(255, 253, 245, 0.22)';
+  const COOL_CSS = '#8fa4ff';
+  const AHEAD_CSS = '#4dfba0';   // matches the HUD: green means beating it
+
+  /** Letter-spaced small caps. Canvas letterSpacing is too new to rely on. */
+  function caps(g, text, cx, y, px, color) {
+    g.font = '800 ' + px + 'px ' + FAM;
+    g.fillStyle = color;
+    const sp = px * 0.17;
+    let w = -sp;
+    for (const ch of text) w += g.measureText(ch).width + sp;
+    let x = cx - w / 2;
+    for (const ch of text) { g.fillText(ch, x, y); x += g.measureText(ch).width + sp; }
+  }
+
+  /**
+   * @param cap   the micro-label above the time
+   * @param color cap colour
+   * @param wing  -1 tail below the plate, +1 chevron above it, 0 neither
+   */
+  function tagTexture(cap, color, wing) {
+    const c = document.createElement('canvas');
+    c.width = TAG_W; c.height = TAG_H;
+    const g = c.getContext('2d');
+    const top = wing > 0 ? TAG_H - PLATE_H : 0;
+    const bot = top + PLATE_H;
+
+    g.fillStyle = PLATE;
+    g.fillRect(0, top, TAG_W, PLATE_H);
+
+    // The wing is what turns a floating rectangle into a label that belongs to
+    // something: down, it points at the head under it; up, it points at road
+    // the player cannot see yet.
+    if (wing) {
+      g.beginPath();
+      if (wing < 0) {
+        g.moveTo(TAG_W / 2 - WING, bot); g.lineTo(TAG_W / 2 + WING, bot);
+        g.lineTo(TAG_W / 2, bot + WING * 0.9);
+      } else {
+        g.moveTo(TAG_W / 2 - WING, top); g.lineTo(TAG_W / 2 + WING, top);
+        g.lineTo(TAG_W / 2, top - WING * 0.9);
+      }
+      g.closePath(); g.fill();
+    }
+
+    g.strokeStyle = HAIR; g.lineWidth = 4;
+    g.strokeRect(2, top + 2, TAG_W - 4, PLATE_H - 4);
+    // A bar of the ghost's own colour down the leading edge, exactly as the
+    // HUD panels wear the accent -- it is what ties tag to body at a glance.
+    g.fillStyle = COOL_CSS;
+    g.fillRect(0, top, 7, PLATE_H);
+
+    g.textAlign = 'left'; g.textBaseline = 'middle';
+    caps(g, cap, TAG_W / 2 + 3, top + 36, 25, color);
+
+    g.textAlign = 'center';
+    g.fillStyle = '#fffdf5';
+    // Fit rather than trust the metrics, the same way the race bib does: a
+    // machine without the preferred family must not overflow the plate.
+    let px = 78;
+    do {
+      g.font = '900 ' + px + 'px ' + FAM;
+      px -= 2;
+    } while (px > 28 && g.measureText(K.RECORD_LABEL).width > TAG_W * 0.80);
+    g.fillText(K.RECORD_LABEL, TAG_W / 2 + 3, top + 100);
+
+    const t = new THREE.CanvasTexture(c);
+    t.anisotropy = 4;
+    return t;
+  }
+
+  function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+  function smoothstep(a, b, x) { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); }
+
+  function sprite(map) {
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+      map,
+      transparent: true,
+      depthTest: false,     // an instrument: never occluded by scenery
+      depthWrite: false,
+      sizeAttenuation: false,
+      fog: false,
+      toneMapped: false,
+    }));
+    sp.renderOrder = 900;
+    // Positioned by hand every frame, including deliberately off to one side;
+    // three's sprite culling would fight that.
+    sp.frustumCulled = false;
+    sp.scale.set(TAG_SIZE * TAG_ASPECT, TAG_SIZE, 1);
+    return sp;
+  }
+
+  // ---------------------------------------------------------------------
+
+  function create() {
+    const group = new THREE.Group();
+
+    // One material for the whole body, so a per-frame opacity or colour change
+    // is a single write rather than fourteen.
+    const mat = S.toon(COOL, 3);
+    mat.transparent = true;
+    mat.opacity = NEAR_ALPHA;
+    mat.depthWrite = false;   // an X-ray read: limbs show through each other
+    mat.fog = false;          // see the header -- haze must not eat the marker
+    mat.needsUpdate = true;
+
+    // Reuse the real rig rather than authoring a second character: it is
+    // procedural, it already animates from ground speed, and any future work
+    // on the runner's silhouette lands on the ghost for free.
+    const body = MR.Runner.create();
+    // Off the player's beat, so two runners side by side at the crossover read
+    // as two runners rather than as one figure and its reflection.
+    body.phase = 0.37;
+
+    const ink = [];
+    body.group.traverse(function (o) {
+      if (!o.isMesh) return;
+      // shading.outlined() tags its own shell; the raw ShaderMaterial test is
+      // the belt to that braces. Recolouring the outline is not an option --
+      // those materials are cached and shared with the player.
+      const par = o.parent;
+      const isInk = (par && par.userData && par.userData.line === o)
+        || (o.material && o.material.isShaderMaterial);
+      if (isInk) ink.push(o); else o.material = mat;
+    });
+    for (const m of ink) if (m.parent) m.parent.remove(m);
+
+    group.add(body.group);
+
+    const texRide = tagTexture('RECORD', COOL_CSS, -1);
+    const texFar = tagTexture('UP THE ROAD', COOL_CSS, 1);
+    const texRear = tagTexture('BEHIND YOU', AHEAD_CSS, 0);
+
+    // Two sprites rather than one that swaps texture: the hand-off from "over
+    // its head" to "pinned in the corner" happens while both are on screen, so
+    // it has to be a cross-fade or it reads as a glitch.
+    const tagWorld = sprite(texRide);
+    const tagRear = sprite(texRear);
+    group.add(tagWorld, tagRear);
+
+    const s = {
+      group,
+      body,
+      x: HOME_X,
+      gap: 0,          // ghost minus player, in world units
+      flash: 0,        // one-shot, fired the instant the player goes past
+      primed: false,   // first frame seeds the state instead of reacting to it
+      z: 0,
+    };
+
+    const _v = new THREE.Vector3();  // hoisted: this runs 60x a second
+    const _r = new THREE.Vector3();
+    const _u = new THREE.Vector3();
+
+    /**
+     * @param dt real seconds
+     * @param st { pace, camera, playerX }
+     */
+    s.update = function (dt, st) {
+      const pace = st.pace;
+      const cam = st.camera;
+      const z = pace.units;
+      const gz = pace.ghostMiles() * K.UNITS_PER_MILE;
+      const gap = gz - z;
+      s.z = gz;
+
+      // The crossover. Detected on the sign change rather than on a threshold,
+      // so it fires exactly once and exactly where the record is beaten. The
+      // primed flag is why ?skip= past mile 20 does not open with a phantom
+      // celebration -- same trick the camera plays with its speed filter.
+      if (!s.primed) { s.primed = true; s.gap = gap; s.x = HOME_X; }
+      else if (s.gap > 0 && gap <= 0) s.flash = 1;
+      s.gap = gap;
+      s.flash = Math.max(0, s.flash - dt / 1.7);
+
+      // ---- lateral -------------------------------------------------------
+      // No course-solving: it holds one lane for twenty-six miles. The single
+      // exception is the pass, where the player arriving in its lane would put
+      // two bodies inside each other -- so it eases toward the kerb, over
+      // about a second, and eases back. A drift, not a dodge.
+      const crowded = Math.abs((st.playerX || 0) - HOME_X) < 1.3 && Math.abs(gap) < 30;
+      s.x += ((crowded ? WIDE_X : HOME_X) - s.x) * (1 - Math.pow(0.35, dt));
+
+      // ---- body ----------------------------------------------------------
+      const camZ = cam.position.z;
+      const ahead = gz - camZ;          // depth in front of the lens
+
+      // Denser the further off it is; see the header. The extra term keeps it
+      // from blinking out at the haze wall.
+      let alpha = NEAR_ALPHA + (FAR_ALPHA - NEAR_ALPHA) * smoothstep(14, 100, gap);
+      alpha *= 1 - smoothstep(HAZE - 34, HAZE, gap);
+      // Shoulder to shoulder is the moment the whole feature exists for, so it
+      // gets a lift of its own on top of the crossover flash.
+      const level = 1 - smoothstep(5, 22, Math.abs(gap));
+      alpha = Math.min(1, alpha + s.flash * 0.5 + level * 0.10);
+
+      const bodyOn = ahead > 1.2 && alpha > 0.02;
+      body.group.visible = bodyOn;
+      if (bodyOn) {
+        mat.opacity = alpha;
+        mat.color.set(COOL).lerp(HOT, s.flash * 0.75);
+        body.update(dt, { speed: SPEED });
+        body.group.position.set(s.x, 0, gz);
+      }
+
+      // ---- tag -----------------------------------------------------------
+      // Hand over to the pinned tag as the ghost slides past the lens. Gated on
+      // the player having genuinely passed it: at the gun the two are level and
+      // the ghost is technically behind the camera, which is not the same thing.
+      const passed = gap < -1;
+      const rear = passed ? clamp01((11 - ahead) / 9) : 0;
+      const pulse = 1 + 0.5 * s.flash;
+
+      tagWorld.material.opacity = 1 - rear;
+      tagWorld.visible = tagWorld.material.opacity > 0.02;
+      if (tagWorld.visible) {
+        // Past the haze the tag's height on screen stops carrying information,
+        // so it stops moving and says so instead.
+        const beyond = gap > HAZE;
+        tagWorld.material.map = beyond ? texFar : texRide;
+        const tz = beyond ? z + HAZE : gz;
+        // Size attenuation is off, so a sprite's world footprint grows with
+        // depth. Scaling the offset by depth too is what keeps the tail the
+        // same distance above the head at three units and at a hundred.
+        const depth = Math.max(4, tz - camZ);
+        tagWorld.scale.set(TAG_SIZE * TAG_ASPECT * pulse, TAG_SIZE * pulse, 1);
+        tagWorld.position.set(s.x, HEAD_Y + depth * TAG_SIZE * pulse * 0.5, tz);
+      }
+
+      tagRear.material.opacity = rear * 0.95;
+      tagRear.visible = tagRear.material.opacity > 0.02;
+      if (tagRear.visible) {
+        // Placed off the camera's own basis rather than in world space: there
+        // is no world position behind the lens that can be drawn, so the only
+        // honest thing left is to park it at a fixed corner of the frame, on
+        // the side of the road the ghost is on.
+        cam.updateMatrixWorld();
+        const e = cam.matrixWorld.elements;
+        _r.set(e[0], e[1], e[2]);
+        _u.set(e[4], e[5], e[6]);
+        _v.set(-e[8], -e[9], -e[10]);
+        const d = 6;
+        const tan = Math.tan(cam.fov * Math.PI / 360);
+        // Lane 0 is screen-right for this camera, which is where the ghost went.
+        const nx = 0.58, ny = -0.58;
+        tagRear.scale.set(TAG_SIZE * TAG_ASPECT * pulse * 0.86, TAG_SIZE * pulse * 0.86, 1);
+        tagRear.position.copy(cam.position)
+          .addScaledVector(_v, d)
+          .addScaledVector(_r, nx * d * tan * cam.aspect)
+          .addScaledVector(_u, ny * d * tan);
+      }
+    };
+
+    s.reset = function () {
+      s.primed = false;
+      s.gap = 0;
+      s.flash = 0;
+      s.x = HOME_X;
+      body.phase = 0.37;
+      mat.opacity = NEAR_ALPHA;
+      mat.color.set(COOL);
+      tagWorld.material.map = texRide;
+    };
+
+    /** Signed gap in world units, for tooling that wants to assert on it. */
+    s.gapUnits = function () { return s.gap; };
+
+    return s;
+  }
+
+  return { create, SPEED, HAZE };
+})();
+
 /* ==================== src/render/camera.js ==================== */
 /**
  * Chase camera: low, tight, and behind the shoulder.
@@ -3632,8 +4325,8 @@ MR.World = (function () {
  * roughly a third of frame height with the road opening out above them --
  * close enough that a lane change is body movement, high enough that the next
  * two gates still read. The first pass sat at 3.0 up / 6.55 back and the
- * runner was a distant sprite; this sits at 1.98 / 4.42 and the character is
- * something you are *inside* of rather than watching.
+ * runner was a distant sprite at a quarter of frame height; this sits at
+ * 2.02 / 4.35 and fills about a third, dropping to 1.68 / 3.73 at full pace.
  *
  * Perceived speed is the hard problem and this file owns all of it. Ground
  * speed only moves 21.8 -> 27.7 units/sec across the whole race, because
@@ -3673,7 +4366,7 @@ MR.Camera = (function () {
   const GEAR_FOV = 2.5;          // extra, only in the top of the band
   const FOV_MIN = 48, FOV_MAX = 76;
 
-  const BASE_Y = 2.02;
+  const BASE_Y = 2.05;
   const BASE_BACK = 4.35;
   const LOOK_Y = 1.16;
   const LOOK_AHEAD = 8.0;
@@ -3726,6 +4419,7 @@ MR.Camera = (function () {
       stride: 0,       // stride phase, mirrors the runner's cadence
       primed: false,   // first frame snaps the speed filter
       sp: SPEED_LO,    // smoothed ground speed
+      drive: 0,        // 0..1 pace within the honest band, shaped
       accel: 0,        // smoothed d(speed)/dt -- the surge signal
 
       shake: 0,        // trauma, 0..1
@@ -3774,6 +4468,10 @@ MR.Camera = (function () {
       // "quick" and "flat out", not between the start line and mile 3.
       const drive = Math.pow(sp01, 0.85);
       const gear = smoothstep(0.70, 0.99, sp01);      // the top-gear state
+      // Kept for impact(): pace *is* the streak, so how fast the runner was
+      // going when they hit something is an honest measure of how much the
+      // hit just cost them. See impact().
+      s.drive = drive;
       // +/- 1 over the range the pace ease can actually produce.
       const surge = Math.max(-1, Math.min(1, s.accel / 3.2));
 
@@ -3860,7 +4558,7 @@ MR.Camera = (function () {
         + fin * 3.4;
 
       const hgt = BASE_Y
-        - drive * 0.34
+        - drive * 0.41
         - duck * 0.34
         + (p.y || 0) * 0.30            // barely follows the arc -- see below
         + s.dip
@@ -3926,9 +4624,13 @@ MR.Camera = (function () {
      * Contact. This costs the player their record, so it gets the whole
      * vocabulary: a lurch, heavy damped shake, and a two-second winded tail
      * where the camera sits back, lifts, and narrows while the pace bleeds.
+     *
+     * Weighted by current pace, which is the only honest read on streak length
+     * the camera has: 4:20/mi means ~170 clean gates in a row, and losing that
+     * should not land the same as clipping the second gate of the race.
      */
     s.impact = function (amount) {
-      const a = amount === undefined ? 1 : amount;
+      const a = (amount === undefined ? 1 : amount) * (0.6 + 0.7 * s.drive);
       s.shake = Math.min(1.5, s.shake + 1.15 * a);
       s.punch = Math.min(1.2, s.punch + 0.9 * a);
       s.winded = Math.min(1, s.winded + 0.85 * a);
@@ -3940,10 +4642,11 @@ MR.Camera = (function () {
       s.lurch = (Math.sin(s.t * 12.9) >= 0 ? 1 : -1) * 0.42 * a;
     };
 
-    /** Landing: compression into the road, then a rebound. */
+    /** Landing: compression into the road, then a rebound. Heavier at pace. */
     s.land = function () {
-      s.dipV -= 3.6;
-      s.shake = Math.min(1.5, s.shake + 0.30);
+      const w = 0.8 + 0.4 * s.drive;
+      s.dipV -= 3.6 * w;
+      s.shake = Math.min(1.5, s.shake + 0.30 * w);
       s.kick = Math.min(1, s.kick + 0.35);
     };
 
@@ -3955,7 +4658,8 @@ MR.Camera = (function () {
 
     s.reset = function () {
       s.x = 0; s.vx = 0; s.roll = 0; s.fov = BASE_FOV;
-      s.t = 0; s.stride = 0; s.primed = false; s.sp = SPEED_LO; s.accel = 0;
+      s.t = 0; s.stride = 0; s.primed = false;
+      s.sp = SPEED_LO; s.drive = 0; s.accel = 0;
       s.shake = 0; s.punch = 0; s.lurch = 0; s.winded = 0;
       s.dip = 0; s.dipV = 0; s.kick = 0;
       s.mile = -1; s.mileT = 0; s.gearT = 0; s.gearArmed = true; s.finish = 0;
@@ -4756,7 +5460,11 @@ MR.HUD = (function () {
       set(n.toGo, 'toGo', Math.max(0, K.MARATHON_MILES - p.miles).toFixed(2) + ' MI TO GO');
 
       // ---- the headline: is the record still alive ----------------------
-      const proj = p.projected();
+      // projectClean() rolls the real streak/easing model forward assuming the
+      // line holds from here, rather than freezing the current pace. The
+      // frozen-pace version read 2:24:12 at the gun on a run heading for
+      // 1:58:14; this reads 1:57:48 there and is exact from about mile 3.
+      const proj = p.projectClean();
       const margin = K.RECORD_SECONDS - proj;         // positive = under the record
       set(n.projVal, 'proj', Pace.clock(proj));
       set(n.margin, 'margin',
@@ -4774,11 +5482,13 @@ MR.HUD = (function () {
       // lot of it is still unspent the projection is falling under the player
       // every second, so it is an estimate and is labelled as one.
       const unlocked = (K.START_PACE - p.targetPace()) / (K.START_PACE - K.FLOOR_PACE);
-      // Past the 14-mile mark there is not enough road left for the streak to
-      // rewrite the answer, so the verdict hardens whatever the streak is doing
-      // -- otherwise a run that never strings anything together would sit on
-      // "still buying speed" all the way to a 2:10 finish.
-      const settled = unlocked >= 0.94 || p.miles > K.MARATHON_MILES * 0.55;
+      // The long "still buying speed" hold existed because the frozen-pace
+      // projection was useless until the streak had spent most of its range.
+      // projectClean() is within ~30s of the truth by the first mile, so the
+      // verdict can harden almost immediately; all that is held back is the
+      // opening stretch where too few gates have been seen to measure the
+      // gate rate the projection depends on.
+      const settled = p.miles > 0.6;
       const bleeding = p.targetPace() - p.pace > 1.5; // streak was cut, pace sliding back
 
       let state, chip;
@@ -4786,7 +5496,7 @@ MR.HUD = (function () {
         state = 'off'; chip = 'RECORD GONE';
       } else if (!settled) {
         state = 'est';
-        chip = bleeding ? 'BLEEDING SPEED ▲' : 'BUYING SPEED ▼';
+        chip = bleeding ? 'BLEEDING SPEED ▲' : 'ESTIMATING';
       } else if (margin > 0) {
         state = 'on';  chip = 'RECORD ON';
       } else {
@@ -5007,6 +5717,12 @@ MR.HUD = (function () {
   const runner = MR.Runner.create();
   scene.add(runner.group);
 
+  // The 1:59:30 record, on the road rather than in the corner of the screen.
+  // It is a pure marker: it reads pace.ghostMiles() and draws it, and nothing
+  // below ever asks it a question that could change a race number.
+  const ghost = MR.Ghost.create();
+  scene.add(ghost.group);
+
   const cam = MR.Camera.create(window.innerWidth / window.innerHeight);
   const controls = MR.Controls.create(canvas);
   const audio = MR.Audio.create();
@@ -5038,6 +5754,7 @@ MR.HUD = (function () {
     mileShown = 0;
     lastStep = 0;
     runner.phase = 0;
+    ghost.reset();
     hud.hideEnd();
     world.update(0);
   }
@@ -5228,6 +5945,11 @@ MR.HUD = (function () {
       speed: pace.speed(), lean: player.lean, duck01: player.duck01,
     });
 
+    // After the camera, never before: the ghost's tag is placed against this
+    // frame's lens (position, fov, aspect), and a frame of lag there shows up
+    // as the tag swimming during a lane change.
+    ghost.update(dt, { pace, camera: cam.camera, playerX: player.x });
+
     hud.update(pace, DEBUG ? { fps, draws: renderer.info.render.calls } : null);
     renderer.render(scene, cam.camera);
   }
@@ -5248,7 +5970,7 @@ MR.HUD = (function () {
     get state() { return state; },
     get pace() { return pace; },
     get player() { return player; },
-    course, world, runner, cam, hud, audio, renderer, scene,
+    course, world, runner, ghost, cam, hud, audio, renderer, scene,
     begin,
     fps: () => fps,
     ready: false,

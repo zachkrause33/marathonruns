@@ -62,9 +62,23 @@ MR.World = (function () {
   // `edge` names the roadside furniture the road tile wears; `mix` weights the
   // roadside prop lottery. Together they are what distinguishes a biome, the
   // colours only agree with it.
+  // ROAD VALUE, and why these are so much lighter than tarmac.
+  //
+  // Measured against the reference frames: in both Subway Surfers shots the
+  // surface the player runs on (crimson train roof, mint train roof) is among
+  // the LIGHTEST and most saturated large masses in frame, and the eye lands
+  // on it first. Ours was 0x4a4f78-0x5b5f88 slate -- the darkest, least
+  // saturated large mass, and also the biggest single area on screen -- so the
+  // eye went to the grass banks and the sky instead of to the road the player
+  // has to read. Realistic asphalt was losing the game a readability fight it
+  // did not need to be in.
+  //
+  // These are lifted several stops and given chroma per biome. Lane paint and
+  // the hazard telegraph mats still have to sit on top of them, so nothing
+  // here goes near white.
   const BIOME_LOOK = {
     'CITY START': {
-      sky: [0x2b3fa8, 0x9fdcff], ground: 0x63c96b, road: 0x50557d, fog: 0x9fdcff,
+      sky: [0x2b3fa8, 0x9fdcff], ground: 0x63c96b, road: 0x9aa0d8, fog: 0x9fdcff,
       edge: 'barrier',
       mix: { building: 2.6, tree: 0.55, grove: 0.15, crowd: 2.3, rival: 0.5, station: 0.10 },
     },
@@ -72,29 +86,29 @@ MR.World = (function () {
     // to the road; at full shoulder width the river sat 35 units out and read
     // as a smear on the horizon.
     'RIVERSIDE': {
-      sky: [0x1f6fb8, 0xbdf0ff], ground: 0x57c7a8, road: 0x4d5a80, fog: 0xbdf0ff,
+      sky: [0x1f6fb8, 0xbdf0ff], ground: 0x57c7a8, road: 0x8fb4dc, fog: 0xbdf0ff,
       edge: 'hedge', bank: -1,
       mix: { building: 0.45, tree: 1.5, grove: 1.3, crowd: 1.0, rival: 0.45, station: 0.12 },
     },
     // Nothing stands beside a bridge deck -- the emptiness is the point, and a
     // spectator out there would be standing on the river.
     'THE BRIDGE': {
-      sky: [0x3a4fc0, 0xffd9a8], ground: 0x2f8fc4, road: 0x5b5f88, fog: 0xffd9a8,
+      sky: [0x3a4fc0, 0xffd9a8], ground: 0x2f8fc4, road: 0xb9a8e0, fog: 0xffd9a8,
       edge: 'rail',
       mix: { building: 0.0, tree: 0.0, crowd: 0.0, rival: 1.0, station: 0.0 },
     },
     'PARKLAND': {
-      sky: [0x2e8fd0, 0xcdf5c0], ground: 0x6fd46a, road: 0x53587f, fog: 0xcdf5c0,
+      sky: [0x2e8fd0, 0xcdf5c0], ground: 0x6fd46a, road: 0xa8b6e2, fog: 0xcdf5c0,
       edge: 'hedge',
       mix: { building: 0.12, tree: 2.2, grove: 3.2, crowd: 1.1, rival: 0.45, station: 0.12 },
     },
     'THE WALL': {
-      sky: [0x8a3a6b, 0xffb27a], ground: 0x8f9a5e, road: 0x5a4f66, fog: 0xffb27a,
+      sky: [0x8a3a6b, 0xffb27a], ground: 0x8f9a5e, road: 0xc79ab0, fog: 0xffb27a,
       edge: 'wall',
       mix: { building: 2.0, tree: 0.25, crowd: 0.35, rival: 0.3, station: 0.18 },
     },
     'FINAL MILE': {
-      sky: [0x24306e, 0xffcf6b], ground: 0x5cb46a, road: 0x4a4f78, fog: 0xffcf6b,
+      sky: [0x24306e, 0xffcf6b], ground: 0x5cb46a, road: 0xa9a2e4, fog: 0xffcf6b,
       edge: 'barrier',
       mix: { building: 1.1, tree: 0.3, crowd: 3.4, rival: 0.6, station: 0.0 },
     },
@@ -860,8 +874,14 @@ MR.World = (function () {
      */
     const RING_GATES = 4;
     const RING_AT = [-12.5, -7.5, -3.0];   // run-up offsets from the gate line
-    const RING_Y = 1.15;
-    const RING_R = 0.28;
+    // 1.30 is the one height that works: above a JUMP kerb (0.80), clear below
+    // a DUCK bar (1.41) so a ring never floats at bar height and reads as
+    // "through here", and high enough that at 40 units the whole ring clears
+    // the top of the runner's head in frame. The radius is set the same way --
+    // 0.36 is 42% of a lane, big enough to survive the fog and small enough
+    // that the trail never looks like something in the way.
+    const RING_Y = 1.30;
+    const RING_R = 0.36;
     const RING_N = RING_GATES * RING_AT.length;
 
     const ringGeo = new THREE.BufferGeometry();
@@ -1262,8 +1282,14 @@ MR.World = (function () {
     const RIVAL_HALF = 0.40;                                  // arm to arm
     const RIVAL_IN = LANE + HAZARD_HALF + RIVAL_HALF;         // nearest line
     const RIVAL_OUT = Math.max(RIVAL_IN, K.TRACK_HALF_WIDTH - RIVAL_HALF);
-    const RIVAL_YIELD = 0.62;    // extra fraction of x at the closest approach
-    const RIVAL_YIELD_Z = 30;    // over how much ground the yield opens up
+    // How far out a rival swings at the closest approach, and over how much
+    // ground the swing opens up. The ceiling is the tarmac, and that is not
+    // fussiness: 0.17 further out is the kerb block, and on the bridge deck the
+    // balustrade stands at TRACK_HALF_WIDTH + 0.55 with open water past it, so
+    // a wider yield puts a runner over the river. The shoulder is therefore
+    // what limits this, not the effect.
+    const RIVAL_YIELD_X = RIVAL_OUT;
+    const RIVAL_YIELD_Z = 30;
 
     function rivalGeo(vest, skin, shorts) {
       return merge([
@@ -1796,7 +1822,8 @@ MR.World = (function () {
         // runner being caught gives way, so the closest approach is also the
         // widest point and the pass happens out beyond the kerb.
         const close = 1 - Math.min(1, Math.abs(r.z - z) / RIVAL_YIELD_Z);
-        r.obj.position.x = r.baseX * (1 + close * close * RIVAL_YIELD);
+        const side = r.baseX < 0 ? -1 : 1;
+        r.obj.position.x = r.baseX + side * (RIVAL_YIELD_X - Math.abs(r.baseX)) * close * close;
         // Cheap run cycle: a bob and a matching roll sell stride at speed.
         const ph = now * 5.5 + r.phase;
         r.obj.position.y = Math.abs(Math.sin(ph)) * 0.09;

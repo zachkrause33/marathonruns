@@ -83,18 +83,21 @@ MR.Runner = (function () {
   const TRIM = P.accent;
   const GLOVE = P.runnerShoe;
 
-  // The outsole is the one deliberately dark thing on the shoe, and it is the
-  // fix for a bug that had been visible in every gameplay screenshot: the
-  // whole underside used to be TRIM. The recovery ankle plantarflexes until
-  // the sole faces the camera square-on, so the largest flat face on the
-  // character was presenting a saturated yellow rectangle bigger than its own
-  // head -- and because that foot swings up right under the opposite glove,
-  // the review read it as a slab held in the runner's left hand. Every
-  // reference shoe shows a DARK underside; the bright part is the upper, and
-  // the upper is what should be flashing for cadence. TRIM survives as a thin
-  // midsole stripe, which is visible from behind and near-invisible from
-  // below -- exactly the wrong way round from where it was.
-  const SOLE = 0x3b3557;
+  // The outsole, and the fix for a bug that had been visible in every
+  // gameplay screenshot: the whole underside used to be TRIM. The recovery
+  // ankle plantarflexes until the sole faces the camera square-on, so the
+  // largest flat face on the character was presenting a saturated yellow
+  // rectangle bigger than its own head -- and because that foot swings up
+  // right beneath the opposite glove, the review read it as a slab held in
+  // the runner's left hand.
+  //
+  // The colour is a half-step off the upper rather than a contrast to it, and
+  // that is the actual repair: whatever face the shoe turns to the camera it
+  // has to stay ONE object, and a sole that jumps hue or value splits into a
+  // second thing hanging off the leg. Going dark instead would have fixed the
+  // shout and lost the foot against the road, and the feet are what carry
+  // cadence from behind.
+  const SOLE = 0xd6cabb;
 
   /**
    * Weld several primitives into one geometry, baking each piece's colour
@@ -234,10 +237,14 @@ MR.Runner = (function () {
     return blobTex;
   }
 
+  // Sonic's shadow is the strongest of the three references and it is the one
+  // to copy: at half strength over this road the blob was there in a still and
+  // gone in motion, which buys nothing.
   const SHADOW_R = 0.46;
+  const BASE_ALPHA = 0.58;
   function groundShadow() {
     if (typeof S.contactShadow === 'function') {
-      return S.contactShadow(SHADOW_R, { opacity: 0.50 });
+      return S.contactShadow(SHADOW_R, { opacity: BASE_ALPHA });
     }
     const mesh = new THREE.Mesh(
       new THREE.PlaneGeometry(SHADOW_R * 2, SHADOW_R * 2).rotateX(-Math.PI / 2),
@@ -245,7 +252,7 @@ MR.Runner = (function () {
         color: P.contact === undefined ? 0x241d3d : P.contact,
         map: blobTexture(),
         transparent: true,
-        opacity: 0.50,
+        opacity: BASE_ALPHA,
         depthWrite: false,     // overlapping blobs blend instead of z-fighting
         side: THREE.DoubleSide,
       })
@@ -368,31 +375,37 @@ MR.Runner = (function () {
       // Sock welded onto the shin: a pale band low on the leg makes the
       // scissor of the run cycle legible from directly behind.
       const shin = multi([
-        { g: new THREE.CapsuleGeometry(0.096, 0.085, 3, 10), c: P.runnerSkin, y: -0.098 },
-        { g: new THREE.CylinderGeometry(0.110, 0.102, 0.095, 10), c: P.runnerShoe, y: -0.152 },
+        { g: new THREE.CapsuleGeometry(0.096, 0.050, 3, 10), c: P.runnerSkin, y: -0.076 },
+        { g: new THREE.CylinderGeometry(0.110, 0.102, 0.085, 10), c: P.runnerShoe, y: -0.118 },
       ]);
       knee.add(shin);
 
-      const ankle = pivot(knee, 0, -0.175, 0);
+      const ankle = pivot(knee, 0, -0.150, 0);
       // Oversized trainer, and domed rather than a bare box. A box presents a
       // hard rectangle to the camera the instant the recovery foot rotates
       // sole-on, which is most of what made the old shoe read as a held
-      // object; a rounded toe and heel keep it a shoe from every angle the
-      // cycle puts it in. Bright upper, thin accent midsole, dark outsole --
-      // see SOLE for why that order and not the other one.
+      // object; a rounded toe, heel and outsole keep it a shoe from every
+      // angle the cycle puts it in. See SOLE for why the underside is the
+      // value it is.
       const foot = multi([
-        { g: new THREE.BoxGeometry(0.190, 0.115, 0.252), c: P.runnerShoe, y: -0.038, z: 0.042 },
-        { g: new THREE.SphereGeometry(0.095, 10, 8), c: P.runnerShoe, y: -0.038, z: 0.168, sy: 0.80, sz: 0.66 },
-        { g: new THREE.SphereGeometry(0.092, 8, 6), c: P.runnerShoe, y: -0.028, z: -0.078, sy: 0.86, sz: 0.74 },
-        { g: new THREE.BoxGeometry(0.198, 0.032, 0.270), c: TRIM, y: -0.110, z: 0.042 },
-        { g: new THREE.BoxGeometry(0.192, 0.034, 0.266), c: SOLE, y: -0.143, z: 0.042 },
+        { g: new THREE.BoxGeometry(0.190, 0.110, 0.225), c: P.runnerShoe, y: -0.036, z: 0.036 },
+        { g: new THREE.SphereGeometry(0.095, 10, 8), c: P.runnerShoe, y: -0.036, z: 0.150, sy: 0.82, sz: 0.66 },
+        { g: new THREE.SphereGeometry(0.092, 8, 6), c: P.runnerShoe, y: -0.026, z: -0.072, sy: 0.86, sz: 0.74 },
+        // Thin accent stripe, and thin is the point: it is a crisp bright line
+        // from behind and almost nothing from below, which is the opposite of
+        // where the accent used to sit.
+        { g: new THREE.BoxGeometry(0.196, 0.028, 0.240), c: TRIM, y: -0.100, z: 0.036 },
+        // Outsole as a squashed ellipsoid rather than a slab, so the face it
+        // turns to the camera on the recovery swing is a rounded oval that
+        // still reads as the bottom of a shoe.
+        { g: new THREE.SphereGeometry(0.140, 12, 8), c: SOLE, y: -0.122, z: 0.036, sx: 0.70, sy: 0.22, sz: 0.90 },
       ], 2);
       ankle.add(foot);
 
       legs.push({ side, hip, knee, ankle });
 
       // arm
-      const shoulder = pivot(chest, side * 0.222, -0.022, 0);
+      const shoulder = pivot(chest, side * 0.222, -0.004, 0);
       // ZXY so the twist happens along the arm before it is swung and then
       // abducted. With the default XYZ the yaw fired after the outward tilt
       // and dragged the whole arm across the back of the vest. It also leaves
@@ -428,7 +441,6 @@ MR.Runner = (function () {
     const shadowPivot = pivot(root, 0, 0, 0);
     const shadow = groundShadow();
     const shadowMat = shadow.material;
-    const shadowY = shadow.position.y;
     shadowPivot.add(shadow);
 
     let shadowW = 1, shadowD = 1, shadowA = 1;
@@ -447,10 +459,12 @@ MR.Runner = (function () {
       // against a road that is already rushing past, but a blob collapsing
       // away underneath him is unambiguous and needs no frame of reference.
       const k = 1 - t * 0.62;
-      shadowPivot.position.y = shadowY - h;
+      // Only the lift is cancelled here -- the quad carries its own clearance
+      // above the road paint, and adding that in twice floated it.
+      shadowPivot.position.y = -h;
       shadowPivot.rotation.z = -root.rotation.z;
       shadow.scale.set(shadowW * k, 1, shadowD * k);
-      shadowMat.opacity = 0.50 * shadowA * (1 - t * 0.80);
+      shadowMat.opacity = BASE_ALPHA * shadowA * (1 - t * 0.80);
       shadowPivot.updateMatrixWorld(true);
     };
 
@@ -620,8 +634,8 @@ MR.Runner = (function () {
       // spreads it, which is the only thing that sells the fold from directly
       // behind, where the fold itself is pointing away from the camera.
       const plant = 1 - Math.abs(Math.cos(p)) * 0.10 * (1 - air);
-      shadowW = (1.06 + duck * 0.18) * plant;
-      shadowD = (0.84 + duck * 0.10) * plant;
+      shadowW = (1.30 + duck * 0.20) * plant;
+      shadowD = (0.96 + duck * 0.12) * plant;
       shadowA = (1 + duck * 0.14) * (2 - plant);
     };
 

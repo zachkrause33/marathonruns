@@ -268,11 +268,10 @@ MR.shading = (function () {
   // eating colour out of a building only 30 units away, which is why the
   // midground used to read as grey no matter what tint it was given; the
   // references keep everything in the first third of the depth fully
-  // saturated and then let go quickly. Pushing near out to 45 while leaving
-  // far alone does exactly that -- the near field is crisp, and the fade over
-  // the remaining 145 units is steeper than it was, so distance reads harder
-  // than before rather than softer.
-  // Aerial perspective has to lose an argument to gameplay here. At 45/190 a
+  // saturated and then let go quickly, so near went out to 45 with far left
+  // alone -- a crisp near field and a steeper fade behind it.
+  //
+  // Then aerial perspective lost an argument to gameplay. At 45/190 a
   // gate 150 units out was 72% washed into the haze, while World spawns
   // hazards 210 units ahead -- so the far half of the spawn window was scenery
   // the player could not read, and planning was limited to the next gate. In a

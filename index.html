@@ -1471,11 +1471,10 @@ MR.shading = (function () {
   // eating colour out of a building only 30 units away, which is why the
   // midground used to read as grey no matter what tint it was given; the
   // references keep everything in the first third of the depth fully
-  // saturated and then let go quickly. Pushing near out to 45 while leaving
-  // far alone does exactly that -- the near field is crisp, and the fade over
-  // the remaining 145 units is steeper than it was, so distance reads harder
-  // than before rather than softer.
-  // Aerial perspective has to lose an argument to gameplay here. At 45/190 a
+  // saturated and then let go quickly, so near went out to 45 with far left
+  // alone -- a crisp near field and a steeper fade behind it.
+  //
+  // Then aerial perspective lost an argument to gameplay. At 45/190 a
   // gate 150 units out was 72% washed into the haze, while World spawns
   // hazards 210 units ahead -- so the far half of the spawn window was scenery
   // the player could not read, and planning was limited to the next gate. In a
@@ -1902,11 +1901,14 @@ MR.shading = (function () {
    *   const sh = S.contactShadow(0.42);     // radius in WORLD UNITS
    *   runner.root.add(sh);                  // parent at the object's ORIGIN
    *
-   *   sh.position.y            already 0.015 -- just clear of the road. Set it
-   *                            to the GROUND height under the object, not to
-   *                            the object's own height: the shadow stays on
-   *                            the road while the runner jumps, so when the
-   *                            parent lifts, subtract the lift back off here.
+   *   sh.position.y            already 0.015 -- just clear of the road, whose
+   *                            paint sits at 0.006. Set it to the GROUND
+   *                            height under the object, not to the object's
+   *                            own height: the shadow stays on the road while
+   *                            the runner jumps, so when the parent lifts,
+   *                            subtract the lift back off here. Never let the
+   *                            result reach 0; below the tarmac it is depth-
+   *                            rejected and vanishes with no other symptom.
    *   sh.scale.setScalar(k)    k MULTIPLIES the radius asked for, so 1 is the
    *                            size requested and no caller has to remember
    *                            the number. Growing and fading it with jump
@@ -1922,9 +1924,10 @@ MR.shading = (function () {
    * makes a distant prop's shadow fade into the haze at the same rate as the
    * prop standing on it.
    *
-   * CAVEAT: it inherits the parent's rotation. Parent it to a node that stays
-   * upright -- the runner's root, not its leaning torso -- or the blob tips up
-   * off the road and gives the trick away.
+   * CAVEATS: it inherits the parent's rotation, so parent it to a node that
+   * stays upright -- the runner's root, not its leaning torso -- or the blob
+   * tips up off the road and gives the trick away. And do not dispose its
+   * geometry or its map; both are shared with every other shadow in the game.
    *
    * @param radius  world units to the blob's visible edge. Default 0.42,
    *                about right for the player.
@@ -2140,7 +2143,7 @@ MR.Runner = (function () {
   const HIP_Y = 0.552;     // pelvis pivot
   const CHEST_Y = 0.767;   // shoulder girdle pivot
   const NECK_Y = 0.907;    // base of the neck; the head rotates from here
-  const HEAD_Y = 1.274;    // centre of the skull
+  const HEAD_Y = 1.269;    // centre of the skull
   const BOB = 0.040;
   const HEIGHT = 1.60;
 
@@ -2154,18 +2157,21 @@ MR.Runner = (function () {
   const TRIM = P.accent;
   const GLOVE = P.runnerShoe;
 
-  // The outsole is the one deliberately dark thing on the shoe, and it is the
-  // fix for a bug that had been visible in every gameplay screenshot: the
-  // whole underside used to be TRIM. The recovery ankle plantarflexes until
-  // the sole faces the camera square-on, so the largest flat face on the
-  // character was presenting a saturated yellow rectangle bigger than its own
-  // head -- and because that foot swings up right under the opposite glove,
-  // the review read it as a slab held in the runner's left hand. Every
-  // reference shoe shows a DARK underside; the bright part is the upper, and
-  // the upper is what should be flashing for cadence. TRIM survives as a thin
-  // midsole stripe, which is visible from behind and near-invisible from
-  // below -- exactly the wrong way round from where it was.
-  const SOLE = 0x3b3557;
+  // The outsole, and the fix for a bug that had been visible in every
+  // gameplay screenshot: the whole underside used to be TRIM. The recovery
+  // ankle plantarflexes until the sole faces the camera square-on, so the
+  // largest flat face on the character was presenting a saturated yellow
+  // rectangle bigger than its own head -- and because that foot swings up
+  // right beneath the opposite glove, the review read it as a slab held in
+  // the runner's left hand.
+  //
+  // The colour is a half-step off the upper rather than a contrast to it, and
+  // that is the actual repair: whatever face the shoe turns to the camera it
+  // has to stay ONE object, and a sole that jumps hue or value splits into a
+  // second thing hanging off the leg. Going dark instead would have fixed the
+  // shout and lost the foot against the road, and the feet are what carry
+  // cadence from behind.
+  const SOLE = 0xd6cabb;
 
   /**
    * Weld several primitives into one geometry, baking each piece's colour
@@ -2305,10 +2311,14 @@ MR.Runner = (function () {
     return blobTex;
   }
 
+  // Sonic's shadow is the strongest of the three references and it is the one
+  // to copy: at half strength over this road the blob was there in a still and
+  // gone in motion, which buys nothing.
   const SHADOW_R = 0.46;
+  const BASE_ALPHA = 0.58;
   function groundShadow() {
     if (typeof S.contactShadow === 'function') {
-      return S.contactShadow(SHADOW_R, { opacity: 0.50 });
+      return S.contactShadow(SHADOW_R, { opacity: BASE_ALPHA });
     }
     const mesh = new THREE.Mesh(
       new THREE.PlaneGeometry(SHADOW_R * 2, SHADOW_R * 2).rotateX(-Math.PI / 2),
@@ -2316,7 +2326,7 @@ MR.Runner = (function () {
         color: P.contact === undefined ? 0x241d3d : P.contact,
         map: blobTexture(),
         transparent: true,
-        opacity: 0.50,
+        opacity: BASE_ALPHA,
         depthWrite: false,     // overlapping blobs blend instead of z-fighting
         side: THREE.DoubleSide,
       })
@@ -2353,14 +2363,14 @@ MR.Runner = (function () {
       // sitting on the shoulders. Short and barely tapered on purpose: a
       // singlet worn over the waistband, so the red reads as one wide squat
       // block the way the reference shirts do rather than as a torso.
-      { g: new THREE.CylinderGeometry(0.262, 0.238, 0.28, 12), c: P.runnerVest, y: -0.055, sz: 0.78 },
+      { g: new THREE.CylinderGeometry(0.262, 0.238, 0.28, 12), c: P.runnerVest, y: -0.037, sz: 0.78 },
       // Deltoids. These are what make the shoulder line read wider than the
       // head; without them the trunk cone tapers into the skull. Flattened
       // hard in Y so they widen the shoulders without raising them. Their
       // outer edge is the 0.78 shoulder measurement constants.js cuts the
       // lane width from -- move them and the whole track has to move.
-      { g: new THREE.SphereGeometry(0.140, 10, 8), c: P.runnerVest, x: -0.244, y: -0.016, sy: 0.76, sz: 0.84 },
-      { g: new THREE.SphereGeometry(0.140, 10, 8), c: P.runnerVest, x: 0.244, y: -0.016, sy: 0.76, sz: 0.84 },
+      { g: new THREE.SphereGeometry(0.140, 10, 8), c: P.runnerVest, x: -0.244, y: 0.002, sy: 0.76, sz: 0.84 },
+      { g: new THREE.SphereGeometry(0.140, 10, 8), c: P.runnerVest, x: 0.244, y: 0.002, sy: 0.76, sz: 0.84 },
       // No shoulder-blade bumps: the race bib is a panel standing proud of
       // the vest and it covers the entire area they would have shown in.
     ]);
@@ -2375,7 +2385,7 @@ MR.Runner = (function () {
       S.toon(0xffffff, 3)
     );
     bib.material.map = raceBib();
-    bib.position.y = -0.038;
+    bib.position.y = -0.020;
     bib.scale.z = 0.78;
     chest.add(bib);
 
@@ -2439,31 +2449,37 @@ MR.Runner = (function () {
       // Sock welded onto the shin: a pale band low on the leg makes the
       // scissor of the run cycle legible from directly behind.
       const shin = multi([
-        { g: new THREE.CapsuleGeometry(0.096, 0.085, 3, 10), c: P.runnerSkin, y: -0.098 },
-        { g: new THREE.CylinderGeometry(0.110, 0.102, 0.095, 10), c: P.runnerShoe, y: -0.152 },
+        { g: new THREE.CapsuleGeometry(0.096, 0.050, 3, 10), c: P.runnerSkin, y: -0.076 },
+        { g: new THREE.CylinderGeometry(0.110, 0.102, 0.085, 10), c: P.runnerShoe, y: -0.118 },
       ]);
       knee.add(shin);
 
-      const ankle = pivot(knee, 0, -0.175, 0);
+      const ankle = pivot(knee, 0, -0.150, 0);
       // Oversized trainer, and domed rather than a bare box. A box presents a
       // hard rectangle to the camera the instant the recovery foot rotates
       // sole-on, which is most of what made the old shoe read as a held
-      // object; a rounded toe and heel keep it a shoe from every angle the
-      // cycle puts it in. Bright upper, thin accent midsole, dark outsole --
-      // see SOLE for why that order and not the other one.
+      // object; a rounded toe, heel and outsole keep it a shoe from every
+      // angle the cycle puts it in. See SOLE for why the underside is the
+      // value it is.
       const foot = multi([
-        { g: new THREE.BoxGeometry(0.190, 0.115, 0.252), c: P.runnerShoe, y: -0.038, z: 0.042 },
-        { g: new THREE.SphereGeometry(0.095, 10, 8), c: P.runnerShoe, y: -0.038, z: 0.168, sy: 0.80, sz: 0.66 },
-        { g: new THREE.SphereGeometry(0.092, 8, 6), c: P.runnerShoe, y: -0.028, z: -0.078, sy: 0.86, sz: 0.74 },
-        { g: new THREE.BoxGeometry(0.198, 0.032, 0.270), c: TRIM, y: -0.110, z: 0.042 },
-        { g: new THREE.BoxGeometry(0.192, 0.034, 0.266), c: SOLE, y: -0.143, z: 0.042 },
+        { g: new THREE.BoxGeometry(0.190, 0.110, 0.225), c: P.runnerShoe, y: -0.036, z: 0.036 },
+        { g: new THREE.SphereGeometry(0.095, 10, 8), c: P.runnerShoe, y: -0.036, z: 0.150, sy: 0.82, sz: 0.66 },
+        { g: new THREE.SphereGeometry(0.092, 8, 6), c: P.runnerShoe, y: -0.026, z: -0.072, sy: 0.86, sz: 0.74 },
+        // Thin accent stripe, and thin is the point: it is a crisp bright line
+        // from behind and almost nothing from below, which is the opposite of
+        // where the accent used to sit.
+        { g: new THREE.BoxGeometry(0.196, 0.028, 0.240), c: TRIM, y: -0.100, z: 0.036 },
+        // Outsole as a squashed ellipsoid rather than a slab, so the face it
+        // turns to the camera on the recovery swing is a rounded oval that
+        // still reads as the bottom of a shoe.
+        { g: new THREE.SphereGeometry(0.140, 12, 8), c: SOLE, y: -0.122, z: 0.036, sx: 0.70, sy: 0.22, sz: 0.90 },
       ], 2);
       ankle.add(foot);
 
       legs.push({ side, hip, knee, ankle });
 
       // arm
-      const shoulder = pivot(chest, side * 0.222, -0.022, 0);
+      const shoulder = pivot(chest, side * 0.222, -0.004, 0);
       // ZXY so the twist happens along the arm before it is swung and then
       // abducted. With the default XYZ the yaw fired after the outward tilt
       // and dragged the whole arm across the back of the vest. It also leaves
@@ -2499,7 +2515,6 @@ MR.Runner = (function () {
     const shadowPivot = pivot(root, 0, 0, 0);
     const shadow = groundShadow();
     const shadowMat = shadow.material;
-    const shadowY = shadow.position.y;
     shadowPivot.add(shadow);
 
     let shadowW = 1, shadowD = 1, shadowA = 1;
@@ -2518,10 +2533,12 @@ MR.Runner = (function () {
       // against a road that is already rushing past, but a blob collapsing
       // away underneath him is unambiguous and needs no frame of reference.
       const k = 1 - t * 0.62;
-      shadowPivot.position.y = shadowY - h;
+      // Only the lift is cancelled here -- the quad carries its own clearance
+      // above the road paint, and adding that in twice floated it.
+      shadowPivot.position.y = -h;
       shadowPivot.rotation.z = -root.rotation.z;
       shadow.scale.set(shadowW * k, 1, shadowD * k);
-      shadowMat.opacity = 0.50 * shadowA * (1 - t * 0.80);
+      shadowMat.opacity = BASE_ALPHA * shadowA * (1 - t * 0.80);
       shadowPivot.updateMatrixWorld(true);
     };
 
@@ -2691,8 +2708,8 @@ MR.Runner = (function () {
       // spreads it, which is the only thing that sells the fold from directly
       // behind, where the fold itself is pointing away from the camera.
       const plant = 1 - Math.abs(Math.cos(p)) * 0.10 * (1 - air);
-      shadowW = (1.06 + duck * 0.18) * plant;
-      shadowD = (0.84 + duck * 0.10) * plant;
+      shadowW = (1.30 + duck * 0.20) * plant;
+      shadowD = (0.96 + duck * 0.12) * plant;
       shadowA = (1 + duck * 0.14) * (2 - plant);
     };
 
@@ -2768,9 +2785,23 @@ MR.World = (function () {
   // `edge` names the roadside furniture the road tile wears; `mix` weights the
   // roadside prop lottery. Together they are what distinguishes a biome, the
   // colours only agree with it.
+  // ROAD VALUE, and why these are so much lighter than tarmac.
+  //
+  // Measured against the reference frames: in both Subway Surfers shots the
+  // surface the player runs on (crimson train roof, mint train roof) is among
+  // the LIGHTEST and most saturated large masses in frame, and the eye lands
+  // on it first. Ours was 0x4a4f78-0x5b5f88 slate -- the darkest, least
+  // saturated large mass, and also the biggest single area on screen -- so the
+  // eye went to the grass banks and the sky instead of to the road the player
+  // has to read. Realistic asphalt was losing the game a readability fight it
+  // did not need to be in.
+  //
+  // These are lifted several stops and given chroma per biome. Lane paint and
+  // the hazard telegraph mats still have to sit on top of them, so nothing
+  // here goes near white.
   const BIOME_LOOK = {
     'CITY START': {
-      sky: [0x2b3fa8, 0x9fdcff], ground: 0x63c96b, road: 0x50557d, fog: 0x9fdcff,
+      sky: [0x2b3fa8, 0x9fdcff], ground: 0x63c96b, road: 0x9aa0d8, fog: 0x9fdcff,
       edge: 'barrier',
       mix: { building: 2.6, tree: 0.55, grove: 0.15, crowd: 2.3, rival: 0.5, station: 0.10 },
     },
@@ -2778,29 +2809,29 @@ MR.World = (function () {
     // to the road; at full shoulder width the river sat 35 units out and read
     // as a smear on the horizon.
     'RIVERSIDE': {
-      sky: [0x1f6fb8, 0xbdf0ff], ground: 0x57c7a8, road: 0x4d5a80, fog: 0xbdf0ff,
+      sky: [0x1f6fb8, 0xbdf0ff], ground: 0x57c7a8, road: 0x8fb4dc, fog: 0xbdf0ff,
       edge: 'hedge', bank: -1,
       mix: { building: 0.45, tree: 1.5, grove: 1.3, crowd: 1.0, rival: 0.45, station: 0.12 },
     },
     // Nothing stands beside a bridge deck -- the emptiness is the point, and a
     // spectator out there would be standing on the river.
     'THE BRIDGE': {
-      sky: [0x3a4fc0, 0xffd9a8], ground: 0x2f8fc4, road: 0x5b5f88, fog: 0xffd9a8,
+      sky: [0x3a4fc0, 0xffd9a8], ground: 0x2f8fc4, road: 0xb9a8e0, fog: 0xffd9a8,
       edge: 'rail',
       mix: { building: 0.0, tree: 0.0, crowd: 0.0, rival: 1.0, station: 0.0 },
     },
     'PARKLAND': {
-      sky: [0x2e8fd0, 0xcdf5c0], ground: 0x6fd46a, road: 0x53587f, fog: 0xcdf5c0,
+      sky: [0x2e8fd0, 0xcdf5c0], ground: 0x6fd46a, road: 0xa8b6e2, fog: 0xcdf5c0,
       edge: 'hedge',
       mix: { building: 0.12, tree: 2.2, grove: 3.2, crowd: 1.1, rival: 0.45, station: 0.12 },
     },
     'THE WALL': {
-      sky: [0x8a3a6b, 0xffb27a], ground: 0x8f9a5e, road: 0x5a4f66, fog: 0xffb27a,
+      sky: [0x8a3a6b, 0xffb27a], ground: 0x8f9a5e, road: 0xc79ab0, fog: 0xffb27a,
       edge: 'wall',
       mix: { building: 2.0, tree: 0.25, crowd: 0.35, rival: 0.3, station: 0.18 },
     },
     'FINAL MILE': {
-      sky: [0x24306e, 0xffcf6b], ground: 0x5cb46a, road: 0x4a4f78, fog: 0xffcf6b,
+      sky: [0x24306e, 0xffcf6b], ground: 0x5cb46a, road: 0xa9a2e4, fog: 0xffcf6b,
       edge: 'barrier',
       mix: { building: 1.1, tree: 0.3, crowd: 3.4, rival: 0.6, station: 0.0 },
     },
@@ -3968,8 +3999,14 @@ MR.World = (function () {
     const RIVAL_HALF = 0.40;                                  // arm to arm
     const RIVAL_IN = LANE + HAZARD_HALF + RIVAL_HALF;         // nearest line
     const RIVAL_OUT = Math.max(RIVAL_IN, K.TRACK_HALF_WIDTH - RIVAL_HALF);
-    const RIVAL_YIELD = 0.62;    // extra fraction of x at the closest approach
-    const RIVAL_YIELD_Z = 30;    // over how much ground the yield opens up
+    // How far out a rival swings at the closest approach, and over how much
+    // ground the swing opens up. The ceiling is the tarmac, and that is not
+    // fussiness: 0.17 further out is the kerb block, and on the bridge deck the
+    // balustrade stands at TRACK_HALF_WIDTH + 0.55 with open water past it, so
+    // a wider yield puts a runner over the river. The shoulder is therefore
+    // what limits this, not the effect.
+    const RIVAL_YIELD_X = RIVAL_OUT;
+    const RIVAL_YIELD_Z = 30;
 
     function rivalGeo(vest, skin, shorts) {
       return merge([
@@ -4502,7 +4539,8 @@ MR.World = (function () {
         // runner being caught gives way, so the closest approach is also the
         // widest point and the pass happens out beyond the kerb.
         const close = 1 - Math.min(1, Math.abs(r.z - z) / RIVAL_YIELD_Z);
-        r.obj.position.x = r.baseX * (1 + close * close * RIVAL_YIELD);
+        const side = r.baseX < 0 ? -1 : 1;
+        r.obj.position.x = r.baseX + side * (RIVAL_YIELD_X - Math.abs(r.baseX)) * close * close;
         // Cheap run cycle: a bob and a matching roll sell stride at speed.
         const ph = now * 5.5 + r.phase;
         r.obj.position.y = Math.abs(Math.sin(ph)) * 0.09;

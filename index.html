@@ -3548,9 +3548,55 @@ MR.World = (function () {
     routeMesh.visible = !!routeLane;
     group.add(routeMesh);
 
+    /**
+     * The floating half of the hint: a trail of rings leading into each of the
+     * next few gates, in the lane that gate has to be taken in.
+     *
+     * Paint alone cannot do this job. The chase camera sits low and directly
+     * behind, so the runner's own body covers the centre of the road from about
+     * 35 units out all the way to the horizon -- a line painted in the lane the
+     * player is already in is invisible exactly where the forward read has to
+     * happen. Rings float at 1.15, which clears the head in frame at every
+     * useful distance, sits above a JUMP kerb and below a DUCK bar, and is the
+     * same answer both reference games arrived at.
+     *
+     * A ring is a hollow circle and nothing else in this game is round, so it
+     * cannot be mistaken for a fifth kind of obstacle. It marks the LANE only:
+     * which action a gate wants, and when to commit, are still the player's.
+     */
+    const RING_GATES = 4;
+    const RING_AT = [-12.5, -7.5, -3.0];   // run-up offsets from the gate line
+    const RING_Y = 1.15;
+    const RING_R = 0.28;
+    const RING_N = RING_GATES * RING_AT.length;
+
+    const ringGeo = new THREE.BufferGeometry();
+    const ringPos = new Float32Array(RING_N * 6 * 3);
+    const ringUvs = new Float32Array(RING_N * 6 * 2);
+    const ringCol = new Float32Array(RING_N * 6 * 4);
+    for (let i = 0; i < RING_N; i++) {
+      // UVs and RGB never change; only the corners and the alpha do.
+      const u = i * 12, c = i * 24;
+      const uvq = [0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1];
+      for (let k = 0; k < 12; k++) ringUvs[u + k] = uvq[k];
+      for (let k = 0; k < 6; k++) { ringCol[c + k * 4] = 1; ringCol[c + k * 4 + 1] = 1; ringCol[c + k * 4 + 2] = 1; }
+    }
+    ringGeo.setAttribute('position', new THREE.BufferAttribute(ringPos, 3));
+    ringGeo.setAttribute('uv', new THREE.BufferAttribute(ringUvs, 2));
+    ringGeo.setAttribute('color', new THREE.BufferAttribute(ringCol, 4));
+    const ringMesh = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({
+      map: ringTexture(), color: 0x5ff0a6, transparent: true, depthWrite: false,
+      vertexColors: true, side: THREE.DoubleSide,
+    }));
+    ringMesh.renderOrder = 6;   // over the telegraph mats, never under them
+    ringMesh.frustumCulled = false;
+    ringMesh.visible = !!routeLane;
+    group.add(ringMesh);
+
     // Sampling walks z forwards, so the gate lookup is a cursor rather than a
     // search. It rewinds at the start of each frame and costs nothing after.
     let routeCursor = 0;
+    let ringCursor = 0;
     function routeX(zz) {
       const gates = course.gates;
       while (routeCursor > 0 && gates[routeCursor - 1].z >= zz) routeCursor--;
@@ -3602,6 +3648,48 @@ MR.World = (function () {
       // The pulse runs forward, away from the runner, so the line leads the eye
       // down the course instead of washing back over it.
       routeTexture().offset.y = -(now * 0.45) % 1;
+
+      // ---- rings -------------------------------------------------------
+      const gates = course.gates;
+      while (ringCursor > 0 && gates[ringCursor - 1].z >= z) ringCursor--;
+      while (ringCursor < gates.length && gates[ringCursor].z < z) ringCursor++;
+      let n = 0;
+      for (let gi = ringCursor; gi < gates.length && gi < ringCursor + RING_GATES; gi++) {
+        const cx = K.LANE_X[routeLane[gi]];
+        for (let k = 0; k < RING_AT.length; k++) {
+          const cz = gates[gi].z + RING_AT[k];
+          // Anything already level with the runner is behind their shoulder and
+          // cannot be read; drop it rather than let it swell across the lens.
+          if (cz < z + 7) continue;
+          // Alpha falls away down the trail so the eye is pulled to the next
+          // gate first and the far ones stay a suggestion, not a second read.
+          const a = 0.92 * Math.max(0.18, 1 - (cz - z) / (ROUTE_FAR * 1.15));
+          const cy = RING_Y + Math.sin(now * 1.9 + gi * 1.3 + k) * 0.045;
+          const p = n * 18, c = n * 24;
+          const l = cx - RING_R, r = cx + RING_R;
+          const b = cy - RING_R, t = cy + RING_R;
+          routeQuad(ringPos, p, l, b, r, t, cz);
+          for (let v = 0; v < 6; v++) ringCol[c + v * 4 + 3] = a;
+          n++;
+        }
+      }
+      // Unused slots collapse to a point, which submits no pixels.
+      for (; n < RING_N; n++) {
+        const p = n * 18;
+        for (let v = 0; v < 18; v++) ringPos[p + v] = 0;
+      }
+      ringGeo.attributes.position.needsUpdate = true;
+      ringGeo.attributes.color.needsUpdate = true;
+    }
+
+    /** Two triangles of an axis-aligned quad in the XY plane at depth `zz`. */
+    function routeQuad(arr, p, l, b, r, t, zz) {
+      arr[p] = l; arr[p + 1] = b; arr[p + 2] = zz;
+      arr[p + 3] = r; arr[p + 4] = b; arr[p + 5] = zz;
+      arr[p + 6] = r; arr[p + 7] = t; arr[p + 8] = zz;
+      arr[p + 9] = l; arr[p + 10] = b; arr[p + 11] = zz;
+      arr[p + 12] = r; arr[p + 13] = t; arr[p + 14] = zz;
+      arr[p + 15] = l; arr[p + 16] = t; arr[p + 17] = zz;
     }
 
     // ---- hazards --------------------------------------------------------
@@ -4859,7 +4947,8 @@ MR.Ghost = (function () {
       // the ghost is technically behind the camera, which is not the same thing.
       const passed = gap < -1;
       const rear = passed ? clamp01((11 - ahead) / 9) : 0;
-      const pulse = 1 + 0.5 * s.flash;
+      const pulse = 1 + 0.55 * s.flash;
+      const tan = Math.tan(cam.fov * Math.PI / 360);
 
       tagWorld.material.opacity = 1 - rear;
       tagWorld.visible = tagWorld.material.opacity > 0.02;
@@ -4867,35 +4956,50 @@ MR.Ghost = (function () {
         // Past the haze the tag's height on screen stops carrying information,
         // so it stops moving and says so instead.
         const beyond = gap > HAZE;
-        tagWorld.material.map = beyond ? texFar : texRide;
+        // The plate turns over at the instant the record changes hands, not
+        // three seconds later when the body finally clears the lens. That is
+        // when the player earned it, and it means the hand-off to the corner
+        // tag below is a fade between two identical images.
+        tagWorld.material.map = beyond ? texFar : gap < 0 ? texRear : texRide;
         const tz = beyond ? z + HAZE : gz;
         // Size attenuation is off, so a sprite's world footprint grows with
         // depth. Scaling the offset by depth too is what keeps the tail the
         // same distance above the head at three units and at a hundred.
         const depth = Math.max(4, tz - camZ);
+        // ...and the further off the ghost is, the higher the tag rides: on
+        // its head at arm's length, up in the sky by the time the body is a
+        // speck. Down at the vanishing point every gate in the next hundred
+        // units is stacked into fifteen pixels of road, and a label the player
+        // cannot act on has no business sitting on top of them.
+        const lift = 0.5 + 1.15 * smoothstep(55, HAZE, gap);
         tagWorld.scale.set(TAG_SIZE * TAG_ASPECT * pulse, TAG_SIZE * pulse, 1);
-        tagWorld.position.set(s.x, HEAD_Y + depth * TAG_SIZE * pulse * 0.5, tz);
+        tagWorld.position.set(s.x, HEAD_Y + depth * TAG_SIZE * pulse * lift, tz);
       }
 
-      tagRear.material.opacity = rear * 0.95;
+      tagRear.material.opacity = rear * 0.96;
       tagRear.visible = tagRear.material.opacity > 0.02;
       if (tagRear.visible) {
         // Placed off the camera's own basis rather than in world space: there
         // is no world position behind the lens that can be drawn, so the only
         // honest thing left is to park it at a fixed corner of the frame, on
-        // the side of the road the ghost is on.
+        // the side of the road the ghost went out on.
         cam.updateMatrixWorld();
         const e = cam.matrixWorld.elements;
         _r.set(e[0], e[1], e[2]);
         _u.set(e[4], e[5], e[6]);
         _v.set(-e[8], -e[9], -e[10]);
         const d = 6;
-        const tan = Math.tan(cam.fov * Math.PI / 360);
-        // World -x is screen RIGHT for a camera looking down +z, so lane 0 is
-        // the side the ghost went out on. Far enough into the corner to clear
-        // the racing line; the rail and the split card own the bottom middle.
-        const nx = 0.70, ny = -0.62;
-        tagRear.scale.set(TAG_SIZE * TAG_ASPECT * pulse * 0.86, TAG_SIZE * pulse * 0.86, 1);
+        tagRear.scale.set(TAG_SIZE * TAG_ASPECT * pulse, TAG_SIZE * pulse, 1);
+        // Corner placement in normalised device coords, then backed out into
+        // world units. Derived from the sprite's own footprint rather than
+        // typed in, because a portrait phone is three times wider in NDC for
+        // the same sprite and a hard-coded 0.70 would hang it off the edge.
+        // World -x is screen RIGHT for a camera looking down +z, which is the
+        // side lane 0 is on. The rail and the split card own the bottom middle.
+        const hw = tagRear.scale.x / (2 * tan * cam.aspect);
+        const hh = tagRear.scale.y / (2 * tan);
+        const nx = Math.min(0.70, 1 - hw - 0.03);
+        const ny = -Math.min(0.62, 1 - hh - 0.15);
         tagRear.position.copy(cam.position)
           .addScaledVector(_v, d)
           .addScaledVector(_r, nx * d * tan * cam.aspect)

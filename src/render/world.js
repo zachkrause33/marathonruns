@@ -842,9 +842,55 @@ MR.World = (function () {
     routeMesh.visible = !!routeLane;
     group.add(routeMesh);
 
+    /**
+     * The floating half of the hint: a trail of rings leading into each of the
+     * next few gates, in the lane that gate has to be taken in.
+     *
+     * Paint alone cannot do this job. The chase camera sits low and directly
+     * behind, so the runner's own body covers the centre of the road from about
+     * 35 units out all the way to the horizon -- a line painted in the lane the
+     * player is already in is invisible exactly where the forward read has to
+     * happen. Rings float at 1.15, which clears the head in frame at every
+     * useful distance, sits above a JUMP kerb and below a DUCK bar, and is the
+     * same answer both reference games arrived at.
+     *
+     * A ring is a hollow circle and nothing else in this game is round, so it
+     * cannot be mistaken for a fifth kind of obstacle. It marks the LANE only:
+     * which action a gate wants, and when to commit, are still the player's.
+     */
+    const RING_GATES = 4;
+    const RING_AT = [-12.5, -7.5, -3.0];   // run-up offsets from the gate line
+    const RING_Y = 1.15;
+    const RING_R = 0.28;
+    const RING_N = RING_GATES * RING_AT.length;
+
+    const ringGeo = new THREE.BufferGeometry();
+    const ringPos = new Float32Array(RING_N * 6 * 3);
+    const ringUvs = new Float32Array(RING_N * 6 * 2);
+    const ringCol = new Float32Array(RING_N * 6 * 4);
+    for (let i = 0; i < RING_N; i++) {
+      // UVs and RGB never change; only the corners and the alpha do.
+      const u = i * 12, c = i * 24;
+      const uvq = [0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1];
+      for (let k = 0; k < 12; k++) ringUvs[u + k] = uvq[k];
+      for (let k = 0; k < 6; k++) { ringCol[c + k * 4] = 1; ringCol[c + k * 4 + 1] = 1; ringCol[c + k * 4 + 2] = 1; }
+    }
+    ringGeo.setAttribute('position', new THREE.BufferAttribute(ringPos, 3));
+    ringGeo.setAttribute('uv', new THREE.BufferAttribute(ringUvs, 2));
+    ringGeo.setAttribute('color', new THREE.BufferAttribute(ringCol, 4));
+    const ringMesh = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({
+      map: ringTexture(), color: 0x5ff0a6, transparent: true, depthWrite: false,
+      vertexColors: true, side: THREE.DoubleSide,
+    }));
+    ringMesh.renderOrder = 6;   // over the telegraph mats, never under them
+    ringMesh.frustumCulled = false;
+    ringMesh.visible = !!routeLane;
+    group.add(ringMesh);
+
     // Sampling walks z forwards, so the gate lookup is a cursor rather than a
     // search. It rewinds at the start of each frame and costs nothing after.
     let routeCursor = 0;
+    let ringCursor = 0;
     function routeX(zz) {
       const gates = course.gates;
       while (routeCursor > 0 && gates[routeCursor - 1].z >= zz) routeCursor--;
@@ -896,6 +942,48 @@ MR.World = (function () {
       // The pulse runs forward, away from the runner, so the line leads the eye
       // down the course instead of washing back over it.
       routeTexture().offset.y = -(now * 0.45) % 1;
+
+      // ---- rings -------------------------------------------------------
+      const gates = course.gates;
+      while (ringCursor > 0 && gates[ringCursor - 1].z >= z) ringCursor--;
+      while (ringCursor < gates.length && gates[ringCursor].z < z) ringCursor++;
+      let n = 0;
+      for (let gi = ringCursor; gi < gates.length && gi < ringCursor + RING_GATES; gi++) {
+        const cx = K.LANE_X[routeLane[gi]];
+        for (let k = 0; k < RING_AT.length; k++) {
+          const cz = gates[gi].z + RING_AT[k];
+          // Anything already level with the runner is behind their shoulder and
+          // cannot be read; drop it rather than let it swell across the lens.
+          if (cz < z + 7) continue;
+          // Alpha falls away down the trail so the eye is pulled to the next
+          // gate first and the far ones stay a suggestion, not a second read.
+          const a = 0.92 * Math.max(0.18, 1 - (cz - z) / (ROUTE_FAR * 1.15));
+          const cy = RING_Y + Math.sin(now * 1.9 + gi * 1.3 + k) * 0.045;
+          const p = n * 18, c = n * 24;
+          const l = cx - RING_R, r = cx + RING_R;
+          const b = cy - RING_R, t = cy + RING_R;
+          routeQuad(ringPos, p, l, b, r, t, cz);
+          for (let v = 0; v < 6; v++) ringCol[c + v * 4 + 3] = a;
+          n++;
+        }
+      }
+      // Unused slots collapse to a point, which submits no pixels.
+      for (; n < RING_N; n++) {
+        const p = n * 18;
+        for (let v = 0; v < 18; v++) ringPos[p + v] = 0;
+      }
+      ringGeo.attributes.position.needsUpdate = true;
+      ringGeo.attributes.color.needsUpdate = true;
+    }
+
+    /** Two triangles of an axis-aligned quad in the XY plane at depth `zz`. */
+    function routeQuad(arr, p, l, b, r, t, zz) {
+      arr[p] = l; arr[p + 1] = b; arr[p + 2] = zz;
+      arr[p + 3] = r; arr[p + 4] = b; arr[p + 5] = zz;
+      arr[p + 6] = r; arr[p + 7] = t; arr[p + 8] = zz;
+      arr[p + 9] = l; arr[p + 10] = b; arr[p + 11] = zz;
+      arr[p + 12] = r; arr[p + 13] = t; arr[p + 14] = zz;
+      arr[p + 15] = l; arr[p + 16] = t; arr[p + 17] = zz;
     }
 
     // ---- hazards --------------------------------------------------------

@@ -339,7 +339,8 @@ MR.Ghost = (function () {
       // the ghost is technically behind the camera, which is not the same thing.
       const passed = gap < -1;
       const rear = passed ? clamp01((11 - ahead) / 9) : 0;
-      const pulse = 1 + 0.5 * s.flash;
+      const pulse = 1 + 0.55 * s.flash;
+      const tan = Math.tan(cam.fov * Math.PI / 360);
 
       tagWorld.material.opacity = 1 - rear;
       tagWorld.visible = tagWorld.material.opacity > 0.02;
@@ -347,35 +348,50 @@ MR.Ghost = (function () {
         // Past the haze the tag's height on screen stops carrying information,
         // so it stops moving and says so instead.
         const beyond = gap > HAZE;
-        tagWorld.material.map = beyond ? texFar : texRide;
+        // The plate turns over at the instant the record changes hands, not
+        // three seconds later when the body finally clears the lens. That is
+        // when the player earned it, and it means the hand-off to the corner
+        // tag below is a fade between two identical images.
+        tagWorld.material.map = beyond ? texFar : gap < 0 ? texRear : texRide;
         const tz = beyond ? z + HAZE : gz;
         // Size attenuation is off, so a sprite's world footprint grows with
         // depth. Scaling the offset by depth too is what keeps the tail the
         // same distance above the head at three units and at a hundred.
         const depth = Math.max(4, tz - camZ);
+        // ...and the further off the ghost is, the higher the tag rides: on
+        // its head at arm's length, up in the sky by the time the body is a
+        // speck. Down at the vanishing point every gate in the next hundred
+        // units is stacked into fifteen pixels of road, and a label the player
+        // cannot act on has no business sitting on top of them.
+        const lift = 0.5 + 1.15 * smoothstep(55, HAZE, gap);
         tagWorld.scale.set(TAG_SIZE * TAG_ASPECT * pulse, TAG_SIZE * pulse, 1);
-        tagWorld.position.set(s.x, HEAD_Y + depth * TAG_SIZE * pulse * 0.5, tz);
+        tagWorld.position.set(s.x, HEAD_Y + depth * TAG_SIZE * pulse * lift, tz);
       }
 
-      tagRear.material.opacity = rear * 0.95;
+      tagRear.material.opacity = rear * 0.96;
       tagRear.visible = tagRear.material.opacity > 0.02;
       if (tagRear.visible) {
         // Placed off the camera's own basis rather than in world space: there
         // is no world position behind the lens that can be drawn, so the only
         // honest thing left is to park it at a fixed corner of the frame, on
-        // the side of the road the ghost is on.
+        // the side of the road the ghost went out on.
         cam.updateMatrixWorld();
         const e = cam.matrixWorld.elements;
         _r.set(e[0], e[1], e[2]);
         _u.set(e[4], e[5], e[6]);
         _v.set(-e[8], -e[9], -e[10]);
         const d = 6;
-        const tan = Math.tan(cam.fov * Math.PI / 360);
-        // World -x is screen RIGHT for a camera looking down +z, so lane 0 is
-        // the side the ghost went out on. Far enough into the corner to clear
-        // the racing line; the rail and the split card own the bottom middle.
-        const nx = 0.70, ny = -0.62;
-        tagRear.scale.set(TAG_SIZE * TAG_ASPECT * pulse * 0.86, TAG_SIZE * pulse * 0.86, 1);
+        tagRear.scale.set(TAG_SIZE * TAG_ASPECT * pulse, TAG_SIZE * pulse, 1);
+        // Corner placement in normalised device coords, then backed out into
+        // world units. Derived from the sprite's own footprint rather than
+        // typed in, because a portrait phone is three times wider in NDC for
+        // the same sprite and a hard-coded 0.70 would hang it off the edge.
+        // World -x is screen RIGHT for a camera looking down +z, which is the
+        // side lane 0 is on. The rail and the split card own the bottom middle.
+        const hw = tagRear.scale.x / (2 * tan * cam.aspect);
+        const hh = tagRear.scale.y / (2 * tan);
+        const nx = Math.min(0.70, 1 - hw - 0.03);
+        const ny = -Math.min(0.62, 1 - hh - 0.15);
         tagRear.position.copy(cam.position)
           .addScaledVector(_v, d)
           .addScaledVector(_r, nx * d * tan * cam.aspect)

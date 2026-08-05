@@ -69,7 +69,7 @@ MR.Runner = (function () {
   const HIP_Y = 0.552;     // pelvis pivot
   const CHEST_Y = 0.767;   // shoulder girdle pivot
   const NECK_Y = 0.907;    // base of the neck; the head rotates from here
-  const HEAD_Y = 1.274;    // centre of the skull
+  const HEAD_Y = 1.269;    // centre of the skull
   const BOB = 0.040;
   const HEIGHT = 1.60;
 
@@ -282,14 +282,14 @@ MR.Runner = (function () {
       // sitting on the shoulders. Short and barely tapered on purpose: a
       // singlet worn over the waistband, so the red reads as one wide squat
       // block the way the reference shirts do rather than as a torso.
-      { g: new THREE.CylinderGeometry(0.262, 0.238, 0.28, 12), c: P.runnerVest, y: -0.055, sz: 0.78 },
+      { g: new THREE.CylinderGeometry(0.262, 0.238, 0.28, 12), c: P.runnerVest, y: -0.037, sz: 0.78 },
       // Deltoids. These are what make the shoulder line read wider than the
       // head; without them the trunk cone tapers into the skull. Flattened
       // hard in Y so they widen the shoulders without raising them. Their
       // outer edge is the 0.78 shoulder measurement constants.js cuts the
       // lane width from -- move them and the whole track has to move.
-      { g: new THREE.SphereGeometry(0.140, 10, 8), c: P.runnerVest, x: -0.244, y: -0.016, sy: 0.76, sz: 0.84 },
-      { g: new THREE.SphereGeometry(0.140, 10, 8), c: P.runnerVest, x: 0.244, y: -0.016, sy: 0.76, sz: 0.84 },
+      { g: new THREE.SphereGeometry(0.140, 10, 8), c: P.runnerVest, x: -0.244, y: 0.002, sy: 0.76, sz: 0.84 },
+      { g: new THREE.SphereGeometry(0.140, 10, 8), c: P.runnerVest, x: 0.244, y: 0.002, sy: 0.76, sz: 0.84 },
       // No shoulder-blade bumps: the race bib is a panel standing proud of
       // the vest and it covers the entire area they would have shown in.
     ]);
@@ -304,7 +304,7 @@ MR.Runner = (function () {
       S.toon(0xffffff, 3)
     );
     bib.material.map = raceBib();
-    bib.position.y = -0.038;
+    bib.position.y = -0.020;
     bib.scale.z = 0.78;
     chest.add(bib);
 

@@ -699,11 +699,14 @@ MR.shading = (function () {
    *   const sh = S.contactShadow(0.42);     // radius in WORLD UNITS
    *   runner.root.add(sh);                  // parent at the object's ORIGIN
    *
-   *   sh.position.y            already 0.015 -- just clear of the road. Set it
-   *                            to the GROUND height under the object, not to
-   *                            the object's own height: the shadow stays on
-   *                            the road while the runner jumps, so when the
-   *                            parent lifts, subtract the lift back off here.
+   *   sh.position.y            already 0.015 -- just clear of the road, whose
+   *                            paint sits at 0.006. Set it to the GROUND
+   *                            height under the object, not to the object's
+   *                            own height: the shadow stays on the road while
+   *                            the runner jumps, so when the parent lifts,
+   *                            subtract the lift back off here. Never let the
+   *                            result reach 0; below the tarmac it is depth-
+   *                            rejected and vanishes with no other symptom.
    *   sh.scale.setScalar(k)    k MULTIPLIES the radius asked for, so 1 is the
    *                            size requested and no caller has to remember
    *                            the number. Growing and fading it with jump
@@ -719,9 +722,10 @@ MR.shading = (function () {
    * makes a distant prop's shadow fade into the haze at the same rate as the
    * prop standing on it.
    *
-   * CAVEAT: it inherits the parent's rotation. Parent it to a node that stays
-   * upright -- the runner's root, not its leaning torso -- or the blob tips up
-   * off the road and gives the trick away.
+   * CAVEATS: it inherits the parent's rotation, so parent it to a node that
+   * stays upright -- the runner's root, not its leaning torso -- or the blob
+   * tips up off the road and gives the trick away. And do not dispose its
+   * geometry or its map; both are shared with every other shadow in the game.
    *
    * @param radius  world units to the blob's visible edge. Default 0.42,
    *                about right for the player.

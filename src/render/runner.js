@@ -152,7 +152,7 @@ MR.Runner = (function () {
     const spine = pivot(hips, 0, 0, 0);
 
     const pelvis = multi([
-      { g: new THREE.CylinderGeometry(0.228, 0.220, 0.30, 12), c: P.runnerShort, y: -0.025, sz: 0.82 },
+      { g: new THREE.CylinderGeometry(0.222, 0.216, 0.22, 12), c: P.runnerShort, y: -0.015, sz: 0.84 },
     ]);
     spine.add(pelvis);
 
@@ -168,14 +168,14 @@ MR.Runner = (function () {
       // It barely tapers on purpose: a singlet worn over the waistband, so
       // red owns two thirds of the trunk. Tapering it to a narrow hem let the
       // navy shorts read as the biggest single shape on the character.
-      { g: new THREE.CylinderGeometry(0.262, 0.236, 0.34, 12), c: P.runnerVest, y: -0.07, sz: 0.72 },
+      { g: new THREE.CylinderGeometry(0.262, 0.230, 0.38, 12), c: P.runnerVest, y: -0.09, sz: 0.72 },
       // Hem stripe -- stops the red mass from running straight into the shorts.
-      { g: new THREE.CylinderGeometry(0.240, 0.236, 0.05, 12), c: TRIM, y: -0.216, sz: 0.73 },
+      { g: new THREE.CylinderGeometry(0.234, 0.231, 0.05, 12), c: TRIM, y: -0.255, sz: 0.73 },
       // Deltoids. These are what make the shoulder line read wider than the
       // head; without them the trunk cone tapers into the skull. Flattened
       // hard in Y so they widen the shoulders without raising them.
-      { g: new THREE.SphereGeometry(0.138, 10, 8), c: P.runnerVest, x: -0.248, y: -0.020, sy: 0.76, sz: 0.84 },
-      { g: new THREE.SphereGeometry(0.138, 10, 8), c: P.runnerVest, x: 0.248, y: -0.020, sy: 0.76, sz: 0.84 },
+      { g: new THREE.SphereGeometry(0.134, 10, 8), c: P.runnerVest, x: -0.244, y: -0.020, sy: 0.78, sz: 0.84 },
+      { g: new THREE.SphereGeometry(0.134, 10, 8), c: P.runnerVest, x: 0.244, y: -0.020, sy: 0.78, sz: 0.84 },
       // Shoulder blades: a shallow pair of bumps so the back is not a blank
       // curve. Barely visible individually, but they catch the terminator.
       { g: new THREE.SphereGeometry(0.085, 8, 6), c: P.runnerVest, x: -0.105, y: -0.07, z: -0.135, sz: 0.55 },
@@ -357,12 +357,12 @@ MR.Runner = (function () {
         const back = Math.max(0, s);
 
         A.shoulder.rotation.x = s * swing * 0.95 - duck * 0.25 + air * 0.30;
-        A.shoulder.rotation.z = A.side * (0.19 + back * 0.28 + duck * 0.14 + air * 0.50);
+        A.shoulder.rotation.z = A.side * (0.19 + back * 0.20 + duck * 0.14 + air * 0.50);
         A.shoulder.rotation.y = -A.side * (0.16 + fwd * 0.22);
         // Flexion peaks with the arm forward -- glove up by the chest at the
         // front of the swing, forearm opening out past the hip at the back,
         // which is exactly when the pale glove clears the torso silhouette.
-        A.elbow.rotation.x = -1.02 - fwd * 0.62 - air * 0.30 - duck * 0.55;
+        A.elbow.rotation.x = -1.16 - fwd * 0.52 - air * 0.30 - duck * 0.55;
       }
 
       // ---- torso: forward lean, vertical bob, and a lateral bank on turns
@@ -370,7 +370,7 @@ MR.Runner = (function () {
       const bob = -Math.abs(Math.cos(p)) * 0.050 * (1 - air) + 0.050;
       body.position.y = bob + air * 0.09;
 
-      const leanFwd = 0.20 + 0.10 * sp01 + duck * 0.80 + stumble * 0.5 - air * 0.07;
+      const leanFwd = 0.26 + 0.12 * sp01 + duck * 0.74 + stumble * 0.5 - air * 0.09;
       spine.rotation.x = leanFwd;
       spine.rotation.z = -lean * 0.30;
       spine.rotation.y = lean * 0.16;

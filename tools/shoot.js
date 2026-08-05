@@ -66,9 +66,18 @@ const DEFAULT_SHOTS = [
     });
     const page = await ctx.newPage();
 
+    // Warnings count as failures, with two known-benign exceptions. The
+    // collision audit reports through console.warn, and for a long stretch it
+    // was failing unnoticed because ad-hoc check scripts only collected
+    // console.error -- the game was waving players through obstacles they were
+    // visibly clipping and nothing said so. Anything unexpected fails the run.
+    const BENIGN = /deprecated with r150|AudioContext was not allowed/;
     const errors = [];
     page.on('console', (m) => {
-      if (m.type() === 'error' || m.type() === 'warning') errors.push(`${m.type()}: ${m.text()}`);
+      const t = m.text();
+      if ((m.type() === 'error' || m.type() === 'warning') && !BENIGN.test(t)) {
+        errors.push(`${m.type()}: ${t}`);
+      }
     });
     page.on('pageerror', (e) => { errors.push('pageerror: ' + e.message); failed = true; });
 

@@ -101,6 +101,11 @@ html, body {
   display: flex; align-items: center; justify-content: space-between;
   gap: 12px; margin-bottom: 1px;
 }
+/* The bug is shrink-to-fit against the middle of the screen, so anything that
+ * is allowed to wrap will wrap on a phone the moment the chip gets longer --
+ * "RECORD GONE" was breaking the label across two lines and pushing the
+ * headline number down with it. */
+#projCell .cap .lab, #projCell .val, #projCell .sub { white-space: nowrap; }
 #projCell .val { font-size: 40px; font-weight: 900; line-height: 1.02; }
 #projCell .sub { font-size: 11px; font-weight: 800; opacity: 0.7; margin-top: 1px; }
 
@@ -294,7 +299,7 @@ html, body {
   overflow-y: auto;
 }
 .panel.hidden { display: none; }
-.panelInner { margin: auto; width: 100%; max-width: 480px; }
+.panelInner { margin: auto; width: 100%; max-width: 540px; }
 .panel h1 {
   font-size: clamp(34px, 7vw, 58px); font-weight: 900;
   letter-spacing: -0.03em; line-height: 0.98;
@@ -405,6 +410,18 @@ html, body {
 }
 #count.hidden { display: none; }
 
+/* ---- fps / debug ----
+ * Below the distance plate at every width and clear of the rail, so the debug
+ * line never lands on top of a number that matters. Declared before the media
+ * queries so their overrides win on equal specificity. */
+#perf {
+  position: absolute; right: 14px; top: 172px;
+  font-size: 10px; font-weight: 700; opacity: 0.45;
+  text-align: right;
+  display: none;
+}
+#perf.on { display: block; }
+
 /* ---- small screens ----
  * A phone is played with a thumb, so the plates shrink but the hierarchy does
  * not change: the projection stays the biggest thing on the screen and the
@@ -445,26 +462,70 @@ html, body {
   .mech { font-size: 12px; }
 }
 
-/* Landscape phones have almost no vertical room, so the panels give up the
- * explanatory blocks rather than push the button off the bottom. */
+/* ---- big screens ----
+ * The readout is sized in pixels so it stays crisp, which leaves it stranded
+ * on a desktop monitor: at 1920 the rail covered a third of the frame and the
+ * ghost gap was too small to read from a normal viewing distance. Everything
+ * steps up together so the hierarchy is unchanged, only larger. */
+@media (min-width: 1500px) {
+  .lab { font-size: 10px; }
+  .chip { font-size: 10px; padding: 3px 7px; }
+
+  #clockCell { min-width: 142px; padding: 10px 19px 12px; }
+  #clockCell .val { font-size: 31px; }
+  #projCell { min-width: 272px; padding: 9px 19px 12px; }
+  #projCell .val { font-size: 50px; }
+  #projCell .sub { font-size: 13px; }
+
+  #leftCol { left: 20px; top: 102px; gap: 11px; }
+  #engine { min-width: 190px; max-width: 220px; padding: 10px 17px 12px; }
+  #engine #streakVal { font-size: 45px; }
+  #engine .val { font-size: 33px; }
+  #engine .unit { font-size: 13px; }
+  #engine .sub, #why { font-size: 11px; }
+  .gauge { height: 9px; }
+
+  #dist { right: 20px; top: 102px; min-width: 172px; padding: 10px 17px 12px; }
+  #dist .val { font-size: 42px; }
+  #dist .unit { font-size: 14px; }
+  #dist .sub { font-size: 12px; }
+
+  #toast { min-width: 190px; padding: 9px 16px 11px; }
+  #toast .big { font-size: 33px; }
+  #toast .unit { font-size: 13px; }
+  #toast .small { font-size: 13px; }
+
+  #railWrap { width: min(1000px, 62vw); bottom: 20px; }
+  #rail { height: 28px; }
+  #gapLine { margin-bottom: 17px; gap: 12px; }
+  #gapVal { font-size: 21px; }
+  #gapTrend { font-size: 11px; }
+  #railCaps { font-size: 10px; margin-top: 4px; }
+  .railTick { top: 8px; bottom: 8px; }
+  .railTick.major { top: 3px; bottom: 3px; }
+
+  #perf { top: 212px; font-size: 12px; }
+}
+
+/* Landscape phones have almost no vertical room, so the readout tightens up
+ * and the panels give up their explanatory blocks rather than push the button
+ * off the bottom of the screen. */
 @media (max-height: 430px) {
   .panel h1 { font-size: clamp(26px, 6vh, 40px); }
   .panel .blurb, .rule, .mech { display: none; }
   .panel .keys { margin-top: 10px; }
   .cta { margin-top: 12px; padding: 10px 26px; }
   #endCols { margin-top: 10px; gap: 8px 24px; }
-}
 
-/* ---- fps / debug ----
- * Below the distance plate at every width, and clear of the rail, so the
- * debug line never sits on top of a number that matters. */
-#perf {
-  position: absolute; right: 14px; top: 172px;
-  font-size: 10px; font-weight: 700; opacity: 0.45;
-  text-align: right;
-  display: none;
+  #leftCol { top: 64px; gap: 6px; }
+  #engine { padding: 5px 10px 6px; }
+  #engine #streakVal { font-size: 23px; }
+  #engine .val { font-size: 18px; }
+  .gauge { margin: 4px 0 5px; }
+  #toast { padding: 5px 10px 6px; }
+  #toast .big { font-size: 18px; }
+  #perf { top: 140px; }
 }
-#perf.on { display: block; }
 
 </style>
 </head>
@@ -1295,7 +1356,10 @@ MR.shading = (function () {
   let cloudTex = null;
   function clouds() {
     if (cloudTex) return cloudTex;
-    const N = 512;
+    // 1024 rather than 512: one tile is stretched across most of the visible
+    // sky, so at 512 the clouds were magnified past their own texels and the
+    // hard cel edge turned into a soft airbrushed smudge.
+    const N = 1024;
     const cv = document.createElement('canvas');
     cv.width = cv.height = N;
     const g = cv.getContext('2d');
@@ -1383,15 +1447,19 @@ MR.shading = (function () {
       vec3 d = normalize(vWorld - cameraPosition);
       float h = d.y;
 
-      // Bands are driven by y/z, not by elevation. Elevation isolines are
-      // cones around the eye and project to CURVES -- which is the whole
-      // complaint about the old sky, and moving the maths off the dome's
-      // vertices only shrank the arcs rather than removing them. Isolines of
-      // y/z are planes through the eye, and a plane through the eye always
-      // projects to a dead straight line, whatever the camera is doing. The
-      // ratio is still world-locked, so the bands roll with a lane change
-      // instead of sticking to the screen like a decal.
-      float sy = d.y / max(d.z, 0.30);
+      // Bands are driven by height over the camera's HORIZONTAL forward axis,
+      // not by elevation angle. Elevation isolines are cones around the eye
+      // and project to curves -- that is the arcing the old sky was criticised
+      // for, and moving the maths off the dome's vertices only shrank the arcs
+      // rather than removing them. Every isoline here is instead a plane
+      // through the eye containing the horizon direction, and such a plane
+      // always projects to a straight line parallel to the horizon itself, at
+      // any camera yaw, pitch or roll. Using plain world z instead of fwd
+      // leaves the bands converging on the x-axis vanishing point, which tilts
+      // them a visible 8 degrees off the horizon when the chase camera turns.
+      vec3 back = vec3(viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2]);
+      vec3 fwd = normalize(vec3(-back.x, 0.0, -back.z));
+      float sy = d.y / max(dot(d, fwd), 0.30);
       float t = clamp(sy * 1.55 + 0.06, 0.0, 1.0);
 
       // Cel steps, blended part-way and antialiased with fwidth: a bare
@@ -1406,10 +1474,11 @@ MR.shading = (function () {
       // sun, not a lens flare. Drawn before the clouds so cover passes in
       // front of it.
       float sd = max(dot(d, sunDir), 0.0);
-      col += glowColor * pow(sd, 6.0) * 0.14;
-      col = mix(col, glowColor, smoothstep(0.99545, 0.99600, sd) * 0.30);
-      col = mix(col, mix(glowColor, sunColor, 0.6), smoothstep(0.99835, 0.99855, sd) * 0.55);
-      col = mix(col, sunColor, smoothstep(0.99915, 0.99930, sd));
+      col += glowColor * pow(sd, 8.0) * 0.20;
+      col = mix(col, mix(glowColor, sunColor, 0.35), smoothstep(0.99680, 0.99700, sd) * 0.65);
+      // Over 1.0 on purpose: the core clips to white so it reads as a light
+      // source rather than as a cream circle painted on the sky.
+      col = mix(col, sunColor * 1.25, smoothstep(0.99845, 0.99862, sd));
 
       // Horizon haze. Zero exactly at the horizon so the sky meets the fogged
       // ground with no step, peaking a few degrees above it. Driven by the
@@ -1429,13 +1498,19 @@ MR.shading = (function () {
       // this the last few degrees above the horizon boil into grey stipple.
       float reach = (1.0 - smoothstep(2.4, 5.6, r)) * smoothstep(0.07, 0.24, h);
 
-      vec3 lit = mix(vec3(1.0), bottom, 0.12);
-      vec3 shd = mix(bottom, top, 0.44);
+      // The shaded half is derived from the LIT cloud colour, not from the sky
+      // top uniform: tying it to that painted navy blobs into a pale blue sky,
+      // which read as holes rather than as cloud.
+      vec3 lit = mix(vec3(1.0), bottom, 0.10);
+      vec3 shd = mix(lit * 0.60, bottom, 0.35);
 
-      vec4 lo = texture2D(cloudMap, p * 0.105 + vec2(0.41 - time * 0.0022, 0.63));
-      col = mix(col, mix(shd, lit, smoothstep(0.35, 0.65, lo.r)), lo.a * reach * 0.55);
+      // The far sheet gets aerial perspective of its own: pale and flat, with
+      // no shaded half at all. Giving it the same underside as the near sheet
+      // painted grey streaks across a light sky that read as smudge.
+      vec4 lo = texture2D(cloudMap, p * 0.125 + vec2(0.41 - time * 0.0022, 0.63));
+      col = mix(col, mix(col, lit, 0.80), lo.a * reach * 0.55);
 
-      vec4 hi = texture2D(cloudMap, p * 0.245 + vec2(time * 0.0055, 0.0));
+      vec4 hi = texture2D(cloudMap, p * 0.300 + vec2(time * 0.0055, 0.0));
       col = mix(col, mix(shd, lit, smoothstep(0.35, 0.65, hi.r)), hi.a * reach);
 
       gl_FragColor = vec4(lin2srgb(col), 1.0);
@@ -1682,7 +1757,7 @@ MR.Runner = (function () {
     const spine = pivot(hips, 0, 0, 0);
 
     const pelvis = multi([
-      { g: new THREE.CylinderGeometry(0.228, 0.220, 0.30, 12), c: P.runnerShort, y: -0.025, sz: 0.82 },
+      { g: new THREE.CylinderGeometry(0.222, 0.216, 0.22, 12), c: P.runnerShort, y: -0.015, sz: 0.84 },
     ]);
     spine.add(pelvis);
 
@@ -1698,14 +1773,14 @@ MR.Runner = (function () {
       // It barely tapers on purpose: a singlet worn over the waistband, so
       // red owns two thirds of the trunk. Tapering it to a narrow hem let the
       // navy shorts read as the biggest single shape on the character.
-      { g: new THREE.CylinderGeometry(0.262, 0.236, 0.34, 12), c: P.runnerVest, y: -0.07, sz: 0.72 },
+      { g: new THREE.CylinderGeometry(0.262, 0.230, 0.38, 12), c: P.runnerVest, y: -0.09, sz: 0.72 },
       // Hem stripe -- stops the red mass from running straight into the shorts.
-      { g: new THREE.CylinderGeometry(0.240, 0.236, 0.05, 12), c: TRIM, y: -0.216, sz: 0.73 },
+      { g: new THREE.CylinderGeometry(0.234, 0.231, 0.05, 12), c: TRIM, y: -0.255, sz: 0.73 },
       // Deltoids. These are what make the shoulder line read wider than the
       // head; without them the trunk cone tapers into the skull. Flattened
       // hard in Y so they widen the shoulders without raising them.
-      { g: new THREE.SphereGeometry(0.138, 10, 8), c: P.runnerVest, x: -0.248, y: -0.020, sy: 0.76, sz: 0.84 },
-      { g: new THREE.SphereGeometry(0.138, 10, 8), c: P.runnerVest, x: 0.248, y: -0.020, sy: 0.76, sz: 0.84 },
+      { g: new THREE.SphereGeometry(0.134, 10, 8), c: P.runnerVest, x: -0.244, y: -0.020, sy: 0.78, sz: 0.84 },
+      { g: new THREE.SphereGeometry(0.134, 10, 8), c: P.runnerVest, x: 0.244, y: -0.020, sy: 0.78, sz: 0.84 },
       // Shoulder blades: a shallow pair of bumps so the back is not a blank
       // curve. Barely visible individually, but they catch the terminator.
       { g: new THREE.SphereGeometry(0.085, 8, 6), c: P.runnerVest, x: -0.105, y: -0.07, z: -0.135, sz: 0.55 },
@@ -1806,7 +1881,7 @@ MR.Runner = (function () {
       const elbow = pivot(shoulder, 0, -0.30, 0);
       const fore = multi([
         { g: new THREE.CapsuleGeometry(0.080, 0.15, 3, 10), c: P.runnerSkin, y: -0.13 },
-        { g: new THREE.SphereGeometry(0.105, 10, 8), c: GLOVE, y: -0.295, sx: 0.92, sz: 1.06 },
+        { g: new THREE.SphereGeometry(0.098, 10, 8), c: GLOVE, y: -0.290, sx: 0.90, sz: 1.10 },
       ]);
       elbow.add(fore);
 
@@ -1857,36 +1932,42 @@ MR.Runner = (function () {
         const s = Math.sin(ph);
         const c = Math.cos(ph);
 
-        // Airborne: tuck both knees so the soles turn toward the camera. The
-        // back view cannot see a leg extend, but it can see two bright soles.
-        const tuck = air * (i === 0 ? 1.15 : 0.85);
+        // Airborne: tuck both knees so the soles turn toward the camera, and
+        // damp the scissor while doing it. The back view cannot see a leg
+        // extend, but two bright soles swinging up read instantly.
+        const tuck = air * (i === 0 ? 1.05 : 0.95);
+        const cyc = 1 - air * 0.75;
 
-        L.hip.rotation.x = -s * swing * 0.72 + tuck * 0.62 + duck * 0.72;
+        L.hip.rotation.x = -s * swing * 0.72 * cyc + tuck * 0.70 + duck * 0.72;
         // Knee only bends one way; bias so it flexes hardest on recovery.
         const bend = Math.max(0, -c * 0.5 + 0.5);
-        L.knee.rotation.x = 0.18 + bend * (1.15 + 0.25 * sp01) + tuck * 1.05 + duck * 1.25;
+        L.knee.rotation.x = 0.18 + bend * (1.15 + 0.25 * sp01) * cyc + tuck * 1.35 + duck * 1.25;
         // Dorsiflex through recovery, plantarflex off the toe.
-        L.ankle.rotation.x = -0.16 + s * 0.34 - tuck * 0.55 + duck * 0.30;
+        L.ankle.rotation.x = -0.16 + s * 0.34 * cyc - tuck * 0.60 + duck * 0.30;
         // A little splay keeps the two legs from overlapping into one shape
         // when they pass each other at midstride.
-        L.hip.rotation.z = L.side * 0.05;
+        L.hip.rotation.z = L.side * (0.05 + air * 0.10);
       }
 
       // ---- arms: opposite the legs, elbows out so they break the outline
+      // Fore-and-aft swing points straight down the camera axis and is
+      // almost invisible from behind, so the cycle is deliberately built out
+      // of the two components the back view CAN see: how far the elbow
+      // travels sideways, and how high the glove rides.
       for (let i = 0; i < arms.length; i++) {
         const A = arms[i];
         const ph = p + (i === 0 ? Math.PI : 0);
-        const s = Math.sin(ph);
+        const s = Math.sin(ph);   // > 0 with the arm swung back
+        const fwd = Math.max(0, -s);
+        const back = Math.max(0, s);
 
-        A.shoulder.rotation.x = s * swing * 0.85 - air * 0.95 - duck * 0.30;
-        // Elbows ride outside the torso silhouette, wider on the back swing.
-        // From behind this is the only limb motion that crosses the outline,
-        // so it does most of the work of selling effort.
-        A.shoulder.rotation.z = A.side * (0.21 + Math.max(0, -s) * 0.13 + duck * 0.14);
-        // Rotating the whole arm inward brings the glove across the chest,
-        // which is what a racer's swing looks like from behind.
-        A.shoulder.rotation.y = -A.side * 0.20;
-        A.elbow.rotation.x = -1.18 - Math.max(0, s) * 0.48 - air * 0.30 - duck * 0.40;
+        A.shoulder.rotation.x = s * swing * 0.95 - duck * 0.25 + air * 0.30;
+        A.shoulder.rotation.z = A.side * (0.19 + back * 0.20 + duck * 0.14 + air * 0.50);
+        A.shoulder.rotation.y = -A.side * (0.16 + fwd * 0.22);
+        // Flexion peaks with the arm forward -- glove up by the chest at the
+        // front of the swing, forearm opening out past the hip at the back,
+        // which is exactly when the pale glove clears the torso silhouette.
+        A.elbow.rotation.x = -1.16 - fwd * 0.52 - air * 0.30 - duck * 0.55;
       }
 
       // ---- torso: forward lean, vertical bob, and a lateral bank on turns
@@ -1894,7 +1975,7 @@ MR.Runner = (function () {
       const bob = -Math.abs(Math.cos(p)) * 0.050 * (1 - air) + 0.050;
       body.position.y = bob + air * 0.09;
 
-      const leanFwd = 0.20 + 0.10 * sp01 + duck * 0.80 + stumble * 0.5 - air * 0.07;
+      const leanFwd = 0.26 + 0.12 * sp01 + duck * 0.74 + stumble * 0.5 - air * 0.09;
       spine.rotation.x = leanFwd;
       spine.rotation.z = -lean * 0.30;
       spine.rotation.y = lean * 0.16;
@@ -1984,12 +2065,15 @@ MR.World = (function () {
     'CITY START': {
       sky: [0x2b3fa8, 0x9fdcff], ground: 0x63c96b, road: 0x50557d, fog: 0x9fdcff,
       edge: 'barrier',
-      mix: { building: 2.6, tree: 0.55, crowd: 2.3, rival: 0.5, station: 0.10 },
+      mix: { building: 2.6, tree: 0.55, grove: 0.15, crowd: 2.3, rival: 0.5, station: 0.10 },
     },
+    // `bank` cuts the shoulder back on one side so the water can come right up
+    // to the road; at full shoulder width the river sat 35 units out and read
+    // as a smear on the horizon.
     'RIVERSIDE': {
       sky: [0x1f6fb8, 0xbdf0ff], ground: 0x57c7a8, road: 0x4d5a80, fog: 0xbdf0ff,
-      edge: 'hedge',
-      mix: { building: 0.45, tree: 1.9, crowd: 1.0, rival: 0.45, station: 0.12 },
+      edge: 'hedge', bank: -1,
+      mix: { building: 0.45, tree: 1.5, grove: 1.3, crowd: 1.0, rival: 0.45, station: 0.12 },
     },
     // Nothing stands beside a bridge deck -- the emptiness is the point, and a
     // spectator out there would be standing on the river.
@@ -2001,7 +2085,7 @@ MR.World = (function () {
     'PARKLAND': {
       sky: [0x2e8fd0, 0xcdf5c0], ground: 0x6fd46a, road: 0x53587f, fog: 0xcdf5c0,
       edge: 'hedge',
-      mix: { building: 0.15, tree: 3.4, crowd: 1.1, rival: 0.45, station: 0.12 },
+      mix: { building: 0.12, tree: 2.2, grove: 3.2, crowd: 1.1, rival: 0.45, station: 0.12 },
     },
     'THE WALL': {
       sky: [0x8a3a6b, 0xffb27a], ground: 0x8f9a5e, road: 0x5a4f66, fog: 0xffb27a,
@@ -2015,7 +2099,7 @@ MR.World = (function () {
     },
   };
 
-  const PROP_KINDS = ['building', 'tree', 'crowd', 'rival', 'station'];
+  const PROP_KINDS = ['building', 'tree', 'grove', 'crowd', 'rival', 'station'];
 
   // Scratch colours: applyBiome runs every frame and must not allocate.
   const _cA = new THREE.Color();
@@ -2078,10 +2162,10 @@ MR.World = (function () {
     const g = c.getContext('2d');
     // A dark wash under the icons: the road is mid-value, the icons are
     // bright, and without this the edges of the mat vanish into it.
-    g.fillStyle = 'rgba(10,10,30,0.42)';
+    g.fillStyle = 'rgba(10,10,30,0.34)';
     g.fillRect(0, 0, 128, 256);
     g.fillStyle = tint;
-    g.fillRect(0, 0, 9, 256); g.fillRect(119, 0, 9, 256);
+    g.fillRect(0, 0, 8, 256); g.fillRect(120, 0, 8, 256);
 
     for (let i = 0; i < 3; i++) {
       const cy = 42 + i * 86;
@@ -2104,7 +2188,7 @@ MR.World = (function () {
       }
     }
     const t = texture(c, true);
-    t.repeat.set(1, 3);
+    t.repeat.set(1, 5);
     return t;
   }
 
@@ -2512,7 +2596,9 @@ MR.World = (function () {
 
     // Lane telegraph mats. Transparent, unlit, and laid a hair above the road
     // paint so they never z-fight with the lane dashes.
-    const matGeo = new THREE.PlaneGeometry(2.24, 11);
+    // 14 units of run-up: the mat has to be readable while the lane choice is
+    // still open, which is 3-4 gate-lengths out, not 1.
+    const matGeo = new THREE.PlaneGeometry(2.24, 14);
     const matMat = {};
     matMat[K.JUMP] = new THREE.MeshBasicMaterial({ map: matTexture(K.JUMP, '#ffc23a'), transparent: true, depthWrite: false });
     matMat[K.DUCK] = new THREE.MeshBasicMaterial({ map: matTexture(K.DUCK, '#4fdcff'), transparent: true, depthWrite: false });
@@ -2521,7 +2607,7 @@ MR.World = (function () {
     function telegraph(kind) {
       const m = new THREE.Mesh(matGeo, matMat[kind]);
       m.rotation.x = -Math.PI / 2;
-      m.position.set(0, 0.012, -6.6);
+      m.position.set(0, 0.012, -8.3);
       m.renderOrder = 5;
       return m;
     }
@@ -2646,6 +2732,36 @@ MR.World = (function () {
     }, group);
 
     /**
+     * A grove: five trees and undergrowth in one mesh. Single trees at the
+     * density the seeded stream can afford left PARKLAND reading as a mown
+     * field; a clump costs the same draw and fills the middle distance.
+     */
+    function groveGeo(seed) {
+      const parts = [];
+      let s = seed;
+      const r = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+      const greens = [0x2f9f52, 0x35a855, 0x3fbf63, 0x59d47a, 0x2b8f6a];
+      for (let i = 0; i < 5; i++) {
+        const x = -5 + r() * 10, z = -6 + r() * 12;
+        const k = 0.75 + r() * 0.85;
+        const g0 = greens[Math.floor(r() * greens.length)];
+        parts.push(cyl(0.17 * k, 0.28 * k, 1.4 * k, 6, x, 0.7 * k, z, 0x8a5a3c));
+        parts.push(cone(1.45 * k, 1.9 * k, 8, x, 2.1 * k, z, g0));
+        parts.push(cone(1.15 * k, 1.6 * k, 8, x, 3.0 * k, z, g0));
+        parts.push(cone(0.80 * k, 1.3 * k, 8, x, 3.9 * k, z, 0x59d47a));
+      }
+      for (let i = 0; i < 6; i++) {
+        parts.push(cone(0.8 + r() * 0.5, 1.0 + r() * 0.6, 6, -6 + r() * 12, 0.4, -7 + r() * 14,
+          greens[Math.floor(r() * greens.length)]));
+      }
+      return merge(parts);
+    }
+    const groveGeos = [groveGeo(5), groveGeo(29), groveGeo(97)];
+    const grovePool = groveGeos.map((geo) => Pool(function () {
+      return S.outlined(geo, mats.prop, S.INK.prop);
+    }, group));
+
+    /**
      * A knot of spectators, merged. Individual capsules read as pills and cost
      * a draw each; eight little figures with legs, raised arms and different
      * shirts cost the same one draw and read as a crowd.
@@ -2656,23 +2772,30 @@ MR.World = (function () {
       const skins = [0xffc79a, 0xe0a173, 0xb87a4e, 0x8a5a3c];
       let s = seed * 9301 + 49297;
       const r = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
-      for (let i = 0; i < 8; i++) {
-        const x = -1.1 + (i % 4) * 0.78 + r() * 0.22;
-        const z = -1.9 + Math.floor(i / 4) * 2.0 + r() * 0.7;
-        const y = 0;
-        const h = 0.90 + r() * 0.22;
+      const signs = [0xffe45e, 0xfffdf5, 0x37d6ff, 0xff9ad5];
+      for (let i = 0; i < 9; i++) {
+        const x = -1.5 + (i % 3) * 1.15 + r() * 0.35;
+        const z = -2.6 + Math.floor(i / 3) * 2.4 + r() * 0.9;
+        const h = 1.02 + r() * 0.26;
         const shirt = shirts[Math.floor(r() * shirts.length)];
         const skin = skins[Math.floor(r() * skins.length)];
-        parts.push(bx(0.30, 0.62 * h, 0.22, x, 0.31 * h, z, 0x2b2f52));
-        parts.push(bx(0.44, 0.60 * h, 0.30, x, 0.92 * h, z, shirt));
-        parts.push(bx(0.26, 0.26, 0.24, x, 1.36 * h, z, skin));
-        // Every third spectator has both arms up -- a still crowd looks dead.
+        parts.push(bx(0.32, 0.60 * h, 0.24, x, 0.30 * h, z, 0x2b2f52));
+        parts.push(bx(0.46, 0.62 * h, 0.32, x, 0.92 * h, z, shirt));
+        parts.push(bx(0.28, 0.28, 0.26, x, 1.38 * h, z, skin));
+        parts.push(bx(0.30, 0.10, 0.28, x, 1.52 * h, z, 0x3a2b46));
+        // Arms up, or holding a placard -- a still crowd looks dead, and the
+        // placards are what read as "spectators" at the distance the figures
+        // themselves have collapsed to two pixels.
         if (i % 3 === 0) {
-          parts.push(bx(0.11, 0.52, 0.11, x - 0.28, 1.20 * h, z, skin, 0, 0, 0.30));
-          parts.push(bx(0.11, 0.52, 0.11, x + 0.28, 1.20 * h, z, skin, 0, 0, -0.30));
+          parts.push(bx(0.12, 0.56, 0.12, x - 0.30, 1.22 * h, z, skin, 0, 0, 0.32));
+          parts.push(bx(0.12, 0.56, 0.12, x + 0.30, 1.22 * h, z, skin, 0, 0, -0.32));
+        } else if (i % 4 === 1) {
+          parts.push(bx(0.12, 0.70, 0.12, x + 0.26, 1.35 * h, z, skin));
+          parts.push(bx(0.10, 0.9, 0.10, x + 0.26, 1.9 * h, z, 0x8a5a3c));
+          parts.push(bx(0.86, 0.62, 0.08, x + 0.26, 2.45 * h, z, signs[Math.floor(r() * signs.length)]));
         } else {
-          parts.push(bx(0.11, 0.44, 0.11, x - 0.26, 0.92 * h, z, shirt));
-          parts.push(bx(0.11, 0.44, 0.11, x + 0.26, 0.92 * h, z, shirt));
+          parts.push(bx(0.12, 0.46, 0.12, x - 0.28, 0.92 * h, z, shirt));
+          parts.push(bx(0.12, 0.46, 0.12, x + 0.28, 0.92 * h, z, shirt));
         }
       }
       return merge(parts);
@@ -2784,16 +2907,17 @@ MR.World = (function () {
      * fight over the same ground.
      */
     const riverGeo = merge([
-      part(new THREE.PlaneGeometry(70, 58), 0x2f8fc4, -72, 0.06, 0, -Math.PI / 2),
-      bx(4.5, 0.5, 58, -36.5, 0.06, 0, 0xe6d9a8),
-      bx(1.4, 0.6, 11, -40.5, 0.36, -14, 0x8a5a3c),
-      bx(6.5, 0.6, 1.6, -44, 0.36, -19, 0x8a5a3c),
-      bx(2.2, 0.9, 5.4, -47, 0.35, 6, 0xfff2e0),
-      bx(0.32, 3.4, 0.32, -47, 2.1, 6, 0xfff2e0),
-      bx(2.0, 2.4, 0.12, -46.0, 2.6, 6, 0xff4d5e),
-      bx(2.2, 0.9, 5.4, -55, 0.35, 24, 0xffe45e),
-      bx(0.32, 3.0, 0.32, -55, 1.9, 24, 0xfff2e0),
-      bx(1.8, 2.0, 0.12, -54.1, 2.3, 24, 0x37d6ff),
+      part(new THREE.PlaneGeometry(94, 58), 0x2f8fc4, -60, -0.12, 0, -Math.PI / 2),
+      bx(2.4, 0.34, 58, -12.6, -0.12, 0, 0xe6d9a8),
+      bx(1.4, 0.5, 12, -16.5, 0.10, -14, 0x8a5a3c),
+      bx(7.5, 0.5, 1.6, -20, 0.10, -19.5, 0x8a5a3c),
+      bx(0.24, 1.1, 0.24, -23.5, 0.4, -19.5, 0x8a5a3c),
+      bx(2.2, 0.8, 5.4, -21, 0.14, 6, 0xfff2e0),
+      bx(0.32, 3.4, 0.32, -21, 1.9, 6, 0xfff2e0),
+      bx(2.0, 2.4, 0.12, -20.0, 2.4, 6, 0xff4d5e),
+      bx(2.2, 0.8, 5.4, -31, 0.14, 24, 0xffe45e),
+      bx(0.32, 3.0, 0.32, -31, 1.7, 24, 0xfff2e0),
+      bx(1.8, 2.0, 0.12, -30.1, 2.1, 24, 0x37d6ff),
     ]);
     const riverPool = Pool(function () {
       return S.outlined(riverGeo, mats.prop, S.INK.prop);
@@ -2928,8 +3052,10 @@ MR.World = (function () {
         const look = lookAtZ(Math.max(0, z)).look;
         const w = PROP_KINDS.map((k) => look.mix[k] || 0);
         const total = w.reduce((a, b) => a + b, 0);
-        const side = rnd.chance(0.5) ? -1 : 1;
+        let side = rnd.chance(0.5) ? -1 : 1;
         let kind = total > 0 ? rnd.weighted(PROP_KINDS, w) : null;
+        // Anything with foundations goes on the dry side of a river leg.
+        if (look.bank === side && kind !== 'crowd' && kind !== 'rival') side = -side;
         // A zero-weighted kind must never slip through the fallback branch of
         // weighted(); a building standing in the middle of the river is the
         // kind of thing nobody notices until a screenshot.
@@ -3009,6 +3135,7 @@ MR.World = (function () {
       if (s.kind === 'building') return buildingPool;
       if (s.kind === 'tree') return treePool;
       if (s.kind === 'station') return stationPool;
+      if (s.kind === 'grove') return grovePool[Math.floor(s.b * grovePool.length) % grovePool.length];
       if (s.kind === 'crowd') return crowdPool[Math.floor(s.a * crowdPool.length) % crowdPool.length];
       return null;   // rivals live in their own list
     }
@@ -3084,7 +3211,17 @@ MR.World = (function () {
         // over water. Tiles are claimed 210 units out, so the swap always
         // happens well beyond anything the player can see change.
         const deck = deckLift(tz + TILE / 2) > 0.55;
-        for (const sh of obj.userData.shoulders) sh.visible = !deck;
+        const bank = lookAtZ(tz).look.bank || 0;
+        for (let i = 0; i < 2; i++) {
+          const sh = obj.userData.shoulders[i];
+          const sx = i === 0 ? -1 : 1;
+          sh.visible = !deck;
+          // Cut the shoulder back to a 9-unit verge where a river runs, so the
+          // water starts at x = 13 instead of past the 34-unit shoulder edge.
+          const cut = (bank === sx);
+          sh.scale.x = cut ? 0.30 : 1;
+          sh.position.x = sx * (cut ? 8.9 : K.TRACK_HALF_WIDTH + 15);
+        }
         activeRoad.push({ z: tz, obj });
         state.roadFrom++;
       }
@@ -3153,6 +3290,9 @@ MR.World = (function () {
           obj.scale.setScalar(0.7 + s.a * 0.75);
           obj.position.set(s.x, 0, s.z);
           obj.rotation.y = s.b * 6.3;
+        } else if (s.kind === 'grove') {
+          obj.position.set(s.x + s.side * 10, 0, s.z);
+          obj.rotation.y = s.a * 6.3;
         } else if (s.kind === 'station') {
           obj.position.set(s.side * (K.TRACK_HALF_WIDTH + 2.4), 0, s.z);
           obj.rotation.y = s.side > 0 ? Math.PI : 0;
@@ -3252,6 +3392,7 @@ MR.World = (function () {
       overpassPool.releaseAll(); standPool.releaseAll();
       for (const p of crowdPool) p.releaseAll();
       for (const p of rivalPool) p.releaseAll();
+      for (const p of grovePool) p.releaseAll();
       activeGates.length = 0; activeScene.length = 0; activeStruct.length = 0;
       activeBanner.length = 0; activeRoad.length = 0; activeRivals.length = 0;
       state.roadFrom = 0; state.gateIdx = 0; state.sceneIdx = 0;
@@ -3361,7 +3502,8 @@ MR.Camera = (function () {
       accel: 0,        // smoothed d(speed)/dt -- the surge signal
 
       shake: 0,        // trauma, 0..1
-      punch: 0,        // one-shot impact lurch
+      punch: 0,        // one-shot impact roll
+      lurch: 0,        // one-shot impact sidestep
       winded: 0,       // long tail after a hit: the camera loses its nerve
       dip: 0, dipV: 0, // sprung landing compression
       kick: 0,         // short FOV punch (landing)
@@ -3437,9 +3579,10 @@ MR.Camera = (function () {
       // Underdamped on purpose (zeta ~0.6): the camera arrives at the new lane
       // slightly late and overshoots a hair, which is the weight the old
       // exponential follow was missing.
-      const tgtX = p.x * 0.78;
+      const tgtX = p.x * 0.78 + s.lurch;
       s.vx += ((tgtX - s.x) * 200 - s.vx * 17) * d;
       s.x += s.vx * d;
+      s.lurch -= s.lurch * Math.min(1, d * 5.0);
 
       // ---- stride ---------------------------------------------------------
       // Same cadence curve as the runner so the bob lands on the footfalls.
@@ -3453,12 +3596,16 @@ MR.Camera = (function () {
       const bobAmp = (0.020 + 0.026 * drive) * (1 - air) * (1 - fin);
       const bobY = -Math.abs(Math.sin(ph)) * bobAmp;        // fall on footfall
       const bobX = Math.sin(ph) * bobAmp * 0.55;
+      // A footfall also eats a little of the gap: the camera surges in on the
+      // drive phase and drifts back on the float. Tiny, but it turns a smooth
+      // dolly into something being pushed by legs.
+      const bobZ = Math.sin(ph * 2) * (0.014 + 0.030 * drive) * (1 - air) * (1 - fin);
 
       // ---- shake ----------------------------------------------------------
       // Trauma squared, plus a permanent tremble at top gear: at the pace
       // floor the frame should never be completely still.
       const tr = s.shake * s.shake;
-      const rumble = gear * 0.055 * (1 - fin);
+      const rumble = gear * 0.045 * (1 - fin);
       const shX = wobble(s.t, 0.0) * (tr * 0.20 + rumble);
       const shY = wobble(s.t, 1.7) * (tr * 0.16 + rumble * 0.7);
       const shR = wobble(s.t, 3.1) * (tr * 0.030 + rumble * 0.10);
@@ -3476,6 +3623,7 @@ MR.Camera = (function () {
         - s.gearT * s.gearT * 0.45
         + s.mileT * 0.45
         + s.winded * 0.28
+        + bobZ
         + fin * 3.4;
 
       const hgt = BASE_Y
@@ -3497,17 +3645,19 @@ MR.Camera = (function () {
       // 0.42/0.30 split had the camera chasing the arc and cancelled it.
       look.set(
         s.x * 0.55,
-        LOOK_Y + (p.y || 0) * 0.46 - duck * 0.26 - drive * 0.10 + fin * 0.55,
+        LOOK_Y + (p.y || 0) * 0.46 - duck * 0.26 - drive * 0.22 + fin * 0.55,
         p.z + LOOK_AHEAD + (p.y || 0) * 1.1 - drive * 0.5
       );
       cam.lookAt(look);
 
       // Roll: the lean term is the body, the camera's own lateral velocity is
-      // the whip that outlasts it. Old value was 0.055 * lean -- about two
-      // degrees, which is below the threshold of being felt at all.
-      const whip = Math.max(-1, Math.min(1, s.vx / 26));
-      const rollTgt = -((p.lean || 0) * 0.105 + whip * 0.055) * (1 - fin);
-      s.roll += (rollTgt - s.roll) * (1 - Math.pow(0.0008, d));
+      // the whip that outlasts it. Old value was 0.055 * lean -- barely two
+      // degrees, below the threshold of being felt at all. This peaks around
+      // seven, which is a bank; the response is fast because a lane change is
+      // over in 0.16s and a slow filter would smooth the whole event away.
+      const whip = Math.max(-1, Math.min(1, s.vx / 20));
+      const rollTgt = -((p.lean || 0) * 0.16 + whip * 0.07) * (1 - fin);
+      s.roll += (rollTgt - s.roll) * (1 - Math.pow(0.00002, d));
       cam.rotation.z += s.roll + shR - s.punch * 0.055;
 
       // ---- fov ------------------------------------------------------------
@@ -3551,6 +3701,10 @@ MR.Camera = (function () {
       s.winded = Math.min(1, s.winded + 0.85 * a);
       s.dipV -= 5.5 * a;
       s.kick = Math.min(1, s.kick + 0.3 * a);
+      // Knocked off the racing line. The side alternates with the clock so a
+      // player who hits three gates in a mile does not see the same canned
+      // stagger three times.
+      s.lurch = (Math.sin(s.t * 12.9) >= 0 ? 1 : -1) * 0.42 * a;
     };
 
     /** Landing: compression into the road, then a rebound. */
@@ -3568,7 +3722,8 @@ MR.Camera = (function () {
     s.reset = function () {
       s.x = 0; s.vx = 0; s.roll = 0; s.fov = BASE_FOV;
       s.t = 0; s.stride = 0; s.primed = false; s.sp = SPEED_LO; s.accel = 0;
-      s.shake = 0; s.punch = 0; s.winded = 0; s.dip = 0; s.dipV = 0; s.kick = 0;
+      s.shake = 0; s.punch = 0; s.lurch = 0; s.winded = 0;
+      s.dip = 0; s.dipV = 0; s.kick = 0;
       s.mile = -1; s.mileT = 0; s.gearT = 0; s.gearArmed = true; s.finish = 0;
       cam.fov = BASE_FOV;
       cam.updateProjectionMatrix();
@@ -3730,8 +3885,21 @@ MR.Collision = (function () {
   };
 
   // State thresholds.
-  const JUMP_CLEAR_Y = 0.62;   // feet must be this high at the gate line
-  const DUCK_CLEAR = 0.50;     // duck must be at least half committed
+  //
+  // Both of these are set BY the audit below rather than by feel, and the
+  // first values chosen (0.62 and 0.50) failed it: at 0.62 the feet were
+  // still 0.18 below the top of a 0.80 block, and at 0.50 the head sat at
+  // 1.57 with the bar starting at 1.41. In both cases the player would have
+  // been waved through while visibly passing through the obstacle -- exactly
+  // the "I cleared it and still got hit" complaint in reverse, and worse in a
+  // game where one contact costs the record. The thresholds now leave real
+  // daylight, and audit() is what proves it.
+  //
+  // The airborne window stays generous: at 0.84 the feet are above the block
+  // from t=0.07s to t=0.53s of a 0.62s jump, which is ~12 world units of
+  // ground at race pace.
+  const JUMP_CLEAR_Y = 0.84;   // feet must be this high at the gate line
+  const DUCK_CLEAR = 0.90;     // duck must be all but fully committed
 
   const PLAYER_STAND_TOP = MR.Runner.HEIGHT;   // 1.78
   const PLAYER_DUCK_DROP = 0.42;

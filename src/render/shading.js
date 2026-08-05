@@ -396,10 +396,11 @@ MR.shading = (function () {
       // sun, not a lens flare. Drawn before the clouds so cover passes in
       // front of it.
       float sd = max(dot(d, sunDir), 0.0);
-      col += glowColor * pow(sd, 5.0) * 0.16;
-      col = mix(col, glowColor, smoothstep(0.99340, 0.99380, sd) * 0.26);
-      col = mix(col, mix(glowColor, sunColor, 0.55), smoothstep(0.99720, 0.99745, sd) * 0.55);
-      col = mix(col, sunColor, smoothstep(0.99855, 0.99872, sd));
+      col += glowColor * pow(sd, 8.0) * 0.20;
+      col = mix(col, mix(glowColor, sunColor, 0.35), smoothstep(0.99680, 0.99700, sd) * 0.65);
+      // Over 1.0 on purpose: the core clips to white so it reads as a light
+      // source rather than as a cream circle painted on the sky.
+      col = mix(col, sunColor * 1.25, smoothstep(0.99845, 0.99862, sd));
 
       // Horizon haze. Zero exactly at the horizon so the sky meets the fogged
       // ground with no step, peaking a few degrees above it. Driven by the
@@ -425,8 +426,11 @@ MR.shading = (function () {
       vec3 lit = mix(vec3(1.0), bottom, 0.10);
       vec3 shd = mix(lit * 0.60, bottom, 0.35);
 
+      // The far sheet gets aerial perspective of its own: pale and flat, with
+      // no shaded half at all. Giving it the same underside as the near sheet
+      // painted grey streaks across a light sky that read as smudge.
       vec4 lo = texture2D(cloudMap, p * 0.125 + vec2(0.41 - time * 0.0022, 0.63));
-      col = mix(col, mix(shd, lit, smoothstep(0.35, 0.65, lo.r)), lo.a * reach * 0.42);
+      col = mix(col, mix(col, lit, 0.80), lo.a * reach * 0.55);
 
       vec4 hi = texture2D(cloudMap, p * 0.300 + vec2(time * 0.0055, 0.0));
       col = mix(col, mix(shd, lit, smoothstep(0.35, 0.65, hi.r)), hi.a * reach);

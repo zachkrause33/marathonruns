@@ -402,6 +402,18 @@ html, body {
 }
 #count.hidden { display: none; }
 
+/* ---- fps / debug ----
+ * Below the distance plate at every width and clear of the rail, so the debug
+ * line never lands on top of a number that matters. Declared before the media
+ * queries so their overrides win on equal specificity. */
+#perf {
+  position: absolute; right: 14px; top: 172px;
+  font-size: 10px; font-weight: 700; opacity: 0.45;
+  text-align: right;
+  display: none;
+}
+#perf.on { display: block; }
+
 /* ---- small screens ----
  * A phone is played with a thumb, so the plates shrink but the hierarchy does
  * not change: the projection stays the biggest thing on the screen and the
@@ -504,15 +516,5 @@ html, body {
   .gauge { margin: 4px 0 5px; }
   #toast { padding: 5px 10px 6px; }
   #toast .big { font-size: 18px; }
+  #perf { top: 140px; }
 }
-
-/* ---- fps / debug ----
- * Below the distance plate at every width, and clear of the rail, so the
- * debug line never sits on top of a number that matters. */
-#perf {
-  position: absolute; right: 14px; top: 172px;
-  font-size: 10px; font-weight: 700; opacity: 0.45;
-  text-align: right;
-  display: none;
-}
-#perf.on { display: block; }

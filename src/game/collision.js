@@ -23,8 +23,21 @@ MR.Collision = (function () {
   };
 
   // State thresholds.
-  const JUMP_CLEAR_Y = 0.62;   // feet must be this high at the gate line
-  const DUCK_CLEAR = 0.50;     // duck must be at least half committed
+  //
+  // Both of these are set BY the audit below rather than by feel, and the
+  // first values chosen (0.62 and 0.50) failed it: at 0.62 the feet were
+  // still 0.18 below the top of a 0.80 block, and at 0.50 the head sat at
+  // 1.57 with the bar starting at 1.41. In both cases the player would have
+  // been waved through while visibly passing through the obstacle -- exactly
+  // the "I cleared it and still got hit" complaint in reverse, and worse in a
+  // game where one contact costs the record. The thresholds now leave real
+  // daylight, and audit() is what proves it.
+  //
+  // The airborne window stays generous: at 0.84 the feet are above the block
+  // from t=0.07s to t=0.53s of a 0.62s jump, which is ~12 world units of
+  // ground at race pace.
+  const JUMP_CLEAR_Y = 0.84;   // feet must be this high at the gate line
+  const DUCK_CLEAR = 0.90;     // duck must be all but fully committed
 
   const PLAYER_STAND_TOP = MR.Runner.HEIGHT;   // 1.78
   const PLAYER_DUCK_DROP = 0.42;

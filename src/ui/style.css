@@ -380,10 +380,13 @@ html, body {
   opacity: 0.45; text-align: right; padding-bottom: 2px;
 }
 #splitTable .v { text-align: right; }
-#splitTable .v.fin {
-  border-top: 1px solid rgba(255, 253, 245, 0.25);
-  padding-top: 4px; margin-top: 2px; font-weight: 900;
+/* A rule spanning the grid, not a border per cell -- per-cell borders break
+ * across the column gaps and read as three dashes. */
+#splitTable .sep {
+  grid-column: 1 / -1; height: 1px;
+  background: rgba(255, 253, 245, 0.25); margin: 3px 0 1px;
 }
+#splitTable .v.fin { font-weight: 900; }
 
 /* ---- countdown ---- */
 #count {
@@ -407,9 +410,11 @@ html, body {
   #projCell .cap { gap: 7px; }
   .lab { font-size: 8px; letter-spacing: 0.12em; }
   .chip { font-size: 8px; padding: 2px 4px; letter-spacing: 0.06em; }
+  .wideOnly { display: none; }
+  .narrowOnly { display: inline; }
 
   #leftCol { left: 9px; top: 70px; gap: 7px; }
-  #engine { min-width: 124px; padding: 6px 11px 7px; }
+  #engine { min-width: 124px; max-width: 142px; padding: 6px 11px 7px; }
   #engine #streakVal { font-size: 27px; }
   #engine .val { font-size: 21px; }
   #engine .sub { font-size: 8px; }
@@ -425,6 +430,7 @@ html, body {
 
   #railWrap { width: 92vw; bottom: 10px; }
   #rail { height: 17px; }
+  #gapLine { margin-bottom: 13px; gap: 7px; }
   #gapVal { font-size: 15px; }
   #count { font-size: 76px; }
   .panel { padding: 16px 14px; }
@@ -441,9 +447,11 @@ html, body {
   #endCols { margin-top: 10px; gap: 8px 24px; }
 }
 
-/* ---- fps / debug ---- */
+/* ---- fps / debug ----
+ * Below the distance plate at every width, and clear of the rail, so the
+ * debug line never sits on top of a number that matters. */
 #perf {
-  position: absolute; right: 14px; top: 158px;
+  position: absolute; right: 14px; top: 172px;
   font-size: 10px; font-weight: 700; opacity: 0.45;
   text-align: right;
   display: none;

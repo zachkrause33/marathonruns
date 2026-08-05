@@ -104,9 +104,13 @@ html, body {
 #projCell .val { font-size: 40px; font-weight: 900; line-height: 1.02; }
 #projCell .sub { font-size: 11px; font-weight: 800; opacity: 0.7; margin-top: 1px; }
 
-#projCell.on  .val, #projCell.on  .sub { color: var(--ahead); opacity: 1; }
-#projCell.off .val, #projCell.off .sub { color: var(--behind); opacity: 1; }
+#projCell.on  .val, #projCell.on  .sub { color: var(--ahead); }
+#projCell.off .val, #projCell.off .sub { color: var(--behind); }
 #projCell.on .sub, #projCell.off .sub { opacity: 0.92; }
+
+/* The short label is not an abbreviation for its own sake: at phone widths the
+ * full one wraps and pushes the headline number down a line. */
+.narrowOnly { display: none; }
 
 /* The chip is the plain-language version of the same judgement. It is an
  * outline while the estimate is still moving under the player and a solid
@@ -132,7 +136,7 @@ html, body {
   background: var(--ink);
   border-left: 4px solid var(--accent);
   padding: 8px 14px 9px;
-  min-width: 152px;
+  min-width: 152px; max-width: 178px;
 }
 #engine #streakVal {
   font-size: 36px; font-weight: 900; line-height: 1;
@@ -143,7 +147,10 @@ html, body {
 #engine .val { font-size: 27px; font-weight: 800; line-height: 1.05; }
 #engine .val.ahead { color: var(--ahead); }
 #engine .unit { font-size: 11px; font-weight: 700; opacity: 0.6; margin-left: 3px; }
-#engine .sub { font-size: 9px; font-weight: 700; opacity: 0.55; margin-top: 2px; }
+#engine .sub { font-size: 9px; font-weight: 700; opacity: 0.68; margin-top: 2px; }
+/* The required pace turning red is the moment the record stops being possible;
+ * it must not stay dimmed like an aside. */
+#engine .sub.behind { opacity: 1; }
 
 /* Contact flashes the whole plate, not just the number: the cost is the
  * streak and the speed together, and they live in the same box. */
@@ -166,7 +173,7 @@ html, body {
 }
 
 #why {
-  font-size: 9px; font-weight: 800; letter-spacing: 0.08em;
+  font-size: 9px; font-weight: 800; letter-spacing: 0.08em; line-height: 1.4;
   margin-top: 6px; color: var(--accent);
   transition: opacity 0.3s;
 }
@@ -199,6 +206,7 @@ html, body {
   transition: opacity 0.22s ease-out, transform 0.22s ease-out;
 }
 #toast.show { opacity: 1; transform: none; }
+#toast.noBig #toastRow { display: none; }
 #toast .lab { opacity: 0.85; color: #fffdf5; }
 #toast .big { font-size: 27px; font-weight: 900; line-height: 1.05; }
 #toast .unit { font-size: 11px; font-weight: 700; opacity: 0.6; margin-left: 3px; }
@@ -215,9 +223,12 @@ html, body {
   transform: translateX(-50%);
   width: min(660px, 88vw);
 }
+/* Clearance here is not slack: the ghost marker's cap sticks up out of the
+ * rail and would otherwise strike through this line whenever the ghost is
+ * near the middle of the course. */
 #gapLine {
   display: flex; align-items: baseline; justify-content: center; gap: 9px;
-  margin-bottom: 5px;
+  margin-bottom: 15px;
   text-shadow: 0 1px 3px rgba(14, 18, 48, 0.9);
 }
 #gapLine .lab { opacity: 0.75; }
@@ -320,6 +331,7 @@ html, body {
 .mechPace span { font-size: 17px; opacity: 0.55; }
 .mechPace i { font-size: 11px; font-style: normal; font-weight: 800; opacity: 0.55; }
 .mech .gauge { max-width: 260px; margin: 8px auto 0; }
+.gaugeLeg { font-size: 10px; font-weight: 700; opacity: 0.5; margin-top: 5px; }
 
 .panel .keys {
   margin-top: 18px; font-size: 12px; font-weight: 700;
@@ -376,10 +388,13 @@ html, body {
   opacity: 0.45; text-align: right; padding-bottom: 2px;
 }
 #splitTable .v { text-align: right; }
-#splitTable .v.fin {
-  border-top: 1px solid rgba(255, 253, 245, 0.25);
-  padding-top: 4px; margin-top: 2px; font-weight: 900;
+/* A rule spanning the grid, not a border per cell -- per-cell borders break
+ * across the column gaps and read as three dashes. */
+#splitTable .sep {
+  grid-column: 1 / -1; height: 1px;
+  background: rgba(255, 253, 245, 0.25); margin: 3px 0 1px;
 }
+#splitTable .v.fin { font-weight: 900; }
 
 /* ---- countdown ---- */
 #count {
@@ -403,9 +418,11 @@ html, body {
   #projCell .cap { gap: 7px; }
   .lab { font-size: 8px; letter-spacing: 0.12em; }
   .chip { font-size: 8px; padding: 2px 4px; letter-spacing: 0.06em; }
+  .wideOnly { display: none; }
+  .narrowOnly { display: inline; }
 
   #leftCol { left: 9px; top: 70px; gap: 7px; }
-  #engine { min-width: 124px; padding: 6px 11px 7px; }
+  #engine { min-width: 124px; max-width: 142px; padding: 6px 11px 7px; }
   #engine #streakVal { font-size: 27px; }
   #engine .val { font-size: 21px; }
   #engine .sub { font-size: 8px; }
@@ -421,6 +438,7 @@ html, body {
 
   #railWrap { width: 92vw; bottom: 10px; }
   #rail { height: 17px; }
+  #gapLine { margin-bottom: 13px; gap: 7px; }
   #gapVal { font-size: 15px; }
   #count { font-size: 76px; }
   .panel { padding: 16px 14px; }
@@ -437,9 +455,11 @@ html, body {
   #endCols { margin-top: 10px; gap: 8px 24px; }
 }
 
-/* ---- fps / debug ---- */
+/* ---- fps / debug ----
+ * Below the distance plate at every width, and clear of the rail, so the
+ * debug line never sits on top of a number that matters. */
 #perf {
-  position: absolute; right: 14px; top: 158px;
+  position: absolute; right: 14px; top: 172px;
   font-size: 10px; font-weight: 700; opacity: 0.45;
   text-align: right;
   display: none;
@@ -1662,7 +1682,7 @@ MR.Runner = (function () {
     const spine = pivot(hips, 0, 0, 0);
 
     const pelvis = multi([
-      { g: new THREE.CylinderGeometry(0.235, 0.215, 0.30, 12), c: P.runnerShort, y: -0.03, sz: 0.80 },
+      { g: new THREE.CylinderGeometry(0.228, 0.220, 0.30, 12), c: P.runnerShort, y: -0.025, sz: 0.82 },
     ]);
     spine.add(pelvis);
 
@@ -1675,14 +1695,17 @@ MR.Runner = (function () {
       // Vest. Top edge at world 1.12. Nothing on the trunk may reach above
       // it -- an earlier deltoid that poked 0.03 higher closed the gap on
       // its own and the head went straight back to sitting on the shoulders.
-      { g: new THREE.CylinderGeometry(0.262, 0.198, 0.42, 12), c: P.runnerVest, y: -0.11, sz: 0.72 },
+      // It barely tapers on purpose: a singlet worn over the waistband, so
+      // red owns two thirds of the trunk. Tapering it to a narrow hem let the
+      // navy shorts read as the biggest single shape on the character.
+      { g: new THREE.CylinderGeometry(0.262, 0.236, 0.34, 12), c: P.runnerVest, y: -0.07, sz: 0.72 },
       // Hem stripe -- stops the red mass from running straight into the shorts.
-      { g: new THREE.CylinderGeometry(0.204, 0.200, 0.055, 12), c: TRIM, y: -0.295, sz: 0.74 },
+      { g: new THREE.CylinderGeometry(0.240, 0.236, 0.05, 12), c: TRIM, y: -0.216, sz: 0.73 },
       // Deltoids. These are what make the shoulder line read wider than the
       // head; without them the trunk cone tapers into the skull. Flattened
       // hard in Y so they widen the shoulders without raising them.
-      { g: new THREE.SphereGeometry(0.130, 10, 8), c: P.runnerVest, x: -0.236, y: -0.015, sy: 0.78, sz: 0.86 },
-      { g: new THREE.SphereGeometry(0.130, 10, 8), c: P.runnerVest, x: 0.236, y: -0.015, sy: 0.78, sz: 0.86 },
+      { g: new THREE.SphereGeometry(0.138, 10, 8), c: P.runnerVest, x: -0.248, y: -0.020, sy: 0.76, sz: 0.84 },
+      { g: new THREE.SphereGeometry(0.138, 10, 8), c: P.runnerVest, x: 0.248, y: -0.020, sy: 0.76, sz: 0.84 },
       // Shoulder blades: a shallow pair of bumps so the back is not a blank
       // curve. Barely visible individually, but they catch the terminator.
       { g: new THREE.SphereGeometry(0.085, 8, 6), c: P.runnerVest, x: -0.105, y: -0.07, z: -0.135, sz: 0.55 },
@@ -1693,11 +1716,11 @@ MR.Runner = (function () {
     // Curved panel rather than a flat card so it hugs the vest at this size,
     // and high on the back so it never straddles the shorts line.
     const bib = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.252, 0.252, 0.22, 10, 1, true, Math.PI - 0.62, 1.24),
+      new THREE.CylinderGeometry(0.253, 0.253, 0.185, 10, 1, true, Math.PI - 0.52, 1.04),
       S.toon(0xffffff, 3)
     );
     bib.material.map = raceBib();
-    bib.position.y = -0.035;
+    bib.position.y = -0.030;
     bib.scale.z = 0.72;
     chest.add(bib);
 
@@ -1713,16 +1736,18 @@ MR.Runner = (function () {
       // those three values is the entire fix. Leaving the nape skin and the
       // hair on the crown gave a light head sitting on a light neck -- one
       // continuous mass with no pinch. Dark / light / saturated reads.
-      { g: new THREE.CylinderGeometry(0.088, 0.100, 0.30, 10), c: P.runnerSkin, y: 0.10 },
+      { g: new THREE.CylinderGeometry(0.097, 0.110, 0.30, 10), c: P.runnerSkin, y: 0.10 },
       { g: new THREE.SphereGeometry(0.25, 16, 12), c: P.runnerSkin, y: 0.38, sy: 1.02, sz: 0.97 },
       // Crown cap for the top of the skull...
-      { g: new THREE.SphereGeometry(0.254, 14, 6, 0, Math.PI * 2, 0, Math.PI * 0.42), c: P.runnerHair, y: 0.38 },
+      { g: new THREE.SphereGeometry(0.264, 14, 6, 0, Math.PI * 2, 0, Math.PI * 0.42), c: P.runnerHair, y: 0.375 },
       // ...and a rear-only shell that carries the hair down to the nape but
       // leaves the face clear. Restricting phi to the back 210 degrees is
       // what lets one primitive do a haircut.
-      { g: new THREE.SphereGeometry(0.256, 14, 8, Math.PI * 1.5 - 1.83, 3.66, Math.PI * 0.20, Math.PI * 0.57), c: P.runnerHair, y: 0.38 },
+      { g: new THREE.SphereGeometry(0.271, 14, 8, Math.PI * 1.5 - 1.83, 3.66, Math.PI * 0.33, Math.PI * 0.44), c: P.runnerHair, y: 0.375 },
       // Headband sits above the eye line -- lower and it reads as goggles.
-      { g: new THREE.CylinderGeometry(0.268, 0.268, 0.072, 14), c: TRIM, y: 0.432, sz: 0.96 },
+      // Radius has to clear the hair everywhere: shells this close together
+      // interpenetrate on their facets and the crown grew a row of teeth.
+      { g: new THREE.CylinderGeometry(0.279, 0.279, 0.070, 14), c: TRIM, y: 0.436 },
       { g: new THREE.SphereGeometry(0.076, 8, 6), c: P.runnerSkin, x: -0.238, y: 0.360, z: -0.012, sx: 0.48, sz: 0.82 },
       { g: new THREE.SphereGeometry(0.076, 8, 6), c: P.runnerSkin, x: 0.238, y: 0.360, z: -0.012, sx: 0.48, sz: 0.82 },
     ]);
@@ -1769,7 +1794,7 @@ MR.Runner = (function () {
       legs.push({ side, hip, knee, ankle });
 
       // arm
-      const shoulder = pivot(chest, side * 0.236, -0.02, 0);
+      const shoulder = pivot(chest, side * 0.245, -0.025, 0);
       // ZXY so the twist happens along the arm before it is swung and then
       // abducted. With the default XYZ the yaw fired after the outward tilt
       // and dragged the whole arm across the back of the vest.
@@ -1951,11 +1976,6 @@ MR.World = (function () {
   const BEHIND = 34;     // release distance behind
   const TILE = 24;       // road tile length
 
-  // Small props are pointless at the far edge of the window -- the fog has
-  // already eaten them -- so they spawn late and buy back draw calls that the
-  // hazards and set pieces actually need.
-  const VIEW_PROP = 152;
-
   // ---- biome palettes ---------------------------------------------------
   // `edge` names the roadside furniture the road tile wears; `mix` weights the
   // roadside prop lottery. Together they are what distinguishes a biome, the
@@ -1971,10 +1991,12 @@ MR.World = (function () {
       edge: 'hedge',
       mix: { building: 0.45, tree: 1.9, crowd: 1.0, rival: 0.45, station: 0.12 },
     },
+    // Nothing stands beside a bridge deck -- the emptiness is the point, and a
+    // spectator out there would be standing on the river.
     'THE BRIDGE': {
       sky: [0x3a4fc0, 0xffd9a8], ground: 0x2f8fc4, road: 0x5b5f88, fog: 0xffd9a8,
       edge: 'rail',
-      mix: { building: 0.0, tree: 0.0, crowd: 0.75, rival: 0.55, station: 0.0 },
+      mix: { building: 0.0, tree: 0.0, crowd: 0.0, rival: 1.0, station: 0.0 },
     },
     'PARKLAND': {
       sky: [0x2e8fd0, 0xcdf5c0], ground: 0x6fd46a, road: 0x53587f, fog: 0xcdf5c0,
@@ -1983,8 +2005,8 @@ MR.World = (function () {
     },
     'THE WALL': {
       sky: [0x8a3a6b, 0xffb27a], ground: 0x8f9a5e, road: 0x5a4f66, fog: 0xffb27a,
-      edge: 'barrier',
-      mix: { building: 1.6, tree: 0.7, crowd: 0.8, rival: 0.35, station: 0.14 },
+      edge: 'wall',
+      mix: { building: 2.0, tree: 0.25, crowd: 0.35, rival: 0.3, station: 0.18 },
     },
     'FINAL MILE': {
       sky: [0x24306e, 0xffcf6b], ground: 0x5cb46a, road: 0x4a4f78, fog: 0xffcf6b,
@@ -2336,11 +2358,23 @@ MR.World = (function () {
       return merge(parts);
     })();
 
-    /** Crowd-control barrier: the single strongest "this is a road race" cue. */
+    /** Kerb + pavement: without it the tarmac sits straight on grass. */
+    function pavement(parts, sx, top, kerb) {
+      const x = sx * (K.TRACK_HALF_WIDTH + 4.0);
+      parts.push(bx(8.0, 0.30, TILE, x, -0.16, 0, top));
+      parts.push(bx(0.34, 0.34, TILE, sx * (K.TRACK_HALF_WIDTH + 0.17), 0.0, 0, kerb));
+    }
+
+    /**
+     * Crowd-control barrier: the single strongest "this is a road race" cue.
+     * The lamp standards are what give the city legs a vertical rhythm at the
+     * distance where individual props have already fogged out.
+     */
     const barrierGeo = (function () {
       const parts = [];
       for (const sx of [-1, 1]) {
         const x = sx * (K.TRACK_HALF_WIDTH + 0.85);
+        pavement(parts, sx, 0xb9bdd6, 0xe8ecff);
         parts.push(bx(0.10, 0.09, TILE, x, 0.92, 0, 0xf2f4ff));
         parts.push(bx(0.09, 0.07, TILE, x, 0.60, 0, 0xdfe6ff));
         for (let i = 0; i < 8; i++) {
@@ -2349,20 +2383,60 @@ MR.World = (function () {
           // Sponsor-ish colour panel between posts: reads as printed hoarding.
           if (i % 2 === 0) parts.push(bx(0.06, 0.30, 2.6, x - sx * 0.03, 0.74, z + 1.5, 0xff3b6b));
         }
+        for (const lz of [-TILE / 4, TILE / 4]) {
+          const lx = sx * (K.TRACK_HALF_WIDTH + 2.2);
+          parts.push(bx(0.22, 6.4, 0.22, lx, 3.2, lz, 0x2b2f52));
+          parts.push(bx(1.9, 0.20, 0.20, lx - sx * 0.85, 6.3, lz, 0x2b2f52));
+          parts.push(bx(0.8, 0.26, 0.44, lx - sx * 1.7, 6.1, lz, 0xffe45e));
+          parts.push(bx(0.9, 1.1, 0.10, lx, 4.6, lz, sx > 0 ? 0x37d6ff : 0xff9ad5));
+        }
       }
       return merge(parts);
     })();
 
-    /** Park/river edge: a clipped hedge with the odd bollard. */
+    /** Park/river edge: a clipped hedge, a gravel path and the odd bench. */
     const hedgeGeo = (function () {
       const parts = [];
       for (const sx of [-1, 1]) {
-        const x = sx * (K.TRACK_HALF_WIDTH + 1.4);
+        const x = sx * (K.TRACK_HALF_WIDTH + 1.6);
+        pavement(parts, sx, 0xd8c9a0, 0xefe3c2);
         parts.push(bx(1.5, 0.78, TILE, x, 0.28, 0, 0x2f9f52));
         parts.push(bx(1.62, 0.16, TILE, x, 0.68, 0, 0x49c96b));
         for (let i = 0; i < 4; i++) {
-          parts.push(cyl(0.10, 0.12, 0.7, 6, sx * (K.TRACK_HALF_WIDTH + 0.35), 0.35,
+          parts.push(cyl(0.10, 0.12, 0.7, 6, sx * (K.TRACK_HALF_WIDTH + 0.4), 0.35,
             -TILE / 2 + 3 + i * 6, 0xfff2e0));
+        }
+        const bz = sx > 0 ? -4 : 6;
+        const bx0 = sx * (K.TRACK_HALF_WIDTH + 5.6);
+        parts.push(bx(0.9, 0.14, 2.4, bx0, 0.46, bz, 0x8a5a3c));
+        parts.push(bx(0.16, 0.62, 2.4, bx0 + sx * 0.4, 0.72, bz, 0x8a5a3c));
+        parts.push(bx(0.2, 0.42, 0.2, bx0, 0.21, bz - 0.9, 0x2b2f52));
+        parts.push(bx(0.2, 0.42, 0.2, bx0, 0.21, bz + 0.9, 0x2b2f52));
+      }
+      return merge(parts);
+    })();
+
+    /**
+     * THE WALL: concrete jersey barrier and a graffitied hoarding. The leg is
+     * meant to feel enclosed and joyless, so the roadside closes in rather
+     * than opening onto crowd.
+     */
+    const wallGeo = (function () {
+      const parts = [];
+      for (const sx of [-1, 1]) {
+        pavement(parts, sx, 0x8c8a96, 0xb0aeba);
+        const x = sx * (K.TRACK_HALF_WIDTH + 0.9);
+        parts.push(bx(1.0, 0.55, TILE, x, 0.27, 0, 0xc8c4cc));
+        parts.push(bx(0.62, 0.55, TILE, x, 0.80, 0, 0xdedae2));
+        parts.push(bx(0.70, 0.12, TILE, x, 1.10, 0, 0xffb020));
+        const wx = sx * (K.TRACK_HALF_WIDTH + 7.6);
+        parts.push(bx(0.7, 6.2, TILE, wx, 3.1, 0, 0x5f5866));
+        parts.push(bx(0.9, 0.4, TILE, wx, 6.3, 0, 0x453f4e));
+        // Fly-posted panels: the only colour on this leg, and deliberately grim.
+        const tags = [0x7a1030, 0x2b6e6a, 0x6a4f8a, 0x8a6a1f];
+        for (let i = 0; i < 4; i++) {
+          parts.push(bx(0.12, 1.6 + (i % 2) * 0.8, 3.4, wx - sx * 0.4,
+            1.6 + (i % 3) * 1.1, -TILE / 2 + 3 + i * 6, tags[(i + (sx > 0 ? 1 : 0)) % 4]));
         }
       }
       return merge(parts);
@@ -2410,6 +2484,7 @@ MR.World = (function () {
         barrier: S.outlined(barrierGeo, mats.prop, S.INK.prop),
         hedge: S.outlined(hedgeGeo, mats.prop, S.INK.prop),
         rail: S.outlined(railGeo, mats.prop, S.INK.prop),
+        wall: S.outlined(wallGeo, mats.prop, S.INK.prop),
       };
       for (const k in edges) { edges[k].visible = false; t.add(edges[k]); }
       t.userData.shoulders = shoulders;
@@ -2874,7 +2949,9 @@ MR.World = (function () {
     // Set pieces: deterministic, biome-specific, and placed by hand rather
     // than rolled, because a bridge tower in the wrong place is not a bridge.
     const structures = [];
-    structures.push({ z: 4, kind: 'arch', label: 'START', sub: course.key, bg: '#1b1633', fg: '#ffe45e' });
+    // Far enough out that the player runs through it rather than starting
+    // underneath it, which is where the camera would never see it at all.
+    structures.push({ z: 30, kind: 'arch', label: 'START', sub: course.key, bg: '#1b1633', fg: '#ffe45e' });
     for (let z = BRIDGE.from + 140; z < BRIDGE.to - 120; z += 235) {
       structures.push({ z, kind: 'tower' });
     }
@@ -2979,7 +3056,6 @@ MR.World = (function () {
      */
     api.update = function (z) {
       const ahead = z + VIEW;
-      const aheadProp = z + VIEW_PROP;
       const back = z - BEHIND;
       const now = performance.now() * 0.001;
 
@@ -3042,14 +3118,15 @@ MR.World = (function () {
       }
 
       // roadside props
-      while (state.sceneIdx < scenery.length && scenery[state.sceneIdx].z < aheadProp) {
+      while (state.sceneIdx < scenery.length && scenery[state.sceneIdx].z < ahead) {
         const s = scenery[state.sceneIdx++];
         if (s.kind === 'rival') {
           const pool = rivalPool[Math.floor(s.a * rivalPool.length) % rivalPool.length];
           const obj = pool.claim();
           obj.userData.pool = pool;
-          // Just outside the outermost lane but still on the tarmac.
-          obj.position.set(s.side * (3.35 + s.b * 0.75), 0, s.z);
+          // Just outside the outermost lane but still on the tarmac. A hazard
+          // in lane 0 or 2 reaches x = 3.47, so 3.9 is the first honest slot.
+          obj.position.set(s.side * (3.90 + s.b * 0.40), 0, s.z);
           activeRivals.push({
             obj, z: s.z,
             speed: 15 + s.c * 5,   // slower than the player: they get passed
@@ -4106,7 +4183,7 @@ MR.HUD = (function () {
           <div class="val num" id="clock">0:00</div>
         </div>
         <div id="projCell">
-          <div class="cap"><span class="lab">PROJECTED FINISH</span><span class="chip" id="status">BUYING SPEED</span></div>
+          <div class="cap"><span class="lab"><span class="wideOnly">PROJECTED</span><span class="narrowOnly">PROJ</span> FINISH</span><span class="chip" id="status">BUYING SPEED</span></div>
           <div class="val num" id="projVal">--:--</div>
           <div class="sub num" id="margin">VS ${K.RECORD_LABEL}</div>
         </div>
@@ -4122,13 +4199,13 @@ MR.HUD = (function () {
           </div>
           <div class="lab" id="paceLab">PACE</div>
           <div><span class="val num" id="paceVal">5:30</span><span class="unit">/MI</span></div>
-          <div class="sub num">RECORD ${Pace.pace(K.RECORD_PACE)} &middot; TOP ${Pace.pace(K.FLOOR_PACE)}</div>
+          <div class="sub num" id="needVal">NEED ${Pace.pace(K.RECORD_PACE)}/MI</div>
           <div id="why">EACH CLEAN GATE BUYS SPEED</div>
         </div>
 
         <div id="toast">
           <div class="lab" id="toastLab">MILE 1</div>
-          <div><span class="big num" id="toastBig">--:--</span><span class="unit">/MI</span></div>
+          <div id="toastRow"><span class="big num" id="toastBig">--:--</span><span class="unit">/MI</span></div>
           <div class="small num" id="toastSmall"></div>
         </div>
       </div>
@@ -4171,6 +4248,7 @@ MR.HUD = (function () {
             <div class="gaugeFill" style="width:100%"></div>
             <div class="gaugeRec"></div>
           </div>
+          <div class="gaugeLeg">the mark is record pace, ${Pace.pace(K.RECORD_PACE)}/mi</div>
           <p>Clear a gate cleanly and you speed up. Every clean gate in a row buys
              more. Touch one and you lose three quarters of the streak, and the
              pace bleeds back down.</p>
@@ -4212,7 +4290,7 @@ MR.HUD = (function () {
       clock: q('clock'),
       projCell: q('projCell'), projVal: q('projVal'), margin: q('margin'), status: q('status'),
       engine: q('engine'), streakVal: q('streakVal'), why: q('why'),
-      gaugeFill: q('gaugeFill'), paceVal: q('paceVal'),
+      gaugeFill: q('gaugeFill'), paceVal: q('paceVal'), needVal: q('needVal'),
       distVal: q('distVal'), toGo: q('toGo'),
       rail: q('rail'), railFill: q('railFill'), railGap: q('railGap'), railGhost: q('railGhost'),
       gapVal: q('gapVal'), gapTrend: q('gapTrend'),
@@ -4281,6 +4359,14 @@ MR.HUD = (function () {
       set(n.margin, 'margin',
         Pace.clock(Math.abs(margin)) + (margin >= 0 ? ' UNDER ' : ' OVER ') + K.RECORD_LABEL);
 
+      // Pace required over the road that is left. This is the race-desk number
+      // and it is also the exact test for a dead record: FLOOR_PACE is the
+      // fastest the streak can ever make you, so once the requirement drops
+      // below it no run of clean gates can get the record back.
+      const remain = K.MARATHON_MILES - p.miles;
+      const need = remain > 0.01 ? (K.RECORD_SECONDS - p.raceTime) / remain : NaN;
+      const gone = remain > 0.01 && !(need >= K.FLOOR_PACE);
+
       // Share of the 5:30 -> 4:20 range the streak has already bought. While a
       // lot of it is still unspent the projection is falling under the player
       // every second, so it is an estimate and is labelled as one.
@@ -4293,13 +4379,15 @@ MR.HUD = (function () {
       const bleeding = p.targetPace() - p.pace > 1.5; // streak was cut, pace sliding back
 
       let state, chip;
-      if (!settled) {
+      if (gone) {
+        state = 'off'; chip = 'RECORD GONE';
+      } else if (!settled) {
         state = 'est';
         chip = bleeding ? 'BLEEDING SPEED ▲' : 'BUYING SPEED ▼';
       } else if (margin > 0) {
         state = 'on';  chip = 'RECORD ON';
       } else {
-        state = 'off'; chip = 'RECORD OFF';
+        state = 'off'; chip = 'OFF RECORD';
       }
       set(n.status, 'chip', chip);
       cls(n.status, 'chipCls', 'chip ' + state);
@@ -4311,6 +4399,8 @@ MR.HUD = (function () {
         (clamp01((K.START_PACE - p.pace) / (K.START_PACE - K.FLOOR_PACE)) * 100) + '%';
       set(n.paceVal, 'pace', Pace.pace(p.pace));
       cls(n.paceVal, 'paceCls', 'val num' + (p.pace <= K.RECORD_PACE ? ' ahead' : ''));
+      set(n.needVal, 'need', 'NEED ' + Pace.pace(need) + '/MI');
+      cls(n.needVal, 'needCls', 'sub num' + (gone ? ' behind' : ''));
 
       // Nothing else on screen says why the pace moves, so the line stays up
       // until the player has plainly felt it, and comes back on every break.
@@ -4378,6 +4468,9 @@ MR.HUD = (function () {
         n.toastSmall.textContent = small || '';
         n.toastSmall.className = 'small num';
       }
+      // Without split data there is no mile time to headline, so the card
+      // drops that row rather than showing a bare "/MI".
+      n.toast.classList.toggle('noBig', !sp);
       n.toast.classList.add('show');
       clearTimeout(toastTimer);
       // Splits arrive every nine or ten real seconds at record pace, so the
@@ -4429,6 +4522,7 @@ MR.HUD = (function () {
               + `<div class="v num ${d < 0 ? 'ahead' : 'behind'}">${Pace.delta(d)}</div>`;
       }
       const fd = p.finishTime - K.RECORD_SECONDS;
+      table += '<div class="sep"></div>';
       table += `<div class="v num fin">${K.MARATHON_LABEL}</div>`
             + `<div class="v num fin">${Pace.clock(p.finishTime)}</div>`
             + `<div class="v num fin ${fd < 0 ? 'ahead' : 'behind'}">${Pace.delta(fd)}</div>`;

@@ -366,15 +366,19 @@ MR.shading = (function () {
       vec3 d = normalize(vWorld - cameraPosition);
       float h = d.y;
 
-      // Bands are driven by y/z, not by elevation. Elevation isolines are
-      // cones around the eye and project to CURVES -- which is the whole
-      // complaint about the old sky, and moving the maths off the dome's
-      // vertices only shrank the arcs rather than removing them. Isolines of
-      // y/z are planes through the eye, and a plane through the eye always
-      // projects to a dead straight line, whatever the camera is doing. The
-      // ratio is still world-locked, so the bands roll with a lane change
-      // instead of sticking to the screen like a decal.
-      float sy = d.y / max(d.z, 0.30);
+      // Bands are driven by height over the camera's HORIZONTAL forward axis,
+      // not by elevation angle. Elevation isolines are cones around the eye
+      // and project to curves -- that is the arcing the old sky was criticised
+      // for, and moving the maths off the dome's vertices only shrank the arcs
+      // rather than removing them. Every isoline here is instead a plane
+      // through the eye containing the horizon direction, and such a plane
+      // always projects to a straight line parallel to the horizon itself, at
+      // any camera yaw, pitch or roll. Using plain world z instead of fwd
+      // leaves the bands converging on the x-axis vanishing point, which tilts
+      // them a visible 8 degrees off the horizon when the chase camera turns.
+      vec3 back = vec3(viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2]);
+      vec3 fwd = normalize(vec3(-back.x, 0.0, -back.z));
+      float sy = d.y / max(dot(d, fwd), 0.30);
       float t = clamp(sy * 1.55 + 0.06, 0.0, 1.0);
 
       // Cel steps, blended part-way and antialiased with fwidth: a bare

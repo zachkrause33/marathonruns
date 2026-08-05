@@ -1,0 +1,32 @@
+<title>Daily Marathon</title>
+<style>
+/* The artifact host supplies the document skeleton and its own reset, so this
+ * variant ships no doctype/html/head/body of its own. It also renders inside a
+ * frame that may not be the full viewport, so the canvas sizes to 100% of its
+ * container rather than to the window. */
+html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #0e1230; }
+#mr-root {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  min-height: 520px;
+  overflow: hidden;
+  background: #0e1230;
+}
+/*__CSS__*/
+/* Re-scope the two fixed-position layers into the frame. */
+#mr-root #gl { position: absolute; inset: 0; width: 100%; height: 100%; }
+#mr-root #ui { position: absolute; inset: 0; }
+</style>
+<div id="mr-root">
+  <canvas id="gl"></canvas>
+  <div id="ui"></div>
+</div>
+<script>
+/*__THREE__*/
+</script>
+<script>
+"use strict";
+var MR = {};
+/*__GAME__*/
+</script>

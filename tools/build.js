@@ -49,7 +49,11 @@ function banner(rel) {
 // harness caught it. The one-line console notice is not worth that risk.
 const three = read('vendor/three.min.js');
 
-const shell = read('tools/shell.html');
+// `--artifact` swaps in a shell with no document skeleton, for hosts that
+// supply their own <head>/<body> and render the page inside a frame.
+const shell = read(process.argv.includes('--artifact')
+  ? 'tools/shell-artifact.html'
+  : 'tools/shell.html');
 const css = read('src/ui/style.css');
 
 let game = '';

@@ -271,7 +271,7 @@
     }
 
     // ---- present --------------------------------------------------------
-    world.update(pace.units);
+    world.update(pace.units, player.lane);
     if (world.fogColor) {
       scene.fog.color.copy(world.fogColor);
       renderer.setClearColor(world.fogColor);
@@ -354,7 +354,7 @@
       player.drainEvents();
       if (pace.finished) break;
     }
-    world.update(pace.units);
+    world.update(pace.units, player.lane);
   } else if (BOT) {
     begin();
   }

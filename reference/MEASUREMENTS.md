@@ -26,7 +26,7 @@ aspect. The ratios below marked **aspect-independent** are the actionable ones.
 
 | Metric | Temple Run | Subway Surfers | Sonic | This game |
 |---|---|---|---|---|
-| **Character ÷ lane width** (aspect-independent) | 60% | **37–43%** | ~40% | **23%** |
+| **Character ÷ lane width** (aspect-independent) | 60% | **37–43%** | ~40% | **33% → 46%** |
 | Character centre, fraction down the frame | 77% | 70–75% | 64–78% | **52%** |
 | Character ÷ frame height | 14.5% | 21–33% | 18–21% | 36% (not comparable) |
 | Ink outlines | none | **none** | **none** | heavy |
@@ -83,3 +83,24 @@ aspect. The ratios below marked **aspect-independent** are the actionable ones.
   deliberately a broadcast race clock and should not converge on them.
 - Coins as a score currency. The reward here is pace, not pickups — but see
   finding 6 for the part worth taking.
+
+
+## Correction to the character-to-lane figure
+
+The 23% originally recorded here was measured on the wrong feature. It is the
+width of the vest cone alone (0.524 units), which excludes the deltoids --
+and the deltoids are the same colour as the vest and *are* the visual shoulder
+line. Measured properly from `src/render/runner.js` geometry, the deltoids are
+r=0.134 spheres at x=±0.244, giving a 0.756 static shoulder line and ~0.78
+live once chest counter-rotation is included.
+
+On the correct ruler the track change is **33% → 46%**, which lands inside the
+37–43% reference band rather than merely approaching it.
+
+Note also that `LANE_W` stopped at 1.70 rather than the 1.38 a literal 1.7x
+would give. That is a hard geometric floor, not caution: the runner's gloves
+swing to ±0.543 and a DUCK frame's standards sit at 1.20·LANE_FIT ± 0.13 from
+their lane centre, so `0.543 + 0.511·L + 0.13 < L` requires L > 1.375 for zero
+clearance. Below about 1.68 the runner visibly grazes hazards it legitimately
+cleared, which would directly contradict the state-based clearance model in
+`src/game/collision.js`.

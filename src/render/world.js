@@ -428,14 +428,20 @@ MR.World = (function () {
    * It is a property of the course, so it is the same for every player on the
    * same day -- exactly like the course itself.
    */
-  function racingLine(gates) {
+  function racingLine(gates, startLane, startIdx) {
     if (!gates.length) return null;
     const AW = MR.Course.ACTION_WINDOW;
+    const from = startIdx || 0;
     // Same state collapse as Course.solvable: lane, the action still committed
     // to, and whether that action is recent enough to conflict.
-    let states = [{ lane: 1, act: K.CLEAR, z: -1e9, cost: 0, prev: null }];
+    //
+    // Seeded from where the player ACTUALLY is, not from a fixed lane 1. A line
+    // planned from lane 1 is always survivable, but it will happily ask a
+    // player sitting in a clear lane to move for no reason, and a hint you
+    // learn to ignore is worse than no hint.
+    let states = [{ lane: startLane === undefined ? 1 : startLane, act: K.CLEAR, z: -1e9, cost: 0, prev: null }];
 
-    for (let i = 0; i < gates.length; i++) {
+    for (let i = from; i < gates.length; i++) {
       const g = gates[i];
       const next = new Map();
       for (const s of states) {
@@ -465,8 +471,14 @@ MR.World = (function () {
 
     let best = states[0];
     for (const s of states) if (s.cost < best.cost) best = s;
+
+    // Backtrack only over the range actually solved. The chain is `from` links
+    // long, not gates.length, so walking to index 0 dereferences null the
+    // moment a replan starts mid-course. Gates already behind the player keep
+    // the start lane, which costs nothing -- the ribbon is only drawn ahead.
     const lanes = new Array(gates.length);
-    for (let i = gates.length - 1; i >= 0; i--) { lanes[i] = best.lane; best = best.prev; }
+    for (let i = gates.length - 1; i >= from; i--) { lanes[i] = best.lane; best = best.prev; }
+    for (let i = 0; i < from; i++) lanes[i] = lanes[from] !== undefined ? lanes[from] : 1;
     return lanes;
   }
 
@@ -843,7 +855,10 @@ MR.World = (function () {
     const ROUTE_W = 0.17;      // half-width
     const ROUTE_UV = 1 / 14;   // one texture tile per 14 units of road
 
-    const routeLane = racingLine(course.gates);
+    // Replanned whenever the player changes lane; the solve is ~174 gates x 3
+    // states, far too cheap to be worth caching harder than this.
+    let routeLane = racingLine(course.gates, 1, 0);
+    let routePlannedLane = 1;
     const routeGeo = new THREE.BufferGeometry();
     const routePos = new Float32Array(ROUTE_SEGS * 6 * 3);
     const routeUvs = new Float32Array(ROUTE_SEGS * 6 * 2);
@@ -1394,8 +1409,8 @@ MR.World = (function () {
 
     /**
      * The river itself, on the left bank of the RIVERSIDE leg. It starts just
-     * beyond the pooled shoulders (which reach |x| = 34.4) so the two never
-     * fight over the same ground.
+     * beyond the pooled shoulders (which reach TRACK_HALF_WIDTH + 30, so a
+     * little under |x| = 34) and so the two never fight over the same ground.
      */
     const riverGeo = merge([
       part(new THREE.PlaneGeometry(94, 58), 0x2f8fc4, -60, -0.12, 0, -Math.PI / 2),
@@ -1651,7 +1666,8 @@ MR.World = (function () {
 
     // routeLane is exposed so it can be asserted against the course rather than
     // taken on trust: the lane it names at every gate must never be a BLOCK.
-    const api = { group, sky, mats, course, routeLane };
+    const api = { group, sky, mats, course };
+    Object.defineProperty(api, 'routeLane', { get: function () { return routeLane; } });
 
     /** Recolour shared materials for the biome at progress f. */
     api.fogColor = new THREE.Color(BIOME_LOOK['CITY START'].fog);
@@ -1686,7 +1702,16 @@ MR.World = (function () {
      * Advance the spawn window. `z` is the runner's distance along the course
      * in world units; the world itself does not move, the camera does.
      */
-    api.update = function (z) {
+    api.update = function (z, playerLane) {
+      if (playerLane !== undefined && playerLane !== routePlannedLane) {
+        routePlannedLane = playerLane;
+        // Replan from the next gate the player has not yet resolved, so the
+        // line starts where they are rather than where they began.
+        let gi = 0;
+        while (gi < course.gates.length && course.gates[gi].z < z) gi++;
+        const re = racingLine(course.gates, playerLane, gi);
+        if (re) routeLane = re;
+      }
       const ahead = z + VIEW;
       const back = z - BEHIND;
       const now = performance.now() * 0.001;

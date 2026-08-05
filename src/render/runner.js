@@ -28,21 +28,41 @@
  *      and lets the pale shoes, gloves and wristbands flash against the
  *      road; those are the parts the eye can actually track from behind.
  *   4. State has to read as SILHOUETTE, not as pose detail, and no two states
- *      may differ on the SAME axis. Measured in pixels dead astern through
- *      one lens, against the run: a jump is 1.92 wide and its crown sits 1.07
- *      up -- a horizontal bar. A committed slide is 1.06 wide and its crown
- *      sits 0.71 up, over a contact shadow 2.4x deeper than the run's. So
- *      width alone separates the jump from both others, and height alone
- *      separates the slide from the run; neither test can return the wrong
- *      answer for the other state. An arm tuck is not readable at all,
- *      because it points straight down the camera axis where there is
- *      nothing to see -- which is what the old head-first duck relied on.
+ *      may differ on the SAME axis. Measured in world units on the rig's own
+ *      bounding box, against the run, on a 390x844 phone in portrait:
+ *
+ *        run    half-width 0.42  (1.00x)   crown 1.57  (1.00x)
+ *        jump   half-width 0.92  (2.2x)    -- a horizontal bar, airborne
+ *        slide  half-width 0.59  (1.4x)    crown 1.32  (0.84x)
+ *
+ *      Width alone separates the jump from both others -- it is still half as
+ *      wide again as the slide -- and height alone separates the slide from
+ *      the run. Neither test can return the wrong answer for the other state.
+ *      The slide is wider than the 1.26x it used to be and that is bought
+ *      deliberately: see SLIDE_YAW, which spends width to get an axis the back
+ *      view can actually measure. It is paid for out of leg splay, and the
+ *      crown came DOWN in the same change (0.90x -> 0.84x), so the height test
+ *      that actually carries this state got stronger rather than weaker. The
+ *      crown matters twice over: collision.js sets the DUCK bar at 1.41, and
+ *      1.32 is 0.09 of real daylight where the previous pose left 0.03.
+ *
+ *      An arm tuck is not readable at all, because it points straight down
+ *      the camera axis where there is nothing to see -- which is what the old
+ *      head-first duck relied on.
+ *   5. Some states cannot be won on silhouette at any price, and the slide is
+ *      one of them: it points the legs down the view axis, where a metre of
+ *      extension is 0.027 of frame height. Those states have to be told
+ *      through what the character does to the WORLD -- see the skid block
+ *      below. Marks left on the road travel toward the lens, which is the one
+ *      direction perspective is generous in.
  *
  * Pivot layout (all rotations are local X unless noted):
  *   root -> body -> hips -> thigh -> shin -> foot
  *                -> spine -> chest -> neck -> head
  *                                  -> shoulder -> upperArm -> forearm+hand
  *        -> shadowPivot -> contact shadow   (cancels the jump and the bank)
+ *        -> fxPivot     -> skid ribbon, dust   (cancels root ENTIRELY, so its
+ *                                               children hold world coords)
  */
 MR.Runner = (function () {
   // Hoisted: this is measured every frame of a slide and must not allocate.
@@ -80,6 +100,31 @@ MR.Runner = (function () {
   const HEAD_Y = 1.269;    // centre of the skull
   const BOB = 0.040;
   const HEIGHT = 1.60;
+
+  // ---- the slide's angle of attack ---------------------------------------
+  // The one number that makes a feet-first slide readable from directly
+  // behind, and it took three passes to find because every earlier attempt
+  // tried to solve it with more extension.
+  //
+  // Measured on this rig at this camera: throwing the feet a full 0.65 ahead
+  // of the head raises them 0.027 of frame height. That is the whole return on
+  // pose extension, and it is nothing, because the legs point down the view
+  // axis where a metre of length is a couple of pixels.
+  //
+  // Turning the body across the lane spends that same extension on the axis
+  // the back view CAN measure. At 0.42rad the 1.6 of body length between the
+  // trailing glove and the leading shoe puts 0.65 of itself sideways -- and
+  // sideways is free, because the figure is only 0.4 wide, so every unit of it
+  // changes the outline instead of hiding behind the torso. It is also simply
+  // what a slide is. Nobody goes into a bag square.
+  //
+  // The ceiling is the lane, not taste: MEASUREMENTS.md puts the runner's
+  // budget at 0.70 from the lane centre before it visibly grazes hazards it
+  // legitimately cleared. Splay was cut from 0.52 to pay for this, so the
+  // committed pose measures 0.59 half-width against the run's 0.42 -- inside
+  // the budget, and still barely two thirds of the jump's 0.92, which is the
+  // silhouette rule this must not break.
+  const SLIDE_YAW = 0.42;
 
   const OUTLINE = MR.shading.INK.character;
 
@@ -264,12 +309,57 @@ MR.Runner = (function () {
   //
   // Both are single dynamic meshes with no outline pass, one draw call each,
   // and neither touches the collision silhouette or the pose the audit reads.
-  const SKID_N = 22;          // ribbon samples kept
-  const SKID_STEP = 0.52;     // world units between samples -- ~11 of trail
-  const DUST_N = 34;
+  // Both are sized off the chase distance rather than off how long a skid
+  // "should" be. The camera sits 4.6 behind the runner in portrait and looks
+  // down about 22 degrees, so the road it can see BEHIND him runs from his
+  // hips to roughly 1.7-2.5 units back -- past that the mark is under the lens
+  // or behind it. A trail eleven units long, which is what a real 0.55s slide
+  // would lay down, spends four fifths of itself off camera and reads as
+  // nothing. Four units, dense, is the whole visible budget.
+  const SKID_N = 16;          // ribbon samples kept
+  const SKID_STEP = 0.25;     // world units between samples -- 4.0 of trail
+  const DUST_N = 112;
   // Road dust, not sparks. Warm enough to separate from the purple tarmac,
   // desaturated enough that it never reads as fire on the wild-west biome.
   const DUST_COLOR = 0xe8dcc4;
+  // Matched to the contact shadow so the mark and the blob under the runner
+  // read as one piece of grounding rather than two effects.
+  const SCUFF_COLOR = P.contact === undefined ? 0x241d3d : P.contact;
+
+  // The dust needs its own alpha profile, not the contact shadow's. That blob
+  // is deliberately soft to the point of having no edge at all, which is right
+  // for a shadow and wrong for a puff: thirty overlapping soft gradients
+  // average into a flat haze, and haze reads as fog or lens glare rather than
+  // as anything being thrown off a road. A near-solid core with a short rim
+  // keeps each puff a countable object, which is how the reference games draw
+  // dust and why theirs reads at a glance.
+  let puffTex = null;
+  function puffTexture() {
+    if (puffTex) return puffTex;
+    const N = 64;
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = N;
+    const g = cv.getContext('2d');
+    const img = g.createImageData(N, N);
+    for (let y = 0; y < N; y++) {
+      for (let x = 0; x < N; x++) {
+        const dx = (x + 0.5) / N * 2 - 1, dy = (y + 0.5) / N * 2 - 1;
+        const r = Math.sqrt(dx * dx + dy * dy);
+        // Lumpy rim: a perfect circle thirty times over reads as bubbles.
+        const lobe = 1 + 0.10 * Math.sin(Math.atan2(dy, dx) * 3 + x * 0.03);
+        const t = r / (0.86 * lobe);
+        const a = t < 0.66 ? 1 : t < 1 ? Math.pow(1 - (t - 0.66) / 0.34, 0.7) : 0;
+        const i = (y * N + x) * 4;
+        img.data[i] = img.data[i + 1] = img.data[i + 2] = 255;
+        img.data[i + 3] = Math.round(a * 255);
+      }
+    }
+    g.putImageData(img, 0, 0);
+    puffTex = new THREE.CanvasTexture(cv);
+    puffTex.minFilter = puffTex.magFilter = THREE.LinearFilter;
+    puffTex.generateMipmaps = false;
+    return puffTex;
+  }
 
   // Gradient along the ribbon: dense at the contact point, gone by the tail,
   // with a soft edge across the width so it never shows a rim. The streaks are
@@ -290,19 +380,27 @@ MR.Runner = (function () {
     for (let i = 0; i < 9; i++) streak.push(0.12 + (i * 0.37) % 0.76);
     for (let y = 0; y < H; y++) {
       const v = y / (H - 1);
-      // Across the width: full in the middle, feathered at both edges.
-      let across = Math.sin(Math.PI * v);
-      across = across * across;
+      // Flat across most of the width, feathered only at the very edges. A
+      // sin-squared profile puts all its alpha in the middle half, which makes
+      // a mark geometrically 1.1 wide read as barely 0.5 of visible scuff.
+      const across = Math.pow(Math.sin(Math.PI * v), 0.55);
       let grit = 0;
       for (const s of streak) {
         const d = Math.abs(v - s);
-        if (d < 0.035) grit += (1 - d / 0.035) * 0.55;
+        if (d < 0.038) grit += (1 - d / 0.038) * 1.05;
       }
       for (let x = 0; x < W; x++) {
         // u = 0 at the contact point, 1 at the oldest sample.
         const u = x / (W - 1);
-        const along = Math.pow(1 - u, 1.15) * (0.45 + 0.55 * Math.min(1, u * 6));
-        const a = Math.min(1, across * (0.72 + grit) * along);
+        // Held flat, then dropped. Only the first half of the ribbon is ever
+        // on screen -- the rest is under the lens or behind it -- so a falloff
+        // that starts at the contact point spends the whole gradient on road
+        // the player cannot see and leaves a thin line where the mark is.
+        const along = u < 0.45 ? 1 : Math.pow(1 - (u - 0.45) / 0.55, 1.1);
+        // Base band low, grit high: the eye should read individual scrape
+        // lines being dragged up the road, not a uniform light panel -- a flat
+        // pale rectangle on tarmac reads as glare or as a puddle.
+        const a = Math.min(1, across * (0.34 + grit) * along);
         const i = (y * W + x) * 4;
         img.data[i] = img.data[i + 1] = img.data[i + 2] = 255;
         img.data[i + 3] = Math.round(a * 255);
@@ -590,7 +688,13 @@ MR.Runner = (function () {
     skidGeo.setAttribute('uv', new THREE.BufferAttribute(skidUv, 2));
     skidGeo.setIndex(new THREE.BufferAttribute(skidIdx, 1));
     const skidMat = new THREE.MeshBasicMaterial({
-      color: DUST_COLOR,
+      // The mark on the road is DARK and the dust above it is pale, and that
+      // pairing is deliberate. A pale smear under pale puffs is one flat wash
+      // the eye cannot separate, and on this purple tarmac it reads as glare
+      // or standing water rather than as anything scraped. Dark scuff first,
+      // light dust over it, is also just what the contact shadow already says
+      // about this character -- it is the same blob stretched into a streak.
+      color: SCUFF_COLOR,
       map: skidTexture(),
       transparent: true,
       opacity: 0,
@@ -627,7 +731,7 @@ MR.Runner = (function () {
     dustGeo.setIndex(new THREE.BufferAttribute(dustIdx, 1));
     const dustMat = new THREE.MeshBasicMaterial({
       color: DUST_COLOR,
-      map: blobTexture(),
+      map: puffTexture(),
       transparent: true,
       vertexColors: true,
       depthWrite: false,
@@ -648,7 +752,11 @@ MR.Runner = (function () {
     }
 
     let fxDt = 0, fxSlid = 0, fxLive = 0, fxEmit = 0, fxBurst = 0;
-    let skidN = 0, lastX = 0, lastZ = 0;
+    // `skidSeeded` is its own flag rather than a test on skidN, and that is not
+    // tidiness: seeding on `skidN === 0` re-anchored the history to the current
+    // position on every frame, the step test then measured zero distance every
+    // frame, and the ribbon could never take its first sample.
+    let skidN = 0, skidSeeded = false, lastX = 0, lastZ = 0;
     const skidX = new Float32Array(SKID_N);
     const skidZ = new Float32Array(SKID_N);
 
@@ -658,24 +766,41 @@ MR.Runner = (function () {
     let dCur = 0;
 
     function fxReset() {
-      skidN = 0; fxEmit = 0;
+      skidN = 0; skidSeeded = false; fxEmit = 0;
       for (let i = 0; i < DUST_N; i++) dTtl[i] = 0;
     }
 
     function spawn(cx, cz, power) {
       const i = dCur; dCur = (dCur + 1) % DUST_N;
-      const side = rnd() < 0.5 ? -1 : 1;
-      dPx[i] = cx + side * (0.14 + rnd() * 0.32);
+      // Biased, not even. SLIDE_YAW turns the body so the hips lead toward -x
+      // and the shoes swing out to +x, and a body ploughing at an angle throws
+      // its spray off the trailing edge rather than symmetrically about its
+      // own centreline. A symmetric plume also fights the pose it is meant to
+      // support: two matched clouds either side are the same "this figure is
+      // square to you" signal the old straddled legs were sending.
+      const side = rnd() < 0.70 ? -1 : 1;
+      dPx[i] = cx + side * (0.14 + rnd() * 0.46);
       dPy[i] = 0.05 + rnd() * 0.07;
-      dPz[i] = cz - rnd() * 0.36;
-      // Out and up off the road. The forward term is drag, not thrust: the
-      // runner is doing ~25 u/s and the cloud keeps only a fraction of it,
-      // which is precisely why it falls behind and becomes a trail.
-      dVx[i] = side * (0.85 + rnd() * 1.5);
-      dVy[i] = (1.0 + rnd() * 1.45) * power;
-      dVz[i] = 2.1 + rnd() * 4.2;
+      dPz[i] = cz - rnd() * 0.30;
+      // Out and up off the road.
+      dVx[i] = side * (0.9 + rnd() * 1.7);
+      dVy[i] = (1.7 + rnd() * 2.0) * power;
+      // Dragged FORWARD hard, and this term decides whether the effect exists
+      // at all. The runner does ~25 u/s and the camera sits 4.6 behind him, so
+      // a puff's entire visible life is however long it takes to fall those
+      // 4.6 units back. At 2 u/s of carry that is a fifth of a second and the
+      // cloud is never seen; at 11 it was still gone by mid-slide, which is
+      // exactly what the frames showed -- a fat cloud at entry and bare road
+      // four frames later.
+      //
+      // A third are thrown at very nearly the runner's own ground speed and
+      // ride with him for their whole life; the rest fall away into the trail.
+      // Without the clinging third the cloud drains backwards faster than it
+      // is made, leaving a fat plume three units behind the runner and bare
+      // road around him -- which is the one place the player is looking.
+      dVz[i] = rnd() < 0.35 ? 23.0 + rnd() * 4.0 : 15.0 + rnd() * 7.0;
       dAge[i] = 0;
-      dTtl[i] = 0.50 + rnd() * 0.30;
+      dTtl[i] = 0.40 + rnd() * 0.26;
     }
 
     // The whole effect is simulated here rather than in update(), because
@@ -693,7 +818,7 @@ MR.Runner = (function () {
       const cx = root.position.x, cz = root.position.z - 0.12;
       const live = fxSlid > 0.05;
 
-      if (live && skidN === 0) { lastX = cx; lastZ = cz; }
+      if (live && !skidSeeded) { skidSeeded = true; lastX = cx; lastZ = cz; }
       // Sample by DISTANCE, never per frame: at 7fps under SwiftShader and at
       // 60 on a phone the runner covers wildly different ground per frame, and
       // a per-frame history would make the trail eleven units long in one and
@@ -731,7 +856,7 @@ MR.Runner = (function () {
         // made it, and a plume opening toward the camera is the single most
         // legible thing in the frame.
         const u = j / SKID_N;
-        const half = 0.24 + 0.34 * u;
+        const half = 0.30 + 0.72 * u;
         const nx = ez * half, nz = -ex * half;
         const o = j * 6;
         skidPos[o] = px + nx; skidPos[o + 1] = 0.022; skidPos[o + 2] = pz + nz;
@@ -742,9 +867,17 @@ MR.Runner = (function () {
 
       // ---- dust ----------------------------------------------------------
       if (fxBurst > 0) { for (let i = 0; i < fxBurst; i++) spawn(cx, cz, 1.55); fxBurst = 0; }
+      // Clusters, not a smooth stream. A steady emitter at the same total
+      // rate produced a thin even haze that read as nothing, while the twelve
+      // puffs of the entry burst -- the same particles, all at once -- read
+      // instantly as dust. Density in one place is the whole cue, and a slide
+      // judders rather than pours, so pulsing is also the honest motion.
       if (live) {
-        fxEmit += dt * 46;
-        while (fxEmit >= 1) { fxEmit -= 1; spawn(cx, cz, 1); }
+        fxEmit += dt;
+        while (fxEmit >= 0.05) {
+          fxEmit -= 0.05;
+          for (let k = 0; k < 8; k++) spawn(cx, cz, 1.15);
+        }
       }
 
       // Billboard off the lens, so a puff is a puff whatever the camera roll
@@ -765,15 +898,18 @@ MR.Runner = (function () {
         }
         dAge[i] += dt;
         if (dAge[i] >= dTtl[i]) { dTtl[i] = 0; continue; }
-        dVy[i] -= 5.4 * dt;
-        dVx[i] -= dVx[i] * dragK; dVz[i] -= dVz[i] * dragK;
+        dVy[i] -= 6.4 * dt;
+        dVx[i] -= dVx[i] * dragK; dVz[i] -= dVz[i] * dragK * 0.85;
         dPx[i] += dVx[i] * dt; dPy[i] += dVy[i] * dt; dPz[i] += dVz[i] * dt;
         if (dPy[i] < 0.04) { dPy[i] = 0.04; dVy[i] = 0; }
 
         const t = dAge[i] / dTtl[i];
         // Dust expands as it dissipates; a puff that shrinks reads as a spark.
-        const s = 0.15 + 0.44 * Math.pow(t, 0.65);
-        const a = Math.min(1, t * 7) * Math.pow(1 - t, 1.4) * 0.92;
+        // Small and hard rather than big and soft. Raising the base radius to
+        // 0.26 was tried and merged thirty puffs back into the single flat
+        // wash the whole puff texture exists to avoid.
+        const s = 0.19 + 0.54 * Math.pow(t, 0.60);
+        const a = Math.min(1, t * 7) * Math.pow(1 - t, 1.05);
         const ax = rx * s, ay = ry * s, az = rz * s;
         const bx = ux * s, by = uy * s, bz = uz * s;
         const px = dPx[i], py = dPy[i], pz = dPz[i];
@@ -873,11 +1009,15 @@ MR.Runner = (function () {
         const tuck = spread * (i === 0 ? 0.80 : 0.70);
         const cyc = (1 - air * 0.75) * (1 - slid * 0.92);
 
-        // Which leg leads the slide. Both go forward -- a slide with one leg
-        // folded under, the way a real baseball slide runs, loses the second
-        // shin out of the silhouette entirely from behind -- but the lead leg
-        // is straighter and rides higher, and that offset is the difference
-        // between a slide and a mannequin tipped onto its back.
+        // Which leg leads the slide, and it is now a real figure-four rather
+        // than the near-symmetric pair this used to be. The old objection to
+        // folding the trail leg -- that it loses that shin out of the
+        // silhouette from behind -- was true of a body pointing straight down
+        // the view axis and stops being true once SLIDE_YAW turns it across
+        // the lane: the folded knee then points out into open road where it is
+        // the most legible thing on the character. Symmetry is what made the
+        // pose nameable as "crouching"; nothing a human does on two feet looks
+        // like one leg out and one knee folded under the hip.
         const lead = i === 0 ? 1 : 0;
 
         // Larger angles than the old rig ran, because the legs are a third
@@ -893,33 +1033,29 @@ MR.Runner = (function () {
         // which is what keeps the heels skimming the road instead of buried
         // in it once the body has dropped.
         L.hip.rotation.x = -s * swing * 0.86 * cyc + tuck * 0.70
-          - slid * (1.72 + lead * 0.10);
+          - slid * (lead ? 1.80 : 1.42);
         // Knee only bends one way; bias so it flexes hardest on recovery.
         const bend = Math.max(0, -c * 0.5 + 0.5);
         L.knee.rotation.x = 0.18 + bend * (1.22 + 0.26 * sp01) * cyc + tuck * 1.25
-          + slid * (0.04 - lead * 0.02);
+          + slid * (lead ? 0.02 : 0.62);
         // Dorsiflex through recovery, plantarflex off the toe -- and hard
         // dorsiflexion in the slide, toes up, which is both what a slider
         // actually does and what turns the biggest pale face on the character
         // away from the road and into the light.
         L.ankle.rotation.x = -0.16 + s * 0.34 * cyc - tuck * 0.45
-          - slid * (0.12 + lead * 0.18);
+          - slid * (lead ? 0.30 : 0.04);
         // A little splay keeps the two legs from overlapping into one shape
         // when they pass each other at midstride, and opens further in the
         // air so the tuck reads as two legs rather than as one mass.
         //
-        // The slide needs far more of it than either, and this is the single
-        // value the whole pose turned on. The chase camera is only about four
-        // degrees above the runner, so legs thrown forward along the view axis
-        // sit at almost exactly the torso's screen height and vanish behind
-        // it -- the first version of this pose had no visible legs at all.
-        // Splaying to 0.70 walks the shoes out to x ~0.50 and takes the rig to
-        // 0.57 half-width, clear of the 0.38 deltoid line, so the two of them
-        // read as shoes flanking the vest rather than as one stump behind it.
-        // 0.70 is also the ceiling: MEASUREMENTS.md derives the lane's own
-        // limit at 0.70 from the lane centre, so this pose spends the width
-        // budget the gloves' 0.543 run swing had already proved is there.
-        L.hip.rotation.z = L.side * (0.05 + spread * 0.30 + slid * 0.52);
+        // The slide used to need far more of it than either -- 0.52, walking
+        // the shoes out to x ~0.50 -- purely so the legs did not vanish behind
+        // the torso when thrown down the view axis. SLIDE_YAW does that job
+        // properly now by turning the whole body across the lane, and it does
+        // it without spending the width budget on a symmetric straddle that
+        // read as squatting. Splay is back to a little more than the run's,
+        // which is all it was ever for: keeping the two legs from merging.
+        L.hip.rotation.z = L.side * (0.05 + spread * 0.30 + slid * (lead ? 0.10 : 0.26));
       }
 
       // ---- arms ----------------------------------------------------------
@@ -961,10 +1097,23 @@ MR.Runner = (function () {
         const fwd = Math.max(0, -s);
         const back = Math.max(0, s);
 
-        // 2.06 is measured against the reclined chest, not the world: the
-        // torso is already 0.78 back, so this lands the upper arm a little
-        // under horizontal in world space with the elbow behind the hip.
-        A.shoulder.rotation.x = s * swing * 0.95 * cycD - spread * 0.26 + slid * 1.46;
+        // 2.78 is measured against the RECLINED chest, not the world, and the
+        // size of it is the fix for the most expensive defect this pose had.
+        // The spine reclines to -1.10, so an arm needs 1.10 + 1.57 simply to
+        // reach world-horizontal. At the old 1.46 it hung 1.2rad short of that
+        // and drove the gloves through the tarmac -- and the road clamp below
+        // then dutifully lifted the WHOLE BODY back out again to fix it.
+        // Measured on the previous build: clamp lift 0.364 against a duck drop
+        // of 0.42. The arms were silently cancelling 87% of the drop, so the
+        // committed "slide" sat at very nearly running height and cleared the
+        // 1.41 DUCK bar by 0.03.
+        //
+        // At 2.78 the arm trails a hair above world-horizontal and stops being
+        // the limiting part; the lift falls to 0.25 (now set by the legs, not
+        // the arms) and the crown to 1.32, which is 0.09 of real daylight. It
+        // is also the right pose: a slider's arms go out behind them, not down
+        // through the surface they are sliding on.
+        A.shoulder.rotation.x = s * swing * 0.95 * cycD - spread * 0.26 + slid * 2.78;
         // Abduction. The running band is deliberately tighter than it used to
         // be: the mitts got big enough to break the outline on their own, so
         // the elbows no longer have to be held out to do it -- and every
@@ -1049,10 +1198,21 @@ MR.Runner = (function () {
       // and headband to the camera instead of the underside of a chin.
       neck.rotation.x = -leanFwd * 0.86 + Math.sin(p * 2) * 0.035 * (1 - slid * 0.9);
       neck.rotation.z = lean * 0.14;
-      neck.rotation.y = -Math.sin(p) * 0.10;
+      // Unwind most of SLIDE_YAW at the neck. A slider keeps their eyes on the
+      // bag; leaving the head square to a body turned 26 degrees would point
+      // the face off into the barrier. It also pays twice over from behind --
+      // a head counter-turned against the shoulders is the clearest possible
+      // statement that the shoulders are turned at all, and it keeps the hair
+      // and headband presented flat to the camera where the pinch reads.
+      neck.rotation.y = -Math.sin(p) * 0.10 - slid * SLIDE_YAW * 0.70;
 
       // Whole-body bank into a lane change reads as weight, not a slide.
-      root.rotation.z = -lean * 0.13 - knock * 0.16;
+      // The slide adds its own, tipping onto the hip it is riding on: a body
+      // that goes in yawed but stays perfectly level reads as a swivel chair.
+      root.rotation.z = -lean * 0.13 - knock * 0.16 - slid * 0.12;
+      // Go in at an angle. See SLIDE_YAW -- this is the term that gives the
+      // back view something lateral to measure.
+      root.rotation.y = slid * SLIDE_YAW;
 
       // Ducking drops the whole body rather than only folding the spine, so
       // the collision capsule and the silhouette agree. The 0.42 matches
@@ -1127,7 +1287,7 @@ MR.Runner = (function () {
         fxLive = Math.max(0, fxLive - dt * 1.7);
       }
       fxPivot.visible = fxLive > 0.01;
-      skidMat.opacity = 0.86 * fxLive;
+      skidMat.opacity = 0.72 * fxLive;
       dustMat.opacity = fxLive;
     };
 

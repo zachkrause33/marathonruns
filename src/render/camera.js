@@ -68,6 +68,24 @@ MR.Camera = (function () {
   const LOOK_Y = 1.16;
   const LOOK_AHEAD = 8.0;
 
+  // Step off the centreline during a slide, toward the side the runner's body
+  // is yawing away from. Dead astern is the worst possible angle from which to
+  // read a pose whose whole statement is length along the travel axis, and at
+  // the 4.6 chase distance a slide holds, this buys about four degrees of
+  // azimuth on it.
+  //
+  // The look point follows most of the step rather than none of it, and that
+  // ratio is the safety property. At SLIDE_LOOK = 0 the camera would rotate by
+  // the full four degrees; portrait's horizontal field is only 30 wide, so
+  // that is an eighth of everything the player can see swinging sideways at
+  // the exact moment they are committed and cannot respond, and the next gate
+  // goes with it. At 0.62 the far road turns by a tenth of a degree -- gates
+  // stay where they were -- and the parallax is spent on the near geometry,
+  // which is the runner and his own wake. Measured, he drifts from 0.49 to
+  // 0.35 of frame width for half a second and comes back.
+  const SLIDE_SIDE = -0.34;
+  const SLIDE_LOOK = 0.62;
+
   // The honest band, in world units/sec. Derived rather than typed in, so a
   // pace retune moves the camera response with it.
   const SPEED_LO = (K.UNITS_PER_MILE * K.TIME_SCALE) / K.START_PACE;
@@ -125,6 +143,8 @@ MR.Camera = (function () {
       winded: 0,       // long tail after a hit: the camera loses its nerve
       dip: 0, dipV: 0, // sprung landing compression
       kick: 0,         // short FOV punch (landing)
+
+      pDuck: 0,        // last frame's duck01, for edge-detecting slide entry
 
       mile: -1,        // last whole mile crossed
       mileT: 0,
@@ -187,6 +207,21 @@ MR.Camera = (function () {
       else if (s.gearArmed && sp01 > 0.93) { s.gearArmed = false; s.gearT = 1; }
       if (!s.gearArmed && sp01 < 0.72) s.gearArmed = true;
       s.gearT = Math.max(0, s.gearT - d * 1.15);
+
+      // Going to ground. The held slide pose is the hard thing to read from
+      // behind and it always will be -- the legs point down the view axis --
+      // so the entry is where the state gets named, and it has to arrive as an
+      // event rather than as a shape that fades in. This is the same spring
+      // the landing uses, fired on the way DOWN: the camera drops with the
+      // body and rebounds, and the FOV kick throws the near road outward for a
+      // few frames. Fired on the edge, not held, so it cannot stack with a
+      // second duck or leave the camera sitting low over a gate.
+      const duckNow = p.duck01 || 0;
+      if (duckNow > 0.18 && s.pDuck <= 0.18) {
+        s.dipV -= 3.1;
+        s.kick = Math.min(1, s.kick + 0.34);
+      }
+      s.pDuck = duckNow;
 
       // Finish: the only place the camera is allowed to abandon the chase.
       if (p.z >= K.TOTAL_UNITS - 0.25) s.finish = Math.min(1, s.finish + d / 1.5);
@@ -280,7 +315,11 @@ MR.Camera = (function () {
         + bobY + shY
         + fin * 1.7;
 
-      cam.position.set(s.x + bobX + shX, hgt, p.z - back);
+      // See SLIDE_SIDE: a bounded step off the centreline, held only while the
+      // body is down.
+      const side = duck * SLIDE_SIDE;
+
+      cam.position.set(s.x + bobX + shX + side, hgt, p.z - back);
 
       // ---- aim ------------------------------------------------------------
       // The look point follows the jump arc *more* than the camera does, so
@@ -288,7 +327,7 @@ MR.Camera = (function () {
       // frame, which is what leaving the ground actually looks like. The old
       // 0.42/0.30 split had the camera chasing the arc and cancelled it.
       look.set(
-        s.x * s.fr.lookX,
+        s.x * s.fr.lookX + side * SLIDE_LOOK,
         LOOK_Y + (p.y || 0) * 0.50 - duck * 1.05 - drive * 0.22 + fin * 0.55,
         p.z + LOOK_AHEAD - duck * 3.2 + (p.y || 0) * 1.1 - drive * 0.5
       );
@@ -302,7 +341,13 @@ MR.Camera = (function () {
       const whip = Math.max(-1, Math.min(1, s.vx / 20));
       const rollTgt = -((p.lean || 0) * 0.16 + whip * 0.07) * s.fr.roll * (1 - fin);
       s.roll += (rollTgt - s.roll) * (1 - Math.pow(0.00002, d));
-      cam.rotation.z += s.roll + shR - s.punch * 0.055;
+      // The slide gets its own small bank, in the same direction the runner's
+      // body yaws over in runner.js. Three and a half degrees is well below
+      // the threshold at which a tilted horizon costs readability, and it buys
+      // the one thing a dead-astern chase can never give a pose: a frame that
+      // is not bilaterally symmetric. A symmetric frame around a symmetric
+      // silhouette is most of why this state kept reading as "kneeling".
+      cam.rotation.z += s.roll + shR - s.punch * 0.055 + duck * 0.062;
 
       // ---- fov ------------------------------------------------------------
       // Widening while pulling in keeps the runner the same size on screen and
@@ -375,6 +420,7 @@ MR.Camera = (function () {
       s.sp = SPEED_LO; s.drive = 0; s.accel = 0;
       s.shake = 0; s.punch = 0; s.lurch = 0; s.winded = 0;
       s.dip = 0; s.dipV = 0; s.kick = 0;
+      s.pDuck = 0;
       s.mile = -1; s.mileT = 0; s.gearT = 0; s.gearArmed = true; s.finish = 0;
       cam.fov = BASE_FOV;
       cam.updateProjectionMatrix();

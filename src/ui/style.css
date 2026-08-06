@@ -162,11 +162,24 @@ html, body {
  * Clean gates buy speed; the gauge shows how much of the START_PACE ->
  * FLOOR_PACE range has been bought; the pace is the result. Putting them in
  * one plate in that order is the only place the game explains itself. */
+/* The projection leads the left column: it is the number that answers "is the
+ * record still alive", so it keeps the weight it had as a centred bar and
+ * gives up only its position. */
+#projCell {
+  background: var(--ink);
+  border-left: 4px solid var(--accent);
+  padding: 7px 13px 8px;
+  min-width: 158px;
+}
+#projCell .cap { display: flex; align-items: center; gap: 8px; }
+#projCell .val { font-size: 30px; font-weight: 700; line-height: 1.02; }
+#projCell .sub { font-size: 10px; font-weight: 600; opacity: 0.68; margin-top: 1px; }
+
 #leftCol {
   /* Clears the top bug by its MEASURED height (hud.js publishes --bugH), plus
      a gap. The fallback matches the desktop height so the layout is still
      correct for one frame before the first measurement lands. */
-  position: absolute; left: 14px; top: calc(var(--bugH, 72px) + 10px);
+  position: absolute; left: 14px; top: 24px;
   display: flex; flex-direction: column; align-items: flex-start; gap: 9px;
 }
 
@@ -220,7 +233,7 @@ html, body {
 
 /* ---- distance, right ---- */
 #dist {
-  position: absolute; right: 14px; top: calc(var(--bugH, 72px) + 10px);
+  position: absolute; right: 14px; top: 24px;
   background: var(--ink);
   border-right: 4px solid var(--accent);
   padding: 8px 14px 9px;
@@ -283,10 +296,17 @@ html, body {
 /* Clearance here is not slack: the ghost marker's cap sticks up out of the
  * rail and would otherwise strike through this line whenever the ghost is
  * near the middle of the course. */
+/* One strip: elapsed on the left, the chase in the middle, distance on the
+ * right. All three are secondary to the plate above the road, and putting them
+ * on the rail they describe is what freed the top of the frame. */
 #gapLine {
-  display: flex; align-items: baseline; justify-content: center; gap: 9px;
-  margin-bottom: 11px;
+  display: flex; align-items: baseline; gap: 8px;
+  margin-bottom: 10px;
 }
+#gapLine #clock { font-size: 12px; font-weight: 600; opacity: 0.72; }
+#gapLine #gapLabel { margin-left: auto; }
+#gapLine #distVal { margin-left: auto; font-size: 12px; font-weight: 700; }
+#gapLine #distUnit { font-size: 8px; font-weight: 700; opacity: 0.55; margin-left: 2px; }
 #gapLine .lab { opacity: 0.75; }
 #gapVal { font-size: 17px; font-weight: 700; line-height: 1; }
 #gapTrend { font-size: 9px; font-weight: 700; letter-spacing: 0.12em; }
@@ -720,14 +740,14 @@ html, body {
   .wideOnly { display: none; }
   .narrowOnly { display: inline; }
 
-  #leftCol { left: 9px; top: calc(var(--bugH, 72px) + 8px); gap: 7px; }
+  #leftCol { left: 9px; top: 22px; gap: 7px; }
   #engine { min-width: 124px; max-width: 142px; padding: 6px 11px 7px; }
   #engine #streakVal { font-size: 27px; }
   #engine .val { font-size: 21px; }
   #engine .sub { font-size: 8px; }
   #why { font-size: 8px; margin-top: 4px; }
 
-  #dist { right: 9px; top: calc(var(--bugH, 72px) + 8px); min-width: 112px; padding: 6px 11px 7px; }
+  #dist { right: 9px; top: 22px; min-width: 112px; padding: 6px 11px 7px; }
   #dist .val { font-size: 25px; }
   #dist .sub { font-size: 9px; }
 
@@ -760,7 +780,7 @@ html, body {
   #projCell .val { font-size: 50px; }
   #projCell .sub { font-size: 13px; }
 
-  #leftCol { left: 20px; top: calc(var(--bugH, 92px) + 14px); gap: 11px; }
+  #leftCol { left: 20px; top: 28px; gap: 11px; }
   #engine { min-width: 190px; max-width: 220px; padding: 10px 17px 12px; }
   #engine #streakVal { font-size: 45px; }
   #engine .val { font-size: 33px; }
@@ -768,7 +788,7 @@ html, body {
   #engine .sub, #why { font-size: 11px; }
   .gauge { height: 9px; }
 
-  #dist { right: 20px; top: calc(var(--bugH, 92px) + 14px); min-width: 172px; padding: 10px 17px 12px; }
+  #dist { right: 20px; top: 28px; min-width: 172px; padding: 10px 17px 12px; }
   #dist .val { font-size: 42px; }
   #dist .unit { font-size: 14px; }
   #dist .sub { font-size: 12px; }
@@ -868,7 +888,7 @@ html, body {
   #tomorrow .tomRoute { font-size: 11px; margin-top: 2px; }
   #endPanel .cta { margin-top: 9px; padding: 10px; }
 
-  #leftCol { top: calc(var(--bugH, 60px) + 6px); gap: 6px; }
+  #leftCol { top: 20px; gap: 6px; }
   #engine { padding: 5px 10px 6px; }
   #engine #streakVal { font-size: 23px; }
   #engine .val { font-size: 18px; }

@@ -153,19 +153,38 @@ MR.HUD = (function () {
   function create(root, opts) {
     opts = opts || {};
     root.innerHTML = `
-      <div id="bug">
-        <div id="clockCell">
-          <div class="lab">RACE TIME</div>
-          <div class="val num" id="clock">0:00</div>
-        </div>
+      <!--
+        THE MIDDLE OF THE FRAME BELONGS TO THE ROAD.
+        
+        That rule is stated at the top of the stylesheet and the layout broke
+        it. Measured at 390x844: three plates in the top third, 25.2% of the
+        screen covered, and the race-clock plate spanning x68-322 of 390 -- 
+        dead centre, which is exactly where the mile gantries stand. Playtest
+        frames show MILE 5 hidden behind the streak panel and MILE 26 cut in
+        half by the projection. The one piece of scenery that tells you how far
+        you have run was being covered by a panel telling you how far you have
+        run.
+
+        So the top bar is gone as a centred object. Everything the player needs
+        while running is on the LEFT EDGE and along the BOTTOM, and the centre
+        and right of the frame are given back to the road.
+
+        What was cut, and why each is safe:
+          RACE TIME   demoted to the rail strip. On a four-minute compressed
+                      race the elapsed clock is flavour; the projection is the
+                      number decisions are made against.
+          DISTANCE    removed entirely. The rail already draws position against
+                      26.2 with mile ticks, and the mile gantries in the world
+                      are the same fact -- made legible for the first time by
+                      deleting the panel that was covering them.
+      -->
+      <div id="leftCol">
         <div id="projCell">
           <div class="cap"><span class="lab"><span class="wideOnly">PROJECTED</span><span class="narrowOnly">PROJ</span> FINISH</span><span class="chip" id="status">BUYING SPEED</span></div>
           <div class="val num" id="projVal">--:--</div>
           <div class="sub num" id="margin">VS ${K.RECORD_LABEL}</div>
         </div>
-      </div>
 
-      <div id="leftCol">
         <div id="engine">
           <div class="lab">CLEAN GATES</div>
           <div class="val num" id="streakVal">0</div>
@@ -186,17 +205,13 @@ MR.HUD = (function () {
         </div>
       </div>
 
-      <div id="dist">
-        <div class="lab">DISTANCE</div>
-        <div><span class="val num" id="distVal">0.00</span><span class="unit">MI</span></div>
-        <div class="sub num" id="toGo">26.22 MI TO GO</div>
-      </div>
-
       <div id="railWrap">
         <div id="gapLine">
+          <span class="num" id="clock">0:00</span>
           <span class="lab" id="gapLabel">RECORD GHOST</span>
           <span class="num" id="gapVal">+0:00.0</span>
           <span id="gapTrend">GAINING</span>
+          <span class="num" id="distVal">0.00</span><span class="unit" id="distUnit">MI</span>
         </div>
         <div id="rail">
           <div id="railBg"></div>
@@ -353,7 +368,7 @@ MR.HUD = (function () {
       projCell: q('projCell'), projVal: q('projVal'), margin: q('margin'), status: q('status'),
       engine: q('engine'), streakVal: q('streakVal'), why: q('why'),
       gaugeFill: q('gaugeFill'), paceVal: q('paceVal'), needVal: q('needVal'),
-      distVal: q('distVal'), toGo: q('toGo'),
+      distVal: q('distVal'), toGo: null,
       rail: q('rail'), railFill: q('railFill'), railGap: q('railGap'), railGhost: q('railGhost'),
       gapVal: q('gapVal'), gapTrend: q('gapTrend'), gapLabel: q('gapLabel'),
       toast: q('toast'), toastLab: q('toastLab'), toastBig: q('toastBig'),
@@ -374,24 +389,11 @@ MR.HUD = (function () {
       perf: q('perf'),
     };
 
-    // The side columns hang below the top bug. Their offset used to be four
-    // independently hard-coded `top` values, one per breakpoint, each of them a
-    // guess at how tall the bug happened to be at that width -- and the narrow
-    // one guessed 2px short, so on every phone the bug's plate clipped the
-    // corners of both side panels. The overlap widened as the screen narrowed
-    // (69px at 420 wide, 99px at 360) because the bug is centred and fixed
-    // while the panels are pinned to the edges.
-    //
-    // Measure it instead. --bugH is the bug's real height, so the columns clear
-    // it at any width, at any font size, and after any future edit to the bar.
-    const bug = q('bug');
-    function measureBug() {
-      const h = bug.getBoundingClientRect().height;
-      if (h > 0) root.style.setProperty('--bugH', h + 'px');
-    }
-    measureBug();
-    if (window.ResizeObserver) new ResizeObserver(measureBug).observe(bug);
-    window.addEventListener('resize', measureBug);
+    // The --bugH machinery that used to live here is gone with the top bar it
+    // measured. It existed because the side columns hung below a centred plate
+    // whose height four breakpoints each guessed at, and the narrow one guessed
+    // 2px short. With the readout moved to the left edge there is no plate
+    // above anything, so there is nothing to measure and nothing to clip.
 
     // Record pace is a fixed point in the unlockable range, so both gauges get
     // their tick from the same number rather than a hand-placed percentage.
@@ -633,7 +635,6 @@ MR.HUD = (function () {
 
       set(n.clock, 'clock', Pace.clock(p.raceTime));
       set(n.distVal, 'dist', p.miles.toFixed(2));
-      set(n.toGo, 'toGo', Math.max(0, K.MARATHON_MILES - p.miles).toFixed(2) + ' MI TO GO');
 
       // ---- the headline: is the record still alive ----------------------
       // projectClean() rolls the real streak/easing model forward assuming the

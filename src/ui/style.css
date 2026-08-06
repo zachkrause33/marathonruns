@@ -34,7 +34,31 @@ html, body {
 #ui {
   position: fixed; inset: 0;
   pointer-events: none;
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  /* THE READOUT HAS A TYPEFACE NOW.
+   *
+   * It used to be `ui-sans-serif, system-ui, ...`, which meant the identity of
+   * a game whose stated direction is broadcast track-and-field was whatever
+   * grotesque the operating system happened to ship -- a different one on
+   * every device, and a wide humanist UI sans on most of them. The arrangement
+   * was athletics; the letterforms were a settings dialog.
+   *
+   * Two measured consequences, not just taste. On the resolved system stack,
+   * weights 600, 700, 800 and 900 all rendered at IDENTICAL width -- four
+   * declared weights, two delivered, so the hierarchy the rules below describe
+   * was not guaranteed to exist. And `tabular-nums` was a no-op that happened
+   * to work only because the fallback was already duplexed; on a proportional
+   * fallback the figures would reflow, which is the one thing a race clock
+   * must never do.
+   *
+   * MRCond is Oswald, a DIN-condensed descendant, subset to the characters
+   * this HUD can print and embedded as a variable font with a real 400-700
+   * axis. Arrows fall through to the system stack on purpose -- Oswald has
+   * none. */
+  /* Weights are declared inside Oswald's real 400-700 axis. The sheet used to
+   * run 600/700/800/900; 800 and 900 both clamp to 700 on this face, which
+   * would have reintroduced the exact flattening the typeface was chosen to
+   * fix. The scale is now 500 body / 600 label / 700 value. */
+  font-family: 'MRCond', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   color: #fffdf5;
   --accent: #ffe45e;
   --ahead: #4dfba0;
@@ -46,11 +70,17 @@ html, body {
 .num {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
+  /* Kerning off, and this is not belt-and-braces. The embedded face has its
+     figures rebuilt to a single advance (tools/mkfont.py), so the digits are
+     tabular by construction -- but `kern` still applies to the colon pairs,
+     which left 1:57:53 measuring 0.29px narrower than 0:00:00. A race clock
+     rewritten sixty times a second cannot be allowed to breathe at all. */
+  font-kerning: none;
   letter-spacing: -0.01em;
 }
 
 .lab {
-  font-size: 9px; font-weight: 800; letter-spacing: 0.16em;
+  font-size: 9px; font-weight: 500; letter-spacing: 0.16em;
   opacity: 0.6; text-transform: uppercase;
 }
 
@@ -83,7 +113,7 @@ html, body {
   padding: 8px 15px 9px; min-width: 116px;
   display: flex; flex-direction: column; justify-content: center;
 }
-#clockCell .val { font-size: 25px; font-weight: 800; line-height: 1.05; margin-top: 1px; }
+#clockCell .val { font-size: 25px; font-weight: 500; line-height: 1.05; margin-top: 1px; }
 
 #projCell {
   padding: 7px 15px 9px; min-width: 214px;
@@ -98,8 +128,8 @@ html, body {
  * "RECORD GONE" was breaking the label across two lines and pushing the
  * headline number down with it. */
 #projCell .cap .lab, #projCell .val, #projCell .sub { white-space: nowrap; }
-#projCell .val { font-size: 40px; font-weight: 900; line-height: 1.02; }
-#projCell .sub { font-size: 11px; font-weight: 800; opacity: 0.7; margin-top: 1px; }
+#projCell .val { font-size: 40px; font-weight: 700; line-height: 1.02; }
+#projCell .sub { font-size: 11px; font-weight: 500; opacity: 0.7; margin-top: 1px; }
 
 #projCell.on  .val, #projCell.on  .sub { color: var(--ahead); }
 #projCell.off .val, #projCell.off .sub { color: var(--behind); }
@@ -113,7 +143,7 @@ html, body {
  * outline while the estimate is still moving under the player and a solid
  * badge once it has become a verdict. */
 .chip {
-  font-size: 9px; font-weight: 900; letter-spacing: 0.1em;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.1em;
   padding: 2px 6px; white-space: nowrap;
 }
 .chip.est { color: var(--accent); border: 1px solid rgba(255, 228, 94, 0.55); }
@@ -147,12 +177,12 @@ html, body {
   min-width: 152px; max-width: 178px;
 }
 #engine #streakVal {
-  font-size: 36px; font-weight: 900; line-height: 1;
+  font-size: 36px; font-weight: 700; line-height: 1;
   color: var(--accent);
   text-shadow: 0 2px 0 rgba(14, 18, 48, 0.6);
 }
 #engine #paceLab { margin-top: 1px; }
-#engine .val { font-size: 27px; font-weight: 800; line-height: 1.05; }
+#engine .val { font-size: 27px; font-weight: 500; line-height: 1.05; }
 #engine .val.ahead { color: var(--ahead); }
 #engine .unit { font-size: 11px; font-weight: 700; opacity: 0.6; margin-left: 3px; }
 #engine .sub { font-size: 9px; font-weight: 700; opacity: 0.68; margin-top: 2px; }
@@ -181,7 +211,7 @@ html, body {
 }
 
 #why {
-  font-size: 9px; font-weight: 800; letter-spacing: 0.08em; line-height: 1.4;
+  font-size: 9px; font-weight: 500; letter-spacing: 0.08em; line-height: 1.4;
   margin-top: 6px; color: var(--accent);
   transition: opacity 0.3s;
 }
@@ -196,7 +226,7 @@ html, body {
   padding: 8px 14px 9px;
   min-width: 138px; text-align: right;
 }
-#dist .val { font-size: 34px; font-weight: 800; line-height: 1; }
+#dist .val { font-size: 34px; font-weight: 500; line-height: 1; }
 #dist .unit { font-size: 12px; font-weight: 700; opacity: 0.6; margin-left: 3px; }
 #dist .sub { font-size: 10px; font-weight: 700; opacity: 0.62; margin-top: 3px; }
 
@@ -216,9 +246,9 @@ html, body {
 #toast.show { opacity: 1; transform: none; }
 #toast.noBig #toastRow { display: none; }
 #toast .lab { opacity: 0.85; color: #fffdf5; }
-#toast .big { font-size: 27px; font-weight: 900; line-height: 1.05; }
+#toast .big { font-size: 27px; font-weight: 700; line-height: 1.05; }
 #toast .unit { font-size: 11px; font-weight: 700; opacity: 0.6; margin-left: 3px; }
-#toast .small { font-size: 11px; font-weight: 800; margin-top: 1px; }
+#toast .small { font-size: 11px; font-weight: 500; margin-top: 1px; }
 #toast .small #toastCum { opacity: 0.8; }
 
 /* ---- progress rail ----
@@ -258,8 +288,8 @@ html, body {
   margin-bottom: 11px;
 }
 #gapLine .lab { opacity: 0.75; }
-#gapVal { font-size: 17px; font-weight: 900; line-height: 1; }
-#gapTrend { font-size: 9px; font-weight: 900; letter-spacing: 0.12em; }
+#gapVal { font-size: 17px; font-weight: 700; line-height: 1; }
+#gapTrend { font-size: 9px; font-weight: 700; letter-spacing: 0.12em; }
 .ahead { color: var(--ahead); }
 .behind { color: var(--behind); }
 /* Plain ink: a position stated without a grade attached. The ghost gap uses
@@ -308,7 +338,7 @@ html, body {
 #railCaps {
   position: relative;
   display: flex; justify-content: space-between;
-  font-size: 9px; font-weight: 800; letter-spacing: 0.1em;
+  font-size: 9px; font-weight: 500; letter-spacing: 0.1em;
   opacity: 0.78; margin-top: 4px;
 }
 #railHalf { position: absolute; left: 50%; transform: translateX(-50%); }
@@ -326,19 +356,19 @@ html, body {
 .panel.hidden { display: none; }
 .panelInner { margin: auto; width: 100%; max-width: 540px; }
 .panel h1 {
-  font-size: clamp(34px, 7vw, 58px); font-weight: 900;
+  font-size: clamp(34px, 7vw, 58px); font-weight: 700;
   letter-spacing: -0.03em; line-height: 0.98;
   font-variant-numeric: tabular-nums;
 }
 .panel .date {
-  font-size: 11px; font-weight: 800; letter-spacing: 0.2em;
+  font-size: 11px; font-weight: 500; letter-spacing: 0.2em;
   color: var(--accent); margin-bottom: 8px;
 }
 .panel .blurb {
-  font-size: 14px; font-weight: 600; opacity: 0.86;
+  font-size: 14px; font-weight: 500; opacity: 0.86;
   max-width: 400px; margin: 12px auto 0; line-height: 1.5;
 }
-.panel .blurb b { font-weight: 900; opacity: 1; }
+.panel .blurb b { font-weight: 700; opacity: 1; }
 
 /* Today's road. The one line on this panel that is different tomorrow, so it
  * sits directly under the wordmark where a masthead's dateline would. */
@@ -348,7 +378,7 @@ html, body {
      at the wider setting a four-stop route was exactly 362px inside a 362px
      column, so any longer name wrapped. */
   font-size: clamp(10.5px, 3.05vw, 12px);
-  font-weight: 900; letter-spacing: 0.08em;
+  font-weight: 700; letter-spacing: 0.08em;
   color: var(--accent); opacity: 0.92;
   margin-top: 9px; line-height: 1.5;
   text-wrap: balance;
@@ -363,9 +393,9 @@ html, body {
   font-variant-numeric: tabular-nums;
 }
 .targetLab {
-  font-size: 10px; font-weight: 900; letter-spacing: 0.22em; opacity: 0.6;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.22em; opacity: 0.6;
 }
-.target b { font-size: 27px; font-weight: 900; color: var(--accent); line-height: 1; }
+.target b { font-size: 27px; font-weight: 700; color: var(--accent); line-height: 1; }
 .targetSub {
   font-size: 11.5px; font-weight: 700; opacity: 0.72;
   flex-basis: 100%; margin-top: 5px;
@@ -375,7 +405,7 @@ html, body {
  * with the one big number each panel is built around. */
 .rule {
   display: flex; align-items: center; gap: 10px;
-  font-size: 9px; font-weight: 900; letter-spacing: 0.2em;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.2em;
   opacity: 0.5; margin: 18px 0 9px;
 }
 .rule::before, .rule::after {
@@ -385,16 +415,16 @@ html, body {
 /* Body copy is 13px at 0.88, not 12.5 at 0.86. The old pairing measured
  * 5.21:1 -- it passed AA on the maths and still read as greyed-out furniture,
  * which is a large part of why the panel's explanations went unread. */
-.mech { font-size: 13px; font-weight: 600; line-height: 1.55; opacity: 0.88; }
+.mech { font-size: 13px; font-weight: 500; line-height: 1.55; opacity: 0.88; }
 .mech p { margin-top: 8px; }
-.mech b { font-weight: 900; opacity: 1; }
+.mech b { font-weight: 700; opacity: 1; }
 .mechPace {
   display: flex; align-items: baseline; justify-content: center; gap: 9px;
   font-variant-numeric: tabular-nums;
 }
-.mechPace b { font-size: 26px; font-weight: 900; color: var(--accent); }
+.mechPace b { font-size: 26px; font-weight: 700; color: var(--accent); }
 .mechPace span { font-size: 17px; opacity: 0.55; }
-.mechPace i { font-size: 11px; font-style: normal; font-weight: 800; opacity: 0.55; }
+.mechPace i { font-size: 11px; font-style: normal; font-weight: 500; opacity: 0.55; }
 .mech .gauge { max-width: 260px; margin: 8px auto 0; }
 .gaugeLeg { font-size: 10px; font-weight: 700; opacity: 0.5; margin-top: 5px; }
 
@@ -403,7 +433,7 @@ html, body {
   opacity: 0.78; line-height: 1.9;
   text-wrap: balance;
 }
-.panel .keys b { font-weight: 900; opacity: 1; color: var(--accent); }
+.panel .keys b { font-weight: 700; opacity: 1; color: var(--accent); }
 /* Dropped first when the line would otherwise wrap and strand a fragment. */
 @media (max-width: 380px) { .orSwipe { display: none; } }
 .panel .keys kbd {
@@ -414,7 +444,7 @@ html, body {
 .cta {
   margin-top: 22px;
   background: var(--accent); color: #14183a;
-  font-size: 15px; font-weight: 900; letter-spacing: 0.1em;
+  font-size: 15px; font-weight: 700; letter-spacing: 0.1em;
   /* 46px tall, not 43. The old height was one pixel under the 44px target and
    * this is the only tap target on the screen, so a near-miss costs a whole
    * interaction rather than a correction. */
@@ -464,10 +494,10 @@ html, body {
   padding: 6px 10px 7px;
 }
 .mplate .mv {
-  font-size: 19px; font-weight: 900; line-height: 1.05; margin-top: 1px;
+  font-size: 19px; font-weight: 700; line-height: 1.05; margin-top: 1px;
 }
 .mplate .ms {
-  font-size: 8.5px; font-weight: 800; letter-spacing: 0.07em;
+  font-size: 8.5px; font-weight: 500; letter-spacing: 0.07em;
   opacity: 0.58; margin-top: 2px; line-height: 1.35;
 }
 
@@ -508,11 +538,11 @@ html, body {
 .endCell { border-left: 4px solid #fffdf5; padding-left: 11px; min-width: 0; }
 .endCell + .endCell { border-left-color: var(--accent); }
 .panel .endBig {
-  font-size: clamp(34px, 9vw, 52px); font-weight: 900;
+  font-size: clamp(34px, 9vw, 52px); font-weight: 700;
   letter-spacing: -0.03em; line-height: 1.0; margin-top: 2px;
 }
 .endSub {
-  font-size: 10px; font-weight: 800; letter-spacing: 0.06em;
+  font-size: 10px; font-weight: 500; letter-spacing: 0.06em;
   opacity: 0.55; margin-top: 4px;
 }
 .endSub.ahead { opacity: 1; }
@@ -527,25 +557,25 @@ html, body {
 }
 #verdict {
   display: inline-block;
-  font-size: 13px; font-weight: 900; letter-spacing: 0.12em;
+  font-size: 13px; font-weight: 700; letter-spacing: 0.12em;
   padding: 6px 13px;
 }
 #verdict.t0 { background: var(--ahead); color: #06301c; }
 #verdict.t1, #verdict.t2, #verdict.t3 { background: var(--accent); color: #14183a; }
 #verdict.t4 { background: rgba(255, 253, 245, 0.92); color: #14183a; }
 #tierNext {
-  font-size: 11px; font-weight: 800; letter-spacing: 0.09em; opacity: 0.72;
+  font-size: 11px; font-weight: 500; letter-spacing: 0.09em; opacity: 0.72;
 }
 
 #endBadges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 #endBadges:empty { display: none; }
 .ebadge {
-  font-size: 9px; font-weight: 900; letter-spacing: 0.12em;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.12em;
   padding: 3px 7px; color: var(--accent);
   border: 1px solid rgba(255, 228, 94, 0.55);
 }
 #endMem {
-  font-size: 10.5px; font-weight: 800; letter-spacing: 0.05em;
+  font-size: 10.5px; font-weight: 500; letter-spacing: 0.05em;
   opacity: 0.62; margin-top: 9px;
 }
 #endMem:empty { display: none; }
@@ -576,7 +606,7 @@ html, body {
 #splitTable  { grid-template-columns: auto auto auto; column-gap: clamp(10px, 4vw, 16px); }
 
 #endCols .k {
-  font-size: 9px; font-weight: 800; letter-spacing: 0.16em;
+  font-size: 9px; font-weight: 500; letter-spacing: 0.16em;
   text-transform: uppercase; opacity: 0.6;
 }
 /* The header row sits on the bottom of its own row, which buys the table a
@@ -585,12 +615,12 @@ html, body {
   align-self: end; padding-bottom: 3px;
   letter-spacing: 0.18em; opacity: 0.4;
 }
-#endCols .v { font-size: 13px; font-weight: 900; }
+#endCols .v { font-size: 13px; font-weight: 700; }
 
 #resultStats .k, #resultStats .v { text-align: left; }
 #splitTable .k, #splitTable .v { text-align: right; }
-#splitTable .v { font-weight: 800; }
-#splitTable .v.fin { font-weight: 900; }
+#splitTable .v { font-weight: 500; }
+#splitTable .v.fin { font-weight: 700; }
 /* A rule spanning the grid, not a border per cell -- per-cell borders break
  * across the column gaps and read as three dashes. */
 #splitTable .sep {
@@ -615,11 +645,11 @@ html, body {
 #endCost .endBig { font-size: clamp(24px, 5.5vw, 32px); }
 #endCost .endSub {
   color: var(--accent); opacity: 0.88;
-  font-weight: 900; letter-spacing: 0.05em;
+  font-weight: 700; letter-spacing: 0.05em;
 }
 
 #endTurn {
-  font-size: 11px; font-weight: 900; letter-spacing: 0.12em;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
   opacity: 0.7; margin-top: 15px;
 }
 #endTurn:empty { display: none; }
@@ -644,7 +674,7 @@ html, body {
 #tomorrow.empty { display: none; }
 #tomorrow .lab { color: var(--accent); opacity: 0.8; }
 #tomorrow .tomRoute {
-  font-size: 13px; font-weight: 900; letter-spacing: 0.07em;
+  font-size: 13px; font-weight: 700; letter-spacing: 0.07em;
   color: var(--accent); line-height: 1.45; margin-top: 3px;
   text-wrap: balance;
 }
@@ -657,7 +687,7 @@ html, body {
 #count {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
-  font-size: 96px; font-weight: 900;
+  font-size: 96px; font-weight: 700;
   text-shadow: 0 4px 0 rgba(14, 18, 48, 0.55);
 }
 #count.hidden { display: none; }

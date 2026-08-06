@@ -55,7 +55,11 @@ const three = read('vendor/three.min.js');
 const shell = read(process.argv.includes('--artifact')
   ? 'tools/shell-artifact.html'
   : 'tools/shell.html');
-const css = read('src/ui/style.css');
+// The embedded typeface goes first: an @font-face has to be declared before
+// the rules that use it, and it is generated rather than hand-edited (see
+// tools/mkfont.js), so it lives in its own file instead of being pasted into
+// the stylesheet a human reads.
+const css = read('src/ui/font.css') + read('src/ui/style.css');
 
 let game = '';
 for (const m of MODULES) game += banner(m) + read(m);

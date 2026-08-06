@@ -31,20 +31,22 @@
  *      may differ on the SAME axis. Measured in world units on the rig's own
  *      bounding box, against the run, on a 390x844 phone in portrait:
  *
- *        run    half-width 0.42  (1.00x)   crown 1.57  (1.00x)
- *        jump   half-width 0.92  (2.2x)    -- a horizontal bar, airborne
- *        slide  half-width 0.59  (1.4x)    crown 1.32  (0.84x)
+ *        run    half-width 0.40  (1.00x)   crown 1.56  (1.00x)
+ *        jump   half-width 0.92  (2.3x)    -- a horizontal bar, airborne
+ *        slide  half-width 0.59  (1.5x)    crown 0.71  (0.46x)
  *
  *      Width alone separates the jump from both others -- it is still half as
  *      wide again as the slide -- and height alone separates the slide from
  *      the run. Neither test can return the wrong answer for the other state.
  *      The slide is wider than the 1.26x it used to be and that is bought
  *      deliberately: see SLIDE_YAW, which spends width to get an axis the back
- *      view can actually measure. It is paid for out of leg splay, and the
- *      crown came DOWN in the same change (0.90x -> 0.84x), so the height test
- *      that actually carries this state got stronger rather than weaker. The
- *      crown matters twice over: collision.js sets the DUCK bar at 1.41, and
- *      1.32 is 0.09 of real daylight where the previous pose left 0.03.
+ *      view can actually measure. It is paid for out of leg splay.
+ *
+ *      The crown is the number that moved most, 1.32 -> 0.71, and it is the
+ *      whole of the head fix: the slide's top is now the trunk and the leading
+ *      shoe, level with each other, with the tucked head 0.02 under them
+ *      instead of 0.6 over. See NECK_SLIDE_X. collision.js sets the DUCK bar at
+ *      1.41, so where the old pose left 0.09 of daylight this leaves 0.70.
  *
  *      An arm tuck is not readable at all, because it points straight down
  *      the camera axis where there is nothing to see -- which is what the old
@@ -55,13 +57,21 @@
  *      through what the character does to the WORLD -- see the skid block
  *      below. Marks left on the road travel toward the lens, which is the one
  *      direction perspective is generous in.
+ *   6. The moments a player has to TIME are the two ends of the jump, and a
+ *      pose cannot mark an instant -- it can only hold one. So both ends fire
+ *      VFX (see STREAK_N) and the ground under an airborne runner carries a
+ *      hard-edged ellipse for the whole arc, which is a landing reticle in a
+ *      shadow's clothing. The soft contact blob is right for a body ON the
+ *      road and exactly wrong for one above it.
  *
  * Pivot layout (all rotations are local X unless noted):
  *   root -> body -> hips -> thigh -> shin -> foot
  *                -> spine -> chest -> neck -> head
  *                                  -> shoulder -> upperArm -> forearm+hand
- *        -> shadowPivot -> contact shadow   (cancels the jump and the bank)
- *        -> fxPivot     -> skid ribbon, dust   (cancels root ENTIRELY, so its
+ *        -> shadowPivot -> contact shadow, landing reticle
+ *                                              (cancels the jump and the bank)
+ *        -> fxPivot     -> skid ribbon, dust, speed streaks
+ *                                              (cancels root ENTIRELY, so its
  *                                               children hold world coords)
  */
 MR.Runner = (function () {
@@ -126,6 +136,16 @@ MR.Runner = (function () {
   // silhouette rule this must not break.
   const SLIDE_YAW = 0.42;
 
+  // How far the trunk lies back in a slide, in radians off vertical. Named
+  // because three separate things are measured against it -- the neck's tuck,
+  // the arms' trail angle, and how much of the body's length ends up on the
+  // lateral axis SLIDE_YAW just bought. Deepened from 1.12: at 1.12 the
+  // shoulders sat HIGHER than the hips and the trunk read as a sit-up rather
+  // than as a body on its back. 1.34 puts the back down on the road, which is
+  // what the reference shows and, once the trail foot stopped digging (see the
+  // hip term), what the road clamp is finally free to allow.
+  const SLIDE_RECLINE = 1.34;
+
   // ---- the slide's head --------------------------------------------------
   // The other half of the same problem, and the half three passes got exactly
   // backwards. The reference frame is unambiguous: Temple Run's slider is flat
@@ -140,24 +160,42 @@ MR.Runner = (function () {
   // height, on a pose whose whole job is to be low. That is a crouch, and it is
   // why extending the legs never worked; the top of the shape was a head.
   //
-  // Three terms put it away, and it takes all three. Pitch alone leaves the
-  // skull sitting on the shoulder line, and sink alone leaves it a symmetric
-  // dome centred on the spine:
-  //   X  extension PAST the reclined chest, so the crown swings back and down
-  //      toward the shoulder blades instead of standing off the neck. The
-  //      chest reclines to -1.10, so -0.62 here lays the head at -1.72 from
-  //      vertical -- past flat, crown toward the camera, which is the one
-  //      direction this view foreshortens INTO the body.
-  //   Z  a roll onto the trailing shoulder, which breaks the symmetry and
-  //      turns the headband edge-on.
-  //   sink the neck pivot down the spine until the skull seats between the
-  //      deltoids. Rotation cannot do this part: it moves the crown but leaves
-  //      the jaw proud of the vest.
+  // Five terms, and every one of them was needed -- the pose was rendered and
+  // measured at each step, and each of the first four left a different defect
+  // that only the next one fixed:
+  //   X  extension PAST the reclined chest. -0.50 against a 1.34 recline lays
+  //      the head at -1.84 off vertical: the crown swings back and DOWN toward
+  //      the shoulder blades. It stops short of aiming the crown straight at
+  //      the lens on purpose. Pole-on, the crown cap's fourteen triangles all
+  //      converge on the pixel facing the camera and the toon ramp bands each
+  //      one differently -- the head rendered as a dark porthole with a gear in
+  //      it. Forty degrees off the pole is enough for the hair to shade as a
+  //      surface again.
+  //   Z  a turn across the lane. With the trunk reclined, the chest's local Z
+  //      is very nearly world UP, so this term is a yaw of the head and not a
+  //      roll -- it takes the face off the camera axis, which matters because
+  //      a laid-back head points its face up and back into the lens.
+  //   sink the neck pivot down the spine, seating the skull between the
+  //      deltoids rather than standing it off them.
+  //   retract the head mesh down its OWN axis. The sink moves the head along
+  //      the spine, and in a slide the spine points at the camera, so the sink
+  //      alone mostly moves the head sideways in depth instead of closer in.
+  //   squash. This is the one that cannot be argued away: the skull is 0.57
+  //      across on a 0.52 trunk, so no rotation and no translation can put it
+  //      inside the body -- the geometry does not fit. At 0.58 it does, and
+  //      what is left above the vest is a dark cap of hair the size of a
+  //      shoulder with the headband reduced to a sliver at its edge. Hiding the
+  //      mesh outright was the alternative and it would pop; a scale runs
+  //      continuously and reads as a head pulled into the shoulders, which is
+  //      what the pose is. Rendered against a head-hidden control frame, the
+  //      two silhouettes now differ by about a shoulder's worth of dark.
   // Every one of them is scaled by `slid`, so recovery runs the whole tuck
   // backwards in step with the body coming up and never pops.
-  const NECK_SLIDE_X = -0.62;
-  const NECK_SLIDE_Z = 0.34;
-  const NECK_SLIDE_SINK = 0.13;
+  const NECK_SLIDE_X = -0.50;
+  const NECK_SLIDE_Z = -0.14;
+  const NECK_SLIDE_SINK = 0.15;
+  const NECK_SLIDE_RETRACT = 0.20;
+  const NECK_SLIDE_SQUASH = 0.42;
 
   const OUTLINE = MR.shading.INK.character;
 
@@ -446,6 +484,96 @@ MR.Runner = (function () {
     return skidTex;
   }
 
+  // ---- jump and landing ---------------------------------------------------
+  //
+  // Subway Surfers spends as much on the VFX of a jump as on the pose, and the
+  // frame strip says why: the pose is a wide bar for four frames and then it is
+  // gone, while the streaks fire on the exact frame the feet leave the ground
+  // and again on the frame they land. They are what make the two ENDS of the
+  // arc legible, and the ends are the only parts a player has to time.
+  //
+  // Radial darts in the camera plane rather than trails in world space: from
+  // directly behind, a trail drawn along the direction of travel points into
+  // the lens and has no length on screen at all -- the same geometry fact that
+  // defeated three passes at the slide. Anything drawn in the plane of the
+  // screen keeps every unit of itself.
+  const STREAK_N = 14;
+  // Warm orange against a purple road, and it stays warm across all six biomes
+  // because the roads only ever move between blue-violet and slate. Additive,
+  // so it lifts whatever it crosses rather than stamping a colour on it.
+  const STREAK_COLOR = 0xff9a2e;
+  const STREAK_LIFE = 0.30;
+
+  // A tapered dart: soft along its length, feathered across its width, tip
+  // fading to nothing. Drawn once into a texture rather than built out of
+  // per-vertex alpha because the taper has to survive a quad only a few pixels
+  // wide on a phone, and vertex alpha across four corners cannot do that.
+  let streakTex = null;
+  function streakTexture() {
+    if (streakTex) return streakTex;
+    const W = 64, H = 32;
+    const cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    const g = cv.getContext('2d');
+    const img = g.createImageData(W, H);
+    for (let y = 0; y < H; y++) {
+      const v = y / (H - 1);
+      const across = Math.pow(Math.sin(Math.PI * v), 0.7);
+      for (let x = 0; x < W; x++) {
+        // u = 0 at the root of the dart, 1 at the tip.
+        const u = x / (W - 1);
+        // Hot for the first fifth, then a long fade. A dart that is uniform
+        // along its length reads as a stick; the fade is what makes it read as
+        // something moving away from the character.
+        const along = u < 0.18 ? 0.55 + u / 0.18 * 0.45 : Math.pow(1 - (u - 0.18) / 0.82, 1.5);
+        const a = Math.max(0, Math.min(1, across * along));
+        const i = (y * W + x) * 4;
+        img.data[i] = img.data[i + 1] = img.data[i + 2] = 255;
+        img.data[i + 3] = Math.round(a * 255);
+      }
+    }
+    g.putImageData(img, 0, 0);
+    streakTex = new THREE.CanvasTexture(cv);
+    streakTex.minFilter = streakTex.magFilter = THREE.LinearFilter;
+    streakTex.generateMipmaps = false;
+    return streakTex;
+  }
+
+  // The landing reticle's alpha: solid to the rim, then two pixels of feather.
+  // This is the OPPOSITE of blobTexture() on purpose. A soft blob says "there
+  // is a body somewhere above here"; a hard ellipse says "the feet come down
+  // HERE", and that is the whole reason the reference draws one.
+  let discTex = null;
+  function discTexture() {
+    if (discTex) return discTex;
+    const N = 64;
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = N;
+    const g = cv.getContext('2d');
+    const img = g.createImageData(N, N);
+    for (let y = 0; y < N; y++) {
+      for (let x = 0; x < N; x++) {
+        const dx = (x + 0.5) / N * 2 - 1, dy = (y + 0.5) / N * 2 - 1;
+        const r = Math.sqrt(dx * dx + dy * dy);
+        // Rim slightly stronger than the core, which is what a real contact
+        // shadow does under a body with limbs out and, more usefully, what
+        // makes the ellipse read as a drawn target rather than as a stain.
+        let a = 0;
+        if (r < 0.80) a = 0.86;
+        else if (r < 0.94) a = 1.0;
+        else if (r < 1.00) a = 1.0 - (r - 0.94) / 0.06;
+        const i = (y * N + x) * 4;
+        img.data[i] = img.data[i + 1] = img.data[i + 2] = 255;
+        img.data[i + 3] = Math.round(a * 255);
+      }
+    }
+    g.putImageData(img, 0, 0);
+    discTex = new THREE.CanvasTexture(cv);
+    discTex.minFilter = discTex.magFilter = THREE.LinearFilter;
+    discTex.generateMipmaps = false;
+    return discTex;
+  }
+
   // Sonic's shadow is the strongest of the three references and it is the one
   // to copy: at half strength over this road the blob was there in a still and
   // gone in motion, which buys nothing.
@@ -541,8 +669,14 @@ MR.Runner = (function () {
       // Long enough to start inside the vest so no gap opens on a head tilt.
       { g: new THREE.CylinderGeometry(0.104, 0.122, 0.32, 10), c: P.runnerSkin, y: HY - 0.300 },
       { g: new THREE.SphereGeometry(0.266, 16, 12), c: P.runnerSkin, y: HY, sy: 1.06, sz: 0.97 },
-      // Crown cap for the top of the skull...
-      { g: new THREE.SphereGeometry(0.280, 14, 6, 0, Math.PI * 2, 0, Math.PI * 0.42), c: P.runnerHair, y: HY },
+      // Crown cap for the top of the skull. 0.288, not the 0.280 it was: the
+      // skull under it is r=0.266 scaled 1.06 in Y, so its pole reached 0.282
+      // and punched a coin-sized disc of SCALP through the middle of the hair.
+      // It was there in every frame ever shot of this character and only became
+      // obvious once the slide started presenting the crown to the camera --
+      // the tucked head rendered as a dark cap with a tan rivet in it. Still
+      // inside the headband's 0.294, which is the other clearance that matters.
+      { g: new THREE.SphereGeometry(0.288, 14, 6, 0, Math.PI * 2, 0, Math.PI * 0.42), c: P.runnerHair, y: HY },
       // ...and a rear-only shell that carries the hair down to the nape but
       // leaves the face clear. Restricting phi to the back 210 degrees is
       // what lets one primitive do a haircut.
@@ -667,6 +801,47 @@ MR.Runner = (function () {
     // onBeforeRender before it reads matrixWorld, so re-seating the quad from
     // here lands on the same frame the runner leaves the ground.
     const LIFT = K.JUMP_HEIGHT;
+
+    // ---- the landing reticle ---------------------------------------------
+    //
+    // The soft blob above is right for a body ON the road and exactly wrong for
+    // one in the air. It shrinks and fades with height, which sells the lift --
+    // and throws away the one piece of information the player needs most at
+    // that moment, which is WHERE THEY WILL LAND. Subway Surfers keeps a hard
+    // elliptical shadow on the surface for the whole arc for that reason: it is
+    // a reticle wearing a shadow's clothes.
+    //
+    // So the two swap over. The blob fades out as the runner rises, the hard
+    // ellipse fades in on the same curve, and the total amount of dark under
+    // the character stays about constant while its EDGE goes from nothing to
+    // definite. The ellipse does not shrink -- a target that shrinks is a
+    // target that lies about where the feet arrive.
+    const RETICLE_ALPHA = 0.50;
+    const reticle = new THREE.Mesh(
+      new THREE.PlaneGeometry(SHADOW_R * 2, SHADOW_R * 2).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({
+        color: SCUFF_COLOR,
+        map: discTexture(),
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        fog: true,
+      })
+    );
+    reticle.position.y = 0.016;   // a hair over the blob, which sits at 0.015
+    reticle.renderOrder = 2;
+    reticle.visible = false;
+    shadowPivot.add(reticle);
+
+    // Both hooks below seat the pivot, because either mesh may be drawn first
+    // and the reticle must not be a frame behind the runner it belongs to.
+    function seatShadow(h) {
+      shadowPivot.position.y = -h;
+      shadowPivot.rotation.z = -root.rotation.z;
+      shadowPivot.updateMatrixWorld(true);
+    }
+
     shadow.onBeforeRender = function () {
       const h = Math.max(0, root.position.y);
       const t = Math.min(1, h / LIFT);
@@ -677,11 +852,19 @@ MR.Runner = (function () {
       const k = 1 - t * 0.62;
       // Only the lift is cancelled here -- the quad carries its own clearance
       // above the road paint, and adding that in twice floated it.
-      shadowPivot.position.y = -h;
-      shadowPivot.rotation.z = -root.rotation.z;
+      seatShadow(h);
       shadow.scale.set(shadowW * k, 1, shadowD * k);
       shadowMat.opacity = BASE_ALPHA * shadowA * (1 - t * 0.80);
-      shadowPivot.updateMatrixWorld(true);
+    };
+
+    reticle.onBeforeRender = function () {
+      const h = Math.max(0, root.position.y);
+      // Ramp over the first fifth of the lift so a stumble or a kerb hop, which
+      // barely leaves the ground, never flashes a target on the road.
+      const t = Math.min(1, h / (LIFT * 0.20));
+      seatShadow(h);
+      reticle.scale.set(1.16, 1, 0.86);
+      reticle.material.opacity = RETICLE_ALPHA * t * t * (3 - 2 * t);
     };
 
     // ---- skid ribbon and dust --------------------------------------------
@@ -776,6 +959,49 @@ MR.Runner = (function () {
     dust.renderOrder = 4;
     fxPivot.add(dust);
 
+    // Speed streaks. One indexed mesh of STREAK_N tapered quads, rebuilt in the
+    // camera's own plane every frame it is alive and hidden the rest of the
+    // time, so a jump costs one draw for a third of a second and a run costs
+    // nothing. It lives under fxPivot with the dust because both are written in
+    // WORLD coordinates -- the burst is anchored to where the runner is, not to
+    // how the rig happens to be banked or yawed at the time.
+    const streakGeo = new THREE.BufferGeometry();
+    const streakPos = new Float32Array(STREAK_N * 4 * 3);
+    const streakCol = new Float32Array(STREAK_N * 4 * 4);
+    const streakUv = new Float32Array(STREAK_N * 4 * 2);
+    const streakIdx = new Uint16Array(STREAK_N * 6);
+    for (let i = 0; i < STREAK_N; i++) {
+      const v = i * 8, o = i * 6, a = i * 4;
+      // u runs along the dart, from root to tip.
+      streakUv[v] = 0; streakUv[v + 1] = 0;
+      streakUv[v + 2] = 0; streakUv[v + 3] = 1;
+      streakUv[v + 4] = 1; streakUv[v + 5] = 0;
+      streakUv[v + 6] = 1; streakUv[v + 7] = 1;
+      streakIdx[o] = a; streakIdx[o + 1] = a + 1; streakIdx[o + 2] = a + 2;
+      streakIdx[o + 3] = a + 1; streakIdx[o + 4] = a + 3; streakIdx[o + 5] = a + 2;
+    }
+    streakGeo.setAttribute('position', new THREE.BufferAttribute(streakPos, 3));
+    streakGeo.setAttribute('uv', new THREE.BufferAttribute(streakUv, 2));
+    streakGeo.setAttribute('color', new THREE.BufferAttribute(streakCol, 4));
+    streakGeo.setIndex(new THREE.BufferAttribute(streakIdx, 1));
+    const streakMat = new THREE.MeshBasicMaterial({
+      color: STREAK_COLOR,
+      map: streakTexture(),
+      transparent: true,
+      vertexColors: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      // No fog. These live within a metre of the lens for their whole life, and
+      // fogging them just desaturates the one thing in frame that is meant to
+      // shout.
+      fog: false,
+    });
+    const streaks = new THREE.Mesh(streakGeo, streakMat);
+    streaks.frustumCulled = false;
+    streaks.renderOrder = 5;      // over the dust, which a burst throws with it
+    streaks.visible = false;
+    fxPivot.add(streaks);
+
     // Deterministic noise. Math.random here would make two screenshots of the
     // same frame differ, and the review loop is screenshots.
     let fxSeed = 1;
@@ -785,6 +1011,19 @@ MR.Runner = (function () {
     }
 
     let fxDt = 0, fxSlid = 0, fxLive = 0, fxEmit = 0, fxBurst = 0;
+    // Jump/landing burst. `bAge < bTtl` is the whole liveness test; `bKick`
+    // carries the dust the same burst throws, deferred to the fx hook because
+    // that is the only place the runner's position for THIS frame is known.
+    let bAge = 1, bTtl = 0, bY = 0, bPow = 1, bKick = 0, bLive = 0, wasFlying = false;
+    // Fixed jitter, so two screenshots of the same burst are the same picture.
+    const bJit = new Float32Array(STREAK_N);
+    const bLen = new Float32Array(STREAK_N);
+    for (let i = 0; i < STREAK_N; i++) {
+      bJit[i] = ((i * 7) % STREAK_N) / STREAK_N * 0.22 - 0.11;
+      // Alternating long and short. A ring of identical darts reads as a gear;
+      // uneven ones read as spray.
+      bLen[i] = i % 3 === 0 ? 1.34 : (i % 3 === 1 ? 0.78 : 1.05);
+    }
     // `skidSeeded` is its own flag rather than a test on skidN, and that is not
     // tidiness: seeding on `skidN === 0` re-anchored the history to the current
     // position on every frame, the step test then measured zero distance every
@@ -834,6 +1073,23 @@ MR.Runner = (function () {
       dVz[i] = rnd() < 0.35 ? 23.0 + rnd() * 4.0 : 15.0 + rnd() * 7.0;
       dAge[i] = 0;
       dTtl[i] = 0.40 + rnd() * 0.26;
+    }
+
+    // A foot kick rather than a plough: symmetric about the runner, thrown low
+    // and wide, and short-lived. The slide's spawn() is deliberately one-sided
+    // (see above) and reusing it for a jump put the whole cloud off one hip,
+    // which reads as a stumble. Same buffers, same single draw call.
+    function kick(cx, cz, power) {
+      const i = dCur; dCur = (dCur + 1) % DUST_N;
+      const side = rnd() < 0.5 ? -1 : 1;
+      dPx[i] = cx + side * (0.10 + rnd() * 0.30);
+      dPy[i] = 0.05 + rnd() * 0.05;
+      dPz[i] = cz - rnd() * 0.16;
+      dVx[i] = side * (1.5 + rnd() * 1.9);
+      dVy[i] = (0.8 + rnd() * 1.5) * power;
+      dVz[i] = 16.0 + rnd() * 9.0;
+      dAge[i] = 0;
+      dTtl[i] = 0.26 + rnd() * 0.20;
     }
 
     // The whole effect is simulated here rather than in update(), because
@@ -900,6 +1156,7 @@ MR.Runner = (function () {
 
       // ---- dust ----------------------------------------------------------
       if (fxBurst > 0) { for (let i = 0; i < fxBurst; i++) spawn(cx, cz, 1.55); fxBurst = 0; }
+      if (bKick > 0) { for (let i = 0; i < bKick; i++) kick(cx, root.position.z, bPow); bKick = 0; }
       // Clusters, not a smooth stream. A steady emitter at the same total
       // rate produced a thin even haze that read as nothing, while the twelve
       // puffs of the entry burst -- the same particles, all at once -- read
@@ -957,6 +1214,45 @@ MR.Runner = (function () {
       }
       dustGeo.attributes.position.needsUpdate = true;
       dustGeo.attributes.color.needsUpdate = true;
+
+      // ---- speed streaks -------------------------------------------------
+      // Written straight into the camera's plane: `ax/ay/az` is the direction
+      // of the dart on screen and `px/py/pz` is across it, both built from the
+      // lens basis read above, so a dart is the same shape whatever the camera
+      // is doing and none of its length is lost down the view axis.
+      if (bAge < bTtl) {
+        bAge += dt;
+        const u = Math.min(1, bAge / bTtl);
+        // Fast attack, long tail: the burst must be at full strength on the
+        // frame it fires, because on a 0.70s arc there are only a handful of
+        // frames in which it can say anything at all.
+        const alpha = (u < 0.10 ? u / 0.10 : Math.pow(1 - (u - 0.10) / 0.90, 1.6)) * bPow;
+        const cy = root.position.y + bY;
+        const ring = 0.44 + 0.50 * Math.pow(u, 0.55);
+        for (let i = 0; i < STREAK_N; i++) {
+          const ang = (i / STREAK_N) * Math.PI * 2 + bJit[i];
+          const ca = Math.cos(ang), sa = Math.sin(ang);
+          const ax = rx * ca + ux * sa, ay = ry * ca + uy * sa, az = rz * ca + uz * sa;
+          const nx = -rx * sa + ux * ca, ny = -ry * sa + uy * ca, nz = -rz * sa + uz * ca;
+          const r0 = ring;
+          const r1 = ring + 0.34 * bLen[i] * (1 - u * 0.45);
+          const w0 = 0.052 * (1 - u * 0.30), w1 = w0 * 0.34;
+          const o = i * 12, c = i * 16;
+          streakPos[o] = cx + ax * r0 + nx * w0; streakPos[o + 1] = cy + ay * r0 + ny * w0; streakPos[o + 2] = root.position.z + az * r0 + nz * w0;
+          streakPos[o + 3] = cx + ax * r0 - nx * w0; streakPos[o + 4] = cy + ay * r0 - ny * w0; streakPos[o + 5] = root.position.z + az * r0 - nz * w0;
+          streakPos[o + 6] = cx + ax * r1 + nx * w1; streakPos[o + 7] = cy + ay * r1 + ny * w1; streakPos[o + 8] = root.position.z + az * r1 + nz * w1;
+          streakPos[o + 9] = cx + ax * r1 - nx * w1; streakPos[o + 10] = cy + ay * r1 - ny * w1; streakPos[o + 11] = root.position.z + az * r1 - nz * w1;
+          for (let k = 0; k < 4; k++) {
+            streakCol[c + k * 4] = 1; streakCol[c + k * 4 + 1] = 1; streakCol[c + k * 4 + 2] = 1;
+            streakCol[c + k * 4 + 3] = alpha;
+          }
+        }
+        streakGeo.attributes.position.needsUpdate = true;
+        streakGeo.attributes.color.needsUpdate = true;
+        streaks.visible = true;
+      } else if (streaks.visible) {
+        streaks.visible = false;
+      }
     };
 
     // ---------------------------------------------------------------------
@@ -1065,8 +1361,17 @@ MR.Runner = (function () {
         // obstacle first. Past 1.5rad the thigh is a hair above horizontal,
         // which is what keeps the heels skimming the road instead of buried
         // in it once the body has dropped.
+        //
+        // The trail leg's 1.42 became 1.66 for a reason that only showed up
+        // once the rig was measured part by part: with the thigh at 1.42 the
+        // folded shin pointed 40 degrees into the road, the trail SHOE was the
+        // deepest thing on the character at -0.29, and the road clamp below was
+        // lifting the entire body by 0.29 to get it out again. Two thirds of
+        // the duck's 0.42 drop was being spent on one buried foot. At 1.66 the
+        // thigh carries the knee a little above the hip, the shin folds behind
+        // it instead of through the floor, and the drop reaches the road.
         L.hip.rotation.x = -s * swing * 0.86 * cyc + tuck * 0.70
-          - slid * (lead ? 1.80 : 1.42);
+          - slid * (lead ? 1.80 : 1.66);
         // Knee only bends one way; bias so it flexes hardest on recovery.
         const bend = Math.max(0, -c * 0.5 + 0.5);
         L.knee.rotation.x = 0.18 + bend * (1.22 + 0.26 * sp01) * cyc + tuck * 1.25
@@ -1130,23 +1435,32 @@ MR.Runner = (function () {
         const fwd = Math.max(0, -s);
         const back = Math.max(0, s);
 
-        // 2.78 is measured against the RECLINED chest, not the world, and the
-        // size of it is the fix for the most expensive defect this pose had.
-        // The spine reclines to -1.10, so an arm needs 1.10 + 1.57 simply to
-        // reach world-horizontal. At the old 1.46 it hung 1.2rad short of that
+        // This angle is measured against the RECLINED chest, not the world, and
+        // the size of it is the fix for the most expensive defect this pose
+        // had. An arm needs SLIDE_RECLINE + 1.57 simply to reach world-
+        // horizontal. At the old 1.46 it hung more than a radian short of that
         // and drove the gloves through the tarmac -- and the road clamp below
         // then dutifully lifted the WHOLE BODY back out again to fix it.
-        // Measured on the previous build: clamp lift 0.364 against a duck drop
-        // of 0.42. The arms were silently cancelling 87% of the drop, so the
+        // Measured two builds ago: clamp lift 0.364 against a duck drop of
+        // 0.42. The arms were silently cancelling 87% of the drop, so the
         // committed "slide" sat at very nearly running height and cleared the
         // 1.41 DUCK bar by 0.03.
         //
-        // At 2.78 the arm trails a hair above world-horizontal and stops being
-        // the limiting part; the lift falls to 0.25 (now set by the legs, not
-        // the arms) and the crown to 1.32, which is 0.09 of real daylight. It
-        // is also the right pose: a slider's arms go out behind them, not down
+        // Trailing a hair above world-horizontal, the arm stops being the
+        // limiting part; the lift is now set by the trail shin and the tucked
+        // head, both of which ride ON the road rather than through it. It is
+        // also the right pose: a slider's arms go out behind them, not down
         // through the surface they are sliding on.
-        A.shoulder.rotation.x = s * swing * 0.95 * cycD - spread * 0.26 + slid * 2.78;
+        //
+        // Written against SLIDE_RECLINE rather than as a bare 2.78, because
+        // that is what it actually means: 1.68 is the angle the arm makes with
+        // the WORLD, a hair past horizontal, and the recline is the part of it
+        // the chest has already spent. Deepening the recline used to swing the
+        // gloves up behind the shoulders by exactly as much as the trunk went
+        // down, which is how the pose lost its trailing brace the first time
+        // the torso was flattened.
+        A.shoulder.rotation.x = s * swing * 0.95 * cycD - spread * 0.26
+          + slid * (SLIDE_RECLINE + 1.68);
         // Abduction. The running band is deliberately tighter than it used to
         // be: the mitts got big enough to break the outline on their own, so
         // the elbows no longer have to be held out to do it -- and every
@@ -1195,7 +1509,7 @@ MR.Runner = (function () {
       // "diving into it".
       const leanFwd = (0.26 + 0.12 * sp01 + stumble * 0.5) * (1 - slid * 0.94)
         - spread * 0.30
-        - slid * 1.12;
+        - slid * SLIDE_RECLINE;
       spine.rotation.x = leanFwd + trip * 0.46;
       // Slide the whole torso BACK along the direction of travel, not just
       // recline it.
@@ -1262,6 +1576,16 @@ MR.Runner = (function () {
       // head on a neck. Nothing else hangs off this pivot, so it costs the
       // pose nothing anywhere else.
       neck.position.y = (NECK_Y - CHEST_Y) - slid * NECK_SLIDE_SINK;
+      // ...and retract the skull down its OWN axis on top of that. Sinking the
+      // neck pivot moves the head along the spine, which in a slide points at
+      // the camera, so on its own it buys far less than it looks like it
+      // should. Pulling the head mesh back toward its pivot is the term that
+      // actually shortens the distance between the crown and the shoulders,
+      // and it is why the head ends up capping the trunk instead of standing
+      // off the end of it. Nothing else is parented here, so no other joint
+      // moves with it.
+      head.position.y = -slid * NECK_SLIDE_RETRACT;
+      head.scale.setScalar(1 - slid * NECK_SLIDE_SQUASH);
 
       // Whole-body bank into a lane change reads as weight, not a slide.
       // The slide adds its own, tipping onto the hip it is riding on: a body
@@ -1281,13 +1605,16 @@ MR.Runner = (function () {
       // and a smoothstep here would make collision.js's arithmetic wrong at
       // every value between the ends.
       //
-      // 0.42 is now the smaller half of the truth, though, and worth knowing:
-      // the recline tips the crown down again on top of the drop, so at the
-      // DUCK_CLEAR threshold the head measures 1.15 where audit() computes
-      // 1.60 - 0.42*0.90 = 1.22 against a bar at 1.41. The error is 0.07 in
-      // the only direction it is allowed to point -- the real head is LOWER
-      // than collision.js believes, never higher -- so the audit stays honest
-      // while understating the daylight it is buying.
+      // 0.42 is now much the smaller half of the truth, and the gap is worth
+      // writing down because it is a contract with another module. The recline,
+      // the neck tuck and the road clamp all press the crown further down on
+      // top of this drop, so at the DUCK_CLEAR threshold of 0.90 the head
+      // measures 0.73 where audit() computes 1.60 - 0.42*0.90 = 1.22 against a
+      // bar at 1.41. The 0.49 of error points the only way it is allowed to --
+      // the real head is LOWER than collision.js believes, never higher -- so
+      // the audit stays honest and simply understates the daylight it buys.
+      // Net of the clamp the body itself drops 0.26 of the 0.42 (it was 0.13
+      // before this pass, when a buried trail foot was eating the rest).
       body.position.y -= duck * 0.42;
 
       // Road clamp. The slide recline plus the braced arms put the lowest
@@ -1301,6 +1628,15 @@ MR.Runner = (function () {
       // and it only runs while sliding. `body` is lifted rather than `root` so
       // the contact shadow, which hangs off its own pivot under root, stays on
       // the road where it belongs.
+      //
+      // It is also a diagnostic, and reading it is what found the last bug in
+      // this pose. The lift tells you which single part is deepest, and for
+      // three passes that part was the TRAIL SHOE, 0.29 under the road, so the
+      // clamp was spending two thirds of the duck's drop hauling one foot out
+      // of the tarmac. Fix the foot (see the hip term) and the same 0.42 of
+      // drop buys 0.26 of real descent instead of 0.13 -- no constant changed,
+      // the body simply stopped fighting itself. The lift now settles on the
+      // trail shin and the tucked head, which is a body resting on the road.
       if (duck > 0.01) {
         root.updateMatrixWorld(true);
         _clampBox.setFromObject(body);
@@ -1343,9 +1679,42 @@ MR.Runner = (function () {
       } else {
         fxLive = Math.max(0, fxLive - dt * 1.7);
       }
-      fxPivot.visible = fxLive > 0.01;
+
+      // ---- jump and landing --------------------------------------------
+      // Edge-detected here rather than in the fx hook because `air` is exact
+      // on both ends: main.js passes sin(airT*PI), which is strictly positive
+      // for the whole arc and exactly zero the instant the player state says
+      // the feet are down. Height would not do -- root.position.y is a frame
+      // behind at takeoff, which is the one frame that has to be right.
+      const flying = air > 0;
+      if (flying !== wasFlying) {
+        wasFlying = flying;
+        bAge = 0;
+        if (flying) {
+          // Take-off. Fired from mid-torso and slightly weaker than the
+          // landing: the character is on its way up and the streaks read as
+          // the push, not the impact.
+          bTtl = STREAK_LIFE; bY = 0.86; bPow = 0.95; bKick = 7;
+        } else {
+          bTtl = STREAK_LIFE * 1.12; bY = 0.30; bPow = 1.15; bKick = 11;
+        }
+        // The burst throws dust, and dust only simulates while the pivot is
+        // live, so give it a life of its own independent of the slide's.
+        bLive = 1;
+      }
+      // The dust from a burst outlives the streaks; hold the pivot open for
+      // the longest puff TTL rather than for the burst.
+      bLive = Math.max(0, bLive - dt * 1.4);
+
+      // Only lit while there is height to report. A kerb hop never flashes it,
+      // and a run never pays for it.
+      reticle.visible = flying;
+
+      fxPivot.visible = fxLive > 0.01 || bLive > 0.01;
       skidMat.opacity = 0.72 * fxLive;
-      dustMat.opacity = fxLive;
+      // The slide fades its dust out with the slide; a burst's dust has to
+      // stay at full strength for its own short life or it never reads.
+      dustMat.opacity = Math.max(fxLive, bLive);
     };
 
     api.update(0, {});

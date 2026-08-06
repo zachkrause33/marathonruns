@@ -130,7 +130,7 @@ MR.World = (function () {
     'CITY START': {
       sky: [0x2b3fa8, 0x9fdcff], ground: 0x63c96b, road: 0x9aa0d8, fog: 0x9fdcff,
       edge: 'barrier',
-      mix: { building: 2.6, tree: 1.1, grove: 0.3, crowd: 2.3 },
+      mix: { building: 2.6, tree: 1.1, grove: 0.3, crowd: 2.3, walkers: 1.1 },
     },
     // `bank` cuts the shoulder back on one side so the water can come right up
     // to the road; at full shoulder width the river sat 35 units out and read
@@ -138,7 +138,7 @@ MR.World = (function () {
     'RIVERSIDE': {
       sky: [0x1f6fb8, 0xbdf0ff], ground: 0x57c7a8, road: 0x8fb4dc, fog: 0xbdf0ff,
       edge: 'hedge', bank: -1,
-      mix: { building: 0.45, tree: 2.0, grove: 2.0, crowd: 1.0 },
+      mix: { building: 0.45, tree: 2.0, grove: 2.0, crowd: 1.0, walkers: 0.8 },
     },
     // Nothing stands beside a bridge deck -- the emptiness is the point, and a
     // spectator out there would be standing on the river. What the leg gets
@@ -151,21 +151,21 @@ MR.World = (function () {
     'PARKLAND': {
       sky: [0x2e8fd0, 0xcdf5c0], ground: 0x6fd46a, road: 0xa8b6e2, fog: 0xcdf5c0,
       edge: 'hedge',
-      mix: { building: 0.12, tree: 2.6, grove: 3.6, crowd: 1.1 },
+      mix: { building: 0.12, tree: 2.6, grove: 3.6, crowd: 1.1, walkers: 0.9 },
     },
     'THE WALL': {
       sky: [0x8a3a6b, 0xffb27a], ground: 0x8f9a5e, road: 0xc79ab0, fog: 0xffb27a,
       edge: 'wall',
-      mix: { building: 2.0, tree: 0.25, crowd: 0.35 },
+      mix: { building: 2.0, tree: 0.25, crowd: 0.35, walkers: 0.3 },
     },
     'FINAL MILE': {
       sky: [0x24306e, 0xffcf6b], ground: 0x5cb46a, road: 0xa9a2e4, fog: 0xffcf6b,
       edge: 'barrier',
-      mix: { building: 1.1, tree: 0.7, crowd: 3.4 },
+      mix: { building: 1.1, tree: 0.7, crowd: 3.4, walkers: 0.7 },
     },
   };
 
-  const PROP_KINDS = ['building', 'tree', 'grove', 'crowd'];
+  const PROP_KINDS = ['building', 'tree', 'grove', 'crowd', 'walkers'];
 
   // Scratch colours: applyBiome runs every frame and must not allocate.
   const _cA = new THREE.Color();
@@ -329,44 +329,21 @@ MR.World = (function () {
   }
 
   /**
-   * The road surface, and the single biggest thing this world was missing.
+   * Tarmac mottle: aggregate, a patched repair and gutter grime.
    *
-   * Subway Surfers' track bed is railway sleepers -- a hard perpendicular
-   * stripe roughly every world unit. At speed that is a strobe streaming under
-   * the player and it is the dominant speed cue in the game. Our road carried
-   * lane dashes every twelve units, an order of magnitude less often, so the
-   * largest surface on screen was flat colour that never changed. The camera
-   * pass reported the same gap from its own side and had already been pushed to
-   * the limit of what framing can do; the remaining headroom was here.
+   * The high-frequency joints that carry the speed cue are NOT here -- they are
+   * geometry, in paintGeo, and the comment there says why a texture could not
+   * do it. What is left is the low-frequency dirt a texture is genuinely good
+   * at: variation too fine to model and too coarse to alias, which stops the
+   * flat colour between the joints reading as coloured paper.
    *
-   * It is a TEXTURE and not geometry, and that is the whole reason it is
-   * affordable. The road is one merged box per tile and roughly half the frame;
-   * baking the detail into its map costs zero extra draws, zero extra fill and
-   * zero extra triangles, and mipmapping does the anti-aliasing for free -- the
-   * joints strobe hard in the near field, where the speed read lives, and
-   * dissolve into an even value at the vanishing point, where a real strobe
-   * would only alias.
-   *
-   * WHY THESE MARKS. A closed city road is concrete carriageway slabs, so the
-   * high frequency is expansion joints: a groove every 1.2 units, with a lit
-   * lip on one side of it. The PAIR is load-bearing. A single dark line mips
-   * down to a uniform grey by 40 units; a light/dark edge keeps an edge at
-   * every mip level, which is exactly the property a speed cue needs.
-   *
-   * WHY NOT CHEVRONS. They were on the list and they are wrong here: a
-   * forward-pointing triangle on the tarmac is the JUMP telegraph's icon, and
-   * the mats are the readability device the whole game rests on. Everything
-   * below is achromatic and low-contrast on purpose -- value variation the eye
-   * reads as motion, with no hue to compete with amber, cyan or pink.
-   *
-   * The period is chosen so the pattern is continuous down the whole course
-   * with no per-tile bookkeeping: eight slabs of 1.2 units is 9.6, the tile is
-   * 24, so repeat is 2.5 -- and half a texture is four slabs, which is itself a
-   * joint. Whichever half of the map a tile seam lands in, it lands on a joint.
+   * Everything below is achromatic on purpose. The telegraph mats own amber,
+   * cyan and pink, and they are the device the whole game's readability rests
+   * on; the road is allowed value variation and no hue at all.
    */
   const ROAD_SLAB = 1.2;
   function roadSurfaceTexture() {
-    const SLABS = 8, PX = 48;
+    const SLABS = 8, PX = 64;
     const c = canvas(128, SLABS * PX);
     const g = c.getContext('2d');
     let s = 7013;
@@ -376,32 +353,27 @@ MR.World = (function () {
 
     for (let i = 0; i < SLABS; i++) {
       const y0 = i * PX;
-      // Slab tone, alternating with a little jitter on top. Without the jitter
-      // eight slabs read as one two-slab pattern repeated, which is a 2.4-unit
-      // beat the eye locks on to instead of a 1.2-unit strobe.
-      const t = (i & 1 ? 0.030 : 0.012) + r() * 0.020;
+      // Slab tone, with a little jitter on top. Without the jitter eight slabs
+      // read as one two-slab pattern repeated, which is a beat the eye locks on
+      // to instead of an even surface.
+      const t = (i & 1 ? 0.032 : 0.012) + r() * 0.020;
       g.fillStyle = 'rgba(24,18,48,' + t.toFixed(3) + ')';
       g.fillRect(0, y0, c.width, PX);
-      // Aggregate. Small and low contrast, but it is what stops the mid mip
-      // levels collapsing to dead flat colour between the joints.
-      for (let k = 0; k < 26; k++) {
-        g.fillStyle = r() > 0.5 ? 'rgba(255,255,255,0.085)' : 'rgba(24,18,48,0.065)';
-        g.fillRect(r() * c.width, y0 + r() * PX, 2 + r() * 7, 2 + r() * 3);
+      // Aggregate. Small and low contrast, but it is what stops the middle
+      // distance collapsing to dead flat colour between the joints.
+      for (let k = 0; k < 30; k++) {
+        g.fillStyle = r() > 0.5 ? 'rgba(255,255,255,0.10)' : 'rgba(24,18,48,0.08)';
+        g.fillRect(r() * c.width, y0 + r() * PX, 2 + r() * 8, 2 + r() * 4);
       }
-      // The joint: groove, then lip.
-      g.fillStyle = 'rgba(20,14,42,0.30)';
-      g.fillRect(0, y0, c.width, 4);
-      g.fillStyle = 'rgba(255,255,255,0.26)';
-      g.fillRect(0, y0 + 4, c.width, 3);
     }
     // A patched repair, spanning two slabs and crossing their joints. It is the
     // one irregular mark on the map and it is what stops the 9.6-unit period
     // from reading as a tile once the eye has learned the joint rhythm.
     g.fillStyle = 'rgba(24,18,48,0.075)';
-    g.fillRect(16, PX * 2 + 9, 52, PX * 2 - 14);
+    g.fillRect(16, PX * 2 + 12, 52, PX * 2 - 20);
     g.fillStyle = 'rgba(24,18,48,0.16)';
-    g.fillRect(16, PX * 2 + 9, 52, 3);
-    g.fillRect(16, PX * 4 - 8, 52, 3);
+    g.fillRect(16, PX * 2 + 12, 52, 4);
+    g.fillRect(16, PX * 4 - 12, 52, 4);
     // Gutter grime, at the tarmac edge on both sides. repeat.x is 1, so u maps
     // straight onto the carriageway and these land exactly at the kerb line.
     g.fillStyle = 'rgba(24,18,48,0.10)';
@@ -686,10 +658,11 @@ MR.World = (function () {
 
   function create(course) {
     const group = new THREE.Group();
-    // v3: the prop lottery lost its rival and station entries, which moves
-    // every draw after the first and so re-rolls the whole layout. Naming that
-    // is cheaper than wondering later why a day's scenery moved.
-    const rnd = MR.rng.stream(course.key, 'scenery/v3');
+    // v4: the prop lottery gained a 'walkers' entry, which moves every draw
+    // after the first and so re-rolls the whole layout. Naming that is cheaper
+    // than wondering later why a day's scenery moved. (v3 was the pass that
+    // dropped the rival and station entries, for the same reason.)
+    const rnd = MR.rng.stream(course.key, 'scenery/v4');
 
     // Biome spans in world units, so road tiles and set pieces can ask "where
     // am I" without reconstructing the fraction every time.
@@ -807,11 +780,65 @@ MR.World = (function () {
     const roadGeo = new THREE.BoxGeometry(K.TRACK_HALF_WIDTH * 2, 0.5, TILE);
     const shoulderGeo = new THREE.BoxGeometry(30, 0.42, TILE);
 
-    // All the road paint in one merged mesh: two solid edge lines and two
-    // dashed lane dividers were four draws per tile for four flat quads.
+    // All the road paint in one merged mesh: two solid edge lines, two dashed
+    // lane dividers and the carriageway joints were six-and-forty draws per
+    // tile for flat quads that share a material.
     const paintGeo = (function () {
       const parts = [];
       const flat = -Math.PI / 2;
+
+      /**
+       * EXPANSION JOINTS -- the ground frequency, and the biggest single thing
+       * this world was missing.
+       *
+       * Subway Surfers' track bed is railway sleepers: a hard perpendicular
+       * stripe roughly every world unit, strobing under the player at speed. It
+       * is the dominant speed cue in that game. Ours carried lane dashes every
+       * twelve units -- an order of magnitude less often -- so the largest
+       * surface on screen was flat colour that never changed. The camera pass
+       * reported the same gap from its own side and had already been pushed to
+       * the limit of what framing can do; the remaining headroom was here.
+       *
+       * WHY GEOMETRY AND NOT A TEXTURE, which is the obvious answer and was
+       * tried first. The road is seen at a grazing angle for its entire length,
+       * which is the one case trilinear filtering handles worst: the mip level
+       * is picked from the LARGEST screen-space derivative, and along z that is
+       * enormous, so a joint baked into the map averaged itself away within
+       * twenty units and the tarmac came back flat. Anisotropic filtering is
+       * exactly the fix and it is exactly what the software rasteriser this is
+       * reviewed on does not have. Quads do not have the problem: they are
+       * rasterised, not filtered.
+       *
+       * And it is close to free anyway. These fold into paintGeo, which is
+       * already one merged draw per tile, so forty quads cost eighty triangles
+       * and NO extra submissions. They are unlit basic-material fill over about
+       * a fifth of the carriageway -- the cheapest fragment this renderer has.
+       *
+       * TWO FREQUENCIES, and the second is not decoration. The 1.2-unit joint
+       * is the strobe and it is sub-pixel past forty units. Every fourth joint
+       * is a heavier construction joint, a 4.8-unit rhythm that survives out to
+       * where gates are actually read. Near field strobes, mid field pulses.
+       *
+       * The groove carries a lit LIP behind it, and the pair is what sells it:
+       * a lone dark line reads as a stain, a dark-then-light edge reads as a
+       * cut in a surface with a thickness.
+       *
+       * Colours are neutral and mid-value so they work as a value step on every
+       * biome's road, from CITY START's lavender to THE WALL's dusty pink. No
+       * chevrons: a forward-pointing triangle on the tarmac is the JUMP
+       * telegraph's own icon, and nothing on the road may compete with the mats.
+       */
+      const nJ = Math.round(TILE / ROAD_SLAB);
+      for (let i = 0; i < nJ; i++) {
+        // -TILE/2 + i*ROAD_SLAB, with TILE an exact multiple of ROAD_SLAB, so
+        // the run continues into the next tile without doubling or drifting.
+        const jz = -TILE / 2 + i * ROAD_SLAB;
+        const heavy = (i % 4) === 0;
+        parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, heavy ? 0.24 : 0.15),
+          heavy ? 0x4b4866 : 0x5e5b7a, 0, 0.004, jz, flat));
+        parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, heavy ? 0.11 : 0.08),
+          heavy ? 0xeae7f6 : 0xdbd8ea, 0, 0.004, jz + (heavy ? 0.18 : 0.12), flat));
+      }
       // Carriageway edge lines, on the outer lane boundary rather than at the
       // tarmac edge. The shoulder beyond them carries the kerb and the aid
       // tables; painting it as road instead of as shoulder is what made three
@@ -850,7 +877,10 @@ MR.World = (function () {
       const n = Math.round(TILE / PAVE_JOINT);
       for (let i = 0; i < n; i++) {
         const z = -TILE / 2 + PAVE_JOINT * 0.5 + i * PAVE_JOINT;
-        parts.push(bx(7.9, 0.05, 0.13, x, 0.0, z, joint));
+        // A quad, not a box: the pavement is flat, so five of a box's six faces
+        // were never going to be seen and this is a sixth of the vertex work.
+        // The kerb notch stays a box because it has to turn the kerb's corner.
+        parts.push(part(new THREE.PlaneGeometry(7.9, 0.13), joint, x, 0.005, z, -Math.PI / 2));
         parts.push(bx(0.36, 0.36, 0.09, kx, 0.0, z, joint));
       }
     }
@@ -1107,9 +1137,14 @@ MR.World = (function () {
         for (const sx of [-1, 1]) {
           parts.push(bx(0.24, 10.4, 0.24, sx * MX, 5.2, sz, TUBE));
         }
-        parts.push(bx(MX * 2, 0.16, 0.16, 0, 9.48, sz, TUBE));
+        parts.push(bx(MX * 2, 0.16, 0.16, 0, 9.52, sz, TUBE));
         parts.push(bx(MX * 2, 0.13, 0.13, 0, 10.24, sz, TUBE2));
-        parts.push(bx(9.4, 0.11, 0.11, 0, 9.88, sz + 0.45, TUBE, 0, 0, i ? 0.15 : -0.15));
+        // No diagonal bracing over the carriageway. It was there and it had to
+        // go: from a camera at 2.7 looking down a 6-degree slope, canted tubes
+        // at 9.9 cross the horizontal ones at every angle at once and the whole
+        // top of the frame turned into a thicket of sticks. The verticals,
+        // longitudinals and boards give the same crossing rhythm and stay
+        // legible as a structure.
         parts.push(bx(3.4, 0.10, 1.6, i ? -3.2 : 3.2, 10.08, sz, 0xc0a878));
       }
       return merge(parts);
@@ -1457,7 +1492,78 @@ MR.World = (function () {
       return m;
     }
 
-    // JUMP: a wide amber kerb with a cream cap. The cap is what survives the
+    /**
+     * HAZARD VARIANTS, and the line they are not allowed to cross.
+     *
+     * Subway Surfers never uses an abstract coloured block: its obstacles are
+     * traffic lights, chevron barriers, crates and train cars. Ours were
+     * coloured boxes, and the player asked for street furniture -- cones,
+     * signs, detour boards -- so the same gameplay reads as a real closed road.
+     *
+     * Every variant below is a re-skin and nothing more. What may NOT change:
+     *
+     *   ENVELOPE. MR.Collision.BOX is the contract -- JUMP tops out at 0.80,
+     *     the DUCK bar spans 1.41-1.83, BLOCK is 2.80 tall and 1.30 deep --
+     *     and clearance is decided from player STATE against those numbers, not
+     *     from these meshes. A variant that broke the envelope would wave a
+     *     player through something they visibly hit. Only x is free, and only
+     *     through LANE_FIT.
+     *   COLOUR. Amber JUMP, cyan DUCK, pink BLOCK, always, on the mass that
+     *     carries the silhouette. One contact ends the record attempt; the hue
+     *     is how the kind is known before the shape resolves.
+     *   SILHOUETTE CLASS. Low wide mass with a light cap for JUMP; tall thin
+     *     verticals with a bar between them for DUCK; a lane-filling wall for
+     *     BLOCK. Checked at 40 units in portrait, which is where the lane
+     *     decision is actually made.
+     *
+     * The telegraph mat and the striped face are untouched by all of this, so
+     * the readability device the game depends on is identical whichever variant
+     * spawns. A variant that reads as scenery is worse than no variant at all.
+     */
+
+    /**
+     * Build a pooled hazard with several interchangeable bodies.
+     *
+     * All variants are built and parented once and switched by visibility. An
+     * invisible child costs a matrix update and no draw call, so a re-skin
+     * lottery is free at render time and the pool stays one pool per kind --
+     * which matters, because the spawn window claims and releases by kind.
+     */
+    function hazardPool(kind, tint, defs) {
+      return Pool(function () {
+        const g = new THREE.Group();
+        const variants = [];
+        for (const d of defs) {
+          const vg = new THREE.Group();
+          const body = S.outlined(d.geo, mats.propLit, S.INK.hazard);
+          vg.add(body);
+          const f = new THREE.Mesh(hplane(d.face[0], d.face[1]), faceMat[tint]);
+          f.position.set(0, d.face[2], d.face[3]);
+          f.rotation.y = Math.PI;
+          vg.add(f);
+          // The one moving part a variant is allowed: a single extra mesh on
+          // its own pivot. Two would be two more draw calls per live hazard.
+          if (d.moving) {
+            const mv = S.outlined(d.moving, mats.propLit, S.INK.hazard);
+            mv.position.set(d.pivot[0] * LANE_FIT, d.pivot[1], d.pivot[2]);
+            vg.add(mv);
+            vg.userData.moving = mv;
+          }
+          vg.userData.body = body;
+          vg.userData.anim = d.anim || null;
+          vg.visible = false;
+          g.add(vg);
+          variants.push(vg);
+        }
+        variants[0].visible = true;
+        g.add(telegraph(kind));
+        g.userData.variants = variants;
+        g.userData.body = variants[0].userData.body;
+        return g;
+      }, group);
+    }
+
+    // JUMP v0: a wide amber kerb with a cream cap. The cap is what survives the
     // fog -- a light band on a dark road at 100 units is still a light band.
     // Nothing here rises past 0.80 or reaches past halfZ 0.52.
     const jumpGeo = merge([
@@ -1467,28 +1573,67 @@ MR.World = (function () {
       hbx(0.30, 0.80, 1.04, 1.16, 0.40, 0, 0xe07f12),
     ]);
 
-    const jumpPool = Pool(function () {
-      const g = new THREE.Group();
-      g.add(S.outlined(jumpGeo, mats.propLit, S.INK.hazard));
-      const face = new THREE.Mesh(hplane(2.2, 0.62), faceMat.jump);
-      face.position.set(0, 0.36, -0.531);
-      face.rotation.y = Math.PI;
-      g.add(face);
-      g.add(telegraph(K.JUMP));
-      return g;
-    }, group);
+    /**
+     * JUMP v1: traffic cones on a low plinth.
+     *
+     * The cones are the identity and the PLINTH is the read. At 40 units the
+     * whole hazard is about seventeen pixels tall in portrait, and three cones
+     * alone would be three amber slivers with road showing between them -- an
+     * object you look at rather than a lane you cannot run down. The plinth
+     * carries the lane-filling amber mass and the cream cap band, exactly as
+     * the kerb does, and the cones sit on top and do the talking once you are
+     * close enough for it to be flavour rather than information.
+     */
+    const jumpConeGeo = (function () {
+      const parts = [
+        hbx(2.24, 0.22, 1.02, 0, 0.11, 0, 0xffb020),
+        hbx(2.34, 0.10, 1.04, 0, 0.27, 0, 0xfff2e0),
+        hbx(0.28, 0.32, 1.02, -1.16, 0.16, 0, 0xe07f12),
+        hbx(0.28, 0.32, 1.02, 1.16, 0.16, 0, 0xe07f12),
+      ];
+      for (let i = 0; i < 3; i++) {
+        const cx = (-0.76 + i * 0.76) * LANE_FIT;
+        parts.push(bx(0.62, 0.09, 0.62, cx, 0.36, 0, 0x2b2f52));
+        parts.push(cone(0.30, 0.48, 8, cx, 0.55, 0, 0xff7a1f));
+        parts.push(cyl(0.20, 0.23, 0.11, 8, cx, 0.55, 0, 0xfff2e0));
+      }
+      return merge(parts);
+    })();
+
+    /**
+     * JUMP v2: a works trench with a low chevron barrier over it. The dark
+     * trench mouth under the board is what makes this one read differently at
+     * speed -- a hole rather than a lump -- while the amber frame and the cream
+     * cap keep it in the same family.
+     */
+    const jumpWorksGeo = merge([
+      hbx(2.24, 0.16, 1.04, 0, 0.08, 0, 0x2b2f52),
+      hbx(2.24, 0.34, 1.04, 0, 0.57, 0, 0xffb020),
+      hbx(2.36, 0.14, 1.08, 0, 0.73, 0, 0xfff2e0),
+      hbx(0.34, 0.80, 0.34, -1.13, 0.40, -0.34, 0xe07f12),
+      hbx(0.34, 0.80, 0.34, 1.13, 0.40, -0.34, 0xe07f12),
+      hbx(0.34, 0.80, 0.34, -1.13, 0.40, 0.34, 0xe07f12),
+      hbx(0.34, 0.80, 0.34, 1.13, 0.40, 0.34, 0xe07f12),
+    ]);
+
+    const jumpPool = hazardPool(K.JUMP, 'jump', [
+      { geo: jumpGeo, face: [2.2, 0.62, 0.36, -0.531] },
+      { geo: jumpConeGeo, face: [2.2, 0.24, 0.16, -0.521] },
+      { geo: jumpWorksGeo, face: [2.2, 0.32, 0.57, -0.531] },
+    ]);
 
     /**
      * DUCK: the bar is only 0.42 tall, which is nothing at distance, so the
      * height comes from tall cyan standards rather than from anything spanning
      * the lane.
      *
-     * That distinction is not cosmetic. The chase camera trails 5.1 units and
-     * carries 42% of the jump arc, so it sweeps y = 1.76 to 3.14 right through
-     * a gate's lane. An earlier version had a header board at 2.44 and the
-     * camera flew straight into it -- one frame of full-screen cyan stripes.
-     * Above the bar only thin members are allowed, so the worst a clip can
-     * ever be is a sliver of post.
+     * That distinction is not cosmetic, and it constrains every variant. The
+     * chase camera trails 5.1 units and carries 42% of the jump arc, so it
+     * sweeps y = 1.76 to 3.14 right through a gate's lane. An earlier version
+     * had a header board at 2.44 and the camera flew straight into it -- one
+     * frame of full-screen cyan stripes. ABOVE THE BAR, ONLY THIN MEMBERS,
+     * and only out at the standards, so the worst a clip can ever be is a
+     * sliver of post.
      */
     const duckGeo = merge([
       hbx(2.30, 0.30, 0.60, 0, 1.56, 0, 0x37d6ff),
@@ -1508,20 +1653,75 @@ MR.World = (function () {
       bxAt(0.50, 0.22, 0.50, 1.20, 0.11, 0, 0x2b2f52),
     ]);
 
-    const duckPool = Pool(function () {
-      const g = new THREE.Group();
-      g.add(S.outlined(duckGeo, mats.propLit, S.INK.hazard));
-      const face = new THREE.Mesh(hplane(2.26, 0.40), faceMat.duck);
-      face.position.set(0, 1.62, -0.302);
-      face.rotation.y = Math.PI;
-      g.add(face);
-      g.add(telegraph(K.DUCK));
-      return g;
-    }, group);
+    /**
+     * DUCK v1: a scaffold gantry over the road. Round standards on base plates,
+     * a hazard-boarded ledger where the bar is, and diagonal braces above --
+     * every one of them a 0.22 tube out at the standards, so the rule above
+     * holds. It is the same shape as v0 built out of different stock, which is
+     * the point: the distance read must not change.
+     */
+    const duckScaffoldGeo = (function () {
+      const parts = [
+        hbx(2.30, 0.34, 0.58, 0, 1.58, 0, 0x37d6ff),
+        hbx(2.38, 0.12, 0.60, 0, 1.79, 0, 0xd8f8ff),
+        hbx(2.24, 0.10, 0.44, 0, 1.44, 0, 0x1f9fd0),
+      ];
+      for (const sx of [-1, 1]) {
+        parts.push(cyl(0.15, 0.15, 3.34, 8, sx * 1.20 * LANE_FIT, 1.67, 0, 0x37d6ff));
+        parts.push(cyl(0.19, 0.19, 0.16, 8, sx * 1.20 * LANE_FIT, 2.42, 0, 0x0d2b36));
+        parts.push(cyl(0.19, 0.19, 0.16, 8, sx * 1.20 * LANE_FIT, 3.02, 0, 0x0d2b36));
+        parts.push(bx(0.56, 0.14, 0.56, sx * 1.20 * LANE_FIT, 0.07, 0, 0x2b2f52));
+        parts.push(bx(0.42, 0.20, 0.42, sx * 1.20 * LANE_FIT, 3.38, 0, 0xd8f8ff));
+        // Kicker braces. Canted, but the cant is 0.12 and the foot is pulled
+        // INSIDE the standard, because the number that matters is how far the
+        // widest point reaches from the lane centre: 1.02, which is inside the
+        // 1.068 the existing cap already reaches, so a runner jumping in the
+        // NEXT lane cannot graze a brace on this one.
+        parts.push(bx(0.15, 1.5, 0.15, sx * (1.20 * LANE_FIT - 0.02), 2.70, 0,
+          0x1f9fd0, 0, 0, sx * 0.12));
+      }
+      return merge(parts);
+    })();
 
-    // BLOCK: a barricaded works truck. Trains scale it along z, so every baked
-    // feature is either a horizontal band or sits at the front face, which the
-    // scale leaves in place.
+    /**
+     * DUCK v2: a height-restriction sign gantry. The bar becomes a deeper cyan
+     * sign board banded top and bottom in cream, and each standard carries a
+     * sign roundel. A round mark is the one shape no telegraph mat uses, so it
+     * never argues with the rungs painted on the road in front of it.
+     */
+    const duckSignGeo = (function () {
+      const parts = [
+        hbx(2.30, 0.42, 0.56, 0, 1.62, 0, 0x37d6ff),
+        hbx(2.38, 0.10, 0.58, 0, 1.81, 0, 0xd8f8ff),
+        hbx(2.38, 0.08, 0.58, 0, 1.43, 0, 0xd8f8ff),
+      ];
+      for (const sx of [-1, 1]) {
+        const px = sx * 1.20 * LANE_FIT;
+        parts.push(bx(0.28, 3.30, 0.28, px, 1.65, 0, 0x37d6ff));
+        // The roundel goes on the POST, not on the bar. On the bar it had to
+        // sit 0.35 in front of the gate line to clear the board -- past the
+        // halfZ the collision box records -- and the striped face covered it
+        // regardless. At 0.87 out it is clear of the runner's glove swing
+        // (0.543) and nowhere near the lane centre the camera flies down.
+        parts.push(cyl(0.20, 0.20, 0.09, 12, px, 2.30, -0.20, 0xfff2e0, Math.PI / 2));
+        parts.push(bx(0.36, 0.18, 0.36, px, 2.86, 0, 0x0d2b36));
+        parts.push(bx(0.30, 0.44, 0.30, px, 3.14, 0, 0x1f9fd0));
+        parts.push(bx(0.40, 0.24, 0.40, px, 3.44, 0, 0xd8f8ff));
+        parts.push(bx(0.54, 0.24, 0.54, px, 0.12, 0, 0x2b2f52));
+      }
+      return merge(parts);
+    })();
+
+    const duckPool = hazardPool(K.DUCK, 'duck', [
+      { geo: duckGeo, face: [2.26, 0.40, 1.62, -0.302] },
+      { geo: duckScaffoldGeo, face: [2.26, 0.36, 1.58, -0.292] },
+      { geo: duckSignGeo, face: [2.26, 0.34, 1.62, -0.282] },
+    ]);
+
+    // BLOCK v0: a barricaded works truck. Trains scale it along z, so every
+    // baked feature is either a horizontal band or sits at the front face,
+    // which the scale leaves in place -- and it is the ONLY variant a train is
+    // ever allowed to use, for exactly that reason.
     const blockGeo = merge([
       hbx(2.10, 2.30, 1.30, 0, 1.50, 0, 0xff3b6b),
       hbx(2.20, 0.44, 1.30, 0, 0.22, 0, 0x2b2f52),
@@ -1531,19 +1731,162 @@ MR.World = (function () {
       bxAt(0.34, 0.34, 0.34, 0.72, 2.92, 0, 0xffe45e),
     ]);
 
-    const blockPool = Pool(function () {
-      const g = new THREE.Group();
-      const body = S.outlined(blockGeo, mats.propLit, S.INK.hazard);
-      g.add(body);
-      const face = new THREE.Mesh(hplane(2.06, 1.9), faceMat.block);
-      face.position.set(0, 1.42, -0.661);
-      face.rotation.y = Math.PI;
-      g.add(face);
-      const tel = telegraph(K.BLOCK);
-      g.add(tel);
-      g.userData.body = body;
-      return g;
-    }, group);
+    /** BLOCK v1: a ROAD CLOSED hoarding on a solid plinth. */
+    const blockSignGeo = merge([
+      hbx(2.20, 0.52, 1.30, 0, 0.26, 0, 0x2b2f52),
+      hbx(2.12, 2.00, 1.06, 0, 1.56, 0, 0xff3b6b),
+      hbx(2.26, 0.16, 1.14, 0, 0.72, 0, 0xfff2e0),
+      hbx(2.26, 0.16, 1.14, 0, 1.60, 0, 0xfff2e0),
+      hbx(2.26, 0.16, 1.14, 0, 2.44, 0, 0xfff2e0),
+      hbx(2.28, 0.24, 1.20, 0, 2.68, 0, 0xd42a55),
+      bxAt(0.34, 0.34, 0.34, -0.74, 2.92, 0, 0xffe45e),
+      bxAt(0.34, 0.34, 0.34, 0.74, 2.92, 0, 0xffe45e),
+    ]);
+
+    /**
+     * BLOCK v2: A CARGO TRIKE, RIDDEN, IN A LANE. The player asked for cyclists
+     * on the road as obstacles, and this is what makes that safe to grant.
+     *
+     * It is a K.BLOCK and nothing else: the lane it occupies is fixed by the
+     * course, so "there is always a way around" is not something this file has
+     * to be careful about -- course.js proves by BFS that a lane path exists
+     * from gun to tape, validate() re-checks it and tools/course-test.js
+     * verifies it across dates. A BLOCK that looks like a cyclist is covered by
+     * exactly the same proof as a BLOCK that looks like a barrier. Nothing here
+     * may ever change lane over time, because that would break the proof, and
+     * the proof is the reason the game is fair.
+     *
+     * WHY A TRIKE AND NOT A BICYCLE. A road cyclist is 1.75 tall and about a
+     * third of a lane wide, and the jump apex is 2.05: a rider on a two-wheeler
+     * reads as something you could hurdle, which is the exact complaint state
+     * thresholds exist to prevent. A cargo trike fills the lane, carries the
+     * pink mass and the cream band the other BLOCKs use, and its tailboard is
+     * where the caution-striped face goes -- it rides away from the runner, so
+     * the back of the box is the face already turned toward the lens.
+     *
+     * THE BOX HAS TO STAY LOW, and the first version got this wrong. At 1.68 it
+     * was taller than the rider was visible above it, so from directly behind
+     * -- which is the ONLY angle this game has -- the whole thing read as a
+     * striped barrier on wheels and the cyclist was invisible. The box now tops
+     * out at 1.28 and the rider runs 1.28 to 2.42, so a back, a head and a
+     * helmet clear it by a wide margin: at a camera height of 2.7 the sightline
+     * over the box corner passes 0.3 units above the rider's chest.
+     *
+     * The two pennant masts do the rest. They take the silhouette to 2.72 --
+     * clear of the 2.05 jump apex -- and they fill the upper outer corners of
+     * the lane that a lone rider leaves open, so nothing about the shape
+     * invites a hurdle. Utility bikes really do carry them, which is the whole
+     * reason this reads as a vehicle rather than as a prop.
+     */
+    const blockTrikeGeo = (function () {
+      const parts = [
+        // Cargo box: the lane-filling mass, in BLOCK pink with the cream band.
+        hbx(2.02, 1.02, 1.20, 0, 0.72, 0.02, 0xff3b6b),
+        hbx(2.10, 0.15, 1.24, 0, 1.28, 0.02, 0xfff2e0),
+        hbx(2.06, 0.20, 1.26, 0, 0.20, 0.02, 0xd42a55),
+        // Rider: back, shoulders, head, helmet -- all of it above the box.
+        hbx(0.70, 0.66, 0.50, 0, 1.61, 0.86, 0xff3b6b),
+        hbx(0.76, 0.14, 0.52, 0, 1.86, 0.86, 0xfff2e0),
+        hbx(0.36, 0.34, 0.34, 0, 2.11, 0.90, 0xffc79a),
+        hbx(0.46, 0.24, 0.46, 0, 2.34, 0.90, 0xfff2e0),
+        // Arms down onto the bars, which is what puts a lean in the shape.
+        hbx(0.16, 0.54, 0.16, -0.34, 1.52, 1.06, 0xffc79a, 0.34),
+        hbx(0.16, 0.54, 0.16, 0.34, 1.52, 1.06, 0xffc79a, 0.34),
+        hbx(0.98, 0.12, 0.12, 0, 1.28, 1.24, 0x2b2f52),
+      ];
+      // Wheels. Seen from directly behind they are slabs rather than discs, so
+      // they are built as discs on an x axis and read as tyres under the box.
+      for (const wx of [-0.86, 0.86]) {
+        parts.push(cyl(0.34, 0.34, 0.16, 10, wx * LANE_FIT, 0.34, 0.20, 0x2b2f52, 0, 0, Math.PI / 2));
+      }
+      parts.push(cyl(0.32, 0.32, 0.12, 10, 0, 0.32, 1.32, 0x2b2f52, 0, 0, Math.PI / 2));
+      // Safety pennants, one each side.
+      for (const sx of [-1, 1]) {
+        parts.push(bxAt(0.11, 1.56, 0.11, sx * 0.92, 1.94, 0.02, 0xfff2e0));
+        parts.push(bxAt(0.09, 0.74, 0.58, sx * 0.92, 2.34, 0.32, 0xff3b6b));
+      }
+      return merge(parts);
+    })();
+    /** The pedalling half: cranks and feet, on the bottom-bracket axis. */
+    const blockTrikeCrankGeo = merge([
+      bx(0.13, 0.52, 0.13, 0, 0, 0.26, 0x2b2f52),
+      bx(0.26, 0.14, 0.32, 0, -0.25, 0.26, 0xfff2e0),
+      bx(0.13, 0.52, 0.13, 0, 0, -0.26, 0x2b2f52),
+      bx(0.26, 0.14, 0.32, 0, 0.25, -0.26, 0xfff2e0),
+    ]);
+
+    /**
+     * BLOCK v3: MARSHALS ACROSS THE LANE. The other half of the same request --
+     * pedestrians crossing the road -- and the same guarantee: a fixed-lane
+     * K.BLOCK, never a mover.
+     *
+     * The striped face is the board they hold across the lane, which is why
+     * this variant can be made of people at all: a person is not a wall, but a
+     * person holding a hazard-boarded barrier across a lane is, and it is what
+     * a real closed course actually looks like. The stop paddle waves, which is
+     * the one animated part it gets.
+     */
+    const blockCrossGeo = (function () {
+      const parts = [];
+      // The barrier they are holding. Deliberately BELOW chest height: at 1.55
+      // it hid both hi-vis tabards and left two pale heads floating over a
+      // board, which is neither a person nor a barrier. At 1.28 the pink
+      // torsos read above it and the pair reads as people holding something.
+      parts.push(hbx(2.16, 0.56, 0.18, 0, 0.98, -0.54, 0xff3b6b));
+      parts.push(hbx(2.24, 0.12, 0.20, 0, 1.30, -0.54, 0xfff2e0));
+      parts.push(hbx(2.24, 0.12, 0.20, 0, 0.66, -0.54, 0xfff2e0));
+      const who = [
+        { x: -0.60, skin: 0xffc79a, z: 0.16 },
+        { x: 0.56, skin: 0xb87a4e, z: 0.44 },
+      ];
+      for (const p of who) {
+        const px = p.x * LANE_FIT;
+        parts.push(bx(0.42, 0.86, 0.32, px, 0.43, p.z, 0x2b2f52));
+        parts.push(bx(0.64, 0.88, 0.40, px, 1.30, p.z, 0xff3b6b));
+        // Hi-vis cross-belt: cream on pink, the same band language as the truck.
+        parts.push(bx(0.68, 0.14, 0.42, px, 1.48, p.z, 0xfff2e0));
+        parts.push(bx(0.38, 0.36, 0.36, px, 1.94, p.z, p.skin));
+        parts.push(bx(0.44, 0.16, 0.42, px, 2.19, p.z, 0xfff2e0));
+        // Arms forward onto the barrier, which is what makes them its holders
+        // rather than two figures that happen to be standing behind it.
+        parts.push(bx(0.15, 0.66, 0.15, px - 0.32, 1.26, p.z - 0.34, p.skin, 0.62));
+        parts.push(bx(0.15, 0.66, 0.15, px + 0.32, 1.26, p.z - 0.34, p.skin, 0.62));
+      }
+      return merge(parts);
+    })();
+    /** The stop paddle, on its own pivot at the marshal's hand. */
+    const blockPaddleGeo = merge([
+      bx(0.11, 1.44, 0.11, 0, 0.72, 0, 0xfff2e0),
+      cyl(0.42, 0.42, 0.10, 12, 0, 1.58, -0.07, 0xff3b6b, Math.PI / 2),
+      bx(0.54, 0.15, 0.12, 0, 1.58, -0.14, 0xfff2e0),
+    ]);
+
+    const blockPool = hazardPool(K.BLOCK, 'block', [
+      { geo: blockGeo, face: [2.06, 1.9, 1.42, -0.661] },
+      { geo: blockSignGeo, face: [2.06, 1.7, 1.58, -0.541] },
+      {
+        geo: blockTrikeGeo, face: [1.98, 0.86, 0.74, -0.591],
+        moving: blockTrikeCrankGeo, pivot: [0, 0.56, 0.92], anim: 'pedal',
+      },
+      {
+        geo: blockCrossGeo, face: [2.10, 0.50, 0.98, -0.655],
+        moving: blockPaddleGeo, pivot: [0.88, 1.00, 0.44], anim: 'paddle',
+      },
+    ]);
+
+    /**
+     * Which skin a gate wears. Derived from the gate's own z and lane, so it is
+     * a property of the course -- identical for every player on the same day,
+     * exactly like the course itself -- and costs no storage.
+     *
+     * A train is always variant 0. It is the only BLOCK body authored to be
+     * stretched along z (see blockGeo), and a six-unit cargo trike would be a
+     * joke rather than an obstacle.
+     */
+    function variantIndex(n, gate, lane) {
+      if (gate.train) return 0;
+      return (Math.round(gate.z) * 7 + lane * 3 + Math.round(gate.z / 37)) % n;
+    }
 
     // ---- scenery --------------------------------------------------------
 
@@ -1657,6 +2000,72 @@ MR.World = (function () {
     }
     const crowdGeos = [crowdGeo(3), crowdGeo(17), crowdGeo(41), crowdGeo(88)];
     const crowdPool = crowdGeos.map((geo) => Pool(function () {
+      return S.outlined(geo, mats.prop, S.INK.prop);
+    }, group));
+
+    /**
+     * PAVEMENT LIFE -- the city carrying on beside the closed road.
+     *
+     * The player asked for people walking across the street, and they now get
+     * that on the road itself, as a fixed-lane BLOCK (see blockCrossGeo). These
+     * are the other half: purely decorative figures, and the distinction
+     * between the two has to be UNMISTAKABLE, because the whole skill of this
+     * game is parsing what is on the tarmac. Two rules make it so, and both are
+     * structural rather than careful:
+     *
+     *   DISTANCE. They are clamped outside WALK_IN, which is four units beyond
+     *     the crowd barrier and roughly three times the half-width of the play
+     *     corridor. Nothing here can drift toward the road however long it is
+     *     on screen; the clamp is applied to the drifted position, not to the
+     *     spawn.
+     *   COLOUR. No pink, no amber, no cyan. Every hazard in this game is one of
+     *     those three, and a figure in hazard colours beyond the kerb would
+     *     teach the player to discount the hue -- which is the read the record
+     *     depends on. These wear greens, blues, creams and browns.
+     *
+     * A previous pass put rival runners on the tarmac and they had to be
+     * removed for the same reason (see the note where they used to be). The
+     * lesson stuck: anything on the road is lethal, anything beyond the kerb is
+     * not, and there is no middle ground.
+     */
+    const WALK_IN = K.TRACK_HALF_WIDTH + 4.2;
+    function walkersGeo(seed) {
+      const parts = [];
+      // Deliberately no hazard hues -- see above.
+      const coats = [0x3f6fbf, 0x2f9f72, 0xf6f2e0, 0x7a5a9a, 0x8a5a3c, 0x4fb0c8];
+      const skins = [0xffc79a, 0xe0a173, 0xb87a4e, 0x8a5a3c];
+      let s = seed * 9301 + 49297;
+      const r = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+      const n = 3 + Math.floor(r() * 2);
+      for (let i = 0; i < n; i++) {
+        const x = -1.1 + r() * 2.2;
+        const z = -1.8 + i * 1.5 + r() * 0.7;
+        const h = 1.0 + r() * 0.22;
+        const coat = coats[Math.floor(r() * coats.length)];
+        const skin = skins[Math.floor(r() * skins.length)];
+        // Mid-stride: one leg forward, one back. A figure with its feet
+        // together reads as standing however much the group is moving, and
+        // "standing beside the road" is what the crowd knots already say.
+        parts.push(bx(0.17, 0.62 * h, 0.19, x - 0.11, 0.31 * h, z + 0.16, 0x2b2f52, -0.30));
+        parts.push(bx(0.17, 0.62 * h, 0.19, x + 0.11, 0.31 * h, z - 0.16, 0x2b2f52, 0.30));
+        parts.push(bx(0.48, 0.64 * h, 0.34, x, 0.94 * h, z, coat));
+        parts.push(bx(0.30, 0.30, 0.28, x, 1.41 * h, z, skin));
+        parts.push(bx(0.32, 0.11, 0.30, x, 1.56 * h, z, 0x3a2b46));
+        parts.push(bx(0.12, 0.50, 0.12, x - 0.30, 0.98 * h, z - 0.14, coat, 0.34));
+        parts.push(bx(0.12, 0.50, 0.12, x + 0.30, 0.98 * h, z + 0.14, coat, -0.34));
+        // A bag, a dog or nothing: three silhouettes rather than one repeated.
+        if (i % 3 === 1) {
+          parts.push(bx(0.26, 0.30, 0.20, x + 0.38, 0.76 * h, z + 0.20, 0xf6f2e0));
+        } else if (i % 3 === 2) {
+          parts.push(bx(0.22, 0.24, 0.56, x + 0.62, 0.30, z + 0.10, 0xe0c69a));
+          parts.push(bx(0.20, 0.22, 0.22, x + 0.62, 0.46, z - 0.20, 0xe0c69a));
+          parts.push(bx(0.09, 0.30, 0.09, x + 0.62, 0.15, z + 0.28, 0xc9a97a));
+        }
+      }
+      return merge(parts);
+    }
+    const walkersGeos = [walkersGeo(11), walkersGeo(23), walkersGeo(59)];
+    const walkersPool = walkersGeos.map((geo) => Pool(function () {
       return S.outlined(geo, mats.prop, S.INK.prop);
     }, group));
 
@@ -1985,6 +2394,74 @@ MR.World = (function () {
     ]);
     const overpassPool = Pool(function () {
       return S.outlined(overpassGeo, mats.prop, S.INK.scenery);
+    }, group);
+
+    /**
+     * A FOOTBRIDGE, and it settles two things at once.
+     *
+     * It is the heaviest thing in the overhead layer -- the tile wires give
+     * rhythm, this gives a single large mass sweeping top-to-bottom past the
+     * lens, which is where the parallax actually comes from. And it is the one
+     * place pedestrians can cross the road without being on it: the figures on
+     * the deck are walking over the runner's head at 9.5 units, which is the
+     * literal answer to "people walking across the street" with no ambiguity
+     * about what is on the tarmac whatsoever.
+     *
+     * The clearance is the design. The soffit sits at 9.05 -- above OVERHEAD_Y,
+     * a full six units above the chase camera and three above the top of the
+     * highest jump -- and the stair towers stand at 8.35, more than twice
+     * CORRIDOR_HALF. A gate is read at 40-90 units, at or below the camera
+     * axis; this can crop the top of the frame and can never be in front of one.
+     */
+    const footbridgeGeo = (function () {
+      const parts = [];
+      const STEEL = 0x5f6a9c, DECK = 0xc9cee8, RAIL = 0xf2f4ff, TRIM = 0x37d6ff;
+      const TX = K.TRACK_HALF_WIDTH + 4.6;
+      const W = TX * 2 + 3.2;
+      parts.push(bx(W, 0.40, 3.0, 0, 9.25, 0, DECK));
+      parts.push(bx(W + 0.4, 0.26, 0.34, 0, 9.20, -1.62, STEEL));
+      parts.push(bx(W + 0.4, 0.26, 0.34, 0, 9.20, 1.62, STEEL));
+      // Parapets. Solid at the bottom so the walkers have legs to stand behind,
+      // open above so they are not sealed into a tube.
+      for (const sz of [-1, 1]) {
+        parts.push(bx(W, 0.70, 0.20, 0, 9.85, sz * 1.55, TRIM));
+        parts.push(bx(W, 0.16, 0.30, 0, 10.72, sz * 1.55, RAIL));
+        for (let i = 0; i < 13; i++) {
+          parts.push(bx(0.13, 1.10, 0.13, -W / 2 + 0.6 + i * ((W - 1.2) / 12), 10.20, sz * 1.55, RAIL));
+        }
+      }
+      // Stair towers, with a flight of steps facing away from the road.
+      for (const sx of [-1, 1]) {
+        parts.push(bx(2.9, 9.4, 3.4, sx * TX, 4.70, 0, STEEL));
+        parts.push(bx(3.3, 0.5, 3.8, sx * TX, 9.65, 0, TRIM));
+        parts.push(bx(3.5, 0.8, 4.0, sx * TX, 0.40, 0, 0x2b2f52));
+        for (let i = 0; i < 9; i++) {
+          parts.push(bx(2.5, 0.24, 0.72, sx * (TX + 1.9), 0.9 + i * 0.95, -1.5 + i * 0.34, DECK));
+        }
+        parts.push(bx(0.7, 3.0, 0.7, sx * (TX + 3.2), 5.6, 1.4, STEEL));
+      }
+      // The people, which are the whole reason this is here rather than a plain
+      // gantry. Static: at 9.5 units up and passed in half a second, a walk
+      // cycle would cost a draw call each and never be seen.
+      const coats = [0x3f6fbf, 0x2f9f72, 0xf6f2e0, 0x7a5a9a, 0x4fb0c8];
+      const skins = [0xffc79a, 0xe0a173, 0xb87a4e];
+      let s = 4111;
+      const r = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+      for (let i = 0; i < 6; i++) {
+        const px = -W / 2 + 2.2 + i * ((W - 4.4) / 5) + r() * 0.6;
+        const pz = -0.5 + r() * 1.0;
+        const h = 1.0 + r() * 0.2;
+        const coat = coats[Math.floor(r() * coats.length)];
+        parts.push(bx(0.18, 0.60 * h, 0.20, px - 0.11, 9.75 + 0.30 * h, pz + 0.14, 0x2b2f52, -0.28));
+        parts.push(bx(0.18, 0.60 * h, 0.20, px + 0.11, 9.75 + 0.30 * h, pz - 0.14, 0x2b2f52, 0.28));
+        parts.push(bx(0.48, 0.62 * h, 0.34, px, 9.75 + 0.92 * h, pz, coat));
+        parts.push(bx(0.30, 0.30, 0.28, px, 9.75 + 1.38 * h, pz, skins[Math.floor(r() * skins.length)]));
+        parts.push(bx(0.32, 0.11, 0.30, px, 9.75 + 1.53 * h, pz, 0x3a2b46));
+      }
+      return merge(parts);
+    })();
+    const footbridgePool = Pool(function () {
+      return S.outlined(footbridgeGeo, mats.prop, S.INK.scenery);
     }, group);
 
     /**
@@ -2520,6 +2997,18 @@ MR.World = (function () {
     landmark(5380, 'hoarding', -1, 12.6, 0, -0.16);
     landmark(5620, 'hoarding', 1, 12.6, 0, -0.16);
 
+    // Footbridges. Placed by hand rather than on a spacing, because every one
+    // has to miss three other things: the mile gantries (every 240 units), the
+    // viaducts, and THE WALL's overpasses -- two structures straddling the road
+    // within twenty units of each other read as one confused mass rather than
+    // as two crossings. None on the bridge deck, which has its own towers and
+    // where a footbridge over open water would be nonsense; none in FINAL MILE,
+    // where the grandstands already stand where the stair towers would.
+    for (const z of [320, 780, 900, 1150, 1520, 1780, 2020,
+                     3300, 3660, 3980, 4260, 4870, 5200, 5540]) {
+      landmarkOver(z, 'footbridge');
+    }
+
     landmark(5860, 'jumbo', 1, 13.5);
     landmark(6020, 'jumbo', -1, 13.5);
     landmark(6180, 'clock', 1, 15.5);
@@ -2596,6 +3085,7 @@ MR.World = (function () {
       if (s.kind === 'tree') return treePool;
       if (s.kind === 'grove') return grovePool[Math.floor(s.b * grovePool.length) % grovePool.length];
       if (s.kind === 'crowd') return crowdPool[Math.floor(s.a * crowdPool.length) % crowdPool.length];
+      if (s.kind === 'walkers') return walkersPool[Math.floor(s.a * walkersPool.length) % walkersPool.length];
       return null;
     }
     function structPool(kind) {
@@ -2604,6 +3094,7 @@ MR.World = (function () {
       if (kind === 'river') return riverPool;
       if (kind === 'overpass') return overpassPool;
       if (kind === 'stand') return standPool;
+      if (kind === 'footbridge') return footbridgePool;
       if (kind === 'arch') return archPool;
       if (kind === 'aidTable') return aidTablePool;
       return landmarkPools[kind] || null;
@@ -2716,6 +3207,15 @@ MR.World = (function () {
           if (kind === K.CLEAR) { objs.push(null); continue; }
           const o = hazardObject(kind);
           o.position.set(K.LANE_X[l], 0, gate.z);
+          // Pick the skin. Pooled, so EVERY variant's visibility is written on
+          // every claim -- a hazard inheriting the previous tenant's body is
+          // the kind of defect that only shows up in one screenshot in twenty,
+          // and on a hazard it costs the record rather than the screenshot.
+          const vs = o.userData.variants;
+          const vi = variantIndex(vs.length, gate, l);
+          for (let k = 0; k < vs.length; k++) vs[k].visible = (k === vi);
+          o.userData.active = vs[vi];
+          o.userData.body = vs[vi].userData.body;
           if (kind === K.BLOCK) {
             // Stretch a train backwards along z rather than repeating blocks;
             // the front face and the telegraph stay put on the gate line.
@@ -2757,6 +3257,20 @@ MR.World = (function () {
         } else if (s.kind === 'grove') {
           obj.position.set(s.x + s.side * 10, 0, s.z);
           obj.rotation.y = s.a * 6.3;
+        } else if (s.kind === 'walkers') {
+          // Turned to face across the road, which is what makes the lateral
+          // drift read as walking rather than as sliding.
+          const bxx = s.side * (WALK_IN + s.b * 3.6);
+          const dir = s.c > 0.5 ? 1 : -1;
+          obj.position.set(bxx, 0, s.z);
+          // side * dir is the world direction the clamped drift actually moves
+          // them in; facing anywhere else turns a walk into a slide.
+          obj.rotation.y = s.side * dir * Math.PI / 2;
+          obj.userData.baseX = bxx;
+          obj.userData.side = s.side;
+          obj.userData.dir = dir;
+          obj.userData.phase = s.a * 6.3;
+          obj.userData.t0 = now;
         } else {
           // Crowd packs against the barrier line; the far side of a wide road
           // is where a real course puts the overflow.
@@ -2888,8 +3402,44 @@ MR.World = (function () {
 
       // Crowd idle: a cheap bob keeps the roadside alive without animation data.
       for (const e of activeScene) {
-        if (e.s.kind !== 'crowd') continue;
-        e.obj.position.y = Math.abs(Math.sin(now * 4 + e.obj.userData.bounce * 6.3)) * 0.13;
+        if (e.s.kind === 'crowd') {
+          e.obj.position.y = Math.abs(Math.sin(now * 4 + e.obj.userData.bounce * 6.3)) * 0.13;
+        } else if (e.s.kind === 'walkers') {
+          // Pavement life, and the reason it moves ACROSS rather than along.
+          // Lateral motion is far more visible at a glance than forward motion
+          // at a speed the runner is already beating, and "people crossing"
+          // is what the city is meant to be doing. The clamp is the safety
+          // rule made structural: they can never reach the barrier line,
+          // whatever the drift does, so a decorative figure can never be
+          // mistaken for a hazard in a lane.
+          const b = e.obj.userData;
+          const d = Math.min(11, (now - b.t0) * 0.85) * b.dir;
+          e.obj.position.x = b.side * Math.max(WALK_IN, Math.abs(b.baseX) + d);
+          e.obj.position.y = Math.abs(Math.sin(now * 3.2 + b.phase)) * 0.075;
+        }
+      }
+
+      // Hazard variants that move. Only the live ones, only the ones that asked
+      // for it, and only ever a rotation on a single child -- a hazard's
+      // POSITION is course data and nothing here is allowed to touch it.
+      for (const g of activeGates) {
+        for (let l = 0; l < 3; l++) {
+          const o = g.objs[l];
+          if (!o) continue;
+          const a = o.userData.active;
+          if (!a || !a.userData.anim) continue;
+          const ph = g.gate.z * 0.7 + l;
+          if (a.userData.anim === 'pedal') {
+            // A cadence, not a wheel spin: 1.6 turns a second is what a rider
+            // holding up traffic looks like, and it is legible at 40 units
+            // where a spinning wheel would only shimmer.
+            a.userData.moving.rotation.x = now * 10.0 + ph;
+            a.position.y = Math.sin(now * 20.0 + ph) * 0.018;
+          } else {
+            a.userData.moving.rotation.z = Math.sin(now * 3.4 + ph) * 0.22;
+            a.position.y = Math.abs(Math.sin(now * 3.0 + ph)) * 0.045;
+          }
+        }
       }
 
       updateRoute(z, now);
@@ -2903,9 +3453,11 @@ MR.World = (function () {
       aidTablePool.releaseAll(); bannerPool.releaseAll(); archPool.releaseAll();
       towerPool.releaseAll(); abutPool.releaseAll(); riverPool.releaseAll();
       overpassPool.releaseAll(); standPool.releaseAll();
+      footbridgePool.releaseAll();
       waterPool.releaseAll(); bananaPool.releaseAll();
       for (const k in landmarkPools) landmarkPools[k].releaseAll();
       for (const p of crowdPool) p.releaseAll();
+      for (const p of walkersPool) p.releaseAll();
       for (const p of grovePool) p.releaseAll();
       activeGates.length = 0; activeScene.length = 0; activeStruct.length = 0;
       activeBanner.length = 0; activeRoad.length = 0; activeAid.length = 0;

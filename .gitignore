@@ -5,3 +5,8 @@ play.html
 
 shots/video/
 clips/
+
+# Agent scratch. Several agents share this working tree and drop one-off probes
+# and cost scripts here; they are working notes, not part of the build, and a
+# stop-hook that demands a clean tree should not force them into history.
+tools/tmp/

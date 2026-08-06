@@ -244,12 +244,12 @@ MR.World = (function () {
     // strongest pull in the table by a distance.
     'THE WALL': {
       sky: [0x8a3a6b, 0.62], fog: [0xffb27a, 0.58],
-      // 0x8a6a79 is 0xe5b1ca at 0.605 -- same hue, two thirds the value.
-      ground: [0x8f9a5e, 0.52], road: [0x8a6a79, 0.42],
+      // 0x6e5560 is 0xe5b1ca at 0.483 -- same hue, half the value.
+      ground: [0x8f9a5e, 0.52], road: [0x6e5560, 0.42],
     },
     'FINAL MILE': {
-      // 0x9c8874 is 0xffe0c0 at 0.61.
-      sky: [0x3a2f7e, 0.34], fog: [0xffcf6b, 0.40], road: [0x9c8874, 0.16],
+      // 0x7d6d5d is 0xffe0c0 at 0.49.
+      sky: [0x3a2f7e, 0.34], fog: [0xffcf6b, 0.40], road: [0x7d6d5d, 0.16],
     },
   };
 
@@ -2471,8 +2471,8 @@ MR.World = (function () {
   }
 
   /** Vertex-coloured toon material -- the workhorse for merged props. */
-  function vtoon(steps) {
-    const m = S.toon(0xffffff, steps || 2);
+  function vtoon(steps, floor) {
+    const m = S.toon(0xffffff, steps || 2, floor);
     m.vertexColors = true;
     return m;
   }
@@ -2763,7 +2763,16 @@ MR.World = (function () {
       // baked vertex colour, so the tints in SETTING_LOOK all sit near white:
       // this can knock a value down, never lift one.
       edge: vtoon(2),
-      propLit: vtoon(3),
+      // HAZARDS GET A LIFTED RAMP FLOOR, and nothing else does. A hazard's
+      // read face points at the camera and therefore away from the key light,
+      // so on the scenery floor of 0.31 it was lit almost entirely by the blue
+      // bounce: the contrast audit measured the JUMP kerb's authored S 0.73
+      // arriving at 0.34 and every BLOCK landing between 1.1x and 1.6x the
+      // centre lane when the reference sits at 2.1-2.56x. See ramp() in
+      // shading.js for the derivation. This is the one class of object the
+      // race is lost by misreading, so it is the one class that spends its
+      // shading budget on chroma rather than on form.
+      propLit: vtoon(3, 0.62),
       water: new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, depthWrite: false }),
     };
 

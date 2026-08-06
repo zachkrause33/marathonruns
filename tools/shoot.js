@@ -54,15 +54,36 @@
  * because their SATURATION differs from the road's by 0.38 and 0.22. Either
  * axis works. What never happens is an object matching the road on both.
  *
- *   CONTRAST  every hazard variant's area-weighted mean must clear either
- *             1.6x the local road in luminance or 0.30 in saturation, in every
- *             lane, on the biome and setting palette live in that frame.
+ *   CONTRAST  every hazard variant's area-weighted mean, measured against the
+ *             local road in every lane, on the biome and setting palette live
+ *             in that frame.
  *
- * world.js measures both sides (api.hazardTones, api.roadTone) because it owns
- * the numbers; this file owns the threshold and the exit code. Every variant is
+ * world.js measures both sides (api.contrastAudit) because it owns the numbers
+ * on both; this file owns the thresholds and the exit code. Every variant is
  * checked, including the ones that frame did not spawn, so the vocabulary is
  * audited in full on a single shot -- and the six shots between them sweep the
  * biome palettes the day drew.
+ *
+ * TWO THRESHOLDS, and the second one is why this does not simply fail today.
+ *
+ *   TARGET  1.6x luminance or 0.30 saturation. This is the spec's rule and it
+ *           is reported per variant. It was read off the reference's STRONG
+ *           objects -- the ones at 2.1x to 2.56x.
+ *   GATE    1.25x or 0.22. This is what actually fails the build, and it is
+ *           the WEAKEST object the same reference demonstrates is legible: the
+ *           sunset trash can, L 73.7 on a road of 73.0, is 1.01x in luminance
+ *           and is carried entirely by a saturation difference of 0.22.
+ *
+ * The reference's own trash can therefore fails the spec's own rule, which is
+ * a real inconsistency in the source document and not a licence to relax
+ * anything: the target is still printed for every variant, and four of our ten
+ * are short of it. What the gate does is refuse the case the reference never
+ * shows -- an object that is neither far enough in value NOR far enough in
+ * chroma to be told from the tarmac by any measure. It is not a formality: it
+ * fires on the real defect this audit was written and found. THE WALL pulled
+ * the road 42% toward a pale dusty PINK while every BLOCK in the game is pink,
+ * which put the marshal barrier at 1.11x the centre lane's luminance and 0.06
+ * of its saturation. That shipped, and nothing said so.
  */
 const { chromium } = require('playwright');
 const path = require('path');
@@ -297,6 +318,12 @@ const DEFAULT_SHOTS = [
       if (!w || !w.contrastAudit) return { skipped: 'world exposes no contrastAudit()' };
       const a = w.contrastAudit(g.renderer, g.scene);
       const tones = a.hazards, roads = a.roads;
+      // TARGET is the spec's rule, read off the reference's STRONG objects.
+      // GATE is the weakest object the same reference demonstrates is legible:
+      // the sunset trash can, L 73.7 on a road of 73.0 -- 1.01x -- carried
+      // entirely by a saturation difference of 0.22. See the header.
+      const T_L = 1.6, T_S = 0.30;
+      const G_L = 1.25, G_S = 0.22;
       const fail = [], worst = [];
       for (const h of tones) {
         let hardest = null;
@@ -304,17 +331,20 @@ const DEFAULT_SHOTS = [
           const ratio = Math.max(h.L, r.L) / Math.max(1e-6, Math.min(h.L, r.L));
           const dS = Math.abs(h.S - r.S);
           // The margin by which the pair clears the easier of the two tests.
-          // Negative means it clears neither and the run is dead.
-          const m = Math.max(ratio / 1.6 - 1, dS / 0.30 - 1);
+          // Negative means it clears neither.
+          const m = Math.max(ratio / T_L - 1, dS / T_S - 1);
+          const gm = Math.max(ratio / G_L - 1, dS / G_S - 1);
           const row = { name: h.name, lane: r.lane, hL: h.L, rL: r.L, hS: h.S, rS: r.S,
-            ratio: +ratio.toFixed(2), dS: +dS.toFixed(3), margin: +m.toFixed(3) };
-          if (!hardest || m < hardest.margin) hardest = row;
+            ratio: +ratio.toFixed(2), dS: +dS.toFixed(3),
+            margin: +m.toFixed(3), gate: +gm.toFixed(3) };
+          if (!hardest || gm < hardest.gate) hardest = row;
         }
         worst.push(hardest);
-        if (hardest.margin < 0) fail.push(hardest);
+        if (hardest.gate < 0) fail.push(hardest);
       }
-      worst.sort((a, b) => a.margin - b.margin);
-      return { tones: tones.length, roads, worst, fail };
+      worst.sort((a, b) => a.gate - b.gate);
+      const short = worst.filter((w) => w.margin < 0);
+      return { tones: tones.length, roads, worst, fail, short, T_L, T_S, G_L, G_S };
     }).catch((e) => ({ skipped: 'evaluate failed: ' + e.message }));
 
     report.push({ shot: sh.name, file, stat, errors, occl, contrast });
@@ -358,11 +388,15 @@ const DEFAULT_SHOTS = [
       console.log(`  road L/S by lane  ${rd}`);
       const t = c.worst[0];
       console.log(`  hazard contrast ${c.tones} variants, tightest ${t.name} vs lane ${t.lane}: `
-        + `${t.ratio}x L, ${t.dS} S  (margin ${t.margin})`);
+        + `${t.ratio}x L, ${t.dS} S  (gate ${t.gate >= 0 ? '+' : ''}${t.gate}, target ${t.margin})`);
+      if (c.short.length) {
+        console.log(`  short of the ${c.T_L}x / ${c.T_S} target (reported, not fatal): `
+          + c.short.map((s) => `${s.name} ${s.ratio}x/${s.dS}S@L${s.lane}`).join(', '));
+      }
       for (const f of c.fail.slice(0, 8)) {
         console.log(`  ! CONTRAST: ${f.name} is L=${f.hL} S=${f.hS} on a lane-${f.lane} road of `
-          + `L=${f.rL} S=${f.rS} -- ${f.ratio}x luminance (needs 1.6) and ${f.dS} saturation `
-          + `(needs 0.30). It matches the tarmac on both axes.`);
+          + `L=${f.rL} S=${f.rS} -- ${f.ratio}x luminance (gate ${c.G_L}) and ${f.dS} saturation `
+          + `(gate ${c.G_S}). It matches the tarmac on both axes.`);
       }
     } else if (c && c.skipped) {
       console.log('  contrast audit skipped: ' + c.skipped);

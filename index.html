@@ -4847,8 +4847,8 @@ MR.World = (function () {
       tower: { colors: [0x2f3550, 0x3a4160, 0x4a5270], glass: 1, crown: 'antenna' },
       tree: { kind: 'round', colors: [0x3f9a52, 0x4faf5f, 0x62c470], h: 1.0 },
       marks: {
-        'CITY START': [{ k: 'willis', x: 20 }, { k: 'lTrack', over: 1 }],
-        'RIVERSIDE': [{ k: 'lTrack', over: 1 }, { k: 'crane', x: 13 }, { k: 'willis', x: 22 }],
+        'CITY START': [{ k: 'willis', x: 20 }, { k: 'lTrack', over: 1, run: 48, alt: 'lTrackTrain', every: 3 }],
+        'RIVERSIDE': [{ k: 'lTrack', over: 1, run: 48, alt: 'lTrackTrain', every: 3 }, { k: 'crane', x: 13 }, { k: 'willis', x: 22 }],
         'PARKLAND': [{ k: 'oak', x: 15 }, { k: 'pond', x: 27 }],
         'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'willis', x: 19 }],
         'FINAL MILE': [{ k: 'willis', x: 20 }, { k: 'jumbo', x: 13.5 }],
@@ -4968,8 +4968,8 @@ MR.World = (function () {
       tower: { colors: [0x8f6a58, 0xa88070, 0xc8a890], glass: 0, crown: 'flat' },
       tree: { kind: 'round', colors: [0x429a55, 0x52ae62, 0x64c070], h: 1.15 },
       marks: {
-        'CITY START': [{ k: 'canal', x: 20 }, { k: 'westerkerk', x: 15 }],
-        'RIVERSIDE': [{ k: 'canal', x: 20 }, { k: 'westerkerk', x: 16 }],
+        'CITY START': [{ k: 'canal', x: 20, run: 40, alt: 'canalBridge', every: 3, side: -1 }, { k: 'westerkerk', x: 15 }],
+        'RIVERSIDE': [{ k: 'canal', x: 20, run: 40, alt: 'canalBridge', every: 3, side: -1 }, { k: 'westerkerk', x: 16 }],
         'PARKLAND': [{ k: 'oak', x: 15 }, { k: 'pond', x: 27 }],
         'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'westerkerk', x: 15 }],
         'FINAL MILE': [{ k: 'westerkerk', x: 15 }, { k: 'jumbo', x: 13.5 }],
@@ -5010,11 +5010,11 @@ MR.World = (function () {
       tower: { colors: [0xdce4ec, 0xc8d4e0, 0xf0f4f8], glass: 1, crown: 'flat' },
       tree: { kind: 'scrub', colors: [0x6f9a4a, 0x8fae5a, 0x5f8f56], h: 0.9 },
       marks: {
-        'CITY START': [{ k: 'tableMountain', x: 120 }, { k: 'clock', x: 15 }],
-        'RIVERSIDE': [{ k: 'tableMountain', x: 130 }, { k: 'ship', x: 34, y: -0.12 }],
-        'PARKLAND': [{ k: 'tableMountain', x: 120 }, { k: 'oak', x: 15 }],
-        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'tableMountain', x: 120 }],
-        'FINAL MILE': [{ k: 'tableMountain', x: 120 }, { k: 'jumbo', x: 13.5 }],
+        'CITY START': [{ k: 'tableMountain', x: 120, run: 220, side: -1 }, { k: 'clock', x: 15 }],
+        'RIVERSIDE': [{ k: 'tableMountain', x: 130, run: 220, side: -1 }, { k: 'ship', x: 34, y: -0.12 }],
+        'PARKLAND': [{ k: 'tableMountain', x: 120, run: 220, side: -1 }, { k: 'oak', x: 15 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'tableMountain', x: 120, run: 220, side: -1 }],
+        'FINAL MILE': [{ k: 'tableMountain', x: 120, run: 220, side: -1 }, { k: 'jumbo', x: 13.5 }],
       },
       bridge: 'tower',
     },
@@ -5142,12 +5142,35 @@ MR.World = (function () {
     return t;
   }
 
-  /** Window grid for buildings. Repeat is set per instance so windows keep a
-   *  constant world size no matter how the box is scaled. */
-  function windowTexture() {
+  /**
+   * Window grid for buildings. Repeat is set per instance so windows keep a
+   * constant world size no matter how the box is scaled.
+   *
+   * Two styles, because a punched window and a curtain wall are different
+   * BUILDINGS and not different colours of the same one: `glass` gives the
+   * continuous horizontal spandrel banding that says post-war office tower,
+   * and it is most of what separates a Chicago block from a Roman one once
+   * the tint has been applied.
+   */
+  function windowTexture(glass) {
     const c = canvas(64, 64);
     const g = c.getContext('2d');
     g.fillStyle = '#ffffff'; g.fillRect(0, 0, 64, 64);
+    if (glass) {
+      for (let ry = 0; ry < 2; ry++) {
+        g.fillStyle = ry ? '#b8cfe8' : '#9fb8d8';
+        g.fillRect(0, ry * 32 + 6, 64, 19);
+        g.fillStyle = 'rgba(255,255,255,0.55)';
+        g.fillRect(0, ry * 32 + 6, 64, 3);
+        g.fillStyle = 'rgba(24,20,50,0.28)';
+        g.fillRect(0, ry * 32 + 23, 64, 3);
+        for (let k = 0; k < 8; k++) {
+          g.fillStyle = 'rgba(24,20,50,0.16)';
+          g.fillRect(k * 8 + 3, ry * 32 + 6, 2, 19);
+        }
+      }
+      return texture(c, true);
+    }
     const lit = ['#ffe9a8', '#cfe4ff', '#8fa6cc', '#6f86b4'];
     for (let ry = 0; ry < 2; ry++) {
       for (let rx = 0; rx < 2; rx++) {
@@ -5499,7 +5522,7 @@ MR.World = (function () {
           // what makes an arcade read as pierced rather than as a decorated
           // wall, and at distance it is the only part that survives.
           sub.push(bx(o.d * 0.5, o.tierH * 0.62, bw * 0.62, -o.d * 0.26,
-            y0 + o.tierH * 0.42, 0, o.void || 0x4a4058));
+            y0 + o.tierH * 0.42, 0, o.voidC || 0x4a4058));
           vArc(sub, {
             cx: 0, cy: y0 + o.tierH * 0.44, cz: 0,
             rx: bw * 0.34, ry: o.tierH * 0.26, n: 5, th: o.tierH * 0.12,
@@ -6053,8 +6076,9 @@ MR.World = (function () {
       parts.push(cyl(3.2, 6.0, 3.0, 12, 0, 1.5, 0, C2));
       parts.push(cyl(1.5, 3.2, 34.0, 12, 0, 20.0, 0, C));
       for (let i = 0; i < 6; i++) {
-        parts.push(cyl(1.55 + 0.28 * (1 - i / 6) * 3, 1.55 + 0.28 * (1 - i / 6) * 3, 0.3, 12,
-          0, 8.0 + i * 5.0, 0, C2));
+        const y = 8.0 + i * 5.0;
+        const r = 3.2 - (y - 3.0) / 34.0 * 1.7 + 0.30;
+        parts.push(cyl(r, r, 0.3, 12, 0, y, 0, C2));
       }
       parts.push(sph(5.6, 12, 0, 39.5, 0, 0xd0d8e8));
       parts.push(cyl(5.7, 5.7, 1.1, 14, 0, 39.5, 0, 0xf4f8ff));
@@ -6494,7 +6518,7 @@ MR.World = (function () {
           parts.push(bx(3.0, 3.4, 0.4, sx * 14.4, 15.0, sz * 7.6, DARK));
         }
       }
-      vArc(parts, { cx: 0, cy: 9.6, rx: 12.0, ry: 7.4, n: 9, th: 1.3, d: 15.2, color: S2, alt: S });
+      vArc(parts, { cx: 0, cy: 9.8, rx: 12.6, ry: 7.4, n: 9, th: 1.3, d: 15.2, color: S2, alt: S });
       parts.push(bx(24.0, 3.4, 15.0, 0, 18.7, 0, S));
       parts.push(bx(45.0, 1.2, 16.0, 0, 21.0, 0, S2));
       parts.push(bx(43.0, 4.6, 14.0, 0, 23.9, 0, S));
@@ -6589,24 +6613,34 @@ MR.World = (function () {
       return merge(parts);
     },
 
-    /** A single inclined white pylon with harp cables. */
+    /**
+     * A single inclined white pylon with harp cables -- Valencia's Calatrava
+     * span. The pylon leans BACK ALONG THE COURSE rather than sideways, which
+     * is what a real harp bridge does and what keeps every cable in one plane:
+     * the whole fan is a rotation about x, so it stays true instead of being
+     * approximated with a compound Euler that does not compose.
+     */
     harp: function () {
       const parts = [];
       const W = 0xfbfbf6, W2 = 0xdde4e4;
-      parts.push(bx(5.0, 4.0, 9.0, 9.6, 1.0, 0, W2));
-      // The pylon leans back over the water, away from the road.
-      const H = 40;
-      parts.push(cyl(0.8, 2.4, H, 10, 12.6, H / 2 + 1.5, 0, W, 0, 0, -0.30));
-      parts.push(cyl(0.5, 0.9, 6.0, 8, 18.4, H + 3.0, 0, W2, 0, 0, -0.30));
+      const PX = 9.8, LEAN = 0.34, H = 42;
+      parts.push(bx(5.4, 4.0, 11.0, PX, 1.2, -6, W2));
+      const top = [PX, 2.0 + H * Math.cos(LEAN), -H * Math.sin(LEAN)];
+      parts.push(cyl(0.75, 2.4, H, 10, PX, 2.0 + H * 0.5 * Math.cos(LEAN),
+        -H * 0.5 * Math.sin(LEAN), W, LEAN));
+      parts.push(cyl(0.4, 0.8, 7.0, 8, top[0], top[1] + 3.3 * Math.cos(LEAN),
+        top[2] - 3.3 * Math.sin(LEAN), W2, LEAN));
       for (let i = 0; i < 11; i++) {
-        const ty = 8.0 + i * 2.9;
-        const px = 12.6 + ty * 0.305;
-        const z = -34 + i * 6.4;
-        const len = Math.hypot(px - 9.6, ty - 2.0, z);
-        parts.push(bx(0.22, len, 0.22, (px + 9.6) / 2, (ty + 2.0) / 2, z / 2, W2,
-          Math.atan2(z, ty - 2.0), 0, Math.atan2(px - 9.6, ty - 2.0)));
+        const t = 0.30 + i * 0.064;
+        const ay = 2.0 + H * t * Math.cos(LEAN);
+        const az = -H * t * Math.sin(LEAN);
+        const bz = 6 + i * 6.6;
+        const dy = ay - 2.2, dz = az - bz;
+        const len = Math.hypot(dy, dz);
+        parts.push(bx(0.22, len, 0.22, PX, (ay + 2.2) / 2, (az + bz) / 2, W2,
+          Math.atan2(dz, dy)));
       }
-      parts.push(bx(3.0, 1.2, 76.0, 9.6, 1.6, 0, W));
+      parts.push(bx(3.0, 1.4, 84.0, PX, 1.6, 0, W));
       return merge(parts);
     },
 
@@ -6697,38 +6731,83 @@ MR.World = (function () {
       return merge(parts);
     },
 
-    /** The Magere Brug: a white timber double bascule. */
+    /**
+     * The Magere Brug: a white timber double bascule.
+     *
+     * Every member is either outboard of the deck rail (|x| >= 5.4) or above
+     * OVERHEAD_Y, which is the rule the whole overhead layer is built on: the
+     * A-frames stand off the deck edge, the crown beams cross the road at 12.9
+     * and the hanger rods hang over the water, never over a lane.
+     */
     magere: function () {
       const parts = [];
       const W = 0xf4f2e6, W2 = 0xdcd6c4, DARK = 0x5f5648;
       for (const sz of [-1, 1]) {
         const z = sz * 11;
         for (const sx of [-1, 1]) {
-          // A-frames over the deck. The crown beam sits at 12.6, comfortably
-          // above the overhead layer and far above anything the camera reaches.
-          parts.push(bx(0.9, 13.5, 0.9, sx * 8.0, 6.4, z, W, 0, 0, sx * 0.13));
-          parts.push(bx(0.7, 0.7, 3.0, sx * 7.2, 12.2, z, W2));
+          parts.push(bx(0.9, 13.5, 0.9, sx * 5.7, 6.4, z, W, 0, 0, sx * 0.09));
+          parts.push(bx(0.7, 0.7, 3.0, sx * 5.1, 12.2, z, W2));
         }
-        parts.push(bx(18.0, 0.9, 1.2, 0, 12.9, z, W));
-        parts.push(bx(17.0, 0.7, 0.7, 0, 11.2, z, W2));
-        // The counterweight beams, canted down toward the middle: this is the
-        // shape a drawbridge has and nothing else does.
+        parts.push(bx(13.0, 0.9, 1.2, 0, 12.9, z, W));
+        parts.push(bx(12.0, 0.7, 0.7, 0, 11.4, z, W2));
+        // The counterweight beams, canted down and away from the middle: this
+        // is the shape a drawbridge has and nothing else does.
         for (const sx of [-1, 1]) {
-          parts.push(bx(13.0, 0.7, 0.7, sx * 5.6, 10.2, z - sz * 3.0, W, 0, 0, -sx * sz * 0.30));
-          parts.push(bx(2.0, 1.8, 1.6, sx * 11.0, 8.0, z - sz * 3.0, DARK));
+          parts.push(bx(13.0, 0.7, 0.7, sx * 11.4, 9.4, z - sz * 3.2, W, 0, 0, sx * 0.34));
+          parts.push(bx(2.0, 1.8, 1.6, sx * 17.4, 7.2, z - sz * 3.2, DARK));
           for (let i = 0; i < 4; i++) {
-            parts.push(bx(0.3, 3.4, 0.3, sx * (3.0 + i * 2.6), 7.4 - i * 0.5, z - sz * 3.0, W2));
+            parts.push(bx(0.3, 3.2, 0.3, sx * (6.6 + i * 2.6), 7.6 - i * 0.9, z - sz * 3.2, W2));
           }
         }
       }
       for (const sx of [-1, 1]) {
-        parts.push(bx(0.5, 1.8, 26.0, sx * 5.2, 1.4, 0, W));
+        parts.push(bx(0.5, 1.8, 26.0, sx * 5.0, 1.4, 0, W));
         for (let i = 0; i < 10; i++) {
-          parts.push(bx(0.3, 1.4, 0.3, sx * 5.2, 1.2, -12 + i * 2.6, W2));
+          parts.push(bx(0.3, 1.4, 0.3, sx * 5.0, 1.2, -12 + i * 2.6, W2));
         }
       }
       return merge(parts);
     },
+
+    // ---- fallbacks and remaining spans ---------------------------------
+    /**
+     * The Zakim: inverted-Y pylons straddling the deck with a cable fan.
+     *
+     * The legs stand outside the deck rail and meet ABOVE the road at 20, so
+     * the one thing crossing the carriageway is the stem, eleven units clear
+     * of OVERHEAD_Y. It is the shape Boston puts on its own postcards and it
+     * is nothing like any other bridge in the pool.
+     */
+    zakim: function () {
+      const parts = [];
+      const W = 0xf0f2fa, W2 = 0xc4cad8, CABLE = 0xd8dce8;
+      for (const sz of [-1, 1]) {
+        const z = sz * 34;
+        for (const sx of [-1, 1]) {
+          parts.push(bx(2.0, 22.0, 2.6, sx * 8.6, 10.0, z, W, 0, 0, sx * 0.32));
+          parts.push(bx(3.2, 1.0, 3.6, sx * 8.6, -0.4, z, W2));
+        }
+        parts.push(bx(9.0, 2.2, 3.0, 0, 20.4, z, W));
+        parts.push(bx(2.6, 22.0, 2.6, 0, 32.0, z, W));
+        parts.push(cone(1.9, 5.0, 4, 0, 45.4, z, W2));
+        // The fan. Cables drop from the stem to the deck edge on both sides,
+        // in the ZY plane, so the rotation is a single turn about x.
+        for (let i = 0; i < 9; i++) {
+          const ay = 26.0 + i * 2.1;
+          const bzo = sz * (10 + i * 7.0);
+          for (const sx of [-1, 1]) {
+            const dy = ay - 2.0, dz = z - (z + bzo);
+            const len = Math.hypot(dy, dz);
+            parts.push(bx(0.20, len, 0.20, sx * 5.0, (ay + 2.0) / 2, z + bzo / 2, CABLE,
+              Math.atan2(-bzo, dy)));
+          }
+        }
+      }
+      return merge(parts);
+    },
+
+    /** The generic span, for a setting with no bridge of its own. */
+    tower: function () { return mkSuspension(0xff6a5e, 0xd8455e, 0xffe45e); },
 
     // ---- ROME ----------------------------------------------------------
     /** The Colosseum: a curved tiered arcade, broken at one end. Reach -9.0. */
@@ -6737,7 +6816,7 @@ MR.World = (function () {
       vArcade(parts, {
         bays: 15, bayW: 4.6, tiers: 3, tierH: 6.0, y0: 1.2, d: 5.0,
         radius: 34, ruin: 2, attic: 4.4, openTiers: 3, inset: -4.2,
-        color: 0xe0c48c, color2: 0xc8a86c, void: 0x6a5540, seed: 23,
+        color: 0xe0c48c, color2: 0xc8a86c, voidC: 0x6a5540, seed: 23,
       });
       parts.push(bx(6.0, 1.2, 62.0, -6.6, 0.6, 0, 0xd8ccae));
       return merge(parts);
@@ -6754,7 +6833,7 @@ MR.World = (function () {
         vArc(parts, { cx: sx * 26.0, cy: 8.0, rx: 6.0, ry: 4.6, n: 7, th: 0.9, d: 7.0, color: S2, alt: S });
         parts.push(bx(6.0, 8.0, 8.0, sx * 32.6, 4.0, 0, S));
       }
-      vArc(parts, { cx: 0, cy: 9.6, rx: 12.4, ry: 8.2, n: 9, th: 1.1, d: 8.2, color: S2, alt: S });
+      vArc(parts, { cx: 0, cy: 9.8, rx: 13.0, ry: 8.2, n: 9, th: 1.1, d: 8.2, color: S2, alt: S });
       parts.push(bx(80.0, 2.4, 8.4, 0, 19.2, 0, S));
       parts.push(bx(81.0, 0.8, 9.2, 0, 20.8, 0, S2));
       // The channel on top, which is what an aqueduct is FOR.
@@ -7017,7 +7096,7 @@ MR.World = (function () {
     // after the first and so re-rolls the whole layout. Naming that is cheaper
     // than wondering later why a day's scenery moved. (v3 was the pass that
     // dropped the rival and station entries, for the same reason.)
-    const rnd = MR.rng.stream(course.key, 'scenery/v4');
+    const rnd = MR.rng.stream(course.key, 'scenery/v5');
 
     // Biome spans in world units, so road tiles and set pieces can ask "where
     // am I" without reconstructing the fraction every time.
@@ -7038,6 +7117,72 @@ MR.World = (function () {
       return b;
     }
     const BRIDGE = BI.find((b) => b.name === 'THE BRIDGE');
+
+    // ---- the day's settings ----------------------------------------------
+    /**
+     * Where this race is being run, in world units, in the order it is run
+     * through. course.js draws three or four of the twelve and hands them over
+     * as fractions of race distance; everything below works in units, exactly
+     * like BI, so a road tile or a set piece can ask "which city am I in"
+     * without reconstructing the fraction.
+     *
+     * A course with no settings on it -- an older saved course, or a caller
+     * building a world by hand -- gets one pseudo-setting carrying the old
+     * per-biome palette, so this file still renders the game it used to.
+     */
+    const SETS = (course.settings && course.settings.length
+      ? course.settings.map(function (s) {
+        return {
+          tag: s.tag, name: s.name,
+          from: s.from * K.TOTAL_UNITS, to: s.to * K.TOTAL_UNITS,
+          look: SETTING_LOOK[s.tag] || fallbackSetting('CITY START'),
+        };
+      })
+      : [{ tag: '', name: '', from: 0, to: K.TOTAL_UNITS, look: null }]);
+    const LEGACY = !(course.settings && course.settings.length);
+
+    /**
+     * THE CROSS-FADE, and why it is a distance and not a fraction.
+     *
+     * A setting lasts sixty to eighty seconds. The handover has to be long
+     * enough that nothing snaps and short enough that the player is never in
+     * two cities at once, and the honest unit for that is METRES OF ROAD, not
+     * a share of the race: at race pace 190 units is about seven seconds,
+     * which is two or three gates and roughly the time the fog takes to hand
+     * a building over from "arriving" to "readable".
+     *
+     * Everything crosses on this one number -- sky, fog, ground, road, the
+     * roadside tint AND the content, which dithers across the same band
+     * instead of switching on a line (see settingIndexAt). Fading the palette
+     * while cutting the buildings would be worse than cutting both.
+     */
+    const SET_FADE = 190;
+
+    function setIndexAt(z) {
+      let i = 0;
+      for (let k = 0; k < SETS.length; k++) if (z >= SETS[k].from) i = k;
+      return i;
+    }
+    /** The setting at z, ignoring the fade -- for anything that must be one. */
+    function setAtZ(z) { return SETS[setIndexAt(z)]; }
+    /** 0 at the boundary, 1 once the new setting owns the frame outright. */
+    function setFadeAt(z) {
+      const i = setIndexAt(z);
+      if (!i) return 1;
+      return Math.max(0, Math.min(1, (z - SETS[i].from) / SET_FADE));
+    }
+    /**
+     * Which setting a PROP belongs to. Inside the fade band the choice is
+     * dithered from the layout stream, so the two cities interleave along the
+     * road over 190 units -- the old street thins out as the new one thickens,
+     * which is what a cross-fade means for content that cannot be blended.
+     */
+    function settingIndexAt(z, r) {
+      const i = setIndexAt(z);
+      if (!i) return 0;
+      const t = setFadeAt(z);
+      return (r < t) ? i : i - 1;
+    }
 
     // The deck is inset from the biome boundary so the abutments have room to
     // cap the ends; the water sinks over a 190-unit ramp on each side, which
@@ -7070,6 +7215,12 @@ MR.World = (function () {
       shoulder: S.toon(P.ground, 2),
       paint: new THREE.MeshBasicMaterial({ vertexColors: true }),
       prop: vtoon(2),
+      // The roadside furniture gets its own material so a setting can put a
+      // little of its own light on the barriers, hedges and parapets without
+      // dragging every tree and spectator with it. It only ever multiplies a
+      // baked vertex colour, so the tints in SETTING_LOOK all sit near white:
+      // this can knock a value down, never lift one.
+      edge: vtoon(2),
       propLit: vtoon(3),
       water: new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, depthWrite: false }),
     };
@@ -7665,10 +7816,10 @@ MR.World = (function () {
       // One of these is shown at a time; keeping all three built means a
       // biome change is a visibility flip rather than a rebuild.
       const edges = {
-        barrier: S.outlined(barrierGeo, mats.prop, S.INK.prop),
-        hedge: S.outlined(hedgeGeo, mats.prop, S.INK.prop),
-        rail: S.outlined(railGeo, mats.prop, S.INK.prop),
-        wall: S.outlined(wallGeo, mats.prop, S.INK.prop),
+        barrier: S.outlined(barrierGeo, mats.edge, S.INK.prop),
+        hedge: S.outlined(hedgeGeo, mats.edge, S.INK.prop),
+        rail: S.outlined(railGeo, mats.edge, S.INK.prop),
+        wall: S.outlined(wallGeo, mats.edge, S.INK.prop),
       };
       for (const k in edges) { edges[k].visible = false; t.add(edges[k]); }
       t.userData.shoulders = shoulders;
@@ -8450,18 +8601,21 @@ MR.World = (function () {
 
     // ---- scenery --------------------------------------------------------
 
-    const winTex = windowTexture();
+    const winTex = [windowTexture(0), windowTexture(1)];
     const unitBox = new THREE.BoxGeometry(1, 1, 1);
 
     const buildingPool = Pool(function () {
       const g = new THREE.Group();
-      // Each building owns its texture so `repeat` can hold the window size
+      // Each building owns its textures so `repeat` can hold the window size
       // constant while the box is scaled to any height -- one shared texture
-      // would smear a 30-unit tower's windows into stripes.
-      const tex = winTex.clone();
-      tex.needsUpdate = true;
+      // would smear a 30-unit tower's windows into stripes. Both styles are
+      // cloned per object because the pool has to be able to hand the same
+      // slot to a punched-window brick block and to a glass tower on
+      // consecutive claims; a 64x64 canvas texture is a rounding error.
+      const tex = [winTex[0].clone(), winTex[1].clone()];
+      tex[0].needsUpdate = tex[1].needsUpdate = true;
       const mat = S.toon(0xffffff, 2);
-      mat.map = tex;
+      mat.map = tex[0];
       const body = new THREE.Mesh(unitBox, mat);
       const line = new THREE.Mesh(unitBox, S.outlineMaterial(S.INK.scenery));
       line.renderOrder = -1;
@@ -8477,36 +8631,24 @@ MR.World = (function () {
       return g;
     }, group);
 
-    // Trees: three stacked cones and a trunk in one mesh.
-    const treeGeo = merge([
-      cyl(0.17, 0.26, 1.3, 6, 0, 0.65, 0, 0x8a5a3c),
-      cone(1.30, 1.7, 8, 0, 2.0, 0, 0x35a855),
-      cone(1.05, 1.5, 8, 0, 2.9, 0, 0x3fbf63),
-      cone(0.75, 1.2, 8, 0, 3.7, 0, 0x59d47a),
-    ]);
-    const treePool = Pool(function () {
-      const g = S.outlined(treeGeo, mats.prop, S.INK.prop);
-      return g;
-    }, group);
-
     /**
      * A grove: five trees and undergrowth in one mesh. Single trees at the
      * density the seeded stream can afford left PARKLAND reading as a mown
      * field; a clump costs the same draw and fills the middle distance.
+     *
+     * The trees in it are the SETTING's trees, so a Roman grove is stone pines
+     * and a Valencian one is palms. The undergrowth takes the same palette,
+     * which is what stops a palm grove sitting on temperate-green scrub.
      */
-    function groveGeo(seed) {
+    function groveGeo(seed, prof) {
       const parts = [];
       let s = seed;
       const r = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
-      const greens = [0x2f9f52, 0x35a855, 0x3fbf63, 0x59d47a, 0x2b8f6a];
+      const greens = prof.colors;
       for (let i = 0; i < 5; i++) {
-        const x = -5 + r() * 10, z = -6 + r() * 12;
-        const k = 0.75 + r() * 0.85;
-        const g0 = greens[Math.floor(r() * greens.length)];
-        parts.push(cyl(0.17 * k, 0.28 * k, 1.4 * k, 6, x, 0.7 * k, z, 0x8a5a3c));
-        parts.push(cone(1.45 * k, 1.9 * k, 8, x, 2.1 * k, z, g0));
-        parts.push(cone(1.15 * k, 1.6 * k, 8, x, 3.0 * k, z, g0));
-        parts.push(cone(0.80 * k, 1.3 * k, 8, x, 3.9 * k, z, 0x59d47a));
+        const sub = [];
+        vTree(sub, prof, 0.75 + r() * 0.6);
+        placeAt(parts, sub, -5 + r() * 10, 0, -6 + r() * 12, r() * 6.3);
       }
       for (let i = 0; i < 6; i++) {
         parts.push(cone(0.8 + r() * 0.5, 1.0 + r() * 0.6, 6, -6 + r() * 12, 0.4, -7 + r() * 14,
@@ -8514,10 +8656,52 @@ MR.World = (function () {
       }
       return merge(parts);
     }
-    const groveGeos = [groveGeo(5), groveGeo(29), groveGeo(97)];
-    const grovePool = groveGeos.map((geo) => Pool(function () {
-      return S.outlined(geo, mats.prop, S.INK.prop);
-    }, group));
+
+    // ---- per-setting content pools ---------------------------------------
+    /**
+     * Trees, groves and street rows, built once per setting the day drew --
+     * three or four of them, never twelve. A pool per setting rather than one
+     * pool re-tinted, because these are different SHAPES: a palm is not a
+     * recoloured conifer and no amount of material work would make it one.
+     */
+    const treePools = SETS.map(function (st) {
+      const parts = [];
+      vTree(parts, st.look.tree, 1);
+      const geo = merge(parts);
+      return Pool(function () { return S.outlined(geo, mats.prop, S.INK.prop); }, group);
+    });
+    const grovePools = SETS.map(function (st) {
+      return [5, 29, 97].map(function (seed) {
+        const geo = groveGeo(seed, st.look.tree);
+        return Pool(function () { return S.outlined(geo, mats.prop, S.INK.prop); }, group);
+      });
+    });
+
+    /**
+     * THE STREET WALL. Three row variants per setting, laid on a grid down
+     * both shoulders wherever the biome says there is a street.
+     *
+     * This is the single highest-value thing in the whole feature and it is
+     * also the cheapest: one merged draw call per row, ten rows live at the
+     * spawn window's full depth, and it is in frame permanently instead of
+     * once a minute like a landmark. Amsterdam's stepped gables and Bo-Kaap's
+     * flat saturated blocks do more to name a city from a still than any tower
+     * does, because they are what the road actually runs between.
+     *
+     * The front face lands at 12.2 -- just behind the eight units of pavement
+     * the tile carries -- so a row crowds the frame edge the way the reference
+     * games' foreground props do, without ever coming near the corridor.
+     */
+    const STREET_LEN = 30;
+    const streetPools = SETS.map(function (st) {
+      const t = st.look.terrace;
+      return [11, 47, 83].map(function (seed) {
+        const parts = [];
+        vTerrace(parts, Object.assign({ bays: Math.max(3, Math.round(STREET_LEN / t.bay)) }, t), seed);
+        const geo = merge(parts);
+        return Pool(function () { return S.outlined(geo, mats.prop, S.INK.scenery); }, group);
+      });
+    });
 
     /**
      * A knot of spectators, merged. Individual capsules read as pills and cost

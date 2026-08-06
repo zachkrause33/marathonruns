@@ -45,11 +45,16 @@
  *      deliberately: see SLIDE_YAW, which spends width to get an axis the back
  *      view can actually measure. It is paid for out of leg splay.
  *
- *      The crown is the number that moved most, 1.32 -> 0.71, and it is the
+ *      The crown is the number that moved most, 1.32 -> 0.72, and it is the
  *      whole of the head fix: the slide's top is now the trunk and the leading
  *      shoe, level with each other, with the tucked head 0.02 under them
  *      instead of 0.6 over. See NECK_SLIDE_X. collision.js sets the DUCK bar at
- *      1.41, so where the old pose left 0.09 of daylight this leaves 0.70.
+ *      1.41, so where the old pose left 0.09 of daylight this leaves 0.69.
+ *      The wardrobe pass cost 0.010 of that -- measured vertex by vertex
+ *      rather than off the bounding box, the run and jump silhouettes came
+ *      through it IDENTICAL and the slide's crown rose by the thickness of
+ *      the hood roll now lying on the upper back, which is the one new part
+ *      that is allowed to be there.
  *
  *      An arm tuck is not readable at all, because it points straight down
  *      the camera axis where there is nothing to see -- which is what the old
@@ -808,6 +813,15 @@ MR.Runner = (function () {
     }
     // Nominal panel radius, so an amplitude in world units can be turned into
     // the radial scale that produces it.
+    //
+    // The geometry's bounding box and sphere are deliberately never
+    // recomputed after a deformation. Box3.setFromObject() caches whatever it
+    // finds on the first call, so the road clamp below sees a bib frozen at
+    // one flutter phase -- which is what it should see: the clamp has to be a
+    // stable function of the POSE, and a limit that jittered with a piece of
+    // cloth would make the whole body twitch. The panel is on the upper back
+    // and is never the lowest part of anything, so the 0.04 it is out by can
+    // never reach the answer.
     const BIB_R = 0.26;
 
     // Secondary-motion state. Two springs for the hood and a free-running

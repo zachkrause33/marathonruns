@@ -4098,18 +4098,21 @@ MR.World = (function () {
 
     // ---- scenery --------------------------------------------------------
 
-    const winTex = windowTexture();
+    const winTex = [windowTexture(0), windowTexture(1)];
     const unitBox = new THREE.BoxGeometry(1, 1, 1);
 
     const buildingPool = Pool(function () {
       const g = new THREE.Group();
-      // Each building owns its texture so `repeat` can hold the window size
+      // Each building owns its textures so `repeat` can hold the window size
       // constant while the box is scaled to any height -- one shared texture
-      // would smear a 30-unit tower's windows into stripes.
-      const tex = winTex.clone();
-      tex.needsUpdate = true;
+      // would smear a 30-unit tower's windows into stripes. Both styles are
+      // cloned per object because the pool has to be able to hand the same
+      // slot to a punched-window brick block and to a glass tower on
+      // consecutive claims; a 64x64 canvas texture is a rounding error.
+      const tex = [winTex[0].clone(), winTex[1].clone()];
+      tex[0].needsUpdate = tex[1].needsUpdate = true;
       const mat = S.toon(0xffffff, 2);
-      mat.map = tex;
+      mat.map = tex[0];
       const body = new THREE.Mesh(unitBox, mat);
       const line = new THREE.Mesh(unitBox, S.outlineMaterial(S.INK.scenery));
       line.renderOrder = -1;
@@ -4125,36 +4128,24 @@ MR.World = (function () {
       return g;
     }, group);
 
-    // Trees: three stacked cones and a trunk in one mesh.
-    const treeGeo = merge([
-      cyl(0.17, 0.26, 1.3, 6, 0, 0.65, 0, 0x8a5a3c),
-      cone(1.30, 1.7, 8, 0, 2.0, 0, 0x35a855),
-      cone(1.05, 1.5, 8, 0, 2.9, 0, 0x3fbf63),
-      cone(0.75, 1.2, 8, 0, 3.7, 0, 0x59d47a),
-    ]);
-    const treePool = Pool(function () {
-      const g = S.outlined(treeGeo, mats.prop, S.INK.prop);
-      return g;
-    }, group);
-
     /**
      * A grove: five trees and undergrowth in one mesh. Single trees at the
      * density the seeded stream can afford left PARKLAND reading as a mown
      * field; a clump costs the same draw and fills the middle distance.
+     *
+     * The trees in it are the SETTING's trees, so a Roman grove is stone pines
+     * and a Valencian one is palms. The undergrowth takes the same palette,
+     * which is what stops a palm grove sitting on temperate-green scrub.
      */
-    function groveGeo(seed) {
+    function groveGeo(seed, prof) {
       const parts = [];
       let s = seed;
       const r = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
-      const greens = [0x2f9f52, 0x35a855, 0x3fbf63, 0x59d47a, 0x2b8f6a];
+      const greens = prof.colors;
       for (let i = 0; i < 5; i++) {
-        const x = -5 + r() * 10, z = -6 + r() * 12;
-        const k = 0.75 + r() * 0.85;
-        const g0 = greens[Math.floor(r() * greens.length)];
-        parts.push(cyl(0.17 * k, 0.28 * k, 1.4 * k, 6, x, 0.7 * k, z, 0x8a5a3c));
-        parts.push(cone(1.45 * k, 1.9 * k, 8, x, 2.1 * k, z, g0));
-        parts.push(cone(1.15 * k, 1.6 * k, 8, x, 3.0 * k, z, g0));
-        parts.push(cone(0.80 * k, 1.3 * k, 8, x, 3.9 * k, z, 0x59d47a));
+        const sub = [];
+        vTree(sub, prof, 0.75 + r() * 0.6);
+        placeAt(parts, sub, -5 + r() * 10, 0, -6 + r() * 12, r() * 6.3);
       }
       for (let i = 0; i < 6; i++) {
         parts.push(cone(0.8 + r() * 0.5, 1.0 + r() * 0.6, 6, -6 + r() * 12, 0.4, -7 + r() * 14,
@@ -4162,10 +4153,52 @@ MR.World = (function () {
       }
       return merge(parts);
     }
-    const groveGeos = [groveGeo(5), groveGeo(29), groveGeo(97)];
-    const grovePool = groveGeos.map((geo) => Pool(function () {
-      return S.outlined(geo, mats.prop, S.INK.prop);
-    }, group));
+
+    // ---- per-setting content pools ---------------------------------------
+    /**
+     * Trees, groves and street rows, built once per setting the day drew --
+     * three or four of them, never twelve. A pool per setting rather than one
+     * pool re-tinted, because these are different SHAPES: a palm is not a
+     * recoloured conifer and no amount of material work would make it one.
+     */
+    const treePools = SETS.map(function (st) {
+      const parts = [];
+      vTree(parts, st.look.tree, 1);
+      const geo = merge(parts);
+      return Pool(function () { return S.outlined(geo, mats.prop, S.INK.prop); }, group);
+    });
+    const grovePools = SETS.map(function (st) {
+      return [5, 29, 97].map(function (seed) {
+        const geo = groveGeo(seed, st.look.tree);
+        return Pool(function () { return S.outlined(geo, mats.prop, S.INK.prop); }, group);
+      });
+    });
+
+    /**
+     * THE STREET WALL. Three row variants per setting, laid on a grid down
+     * both shoulders wherever the biome says there is a street.
+     *
+     * This is the single highest-value thing in the whole feature and it is
+     * also the cheapest: one merged draw call per row, ten rows live at the
+     * spawn window's full depth, and it is in frame permanently instead of
+     * once a minute like a landmark. Amsterdam's stepped gables and Bo-Kaap's
+     * flat saturated blocks do more to name a city from a still than any tower
+     * does, because they are what the road actually runs between.
+     *
+     * The front face lands at 12.2 -- just behind the eight units of pavement
+     * the tile carries -- so a row crowds the frame edge the way the reference
+     * games' foreground props do, without ever coming near the corridor.
+     */
+    const STREET_LEN = 30;
+    const streetPools = SETS.map(function (st) {
+      const t = st.look.terrace;
+      return [11, 47, 83].map(function (seed) {
+        const parts = [];
+        vTerrace(parts, Object.assign({ bays: Math.max(3, Math.round(STREET_LEN / t.bay)) }, t), seed);
+        const geo = merge(parts);
+        return Pool(function () { return S.outlined(geo, mats.prop, S.INK.scenery); }, group);
+      });
+    });
 
     /**
      * A knot of spectators, merged. Individual capsules read as pills and cost
@@ -4527,34 +4560,10 @@ MR.World = (function () {
 
     // ---- biome set pieces -------------------------------------------------
 
-    /** Suspension tower with its main cables, straddling the deck. */
-    const towerGeo = (function () {
-      const parts = [];
-      for (const sx of [-1, 1]) {
-        const x = sx * 9.6;
-        parts.push(bx(2.4, 30, 2.4, x, 12.5, 0, 0xff6a5e));
-        parts.push(bx(2.9, 1.0, 2.9, x, 27.0, 0, 0xd8455e));
-        parts.push(bx(2.9, 1.0, 2.9, x, 16.0, 0, 0xd8455e));
-        parts.push(bx(3.1, 1.2, 3.1, x, -1.0, 0, 0x3a4570));
-        // Catenary, approximated in straight segments either side of the tower.
-        for (let i = 0; i < 8; i++) {
-          const z0 = i * 13, z1 = (i + 1) * 13;
-          const y0 = 26 - Math.pow(i / 8, 1.7) * 22;
-          const y1 = 26 - Math.pow((i + 1) / 8, 1.7) * 22;
-          const len = Math.hypot(z1 - z0, y1 - y0);
-          const ang = Math.atan2(y1 - y0, z1 - z0);
-          for (const sz of [-1, 1]) {
-            parts.push(bx(0.34, 0.34, len, x, (y0 + y1) / 2, sz * (z0 + z1) / 2, 0xffe45e, -sz * ang));
-          }
-        }
-      }
-      parts.push(bx(21, 1.6, 2.0, 0, 26.4, 0, 0xff6a5e));
-      parts.push(bx(21, 1.0, 1.6, 0, 21.0, 0, 0xd8455e));
-      return merge(parts);
-    })();
-    const towerPool = Pool(function () {
-      return S.outlined(towerGeo, mats.prop, S.INK.scenery);
-    }, group);
+    // The suspension tower that used to live here is now MARKS.tower, built
+    // per setting from mkSuspension: the same shape in a different palette is
+    // London's, New York's and Tokyo's span, and building one copy eagerly for
+    // a day that draws none of them was pure waste.
 
     /** Abutment: caps the end of the deck so the water does not just stop. */
     const abutGeo = merge([
@@ -5077,6 +5086,13 @@ MR.World = (function () {
     // ---------------------------------------------------------------------
     // Layout is drawn once from the seeded stream so it is identical for every
     // player, then indexed by z for windowed spawning.
+    //
+    // Every entry now records WHICH SETTING it belongs to. Inside a 190-unit
+    // fade band that choice is dithered (settingIndexAt), so the two cities
+    // interleave along the road instead of changing on a line -- the old
+    // street thins out as the new one thickens. Content cannot be lerped the
+    // way a colour can; dithering the placement is the closest thing to a
+    // cross-fade that geometry has.
     const scenery = [];
     {
       let z = -60;
@@ -5092,9 +5108,10 @@ MR.World = (function () {
         // weighted(); a building standing in the middle of the river is the
         // kind of thing nobody notices until a screenshot.
         if (kind && !look.mix[kind]) kind = null;
+        const set = settingIndexAt(Math.max(0, z), rnd.next());
         if (kind) {
           scenery.push({
-            z, side, kind,
+            z, side, kind, set,
             x: side * rnd.range(7.5, 26),
             a: rnd.next(), b: rnd.next(), c: rnd.next(),
           });
@@ -5110,29 +5127,8 @@ MR.World = (function () {
     // Far enough out that the player runs through it rather than starting
     // underneath it, which is where the camera would never see it at all.
     structures.push({ z: 30, kind: 'arch', label: 'START', sub: course.key, bg: '#1b1633', fg: '#ffe45e' });
-    for (let z = BRIDGE.from + 140; z < BRIDGE.to - 120; z += 235) {
-      structures.push({ z, kind: 'tower' });
-    }
     structures.push({ z: DECK_FROM - 5, kind: 'abut' });
     structures.push({ z: DECK_TO + 5, kind: 'abut' });
-    for (const b of BI) {
-      if (b.name === 'RIVERSIDE') {
-        for (let z = b.from; z < b.to; z += 58) structures.push({ z, kind: 'river', side: -1 });
-      }
-      if (b.name === 'THE WALL') {
-        for (let z = b.from + 90; z < b.to - 40; z += 168) structures.push({ z, kind: 'overpass' });
-        // One placed by hand: you go under it and the mile 20 gantry is
-        // waiting on the far side. Mile 20 is where a marathon breaks people,
-        // and the course should stage it rather than merely label it.
-        structures.push({ z: 20 * K.UNITS_PER_MILE - 34, kind: 'overpass' });
-      }
-      if (b.name === 'FINAL MILE') {
-        for (let z = b.from; z < K.TOTAL_UNITS + 30; z += TILE) {
-          structures.push({ z, kind: 'stand', side: -1 });
-          structures.push({ z, kind: 'stand', side: 1 });
-        }
-      }
-    }
 
     /**
      * Place one landmark. `x` is the distance out from the centre line and is
@@ -5140,9 +5136,9 @@ MR.World = (function () {
      * mesh a half-turn so its road-facing side (local -x, by convention above)
      * still faces the road. Nothing may be placed inside LANDMARK_IN.
      */
-    function landmark(z, kind, side, x, y, rz) {
+    function landmark(z, kind, side, x, y, rz, set) {
       structures.push({
-        z, kind, side,
+        z, kind, side, set: set || 0,
         x: side * Math.max(x, LANDMARK_IN),
         y: y || 0,
         ry: side < 0 ? Math.PI : 0,
@@ -5150,76 +5146,171 @@ MR.World = (function () {
       });
     }
     // Spanning pieces are symmetric and sit on the centre line.
-    function landmarkOver(z, kind) {
-      structures.push({ z, kind, side: 1, x: 0, y: 0, ry: 0, rz: 0 });
+    function landmarkOver(z, kind, set) {
+      structures.push({ z, kind, set: set || 0, side: 1, x: 0, y: 0, ry: 0, rz: 0 });
     }
 
-    // Hand-placed, one biome at a time, and spaced so at most two are ever in
-    // the 210-unit spawn window at once. They are the most expensive thing in
-    // the frame in fill terms, and a skyline of them would read as clutter
-    // rather than as landmarks anyway.
-    landmark(180, 'hoarding', -1, 13.0, 0, -0.13);
-    landmark(300, 'clock', 1, 14.5);
-    landmarkOver(560, 'viaduct');
-    landmark(700, 'hoarding', 1, 13.0, 0, -0.13);
-    landmark(880, 'clock', -1, 15.0);
-    landmarkOver(1010, 'viaduct');
+    /**
+     * THE BRIDGE is the same structural beat in every city and a different
+     * object in each: Tower Bridge in London, the Harbour Bridge's arch in
+     * Sydney, a bascule in Chicago, a white harp in Valencia, a stone span in
+     * Rome. This is the crossing of the two axes in one line of code -- the
+     * biome decides that there IS a bridge here and where its deck runs, the
+     * setting decides what it looks like.
+     */
+    for (let z = BRIDGE.from + 140; z < BRIDGE.to - 120; z += 235) {
+      const si = setIndexAt(z);
+      landmarkOver(z, SETS[si].look.bridge || 'tower', si);
+    }
 
-    landmark(1150, 'ship', -1, 34.0, -0.12);
-    landmark(1230, 'crane', -1, 13.0);
-    landmark(1380, 'oak', 1, 15.0);
-    landmark(1520, 'pond', 1, 27.0);
-    landmark(1640, 'ship', -1, 38.0, -0.12);
-    landmark(1880, 'crane', -1, 13.0);
-    landmark(2000, 'oak', 1, 15.0);
+    for (const b of BI) {
+      if (b.name === 'RIVERSIDE') {
+        for (let z = b.from; z < b.to; z += 58) structures.push({ z, kind: 'river', side: -1, set: 0 });
+      }
+      if (b.name === 'THE WALL') {
+        for (let z = b.from + 90; z < b.to - 40; z += 168) structures.push({ z, kind: 'overpass', set: 0 });
+        // One placed by hand: you go under it and the mile 20 gantry is
+        // waiting on the far side. Mile 20 is where a marathon breaks people,
+        // and the course should stage it rather than merely label it.
+        structures.push({ z: 20 * K.UNITS_PER_MILE - 34, kind: 'overpass', set: 0 });
+      }
+      if (b.name === 'FINAL MILE') {
+        for (let z = b.from; z < K.TOTAL_UNITS + 30; z += TILE) {
+          structures.push({ z, kind: 'stand', side: -1, set: 0 });
+          structures.push({ z, kind: 'stand', side: 1, set: 0 });
+        }
+      }
+    }
 
     // Under the bridge the water is WATER_DROP below the road, so the ships sit
     // there rather than at zero -- and being able to see how far down that is,
     // on an object of known size, is the whole reason they are out there. They
     // are also the only objects on this leg: with the shoulders gone the deck
     // is a ribbon over an empty plane, and a ribbon over nothing has no speed.
-    for (let i = 0; i < 6; i++) {
-      const sd = i % 2 ? 1 : -1;
-      landmark(2200 + i * 155, 'ship', sd, 24 + (i % 3) * 8, -0.34 - WATER_DROP);
+    for (let z = DECK_FROM + 60; z < DECK_TO - 40; z += 155) {
+      const sd = (Math.round(z / 155) % 2) ? 1 : -1;
+      landmark(z, 'ship', sd, 24 + (Math.round(z / 155) % 3) * 8, -0.34 - WATER_DROP, 0,
+        setIndexAt(z));
     }
 
-    landmark(3160, 'oak', -1, 15.0);
-    landmark(3280, 'oak', 1, 15.0);
-    // The lake has to stand off further than anything else: its stone rim is
-    // 13.8 out from its own centre, and the PARKLAND verge carries eight units
-    // of pavement to x = 11.75 that it may not cut through.
-    landmark(3480, 'pond', -1, 27.0);
-    landmark(3620, 'oak', 1, 16.0);
-    landmark(3900, 'oak', -1, 15.0);
-    landmark(4060, 'oak', 1, 15.0);
-    landmark(4200, 'pond', 1, 27.0);
-    landmark(4400, 'oak', -1, 15.0);
-
-    // Closer in than the rest: THE WALL boxes the road in with a 6.5-unit
-    // hoarding at 11.35, so anything standing further out only shows its top.
-    // These are meant to loom over that wall, which is also the only relief the
-    // leg gets.
-    landmark(4700, 'hoarding', 1, 12.6, 0, -0.16);
-    landmark(4930, 'hoarding', -1, 12.6, 0, -0.16);
-    landmark(5150, 'hoarding', 1, 12.6, 0, -0.16);
-    landmark(5380, 'hoarding', -1, 12.6, 0, -0.16);
-    landmark(5620, 'hoarding', 1, 12.6, 0, -0.16);
-
-    // Footbridges. Placed by hand rather than on a spacing, because every one
-    // has to miss three other things: the mile gantries (every 240 units), the
-    // viaducts, and THE WALL's overpasses -- two structures straddling the road
-    // within twenty units of each other read as one confused mass rather than
-    // as two crossings. None on the bridge deck, which has its own towers and
-    // where a footbridge over open water would be nonsense; none in FINAL MILE,
-    // where the grandstands already stand where the stair towers would.
-    for (const z of [320, 780, 900, 1150, 1520, 1780, 2020,
-                     3300, 3660, 3980, 4260, 4870, 5200, 5540]) {
-      landmarkOver(z, 'footbridge');
+    // ---- the street wall --------------------------------------------------
+    // Rows on a 30-unit grid down both shoulders, thinned by the biome's own
+    // `street` density so PARKLAND stays open and CITY START closes in. The
+    // front face lands at 12.2, just behind the pavement the road tile carries.
+    for (const b of BI) {
+      const dens = b.look.street || 0;
+      if (!dens) continue;
+      for (let z = b.from; z < b.to; z += STREET_LEN) {
+        for (const side of [-1, 1]) {
+          const take = rnd.chance(dens);
+          const si = settingIndexAt(z, rnd.next());
+          const v = rnd.int(0, 2);
+          if (!take) continue;
+          if (b.look.bank === side) continue;          // never over the water
+          if (deckLift(z) > 0.15) continue;            // nor on the bridge ramp
+          const depth = SETS[si].look.terrace.depth;
+          structures.push({
+            z: z + STREET_LEN / 2, kind: 'street', set: si, v, side,
+            x: side * (12.2 + depth / 2), y: 0,
+            ry: side < 0 ? Math.PI : 0, rz: 0,
+          });
+        }
+      }
     }
 
-    landmark(5860, 'jumbo', 1, 13.5);
-    landmark(6020, 'jumbo', -1, 13.5);
-    landmark(6180, 'clock', 1, 15.5);
+    // ---- landmarks --------------------------------------------------------
+    /**
+     * Landmarks, planned rather than typed out.
+     *
+     * The old version was a hand-written list of thirty calls, which was fine
+     * when the course was one place. It cannot survive twelve settings times
+     * six biomes, so the placement is now a walk: for each biome, for each
+     * setting that overlaps it, take that setting's list for that beat and lay
+     * it down the overlap. A setting with nothing to say about a beat falls
+     * back to the generic set this file has always had, which is exactly what
+     * "fall back gracefully rather than inventing something generic and wrong"
+     * has to mean in code.
+     *
+     * Spacing is 145 units -- about five seconds at race pace, and far enough
+     * apart that at most two are in the 210-unit spawn window at once. They are
+     * the most expensive thing in the frame in fill terms and a skyline of them
+     * would read as clutter rather than as landmarks.
+     */
+    const DEFAULT_MARKS = {
+      'CITY START': [{ k: 'clock', x: 14.5 }, { k: 'hoarding', x: 13.0, rz: -0.13 }, { k: 'viaduct', over: 1 }],
+      'RIVERSIDE': [{ k: 'crane', x: 13.0 }, { k: 'ship', x: 34.0, y: -0.12 }, { k: 'oak', x: 15.0 }],
+      'PARKLAND': [{ k: 'oak', x: 15.0 }, { k: 'pond', x: 27.0 }],
+      'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }],
+      'FINAL MILE': [{ k: 'jumbo', x: 13.5 }, { k: 'clock', x: 15.5 }],
+    };
+    const MARK_SPACING = 145;
+    // Spans already carrying a continuous structure over the road -- Chicago's
+    // L -- take no footbridges: two things straddling the road at once read as
+    // one confused mass, which is the same rule the old hand-placed list was
+    // obeying by eye.
+    const noBridgeSpans = [];
+
+    /** Keep a spanning piece clear of the mile gantries, which are every 240. */
+    function nudgeOver(z) {
+      const m = Math.round(z / K.UNITS_PER_MILE) * K.UNITS_PER_MILE;
+      return Math.abs(z - m) < 32 ? m + (z < m ? -32 : 32) : z;
+    }
+
+    for (const b of BI) {
+      // The bridge deck's landmark IS the bridge, placed above. Nothing else
+      // stands out there -- there is nothing for it to stand on.
+      if (b.name === 'THE BRIDGE') continue;
+      for (let si = 0; si < SETS.length; si++) {
+        const from = Math.max(b.from, SETS[si].from);
+        const to = Math.min(b.to, SETS[si].to);
+        if (to - from < 70) continue;
+        const look = SETS[si].look;
+        const listed = (look.marks && look.marks[b.name]) || [];
+        const list = listed.length ? listed : (DEFAULT_MARKS[b.name] || []);
+        const runs = list.filter((e) => e.run);
+        const pts = list.filter((e) => !e.run);
+
+        for (const e of runs) {
+          let i = 0;
+          if (e.over) noBridgeSpans.push([from - 30, to + 30]);
+          for (let z = from; z < to; z += e.run, i++) {
+            const kind = (e.alt && e.every && (i % e.every) === 0) ? e.alt : e.k;
+            const zc = z + e.run / 2;
+            if (e.over) landmarkOver(zc, kind, si);
+            else landmark(zc, kind, e.side || -1, e.x || LANDMARK_IN, e.y, e.rz, si);
+          }
+        }
+        if (!pts.length) continue;
+        let i = 0, side = ((si & 1) ? -1 : 1);
+        for (let z = from + 55; z < to - 45; z += MARK_SPACING) {
+          const e = pts[i++ % pts.length];
+          if (e.over) landmarkOver(nudgeOver(z), e.k, si);
+          else {
+            const sd = e.side || side;
+            landmark(z, e.k, sd, e.x || LANDMARK_IN, e.y, e.rz, si);
+            side = -side;
+          }
+        }
+      }
+    }
+
+    /**
+     * Footbridges: the heaviest thing in the overhead layer, and the one place
+     * pedestrians cross the road without being on it.
+     *
+     * Placed on a spacing now rather than from a hand-written list, because the
+     * landmarks they have to miss are no longer at fixed z. Each one is nudged
+     * off the mile gantries and dropped entirely where a setting is already
+     * running something continuous over the road. None on the bridge deck,
+     * which has its own span; none in FINAL MILE, where the grandstands stand
+     * where the stair towers would.
+     */
+    for (let z = 300; z < K.TOTAL_UNITS - 400; z += 330) {
+      if (deckLift(z) > 0.05) continue;
+      const zz = nudgeOver(z);
+      if (noBridgeSpans.some((sp) => zz > sp[0] && zz < sp[1])) continue;
+      landmarkOver(zz, 'footbridge', 0);
+    }
 
     /**
      * Water tables, derived from the aid the course generated rather than
@@ -5289,56 +5380,170 @@ MR.World = (function () {
     }
 
     function sceneryPool(s) {
+      const si = Math.min(SETS.length - 1, s.set || 0);
       if (s.kind === 'building') return buildingPool;
-      if (s.kind === 'tree') return treePool;
-      if (s.kind === 'grove') return grovePool[Math.floor(s.b * grovePool.length) % grovePool.length];
+      if (s.kind === 'tree') return treePools[si];
+      if (s.kind === 'grove') {
+        const g = grovePools[si];
+        return g[Math.floor(s.b * g.length) % g.length];
+      }
       if (s.kind === 'crowd') return crowdPool[Math.floor(s.a * crowdPool.length) % crowdPool.length];
       if (s.kind === 'walkers') return walkersPool[Math.floor(s.a * walkersPool.length) % walkersPool.length];
       return null;
     }
-    function structPool(kind) {
-      if (kind === 'tower') return towerPool;
-      if (kind === 'abut') return abutPool;
-      if (kind === 'river') return riverPool;
-      if (kind === 'overpass') return overpassPool;
-      if (kind === 'stand') return standPool;
-      if (kind === 'footbridge') return footbridgePool;
-      if (kind === 'arch') return archPool;
-      if (kind === 'aidTable') return aidTablePool;
-      return landmarkPools[kind] || null;
+
+    /**
+     * A pool per (setting, landmark). Built on demand and then cached, and
+     * warmed at the end of create() for everything the plan actually uses --
+     * merging a forty-metre lattice tower in the middle of a race would be a
+     * visible hitch, and merging all twelve settings' worth up front would be
+     * most of a second of start-up for geometry nine tenths of which never
+     * appears.
+     */
+    const markPools = {};
+    function markPool(st) {
+      const kind = st.kind;
+      const si = Math.min(SETS.length - 1, st.set || 0);
+      const build = MARKS[kind];
+      // Structural pieces and the generic landmarks are shared across
+      // settings: a footbridge is a footbridge in every city.
+      if (!build) {
+        if (kind === 'abut') return abutPool;
+        if (kind === 'river') return riverPool;
+        if (kind === 'overpass') return overpassPool;
+        if (kind === 'stand') return standPool;
+        if (kind === 'footbridge') return footbridgePool;
+        if (kind === 'arch') return archPool;
+        if (kind === 'aidTable') return aidTablePool;
+        if (kind === 'street') return streetPools[si][st.v || 0];
+        return landmarkPools[kind] || null;
+      }
+      const key = si + '/' + kind;
+      let pool = markPools[key];
+      if (!pool) {
+        const geo = build(SETS[si].look);
+        pool = Pool(function () { return S.outlined(geo, mats.prop, S.INK.scenery); }, group);
+        markPools[key] = pool;
+      }
+      return pool;
     }
+    function structPool(st) { return markPool(st); }
 
     // routeLane is exposed so it can be asserted against the course rather than
     // taken on trust: the lane it names at every gate must never be a BLOCK.
     const api = { group, sky, mats, course };
     Object.defineProperty(api, 'routeLane', { get: function () { return routeLane; } });
 
-    /** Recolour shared materials for the biome at progress f. */
+    /**
+     * ================== THE PALETTE, AND ITS TWO AXES ==================
+     *
+     * Called every frame with the runner's progress. Two independent
+     * cross-fades run here and they compose rather than compete:
+     *
+     *   SETTING -- where the race is. Fades over SET_FADE (190 units, ~7s)
+     *              at each of the two or three boundaries the day drew.
+     *   BIOME   -- what the race is doing. Fades over 0.03 of the distance at
+     *              each of the six fixed structural beats.
+     *
+     * The order matters and it is not arbitrary. The setting blend produces a
+     * BASE palette -- what this place looks like. The biome then PULLS that
+     * base around (BIOME_MOD): water under a bridge deck, a purple-and-amber
+     * sky at mile 20, gold into the tape. Because the pull is applied to the
+     * blended base and the two pulls either side of a biome seam are then
+     * blended themselves, both fades stay smooth even when a setting boundary
+     * and a biome boundary land in the same fifty units -- which they do,
+     * roughly one day in five, because nothing coordinates them.
+     *
+     * Nothing here allocates: every colour is a preallocated scratch.
+     */
     api.fogColor = new THREE.Color(BIOME_LOOK['CITY START'].fog);
-    const _road = new THREE.Color(), _shoulder = new THREE.Color();
+    const _shoulder = new THREE.Color();
     const _skyTop = new THREE.Color(), _skyBot = new THREE.Color();
+    const _edge = new THREE.Color();
+    const _base = {
+      sky0: new THREE.Color(), sky1: new THREE.Color(), fog: new THREE.Color(),
+      ground: new THREE.Color(), road: new THREE.Color(),
+      water: new THREE.Color(), edge: new THREE.Color(),
+    };
+    const _a = new THREE.Color(), _b = new THREE.Color(), _t = new THREE.Color();
+
+    /** Apply one biome's pulls to the blended base, into `out`. */
+    function applyMod(out, key, mod) {
+      out.copy(_base[key]);
+      if (!mod) return out;
+      if (key === 'ground' && mod.groundWater) { out.copy(_base.water); }
+      const m = mod[key === 'sky0' || key === 'sky1' ? 'sky' : key];
+      if (m) out.lerp(_t.set(m[0]), m[1]);
+      return out;
+    }
 
     api.applyBiome = function (f) {
       const b = MR.Course.biomeAt(f);
-      const look = BIOME_LOOK[b.name] || BIOME_LOOK['CITY START'];
       const idx = MR.Course.BIOMES.indexOf(b);
-      const prev = (idx > 0 && BIOME_LOOK[MR.Course.BIOMES[idx - 1].name]) || look;
-
+      const bPrev = idx > 0 ? MR.Course.BIOMES[idx - 1] : b;
       // Cross-fade over the first 0.03 of a biome instead of popping.
-      const t = Math.min(1, (f - b.from) / 0.03);
+      const tb = Math.min(1, (f - b.from) / 0.03);
+      const mod = BIOME_MOD[b.name], modPrev = BIOME_MOD[bPrev.name];
 
-      mats.road.color.copy(lerpInto(_road, prev.road, look.road, t));
-      mats.shoulder.color.copy(lerpInto(_shoulder, prev.ground, look.ground, t));
-      if (mats.ground) mats.ground.color.copy(mats.shoulder.color);
-      sky.material.uniforms.top.value.copy(lerpInto(_skyTop, prev.sky[0], look.sky[0], t));
-      sky.material.uniforms.bottom.value.copy(lerpInto(_skyBot, prev.sky[1], look.sky[1], t));
+      const z = f * K.TOTAL_UNITS;
+      if (LEGACY) {
+        // No settings on this course: the old per-biome palette, unchanged.
+        const look = BIOME_LOOK[b.name] || BIOME_LOOK['CITY START'];
+        const prev = BIOME_LOOK[bPrev.name] || look;
+        _base.sky0.copy(lerpInto(_skyTop, prev.sky[0], look.sky[0], tb));
+        _base.sky1.copy(lerpInto(_skyBot, prev.sky[1], look.sky[1], tb));
+        _base.fog.copy(lerpInto(_t, prev.fog, look.fog, tb));
+        _base.ground.copy(lerpInto(_t, prev.ground, look.ground, tb));
+        _base.road.copy(lerpInto(_t, prev.road, look.road, tb));
+        _base.water.set(0x2f8fc4);
+        _base.edge.set(0xffffff);
+        sky.material.uniforms.top.value.copy(_base.sky0);
+        sky.material.uniforms.bottom.value.copy(_base.sky1);
+        mats.road.color.copy(_base.road);
+        mats.shoulder.color.copy(_base.ground);
+        if (mats.ground) mats.ground.color.copy(_base.ground);
+        mats.edge.color.set(0xffffff);
+        api.fogColor.copy(_base.fog);
+        hillsMat.color.copy(mats.shoulder.color).lerp(api.fogColor, 0.45);
+        state.biome = b;
+        state.look = look;
+        return b;
+      }
+
+      // ---- 1. the setting blend, which is the base palette ----
+      const si = setIndexAt(z);
+      const ts = setFadeAt(z);
+      const cur = SETS[si].look;
+      const pre = SETS[si ? si - 1 : 0].look;
+      lerpInto(_base.sky0, pre.sky[0], cur.sky[0], ts);
+      lerpInto(_base.sky1, pre.sky[1], cur.sky[1], ts);
+      lerpInto(_base.fog, pre.fog, cur.fog, ts);
+      lerpInto(_base.ground, pre.ground, cur.ground, ts);
+      lerpInto(_base.road, pre.road, cur.road, ts);
+      lerpInto(_base.water, pre.water, cur.water, ts);
+      lerpInto(_base.edge, pre.edge, cur.edge, ts);
+
+      // ---- 2. the biome pull, itself blended across the biome seam ----
+      sky.material.uniforms.top.value.copy(
+        applyMod(_a, 'sky0', modPrev).lerp(applyMod(_b, 'sky0', mod), tb));
+      sky.material.uniforms.bottom.value.copy(
+        applyMod(_a, 'sky1', modPrev).lerp(applyMod(_b, 'sky1', mod), tb));
+      api.fogColor.copy(applyMod(_a, 'fog', modPrev).lerp(applyMod(_b, 'fog', mod), tb));
+      mats.road.color.copy(applyMod(_a, 'road', modPrev).lerp(applyMod(_b, 'road', mod), tb));
+      _shoulder.copy(applyMod(_a, 'ground', modPrev).lerp(applyMod(_b, 'ground', mod), tb));
+      mats.shoulder.color.copy(_shoulder);
+      if (mats.ground) mats.ground.color.copy(_shoulder);
+      // The roadside furniture takes the setting's tint knocked toward the
+      // haze, so barriers and parapets belong to the same air as everything
+      // standing behind them.
+      mats.edge.color.copy(_edge.copy(_base.edge).lerp(api.fogColor, 0.10 + 0.10 * tb));
 
       state.biome = b;
-      state.look = look;
-      lerpInto(api.fogColor, prev.fog, look.fog, t);
+      state.look = BIOME_LOOK[b.name] || BIOME_LOOK['CITY START'];
+      state.setting = SETS[si];
       // Hills take the ground hue knocked back toward the fog, so they read as
       // the same land seen through a great deal of air.
-      hillsMat.color.copy(mats.shoulder.color).lerp(api.fogColor, 0.45);
+      hillsMat.color.copy(_shoulder).lerp(api.fogColor, 0.45);
       return b;
     };
 
@@ -5447,14 +5652,22 @@ MR.World = (function () {
         if (!pool) continue;
         const obj = pool.claim();
         if (s.kind === 'building') {
+          // The blocks set back behind the street wall. Their tint and their
+          // window style are the SETTING's: Chicago's are black glass, Rome's
+          // are ochre with punched openings, and that difference is carried by
+          // two lines rather than by two pools.
+          const tw = SETS[Math.min(SETS.length - 1, s.set || 0)].look.tower;
           const w = 5 + s.a * 10, h = 7 + s.b * 26, d = 5 + s.c * 8;
           obj.userData.body.scale.set(w, h, d);
           obj.userData.line.scale.set(w, h, d);
-          const tint = P.building[Math.floor(s.a * P.building.length)];
+          const tint = tw.colors[Math.floor(s.a * tw.colors.length) % tw.colors.length];
           obj.userData.mat.color.set(tint);
           obj.userData.capMat.color.set(tint);
+          const tex = obj.userData.tex[tw.glass ? 1 : 0];
+          obj.userData.mat.map = tex;
+          obj.userData.mat.needsUpdate = true;
           // Windows keep a constant world size whatever the box is scaled to.
-          obj.userData.tex.repeat.set(Math.max(1, Math.round(w / 4.5)), Math.max(1, Math.round(h / 4.5)));
+          tex.repeat.set(Math.max(1, Math.round(w / 4.5)), Math.max(1, Math.round(h / 4.5)));
           obj.userData.parapet.scale.set(w + 0.7, 0.6 + s.c * 0.8, d + 0.7);
           obj.userData.parapet.position.y = h / 2 + 0.3;
           obj.position.set(s.x + s.side * 13, h / 2, s.z);
@@ -5559,7 +5772,7 @@ MR.World = (function () {
       // biome set pieces
       while (state.structIdx < structures.length && structures[state.structIdx].z < ahead) {
         const st = structures[state.structIdx++];
-        const pool = structPool(st.kind);
+        const pool = structPool(st);
         if (!pool) continue;
         const obj = pool.claim();
         // Pooled, so every transform a set piece can carry has to be written
@@ -5662,21 +5875,33 @@ MR.World = (function () {
 
     api.reset = function () {
       roadPool.releaseAll(); jumpPool.releaseAll(); duckPool.releaseAll();
-      blockPool.releaseAll(); buildingPool.releaseAll(); treePool.releaseAll();
+      blockPool.releaseAll(); buildingPool.releaseAll();
       aidTablePool.releaseAll(); bannerPool.releaseAll(); archPool.releaseAll();
-      towerPool.releaseAll(); abutPool.releaseAll(); riverPool.releaseAll();
+      abutPool.releaseAll(); riverPool.releaseAll();
       overpassPool.releaseAll(); standPool.releaseAll();
       footbridgePool.releaseAll();
       waterPool.releaseAll(); bananaPool.releaseAll();
       for (const k in landmarkPools) landmarkPools[k].releaseAll();
+      for (const k in markPools) markPools[k].releaseAll();
       for (const p of crowdPool) p.releaseAll();
       for (const p of walkersPool) p.releaseAll();
-      for (const p of grovePool) p.releaseAll();
+      for (const p of treePools) p.releaseAll();
+      for (const g of grovePools) for (const p of g) p.releaseAll();
+      for (const g of streetPools) for (const p of g) p.releaseAll();
       activeGates.length = 0; activeScene.length = 0; activeStruct.length = 0;
       activeBanner.length = 0; activeRoad.length = 0; activeAid.length = 0;
       state.roadFrom = 0; state.gateIdx = 0; state.sceneIdx = 0;
       state.structIdx = 0; state.bannerIdx = 0; state.aidIdx = 0;
     };
+
+    /**
+     * Warm every pool the plan will actually ask for. Merging a lattice tower
+     * takes a few milliseconds; doing it the first time one comes into view
+     * would be a frame drop at the exact moment a new city arrives, which is
+     * the worst possible moment for one. Cheap after the first hit -- this is
+     * a map lookup per structure.
+     */
+    for (const st of structures) markPool(st);
 
     api.stats = function () {
       return {

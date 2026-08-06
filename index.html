@@ -9456,7 +9456,13 @@ MR.World = (function () {
      * lottery is free at render time and the pool stays one pool per kind --
      * which matters, because the spawn window claims and releases by kind.
      */
+    // Every hazard vocabulary registers itself here so the contrast audit at
+    // the bottom of this file can walk EVERY variant, not merely the handful a
+    // given frame happened to spawn.
+    const HAZARD_DEFS = [];
+
     function hazardPool(kind, tint, defs) {
+      HAZARD_DEFS.push({ kind, tint, defs });
       // The draw bag. A def's `weight` is how many tickets it holds; variants
       // are then picked by hashing into the bag, so the ratio a variant is
       // authored with is the ratio it actually spawns at, instead of being an
@@ -12156,13 +12162,39 @@ MR.World = (function () {
  *
  * ---- the three problems, and what they cost ----
  *
- * 1. IT MUST NEVER READ AS A HAZARD. Every solid thing in this game wears an
- *    ink outline, so the ghost's outlines are stripped rather than recoloured:
- *    the absence of ink is the loudest "not real" signal the art direction
- *    has, and it halves the character's draw calls into the bargain. On top of
- *    that it is translucent, it is a single cool colour with no vest red
- *    anywhere on it, and it runs the outside lane rather than the middle one
- *    where the eye is hunting for gates.
+ * 1. IT MUST NEVER READ AS A HAZARD -- BUT IT HAS TO READ AS SOMETHING. This
+ *    used to be solved by stripping the ink outright, on the argument that in
+ *    a scene where every solid thing wears a black line the absence of one is
+ *    the loudest available "not real". The argument is right about the signal
+ *    and wrong about the cost, and an art review put the cost plainly: with no
+ *    line, no depth sorting and fourteen translucent primitives blending
+ *    through each other, the most narratively important object in the game --
+ *    the world record, personified -- rendered as a blue smear and read as a
+ *    rendering fault. A marker nobody can identify is not a marker.
+ *
+ *    So the ink comes back, in the ghost's own colour rather than in black.
+ *    That keeps the whole of the original signal: black ink means SOLID, and
+ *    nothing else in the scene has a pale cool rim. What it adds is the one
+ *    thing a translucent figure cannot generate for itself, which is an edge.
+ *    A hard rim around a see-through fill is also simply what a ghost looks
+ *    like, and it is the reading the tag, the lane and the colour were already
+ *    asking for.
+ *
+ *    The rim is drawn by this file rather than by shading.outlined(): the
+ *    shared outline materials are cached, opaque and shared with the player,
+ *    and this one has to fade with the body it wraps or it would still be
+ *    hanging in the haze after the ghost had dissolved.
+ *
+ * 1b. AND IT MUST NOT BLEND WITH ITSELF. The fill wrote no depth, on the
+ *    argument that an X-ray read lets limbs show through each other. What it
+ *    actually did was let the FAR ones paint over the NEAR ones, because
+ *    nothing rejected them -- an arm behind the chest drew on top of it
+ *    whenever the sort order fell that way, which is the "internal
+ *    self-overlap" the review saw. Writing depth costs nothing here (the parts
+ *    are convex and disjoint) and turns fourteen stacked lumps into a body
+ *    with an inside and an outside. Everything behind the ghost still shows
+ *    through it, which is the part of the X-ray read that was ever worth
+ *    having.
  *
  * 2. IT IS TINY EXACTLY WHEN THE GAP MATTERS MOST. At the 131-unit peak the
  *    body is seven pixels tall against pale haze. So two things run backwards
@@ -12230,8 +12262,74 @@ MR.Ghost = (function () {
   const COOL = 0x8fa4ff;
   const HOT = new THREE.Color(0xffffff);
 
-  const NEAR_ALPHA = 0.34;   // right beside you: unmistakably not solid
+  const NEAR_ALPHA = 0.42;   // right beside you: unmistakably not solid
   const FAR_ALPHA = 0.90;    // seven pixels tall in haze: take every bit
+
+  // ---- the rim ----------------------------------------------------------
+  //
+  // An inverted hull, the same device the rest of the game inks with, but
+  // owned here because it has to do two things shading.js's shared materials
+  // cannot: carry the body's own alpha, and never fog. Both follow from the
+  // ghost being an instrument rather than scenery -- see point 2 below.
+  //
+  // Thinner than the character weight (0.014). The line is constant-width on
+  // screen by design, so at the 131-unit peak, where the body is seven pixels
+  // tall, a full-weight rim would be most of the ghost; at 0.009 it stays a
+  // rim at every distance in the range and the body it wraps stays visible
+  // inside it.
+  const RIM_W = 0.009;
+  // Pale enough to read against the dark road up close and against the haze at
+  // depth, and a clear step off the fill so the edge exists at all. It is the
+  // one bright cool line in the game; nothing else can be mistaken for it.
+  const RIM = 0xdfe7ff;
+
+  // Linear working value -> what an sRGB framebuffer expects. A raw
+  // ShaderMaterial gets none of three's colour-space includes, so the
+  // conversion has to be done to the uniform by hand or the rim sits a stop
+  // darker than everything around it.
+  function encode(v) {
+    return v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055;
+  }
+
+  function rimMaterial() {
+    const c = new THREE.Color(RIM);
+    return new THREE.ShaderMaterial({
+      uniforms: {
+        thickness: { value: RIM_W },
+        rimColor: { value: new THREE.Color(encode(c.r), encode(c.g), encode(c.b)) },
+        rimAlpha: { value: NEAR_ALPHA },
+      },
+      // The depth term is what keeps the line the same weight on screen from
+      // three units away to a hundred and ninety; a plain scaled hull balloons
+      // on the torso and vanishes on the fingers.
+      vertexShader: `
+        uniform float thickness;
+        void main() {
+          vec3 n = normalize(normalMatrix * normal);
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          mv.xyz += n * thickness * clamp(0.75 + 0.05 * (-mv.z), 0.90, 3.6);
+          gl_Position = projectionMatrix * mv;
+        }`,
+      fragmentShader: `
+        uniform vec3 rimColor;
+        uniform float rimAlpha;
+        void main() { gl_FragColor = vec4(rimColor, rimAlpha); }`,
+      side: THREE.BackSide,
+      transparent: true,
+      // Reads depth, never writes it, and draws AFTER every fill. That order is
+      // the whole difference between a rim and a fog. The first attempt put the
+      // shells ahead of the body the way shading.js does, which is right for an
+      // opaque character and wrong for a see-through one: with nothing in the
+      // depth buffer yet, every shell in the rig drew -- including the fourteen
+      // behind the body -- and then showed straight through the translucent
+      // fill, so the ghost came out as a pale haze with a figure somewhere in
+      // it. Drawn last against a depth buffer the fills have already written,
+      // a shell survives only where there is no nearer body in front of it:
+      // around the outside of the figure, and along the edge of any near limb
+      // that crosses a far one. Which is exactly a silhouette.
+      depthWrite: false,
+    });
+  }
 
   // ---- the tag ----------------------------------------------------------
   // Drawn to match the HUD's own language: hard rectangle, hairline border,
@@ -12348,9 +12446,13 @@ MR.Ghost = (function () {
     const mat = S.toon(COOL, 3);
     mat.transparent = true;
     mat.opacity = NEAR_ALPHA;
-    mat.depthWrite = false;   // an X-ray read: limbs show through each other
+    // Depth IS written -- see point 1b in the header. Without it the far half
+    // of the body paints over the near half and the figure has no inside.
+    mat.depthWrite = true;
     mat.fog = false;          // see the header -- haze must not eat the marker
     mat.needsUpdate = true;
+
+    const rim = rimMaterial();
 
     // Reuse the real rig rather than authoring a second character: it is
     // procedural, it already animates from ground speed, and any future work
@@ -12360,15 +12462,22 @@ MR.Ghost = (function () {
     // as two runners rather than as one figure and its reflection.
     body.phase = 0.37;
 
-    const ink = [];
     body.group.traverse(function (o) {
       if (!o.isMesh || !o.material) return;
       // shading.outlined() tags its own shell; the raw ShaderMaterial test is
-      // the belt to that braces. Recolouring the outline is not an option --
-      // those materials are cached and shared with the player.
+      // the belt to that braces. The shells are REPLACED rather than removed:
+      // they are already built, already parented and already share their
+      // fill's geometry, so re-materialling them costs nothing and a deformed
+      // bib or a posed limb carries its rim with it for free. The shared
+      // material must not be touched -- it is cached and the player is using
+      // it -- so each shell is handed the ghost's own.
       const par = o.parent;
       if ((par && par.userData && par.userData.line === o) || o.material.isShaderMaterial) {
-        ink.push(o);
+        o.material = rim;
+        o.visible = true;
+        // After every fill. See the material -- the depth the fills write is
+        // what turns fourteen overlapping hulls into one outline.
+        o.renderOrder = 1;
         return;
       }
       // Anything already transparent is not a lit body part. Today that is the
@@ -12384,8 +12493,6 @@ MR.Ghost = (function () {
       }
       o.material = mat;
     });
-    for (const m of ink) if (m.parent) m.parent.remove(m);
-
     group.add(body.group);
 
     const texRide = tagTexture('RECORD', COOL_CSS, -1);
@@ -12491,6 +12598,13 @@ MR.Ghost = (function () {
       if (bodyOn) {
         mat.opacity = alpha;
         mat.color.set(COOL).lerp(HOT, s.flash * 0.85);
+        // The rim rides a little ahead of the fill and tops out solid. Up
+        // close that is the whole point -- a hard edge round a see-through
+        // body is what says "ghost" rather than "smudge" -- and far out it is
+        // most of what is left to see, since a seven-pixel figure is very
+        // nearly all edge. It still dies with the body at the haze wall, which
+        // is why it cannot use the shared, opaque, cached ink material.
+        rim.uniforms.rimAlpha.value = Math.min(1, alpha * 1.45 + 0.10);
         body.update(dt, { speed: SPEED });
         body.group.position.set(s.x, 0, gz);
       }
@@ -12569,6 +12683,7 @@ MR.Ghost = (function () {
       body.phase = 0.37;
       mat.opacity = NEAR_ALPHA;
       mat.color.set(COOL);
+      rim.uniforms.rimAlpha.value = NEAR_ALPHA;
       tagWorld.material.map = texRide;
     };
 
@@ -14370,10 +14485,22 @@ MR.HUD = (function () {
         const rung = Tier.of(proj);
         const up = Tier.next(proj);
         state = 'tier';
-        chip = rung.name;
-        sub = up
-          ? Pace.clock(Tier.gapTo(proj, up)) + ' OFF ' + up.name
-          : 'ON FOR ' + rung.name;
+        if (isFinite(rung.max)) {
+          // A rung is being held. Name it, and price the next one up.
+          chip = rung.name;
+          sub = up
+            ? Pace.clock(Tier.gapTo(proj, up)) + ' OFF ' + up.name
+            : 'ON FOR ' + rung.name;
+        } else {
+          // The bottom of the ladder, where the rung is called FINISHED --
+          // which is the right word on the finish card and the wrong one at
+          // mile 20, where a chip reading FINISHED next to a header reading
+          // PROJ FINISH says the race is already over. With no rung held
+          // there is nothing to report, so the chip names the one being
+          // chased instead, marked as a target rather than a standing.
+          chip = up ? '▲ ' + up.name : rung.name;
+          sub = up ? Pace.clock(Tier.gapTo(proj, up)) + ' TO GO' : '';
+        }
       } else if (!settled) {
         state = 'est';
         chip = bleeding ? 'BLEEDING SPEED ▲' : 'ESTIMATING';

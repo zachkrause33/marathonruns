@@ -3894,7 +3894,13 @@ MR.World = (function () {
      * lottery is free at render time and the pool stays one pool per kind --
      * which matters, because the spawn window claims and releases by kind.
      */
+    // Every hazard vocabulary registers itself here so the contrast audit at
+    // the bottom of this file can walk EVERY variant, not merely the handful a
+    // given frame happened to spawn.
+    const HAZARD_DEFS = [];
+
     function hazardPool(kind, tint, defs) {
+      HAZARD_DEFS.push({ kind, tint, defs });
       // The draw bag. A def's `weight` is how many tickets it holds; variants
       // are then picked by hashing into the bag, so the ratio a variant is
       // authored with is the ratio it actually spawns at, instead of being an

@@ -655,10 +655,22 @@ MR.HUD = (function () {
         const rung = Tier.of(proj);
         const up = Tier.next(proj);
         state = 'tier';
-        chip = rung.name;
-        sub = up
-          ? Pace.clock(Tier.gapTo(proj, up)) + ' OFF ' + up.name
-          : 'ON FOR ' + rung.name;
+        if (isFinite(rung.max)) {
+          // A rung is being held. Name it, and price the next one up.
+          chip = rung.name;
+          sub = up
+            ? Pace.clock(Tier.gapTo(proj, up)) + ' OFF ' + up.name
+            : 'ON FOR ' + rung.name;
+        } else {
+          // The bottom of the ladder, where the rung is called FINISHED --
+          // which is the right word on the finish card and the wrong one at
+          // mile 20, where a chip reading FINISHED next to a header reading
+          // PROJ FINISH says the race is already over. With no rung held
+          // there is nothing to report, so the chip names the one being
+          // chased instead, marked as a target rather than a standing.
+          chip = up ? '▲ ' + up.name : rung.name;
+          sub = up ? Pace.clock(Tier.gapTo(proj, up)) + ' TO GO' : '';
+        }
       } else if (!settled) {
         state = 'est';
         chip = bleeding ? 'BLEEDING SPEED ▲' : 'ESTIMATING';

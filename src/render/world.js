@@ -507,11 +507,11 @@ MR.World = (function () {
       tower: { colors: [0xdce4ec, 0xc8d4e0, 0xf0f4f8], glass: 1, crown: 'flat' },
       tree: { kind: 'scrub', colors: [0x6f9a4a, 0x8fae5a, 0x5f8f56], h: 0.9 },
       marks: {
-        'CITY START': [{ k: 'tableMountain', x: 120, run: 220, side: -1 }, { k: 'clock', x: 15 }],
-        'RIVERSIDE': [{ k: 'tableMountain', x: 130, run: 220, side: -1 }, { k: 'ship', x: 34, y: -0.12 }],
-        'PARKLAND': [{ k: 'tableMountain', x: 120, run: 220, side: -1 }, { k: 'oak', x: 15 }],
-        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'tableMountain', x: 120, run: 220, side: -1 }],
-        'FINAL MILE': [{ k: 'tableMountain', x: 120, run: 220, side: -1 }, { k: 'jumbo', x: 13.5 }],
+        'CITY START': [{ k: 'tableMountain', x: 72, run: 220, side: -1 }, { k: 'clock', x: 15 }],
+        'RIVERSIDE': [{ k: 'tableMountain', x: 78, run: 220, side: -1 }, { k: 'ship', x: 34, y: -0.12 }],
+        'PARKLAND': [{ k: 'tableMountain', x: 72, run: 220, side: -1 }, { k: 'oak', x: 15 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'tableMountain', x: 72, run: 220, side: -1 }],
+        'FINAL MILE': [{ k: 'tableMountain', x: 72, run: 220, side: -1 }, { k: 'jumbo', x: 13.5 }],
       },
       bridge: 'tower',
     },
@@ -2088,24 +2088,27 @@ MR.World = (function () {
     hemisferic: function (look) {
       const parts = [];
       const W = 0xfbfbf6, W2 = 0xdfe6e6;
-      parts.push(part(new THREE.PlaneGeometry(42, 46), look.water, 0, 0.02, 0, -Math.PI / 2));
-      parts.push(bx(44, 0.6, 48, 0, -0.2, 0, 0xe8ece8));
+      // Centred on local +4 and 30 wide rather than 42 about the origin: at
+      // the table's x = 20 the old sheet reached world x = -1, i.e. across the
+      // road. Same bug as the canal had; see the note there.
+      parts.push(part(new THREE.PlaneGeometry(30, 46), look.water, 4, 0.02, 0, -Math.PI / 2));
+      parts.push(bx(32, 0.6, 48, 4, -0.2, 0, 0xe8ece8));
       // The pupil, and its reflection: a hemisphere over an inverted one.
       parts.push(part(new THREE.SphereGeometry(8.0, 16, 9, 0, 6.2832, 0, Math.PI / 2),
-        0xe8ecf0, 0, 0.2, 0));
+        0xe8ecf0, 3.0, 0.2, 0));
       parts.push(part(new THREE.SphereGeometry(8.0, 16, 9, 0, 6.2832, Math.PI / 2, Math.PI / 2),
-        0xb8c8d0, 0, 0.1, 0));
-      parts.push(cyl(8.2, 8.2, 0.5, 16, 0, 0.3, 0, W2));
+        0xb8c8d0, 3.0, 0.1, 0));
+      parts.push(cyl(8.2, 8.2, 0.5, 16, 3.0, 0.3, 0, W2));
       // The lid: a long shallow shell over the top, which is the whole read.
       for (let i = 0; i < 10; i++) {
         const t = (i - 4.5) / 4.5;
         const w = Math.sqrt(Math.max(0.05, 1 - t * t));
-        parts.push(bx(0.9, 1.0 + 12.0 * w, 2.6, -1.2 - 1.4 * (1 - w), 5.0 + 5.0 * w, t * 13.0,
+        parts.push(bx(0.9, 1.0 + 12.0 * w, 2.6, 1.8 - 1.4 * (1 - w), 5.0 + 5.0 * w, t * 13.0,
           i % 2 ? W : W2, 0, 0, -t * 0.5));
       }
-      parts.push(bx(1.4, 1.4, 30.0, -2.2, 13.4, 0, W));
+      parts.push(bx(1.4, 1.4, 30.0, 0.8, 13.4, 0, W));
       for (const sz of [-1, 1]) {
-        parts.push(bx(1.6, 8.0, 1.6, -2.2, 4.0, sz * 15.0, W2, 0, 0, 0.2));
+        parts.push(bx(1.6, 8.0, 1.6, 0.8, 4.0, sz * 15.0, W2, 0, 0, 0.2));
       }
       return merge(parts);
     },
@@ -2150,44 +2153,54 @@ MR.World = (function () {
       const parts = [];
       const W = look.water, QUAY = 0x8f8a7e, STONE = 0xa8a294, TREE = 0x3f8f52;
       const L = 40;
-      parts.push(part(new THREE.PlaneGeometry(17, L), W, -11.0, 0.02, 0, -Math.PI / 2));
+      // EVERYTHING SITS AT LOCAL x >= -8, and that is not a style choice.
+      // A landmark is placed at its centre and the mesh runs toward the road
+      // from there; the first version of this built the canal about local
+      // x = -11 with a quay wall at -19.6, so at the table's x = 20 the near
+      // wall landed at world x = 0.4 -- a stone kerb standing in the middle
+      // lane. Scenery that reaches into the corridor is a hazard the collision
+      // model has never heard of, which is the one bug this file must not
+      // ship. The near quay now stops at -8, i.e. world 12 at x = 20, just
+      // past the eight units of pavement the road tile carries.
+      const C = 2.0;                    // water centre, in local x
+      parts.push(part(new THREE.PlaneGeometry(15, L), W, C, 0.02, 0, -Math.PI / 2));
       for (const sx of [-1, 1]) {
-        const x = -11.0 + sx * 8.6;
+        const x = C + sx * 8.0;
         parts.push(bx(1.6, 2.4, L, x, 0.4, 0, QUAY));
         parts.push(bx(2.0, 0.4, L, x, 1.5, 0, STONE));
         for (let i = 0; i < 7; i++) {
-          parts.push(bx(0.24, 1.0, 0.24, x + sx * 0.7, 1.9, -L / 2 + 3 + i * 6, 0x3a3550));
+          parts.push(bx(0.24, 1.0, 0.24, x - sx * 0.7, 1.9, -L / 2 + 3 + i * 6, 0x3a3550));
         }
       }
-      // Elms along the quay and a couple of moored barges.
+      // Elms along the near quay and a couple of moored barges.
       for (let i = 0; i < 3; i++) {
         const tz = -L / 2 + 7 + i * 13;
-        parts.push(cyl(0.26, 0.4, 3.2, 6, -2.0, 1.6, tz, 0x7a6a58));
-        parts.push(sph(2.2, 8, -2.0, 5.4, tz, TREE));
-        parts.push(sph(1.6, 7, -3.2, 4.6, tz + 1.0, 0x4fa062));
+        parts.push(cyl(0.26, 0.4, 3.2, 6, C - 9.4, 1.6, tz, 0x7a6a58));
+        parts.push(sph(2.2, 8, C - 9.4, 5.4, tz, TREE));
+        parts.push(sph(1.6, 7, C - 10.4, 4.6, tz + 1.0, 0x4fa062));
       }
       for (let i = 0; i < 2; i++) {
         const bz = -10 + i * 20;
-        parts.push(bx(3.4, 1.0, 11.0, -6.6, 0.35, bz, 0x2f4a5e));
-        parts.push(bx(3.0, 0.3, 10.4, -6.6, 0.9, bz, 0x6a7a5e));
-        parts.push(bx(2.4, 1.4, 4.0, -6.6, 1.6, bz - 2.6, 0x3f6a4a));
-        parts.push(bx(2.6, 0.24, 4.2, -6.6, 2.4, bz - 2.6, 0xefe6d4));
+        parts.push(bx(3.4, 1.0, 11.0, C - 4.4, 0.35, bz, 0x2f4a5e));
+        parts.push(bx(3.0, 0.3, 10.4, C - 4.4, 0.9, bz, 0x6a7a5e));
+        parts.push(bx(2.4, 1.4, 4.0, C - 4.4, 1.6, bz - 2.6, 0x3f6a4a));
+        parts.push(bx(2.6, 0.24, 4.2, C - 4.4, 2.4, bz - 2.6, 0xefe6d4));
       }
       if (withBridge) {
         // The humpback: three shallow arches and a white balustrade.
         const sub = [];
         for (let i = 0; i < 3; i++) {
-          vArc(sub, { cx: (i - 1) * 6.0, cy: 0.4, cz: 0, rx: 2.6, ry: 2.2, n: 6, th: 0.7, d: 5.0, color: STONE });
+          vArc(sub, { cx: (i - 1) * 5.2, cy: 0.4, cz: 0, rx: 2.3, ry: 2.2, n: 6, th: 0.7, d: 5.0, color: STONE });
         }
         for (let i = 0; i < 9; i++) {
-          const x = -9.0 + i * 2.25;
-          const y = 3.4 + 1.3 * Math.cos(x / 9.0 * 1.4);
-          sub.push(bx(2.4, 0.5, 5.2, x, y, 0, STONE));
+          const x = -8.0 + i * 2.0;
+          const y = 3.4 + 1.3 * Math.cos(x / 8.0 * 1.4);
+          sub.push(bx(2.2, 0.5, 5.2, x, y, 0, STONE));
           for (const sz of [-1, 1]) {
-            sub.push(bx(2.4, 0.9, 0.3, x, y + 0.7, sz * 2.5, 0xf4f0e4));
+            sub.push(bx(2.2, 0.9, 0.3, x, y + 0.7, sz * 2.5, 0xf4f0e4));
           }
         }
-        placeAt(parts, sub, -11.0, 0, 0, Math.PI / 2);
+        placeAt(parts, sub, C, 0, 0, Math.PI / 2);
       }
       return merge(parts);
     },
@@ -2345,8 +2358,13 @@ MR.World = (function () {
      * Table Mountain: a flat top, a steep face and Devil's Peak beside it.
      *
      * Laid as a RUN 220 units long, because a mountain does not come and go.
-     * It stands at 120 units out, deep enough in the haze to read as distance
-     * and near enough that the flat top is unmistakable.
+     *
+     * It stands at 72 units, not the 120 it was first given. At 120 the massif
+     * sat 26 degrees off the camera axis and spent most of the leg outside the
+     * frame entirely -- a landmark you cannot see is not a landmark. At 72 it
+     * crops the shoulder of the frame the way the reference games' oversized
+     * props do, and the haze at that range still reads as distance because the
+     * thing is sixty units tall.
      */
     tableMountain: function () {
       const parts = [];
@@ -5136,7 +5154,12 @@ MR.World = (function () {
      * mesh a half-turn so its road-facing side (local -x, by convention above)
      * still faces the road. Nothing may be placed inside LANDMARK_IN.
      */
+    // Where a landmark stands, the street opens up for it. See the street-wall
+    // pass below: rows are laid AFTER the landmarks and skipped inside these
+    // spans, so a Colosseum at x = 21 is not buried behind a terrace at 15.
+    const markBlocks = [];
     function landmark(z, kind, side, x, y, rz, set) {
+      if (Math.abs(x) < 34) markBlocks.push({ z, side });
       structures.push({
         z, kind, side, set: set || 0,
         x: side * Math.max(x, LANDMARK_IN),
@@ -5147,6 +5170,8 @@ MR.World = (function () {
     }
     // Spanning pieces are symmetric and sit on the centre line.
     function landmarkOver(z, kind, set) {
+      // A spanning piece has piers on BOTH shoulders, so it clears both.
+      markBlocks.push({ z, side: 0 });
       structures.push({ z, kind, set: set || 0, side: 1, x: 0, y: 0, ry: 0, rz: 0 });
     }
 
@@ -5191,31 +5216,6 @@ MR.World = (function () {
       const sd = (Math.round(z / 155) % 2) ? 1 : -1;
       landmark(z, 'ship', sd, 24 + (Math.round(z / 155) % 3) * 8, -0.34 - WATER_DROP, 0,
         setIndexAt(z));
-    }
-
-    // ---- the street wall --------------------------------------------------
-    // Rows on a 30-unit grid down both shoulders, thinned by the biome's own
-    // `street` density so PARKLAND stays open and CITY START closes in. The
-    // front face lands at 12.2, just behind the pavement the road tile carries.
-    for (const b of BI) {
-      const dens = b.look.street || 0;
-      if (!dens) continue;
-      for (let z = b.from; z < b.to; z += STREET_LEN) {
-        for (const side of [-1, 1]) {
-          const take = rnd.chance(dens);
-          const si = settingIndexAt(z, rnd.next());
-          const v = rnd.int(0, 2);
-          if (!take) continue;
-          if (b.look.bank === side) continue;          // never over the water
-          if (deckLift(z) > 0.15) continue;            // nor on the bridge ramp
-          const depth = SETS[si].look.terrace.depth;
-          structures.push({
-            z: z + STREET_LEN / 2, kind: 'street', set: si, v, side,
-            x: side * (12.2 + depth / 2), y: 0,
-            ry: side < 0 ? Math.PI : 0, rz: 0,
-          });
-        }
-      }
     }
 
     // ---- landmarks --------------------------------------------------------
@@ -5310,6 +5310,43 @@ MR.World = (function () {
       const zz = nudgeOver(z);
       if (noBridgeSpans.some((sp) => zz > sp[0] && zz < sp[1])) continue;
       landmarkOver(zz, 'footbridge', 0);
+    }
+
+    // ---- the street wall --------------------------------------------------
+    /**
+     * Rows on a 30-unit grid down both shoulders, thinned by the biome's own
+     * `street` density so PARKLAND stays open and CITY START closes in. The
+     * front face lands at 12.2, just behind the pavement the road tile carries.
+     *
+     * Laid LAST, and that ordering is the whole reason it works. A terrace row
+     * occupies x = 12.2 to about 19, which is exactly the band the landmarks
+     * stand in -- the first version put the rows down first and every setting's
+     * signature silhouette ended up inside a block of flats. The street now
+     * opens for a landmark and closes again behind it, which is also what a
+     * real city does around its monuments.
+     */
+    for (const b of BI) {
+      const dens = b.look.street || 0;
+      if (!dens) continue;
+      for (let z = b.from; z < b.to; z += STREET_LEN) {
+        for (const side of [-1, 1]) {
+          const take = rnd.chance(dens);
+          const si = settingIndexAt(z, rnd.next());
+          const v = rnd.int(0, 2);
+          if (!take) continue;
+          if (b.look.bank === side) continue;          // never over the water
+          if (deckLift(z) > 0.15) continue;            // nor on the bridge ramp
+          const cz = z + STREET_LEN / 2;
+          if (markBlocks.some((m) => (m.side === 0 || m.side === side)
+            && Math.abs(m.z - cz) < 30)) continue;
+          const depth = SETS[si].look.terrace.depth;
+          structures.push({
+            z: cz, kind: 'street', set: si, v, side,
+            x: side * (12.2 + depth / 2), y: 0,
+            ry: side < 0 ? Math.PI : 0, rz: 0,
+          });
+        }
+      }
     }
 
     /**

@@ -278,6 +278,7 @@ MR.Course = (function () {
     if (!gates.length) return items;
 
     let gi = 0;
+    let nudged = 0;   // consecutive gaps a rescue item has declined
     let z = START_GRACE + rnd.range(200, 340);
     const end = K.TOTAL_UNITS - FINISH_GRACE - 60;
     let guard = 0;
@@ -321,7 +322,37 @@ MR.Course = (function () {
           // The lane is still guaranteed passable at both gates, so this makes
           // aid demanding without ever making it a trap. Nothing here can
           // reach a BLOCK: `open` excluded those before scoring.
-          let lane = open[0], best = -1;
+          // ...but not EVERY item, and that qualification is the whole fix.
+          //
+          // Scoring every placement for maximum difficulty produced a rescue
+          // mechanic that only a player who did not need rescuing could reach.
+          // Measured over 171 items: 85% sat off the centre lane, 71% demanded
+          // an action at the gate on BOTH sides, and 94% demanded one on at
+          // least one side. Aid tops the streak back up to AID_CEILING, so it
+          // is the designated road back for a broken run -- and it was gated
+          // behind two consecutive clean clears plus a lane change, asked of
+          // the one player whose defining problem is that they cannot string
+          // two clean clears together. The stronger the aid was made, the
+          // further out of reach it moved. A 16-contact run collected none.
+          //
+          // So the pool is mixed rather than uniformly hard. Roughly half the
+          // items are still scored for maximum difficulty -- those are the
+          // trade the design wants, and a strong run will hoover them up on
+          // the way past. The rest are scored INVERTED, landing in the easiest
+          // legal lane, and those are the ones a broken run can actually take.
+          //
+          // Deterministic, so the course stays identical for every player: the
+          // choice comes from the same seeded stream as everything else, never
+          // from the runner's live state.
+          const rescue = rnd.chance(0.5);
+          // -Infinity, not -1. On the rescue path `rank` is a NEGATED score
+          // and is therefore always below zero, so a -1 seed meant no lane
+          // scoring 1 or worse could ever beat the initial value: the loop
+          // silently fell through, left the lane as an arbitrary open[0], and
+          // reported a demand of 1 no matter how hard the placement actually
+          // was. Two rounds of tuning measured no effect for exactly this
+          // reason before the seed was found.
+          let lane = open[0], best = -Infinity;
           for (const l of open) {
             const before = gates[gi].lanes[l];
             const after = gi + 1 < gates.length ? gates[gi + 1].lanes[l] : K.CLEAR;
@@ -331,14 +362,45 @@ MR.Course = (function () {
             if (l !== 1) score += 1;
             // Break ties from the seeded stream so a course still varies.
             score += rnd.next() * 0.9;
-            if (score > best) { best = score; lane = l; }
+            // A rescue item wants the LEAST demanding lane, so the same score
+            // is simply read the other way up rather than duplicated.
+            const rank = rescue ? -score : score;
+            if (rank > best) { best = rank; lane = l; }
           }
+          // `best` is negated on a rescue item, so recover the real score for
+          // the guarded flag the renderer uses to decide how loudly to
+          // telegraph the pickup.
+          const demand = rescue ? -best : best;
+
+          // Reading the score the other way up is not enough on its own, and
+          // measurement is why this is here. Inverting the lane choice moved
+          // "reachable without clearing anything" only from 6% to 9%, because
+          // the LANE is picked after the POSITION and the course is now dense
+          // enough that most gaps have no easy lane in any of the three.
+          //
+          // So a rescue item is allowed to decline a gap. If the gentlest lane
+          // here still demands an action, skip this gap and look at the next
+          // one; `nudged` bounds that walk so aid can never migrate far from
+          // where the spacing rule wanted it, and so a stretch of course with
+          // no easy gap at all cannot silently swallow every rescue item.
+          if (rescue && demand >= 3 && nudged < 5) {
+            nudged++;
+            // Step to the NEXT GAP, not a fixed distance. The first version of
+            // this advanced 26 units, which is less than the median gate
+            // spacing of 29.6 -- so it usually re-tested the same gap, decided
+            // the same thing, and burned its whole allowance without ever
+            // looking at a new one. The measured effect was nil.
+            const nz = gi + 1 < gates.length ? gates[gi + 1].z + 5 : z + 32;
+            z = Math.max(z + 10, nz);
+            continue;
+          }
+          nudged = 0;
 
           const f2 = z / K.TOTAL_UNITS;
           const fruit = rnd.chance(0.12 + 0.46 * f2 * f2);
           items.push(fruit
-            ? { z, lane, kind: 'banana', gain: K.AID_BANANA, guarded: best >= 3 }
-            : { z, lane, kind: 'water', gain: K.AID_WATER, guarded: best >= 3 });
+            ? { z, lane, kind: 'banana', gain: K.AID_BANANA, guarded: demand >= 3 }
+            : { z, lane, kind: 'water', gain: K.AID_WATER, guarded: demand >= 3 });
         }
       }
 

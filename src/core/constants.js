@@ -97,8 +97,23 @@ MR.K = (function () {
     // Share of the 5:30 -> 4:14 gap carried by the fast term.
     STREAK_FAST_SHARE: FAST_SHARE,
 
-    // Penalties. A hit keeps a quarter of the streak and costs race seconds.
-    HIT_STREAK_KEEP: 0.25,
+    // Penalties. A hit keeps this much of the streak and costs race seconds.
+    //
+    // 0.40, not the old 0.25. This is the one dial that changes the modal
+    // player's experience without touching a flawless run at all: a perfect
+    // line never calls onHit, so the finish is bit-identical at every value --
+    // 1:57:50 at 0.25, 0.40 and 0.45 alike. What it moves is everyone else.
+    // At 0.90 accuracy the average pace goes 5:06 -> 5:00/mi and the best
+    // streak 11 -> 14; at 0.95, 4:51 -> 4:45 and 25 -> 31. That matters
+    // because speed is the entire sensory pleasure of a runner game, and a
+    // normal player was spending four minutes at roughly starting pace,
+    // holding a goal but never getting the feeling.
+    //
+    // 0.45 was measured and rejected. It is better still for a weak player,
+    // but it lets the record survive TWO mistakes with no aid, and the start
+    // panel's wager -- "survives one mistake in 196" -- is the tension the
+    // whole design is sold on. 0.40 keeps that contract exactly.
+    HIT_STREAK_KEEP: 0.40,
     HIT_TIME_PENALTY: 1.5,          // race seconds added on contact
     PACE_EASE: 2.2,                 // s/mi per race-second of easing toward target
 

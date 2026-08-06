@@ -4893,7 +4893,7 @@ MR.World = (function () {
     // the frame around it -- the same job the brown ballast does in the
     // reference. It is only 1.2 units wide a side, so it costs the play surface
     // nothing in the "lightest large mass" reckoning.
-    const ROAD_MARGIN = 0xcccccc;
+    const ROAD_MARGIN = 0xd0d0d0;
 
     const roadGeo = (function () {
       const parts = [];
@@ -5687,6 +5687,14 @@ MR.World = (function () {
      * which matters, because the spawn window claims and releases by kind.
      */
     function hazardPool(kind, tint, defs) {
+      // The draw bag. A def's `weight` is how many tickets it holds; variants
+      // are then picked by hashing into the bag, so the ratio a variant is
+      // authored with is the ratio it actually spawns at, instead of being an
+      // emergent property of an ad-hoc modulo. See variantIndex.
+      const bag = [];
+      defs.forEach(function (d, i) {
+        for (let k = 0; k < (d.weight || 1); k++) bag.push(i);
+      });
       return Pool(function () {
         const g = new THREE.Group();
         const variants = [];
@@ -5715,6 +5723,7 @@ MR.World = (function () {
         variants[0].visible = true;
         g.add(telegraph(kind));
         g.userData.variants = variants;
+        g.userData.bag = bag;
         g.userData.body = variants[0].userData.body;
         return g;
       }, group);
@@ -5941,14 +5950,37 @@ MR.World = (function () {
         hbx(2.02, 1.02, 1.20, 0, 0.72, 0.02, 0xff3b6b),
         hbx(2.10, 0.15, 1.24, 0, 1.28, 0.02, 0xfff2e0),
         hbx(2.06, 0.20, 1.26, 0, 0.20, 0.02, 0xd42a55),
-        // Rider: back, shoulders, head, helmet -- all of it above the box.
-        hbx(0.70, 0.66, 0.50, 0, 1.61, 0.86, 0xff3b6b),
-        hbx(0.76, 0.14, 0.52, 0, 1.86, 0.86, 0xfff2e0),
-        hbx(0.36, 0.34, 0.34, 0, 2.11, 0.90, 0xffc79a),
-        hbx(0.46, 0.24, 0.46, 0, 2.34, 0.90, 0xfff2e0),
+        /**
+         * THE RIDER, resized and revalued after a full playtest in which the
+         * player reported seeing no cyclist at all.
+         *
+         * Two things were wrong and neither was the pose. First SIZE: the old
+         * torso was 0.51 world units wide and the head 0.26, which at the 50
+         * units a lane is chosen at is six pixels and three. Nothing legible
+         * about a human being survives three pixels. Second and worse, VALUE:
+         * the torso was 0xff3b6b -- the cargo box's own colour -- so the one
+         * part big enough to see had no edge against the thing it was sitting
+         * on, and the figure was a bump on a barrier rather than a person.
+         *
+         * The rule the rebuild follows is that the background CHANGES up the
+         * figure. From the chase camera the torso is seen against the box and
+         * the far road, both pale; the head and helmet are seen against sky,
+         * paler still. So the body is dark navy -- the darkest thing in the
+         * scene, unmissable against either -- with one broad cream hi-vis band
+         * where the eye lands, and the helmet stays BLOCK pink so the top of
+         * the silhouette still says "impassable" before the shape resolves.
+         *
+         * Top of the helmet is 2.72, which is the pennant height this variant
+         * has always had and still inside the 2.80 the collision box records.
+         */
+        hbx(1.14, 0.44, 0.56, 0, 1.52, 0.86, 0x2b2f52),
+        hbx(1.22, 0.34, 0.58, 0, 1.91, 0.86, 0xfff2e0),
+        hbx(1.10, 0.10, 0.54, 0, 2.13, 0.86, 0x2b2f52),
+        hbx(0.60, 0.48, 0.50, 0, 2.44, 0.90, 0xffc79a),
+        hbx(0.70, 0.22, 0.60, 0, 2.61, 0.90, 0xff3b6b),
         // Arms down onto the bars, which is what puts a lean in the shape.
-        hbx(0.16, 0.54, 0.16, -0.34, 1.52, 1.06, 0xffc79a, 0.34),
-        hbx(0.16, 0.54, 0.16, 0.34, 1.52, 1.06, 0xffc79a, 0.34),
+        hbx(0.22, 0.62, 0.20, -0.62, 1.56, 1.06, 0x2b2f52, 0.34),
+        hbx(0.22, 0.62, 0.20, 0.62, 1.56, 1.06, 0x2b2f52, 0.34),
         hbx(0.98, 0.12, 0.12, 0, 1.28, 1.24, 0x2b2f52),
       ];
       // Wheels. Seen from directly behind they are slabs rather than discs, so
@@ -5964,12 +5996,27 @@ MR.World = (function () {
       }
       return merge(parts);
     })();
-    /** The pedalling half: cranks and feet, on the bottom-bracket axis. */
+    /**
+     * The pedalling half -- now KNEES either side of the rider, not cranks.
+     *
+     * The cranks were correct and invisible. They sat at z = 0.92, which is
+     * further from the lens than the cargo box's far face at 0.62, so the one
+     * moving part on the one hazard that was supposed to feel alive was
+     * occluded by its own vehicle for the whole approach. Nothing else static
+     * on this road moves, so losing that was expensive.
+     *
+     * Knees orbiting a bottom bracket at (±0.50, 1.30, 0.55) sweep from 0.90 to
+     * 1.70 in y. The box tops out at 1.355, so each knee RISES INTO VIEW above
+     * it and drops back out of sight, alternately, which is exactly what a
+     * rider seen from directly behind looks like and is a far stronger signal
+     * than a wheel or a crank at this distance. Cream shoe caps carry it, and
+     * they are outboard of the 0.82-wide torso so the rider never hides them.
+     */
     const blockTrikeCrankGeo = merge([
-      bx(0.13, 0.52, 0.13, 0, 0, 0.26, 0x2b2f52),
-      bx(0.26, 0.14, 0.32, 0, -0.25, 0.26, 0xfff2e0),
-      bx(0.13, 0.52, 0.13, 0, 0, -0.26, 0x2b2f52),
-      bx(0.26, 0.14, 0.32, 0, 0.25, -0.26, 0xfff2e0),
+      bx(0.30, 0.40, 0.28, -0.50, 0.40, 0, 0x2b2f52),
+      bx(0.34, 0.16, 0.32, -0.50, 0.60, 0.04, 0xfff2e0),
+      bx(0.30, 0.40, 0.28, 0.50, -0.40, 0, 0x2b2f52),
+      bx(0.34, 0.16, 0.32, 0.50, -0.60, 0.04, 0xfff2e0),
     ]);
 
     /**
@@ -5992,22 +6039,47 @@ MR.World = (function () {
       parts.push(hbx(2.16, 0.56, 0.18, 0, 0.98, -0.54, 0xff3b6b));
       parts.push(hbx(2.24, 0.12, 0.20, 0, 1.30, -0.54, 0xfff2e0));
       parts.push(hbx(2.24, 0.12, 0.20, 0, 0.66, -0.54, 0xfff2e0));
+      /**
+       * The pair, rebuilt for the same reason the trike's rider was: a player
+       * who ran the whole race did not report two marshals they could not make
+       * out, they reported seeing nobody.
+       *
+       * The old torso was 0xff3b6b, the board's own colour, so from behind the
+       * two figures had no edge against the thing they were holding and the
+       * whole variant collapsed into "striped barrier with lumps". They are now
+       * dark navy with a broad cream hi-vis tabard -- the same value ladder the
+       * trike's rider uses, and for the same reason: everything they are seen
+       * against up there is pale. Caps are BLOCK pink so the top of each
+       * silhouette still carries the hazard hue.
+       *
+       * They are also bigger and further apart: 0.56 world units of shoulder
+       * each, set at +/-0.46 so the pair spans the lane and reads as TWO
+       * people rather than one mass. Different heights, because two identical
+       * figures read as a repeated prop.
+       */
       const who = [
-        { x: -0.60, skin: 0xffc79a, z: 0.16 },
-        { x: 0.56, skin: 0xb87a4e, z: 0.44 },
+        { x: -0.64, skin: 0xffc79a, z: 0.16, h: 0.00 },
+        { x: 0.60, skin: 0xb87a4e, z: 0.44, h: -0.09 },
       ];
       for (const p of who) {
         const px = p.x * LANE_FIT;
-        parts.push(bx(0.42, 0.86, 0.32, px, 0.43, p.z, 0x2b2f52));
-        parts.push(bx(0.64, 0.88, 0.40, px, 1.30, p.z, 0xff3b6b));
-        // Hi-vis cross-belt: cream on pink, the same band language as the truck.
-        parts.push(bx(0.68, 0.14, 0.42, px, 1.48, p.z, 0xfff2e0));
-        parts.push(bx(0.38, 0.36, 0.36, px, 1.94, p.z, p.skin));
-        parts.push(bx(0.44, 0.16, 0.42, px, 2.19, p.z, 0xfff2e0));
+        const y = p.h;
+        // The ladder, bottom to top: dark waist, cream hi-vis, dark collar,
+        // skin head, pink cap. Rear faces sit in the toon ramp's dark band --
+        // measured, 0x2b2f52 renders near 0x111737 and 0xfff2e0 near 0x848f9d --
+        // so alternating dark and light is worth several times what a hue
+        // change is up here, and the dark collar is specifically what keeps the
+        // head from melting into the tabard at forty units.
+        parts.push(bx(0.50, 0.86, 0.34, px, 0.43, p.z, 0x2b2f52));
+        parts.push(bx(0.80, 0.32, 0.44, px, 1.34 + y, p.z, 0x2b2f52));
+        parts.push(bx(0.86, 0.40, 0.46, px, 1.70 + y, p.z, 0xfff2e0));
+        parts.push(bx(0.76, 0.10, 0.42, px, 1.95 + y, p.z, 0x2b2f52));
+        parts.push(bx(0.54, 0.48, 0.46, px, 2.24 + y, p.z, p.skin));
+        parts.push(bx(0.62, 0.20, 0.52, px, 2.44 + y, p.z, 0xff3b6b));
         // Arms forward onto the barrier, which is what makes them its holders
         // rather than two figures that happen to be standing behind it.
-        parts.push(bx(0.15, 0.66, 0.15, px - 0.32, 1.26, p.z - 0.34, p.skin, 0.62));
-        parts.push(bx(0.15, 0.66, 0.15, px + 0.32, 1.26, p.z - 0.34, p.skin, 0.62));
+        parts.push(bx(0.19, 0.70, 0.19, px - 0.40, 1.28 + y, p.z - 0.34, 0x2b2f52, 0.62));
+        parts.push(bx(0.19, 0.70, 0.19, px + 0.40, 1.28 + y, p.z - 0.34, 0x2b2f52, 0.62));
       }
       return merge(parts);
     })();
@@ -6018,16 +6090,28 @@ MR.World = (function () {
       bx(0.54, 0.15, 0.12, 0, 1.58, -0.14, 0xfff2e0),
     ]);
 
+    // The two INHABITED skins carry double weight. A player who ran the whole
+    // race reported never seeing a cyclist or a marshal at all: at even odds
+    // they were about a tenth of the gates, and the course has since got harder
+    // in a way that spawns fewer BLOCKs still (a full-width gate never carries
+    // one). Two thirds living is what makes the road read as a city closed for
+    // a race rather than a corridor of street furniture, and it costs nothing
+    // -- every variant is built and parented once either way.
     const blockPool = hazardPool(K.BLOCK, 'block', [
-      { geo: blockGeo, face: [2.06, 1.9, 1.42, -0.661] },
-      { geo: blockSignGeo, face: [2.06, 1.7, 1.58, -0.541] },
+      { geo: blockGeo, face: [2.06, 1.9, 1.42, -0.661], weight: 1 },
+      { geo: blockSignGeo, face: [2.06, 1.7, 1.58, -0.541], weight: 1 },
       {
-        geo: blockTrikeGeo, face: [1.98, 0.86, 0.74, -0.591],
-        moving: blockTrikeCrankGeo, pivot: [0, 0.56, 0.92], anim: 'pedal',
+        geo: blockTrikeGeo, face: [1.98, 0.86, 0.74, -0.591], weight: 2,
+        // Bottom bracket lifted to the box line and pulled forward of its far
+        // face, so the knees break the box's top edge instead of pedalling
+        // behind it. See blockTrikeCrankGeo.
+        moving: blockTrikeCrankGeo, pivot: [0, 1.30, 0.55], anim: 'pedal',
       },
       {
-        geo: blockCrossGeo, face: [2.10, 0.50, 0.98, -0.655],
-        moving: blockPaddleGeo, pivot: [0.88, 1.00, 0.44], anim: 'paddle',
+        geo: blockCrossGeo, face: [2.10, 0.50, 0.98, -0.655], weight: 2,
+        // Dropped 0.20 so the roundel's top lands exactly on the 2.80 the
+        // collision box records for a BLOCK rather than 0.20 over it.
+        moving: blockPaddleGeo, pivot: [0.92, 0.80, 0.30], anim: 'paddle',
       },
     ]);
 
@@ -6036,13 +6120,29 @@ MR.World = (function () {
      * a property of the course -- identical for every player on the same day,
      * exactly like the course itself -- and costs no storage.
      *
+     * The old form was `(round(z)*7 + lane*3 + round(z/37)) % n`, and it was not
+     * a hash: with n = 4 the first term collapses to 3*round(z) mod 4, the last
+     * term walks slowly and correlates with the first, and gate z is not
+     * uniform mod 4 either -- spacing runs 46 units early and 24 late. Counted
+     * over a real course it gave the four BLOCK skins 36 / 25 / 11 / 18, so the
+     * rarest was under a third of the commonest and it was the cyclist. This is
+     * a proper 32-bit avalanche instead, which puts consecutive gates in
+     * unrelated buckets, and it draws from a weighted BAG rather than modulo n
+     * so a variant's share is something this file states rather than discovers.
+     *
      * A train is always variant 0. It is the only BLOCK body authored to be
      * stretched along z (see blockGeo), and a six-unit cargo trike would be a
      * joke rather than an obstacle.
      */
-    function variantIndex(n, gate, lane) {
+    function variantIndex(bag, gate, lane) {
       if (gate.train) return 0;
-      return (Math.round(gate.z) * 7 + lane * 3 + Math.round(gate.z / 37)) % n;
+      // Quarter units, so two gates a fraction apart cannot land on the same
+      // key, and imul throughout because the products overflow 2^31.
+      let h = (Math.round(gate.z * 4) + lane * 0x9e37) | 0;
+      h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d);
+      h = Math.imul(h ^ (h >>> 13), 0x297a2d39);
+      h = (h ^ (h >>> 16)) >>> 0;
+      return bag[h % bag.length];
     }
 
     // ---- scenery --------------------------------------------------------
@@ -7369,7 +7469,7 @@ MR.World = (function () {
           // the kind of defect that only shows up in one screenshot in twenty,
           // and on a hazard it costs the record rather than the screenshot.
           const vs = o.userData.variants;
-          const vi = variantIndex(vs.length, gate, l);
+          const vi = variantIndex(o.userData.bag, gate, l);
           for (let k = 0; k < vs.length; k++) vs[k].visible = (k === vi);
           o.userData.active = vs[vi];
           o.userData.body = vs[vi].userData.body;
@@ -7587,14 +7687,19 @@ MR.World = (function () {
           if (!a || !a.userData.anim) continue;
           const ph = g.gate.z * 0.7 + l;
           if (a.userData.anim === 'pedal') {
-            // A cadence, not a wheel spin: 1.6 turns a second is what a rider
-            // holding up traffic looks like, and it is legible at 40 units
-            // where a spinning wheel would only shimmer.
-            a.userData.moving.rotation.x = now * 10.0 + ph;
-            a.position.y = Math.sin(now * 20.0 + ph) * 0.018;
+            // A cadence, not a wheel spin: about 1.2 turns a second is what a
+            // rider holding up traffic looks like. Slowed from 1.6 now that the
+            // knees rise past the box line rather than turning behind it -- at
+            // the old rate the pair strobed instead of reading as legs, and a
+            // motion you cannot follow is the same as no motion.
+            a.userData.moving.rotation.x = now * 7.6 + ph;
+            a.position.y = Math.sin(now * 15.2 + ph) * 0.030;
           } else {
-            a.userData.moving.rotation.z = Math.sin(now * 3.4 + ph) * 0.22;
-            a.position.y = Math.abs(Math.sin(now * 3.0 + ph)) * 0.045;
+            // A wave, and a big one. This is the only thing on the road that
+            // signals a human intention rather than an obstacle, so it is worth
+            // more amplitude than realism would give it.
+            a.userData.moving.rotation.z = Math.sin(now * 3.4 + ph) * 0.42;
+            a.position.y = Math.abs(Math.sin(now * 3.0 + ph)) * 0.050;
           }
         }
       }

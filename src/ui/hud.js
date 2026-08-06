@@ -185,16 +185,35 @@ MR.HUD = (function () {
           <div class="sub num" id="margin">VS ${K.RECORD_LABEL}</div>
         </div>
 
+        <!--
+          THE STREAK IS FUEL, NOT A SCORE.
+
+          It used to lead with CLEAN GATES over a large integer, and every
+          review of this game independently said the same thing about it: a big
+          number with a label like that is a SCOREBOARD, and people read
+          scoreboards with the loss-aversion circuit -- "points I could lose".
+          The variable is not a score. It is a tank: it fills while you run
+          clean, it drains most of the way on contact, water and bananas refill
+          it, and the pace you get is read straight off how full it is. The
+          shipped aid toast already says FUEL out loud while crediting a
+          counter called CLEAN GATES -- three names for one thing.
+
+          So the gauge leads and the integer stops being the headline. Same
+          variable, same maths, nothing balanced changed; what changes is
+          whether a player reads it as something to protect or something to
+          spend and rebuild. It also costs one large number less on a screen
+          the owner asked to declutter.
+        -->
         <div id="engine">
-          <div class="lab">CLEAN GATES</div>
-          <div class="val num" id="streakVal">0</div>
-          <div class="gauge" id="paceGauge">
+          <div class="lab">FUEL</div>
+          <div class="gauge tank" id="paceGauge">
             <div class="gaugeFill" id="gaugeFill"></div>
             <div class="gaugeRec"></div>
           </div>
           <div class="lab" id="paceLab">PACE</div>
           <div><span class="val num" id="paceVal">5:30</span><span class="unit">/MI</span></div>
           <div class="sub num" id="needVal">NEED ${Pace.pace(K.RECORD_PACE)}/MI</div>
+          <div class="sub num" id="streakLine"><span id="streakVal">0</span> CLEAN</div>
           <div id="why">EACH CLEAN GATE BUYS SPEED</div>
         </div>
 

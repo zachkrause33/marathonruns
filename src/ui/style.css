@@ -189,11 +189,10 @@ html, body {
   padding: 8px 14px 9px;
   min-width: 152px; max-width: 178px;
 }
-#engine #streakVal {
-  font-size: 36px; font-weight: 700; line-height: 1;
-  color: var(--accent);
-  text-shadow: 0 2px 0 rgba(14, 18, 48, 0.6);
-}
+/* The count is a sub-line now, not the headline -- it explains the tank above
+   it rather than competing with the pace below. Accent still, because it is
+   the same quantity the gauge draws. */
+#engine #streakVal { font-weight: 700; color: var(--accent); }
 #engine #paceLab { margin-top: 1px; }
 #engine .val { font-size: 27px; font-weight: 500; line-height: 1.05; }
 #engine .val.ahead { color: var(--ahead); }
@@ -206,7 +205,8 @@ html, body {
 /* Contact flashes the whole plate, not just the number: the cost is the
  * streak and the speed together, and they live in the same box. */
 #engine.broken { border-left-color: var(--behind); background: rgba(58, 14, 32, 0.86); }
-#engine.broken #streakVal { color: var(--behind); }
+#engine.broken #streakVal,
+#engine.broken .gaugeFill { color: var(--behind); background: var(--behind); }
 
 .gauge {
   position: relative;
@@ -215,6 +215,19 @@ html, body {
   background: rgba(255, 253, 245, 0.13);
   border: 1px solid rgba(255, 253, 245, 0.16);
 }
+/* The in-race gauge is a tank, not a progress bar. It is the primary readout
+   of the engine now that the integer has stepped back, so it gets the height
+   to be read at a glance and a segmented face -- a continuous bar reads as
+   "how far through", a divided one reads as "how much is left". */
+.gauge.tank {
+  height: 14px;
+  margin: 5px 0 8px;
+  background:
+    repeating-linear-gradient(90deg,
+      rgba(255, 253, 245, 0.13) 0 calc(12.5% - 1px),
+      rgba(14, 18, 48, 0.55) calc(12.5% - 1px) 12.5%);
+}
+.gauge.tank .gaugeFill { opacity: 0.92; }
 .gaugeFill { position: absolute; inset: 0 auto 0 0; background: var(--accent); width: 0; }
 /* Record pace as a mark on the range you are unlocking: once the fill passes
  * it, you are running faster than 1:59:30 needs. */
@@ -742,7 +755,7 @@ html, body {
 
   #leftCol { left: 9px; top: 22px; gap: 7px; }
   #engine { min-width: 124px; max-width: 142px; padding: 6px 11px 7px; }
-  #engine #streakVal { font-size: 27px; }
+  #engine #streakLine { opacity: 0.62; }
   #engine .val { font-size: 21px; }
   #engine .sub { font-size: 8px; }
   #why { font-size: 8px; margin-top: 4px; }
@@ -782,7 +795,6 @@ html, body {
 
   #leftCol { left: 20px; top: 28px; gap: 11px; }
   #engine { min-width: 190px; max-width: 220px; padding: 10px 17px 12px; }
-  #engine #streakVal { font-size: 45px; }
   #engine .val { font-size: 33px; }
   #engine .unit { font-size: 13px; }
   #engine .sub, #why { font-size: 11px; }
@@ -890,7 +902,6 @@ html, body {
 
   #leftCol { top: 20px; gap: 6px; }
   #engine { padding: 5px 10px 6px; }
-  #engine #streakVal { font-size: 23px; }
   #engine .val { font-size: 18px; }
   .gauge { margin: 4px 0 5px; }
   #toast { padding: 5px 10px 6px; }

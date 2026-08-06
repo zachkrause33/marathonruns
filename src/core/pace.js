@@ -16,7 +16,13 @@ MR.Pace = (function () {
   const K = MR.K;
 
   function targetPace(streak) {
-    return K.FLOOR_PACE + (K.START_PACE - K.FLOOR_PACE) * Math.exp(-streak / K.STREAK_K);
+    // Two time constants. The fast term pays a weak player early; the slow
+    // term is still unwinding at the finish, so late gates keep buying time
+    // and a late mistake still costs something. See constants.js.
+    const gap = K.START_PACE - K.FLOOR_PACE;
+    return K.FLOOR_PACE
+      + gap * K.STREAK_FAST_SHARE * Math.exp(-streak / K.STREAK_FAST)
+      + gap * (1 - K.STREAK_FAST_SHARE) * Math.exp(-streak / K.STREAK_SLOW);
   }
 
   function create() {

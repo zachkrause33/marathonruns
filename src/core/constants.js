@@ -28,6 +28,21 @@ MR.K = (function () {
   // for why this number and not another.
   const LANE_W = 1.70;
 
+  // Pace ramp. See the STREAK_FAST / STREAK_SLOW block below for the
+  // derivation; these live out here because AID_CEILING has to solve against
+  // the same curve and must not be able to drift from it.
+  const FLOOR_PACE = 254;                 // 4:14 /mi
+  const START = 330;
+  const FAST_SHARE = 0.685;
+  const K_FAST = 10, K_SLOW = 100;
+
+  function targetPaceAt(streak) {
+    const gap = START - FLOOR_PACE;
+    return FLOOR_PACE
+      + gap * FAST_SHARE * Math.exp(-streak / K_FAST)
+      + gap * (1 - FAST_SHARE) * Math.exp(-streak / K_SLOW);
+  }
+
   return {
     MARATHON_MILES,
     MARATHON_LABEL: '26.2',
@@ -40,8 +55,47 @@ MR.K = (function () {
     // run with a single mistake squeaks in at 1:59:21, and two mistakes end
     // the record attempt. See tools/simulate.js.
     START_PACE: 330,                // 5:30 /mi
-    FLOOR_PACE: 260,                // 4:20 /mi -- the ceiling on a perfect line
-    STREAK_K: 20,                   // clean gates to close ~63% of the gap
+    FLOOR_PACE,                     // 4:14 /mi -- the ceiling on a perfect line
+
+    // THE RAMP HAS TWO TIME CONSTANTS, AND THAT IS THE WHOLE POINT.
+    //
+    // It used to be a single exponential with K=20 against a course of 189
+    // gates, and that made the race a sprint with a three-minute tail. The
+    // numbers, measured on this model:
+    //
+    //   one mistake at  5% of the race cost  69s
+    //                  15%                  105s   <- peak
+    //                  50%                   54s
+    //                  97%                   10s
+    //
+    // An eleven-fold swing. The exponential was 90% spent by streak 46, so by
+    // mile 13 -- two minutes in -- the next clean gate bought 0.06 s/mi and
+    // the last hundred gates bought essentially nothing. The second half of a
+    // good run had no reward left and a shrinking penalty: nothing to win and
+    // progressively less to lose.
+    //
+    // Simply slowing the ramp does not fix it. Total time is an integral, so a
+    // curve that keeps you slower for longer costs finish time, and holding
+    // FLOOR_PACE at 4:20 made the record unbeatable above K=25. Slowing it also
+    // makes things WORSE for a weak player: at K=45 a streak-20 runner is
+    // slower than they are today, and a 90%-accuracy player already never sees
+    // the speed system work at all.
+    //
+    // Two terms solve both at once. The fast term pays out early, so a player
+    // who is not near-perfect still feels the engine -- a streak-20 runner is
+    // now 4.4 s/mi faster than under the old curve. The slow term is a tail
+    // that is still unwinding at the finish, so the last gates keep buying
+    // real time and a late mistake still costs something.
+    //
+    //   target(s) = FLOOR + A*exp(-s/10) + B*exp(-s/100)
+    //
+    // Paid for with six seconds a mile of top gear: 4:20 -> 4:14. That is the
+    // whole cost. The flawless finish is unchanged at 1:58:03, the record still
+    // survives exactly one mistake, and the swing drops from 10.9x to 5.0x.
+    STREAK_FAST: 10,
+    STREAK_SLOW: 100,
+    // Share of the 5:30 -> 4:14 gap carried by the fast term.
+    STREAK_FAST_SHARE: FAST_SHARE,
 
     // Penalties. A hit keeps a quarter of the streak and costs race seconds.
     HIT_STREAK_KEEP: 0.25,
@@ -149,9 +203,25 @@ MR.K = (function () {
     // which is the entire point of putting it in the game.
     AID_WATER: 10,
     AID_BANANA: 22,
-    AID_CEILING: Math.ceil(
-      -20 * Math.log((7170 / (42.195 / 1.609344) - 260) / (330 - 260))
-    ),
+    // Solved against the real curve rather than restated as a formula. The old
+    // line hard-coded 20, 260, 330 and 7170 -- four duplicates of constants
+    // defined a few lines above it -- so retuning the ramp would have left the
+    // ceiling silently describing a curve that no longer existed.
+    //
+    // It also aimed at exactly record pace, which measured badly in play: it
+    // put the ceiling at streak 33, and on a three-mistake run the streak was
+    // already 40, 40 and 59 at the moments aid was collected. The intended
+    // road back was inert at every one of them -- the mechanic documented as
+    // "a lifeline to a broken run" did nothing for most of the race.
+    //
+    // Now it aims halfway between record pace and the floor. Aid can carry a
+    // broken run back through half of what remains; the other half is still
+    // only buyable with an unbroken line, so the top gear is still earned.
+    AID_CEILING: (function () {
+      const aim = (RECORD_PACE + FLOOR_PACE) / 2;
+      for (let s = 0; s <= 400; s++) if (targetPaceAt(s) <= aim) return s;
+      return 400;
+    })(),
 
     // Hazard kinds
     CLEAR: 0,

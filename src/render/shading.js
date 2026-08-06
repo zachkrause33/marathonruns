@@ -171,8 +171,31 @@ MR.shading = (function () {
    * building's lit side and its shaded side are two colours rather than two
    * strengths of one.
    */
-  function ramp(steps) {
-    if (ramps.has(steps)) return ramps.get(steps);
+  /**
+   * `floor` is the darkest band, and it exists because ONE class of object in
+   * this game is not decoration.
+   *
+   * 0.31 is right for scenery: it is as low as the shading can go before the
+   * ambient stops keeping a shaded red vest from reading as brown, and it is
+   * what makes a building's lit and shaded sides two colours rather than two
+   * strengths of one. But a HAZARD is read as a flat silhouette at forty to
+   * ninety units, and its read face points at the camera -- away from the key
+   * light -- so at a 0.31 floor it is lit almost entirely by the blue bounce
+   * and the hemisphere. Measured through the contrast audit: the JUMP kerb's
+   * amber is authored at S 0.73 and rendered at S 0.34, and every BLOCK lands
+   * between 1.1x and 1.6x the centre lane's luminance when the reference sits
+   * at 2.1x to 2.56x. The chroma the whole readability system depends on was
+   * being spent on form shading nobody looks at.
+   *
+   * Raising the floor raises the COLOURED diffuse term against a fixed
+   * additive ambient, so it lifts value and saturation together, which is
+   * exactly the axis the measurement says is short. Form survives because the
+   * band above it is unchanged.
+   */
+  function ramp(steps, floor) {
+    const base = floor === undefined ? 0.31 : floor;
+    const key = steps + '/' + base;
+    if (ramps.has(key)) return ramps.get(key);
     const n = Math.max(2, steps);
     const data = new Uint8Array(n * 4);
     for (let i = 0; i < n; i++) {
@@ -183,7 +206,7 @@ MR.shading = (function () {
       // full brightness and the form stops reading. 0.31 is as low as this can
       // go before the ambient can no longer keep a shaded red vest from
       // reading as brown.
-      const v = 0.31 + 0.69 * Math.pow(k, 1.22);
+      const v = base + (1 - base) * Math.pow(k, 1.22);
       // Cool the dark end. Pushed too far this desaturates the base colour to
       // blue-grey instead of shading it, so it falls off fast toward the light.
       // The exponent is what keeps a 3-band ramp's MIDDLE band only slightly
@@ -200,7 +223,7 @@ MR.shading = (function () {
     tex.minFilter = tex.magFilter = THREE.NearestFilter;
     tex.generateMipmaps = false;
     tex.needsUpdate = true;
-    ramps.set(steps, tex);
+    ramps.set(key, tex);
     return tex;
   }
 
@@ -237,10 +260,10 @@ MR.shading = (function () {
   }
 
   /** Standard toon material. `steps` 2 for props, 3 for characters. */
-  function toon(color, steps) {
+  function toon(color, steps, floor) {
     const m = new THREE.MeshToonMaterial({
       color,
-      gradientMap: ramp(steps || 3),
+      gradientMap: ramp(steps || 3, floor),
     });
     m.onBeforeCompile = patchToonRamp;
     return m;

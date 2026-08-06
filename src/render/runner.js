@@ -319,11 +319,17 @@ MR.Runner = (function () {
   // road it is the same brightness as. It is still far and away the palest
   // thing at that height apart from the shoe, so rule 3 -- the gloves flash
   // against the road -- is untouched.
-  const MITT = 0xc9d2ea;
+  // A mid blue rather than the near-white the first attempt used. Measured off
+  // the frames: a white shoe's SHADED side lands around 0xc8ccdd under the cool
+  // end of the toon ramp, so a near-white cool mitt's LIT side was the same
+  // colour as the thing it had to separate from. A step further down clears the
+  // shoe at both ends of its own ramp and is still 1.8x the road's luminance,
+  // so rule 3 -- the gloves flash against the road -- survives.
+  const MITT = 0xa8b6de;
   // The curled fingers. Darker again, and it is the only interior detail the
   // hand gets: at 14px a knuckle line is the difference between a mitt and a
   // ball, and three separate fingers are three 4px lobes that alias into one.
-  const MITT_DK = 0x8791b7;
+  const MITT_DK = 0x6b74a0;
 
   /**
    * Weld several primitives into one geometry, baking each piece's colour
@@ -1360,16 +1366,23 @@ MR.Runner = (function () {
         // so the airborne span, which MEASUREMENTS.md caps at 0.70 from the
         // lane centre, is spent DOWN rather than up. The extra mass is bought
         // in z, which is the axis the back view does not measure at all.
-        { g: new THREE.SphereGeometry(0.086, 8, 6), c: MITT, y: -0.208, sy: 0.88, sz: 1.00 },
-        { g: new THREE.BoxGeometry(0.170, 0.116, 0.150), c: MITT, y: -0.262, z: 0.014 },
-        // Knuckles: the block's outboard-forward corner rounded off, so the
-        // hand has a leading edge instead of four square ones.
-        { g: new THREE.SphereGeometry(0.090, 8, 6), c: MITT, y: -0.258, z: 0.052, sx: 0.94, sy: 0.70, sz: 0.60 },
-        // The curled fingers, one roll lying across the hand. Its cap ends are
-        // the outer knuckles, exactly as the old three capsules used their caps
-        // -- one primitive doing both jobs, but at a size that survives.
-        { g: new THREE.CapsuleGeometry(0.048, 0.086, 2, 8), c: MITT_DK, y: -0.313, z: 0.048, rz: Math.PI / 2 },
-        { g: new THREE.CapsuleGeometry(0.036, 0.048, 2, 6), c: MITT, x: -side * 0.062, y: -0.242, z: 0.062, rx: 0.85, rz: side * 0.62 },
+        { g: new THREE.SphereGeometry(0.094, 8, 6), c: MITT, y: -0.204, sy: 0.86, sz: 1.00 },
+        { g: new THREE.BoxGeometry(0.206, 0.140, 0.168), c: MITT, y: -0.270, z: 0.018 },
+        // The curled fingers, one roll lying across the hand, at its LEADING
+        // edge rather than under it. Where the break sits matters more than
+        // what it is: the chase camera looks down about 17 degrees onto a
+        // forearm already pitched forward, so what it sees of a hand is the
+        // upper-rear surface and the far edge. A knuckle line on the far edge
+        // is in view for the whole cycle; the same roll tucked underneath,
+        // which is where a curled hand really carries it, was in view for none
+        // of it and measured as invisible.
+        //
+        // Its cap ends are the outer knuckles -- one primitive doing both jobs,
+        // exactly as the three finger capsules it replaces used theirs, but at
+        // a size that survives the minification instead of aliasing into the
+        // palm it stands on.
+        { g: new THREE.CapsuleGeometry(0.057, 0.096, 2, 8), c: MITT_DK, y: -0.296, z: 0.082, rz: Math.PI / 2 },
+        { g: new THREE.CapsuleGeometry(0.041, 0.052, 2, 6), c: MITT, x: -side * 0.072, y: -0.238, z: 0.062, rx: 0.85, rz: side * 0.62 },
       ]);
       elbow.add(fore);
 
@@ -2070,14 +2083,33 @@ MR.Runner = (function () {
         // Worth 0.09 of span for nothing, and it keeps the arm root buried in
         // the deltoid instead of tearing a gap at the seam.
         A.shoulder.position.x = A.side * (0.222 + spread * 0.048);
-        // Flexion peaks with the arm forward -- glove up by the chest at the
-        // front of the swing, forearm opening out past the hip at the back,
-        // which is exactly when the pale glove clears the torso silhouette.
+        // Flexion, and it is now held at BOTH ends of the swing rather than
+        // only at the front. That is a readability fix, not an anatomy one.
+        //
+        // Shoulder-to-hand on this rig is 0.623 -- deliberately long, because
+        // reach is the only term in the spread jump pose. With flexion easing
+        // off as the arm swung back, the trailing hand fell to world y=0.274
+        // and the shoe tops sit at 0.25: for a third of every stride the only
+        // two pale terminals on the character were four pixels apart, and an
+        // art review's verdict on that was that the runner had no hands. No
+        // colour or geometry survives two objects landing in the same place.
+        //
+        // 0.18, and the ceiling on it is not taste. Flexing HARDER swings the
+        // trailing forearm further forward, not further back -- the shoulder
+        // only opens 0.89 behind vertical, so past about 0.2 of extra flexion
+        // the hand climbs to hip height and disappears BEHIND the hips, which
+        // are 0.234 wide and 0.19 nearer the lens. Tried at 0.40 it hid the
+        // hand for most of the cycle, which is a worse failure than the one it
+        // was fixing. At 0.18 the hand lands at y=0.306 with the shoe tops at
+        // 0.25: eight pixels of daylight at gameplay framing, low enough to
+        // stay outside the hip silhouette, and squarely against open road,
+        // which is the background the mitt was toned for.
+        //
         // A slide straightens it instead, so the whole arm becomes one long
         // brace trailing behind the body -- flat and low against the jump's
         // wide, and neither of them the run.
         A.elbow.rotation.x =
-          (-1.32 - fwd * 0.46) * (1 - spread * 0.95) * (1 - slid * 0.86) - slid * 0.10;
+          (-1.32 - fwd * 0.46 - back * 0.18) * (1 - spread * 0.95) * (1 - slid * 0.86) - slid * 0.10;
       }
 
       // ---- torso: forward lean, vertical bob, and a lateral bank on turns

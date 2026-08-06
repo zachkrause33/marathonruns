@@ -209,6 +209,31 @@ MR.World = (function () {
    * the start, water in the middle, a purple-and-amber wall at mile 20, gold
    * into the tape -- in whichever city the day drew.
    */
+  /**
+   * A PULL ON THE ROAD IS A PULL ON THE PLAY SURFACE, and that is not the same
+   * kind of change as a pull on the sky.
+   *
+   * R1 halved every setting's `road` to land the centre lane at L = 100, and it
+   * did land: measured on the frame, CITY START and THE BRIDGE come out at 94.5
+   * and 95.0. But two biomes then lifted it straight back up, because both of
+   * their road pulls aimed at a pale colour:
+   *
+   *   THE WALL     road [0xe5b1ca, 0.42]  ->  centre lane L 142.3   1.42x target
+   *   FINAL MILE   road [0xffe0c0, 0.16]  ->  centre lane L 126.5   1.26x target
+   *
+   * That is R1 undone on the two legs the race is decided on, and it is not
+   * cosmetic: it is what the hazard-contrast assertion in tools/shoot.js fires
+   * on. THE WALL's road is dusty PINK and every BLOCK in the game is pink -- at
+   * 142 the road came within 1.05x of the ROAD CLOSED barrier's own luminance
+   * and within 0.19 of its saturation, which is a hazard invisible against the
+   * tarmac on both axes at once. Measured on 04-wall before the fix: the amber
+   * JUMP kerb rendered at L 136.7 on a road of L 136.6.
+   *
+   * The mood is not the casualty. The pull is retargeted at the SAME HUE two
+   * thirds of the way down in value, so mile 20 keeps its dusty pink cast and
+   * mile 26 keeps its gold one, and the surface the player reads stays where R1
+   * put it. Value belongs to the road; hue belongs to the leg.
+   */
   const BIOME_MOD = {
     'CITY START': {},
     'RIVERSIDE': { fog: [0xcfefff, 0.18] },
@@ -219,10 +244,12 @@ MR.World = (function () {
     // strongest pull in the table by a distance.
     'THE WALL': {
       sky: [0x8a3a6b, 0.62], fog: [0xffb27a, 0.58],
-      ground: [0x8f9a5e, 0.52], road: [0xe5b1ca, 0.42],
+      // 0x8a6a79 is 0xe5b1ca at 0.605 -- same hue, two thirds the value.
+      ground: [0x8f9a5e, 0.52], road: [0x8a6a79, 0.42],
     },
     'FINAL MILE': {
-      sky: [0x3a2f7e, 0.34], fog: [0xffcf6b, 0.40], road: [0xffe0c0, 0.16],
+      // 0x9c8874 is 0xffe0c0 at 0.61.
+      sky: [0x3a2f7e, 0.34], fog: [0xffcf6b, 0.40], road: [0x9c8874, 0.16],
     },
   };
 
@@ -6541,6 +6568,229 @@ MR.World = (function () {
       }
       for (let i = 0; i < group.children.length; i++) scan(group.children[i]);
       return out;
+    };
+
+    /**
+     * ============ THE HAZARD CONTRAST RULE, MADE MEASURABLE ============
+     *
+     * Measured off tgr-city.png and tgr-sunset-ramp.png, five objects, own
+     * luminance against the tarmac they stand on:
+     *
+     *   guard rail  186.7 on 73.0  ratio 2.56   S 0.20 vs 0.47
+     *   ramp deck   181.6 on 73.0  ratio 2.49   S 0.56 vs 0.47
+     *   tram roof   163.5 on 78.0  ratio 2.10   S 0.28 vs 0.22
+     *   parked car   76.4 on 78.0  ratio 0.98   S 0.60 vs 0.22
+     *   trash can    73.7 on 73.0  ratio 1.01   S 0.25 vs 0.47
+     *
+     * The last two are the interesting ones. The blue car and the grey bin are
+     * the same LUMINANCE as the road to within 2% and are still instantly
+     * legible -- the car because its saturation is 2.7x the road's, the bin
+     * because its saturation is HALF the road's. Either direction works. What
+     * never happens in the reference is an object that matches the road on both
+     * axes at once. So the rule is not "value contrast is the whole game":
+     *
+     *   Every hazard's area-weighted mean must differ from the local road by a
+     *   factor of >= 1.6 in luminance, OR by >= 0.30 in saturation.
+     *
+     * tools/shoot.js applies it and fails the run. It is stated here rather
+     * than there because this is the file that owns the numbers on both sides.
+     *
+     * WEIGHTING, and it is the part that makes the rule mean anything. A hazard
+     * is read head on, down the road, so what matters is the area it presents
+     * TO THE LENS -- not its total surface area, which would count the top and
+     * both flanks of a train equally with the face you actually see. Each
+     * triangle is therefore weighted by the area of its projection onto the
+     * view plane, and back faces (cross.z >= 0, pointing away from a camera
+     * that looks down +z) are dropped. For a convex body that is exactly its
+     * silhouette area, which is what survives to sixty units.
+     *
+     * WHAT IS INCLUDED: the merged body, the one moving part a variant may
+     * carry, and the caution-stripe face plane -- which is unlit, textured and
+     * a big fraction of the frontal area, so its own canvas is averaged rather
+     * than guessed at. The telegraph mat is NOT included: it is painted on the
+     * road in front of the hazard, it is the lane cue rather than the object,
+     * and letting it into the average would let a bright mat excuse a hazard
+     * that has itself gone invisible. That is the exact failure this catches.
+     *
+     * IT IS MEASURED ON RENDERED PIXELS, not on authored hex. A first pass did
+     * the arithmetic on material colour x vertex colour and it was WRONG in the
+     * only cases that matter. The road is horizontal and a hazard's read face is
+     * vertical, so the toon ramp lands them in different bands: measured off
+     * 04-wall, the road comes back at 0.89 of its authored value while a
+     * hazard's rear faces come back at about 0.55 (this file already records
+     * 0x2b2f52 rendering near 0x111737). Authored arithmetic therefore put the
+     * marshal barrier at 1.36x the road -- in the dead zone -- when the shaded
+     * object is comfortably DARKER than the road and clears the rule from the
+     * other side. The rule is symmetric in luminance for exactly the reason the
+     * reference's grey bin is legible, and a model that gets the shading wrong
+     * cannot tell which side of the road an object has landed on.
+     *
+     * So each variant is rendered off screen, alone, with its real materials,
+     * the scene's real lights and the real gradient maps, into an alpha-cleared
+     * 128px target whose texture is tagged SRGBColorSpace so what comes back is
+     * display bytes -- the same quantity the reference frames were measured in.
+     * Covered pixels are averaged. That IS the area-weighted mean, done by the
+     * rasteriser, with occlusion between the object's own parts handled for
+     * free, which no amount of triangle arithmetic gets right.
+     *
+     * The camera is orthographic, aimed down the game's own sightline: BASE_Y
+     * 2.62 falling to LOOK_Y 1.16 over LOOK_AHEAD 8.0 is 10.35 degrees below
+     * horizontal. The road is measured through the SAME camera, so the grazing
+     * angle the tarmac is always seen at is in the number rather than assumed
+     * away. It sits 20 units out, inside the fog's near plane, so haze is not in
+     * either measurement -- correctly, since a hazard is committed to well
+     * before the fog reaches it.
+     */
+    function lumOf(rgb) { return 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]; }
+    function satOf(rgb) {
+      const hi = Math.max(rgb[0], rgb[1], rgb[2]), lo = Math.min(rgb[0], rgb[1], rgb[2]);
+      return hi <= 0 ? 0 : (hi - lo) / hi;
+    }
+
+    const AUDIT_PX = 128;
+    const _audit = { rt: null, cam: null, buf: null, lanes: null, holder: null };
+    function auditSetup() {
+      if (_audit.rt) return;
+      _audit.rt = new THREE.WebGLRenderTarget(AUDIT_PX, AUDIT_PX);
+      _audit.rt.texture.colorSpace = THREE.SRGBColorSpace;
+      _audit.rt.texture.generateMipmaps = false;
+      _audit.cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.05, 80);
+      _audit.buf = new Uint8Array(AUDIT_PX * AUDIT_PX * 4);
+      _audit.pitch = Math.atan2(2.62 - 1.16, 8.0);
+      _audit.holder = new THREE.Group();
+      // One lane's tarmac, exactly as roadGeo builds it -- same five camber
+      // strips, same tints, same uv remap onto the carriageway, so the mottle
+      // and the gutter grime land where they land on the real road.
+      _audit.lanes = [0, 1, 2].map(function (l) {
+        const parts = [];
+        const sw = LANE / CAMBER_STRIPS;
+        for (let s = 0; s < CAMBER_STRIPS; s++) {
+          const cx = K.LANE_X[l] - LANE / 2 + sw * (s + 0.5);
+          parts.push(laneBand(cx, sw, tintScale(LANE_BAND[l], camber(cx))));
+        }
+        return new THREE.Mesh(merge(parts), mats.road);
+      });
+    }
+
+    const _clr = new THREE.Color();
+    /**
+     * Render `obj` alone, down the game's sightline, and average the pixels it
+     * covers. Everything in the scene but the lights is hidden for the duration
+     * -- a light with `visible` false stops contributing, which would measure
+     * the object in the dark.
+     */
+    function shotMean(renderer, scene, obj, cx, cy, cz, halfW, halfH) {
+      auditSetup();
+      const saved = [];
+      for (const o of scene.children) {
+        if (o.isLight) continue;
+        saved.push([o, o.visible]);
+        o.visible = false;
+      }
+      _audit.holder.clear();
+      _audit.holder.add(obj);
+      scene.add(_audit.holder);
+
+      const cam = _audit.cam;
+      cam.left = -halfW; cam.right = halfW; cam.top = halfH; cam.bottom = -halfH;
+      cam.updateProjectionMatrix();
+      const d = 20;
+      cam.position.set(cx, cy + d * Math.sin(_audit.pitch), cz - d * Math.cos(_audit.pitch));
+      cam.lookAt(cx, cy, cz);
+
+      const prevRT = renderer.getRenderTarget();
+      renderer.getClearColor(_clr);
+      const prevA = renderer.getClearAlpha();
+      renderer.setRenderTarget(_audit.rt);
+      renderer.setClearColor(0x000000, 0);
+      renderer.clear();
+      renderer.render(scene, cam);
+      renderer.readRenderTargetPixels(_audit.rt, 0, 0, AUDIT_PX, AUDIT_PX, _audit.buf);
+      renderer.setRenderTarget(prevRT);
+      renderer.setClearColor(_clr, prevA);
+
+      scene.remove(_audit.holder);
+      _audit.holder.clear();
+      for (const s of saved) s[0].visible = s[1];
+
+      const b = _audit.buf;
+      let r = 0, g = 0, bl = 0, n = 0;
+      // Fully covered pixels only. A render target has no MSAA, so an edge
+      // pixel is either the object or the clear -- the threshold is belt and
+      // braces against a blended alpha, not a silhouette softener.
+      for (let i = 0; i < b.length; i += 4) {
+        if (b[i + 3] < 200) continue;
+        r += b[i]; g += b[i + 1]; bl += b[i + 2]; n++;
+      }
+      if (!n) return null;
+      const rgb = [r / n, g / n, bl / n];
+      const out = {
+        px: n, rgb: rgb.map((v) => +v.toFixed(1)),
+        L: +lumOf(rgb).toFixed(1), S: +satOf(rgb).toFixed(3),
+      };
+      // A failing assertion that cannot be looked at is an assertion nobody
+      // trusts. On request each swatch comes back as a png so the build can
+      // drop the exact pixels it measured next to the frame it measured them
+      // for. readRenderTargetPixels is bottom-up, hence the flip.
+      if (_audit.images) {
+        const cv = canvas(AUDIT_PX, AUDIT_PX);
+        const cg = cv.getContext('2d');
+        const img = cg.createImageData(AUDIT_PX, AUDIT_PX);
+        for (let y = 0; y < AUDIT_PX; y++) {
+          const src = (AUDIT_PX - 1 - y) * AUDIT_PX * 4;
+          img.data.set(b.subarray(src, src + AUDIT_PX * 4), y * AUDIT_PX * 4);
+        }
+        cg.putImageData(img, 0, 0);
+        out.png = cv.toDataURL('image/png');
+      }
+      return out;
+    }
+
+    /**
+     * Every hazard variant's rendered tone, and every lane's road tone under
+     * the palette live in this frame. Needs the renderer and the scene, which
+     * this file deliberately does not hold: it is a build-time audit, called
+     * from tools/shoot.js, and nothing in the game loop may reach for a
+     * framebuffer.
+     */
+    api.contrastAudit = function (renderer, scene, opts) {
+      auditSetup();
+      _audit.images = !!(opts && opts.images);
+      const NAME = { [K.JUMP]: 'JUMP', [K.DUCK]: 'DUCK', [K.BLOCK]: 'BLOCK' };
+      const hazards = [];
+      for (const grp of HAZARD_DEFS) {
+        grp.defs.forEach(function (d, vi) {
+          // The object as it is actually assembled at spawn: inked body, the
+          // caution face it turns toward the lens, and the one moving part.
+          // The telegraph mat is NOT here -- it is painted on the road in
+          // front of the hazard, and letting a bright mat into the average
+          // would excuse a hazard that had itself gone invisible.
+          const g = new THREE.Group();
+          g.add(S.outlined(d.geo, mats.propLit, S.INK.hazard));
+          const f = new THREE.Mesh(hplane(d.face[0], d.face[1]), faceMat[grp.tint]);
+          f.position.set(0, d.face[2], d.face[3]);
+          f.rotation.y = Math.PI;
+          g.add(f);
+          if (d.moving) {
+            const mv = S.outlined(d.moving, mats.propLit, S.INK.hazard);
+            mv.position.set(d.pivot[0] * LANE_FIT, d.pivot[1], d.pivot[2]);
+            g.add(mv);
+          }
+          d.geo.computeBoundingBox();
+          const bb = d.geo.boundingBox;
+          const h = Math.max(bb.max.y, d.face[2] + d.face[1] / 2);
+          const m = shotMean(renderer, scene, g, 0, h / 2, 0, LANE * 0.62, h * 0.62);
+          hazards.push(Object.assign({
+            kind: grp.kind, variant: vi, name: NAME[grp.kind] + ' v' + vi,
+          }, m));
+        });
+      }
+      const roads = [0, 1, 2].map(function (l) {
+        const m = shotMean(renderer, scene, _audit.lanes[l], K.LANE_X[l], 0.25, 0,
+          LANE * 0.44, LANE * 0.44);
+        return Object.assign({ lane: l }, m);
+      });
+      return { hazards, roads };
     };
 
     /**

@@ -43,6 +43,26 @@
  * Both are geometric, so a new prop is audited the day it is added rather than
  * the day somebody notices. Hazards, aid and the sky/ground/hills backdrop are
  * exempt and world.js says why at each exemption.
+ *
+ * ---- CONTRAST, and why that is a build failure too -----------------------
+ *
+ * The other way to lose a streak to something you could not see is for the
+ * hazard to be the same colour as the tarmac. Measured on the reference, five
+ * objects on the road they stand on: a guard rail at 2.56x the road's
+ * luminance, a ramp deck at 2.49x, a tram roof at 2.10x -- and then a parked
+ * car at 0.98x and a bin at 1.01x, both of which are still instantly legible
+ * because their SATURATION differs from the road's by 0.38 and 0.22. Either
+ * axis works. What never happens is an object matching the road on both.
+ *
+ *   CONTRAST  every hazard variant's area-weighted mean must clear either
+ *             1.6x the local road in luminance or 0.30 in saturation, in every
+ *             lane, on the biome and setting palette live in that frame.
+ *
+ * world.js measures both sides (api.hazardTones, api.roadTone) because it owns
+ * the numbers; this file owns the threshold and the exit code. Every variant is
+ * checked, including the ones that frame did not spawn, so the vocabulary is
+ * audited in full on a single shot -- and the six shots between them sweep the
+ * biome palettes the day drew.
  */
 const { chromium } = require('playwright');
 const path = require('path');
@@ -264,10 +284,44 @@ const DEFAULT_SHOTS = [
 
     const file = path.join(OUT, sh.name + '.png');
     await page.screenshot({ path: file });
-    report.push({ shot: sh.name, file, stat, errors, occl });
+
+    // ---- fairness: a hazard must not match the road on both axes ------
+    //
+    // See the CONTRAST header comment. The measurement lives in world.js
+    // (api.contrastAudit), because that file owns the numbers on
+    // both sides; the RULE lives here, because a rule that does not fail a
+    // build is a comment.
+    const contrast = await page.evaluate(() => {
+      const g = window.MR && MR.game;
+      const w = g && g.world;
+      if (!w || !w.contrastAudit) return { skipped: 'world exposes no contrastAudit()' };
+      const a = w.contrastAudit(g.renderer, g.scene);
+      const tones = a.hazards, roads = a.roads;
+      const fail = [], worst = [];
+      for (const h of tones) {
+        let hardest = null;
+        for (const r of roads) {
+          const ratio = Math.max(h.L, r.L) / Math.max(1e-6, Math.min(h.L, r.L));
+          const dS = Math.abs(h.S - r.S);
+          // The margin by which the pair clears the easier of the two tests.
+          // Negative means it clears neither and the run is dead.
+          const m = Math.max(ratio / 1.6 - 1, dS / 0.30 - 1);
+          const row = { name: h.name, lane: r.lane, hL: h.L, rL: r.L, hS: h.S, rS: r.S,
+            ratio: +ratio.toFixed(2), dS: +dS.toFixed(3), margin: +m.toFixed(3) };
+          if (!hardest || m < hardest.margin) hardest = row;
+        }
+        worst.push(hardest);
+        if (hardest.margin < 0) fail.push(hardest);
+      }
+      worst.sort((a, b) => a.margin - b.margin);
+      return { tones: tones.length, roads, worst, fail };
+    }).catch((e) => ({ skipped: 'evaluate failed: ' + e.message }));
+
+    report.push({ shot: sh.name, file, stat, errors, occl, contrast });
 
     if (errors.length) failed = true;
     if (occl && !occl.skipped && (occl.low.length || occl.hide.length)) failed = true;
+    if (contrast && !contrast.skipped && contrast.fail.length) failed = true;
     await ctx.close();
   }
 
@@ -298,8 +352,23 @@ const DEFAULT_SHOTS = [
     } else if (o && o.skipped) {
       console.log('  occlusion audit skipped: ' + o.skipped);
     }
+    const c = r.contrast;
+    if (c && !c.skipped) {
+      const rd = c.roads.map((x) => `L${x.L}/S${x.S}`).join('  ');
+      console.log(`  road L/S by lane  ${rd}`);
+      const t = c.worst[0];
+      console.log(`  hazard contrast ${c.tones} variants, tightest ${t.name} vs lane ${t.lane}: `
+        + `${t.ratio}x L, ${t.dS} S  (margin ${t.margin})`);
+      for (const f of c.fail.slice(0, 8)) {
+        console.log(`  ! CONTRAST: ${f.name} is L=${f.hL} S=${f.hS} on a lane-${f.lane} road of `
+          + `L=${f.rL} S=${f.rS} -- ${f.ratio}x luminance (needs 1.6) and ${f.dS} saturation `
+          + `(needs 0.30). It matches the tarmac on both axes.`);
+      }
+    } else if (c && c.skipped) {
+      console.log('  contrast audit skipped: ' + c.skipped);
+    }
   }
 
-  console.log('\n' + (failed ? 'FAIL: page errors, missing state, or a hazard the player cannot see' : 'OK: all shots clean'));
+  console.log('\n' + (failed ? 'FAIL: page errors, missing state, a hazard the player cannot see, or one they cannot tell from the road' : 'OK: all shots clean'));
   process.exit(failed ? 1 : 0);
 })();

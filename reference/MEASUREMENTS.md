@@ -104,3 +104,50 @@ their lane centre, so `0.543 + 0.511·L + 0.13 < L` requires L > 1.375 for zero
 clearance. Below about 1.68 the runner visibly grazes hazards it legitimately
 cleared, which would directly contradict the state-based clearance model in
 `src/game/collision.js`.
+
+## Video reference (added after the first real playtest)
+
+Four screen recordings supplied by the user: two of this game, one of Subway
+Surfers and one of Temple Run, all in MOTION rather than as stills. Frames are
+pulled with `tools/frames.py`. Three are kept here:
+
+| File | Shows |
+|---|---|
+| `tr-slide-01/02` | Temple Run's slide, from directly behind |
+| `ss-jump-01` | Subway Surfers' jump |
+
+### Why Temple Run's slide reads and ours does not
+
+This is the frame that settles three failed attempts at the slide pose. In
+Temple Run the sliding character is **flat on their back with the head out of
+the silhouette entirely**. What the camera sees, front to back, is: both legs
+laid out fully forward up the path, then the torso, then the top of the
+shoulders nearest the lens. Arms are out wide. There is no head-at-top /
+feet-at-bottom ambiguity because there is no visible head.
+
+This build does the opposite. `runner.js` deliberately keeps the head level
+through the slide -- the neck cancels most of the spine recline "so it
+presents hair and headband, not a chin or a crown" -- and the headband is the
+brightest thing on the character. So the figure reads as an upright head above
+a low body, which is a crouch, and no amount of leg extension fixes it while
+the head is still the top of the shape.
+
+The fix direction is therefore the reverse of what was tried: drop the head
+INTO the body and let the back become the top of the silhouette, so the legs
+are unambiguously the leading edge.
+
+### The forgiveness windows are too tight for a human
+
+The player's own run: race time 5:32 to 7:27, mile 0.99 to 1.33, `CLEAN GATES`
+reads **0 in every frame**, with `STREAK CUT / SPEED BLEEDING` showing
+throughout and pace never leaving 5:30/mi. They are visibly trying -- one
+frame catches a committed jump, arms wide, over a gantry.
+
+`DUCK_CLEAR` is 0.90 and `duck01` ramps at rate 16 and decays after
+`DUCK_TIME` 0.55s, so a slide only counts inside roughly a 0.4s window, about
+9 world units at race pace. `JUMP_CLEAR_Y` was raised 0.62 -> 0.84 for visual
+honesty with the same effect. The autopilot clears these easily because it
+acts on exact distances; a human on a phone does not.
+
+The whole game rests on building a clean streak, and on this evidence a human
+currently cannot start one.

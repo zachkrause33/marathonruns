@@ -480,13 +480,16 @@ MR.Runner = (function () {
 
     // (u, v) run across and DOWN the panel; `o` is a radial offset off the
     // mid-surface, so +T/2 is the outer face and -T/2 the inner one.
+    // u runs LEFT TO RIGHT AS THE PLAYER SEES IT, which is why the sign is
+    // inverted: the panel faces -z, so screen-left is +x and a naive mapping
+    // prints the number in mirror writing.
     function pt(u, v, o) {
-      const a = (u - 0.5) * 2 * BIB_A;
+      const a = (0.5 - u) * 2 * BIB_A;
       const r = BIB_R0 + (BIB_R1 - BIB_R0) * v + o;
       return [r * Math.sin(a), BIB_H * (0.5 - v), -r * Math.cos(a)];
     }
     function out(u) {
-      const a = (u - 0.5) * 2 * BIB_A;
+      const a = (0.5 - u) * 2 * BIB_A;
       return [Math.sin(a), 0, -Math.cos(a)];
     }
     // Winding is derived rather than reasoned about: the quad is emitted with
@@ -534,9 +537,9 @@ MR.Runner = (function () {
       quad(pt(u0, 1, H), pt(u1, 1, H), pt(u1, 1, -H), pt(u0, 1, -H), [0, -1, 0], BIB_PAPER);
     }
     // Side rims. The normal is the arc's own tangent turned outward.
-    for (const [u, s] of [[0, -1], [1, 1]]) {
-      const a = (u - 0.5) * 2 * BIB_A;
-      const ref = [s * Math.cos(a), 0, s * Math.sin(a)];
+    for (const [u, sg] of [[0, 1], [1, -1]]) {
+      const a = (0.5 - u) * 2 * BIB_A;
+      const ref = [sg * Math.cos(a), 0, sg * Math.sin(a)];
       for (let j = 0; j < BIB_NR; j++) {
         const v0 = j / BIB_NR, v1 = (j + 1) / BIB_NR;
         quad(pt(u, v0, H), pt(u, v1, H), pt(u, v1, -H), pt(u, v0, -H), ref, BIB_PAPER);
@@ -2228,24 +2231,35 @@ MR.Runner = (function () {
       // pinned along its top edge and held flat in the middle by the back
       // behind it, so the drive is a travelling wave in theta: the two free
       // bottom corners lift out of phase with each other and the number never
-      // moves. 22 vertices, one buffer upload, no draw call.
+      // moves. One buffer upload, no draw call.
       //
       // Rate and amplitude both climb with pace, which makes this a speed cue
       // as well as a life cue -- it is the only motion on the character that
       // is not locked to the stride, so it beats against the cadence instead
       // of reinforcing it, and that is what stops the whole figure reading as
       // one clockwork.
+      //
+      // The lift is now ONE-SIDED, and that is a bug fix rather than a taste
+      // change. A signed sine put the free corners 0.05 INTO a vest whose
+      // surface is only 0.008 behind the panel, so for half of every cycle the
+      // vest's red cut a wave across the bottom of the white card -- which the
+      // art review read, correctly, as the bib straddling the hem crooked. A
+      // panel pinned to a back can lift off it and cannot pass through it, so
+      // the drive is biased into [0, 1] and the corners now alternate between
+      // lifted and flat instead of between out and in. The amplitude is raised
+      // to compensate for losing half the swing.
       bibT += dt * (5.2 + 6.4 * sp01);
-      // 0.036, not the 0.026 this started at: measured off a burst of frames,
-      // 0.026 moves a corner about four pixels at gameplay framing and the
-      // strip could not resolve it. Past about 0.05 the corner visibly leaves
-      // the vest and the panel reads as unstuck rather than as fluttering.
-      const bibAmp = (0.036 + 0.016 * sp01) * (1 - slid * 0.55) + spread * 0.018;
+      // 0.046, not the 0.036 the two-sided version used: half the range is now
+      // spent on the flat side, and measured off a burst of frames a corner has
+      // to travel about 0.05 before the strip can resolve it moving at all.
+      // Past about 0.08 of outward travel the corner visibly leaves the vest
+      // and the panel reads as unstuck rather than as fluttering.
+      const bibAmp = (0.046 + 0.020 * sp01) * (1 - slid * 0.55) + spread * 0.018;
       const bp = bibPos.array;
       for (let i = 0; i < bibPos.count; i++) {
         const w = bibWeight[i];
         if (w <= 0) continue;
-        const lift = Math.sin(bibT + bibTheta[i] * 3.4) * bibAmp * w;
+        const lift = (0.5 + 0.5 * Math.sin(bibT + bibTheta[i] * 3.4)) * bibAmp * w;
         // Radial, because the panel is curved: scaling x and z about the
         // vest's own axis lifts the corner off the back, where moving it in a
         // straight line would shear it sideways across the number.

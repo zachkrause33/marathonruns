@@ -12345,13 +12345,24 @@ MR.HUD = (function () {
       cls(n.gapVal, 'gapCls', 'num ' + (ahead ? 'ahead' : 'behind'));
       cls(n.railGap, 'railGapCls', ahead ? 'ahead' : 'behind');
 
-      // Whether the gap is opening or closing is exactly whether the current
-      // pace beats record pace, so it needs no smoothing to be honest. Under a
-      // second there is no gap worth describing, and calling the start line
-      // "LOSING" is a scold rather than information.
-      const gaining = p.pace < K.RECORD_PACE;
-      set(n.gapTrend, 'trend', Math.abs(d) < 1 ? '' : gaining ? 'GAINING' : 'LOSING');
-      cls(n.gapTrend, 'trendCls', gaining ? 'ahead' : 'behind');
+      // THE GHOST GAP IS A POSITION, NOT A GRADE.
+      //
+      // This used to read GAINING / LOSING off `p.pace < RECORD_PACE`, which is
+      // accurate and was still wrong. The race is DESIGNED to start below
+      // record pace and reel it in, so a flawless run is slower than 4:33 for
+      // the whole first half and the tag read LOSING for about three quarters
+      // of it -- while the projection at the top of the same screen read
+      // RECORD ON. Two thirds of the readout told a perfect player they were
+      // failing, and the start panel had grown a sentence explaining that the
+      // ghost leads "by design", which is the game apologising for its own HUD.
+      //
+      // The projection already carries the verdict, and carries it correctly,
+      // because it integrates the whole remaining race. So this line gives up
+      // grading and states where the ghost is instead -- which is the one
+      // thing the projection cannot tell you and the thing you actually want
+      // when you are looking at the road.
+      set(n.gapTrend, 'trend', Math.abs(d) < 1 ? 'LEVEL' : ahead ? 'BEHIND YOU' : 'UP THE ROAD');
+      cls(n.gapTrend, 'trendCls', ahead ? 'ahead' : 'behind');
 
       if (extra && extra.fps !== undefined) {
         set(n.perf, 'perf', extra.fps.toFixed(0) + ' FPS · ' + (extra.draws || 0) + ' DRAWS');

@@ -129,7 +129,8 @@ html, body {
 #projCell.tier .sub { color: var(--accent); opacity: 0.92; }
 
 /* ---- left column: the mechanic, read top to bottom ----
- * Clean gates buy speed; the gauge shows how much of the 5:30 -> 4:20 range
+ * Clean gates buy speed; the gauge shows how much of the START_PACE ->
+ * FLOOR_PACE range
  * has been bought; the pace is the result. Putting them in one plate in that
  * order is the only place the game explains itself. */
 #leftCol {

@@ -400,34 +400,189 @@ MR.Runner = (function () {
     return p;
   }
 
-  // The one thing on the character that says "marathon" rather than
-  // "runner", and it belongs on the back where the player can see it.
-  // Generated at runtime like world.js's mile banners -- still no assets.
-  let bibTex = null;
-  function raceBib() {
-    if (bibTex) return bibTex;
-    const c = document.createElement('canvas');
-    c.width = 160; c.height = 96;
-    const g = c.getContext('2d');
-    g.fillStyle = '#fffdf5';
-    g.fillRect(0, 0, c.width, c.height);
-    g.fillStyle = '#' + new THREE.Color(P.runnerVest).getHexString();
-    g.fillRect(0, 0, c.width, 8);
-    g.fillRect(0, c.height - 8, c.width, 8);
-    g.fillStyle = '#1b1633';
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    // Fit rather than trust: the first version hard-coded 62px and the
-    // string overflowed the canvas on a machine without Helvetica, so the
-    // back of the vest read "6." instead of a race number.
-    let px = 64;
-    do {
-      g.font = 'bold ' + px + 'px Helvetica, Arial, sans-serif';
-      px -= 2;
-    } while (px > 20 && g.measureText('26.2').width > c.width * 0.82);
-    g.fillText('26.2', c.width / 2, c.height / 2 + 3);
-    bibTex = new THREE.CanvasTexture(c);
-    return bibTex;
+  // ---- the race bib ------------------------------------------------------
+  //
+  // The one thing on the character that says "marathon" rather than "runner",
+  // and it belongs on the back where the player can see it.
+  //
+  // It was a canvas texture on an open cylinder segment, and that made it the
+  // only thing on the character with no ink line -- a stack of soft grey
+  // anti-aliased numerals on an edgeless white card, sitting on the nearest
+  // object in the frame while every hazard behind it wore a hard black rim. It
+  // read as a sticker because it was built like one.
+  //
+  // Three things had to change and only one of them is the numerals:
+  //
+  //   IT NEEDS AN EDGE. `outlined()` extrudes a mesh along its own normals and
+  //     draws the shell BACK-face-only, so an OPEN surface gets no line at all
+  //     -- its shell faces away from the lens everywhere and is culled. That is
+  //     why the panel never had one and why no amount of re-materialling would
+  //     have given it one. So it is a closed SLAB now: an outer face, an inner
+  //     face 0.014 behind it, and four rims joining them. The inner face and
+  //     the rims are never seen; they exist so the silhouette exists.
+  //
+  //   IT NEEDS TO SHADE. One smooth cylinder segment facing dead astern puts
+  //     every normal it owns into the same band of the toon ramp, so the panel
+  //     came out as one flat value however the light moved. Twelve facets
+  //     across the arc and four rims give the ramp something to break on, and
+  //     the rims give the bottom edge a lit lip -- which is what says the panel
+  //     is a piece of card lying on cloth and not a decal printed into it.
+  //
+  //   THE NUMERALS HAVE TO BE GEOMETRY. Not because it makes them legible: it
+  //     does not, and that has to be said plainly. The panel is 0.252 wide on a
+  //     1.60 figure and the figure is 110-200px, so the whole of "26.2" gets
+  //     17-31px and a stroke gets one. NOTHING makes four glyphs legible in
+  //     31px. What geometry buys is that the one pixel is the RIGHT one: a hard
+  //     dark stroke at full contrast rather than a minified texel averaged into
+  //     grey, so at gameplay scale the bib reads as white card with definite
+  //     print on it, and at the finish framing the number is crisp. Which is
+  //     what a real race bib does at twenty metres and at two.
+  //
+  // The numerals are single-sided quads standing 0.0035 off the panel's outer
+  // face, and being single-sided is load-bearing twice over: their own outline
+  // shell is culled, so the print gets no ink of its own (a 0.014 rim around a
+  // 0.015 stroke would swallow it whole), and they cost no closed volume.
+  const BIB_A = 0.50;          // half-arc, radians
+  const BIB_R0 = 0.268;        // radius at the top edge...
+  const BIB_R1 = 0.258;        // ...and at the bottom, matching the vest's taper
+  const BIB_H = 0.146;
+  const BIB_T = 0.014;         // slab thickness
+  const BIB_PROUD = 0.0035;    // how far the print stands off the face
+  const BIB_NC = 12, BIB_NR = 3;
+  // Nominal radius, so an amplitude in world units can be turned into the
+  // radial scale that produces it.
+  const BIB_R = 0.263;
+  const BIB_PAPER = 0xfffdf5;
+  const BIB_BACK = 0xd9d3c2;   // the reverse of the card; only ever edge-on
+  const BIB_INK = 0x232046;
+
+  // A 7x9 blocky face with two cells to a stroke. Finer and a stroke is under
+  // a pixel at gameplay framing; coarser and "26.2" stops fitting the panel.
+  const BIB_GLYPH = {
+    '2': ['0111110', '1100011', '0000011', '0000110', '0001100', '0011000', '0110000', '1100000', '1111111'],
+    '6': ['0011110', '0110000', '1100000', '1111100', '1100110', '1100011', '1100011', '0110110', '0011100'],
+    '.': ['000', '000', '000', '000', '000', '000', '000', '011', '011'],
+  };
+  const BIB_STR = '26.2';
+  const BIB_GAP = 1;           // cells between glyphs
+  // Where the print sits inside the panel, as fractions across and down it.
+  const BIB_TU0 = 0.10, BIB_TU1 = 0.90, BIB_TV0 = 0.17, BIB_TV1 = 0.85;
+
+  /**
+   * The slab, its print, and nothing else. Returns a geometry carrying
+   * position / normal / colour, ready for outlined() and a vertex-coloured
+   * toon material -- the same contract weld() produces, built by hand because
+   * no THREE primitive is a closed curved card.
+   */
+  function bibGeometry() {
+    const pos = [], nrm = [], col = [];
+    const c = new THREE.Color();
+
+    // (u, v) run across and DOWN the panel; `o` is a radial offset off the
+    // mid-surface, so +T/2 is the outer face and -T/2 the inner one.
+    function pt(u, v, o) {
+      const a = (u - 0.5) * 2 * BIB_A;
+      const r = BIB_R0 + (BIB_R1 - BIB_R0) * v + o;
+      return [r * Math.sin(a), BIB_H * (0.5 - v), -r * Math.cos(a)];
+    }
+    function out(u) {
+      const a = (u - 0.5) * 2 * BIB_A;
+      return [Math.sin(a), 0, -Math.cos(a)];
+    }
+    // Winding is derived rather than reasoned about: the quad is emitted with
+    // whichever order makes its geometric normal agree with `ref`. Getting a
+    // face inside out here would punch a hole in the outline shell that only
+    // shows from one angle, which is exactly the class of bug that is cheapest
+    // to make impossible.
+    function quad(p0, p1, p2, p3, ref, hex) {
+      const ax = p1[0] - p0[0], ay = p1[1] - p0[1], az = p1[2] - p0[2];
+      const bx = p3[0] - p0[0], by = p3[1] - p0[1], bz = p3[2] - p0[2];
+      const nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
+      if (nx * ref[0] + ny * ref[1] + nz * ref[2] < 0) { const t = p1; p1 = p3; p3 = t; }
+      const L = Math.sqrt(ref[0] * ref[0] + ref[1] * ref[1] + ref[2] * ref[2]) || 1;
+      const n = [ref[0] / L, ref[1] / L, ref[2] / L];
+      c.set(hex);
+      const tri = [p0, p1, p2, p0, p2, p3];
+      for (const p of tri) {
+        pos.push(p[0], p[1], p[2]);
+        nrm.push(n[0], n[1], n[2]);
+        col.push(c.r, c.g, c.b);
+      }
+    }
+
+    const H = BIB_T / 2;
+    // Outer face: the only one anybody sees, and the only one subdivided.
+    for (let i = 0; i < BIB_NC; i++) {
+      const u0 = i / BIB_NC, u1 = (i + 1) / BIB_NC;
+      const ref = out((u0 + u1) / 2);
+      for (let j = 0; j < BIB_NR; j++) {
+        const v0 = j / BIB_NR, v1 = (j + 1) / BIB_NR;
+        quad(pt(u0, v0, H), pt(u1, v0, H), pt(u1, v1, H), pt(u0, v1, H), ref, BIB_PAPER);
+      }
+    }
+    // Inner face, one row deep.
+    for (let i = 0; i < BIB_NC; i++) {
+      const u0 = i / BIB_NC, u1 = (i + 1) / BIB_NC;
+      const o = out((u0 + u1) / 2);
+      quad(pt(u0, 0, -H), pt(u1, 0, -H), pt(u1, 1, -H), pt(u0, 1, -H),
+        [-o[0], 0, -o[2]], BIB_BACK);
+    }
+    // Top and bottom rims.
+    for (let i = 0; i < BIB_NC; i++) {
+      const u0 = i / BIB_NC, u1 = (i + 1) / BIB_NC;
+      quad(pt(u0, 0, H), pt(u1, 0, H), pt(u1, 0, -H), pt(u0, 0, -H), [0, 1, 0], BIB_PAPER);
+      quad(pt(u0, 1, H), pt(u1, 1, H), pt(u1, 1, -H), pt(u0, 1, -H), [0, -1, 0], BIB_PAPER);
+    }
+    // Side rims. The normal is the arc's own tangent turned outward.
+    for (const [u, s] of [[0, -1], [1, 1]]) {
+      const a = (u - 0.5) * 2 * BIB_A;
+      const ref = [s * Math.cos(a), 0, s * Math.sin(a)];
+      for (let j = 0; j < BIB_NR; j++) {
+        const v0 = j / BIB_NR, v1 = (j + 1) / BIB_NR;
+        quad(pt(u, v0, H), pt(u, v1, H), pt(u, v1, -H), pt(u, v0, -H), ref, BIB_PAPER);
+      }
+    }
+
+    // ---- the print -------------------------------------------------------
+    // Cells are merged along a row into runs, but never more than three at a
+    // time. A long run is a straight chord across an arc the panel underneath
+    // is subdivided far more finely than -- and once the hem flutters, a chord
+    // spanning a third of the panel dips further than the 0.0035 it stands
+    // proud and the number sinks into the card.
+    let cols = 0;
+    for (let k = 0; k < BIB_STR.length; k++) {
+      cols += BIB_GLYPH[BIB_STR[k]][0].length + (k ? BIB_GAP : 0);
+    }
+    const rows = BIB_GLYPH[BIB_STR[0]].length;
+    const uOf = (cx) => BIB_TU0 + (BIB_TU1 - BIB_TU0) * (cx / cols);
+    const vOf = (ry) => BIB_TV0 + (BIB_TV1 - BIB_TV0) * (ry / rows);
+    let cx0 = 0;
+    for (let k = 0; k < BIB_STR.length; k++) {
+      const gl = BIB_GLYPH[BIB_STR[k]];
+      if (k) cx0 += BIB_GAP;
+      for (let r = 0; r < gl.length; r++) {
+        const row = gl[r];
+        let x = 0;
+        while (x < row.length) {
+          if (row[x] !== '1') { x++; continue; }
+          let n = 0;
+          while (n < 3 && row[x + n] === '1') n++;
+          const u0 = uOf(cx0 + x), u1 = uOf(cx0 + x + n);
+          const v0 = vOf(r), v1 = vOf(r + 1);
+          const ref = out((u0 + u1) / 2);
+          quad(pt(u0, v0, H + BIB_PROUD), pt(u1, v0, H + BIB_PROUD),
+            pt(u1, v1, H + BIB_PROUD), pt(u0, v1, H + BIB_PROUD), ref, BIB_INK);
+          x += n;
+        }
+      }
+      cx0 += gl[0].length;
+    }
+
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    return g;
   }
 
   // ---- contact shadow ----------------------------------------------------
@@ -820,18 +975,24 @@ MR.Runner = (function () {
     ]);
     hoodPivot.add(hood);
 
-    // Curved panel rather than a flat card so it hugs the vest at this size,
-    // and high on the back so it never straddles the shorts line -- but 0.042
-    // lower than it was, and 0.010 shorter, to clear the hood roll above it.
-    // The number is the one piece of type on the character and a hood crossing
-    // its top edge would read as a printing fault rather than as cloth.
+    // Curved rather than a flat card so it hugs the vest at this size, tapered
+    // to match the vest's own cone so the wider top of the vest cannot poke
+    // through the number, and hung so it clears BOTH neighbours: the hood roll
+    // ends around -0.008 in chest space and the vest hem starts at -0.151, so
+    // the panel runs 0.000 to -0.146 and touches neither. The number is the one
+    // piece of type on the character; a hood crossing its top edge or a hem its
+    // bottom would read as a printing fault rather than as cloth.
     //
-    // Cone, not cylinder: matched to the vest's taper. A constant-radius panel
-    // let the wider top of the vest poke through the number.
-    const bibGeo = new THREE.CylinderGeometry(0.266, 0.256, 0.150, 10, 1, true, Math.PI - 0.52, 1.04);
-    const bib = new THREE.Mesh(bibGeo, S.toon(0xffffff, 3));
-    bib.material.map = raceBib();
-    bib.position.y = -0.062;
+    // Straddling the vest/shorts line was the other half of the review's
+    // finding and it is a symptom, not a cause -- see the flutter below, which
+    // used to drive the bottom corners INWARD through the vest on half of every
+    // cycle. What showed was the red of the vest cutting across the white card
+    // in a wave, which looks exactly like a panel hung crooked over a hem.
+    const bibGeo = bibGeometry();
+    const bibMat = S.toon(0xffffff, 3);
+    bibMat.vertexColors = true;
+    const bib = S.outlined(bibGeo, bibMat, OUTLINE);
+    bib.position.y = -0.073;
     bib.scale.z = 0.78;
     chest.add(bib);
 
@@ -842,10 +1003,11 @@ MR.Runner = (function () {
     // falls off as the square of the height so the top row never moves and the
     // texture cannot shear.
     //
-    // 22 vertices, rewritten in place each frame. The rest pose is kept
-    // because the deformation has to be absolute rather than incremental: an
-    // incremental one accumulates float error over a 2-hour race and the panel
-    // slowly inflates off the vest.
+    // Rewritten in place each frame -- fill and ink shell share the buffer, so
+    // the outline flutters with the card rather than staying behind on the
+    // vest. The rest pose is kept because the deformation has to be absolute
+    // rather than incremental: an incremental one accumulates float error over
+    // a 2-hour race and the panel slowly inflates off the vest.
     const bibPos = bibGeo.attributes.position;
     const bibRest = new Float32Array(bibPos.array);
     const bibWeight = new Float32Array(bibPos.count);
@@ -876,7 +1038,6 @@ MR.Runner = (function () {
     // cloth would make the whole body twitch. The panel is on the upper back
     // and is never the lowest part of anything, so the 0.04 it is out by can
     // never reach the answer.
-    const BIB_R = 0.26;
 
     // Secondary-motion state. Two springs for the hood and a free-running
     // clock for the bib; see the block at the end of update() for why they are

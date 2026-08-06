@@ -117,7 +117,9 @@ MR.HUD = (function () {
   const Tier = MR.Tier;
   const Store = MR.Store;
 
-  // Where record pace sits inside the 5:30 -> 4:20 range the streak unlocks.
+  // Where record pace sits inside the START_PACE -> FLOOR_PACE range the
+  // streak unlocks. Derived, so a retune of either end moves the tick: the
+  // floor has already moved once, 4:20 -> 4:14.
   // Everything that draws the speed gauge shares this so the tick, the fill
   // and the copy can never drift apart.
   const REC_MARK = (K.START_PACE - K.RECORD_PACE) / (K.START_PACE - K.FLOOR_PACE);
@@ -621,16 +623,13 @@ MR.HUD = (function () {
       if (!recordGone && remain > 0.01 && !(need >= K.FLOOR_PACE)) recordGone = true;
       const gone = recordGone;
 
-      // Share of the 5:30 -> 4:20 range the streak has already bought. While a
-      // lot of it is still unspent the projection is falling under the player
-      // every second, so it is an estimate and is labelled as one.
-      const unlocked = (K.START_PACE - p.targetPace()) / (K.START_PACE - K.FLOOR_PACE);
-      // The long "still buying speed" hold existed because the frozen-pace
-      // projection was useless until the streak had spent most of its range.
-      // projectClean() is within ~30s of the truth by the first mile, so the
-      // verdict can harden almost immediately; all that is held back is the
-      // opening stretch where too few gates have been seen to measure the
-      // gate rate the projection depends on.
+      // The projection is an estimate until enough of the race has gone past
+      // to measure the gate rate it depends on. `unlocked` -- the share of the
+      // START_PACE -> FLOOR_PACE range the streak had already bought -- used
+      // to gate this and was computed here for a test that no longer reads it;
+      // it has been removed rather than left as a dead line that looks load
+      // bearing. projectClean() is within ~30s of the truth by the first mile,
+      // so the verdict can harden almost immediately.
       const settled = p.miles > 0.6;
       const bleeding = p.targetPace() - p.pace > 1.5; // streak was cut, pace sliding back
 

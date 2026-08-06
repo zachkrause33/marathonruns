@@ -282,8 +282,25 @@ MR.shading = (function () {
   // goes 72% -> 37%, while anything past 200 still sits deep enough in the
   // haze to read as distance. The depth cue survives; the far half of the
   // spawn window becomes usable.
+  //
+  // THEN THE FAR PLANE WAS MEASURED AND IT NEVER COMPLETED. Nothing spawns
+  // past VIEW = 210, and at 210 units a far of 300 gives a fog factor of only
+  // (210-60)/(300-60) = 0.625 -- so the most distant object on screen still
+  // carried 37.5% of its own colour and chroma, and props POPPED IN at visible
+  // contrast instead of condensing out of the haze. Every reference frame has a
+  // fully dissolved far plane (Tom Gold Run's pyramid measures S=0.073, which is
+  // the sky's own saturation). far = 215 puts the spawn distance at fog factor
+  // 0.95 and closes that hole.
+  //
+  // The gameplay argument above is preserved because it was never about the far
+  // plane. Gates are committed to at 26-90 units: at 60/215 a gate at 90 sits at
+  // 0.19 hazed (was 0.13) and one at 120 at 0.39 (was 0.25) -- the read window
+  // is materially unchanged and the depth cue behind it is much stronger. What
+  // is given up is planning against a gate 150+ units out, which the racing line
+  // (ROUTE_FAR = 124) and the route rings now do far better than a silhouette in
+  // haze ever did.
   const FOG_NEAR = 60;
-  const FOG_FAR = 300;
+  const FOG_FAR = 215;
 
   const fogU = {
     inkFogColor: { value: new THREE.Color(1, 1, 1) },

@@ -119,6 +119,14 @@ html, body {
 .chip.est { color: var(--accent); border: 1px solid rgba(255, 228, 94, 0.55); }
 .chip.on  { background: var(--ahead);  color: #06301c; }
 .chip.off { background: var(--behind); color: #35060f; }
+/* The record is gone and the headline has retargeted onto the ladder. It is
+ * neither winning nor losing any more -- it is HOLDING a rung -- so it takes
+ * the accent, the colour this HUD already uses for the thing you are earning,
+ * and the projection beside it goes back to plain ink. Leaving it red said
+ * "still failing" for up to two thirds of a run. */
+.chip.tier { background: var(--accent); color: #14183a; }
+#projCell.tier .val { color: #fffdf5; }
+#projCell.tier .sub { color: var(--accent); opacity: 0.92; }
 
 /* ---- left column: the mechanic, read top to bottom ----
  * Clean gates buy speed; the gauge shows how much of the 5:30 -> 4:20 range
@@ -546,7 +554,11 @@ html, body {
  * same baseline as the matching line of the other at every breakpoint. */
 #endCols {
   --endRow: 21px;
-  display: flex; flex-wrap: wrap; gap: 14px 34px;
+  display: flex; flex-wrap: wrap;
+  /* Fluid, so the two columns stay SIDE BY SIDE on a 360px phone instead of
+   * stacking and leaving half the card empty. At fixed 34/18/16 the pair
+   * measured 338px against 332px of content width and wrapped by six pixels. */
+  gap: 14px clamp(16px, 6vw, 34px);
   justify-content: flex-start; align-items: flex-start;
   margin-top: 16px;
 }
@@ -555,8 +567,8 @@ html, body {
   row-gap: 0; grid-auto-rows: var(--endRow);
   font-variant-numeric: tabular-nums;
 }
-#resultStats { grid-template-columns: auto auto; column-gap: 18px; }
-#splitTable  { grid-template-columns: auto auto auto; column-gap: 16px; }
+#resultStats { grid-template-columns: auto auto; column-gap: clamp(11px, 4.5vw, 18px); }
+#splitTable  { grid-template-columns: auto auto auto; column-gap: clamp(10px, 4vw, 16px); }
 
 #endCols .k {
   font-size: 9px; font-weight: 800; letter-spacing: 0.16em;
@@ -784,9 +796,15 @@ html, body {
   .cta { margin-top: 12px; padding: 10px 26px; }
 
   /* The finish card has the most to say and the least room to say it in, so
-   * it gives up its vertical air rather than its content -- everything still
-   * fits above the fold on a 430px-tall landscape phone except the splits,
-   * which are the one block that is a nice-to-have. */
+   * it gives up vertical air first and then the one line it can afford to
+   * lose -- the race-report sentence, which is the only block here that is
+   * colour rather than fact. What survives is the grade, the two headlines,
+   * the tables, the true cost of contact and tomorrow.
+   *
+   * It still does not all fit at 844x390: the card runs about 40px past the
+   * fold and scrolls, which is what .canScroll's fade is for. Portrait is the
+   * reference experience and this is the deliberate trade. */
+  .panel { padding: 10px 14px; }
   #startMemory { margin-top: 10px; gap: 6px; }
   .mplate { padding: 4px 8px 5px; }
   .mplate .mv { font-size: 15px; }
@@ -794,13 +812,14 @@ html, body {
   .panel .endBig { font-size: clamp(26px, 6vh, 38px); }
   #endHead { gap: 8px 24px; }
   .endSub { margin-top: 2px; }
-  #tierRow { margin-top: 9px; }
-  #endBadges, #endMem { margin-top: 6px; }
-  #endCols { --endRow: 18px; margin-top: 9px; gap: 8px 24px; }
-  #endCost { margin-top: 9px; }
-  #endTurn { margin-top: 8px; }
-  #tomorrow { margin-top: 9px; padding-top: 8px; }
-  #endPanel .cta { margin-top: 10px; }
+  #tierRow { margin-top: 8px; }
+  #endBadges, #endMem { margin-top: 5px; }
+  #endCols { --endRow: 16px; margin-top: 8px; gap: 8px 24px; }
+  #endCost { margin-top: 8px; }
+  #endCost .endBig { font-size: 22px; }
+  #endTurn { display: none; }
+  #tomorrow { margin-top: 8px; padding-top: 7px; }
+  #endPanel .cta { margin-top: 9px; padding: 10px; }
 
   #leftCol { top: calc(var(--bugH, 60px) + 6px); gap: 6px; }
   #engine { padding: 5px 10px 6px; }

@@ -18,8 +18,11 @@
  *      with the head rather than stay fixed. The chase camera looks DOWN, so
  *      a fatter skull hangs more of its own silhouette into the gap before
  *      the neck gets any use of it -- at this head size about 0.05 of it.
+ *      Nothing may be added to the back of the head that is not part of the
+ *      ladder in rule 2. The cap's peak is at the FRONT for that reason and
+ *      not for any reason to do with caps -- see the peak's own note.
  *   2. The back needs its own value structure, and the order matters.
- *      Top to bottom it runs red cap / bright band / dark brim / dark hair /
+ *      Top to bottom it runs red cap / bright band / dark hair /
  *      light neck / dark hood / red vest / white race bib. Hair on the crown
  *      with a bare nape put light on light and the head merged again; the
  *      dark mass has to sit directly above the lit neck for the pinch to
@@ -74,12 +77,18 @@
  *   7. A person reads as a person because they are WEARING something, and a
  *      garment is only ever visible at its EDGES. The reference character from
  *      behind is a stack of hems -- cap band, hood roll, collar, vest hem,
- *      waistband, short cuff, sock, shoe collar -- and this one was a smooth
- *      cylinder with a number on it. Every hem added here is welded into a
- *      part that already existed, so the whole wardrobe costs two draw calls
- *      (the hood, which has to move on its own) and not one vertex of extra
- *      width: see the note above the colour block, and the hand, which pays
- *      for its fingers out of its own palm.
+ *      short cuff, sock, shoe collar -- and this one was a smooth cylinder
+ *      with a number on it. Every hem added here is welded into a part that
+ *      already existed, so the whole wardrobe costs two draw calls (the hood,
+ *      which has to move on its own, and the bib, which flutters) and not one
+ *      vertex of extra width.
+ *
+ *      A hem also has to be MEASURED at the size the game ships, and half of
+ *      the first wardrobe pass was not. Anything under about three pixels, or
+ *      standing on a neighbour it barely differs from, is not detail; it is
+ *      cost. See the list above the colour block for what came out again and
+ *      why -- one item was not merely invisible but actively read as a hole in
+ *      the vest, which is the failure mode worth remembering.
  *   8. Nothing on a rig where every part is bolted to a joint can arrive late,
  *      and everything real does. Two things here are not bolted to a joint:
  *      the hood, on a pair of underdamped springs, and the bib's hem, on a
@@ -229,7 +238,6 @@ MR.Runner = (function () {
   // designed character instead of assorted parts. A fourth hit on the vest
   // hem put three yellows at the same height and just read as clutter.
   const TRIM = P.accent;
-  const GLOVE = P.runnerShoe;
 
   // ---- the wardrobe ------------------------------------------------------
   //
@@ -237,7 +245,7 @@ MR.Runner = (function () {
   // they read as a PERSON WEARING CLOTHES: every garment has an edge, and the
   // edges are where one tone meets a neighbouring one. Subway Surfers' runner
   // from behind is a stack of hems -- cap band, hood roll, jacket collar,
-  // jacket hem, waistband, short cuff, sock, shoe collar -- and none of them
+  // jacket hem, short cuff, sock, shoe collar -- and none of them
   // is a strong colour. They are all a step off the garment they trim.
   //
   // So every tone below is deliberately a NEIGHBOUR of the mass it edges,
@@ -249,10 +257,28 @@ MR.Runner = (function () {
   // They also have to survive the toon ramp's three bands. A tone less than
   // about 12% off its neighbour lands in the same band on most of the surface
   // and the hem simply is not there; these all sit between 15% and 30% off.
-  const JACKET = 0xd6394e;   // cap brim, vest collar, vest hem, sleeve cuff -- under the vest
-  const BASE = 0xb9c4de;     // base-layer tee, seen only as the sleeves
-  const WAIST = 0x434a80;    // hood, waistband, short cuff -- one step over the shorts
-  const SHOE_DK = 0x5f6796;  // heel counter and lace panel
+  //
+  // WHAT SURVIVES THE CAMERA, AND WHAT WAS TAKEN OUT AGAIN. The wardrobe pass
+  // that put this list here was reviewed at gameplay framing -- the runner is
+  // 110-200px tall in the frame that ships -- and half of it did not resolve.
+  // Detail that does not resolve is not free: it costs triangles, it costs the
+  // eye a moment, and one item was worse than that. Kept, because they were
+  // measured to read: the cap band, the vest's red against the shorts' navy,
+  // the short cuff, the shoe. Taken out:
+  //   BASE-LAYER SLEEVES  a pale blue cylinder under each deltoid. At 110px it
+  //     is two pale triangles at the shoulders and they read as HOLES in the
+  //     vest -- the one failure mode worse than being invisible. Its cuff went
+  //     with it; a cuff on a sleeve that is not there is nothing.
+  //   LACE PANEL  0.078 across on the instep, seen only on the top face of a
+  //     planted shoe, at 0.5px. Gone.
+  //   WAISTBAND  a third navy tone 0.052 tall inside a navy mass that already
+  //     had two. The vest's red meeting the shorts' navy IS the two-garment
+  //     read and it is enormous; the band added a stripe under it that at
+  //     gameplay scale only softened the edge that was doing the work.
+  // What the freed budget bought is the hand -- see the mitt below.
+  const JACKET = 0xd6394e;   // cap peak, vest collar, vest hem -- under the vest
+  const WAIST = 0x434a80;    // hood and short cuff -- one step over the shorts
+  const SHOE_DK = 0x5f6796;  // heel counter
   // The cap is the vest's own red rather than a new colour. It puts the
   // brightest garment tone at the top AND the middle of the figure, which is
   // the same "repeat one colour on a rhythm" trick TRIM runs, and it means the
@@ -276,14 +302,37 @@ MR.Runner = (function () {
   // cadence from behind.
   const SOLE = 0xd6cabb;
 
+  // ---- the mitt ----------------------------------------------------------
+  //
+  // The hand used to be the shoe's own colour, and that is most of why the
+  // review found the runner had none. At the back of the arm swing the trailing
+  // glove sits at world y~0.30 and the shoe tops sit at 0.25, a few pixels
+  // apart on screen -- so the biggest pale mass on the lower half of the figure
+  // had a second pale mass of exactly the same tone parked beside it, and the
+  // two averaged into one blob. No amount of finger geometry survives that.
+  //
+  // Cool where the shoe is warm, and a step darker. At gameplay scale the hand
+  // is about 14px across, which is enough for a shape and ONE value break and
+  // nothing else, so both are spent on saying "not the shoe": MITT against the
+  // shoe's 0xfff2e0 is a 22% value step AND a hue flip, which is the pair of
+  // axes MEASUREMENTS.md records the reference using to separate a car from the
+  // road it is the same brightness as. It is still far and away the palest
+  // thing at that height apart from the shoe, so rule 3 -- the gloves flash
+  // against the road -- is untouched.
+  const MITT = 0xc9d2ea;
+  // The curled fingers. Darker again, and it is the only interior detail the
+  // hand gets: at 14px a knuckle line is the difference between a mitt and a
+  // ball, and three separate fingers are three 4px lobes that alias into one.
+  const MITT_DK = 0x8791b7;
+
   /**
    * Weld several primitives into one geometry, baking each piece's colour
    * into a vertex-colour attribute.
    *
    * Every part is outlined, so a part costs two draw calls. Welding the
-   * pieces that never move relative to each other -- skull + cap + brim +
+   * pieces that never move relative to each other -- skull + cap + peak +
    * hair + nape + band + ears + neck, vest + shoulders + collar + hem, shoe +
-   * sole + heel counter + laces -- is what pays for the extra detail this
+   * sole + heel counter -- is what pays for the extra detail this
    * silhouette needs while staying inside the budget. The whole character is
    * 30 draws plus one for the shadow, and the entire wardrobe pass that took
    * it from a cylinder to a person cost two of those: the hood, which is the
@@ -335,7 +384,7 @@ MR.Runner = (function () {
 
   // There is no single-primitive part() any more. The last two holdouts were
   // the thigh and the upper arm, and the wardrobe pass gave both of them
-  // something welded on -- a hamstring and a sleeve -- so every part on the
+  // something welded on -- a hamstring and a triceps -- so every part on the
   // character is now a weld. That is the point rather than an accident: a
   // lone primitive is exactly the shape that reads as a raw primitive.
   function multi(pieces, steps) {
@@ -670,17 +719,21 @@ MR.Runner = (function () {
 
     const pelvis = multi([
       { g: new THREE.CylinderGeometry(0.228, 0.220, 0.25, 12), c: P.runnerShort, y: -0.020, sz: 0.78 },
-      // Waistband. The vest's hem stops at world 0.590 and the shorts run down
-      // to 0.407, so this is the only band that can turn one continuous dark
-      // mass into "a top tucked over a bottom" -- which is the single cheapest
-      // human read on the whole figure, because the eye already expects a
-      // person to be two garments. It has to sit BELOW the vest hem to exist
-      // at all; anything above 0.586 is inside the vest and invisible.
-      { g: new THREE.CylinderGeometry(0.234, 0.232, 0.052, 10), c: WAIST, y: 0.000, sz: 0.79 },
-      // ...and the short's own cuff at the leg opening, so the thighs come out
-      // of a hem rather than out of a hole. Straddles the shorts' bottom edge
-      // on purpose: a band that stops short of it leaves a sliver of the old
-      // hard cut still showing under it.
+      // There is no waistband here any more, and its own argument is why. It
+      // was put in to turn one dark mass into "a top tucked over a bottom" --
+      // but the thing that actually says that is the VEST'S RED meeting the
+      // shorts' NAVY, which is a 0.52-wide edge between the two most different
+      // tones on the figure and is legible at any size the game ever draws. The
+      // waistband sat 0.03 under that edge in a third navy, and at gameplay
+      // scale a 3px band of a near tone directly beneath a huge hard edge does
+      // not add a garment: it blurs the one that was already there.
+      //
+      // The short's own cuff at the leg opening stays, and the difference is
+      // the whole reason one went and one did not: the cuff's edge is against
+      // SKIN, not against more navy, so it is doing what the waistband was
+      // only claiming to do. The thighs come out of a hem rather than a hole.
+      // Straddles the shorts' bottom edge on purpose: a band that stops short
+      // of it leaves a sliver of the old hard cut still showing under it.
       { g: new THREE.CylinderGeometry(0.236, 0.230, 0.044, 10), c: WAIST, y: -0.126, sz: 0.79 },
     ]);
     spine.add(pelvis);
@@ -694,7 +747,7 @@ MR.Runner = (function () {
       // Vest. Nothing on the trunk may reach above the deltoids -- an earlier
       // version had it poking 0.03 higher and the head went straight back to
       // sitting on the shoulders. Short and barely tapered on purpose: a
-      // singlet worn over the waistband, so the red reads as one wide squat
+      // singlet worn over the shorts, so the red reads as one wide squat
       // block the way the reference shirts do rather than as a torso.
       { g: new THREE.CylinderGeometry(0.262, 0.238, 0.28, 12), c: P.runnerVest, y: -0.037, sz: 0.78 },
       // Deltoids. These are what make the shoulder line read wider than the
@@ -755,8 +808,8 @@ MR.Runner = (function () {
     // at the shorts' value the hood, the hair and the shorts made three near-
     // black masses on a figure the references keep light, and the shoulders
     // were the heaviest thing in frame. One step up is still unambiguously
-    // dark against the neck, and it gives WAIST its third hit -- hood,
-    // waistband, short cuff -- which is the rhythm TRIM already runs.
+    // dark against the neck, and it pairs WAIST with the short cuff at the
+    // other end of the figure, which is the rhythm TRIM already runs.
     const hoodPivot = pivot(chest, 0, 0.048, -0.045);
     const hood = multi([
       // sz, not sy: weld() composes T*R*S, so the squash lands on the geometry
@@ -894,42 +947,73 @@ MR.Runner = (function () {
       // Radius has to clear the shells everywhere: two this close together
       // interpenetrate on their facets and the crown grew a row of teeth.
       { g: new THREE.CylinderGeometry(0.294, 0.294, 0.074, 14), c: TRIM, y: HY + 0.060 },
-      // The brim, worn backwards -- which is the only way a brim is worth
-      // drawing here, because forwards it points down the view axis and is
-      // gone. Backwards it points AT the lens, and the chase camera looks down
-      // about 18 degrees, so what the player sees is the top face of it: a
-      // hard horizontal lozenge cutting across an otherwise perfectly round
-      // skull, and a shadow line where it overhangs the hair.
+      // The peak, and it is at the FRONT, where a running cap's peak is.
       //
-      // Tilted up 0.30rad so the far edge rises to 0.134 -- well under the
-      // crown at 0.288, so it adds nothing to HEIGHT, and 0.298 wide against
-      // the band's 0.294, so it adds nothing to the half-width either. It is
-      // pure value pattern, which is the only currency this camera has.
+      // It used to be worn backwards, on the argument that a forward peak
+      // points down the view axis and is therefore not worth drawing. That
+      // argument is sound about what a backward peak BUYS and silent about
+      // what it COSTS, and the cost was the defect: a shelf standing 0.12
+      // proud of the hair at the back, below the sweatband, drawing as a red
+      // block on the black hair in every frame of every race. The chase
+      // camera looks at the back of this head for two hours. The one thing
+      // that may never be wrong is the back of the head.
       //
-      // JACKET rather than the crown's own red, and that is the whole of
-      // whether it exists. Rendered in the cap colour the brim was invisible:
-      // it is a shelf seen from 20 degrees above, so what the player sees is
-      // its TOP FACE, and a top face the same colour as the dome behind it is
-      // a shape with no edge. One step darker and it separates into a plane.
+      // So the peak is now judged by two tests instead of one:
+      //   FRONT   it has to read from the three-quarter and front views, which
+      //           are what the start panel and the finish framing show, and
+      //           it is the single most legible thing a cap has from there.
+      //   ASTERN  it has to be INVISIBLE from behind -- not small, not subtle,
+      //           not the same colour as what is behind it. Zero pixels.
+      // The second test is measured rather than judged (see the report): the
+      // peak's fill is recoloured and counted from dead astern and from the
+      // chase angle, and the whole head is diffed against a build with the
+      // peak collapsed to a point. Both come back at zero.
       //
-      // An ELLIPSE, narrow across and long back, and that shape is the whole
-      // repair on this part. A round half-disc big enough to overhang put a
-      // third shell within 0.015 of the skull's 0.266 and the band's 0.294 --
-      // three surfaces inside one outline width -- and the ink shell punched
-      // through both in a ring of dark wedges: the same row of teeth the
-      // headband note warns about, arrived at from a different direction.
-      // Squashed to 0.185 across it is buried inside the skull everywhere
-      // except behind it, so the only part that draws at all is the shelf.
+      // The geometry is what makes that free. The peak is a half-disc lying
+      // in the FRONT half (thetaStart -pi/2), so nothing of it exists behind
+      // the skull's equator at all; the crown, the hair shell and the band are
+      // then a solid occluder 0.53 across standing between it and the lens.
       //
-      // Held nearly level (0.06rad) rather than cocked up, which is the
-      // difference between a brim and a stripe. The camera is only about 20
-      // degrees above it, so a point 0.33 nearer the lens draws 0.11 LOWER on
-      // screen than one at the same height on the skull -- a brim cocked up
-      // 0.34 climbs almost exactly that, the two cancel, and the first version
-      // projected as a band across the middle of the cap rather than as a
-      // shelf standing off the back of it.
-      { g: new THREE.CylinderGeometry(0.250, 0.250, 0.034, 12, 1, false, Math.PI * 0.5, Math.PI), c: JACKET,
-        y: HY + 0.030, z: -0.085, rx: 0.06, sx: 0.74, sz: 1.30 },
+      // The old note's real lesson is kept, and a second one had to be learned
+      // next to it. A round half-disc concentric with the skull is the one
+      // shape that CANNOT be used, because it leaves the skull almost
+      // tangentially and spends a long arc within one ink width of it -- three
+      // surfaces inside 0.014 and the outline punches through both in a row of
+      // dark wedges. But TANGENCY, not roundness, is the actual fault, and the
+      // first front-facing version reinvented it from the other side: drooped
+      // 0.24rad it left the head through the BAND'S FLAT UNDERSIDE at 13
+      // degrees, which is a grazing crossing 0.059 wide, and the teeth came
+      // straight back.
+      //
+      // So the plate is sized to the band rather than to the skull. It is
+      // 0.022 thick and rides at the band's own mid-height, which leaves 0.024
+      // of clear air above it and 0.028 below inside a band 0.074 tall -- both
+      // comfortably over one ink width -- and it is held nearly level (0.06rad)
+      // so it still has 0.015 of that clearance where it passes out through the
+      // band's VERTICAL wall, which a level plate crosses at eighty degrees.
+      // Every other surface it meets on the way (the skull, the hair) it meets
+      // deep inside the band, where nothing is drawn. Its own flat edge sits
+      // 0.025 inside the skull at z=0.08 and is never seen from any angle.
+      //
+      // Level, not cocked: the original note's argument survives the flip.
+      // What a peak has to be from the quarter view is a hard horizontal plane
+      // cutting the round skull, and a peak angled down enough to read as
+      // "pulled over the eyes" from the front reads as a stripe from anywhere
+      // else. Held level it overhangs 0.17 past the face, which is the whole
+      // of what makes it a peak.
+      //
+      // Width is free and is taken. The disc's widest points are its flat
+      // edge, buried at z=0.08, so what actually leaves the band is the arc:
+      // it emerges 0.48 across at x=+-0.242 and tapers to a point 0.26 further
+      // forward, which is the shape of a peak rather than a shelf. Because it
+      // emerges ON the band's own cylinder it can never be wider than the band
+      // is, so it costs the half-width nothing at all.
+      //
+      // JACKET rather than the crown's own red, unchanged and for the
+      // unchanged reason: the peak is a plane seen against the dome behind it
+      // and a plane the same colour as its background is a shape with no edge.
+      { g: new THREE.CylinderGeometry(0.250, 0.250, 0.022, 16, 1, false, -Math.PI * 0.5, Math.PI), c: JACKET,
+        y: HY + 0.062, z: 0.080, rx: 0.06, sz: 1.40 },
       { g: new THREE.SphereGeometry(0.080, 8, 6), c: P.runnerSkin, x: -0.254, y: HY - 0.020, z: -0.013, sx: 0.48, sz: 0.82 },
       { g: new THREE.SphereGeometry(0.080, 8, 6), c: P.runnerSkin, x: 0.254, y: HY - 0.020, z: -0.013, sx: 0.48, sz: 0.82 },
     ]);
@@ -1012,11 +1096,13 @@ MR.Runner = (function () {
         // the shell it sits on is the coin-of-scalp bug the hair cap had, and
         // this one is deliberately proud in z and inset in x.
         { g: new THREE.SphereGeometry(0.098, 8, 6), c: SHOE_DK, y: -0.030, z: -0.076, sx: 0.90, sy: 0.72, sz: 0.72 },
-        // Lace panel across the instep. Invisible head-on, which is why it is
-        // cheap -- but the camera looks DOWN about 18 degrees, so the top face
-        // of the planted shoe is in view on every footstrike, and a shoe with
-        // nothing on its upper reads as a clog.
-        { g: new THREE.BoxGeometry(0.078, 0.030, 0.150), c: SHOE_DK, y: 0.020, z: 0.070 },
+        // The lace panel that used to sit across the instep is gone. It was
+        // 0.078 across on the ONE face of the shoe the camera sees least -- the
+        // top of a planted foot, at a glancing angle -- and measured at
+        // gameplay framing it was half a pixel wide. The heel counter above is
+        // the same idea aimed at the face the camera never stops seeing, and it
+        // is the reason the shoe still reads as a trainer without it.
+        //
         // Thin accent stripe, and thin is the point: it is a crisp bright line
         // from behind and almost nothing from below, which is the opposite of
         // where the accent used to sit.
@@ -1038,21 +1124,25 @@ MR.Runner = (function () {
       // rotation.z as a clean abduction angle measured from straight down,
       // which is the single number the jump pose steers.
       shoulder.rotation.order = 'ZXY';
-      // The base layer, and the only place it is ever seen. "A race vest over
-      // a base layer" is what the reference wears and what a marathon runner
-      // wears, but from behind the trunk is entirely vest and entirely bib --
-      // there is nowhere on it for a second garment to show. The upper arm is
-      // where it can: a sleeve emerging from under the deltoid, ending in its
-      // own rolled cuff, turns a bare skin tube into an arm in a shirt. Two
-      // hits, symmetric, at the widest part of the figure.
+      // Bare, and that is a reversal. This carried a base-layer sleeve in a
+      // pale blue with its own rolled cuff, on the argument that "a race vest
+      // over a base layer" is what a marathon runner wears and the upper arm is
+      // the only place from behind where a second garment can show. The
+      // argument is true and the result was the worst thing on the character:
+      // seen from the chase camera the sleeve is not a cylinder, it is the
+      // sliver of one that clears the deltoid, so at gameplay scale it resolved
+      // as a pale triangle at each shoulder -- and a pale triangle inside a red
+      // mass reads as a HOLE IN THE VEST. Being invisible would have been the
+      // better outcome of the two.
       //
-      // The sleeve's top is tucked UNDER the deltoid sphere (which reaches to
-      // -0.100 in this frame) so the join is hidden by the shoulder's own
-      // curve rather than showing as a ring where the singlet ends.
+      // What replaces it is form rather than tone: a triceps swell, in skin,
+      // 0.020 proud at the back and nothing at the sides. Same argument as the
+      // hamstring and the calf -- it gives the ramp something to shade without
+      // introducing a value the silhouette has to pay for, and it keeps this
+      // part off the list of lone primitives.
       const upper = multi([
         { g: new THREE.CapsuleGeometry(0.086, 0.095, 3, 10), c: P.runnerSkin, y: -0.122 },
-        { g: new THREE.CylinderGeometry(0.101, 0.096, 0.090, 10), c: BASE, y: -0.108 },
-        { g: new THREE.CylinderGeometry(0.100, 0.098, 0.024, 10), c: JACKET, y: -0.160 },
+        { g: new THREE.SphereGeometry(0.088, 8, 6), c: P.runnerSkin, y: -0.108, z: -0.016, sx: 0.90, sy: 1.15 },
       ]);
       shoulder.add(upper);
 
@@ -1063,10 +1153,10 @@ MR.Runner = (function () {
       // unmistakable. At rest the extra is absorbed by the elbow's flexion and
       // never shows.
       const elbow = pivot(shoulder, 0, -0.262, 0);
-      // Forearm ending in a pale mitt over a trim wristband. Arms and thighs
+      // Forearm ending in a mitt over a trim wristband. Arms and thighs
       // are both skin, and from behind they overlap for most of the stride --
       // without a bright break at the wrist the whole lower half of the
-      // character reads as one undifferentiated mass. The mitt is 0.21 across
+      // character reads as one undifferentiated mass. The mitt is 0.19 across
       // against a 0.57 head, near the ratio Sonic's gloves run at, and it is
       // what makes both the arm swing and the spread jump pose land.
       const fore = multi([
@@ -1078,26 +1168,44 @@ MR.Runner = (function () {
         // the joint the back view was built to watch.
         { g: new THREE.SphereGeometry(0.088, 8, 5), c: P.runnerSkin, y: -0.012, sy: 0.92, sz: 0.96 },
         { g: new THREE.CylinderGeometry(0.088, 0.088, 0.048, 10), c: TRIM, y: -0.188 },
-        // The hand. It was a ball, and a ball is the one shape a hand is not.
-        // Palm plus three fingers, and the budget for the fingers is taken OUT
-        // of the palm -- 0.118 down to 0.112, sitting 0.008 higher -- so the
-        // hand ends at -0.361 where the ball ended at -0.376. That matters
-        // more than it sounds: the gloves are the outermost thing on the
-        // airborne pose, MEASUREMENTS.md puts the runner's lateral budget at
-        // 0.70 from the lane centre before it grazes hazards it legitimately
-        // cleared, and growing the reach to buy fingers would have spent it.
+        // ---- the hand ------------------------------------------------------
         //
-        // The fingers point forward and down, curled the way a running hand
-        // is, so from behind what shows is the knuckle line across the back of
-        // the hand and three lobes breaking the bottom of its outline. The
-        // capsule CAPS are the knuckles -- one primitive doing both jobs.
-        { g: new THREE.SphereGeometry(0.112, 10, 8), c: GLOVE, y: -0.250, sx: 0.88, sz: 1.02 },
-        { g: new THREE.CapsuleGeometry(0.030, 0.042, 1, 6), c: GLOVE, x: -0.048, y: -0.318, z: 0.010, rx: 0.60 },
-        { g: new THREE.CapsuleGeometry(0.032, 0.046, 1, 6), c: GLOVE, x: 0.000, y: -0.320, z: 0.012, rx: 0.60 },
-        { g: new THREE.CapsuleGeometry(0.029, 0.040, 1, 6), c: GLOVE, x: 0.048, y: -0.314, z: 0.008, rx: 0.60 },
-        // Thumb, on the inboard face, where it is a silhouette bump against
-        // the torso rather than a lump lost on the outside of the arm.
-        { g: new THREE.CapsuleGeometry(0.032, 0.036, 1, 6), c: GLOVE, x: -side * 0.086, y: -0.268, z: 0.030, rx: 0.55, rz: side * 0.55 },
+        // Sized to the frame that ships and not to a close-up. The figure is
+        // 110-200px tall in play, the hand is 0.20 across on a 1.60 figure, so
+        // the hand is 14-25 PIXELS. That number decides everything below:
+        //
+        //   - Three fingers do not exist at 14px. Each was 0.06 across, under
+        //     4px, in the palm's own colour, and the review's verdict on them
+        //     was "unarticulated rounded stump" -- which is what four pale
+        //     lobes of one tone at 4px are. They are replaced by ONE curled
+        //     roll carrying the whole hand's single value break. A knuckle line
+        //     is the only interior detail a 14px hand can hold, so it gets that
+        //     and nothing else.
+        //   - A ball reads as a ball at every size. The mass is now a flattened
+        //     BLOCK, deeper front-to-back than it is wide, with the wrist ball
+        //     above it and the finger roll below: three stacked shapes of two
+        //     tones, which at 14px resolves as forearm / band / hand / fingers
+        //     rather than as one pale oval.
+        //   - The thumb rides high and INBOARD, so it breaks the outline
+        //     against the vest and the thigh -- the two dark masses the hand
+        //     passes in front of -- rather than against the road, where the
+        //     mitt's own edge is already doing the work.
+        //
+        // Every dimension is inside the ones it replaces. The old hand reached
+        // -0.362 and was 0.197 across; this one reaches -0.361 and is 0.186,
+        // so the airborne span, which MEASUREMENTS.md caps at 0.70 from the
+        // lane centre, is spent DOWN rather than up. The extra mass is bought
+        // in z, which is the axis the back view does not measure at all.
+        { g: new THREE.SphereGeometry(0.086, 8, 6), c: MITT, y: -0.208, sy: 0.88, sz: 1.00 },
+        { g: new THREE.BoxGeometry(0.170, 0.116, 0.150), c: MITT, y: -0.262, z: 0.014 },
+        // Knuckles: the block's outboard-forward corner rounded off, so the
+        // hand has a leading edge instead of four square ones.
+        { g: new THREE.SphereGeometry(0.090, 8, 6), c: MITT, y: -0.258, z: 0.052, sx: 0.94, sy: 0.70, sz: 0.60 },
+        // The curled fingers, one roll lying across the hand. Its cap ends are
+        // the outer knuckles, exactly as the old three capsules used their caps
+        // -- one primitive doing both jobs, but at a size that survives.
+        { g: new THREE.CapsuleGeometry(0.048, 0.086, 2, 8), c: MITT_DK, y: -0.313, z: 0.048, rz: Math.PI / 2 },
+        { g: new THREE.CapsuleGeometry(0.036, 0.048, 2, 6), c: MITT, x: -side * 0.062, y: -0.242, z: 0.062, rx: 0.85, rz: side * 0.62 },
       ]);
       elbow.add(fore);
 

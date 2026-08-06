@@ -924,9 +924,9 @@ MR.HUD = (function () {
 
       // ---- what the save made of it --------------------------------------
       const badges = [];
-      if (rec.allTimeBest) badges.push('ALL-TIME BEST');
+      if (rec.allTimeBest && !rec.firstEver) badges.push('ALL-TIME BEST');
       else if (rec.beatToday && !rec.firstToday) badges.push('BEST TODAY');
-      if (rec.allTimeStreak) badges.push('LONGEST CLEAN EVER');
+      if (rec.allTimeStreak && !rec.firstEver) badges.push('LONGEST CLEAN EVER');
       else if (rec.beatTodayStreak && !rec.firstToday) badges.push('LONGEST CLEAN TODAY');
       if (rec.dayStreak > 1) badges.push(rec.dayStreak + ' DAY STREAK');
       n.endBadges.innerHTML = badges

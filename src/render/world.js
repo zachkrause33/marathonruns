@@ -4231,6 +4231,158 @@ MR.World = (function () {
     ]);
 
     /**
+     * ============ CONTACT SHADING UNDER EVERY HAZARD ============
+     *
+     * Measured off tgr-city.png and tgr-egypt.png, and the measurement is the
+     * whole point: their contact shading is not a grey shape painted on the
+     * road, it is a MULTIPLY of the surface.
+     *
+     *   parked car, city    47,48,63  on  83,85,112   0.57 / 0.56 / 0.56
+     *   runner, Egypt      186,172,135 on 249,232,180  0.747 / 0.741 / 0.750
+     *   tram spill, city    78,83,104 on  91,96,122   0.857 / 0.865 / 0.852
+     *
+     * The same number on all three channels to within 0.01, every time. So the
+     * target is 0.60 directly under the footprint easing to 0.85 at the rim --
+     * a hard contact under a car, an ambient-occlusion spill several units out.
+     *
+     * The runner got a shadow when the first review asked for one. The hazards
+     * never did, and they are the objects the game is lost by misjudging.
+     *
+     * WHY ONE MESH. A flat opaque quad cannot multiply, and a blended material
+     * per hazard is a draw call per hazard -- up to thirty of them at mile 20.
+     * So every live hazard's quad is written into ONE pooled geometry whose
+     * vertices are rewritten in place each frame, exactly as the racing line
+     * does: no allocation, no growth with the course, ONE extra draw call for
+     * the whole road and two triangles per hazard.
+     *
+     * COLOUR SPACE, because a multiply is where it bites hardest. The renderer
+     * outputs sRGB, so blending happens on sRGB-encoded values in the default
+     * framebuffer, and the measurements above are sRGB byte ratios. Authoring
+     * the falloff as sRGB bytes and letting three decode and re-encode it puts
+     * exactly the measured factor on the destination. Fog stays ON: it mixes
+     * the multiplicand toward the near-white haze, so a distant hazard's shadow
+     * dissolves at the same rate the hazard does, for free.
+     */
+    const SHADOW_CORE = 0.60;     // directly under the footprint
+    const SHADOW_RIM = 0.85;      // the ambient spill at the edge of the mass
+    const shadowTex = (function () {
+      const N = 64;
+      const cv = canvas(N, N);
+      const g = cv.getContext('2d');
+      const img = g.createImageData(N, N);
+      const d = img.data;
+      const c = (N - 1) / 2;
+      for (let y = 0; y < N; y++) {
+        for (let x = 0; x < N; x++) {
+          const dx = (x - c) / c, dy = (y - c) / c;
+          const r = Math.sqrt(dx * dx + dy * dy);
+          // Flat core out to 0.55 of the radius (the footprint), the measured
+          // ease to 0.85 by 0.80 (the rim), then out to 1.0 -- which under a
+          // multiply is "no change" and is what keeps the quad's own square
+          // edge invisible.
+          let v;
+          if (r <= 0.55) v = SHADOW_CORE;
+          else if (r <= 0.80) {
+            const t = (r - 0.55) / 0.25;
+            v = SHADOW_CORE + (SHADOW_RIM - SHADOW_CORE) * (t * t * (3 - 2 * t));
+          } else {
+            const t = Math.min(1, (r - 0.80) / 0.20);
+            v = SHADOW_RIM + (1 - SHADOW_RIM) * (t * t * (3 - 2 * t));
+          }
+          const i = (y * N + x) * 4;
+          d[i] = d[i + 1] = d[i + 2] = Math.round(v * 255);
+          d[i + 3] = 255;
+        }
+      }
+      g.putImageData(img, 0, 0);
+      const t = new THREE.CanvasTexture(cv);
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.generateMipmaps = false;
+      t.minFilter = t.magFilter = THREE.LinearFilter;
+      t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+      return t;
+    })();
+
+    // Three lanes x the deepest gate cluster the spawn window ever holds, with
+    // room to spare. Quads past the live count collapse to a point rather than
+    // being removed, so the buffer never resizes.
+    const SHADOW_MAX = 72;
+    const shadowGeo = (function () {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(SHADOW_MAX * 18), 3));
+      // WINDING. Seen from +y -- which is the only side anything ever sees a
+      // road quad from -- the vertices have to run (x0,z0) (x0,z1) (x1,z1) /
+      // (x0,z0) (x1,z1) (x1,z0). The obvious order instead puts the cross
+      // product at -y, the quads face DOWN THROUGH THE ROAD, and FrontSide
+      // culls every one of them: the mesh reports a live draw range, its
+      // vertices are where they should be, and it draws nothing whatever. This
+      // file has lost a week to exactly that failure once already -- see the
+      // LANE_FIT note at the top -- and it presents identically both times.
+      const uv = new Float32Array(SHADOW_MAX * 12);
+      for (let i = 0; i < SHADOW_MAX; i++) {
+        const u = i * 12;
+        uv[u] = 0; uv[u + 1] = 0;
+        uv[u + 2] = 0; uv[u + 3] = 1;
+        uv[u + 4] = 1; uv[u + 5] = 1;
+        uv[u + 6] = 0; uv[u + 7] = 0;
+        uv[u + 8] = 1; uv[u + 9] = 1;
+        uv[u + 10] = 1; uv[u + 11] = 0;
+      }
+      g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+      return g;
+    })();
+    const shadowMesh = new THREE.Mesh(shadowGeo, new THREE.MeshBasicMaterial({
+      map: shadowTex,
+      blending: THREE.MultiplyBlending,
+      transparent: true,
+      depthWrite: false,
+    }));
+    // Above the road paint (0.005-0.009) and below the telegraph mats (0.012):
+    // the shadow darkens the tarmac and the markings, which is what a shadow
+    // does, and never touches the device the lane read depends on.
+    shadowMesh.renderOrder = 2;
+    shadowMesh.frustumCulled = false;
+    shadowMesh.userData.notScenery = true;
+    group.add(shadowMesh);
+
+    const SHADOW_Y = 0.0105;
+    // Wider than the lane so the rim falls off over tarmac rather than being
+    // cut at the seam, and long enough that the near end reads as the object
+    // sitting ON the road rather than as a disc in front of it.
+    const SHADOW_SPREAD = 0.95;
+    function updateShadows() {
+      const pos = shadowGeo.attributes.position.array;
+      const B = MR.Collision.BOX;
+      let n = 0;
+      for (const g of activeGates) {
+        for (let l = 0; l < 3 && n < SHADOW_MAX; l++) {
+          const kind = g.gate.lanes[l];
+          if (kind === K.CLEAR || !g.objs[l]) continue;
+          const box = B[kind];
+          if (!box) continue;
+          // Same span the body is stretched by, so a six-unit train drags its
+          // whole length of shadow instead of a disc at the cab.
+          const span = (kind === K.BLOCK && g.gate.train) ? 1 + g.gate.train * 0.9 : 1;
+          const z0 = g.gate.z - box.halfZ - SHADOW_SPREAD;
+          const z1 = g.gate.z + box.halfZ * (2 * span - 1) + SHADOW_SPREAD;
+          const cx = K.LANE_X[l];
+          // LANE_W, never a difference of LANE_X.
+          const hx = LANE * 0.5 + SHADOW_SPREAD;
+          const p = n * 18;
+          pos[p] = cx - hx; pos[p + 1] = SHADOW_Y; pos[p + 2] = z0;
+          pos[p + 3] = cx - hx; pos[p + 4] = SHADOW_Y; pos[p + 5] = z1;
+          pos[p + 6] = cx + hx; pos[p + 7] = SHADOW_Y; pos[p + 8] = z1;
+          pos[p + 9] = cx - hx; pos[p + 10] = SHADOW_Y; pos[p + 11] = z0;
+          pos[p + 12] = cx + hx; pos[p + 13] = SHADOW_Y; pos[p + 14] = z1;
+          pos[p + 15] = cx + hx; pos[p + 16] = SHADOW_Y; pos[p + 17] = z0;
+          n++;
+        }
+      }
+      shadowGeo.setDrawRange(0, n * 6);
+      shadowGeo.attributes.position.needsUpdate = true;
+    }
+
+    /**
      * Which skin a gate wears. Derived from the gate's own z and lane, so it is
      * a property of the course -- identical for every player on the same day,
      * exactly like the course itself -- and costs no storage.
@@ -6138,6 +6290,7 @@ MR.World = (function () {
         }
       }
 
+      updateShadows();
       updateRoute(z, now);
 
       api.applyBiome(Math.min(1, z / K.TOTAL_UNITS));

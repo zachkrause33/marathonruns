@@ -66,11 +66,12 @@ MR.Store = (function () {
 
   const ls = probe();
 
-  // The fallback is not a stub that throws everything away. Within one tab it
+  // The fallback is not a stub that throws everything away. Within one page it
   // behaves exactly like the real thing, so a player in private mode still
-  // gets "your best today" across their second and third runs -- they only
-  // lose it when they close the tab, which is the most that can honestly be
-  // promised there.
+  // gets "your best today" and "you beat it by 3:16" across their second and
+  // third runs -- RUN IT AGAIN never leaves the document. It is lost on
+  // reload, which is the most that can honestly be promised there, and it is
+  // strictly more than the nothing the alternative offers.
   let memBlob = null;
   const persistent = !!ls;
 
@@ -267,6 +268,10 @@ MR.Store = (function () {
       beatToday: false,
       beatTodayStreak: false,
       firstToday: !before.today,
+      // A first-ever run sets every all-time mark by definition, which is not
+      // an achievement and must not be announced as one -- a 2:08 disaster
+      // wearing an ALL-TIME BEST badge is the screen lying to a beginner.
+      firstEver: !before.best,
       allTimeBest: false,
       allTimeStreak: false,
       dayStreak: before.dayStreak,

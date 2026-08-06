@@ -12,6 +12,37 @@
  *
  * Exit code is non-zero if the page threw, so a broken build cannot pass
  * review by producing a plausible-looking image.
+ *
+ * ---- OCCLUSION, and why it is a build failure ----------------------------
+ *
+ * This game is lost by hitting one thing. A hazard the player could not see
+ * because a lamp post, a gantry or an overpass was drawn in front of it is not
+ * a difficulty spike, it is the game taking a streak for something outside the
+ * player's control -- the same class of defect as a page error, and worth
+ * failing the build for.
+ *
+ * world.js states the rule ("anything reaching back over the carriageway does
+ * so above OVERHEAD_Y", "nothing may be between the lens and the next gate")
+ * and for a long time only stated it. It was false in two places at once: the
+ * WALL overpass carried fascia bars across the road at y = 8.0 against an
+ * OVERHEAD_Y of 9.0, and every mile gantry crossed the road at y = 3.5-6.0 --
+ * squarely inside the band a BLOCK occupies, reproducible in one frame at
+ * ?skip=190 where the MILE 21 sign passes through the runner's head.
+ *
+ * So the rule is checked here instead, against the live scene graph of the
+ * frame that was just captured, in two parts:
+ *
+ *   LOW    world.crossings() walks every drawn triangle passing over the play
+ *          corridor and reports the lowest. Any below OVERHEAD_Y fails.
+ *   HIDES  every such crossing is projected through the real camera and
+ *          compared with every live hazard BEHIND it, taken from
+ *          MR.Collision.BOX rather than from the art. If the crossing's lowest
+ *          screen row is below the hazard's highest, it is in front of a
+ *          hazard on screen and the run fails.
+ *
+ * Both are geometric, so a new prop is audited the day it is added rather than
+ * the day somebody notices. Hazards, aid and the sky/ground/hills backdrop are
+ * exempt and world.js says why at each exemption.
  */
 const { chromium } = require('playwright');
 const path = require('path');
@@ -110,11 +141,133 @@ const DEFAULT_SHOTS = [
       };
     });
 
+    // ---- fairness: nothing may hide a hazard --------------------------
+    //
+    // See the header comment on OCCLUSION below. Runs against the live scene
+    // graph of the frame that was just captured, so what it asserts is true of
+    // the image on disk.
+    const occl = await page.evaluate(() => {
+      const g = window.MR && MR.game;
+      if (!g || !g.world || !g.world.crossings) return { skipped: 'world exposes no crossings()' };
+      const cam = g.cam.camera;
+      const camZ = cam.position.z;
+      const OY = g.world.OVERHEAD_Y;
+      cam.updateMatrixWorld();
+      const CH = g.world.CORRIDOR_HALF;
+
+      // Everything the runner can still see ahead. VIEW is 210; a little past
+      // it costs nothing and catches a set piece straddling the spawn edge.
+      const els = g.world.crossings(camZ + 0.5, camZ + 240);
+      const gates = g.world.gateBoxes();
+
+      const v = new THREE.Vector3();
+      const EDGES = [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4],
+                     [0, 4], [1, 5], [2, 6], [3, 7]];
+      /**
+       * The rows a world-space box occupies, as fractions down the frame.
+       *
+       * Corners are not enough. A road tile is a 24-unit span and the runner is
+       * usually standing inside one, so the near face of its overhead geometry
+       * is routinely BEHIND the lens -- and a point behind the camera has
+       * negative w, which flips its projection and reports the top of the frame
+       * as the bottom. That produced a confident "the scaffold is hiding six
+       * hazards" on a frame where it plainly was not. So the twelve edges are
+       * walked instead and every sample behind the near plane is dropped: what
+       * comes back is the band the box actually covers ON SCREEN.
+       */
+      function band(x0, x1, y0, y1, z0, z1) {
+        let lo = Infinity, hi = -Infinity;
+        const C = [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0],
+                   [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]];
+        for (const e of EDGES) {
+          const a = C[e[0]], b = C[e[1]];
+          for (let s = 0; s <= 12; s++) {
+            const t = s / 12;
+            v.set(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t);
+            v.applyMatrix4(cam.matrixWorldInverse);
+            if (-v.z < 0.5) continue;
+            v.applyMatrix4(cam.projectionMatrix);
+            const py = (1 - v.y) * 0.5;
+            if (py < lo) lo = py;
+            if (py > hi) hi = py;
+          }
+        }
+        return lo === Infinity ? null : { top: lo, bottom: hi };
+      }
+
+      const low = [], hide = [];
+      // 1. The corridor rule itself, in world space. world.js promises that
+      //    anything reaching back over the carriageway does so above
+      //    OVERHEAD_Y. This is that sentence, executable -- and it is the
+      //    load-bearing half: eye height is 2.62 and OVERHEAD_Y is 9.0, so
+      //    anything obeying it projects above the horizon while every hazard
+      //    (top 2.80) projects at or below it, and the screen test below can
+      //    then never fire. Breaking the rule is what makes occlusion possible
+      //    in the first place.
+      for (const e of els) if (e.yMin < OY) low.push(e);
+
+      // 2. The screen test, as the backstop. Sliced in depth: a single box
+      //    around a 24-unit tile spans half the frame and would overlap
+      //    everything, so each element is cut into short depth slices and only
+      //    slices wholly in front of a gate are tested against it.
+      const SLICES = 8;
+      for (const e of els) {
+        const near = Math.max(e.z0, camZ + 0.2);
+        if (e.z1 <= near) continue;
+        const step = (e.z1 - near) / SLICES;
+        for (let s = 0; s < SLICES; s++) {
+          const za = near + step * s, zb = za + step;
+          const eb = band(-CH, CH, e.yMin, e.yMax, za, zb);
+          if (!eb) continue;
+          for (const gt of gates) {
+            // Only scenery strictly IN FRONT of a gate can hide it.
+            if (gt.z0 <= zb) continue;
+            // A gate closer than 26 units is already committed to; the spec's
+            // read window is 26 units out and beyond.
+            if (gt.z - camZ < 26) continue;
+            const gb = band(gt.x - gt.halfX, gt.x + gt.halfX, gt.yMin, gt.yMax, gt.z0, gt.z1);
+            if (!gb) continue;
+            // A genuine interval overlap, both ends. The one-sided form the
+            // spec sketched assumes the scenery is overhead; a long low object
+            // like a bridge abutment sits BELOW every distant gate on screen
+            // and a one-sided test calls that an occlusion.
+            if (eb.bottom > gb.top && eb.top < gb.bottom) {
+              hide.push({
+                el: e.name, elY: +e.yMin.toFixed(2), elZ: +zb.toFixed(1),
+                gateZ: +gt.z.toFixed(1), lane: gt.lane, kind: gt.kind,
+                d: +(gt.z - camZ).toFixed(1),
+                // Fractions down the frame, so a failure can be checked by eye
+                // against the .png sitting next to it.
+                elBottom: +eb.bottom.toFixed(3), gateTop: +gb.top.toFixed(3),
+              });
+            }
+          }
+        }
+      }
+      // One line per offender, not one per (offender, gate) pair.
+      const seen = new Set();
+      const uniqLow = low.filter((e) => {
+        const k = e.name + '@' + e.yMin.toFixed(2);
+        if (seen.has(k)) return false; seen.add(k); return true;
+      });
+      const seen2 = new Set();
+      const uniqHide = hide.filter((h) => {
+        const k = h.el + '@' + h.gateZ;
+        if (seen2.has(k)) return false; seen2.add(k); return true;
+      });
+      return {
+        elements: els.length, gates: gates.length,
+        low: uniqLow.map((e) => ({ name: e.name, yMin: +e.yMin.toFixed(2), z0: +e.z0.toFixed(1) })),
+        hide: uniqHide,
+      };
+    }).catch((e) => ({ skipped: 'evaluate failed: ' + e.message }));
+
     const file = path.join(OUT, sh.name + '.png');
     await page.screenshot({ path: file });
-    report.push({ shot: sh.name, file, stat, errors });
+    report.push({ shot: sh.name, file, stat, errors, occl });
 
     if (errors.length) failed = true;
+    if (occl && !occl.skipped && (occl.low.length || occl.hide.length)) failed = true;
     await ctx.close();
   }
 
@@ -131,8 +284,22 @@ const DEFAULT_SHOTS = [
       console.log('  NO STATE -- page did not initialise');
     }
     for (const e of r.errors.slice(0, 8)) console.log('  ! ' + e);
+    const o = r.occl;
+    if (o && !o.skipped) {
+      console.log(`  overhead ${o.elements} crossings, ${o.gates} live hazards`);
+      for (const e of o.low.slice(0, 6)) {
+        console.log(`  ! LOW: ${e.name} crosses the corridor at y=${e.yMin} (below OVERHEAD_Y)`);
+      }
+      for (const h of o.hide.slice(0, 6)) {
+        console.log(`  ! HIDES: ${h.el} (y>=${h.elY}, z<=${h.elZ}) projects onto the `
+          + `${['-', 'JUMP', 'DUCK', 'BLOCK'][h.kind]} in lane ${h.lane} at z=${h.gateZ} (${h.d}u ahead)`
+          + ` -- scenery reaches ${h.elBottom} down the frame, hazard tops out at ${h.gateTop}`);
+      }
+    } else if (o && o.skipped) {
+      console.log('  occlusion audit skipped: ' + o.skipped);
+    }
   }
 
-  console.log('\n' + (failed ? 'FAIL: page errors or missing state' : 'OK: all shots clean'));
+  console.log('\n' + (failed ? 'FAIL: page errors, missing state, or a hazard the player cannot see' : 'OK: all shots clean'));
   process.exit(failed ? 1 : 0);
 })();

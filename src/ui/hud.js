@@ -35,9 +35,80 @@
  * speed it can buy. Until then the chip says so in as many words, and the
  * estimate is shown in neutral ink rather than in red.
  */
+/**
+ * THE RESULT LADDER.
+ *
+ * A run used to have two possible endings: it beat 1:59:30, or it read
+ * "SHORT BY 11:58". The record survives exactly one mistake in 189 obstacles,
+ * so the second ending is what essentially every session got -- a pure
+ * negative, with no information in it about whether this run was better than
+ * the last one, and nothing to aim at next time except the thing that had
+ * just been proved out of reach.
+ *
+ * The ladder converts the same arithmetic into a graded result with a next
+ * rung. It changes no balance whatsoever: the bands below are measured off
+ * the shipped pace model (tools/simulate.js, aid included), where a
+ * one-mistake run finishes 1:58:49, two 1:59:40, five 2:02:17 and ten
+ * 2:05:22. Each rung is therefore roughly "one more mistake than the last",
+ * which is exactly the resolution a player can act on.
+ *
+ * The rungs are DERIVED, not typed. They hang off RECORD_SECONDS: the first
+ * is the next whole minute above the record, and the gaps double from there,
+ * because the spread of finish times widens as the mistakes multiply. Retune
+ * the pace model and the whole ladder moves with it -- including the labels,
+ * which are formatted from the same numbers that gate the comparison, so a
+ * band can never be named one thing and tested as another.
+ */
+MR.Tier = (function () {
+  const K = MR.K;
+
+  const BASE = Math.ceil(K.RECORD_SECONDS / 60) * 60;   // next whole minute up
+  const STEP = 120;                                     // then 2 min, then 4
+
+  /** 7320 -> "2:02". Rounds through whole minutes so 7170 cannot read "1:60". */
+  function mark(sec) {
+    if (!isFinite(sec)) return '';
+    const m = Math.round(sec / 60);
+    return Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0');
+  }
+
+  const LADDER = [
+    { max: K.RECORD_SECONDS, name: 'RECORD', label: K.RECORD_LABEL },
+    { max: BASE },
+    { max: BASE + STEP },
+    { max: BASE + STEP * 3 },
+    { max: Infinity, name: 'FINISHED', label: '' },
+  ];
+  LADDER.forEach(function (t, i) {
+    t.i = i;
+    if (!t.name) { t.label = mark(t.max); t.name = 'SUB-' + t.label; }
+  });
+
+  /** The band a finish time lands in. Never null. */
+  function of(sec) {
+    for (const t of LADDER) if (sec <= t.max) return t;
+    return LADDER[LADDER.length - 1];
+  }
+
+  /** The rung above that band -- the thing to chase -- or null at the top. */
+  function next(sec) {
+    const i = of(sec).i;
+    return i > 0 ? LADDER[i - 1] : null;
+  }
+
+  /** Seconds still to find to reach `rung`. */
+  function gapTo(sec, rung) {
+    return rung && isFinite(rung.max) ? Math.max(0, sec - rung.max) : 0;
+  }
+
+  return { LADDER, of, next, gapTo, mark };
+})();
+
 MR.HUD = (function () {
   const K = MR.K;
   const Pace = MR.Pace;
+  const Tier = MR.Tier;
+  const Store = MR.Store;
 
   // Where record pace sits inside the 5:30 -> 4:20 range the streak unlocks.
   // Everything that draws the speed gauge shares this so the tick, the fill
@@ -157,19 +228,80 @@ MR.HUD = (function () {
           <span class="targetSub" id="targetSub">&nbsp;</span>
         </div>
 
+        <!--
+          WHAT THE GAME REMEMBERS.
+
+          Empty on a first visit, and it stays out of the way when it is: a
+          stranger gets exactly the panel they got before. From the second run
+          onward it is the reason to have come back, so it sits directly under
+          the wager it is a record of.
+        -->
+        <div id="startMemory"></div>
+
         <div class="keys" id="startKeys"></div>
         <button class="cta" id="startBtn" type="button">TOE THE LINE</button>
       </div></div>
 
+      <!--
+        THE FINISH CARD.
+
+        It was a spreadsheet on a dimmed screenshot: two grids of 12.5px/700
+        text, keys and values at identical size and weight separated only by
+        opacity, on two baseline rhythms three pixels out of phase, under a
+        date line typeset larger and louder than the label of the headline
+        number. Nothing about it belonged to the same product as the HUD.
+
+        So it is rebuilt in the HUD's own language -- plates, left-aligned
+        columns, a 9px/800/0.16em label over a large tabular value -- and it
+        carries the things the old card could not:
+
+          - a GRADE, not a verdict. See MR.Tier.
+          - the longest clean streak as a co-headline. It is monotone, so a
+            contact can never take it away; it has 189 points of resolution
+            against the record's one bit; and it stays winnable for the whole
+            race long after the record has died.
+          - the TRUE cost of contact, measured against a flawless run of this
+            exact course rather than 1.5s per hit.
+          - what the player's best today was, and whether this beat it.
+          - tomorrow.
+      -->
       <div class="panel hidden" id="endPanel"><div class="panelInner">
-        <div class="date" id="endDate"></div>
-        <div class="finLab">FINAL TIME</div>
-        <h1 id="endTime">&mdash;</h1>
-        <div id="verdict"></div>
+        <div class="endDate" id="endDate"></div>
+
+        <div id="endHead">
+          <div class="endCell">
+            <div class="lab">FINAL TIME</div>
+            <h1 class="endBig num" id="endTime">&mdash;</h1>
+            <div class="endSub num" id="endVs"></div>
+          </div>
+          <div class="endCell">
+            <div class="lab">LONGEST CLEAN</div>
+            <div class="endBig num" id="endStreak">0</div>
+            <div class="endSub num" id="endStreakSub"></div>
+          </div>
+        </div>
+
+        <div id="tierRow">
+          <span id="verdict"></span>
+          <span id="tierNext" class="num"></span>
+        </div>
+
+        <div id="endBadges"></div>
+        <div id="endMem" class="num"></div>
+
         <div id="endCols">
           <div id="resultStats"></div>
           <div id="splitTable"></div>
         </div>
+
+        <div id="endCost">
+          <div class="lab" id="endCostLab">WHAT THE CONTACTS COST</div>
+          <div class="endBig num" id="endCostVal">0:00</div>
+          <div class="endSub" id="endCostSub"></div>
+        </div>
+
+        <div id="endTurn"></div>
+        <div id="tomorrow"></div>
         <button class="cta" id="againBtn">RUN IT AGAIN</button>
       </div></div>
 
@@ -189,8 +321,15 @@ MR.HUD = (function () {
       toastCum: q('toastCum'), toastDelta: q('toastDelta'),
       startPanel: q('startPanel'), startBtn: q('startBtn'), startDate: q('startDate'),
       startRoute: q('startRoute'), startKeys: q('startKeys'), targetSub: q('targetSub'),
+      startMemory: q('startMemory'),
       endPanel: q('endPanel'), endTime: q('endTime'), endDate: q('endDate'),
-      verdict: q('verdict'), stats: q('resultStats'), splitTable: q('splitTable'),
+      endVs: q('endVs'), endStreak: q('endStreak'), endStreakSub: q('endStreakSub'),
+      verdict: q('verdict'), tierNext: q('tierNext'),
+      endBadges: q('endBadges'), endMem: q('endMem'),
+      stats: q('resultStats'), splitTable: q('splitTable'),
+      endCost: q('endCost'), endCostLab: q('endCostLab'),
+      endCostVal: q('endCostVal'), endCostSub: q('endCostSub'),
+      endTurn: q('endTurn'), tomorrow: q('tomorrow'),
       againBtn: q('againBtn'),
       count: q('count'), countVal: q('countVal'),
       perf: q('perf'),
@@ -249,13 +388,124 @@ MR.HUD = (function () {
 
     let lastP = null;      // last state seen, so the split card can read splits
     let hintUntil = 0;     // while set, the why-line shows the streak-cut message
+    let mem = null;        // what MR.Store remembers, as of this run's start
+    let dateKey = '';
+    let course = null;
+    let cleanTime = null;  // this course's flawless finish, computed once
+
+    // Latched, and deliberately so. `recordPossible()` is a bound, not a
+    // guess, but at the exact boundary it can flicker: a player holding
+    // FLOOR_PACE keeps the required pace constant, so the comparison sits on a
+    // knife edge for several seconds. A verdict that un-says itself is worse
+    // than either answer, and the record genuinely does not come back.
+    let recordGone = false;
+    // The debounced RECORD ON / OFF RECORD verdict. See update().
+    let chipOn = null, chipAt = 0;
+    const CHIP_DEAD = 6;    // projected seconds either side of the record
+    const CHIP_HOLD = 900;  // ms a verdict must stand before it may flip back
 
     const api = { nodes: n };
 
+    /** Clear everything that belongs to one run. Called before each start. */
+    api.reset = function () {
+      recordGone = false;
+      chipOn = null;
+      chipAt = 0;
+      cache.chip = cache.chipCls = cache.projCls = undefined;
+      cache.need = cache.needCls = undefined;
+    };
+
     api.setDate = function (key) {
+      dateKey = key;
       n.startDate.textContent = key + ' · GLOBAL COURSE';
       n.endDate.textContent = key + ' · GLOBAL COURSE';
     };
+
+    // ---- memory ---------------------------------------------------------
+
+    /** 2026-08-05 -> "AUG 5". Relative where relative is clearer. */
+    function dayName(key, today) {
+      const d = Store ? Store.dayDiff(key, today) : NaN;
+      if (d === 1) return 'YESTERDAY';
+      const t = Store ? Store.parseKey(key) : NaN;
+      if (isNaN(t)) return key;
+      const dt = new Date(t);
+      const M = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
+                 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+      return M[dt.getUTCMonth()] + ' ' + dt.getUTCDate();
+    }
+
+    function plate(lab, val, sub) {
+      return '<div class="mplate"><div class="lab">' + lab + '</div>'
+           + '<div class="mv num">' + val + '</div>'
+           + '<div class="ms">' + (sub || '&nbsp;') + '</div></div>';
+    }
+
+    /**
+     * Put the save on the start panel.
+     *
+     * Three plates at most, and each one only when it has something true to
+     * say. A first-ever visit renders nothing at all -- the panel a stranger
+     * meets is unchanged, and the memory arrives as a reward for having come
+     * back rather than as an empty frame promising one.
+     */
+    api.setMemory = function (sum) {
+      mem = sum || null;
+      if (!n.startMemory) return;
+      if (!sum) { n.startMemory.innerHTML = ''; return; }
+
+      let html = '';
+      if (sum.today) {
+        html += plate("TODAY'S BEST", Pace.clock(sum.today.time),
+          Tier.of(sum.today.time).name + ' · ' + sum.today.streak + ' CLEAN');
+      }
+      if (sum.dayStreak > 0) {
+        html += plate('DAY STREAK', String(sum.dayStreak),
+          sum.dayStreakCounted
+            ? (sum.dayStreak === 1 ? 'DAY' : 'DAYS') + ' IN A ROW'
+            : 'RUN TODAY FOR ' + (sum.dayStreak + 1));
+      }
+      if (sum.last) {
+        html += plate('LAST RUN', Pace.clock(sum.last.time),
+          dayName(sum.last.date, sum.dateKey) + ' · ' + Tier.of(sum.last.time).name);
+      }
+      if (!html && sum.best) {
+        html += plate('ALL-TIME BEST', Pace.clock(sum.best.time),
+          Tier.of(sum.best.time).name + ' · ' + sum.best.streak + ' CLEAN');
+      }
+      n.startMemory.innerHTML = html;
+      if (api.markScroll) requestAnimationFrame(api.markScroll);
+    };
+
+    /**
+     * The flawless finish for THIS course, simulated once.
+     *
+     * This is the counterfactual the finish card is missing, and it cannot be
+     * approximated: `projectClean()` from a cold start models gates as
+     * arriving continuously and lands 50 seconds optimistic, because the real
+     * course opens with 150 units of empty runway during which the streak
+     * cannot grow. So this rolls the real pace model over the real gate
+     * positions -- the same code the race runs -- and takes the finish time.
+     *
+     * ~14400 steps, measured at 8.7ms, done once and cached. Aid is ignored on
+     * purpose: aid tops a streak up to a ceiling a flawless run is already
+     * above, so it is worth exactly zero to this hypothetical player.
+     */
+    function cleanFinish() {
+      if (cleanTime !== null) return cleanTime;
+      cleanTime = 0;
+      if (!course || !course.gates || !course.gates.length) return cleanTime;
+      const p = Pace.create();
+      let gi = 0, guard = 0;
+      while (!p.finished && guard++ < 40000) {
+        p.update(1 / 60);
+        while (gi < course.gates.length && p.units >= course.gates[gi].z) {
+          gi++; p.onClean();
+        }
+      }
+      cleanTime = p.finished ? p.finishTime : 0;
+      return cleanTime;
+    }
 
     /**
      * Name today's road, and price the wager.
@@ -270,8 +520,10 @@ MR.HUD = (function () {
      * and that was established by simulating this pace model against real
      * generated courses.
      */
-    api.setCourse = function (course) {
-      if (!course) return;
+    api.setCourse = function (c) {
+      if (!c) return;
+      course = c;
+      cleanTime = null;
       const set = course.settings;
       n.startRoute.textContent = set && set.length
         ? set.map(function (x) { return x.name; }).join(' → ')
@@ -352,8 +604,6 @@ MR.HUD = (function () {
       const proj = p.projectClean();
       const margin = K.RECORD_SECONDS - proj;         // positive = under the record
       set(n.projVal, 'proj', Pace.clock(proj));
-      set(n.margin, 'margin',
-        Pace.clock(Math.abs(margin)) + (margin >= 0 ? ' UNDER ' : ' OVER ') + K.RECORD_LABEL);
 
       // Pace required over the road that is left. This is the race-desk number
       // and it is also the exact test for a dead record: FLOOR_PACE is the
@@ -361,7 +611,8 @@ MR.HUD = (function () {
       // below it no run of clean gates can get the record back.
       const remain = K.MARATHON_MILES - p.miles;
       const need = remain > 0.01 ? (K.RECORD_SECONDS - p.raceTime) / remain : NaN;
-      const gone = remain > 0.01 && !(need >= K.FLOOR_PACE);
+      if (!recordGone && remain > 0.01 && !(need >= K.FLOOR_PACE)) recordGone = true;
+      const gone = recordGone;
 
       // Share of the 5:30 -> 4:20 range the streak has already bought. While a
       // lot of it is still unspent the projection is falling under the player
@@ -376,17 +627,59 @@ MR.HUD = (function () {
       const settled = p.miles > 0.6;
       const bleeding = p.targetPace() - p.pace > 1.5; // streak was cut, pace sliding back
 
-      let state, chip;
+      let state, chip, sub;
       if (gone) {
-        state = 'off'; chip = 'RECORD GONE';
+        // THE RECORD IS DEAD; THE RACE IS NOT.
+        //
+        // Measured on the shipped build, at 90% accuracy the record dies at
+        // wall-second 80 of 240 and at 95% at second 100 -- so up to 69% of a
+        // run had no goal at all. Worse, it kept demanding NEED 3:54/MI in
+        // red: a pace the engine physically cannot produce, since the floor is
+        // 4:20. The screen was asking for something impossible and grading the
+        // player against it for two and a half minutes.
+        //
+        // So the headline retargets. The projection is unchanged -- it is
+        // still "where you finish if you hold a clean line from here" -- but
+        // it is now measured against the rung of the ladder the run is
+        // actually on, and the sub-line names the next rung up. Both move
+        // live, so clearing gates still changes the number the player is
+        // looking at, which is the whole job of a race readout.
+        const rung = Tier.of(proj);
+        const up = Tier.next(proj);
+        state = 'tier';
+        chip = rung.name;
+        sub = up
+          ? Pace.clock(Tier.gapTo(proj, up)) + ' OFF ' + up.name
+          : 'ON FOR ' + rung.name;
       } else if (!settled) {
         state = 'est';
         chip = bleeding ? 'BLEEDING SPEED ▲' : 'ESTIMATING';
-      } else if (margin > 0) {
-        state = 'on';  chip = 'RECORD ON';
       } else {
-        state = 'off'; chip = 'OFF RECORD';
+        // DEBOUNCED, because the underlying comparison is a coin landing on
+        // its edge. Around mile 2 of a clean run projectClean() crosses 7170
+        // by single seconds, and the chip flickered between RECORD ON and OFF
+        // RECORD several times in a couple of seconds -- which reads as a
+        // broken readout, and destroys the authority of the one number on
+        // screen that is supposed to be the verdict. A verdict has to stand
+        // for a moment to be a verdict: it flips only once the projection is
+        // CHIP_DEAD seconds clear on the other side, and never twice inside
+        // CHIP_HOLD milliseconds.
+        const now = performance.now();
+        const want = margin > 0;
+        if (chipOn === null) { chipOn = want; chipAt = now; }
+        else if (want !== chipOn
+                 && (want ? margin > CHIP_DEAD : margin < -CHIP_DEAD)
+                 && now - chipAt > CHIP_HOLD) {
+          chipOn = want; chipAt = now;
+        }
+        state = chipOn ? 'on' : 'off';
+        chip = chipOn ? 'RECORD ON' : 'OFF RECORD';
       }
+      if (sub === undefined) {
+        sub = Pace.clock(Math.abs(margin))
+            + (margin >= 0 ? ' UNDER ' : ' OVER ') + K.RECORD_LABEL;
+      }
+      set(n.margin, 'margin', sub);
       set(n.status, 'chip', chip);
       cls(n.status, 'chipCls', 'chip ' + state);
       cls(n.projCell, 'projCls', state);
@@ -397,8 +690,29 @@ MR.HUD = (function () {
         (clamp01((K.START_PACE - p.pace) / (K.START_PACE - K.FLOOR_PACE)) * 100) + '%';
       set(n.paceVal, 'pace', Pace.pace(p.pace));
       cls(n.paceVal, 'paceCls', 'val num' + (p.pace <= K.RECORD_PACE ? ' ahead' : ''));
-      set(n.needVal, 'need', 'NEED ' + Pace.pace(need) + '/MI');
-      cls(n.needVal, 'needCls', 'sub num' + (gone ? ' behind' : ''));
+      // The line under the pace. While the record lives it is the race-desk
+      // number: the pace the rest of the course demands. Once the record is
+      // gone that number is a lie -- it asks for 3:54/mi against a 4:20 floor
+      // -- so the plate switches to the one target that is still winnable and
+      // still live: the player's own longest clean line. It is monotone, so it
+      // can only ever be approached, never lost; it has 189 points of
+      // resolution; and it is the exact skill the game is teaching.
+      let needText, needCls;
+      if (!gone) {
+        needText = 'NEED ' + Pace.pace(need) + '/MI';
+        needCls = 'sub num';
+      } else if (mem && mem.pbStreak > 0) {
+        const togo = mem.pbStreak - p.bestStreak;
+        needText = togo > 0
+          ? 'PB ' + mem.pbStreak + ' CLEAN · ' + togo + ' TO GO'
+          : 'CLEAN PB · ' + p.bestStreak;
+        needCls = 'sub num' + (togo > 0 ? '' : ' pb');
+      } else {
+        needText = 'LONGEST CLEAN · ' + p.bestStreak;
+        needCls = 'sub num';
+      }
+      set(n.needVal, 'need', needText);
+      cls(n.needVal, 'needCls', needCls);
 
       // Nothing else on screen says why the pace moves, so the line stays up
       // until the player has plainly felt it, and comes back on every break.
@@ -521,48 +835,193 @@ MR.HUD = (function () {
       if (text !== null) n.countVal.textContent = text;
     };
 
-    api.showEnd = function (p) {
-      const beat = p.finishTime < K.RECORD_SECONDS;
-      n.endTime.textContent = Pace.clock(p.finishTime);
-      n.verdict.textContent = beat
-        ? `RECORD BEATEN BY ${Pace.clock(K.RECORD_SECONDS - p.finishTime)}`
-        : `SHORT BY ${Pace.clock(p.finishTime - K.RECORD_SECONDS)}`;
-      n.verdict.className = beat ? 'beat' : 'miss';
+    /**
+     * The one line of narrative the card is allowed.
+     *
+     * A record-beating run used to be graded pink for three of its six splits,
+     * because the ghost comparison is structurally negative early: the player
+     * starts at 5:30 by design and reels the ghost in. The comparison was not
+     * wrong, it was being asked the wrong question at the wrong mile. So the
+     * split column stops carrying it (see below) and the turn is NAMED
+     * instead, once, in the tense a race report would use.
+     *
+     * A run that never took the lead gets its fastest mile rather than a
+     * silence -- still a fact, still the player's own, and still the thing
+     * they did best.
+     */
+    function turnLine(p) {
+      const sp = p.splits;
+      if (!sp.length) return '';
+      if (p.finishTime < K.RECORD_SECONDS) {
+        let m = 1;
+        for (let i = sp.length - 1; i >= 0; i--) {
+          if (sp[i].time - sp[i].mile * K.RECORD_PACE >= 0) { m = sp[i].mile + 1; break; }
+        }
+        return m > 1 ? 'YOU TOOK THE LEAD AT MILE ' + m
+                     : 'AHEAD OF THE GHOST FROM THE GUN';
+      }
+      let best = null, prev = 0;
+      for (const s of sp) {
+        const mt = s.time - prev; prev = s.time;
+        if (!best || mt < best.mt) best = { mile: s.mile, mt: mt };
+      }
+      return best ? 'FASTEST MILE · MILE ' + best.mile + ' IN ' + Pace.pace(best.mt) + '/MI' : '';
+    }
 
+    /** Tomorrow's road. Free: the date seed already decides it. */
+    function tomorrowLine() {
+      try {
+        const k = Store && dateKey ? Store.shift(dateKey, 1) : null;
+        const s = k && MR.Course.pickSettings ? MR.Course.pickSettings(k) : null;
+        if (s && s.length) {
+          return 'TOMORROW · ' + s.map(function (x) { return x.name; }).join(' → ');
+        }
+      } catch (e) { /* a teaser is never worth an exception */ }
+      return '';
+    }
+
+    /**
+     * @param p    the finished pace state
+     * @param rec  what MR.Store made of it (see Store.record), or nothing
+     */
+    api.showEnd = function (p, rec) {
+      rec = rec || {};
+      const t = p.finishTime;
+      const rung = Tier.of(t);
+      const up = Tier.next(t);
+
+      // ---- headline: the time, and the streak beside it ------------------
+      // Two numbers, not one. The finish time is the result; the longest clean
+      // line is the SKILL, and unlike the time it cannot be taken away by a
+      // single contact in mile 3. It is monotone, it has 189 points of
+      // resolution, and it is still worth chasing on a day the record died
+      // ninety seconds in -- which is most days.
+      n.endTime.textContent = Pace.clock(t);
+      const vs = t - K.RECORD_SECONDS;
+      n.endVs.textContent = (vs <= 0 ? '-' : '+') + Pace.clock(Math.abs(vs))
+                          + ' VS ' + K.RECORD_LABEL;
+      cls(n.endVs, 'endVsCls', 'endSub num' + (vs <= 0 ? ' ahead' : ''));
+
+      n.endStreak.textContent = String(p.bestStreak);
+      const gates = course && course.gates ? course.gates.length : p.gatesSeen;
+      n.endStreakSub.textContent = 'OF ' + gates + ' GATES';
+
+      // ---- the grade -----------------------------------------------------
+      n.verdict.textContent = rung.name;
+      n.verdict.className = 'tier t' + rung.i;
+      n.tierNext.textContent = up
+        ? Pace.clock(Tier.gapTo(t, up)) + ' OFF ' + up.name
+        : 'RECORD BEATEN BY ' + Pace.clock(-vs);
+
+      // ---- what the save made of it --------------------------------------
+      const badges = [];
+      if (rec.allTimeBest) badges.push('ALL-TIME BEST');
+      else if (rec.beatToday && !rec.firstToday) badges.push('BEST TODAY');
+      if (rec.allTimeStreak) badges.push('LONGEST CLEAN EVER');
+      else if (rec.beatTodayStreak && !rec.firstToday) badges.push('LONGEST CLEAN TODAY');
+      if (rec.dayStreak > 1) badges.push(rec.dayStreak + ' DAY STREAK');
+      n.endBadges.innerHTML = badges
+        .map(function (b) { return '<span class="ebadge">' + b + '</span>'; }).join('');
+
+      const was = rec.prevToday;
+      n.endMem.textContent = was
+        ? (t < was.time
+            ? 'BEAT YOUR BEST TODAY BY ' + Pace.clock(was.time - t)
+            : 'YOUR BEST TODAY ' + Pace.clock(was.time)
+              + ' · THIS RUN +' + Pace.clock(t - was.time))
+        : (rec.dateKey ? 'FIRST RUN TODAY' : '');
+
+      // ---- summary -------------------------------------------------------
+      // Label and value are no longer the same type at two opacities: the
+      // label is the HUD's own 9px/800/0.16em and the value is a large
+      // tabular figure, which is the pairing every plate in the live readout
+      // already uses. Casing is uppercase throughout, because the HUD says
+      // /MI and CLEAN GATES and this card used to say /mi and gates.
       const rows = [
-        ['AVG PACE', Pace.pace(p.finishTime / K.MARATHON_MILES) + '/mi'],
+        ['AVG PACE', Pace.pace(t / K.MARATHON_MILES) + '/MI'],
         // p.pace at the line is the pace held into the finish, not the best of
         // the race -- a run that broke late finishes slower than it ever ran.
-        ['FINAL PACE', Pace.pace(p.pace) + '/mi'],
-        ['LONGEST CLEAN', String(p.bestStreak) + ' gates'],
+        ['FINAL PACE', Pace.pace(p.pace) + '/MI'],
+        ['CLEAN GATES', String(Math.max(0, p.gatesSeen - p.hits))],
         ['CONTACTS', String(p.hits)],
-        ['TIME LOST', '+' + Pace.clock(p.hits * K.HIT_TIME_PENALTY)],
-        ['RECORD', K.RECORD_LABEL],
+        ['AID TAKEN', String(p.aid)],
       ];
-      n.stats.innerHTML = rows
-        .map(([k, v]) => `<div class="k">${k}</div><div class="v num">${v}</div>`)
-        .join('');
+      // Both grids open with exactly one header row and then run on identical
+      // fixed-height rows, which is what puts them back in phase -- they were
+      // two grids on two rhythms about three pixels apart, which is close
+      // enough to look like a mistake and far enough to be one.
+      n.stats.innerHTML = '<div class="k hd">SUMMARY</div><div class="k hd"></div>' + rows
+        .map(function (r) {
+          return '<div class="k">' + r[0] + '</div><div class="v num">' + r[1] + '</div>';
+        }).join('');
 
-      // Five-mile splits plus the line: the shape of the race in six rows,
-      // which is the one thing the finish screen can show that the live
-      // readout never could.
-      let table = '<div class="k">MI</div><div class="k">TIME</div><div class="k">VS REC</div>';
-      const marks = p.splits.filter((s) => s.mile % 5 === 0);
+      // ---- splits --------------------------------------------------------
+      // PER-BLOCK PACE, NOT VS-RECORD.
+      //
+      // The old third column was the ghost delta, and it graded a WINNING run
+      // pink for its first three rows -- the race is built so the player opens
+      // at 5:30 and reels the record in, so the delta is positive for the
+      // whole first half of even a flawless line. A win that reads as
+      // three-fifths failure is a broken scorecard, and no amount of tinting
+      // fixes a column that is measuring the wrong thing.
+      //
+      // Pace over each five-mile block is the same data without the false
+      // verdict: it shows the shape of the race climbing from 5:30 toward the
+      // floor, and it goes green only where the block was AT or under record
+      // pace. Nothing on this card is tinted for failure any more; the tier
+      // band carries the result, once.
+      let table = '<div class="k hd">MI</div><div class="k hd">TIME</div>'
+                + '<div class="k hd">PACE</div>';
+      const marks = p.splits.filter(function (s) { return s.mile % 5 === 0; });
+      let pm = 0, pt = 0;
       for (const s of marks) {
-        const d = s.time - s.mile * K.RECORD_PACE;
-        table += `<div class="v num">${s.mile}</div>`
-              + `<div class="v num">${Pace.clock(s.time)}</div>`
-              + `<div class="v num ${d < 0 ? 'ahead' : 'behind'}">${Pace.delta(d)}</div>`;
+        const blk = (s.time - pt) / (s.mile - pm);
+        table += '<div class="v num">' + s.mile + '</div>'
+              + '<div class="v num">' + Pace.clock(s.time) + '</div>'
+              + '<div class="v num' + (blk <= K.RECORD_PACE ? ' ahead' : '') + '">'
+              + Pace.pace(blk) + '</div>';
+        pm = s.mile; pt = s.time;
       }
-      const fd = p.finishTime - K.RECORD_SECONDS;
-      table += '<div class="sep"></div>';
-      table += `<div class="v num fin">${K.MARATHON_LABEL}</div>`
-            + `<div class="v num fin">${Pace.clock(p.finishTime)}</div>`
-            + `<div class="v num fin ${fd < 0 ? 'ahead' : 'behind'}">${Pace.delta(fd)}</div>`;
+      const fblk = K.MARATHON_MILES > pm ? (t - pt) / (K.MARATHON_MILES - pm) : NaN;
+      table += '<div class="sep"></div>'
+            + '<div class="v num fin">' + K.MARATHON_LABEL + '</div>'
+            + '<div class="v num fin">' + Pace.clock(t) + '</div>'
+            + '<div class="v num fin' + (fblk <= K.RECORD_PACE ? ' ahead' : '') + '">'
+            + Pace.pace(fblk) + '</div>';
       n.splitTable.innerHTML = table;
+
+      // ---- the true cost of contact --------------------------------------
+      // This row used to print hits * HIT_TIME_PENALTY. On a twelve-contact
+      // run that is +0:18 against a real cost of over thirteen minutes -- the
+      // stopwatch penalty is a rounding error next to the speed those twelve
+      // contacts took away for the rest of the race. The screen understated
+      // the player's own causal contribution by a factor of forty-five and
+      // left an unexplained twelve-minute hole, which invites exactly one
+      // conclusion: "my mistakes cost 18 seconds, the game did the rest."
+      //
+      // The counterfactual is computable and is now computed. See
+      // cleanFinish(): the same pace model, over the same gates, cleared.
+      const clean = cleanFinish();
+      const lost = clean ? Math.max(0, t - clean) : p.hits * K.HIT_TIME_PENALTY;
+      n.endCost.classList.toggle('clean', !p.hits);
+      if (!p.hits) {
+        n.endCostLab.textContent = 'CLEAN LINE';
+        n.endCostVal.textContent = '0:00';
+        n.endCostSub.textContent = 'NOTHING LEFT ON THE ROAD';
+      } else {
+        n.endCostLab.textContent = p.hits + (p.hits === 1 ? ' CONTACT COST' : ' CONTACTS COST');
+        n.endCostVal.textContent = Pace.clock(lost);
+        n.endCostSub.textContent = clean
+          ? 'CLEAN, YOU FINISH ' + Pace.clock(clean) + ' ON THIS COURSE'
+          : 'AGAINST A FLAWLESS LINE';
+      }
+
+      n.endTurn.textContent = turnLine(p);
+      n.tomorrow.textContent = tomorrowLine();
 
       n.endPanel.classList.remove('hidden');
       syncPanels();
+      requestAnimationFrame(markScroll);
     };
 
     api.hideEnd = function () {

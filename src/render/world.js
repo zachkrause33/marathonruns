@@ -2742,6 +2742,7 @@ MR.World = (function () {
 
     // ---- sky + fog ------------------------------------------------------
     const sky = S.skyDome(900, P.skyTop, P.skyBot);
+    sky.userData.notScenery = true;
     group.add(sky);
 
     // Ground plane. The pooled shoulders are only 30 units wide, so without
@@ -2759,6 +2760,7 @@ MR.World = (function () {
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.34;
     ground.renderOrder = -500;
+    ground.userData.notScenery = true;
     group.add(ground);
     mats.ground = groundMat;
 
@@ -2792,6 +2794,7 @@ MR.World = (function () {
     const hills = new THREE.Mesh(hillsGeo, hillsMat);
     hills.renderOrder = -490;
     hills.frustumCulled = false;
+    hills.userData.notScenery = true;
     group.add(hills);
 
     // Ripples ride just above the water surface and are only shown when the
@@ -2804,6 +2807,7 @@ MR.World = (function () {
     ripples.rotation.x = -Math.PI / 2;
     ripples.renderOrder = -480;
     ripples.visible = false;
+    ripples.userData.notScenery = true;
     group.add(ripples);
 
     // ---- road tiles -----------------------------------------------------
@@ -3393,6 +3397,7 @@ MR.World = (function () {
     // Below the hazard telegraph mats (5) and the finish checker (4): where the
     // line runs across a gate's own mat, the hazard has to win.
     routeMesh.renderOrder = 3;
+    routeMesh.userData.notScenery = true;
     routeMesh.frustumCulled = false;   // its bounds change every frame
     routeMesh.visible = !!routeLane;
     group.add(routeMesh);
@@ -3687,6 +3692,10 @@ MR.World = (function () {
         }
         variants[0].visible = true;
         g.add(telegraph(kind));
+        // A hazard is the thing the audit protects, not a thing it polices: it
+        // is meant to be in the corridor, and one gate hiding another is the
+        // game rather than a bug. See api.crossings().
+        g.userData.notScenery = true;
         g.userData.variants = variants;
         g.userData.bag = bag;
         g.userData.body = variants[0].userData.body;
@@ -4486,11 +4495,18 @@ MR.World = (function () {
       return merge(parts);
     })();
 
+    // Aid stands IN the corridor on purpose -- it is collected by lane -- so it
+    // is exempt from the crossing audit the same way a hazard is. See
+    // api.crossings().
     const waterPool = Pool(function () {
-      return S.outlined(waterGeo, mats.propLit, S.INK.prop);
+      const o = S.outlined(waterGeo, mats.propLit, S.INK.prop);
+      o.userData.notScenery = true;
+      return o;
     }, group);
     const bananaPool = Pool(function () {
-      return S.outlined(bananaGeo, mats.propLit, S.INK.prop);
+      const o = S.outlined(bananaGeo, mats.propLit, S.INK.prop);
+      o.userData.notScenery = true;
+      return o;
     }, group);
 
     /**
@@ -4616,17 +4632,41 @@ MR.World = (function () {
       return S.outlined(riverGeo, mats.prop, S.INK.prop);
     }, group);
 
-    /** Overpass: THE WALL runs under a string of these, so the light drops. */
-    const overpassGeo = merge([
-      bx(3.4, 8.2, 5.0, -10.5, 4.1, 0, 0x6f6580),
-      bx(3.4, 8.2, 5.0, 10.5, 4.1, 0, 0x6f6580),
-      bx(26, 1.9, 6.0, 0, 9.0, 0, 0x8b7f9c),
-      bx(27, 0.7, 6.4, 0, 10.2, 0, 0x5a4f66),
-      bx(26, 0.5, 0.4, 0, 8.0, -3.0, 0x2b2f52),
-      bx(26, 0.5, 0.4, 0, 8.0, 3.0, 0x2b2f52),
-      bx(27, 1.0, 0.35, 0, 11.0, -3.2, 0xffb020),
-      bx(27, 1.0, 0.35, 0, 11.0, 3.2, 0xffb020),
-    ]);
+    /**
+     * Overpass: THE WALL runs under a string of these, so the light drops.
+     *
+     * THE SOFFIT IS THE WHOLE SPECIFICATION. This deck spanned the road with
+     * its fascia bars at y = 8.0 and its underside at 8.05, both below
+     * OVERHEAD_Y -- and it had done since it was added, with the corridor
+     * comment at the top of this file citing "the WALL overpass has spanned the
+     * road at 8.0" as though that were a fact about the design rather than a
+     * defect. It is a defect. A structure hanging over the carriageway inside
+     * the height the collision model reasons about is geometry the game does
+     * not know is there: the player passes through it, and it is drawn in front
+     * of whatever is behind it.
+     *
+     * DECK_Y is the underside, and everything else is measured off it, so the
+     * clearance cannot be lost again by editing one number in the middle. The
+     * piers grow to meet the deck rather than the deck dropping to meet them.
+     */
+    const OVERPASS_SOFFIT = OVERHEAD_Y + 0.20;    // 9.20
+    const overpassGeo = (function () {
+      const soffit = OVERPASS_SOFFIT;
+      const deckH = 1.9;
+      const pierTop = soffit + deckH * 0.6;
+      return merge([
+        bx(3.4, pierTop, 5.0, -10.5, pierTop / 2, 0, 0x6f6580),
+        bx(3.4, pierTop, 5.0, 10.5, pierTop / 2, 0, 0x6f6580),
+        // Fascia first: it is the lowest thing over the road and therefore the
+        // number the audit checks, so it sits exactly on the soffit line.
+        bx(26, 0.5, 0.4, 0, soffit + 0.25, -3.0, 0x2b2f52),
+        bx(26, 0.5, 0.4, 0, soffit + 0.25, 3.0, 0x2b2f52),
+        bx(26, deckH, 6.0, 0, soffit + deckH / 2, 0, 0x8b7f9c),
+        bx(27, 0.7, 6.4, 0, soffit + deckH + 0.25, 0, 0x5a4f66),
+        bx(27, 1.0, 0.35, 0, soffit + deckH + 1.05, -3.2, 0xffb020),
+        bx(27, 1.0, 0.35, 0, soffit + deckH + 1.05, 3.2, 0xffb020),
+      ]);
+    })();
     const overpassPool = Pool(function () {
       return S.outlined(overpassGeo, mats.prop, S.INK.scenery);
     }, group);
@@ -5641,6 +5681,7 @@ MR.World = (function () {
           sh.scale.x = cut ? 0.30 : 1;
           sh.position.x = sx * (cut ? 8.9 : K.TRACK_HALF_WIDTH + 15);
         }
+        obj.userData.auditName = 'road tile / ' + edge;
         activeRoad.push({ z: tz, obj });
         state.roadFrom++;
       }
@@ -5736,6 +5777,7 @@ MR.World = (function () {
           obj.rotation.y = s.side > 0 ? Math.PI : 0;
           obj.userData.bounce = s.c;
         }
+        obj.userData.auditName = 'prop / ' + s.kind;
         activeScene.push({ s, obj, pool });
       }
       while (activeScene.length && activeScene[0].s.z < back) {
@@ -5826,6 +5868,7 @@ MR.World = (function () {
           obj.userData.mat.map = st.tex;
           obj.userData.mat.needsUpdate = true;
         }
+        obj.userData.auditName = 'set piece / ' + st.kind;
         activeStruct.push({ st, obj, pool });
       }
       while (activeStruct.length && activeStruct[0].st.z < back - 60) {
@@ -5851,6 +5894,7 @@ MR.World = (function () {
         obj.userData.mat.map = b.tex;
         obj.userData.mat.color.set(0xffffff);
         obj.userData.mat.needsUpdate = true;
+        obj.userData.auditName = finish ? 'finish arch' : 'mile banner ' + b.m.mile;
         activeBanner.push({ b, obj, pool });
       }
       while (activeBanner.length && activeBanner[0].b.m.z < back) {
@@ -5948,6 +5992,129 @@ MR.World = (function () {
         aid: activeAid.length,
         road: activeRoad.length,
       };
+    };
+
+    /**
+     * ============ WHAT IS STANDING OVER THE PLAY CORRIDOR ============
+     *
+     * The corridor rule at the top of this file says no scenery may occupy the
+     * play space, and that "anything reaching back over the carriageway does so
+     * above OVERHEAD_Y". Both were prose. They were also both false: the WALL
+     * overpass carried two fascia bars across the road at y = 8.0 and every
+     * mile gantry crossed it at 3.5-6.0, which is the height a BLOCK occupies.
+     *
+     * A comment cannot catch that. This can. It walks the LIVE scene graph --
+     * not a hand-kept list, so geometry added tomorrow is audited the day it is
+     * added -- and reports every drawn triangle that passes over the corridor,
+     * grouped per mesh, with the lowest point of the over-corridor part.
+     *
+     * tools/shoot.js turns the result into two failing assertions:
+     *   1. nothing crosses the corridor below OVERHEAD_Y;
+     *   2. nothing crossing the corridor projects onto a gate behind it.
+     * The second is the one that matters. Scenery that hides a hazard costs the
+     * player a streak for something they could not see, which in this game is
+     * the record; it is a correctness bug and it should fail the build.
+     *
+     * EXEMPT, via userData.notScenery, and each for a stated reason:
+     *   hazards   they ARE the corridor's content, and one gate occluding
+     *             another is the game rather than a defect
+     *   aid       collected by lane, so it stands in the corridor by design
+     *   backdrop  sky dome, ground plane, hills, ripples -- unbounded surfaces
+     *             that pass over everything and are behind everything
+     *   route     the painted racing line, which is on the road, not over it
+     *
+     * Road paint, telegraph mats and the finish checker all sit under Y_FLOOR
+     * and drop out on height alone.
+     *
+     * Cost is a full triangle walk of the live graph, so it is a debug hook and
+     * nothing calls it per frame.
+     */
+    const Y_FLOOR = 0.06;      // above this is "over the road", below is paint
+    api.OVERHEAD_Y = OVERHEAD_Y;
+    api.CORRIDOR_HALF = CORRIDOR_HALF;
+    api.crossings = function (fromZ, toZ) {
+      // 0.05 of slack, so a kerb notch whose inner face is authored ON the
+      // corridor line (and overhangs it by a hundredth of a unit) is furniture
+      // rather than a crossing. Nothing that genuinely spans the road misses
+      // the corridor by less than five centimetres.
+      const CH = CORRIDOR_HALF - 0.05;
+      const z0lim = fromZ === undefined ? -1e9 : fromZ;
+      const z1lim = toZ === undefined ? 1e9 : toZ;
+      const out = [];
+      const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+      group.updateWorldMatrix(true, true);
+
+      function scan(o) {
+        if (!o.visible || o.userData.notScenery) return;
+        const g = o.geometry;
+        if (g && g.attributes && g.attributes.position) {
+          const pos = g.attributes.position;
+          const idx = g.index;
+          const n = idx ? idx.count : pos.count;
+          const m = o.matrixWorld;
+          let yMin = Infinity, yMax = -Infinity, zMin = Infinity, zMax = -Infinity, hits = 0;
+          for (let i = 0; i + 2 < n; i += 3) {
+            const i0 = idx ? idx.getX(i) : i;
+            const i1 = idx ? idx.getX(i + 1) : i + 1;
+            const i2 = idx ? idx.getX(i + 2) : i + 2;
+            a.fromBufferAttribute(pos, i0).applyMatrix4(m);
+            b.fromBufferAttribute(pos, i1).applyMatrix4(m);
+            c.fromBufferAttribute(pos, i2).applyMatrix4(m);
+            // The triangle counts only if its x span actually reaches into the
+            // corridor. A kerb whose inner face sits exactly on CORRIDOR_HALF
+            // is roadside furniture, not a crossing, so the test is strict.
+            const xlo = Math.min(a.x, b.x, c.x), xhi = Math.max(a.x, b.x, c.x);
+            if (xhi <= -CH || xlo >= CH) continue;
+            const ty = Math.min(a.y, b.y, c.y);
+            if (Math.max(a.y, b.y, c.y) <= Y_FLOOR) continue;
+            const tz0 = Math.min(a.z, b.z, c.z), tz1 = Math.max(a.z, b.z, c.z);
+            if (tz1 < z0lim || tz0 > z1lim) continue;
+            hits++;
+            if (ty < yMin) yMin = ty;
+            const th = Math.max(a.y, b.y, c.y);
+            if (th > yMax) yMax = th;
+            if (tz0 < zMin) zMin = tz0;
+            if (tz1 > zMax) zMax = tz1;
+          }
+          if (hits) {
+            let name = 'mesh', p = o;
+            while (p && p !== group) {
+              if (p.userData.auditName) { name = p.userData.auditName; break; }
+              p = p.parent;
+            }
+            out.push({ name, tris: hits, yMin, yMax, z0: zMin, z1: zMax });
+          }
+        }
+        for (let i = 0; i < o.children.length; i++) scan(o.children[i]);
+      }
+      for (let i = 0; i < group.children.length; i++) scan(group.children[i]);
+      return out;
+    };
+
+    /**
+     * The gates as the occlusion check needs to see them: a world-space box per
+     * live hazard, taken from MR.Collision.BOX so the audit is measured against
+     * the collision contract rather than against the art.
+     */
+    api.gateBoxes = function () {
+      const B = MR.Collision.BOX;
+      const out = [];
+      for (const g of activeGates) {
+        for (let l = 0; l < 3; l++) {
+          const kind = g.gate.lanes[l];
+          if (kind === K.CLEAR) continue;
+          const box = B[kind];
+          if (!box) continue;
+          const span = (kind === K.BLOCK && g.gate.train) ? 1 + g.gate.train * 0.9 : 1;
+          out.push({
+            kind, lane: l, z: g.gate.z,
+            x: K.LANE_X[l], halfX: LANE * 0.5,
+            yMin: box.yMin, yMax: box.yMax,
+            z0: g.gate.z - box.halfZ, z1: g.gate.z + box.halfZ * (2 * span - 1),
+          });
+        }
+      }
+      return out;
     };
 
     return api;

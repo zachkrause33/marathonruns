@@ -9,6 +9,7 @@
  *   ?skip=SECONDS     fast-forward this many race seconds before rendering
  *   ?debug=1          FPS and draw-call readout
  *   ?nocount=1        skip the countdown
+ *   ?nosave=1         play without writing to the save
  */
 (function () {
   const K = MR.K;
@@ -22,6 +23,8 @@
   const DEBUG = params.get('debug') === '1';
   const SKIP = parseFloat(params.get('skip') || '0');
   const NOCOUNT = params.get('nocount') === '1' || BOT;
+  // Inspecting the game should not be able to overwrite a real player's best.
+  const NOSAVE = params.get('nosave') === '1';
 
   // ---- renderer ---------------------------------------------------------
   const canvas = document.getElementById('gl');
@@ -78,6 +81,10 @@
   let mileShown = 0;
 
   function reset() {
+    // Re-read the save before every run, not once at boot: a second run in the
+    // same session has to chase the streak the first one just set.
+    hud.setMemory(MR.Store.summary(dateKey));
+    hud.reset();
     pace = Pace.create();
     player.reset();
     world.reset();
@@ -275,7 +282,17 @@
 
       if (pace.finished) {
         state = DONE;
-        hud.showEnd(pace);
+        // Fold the result into the save FIRST, because the only moment at
+        // which "did this beat your best today" can be answered is before the
+        // best today becomes this run. Store.record returns that comparison
+        // and never throws, so a browser with no usable localStorage produces
+        // the same finish screen minus the memory.
+        const saved = NOSAVE ? null : MR.Store.record(dateKey, {
+          time: pace.finishTime,
+          streak: pace.bestStreak,
+          tier: MR.Tier.of(pace.finishTime).name,
+        });
+        hud.showEnd(pace, saved);
         audio.finish(pace.finishTime < K.RECORD_SECONDS);
       }
     }

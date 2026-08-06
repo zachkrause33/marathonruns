@@ -18,6 +18,7 @@ const MODULES = [
   'src/core/constants.js',
   'src/core/pace.js',
   'src/core/course.js',
+  'src/core/store.js',
   'src/render/shading.js',
   'src/render/runner.js',
   'src/render/world.js',

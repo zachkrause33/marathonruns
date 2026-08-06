@@ -434,50 +434,197 @@ html, body {
 }
 .panel.canScroll::after { opacity: 1; }
 
-/* ---- finish panel ---- */
-.finLab {
-  font-size: 10px; font-weight: 900; letter-spacing: 0.24em;
-  opacity: 0.5; margin-bottom: 2px;
+/* ---- the memory, on the start panel ----
+ * Plates, in the HUD's language: a 9px label over a large tabular figure.
+ * Rendered only when there is something to remember, so a first-ever visit
+ * gets the panel a stranger has always got. */
+#startMemory {
+  display: flex; flex-wrap: wrap; justify-content: center;
+  align-items: stretch; gap: 7px;
+  margin-top: 16px;
 }
-/* The verdict is the point of the screen, so it is a solid band rather than
- * coloured text -- it should be legible from across a room. */
+#startMemory:empty { display: none; }
+.mplate {
+  flex: 0 1 auto; min-width: 92px; max-width: 160px; text-align: left;
+  background: rgba(255, 253, 245, 0.055);
+  border-left: 3px solid var(--accent);
+  padding: 6px 10px 7px;
+}
+.mplate .mv {
+  font-size: 19px; font-weight: 900; line-height: 1.05; margin-top: 1px;
+}
+.mplate .ms {
+  font-size: 8.5px; font-weight: 800; letter-spacing: 0.07em;
+  opacity: 0.58; margin-top: 2px; line-height: 1.35;
+}
+
+/* ---- finish panel ----
+ *
+ * Rebuilt out of the HUD's own parts. The card was a spreadsheet dropped on a
+ * dimmed screenshot: 12.5px/700 for both the key and the value of every row,
+ * told apart only by `opacity: 0.55`, in a centred block, with a date line
+ * typeset larger, louder and more tracked than the label of the headline
+ * number it sat above. The live readout, two seconds earlier, had spent its
+ * entire budget on a 9px/800/0.16em label over a 25-40px/900 figure.
+ *
+ * So: the same label/value pair, the same plates with a 4px rule down their
+ * left edge, the same left-aligned columns. Uppercase throughout -- the HUD
+ * says /MI and CLEAN GATES; this card used to answer /mi and gates. */
+#endPanel .panelInner { text-align: left; }
+
+/* The dateline is furniture and is now typeset as furniture. It was 11px/800
+ * at 0.2em in accent yellow -- bigger, more tracked and more coloured than
+ * FINAL TIME, which labels the largest number on the screen. */
+.endDate {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; opacity: 0.42; margin-bottom: 11px;
+}
+
+/* TWO HEADLINES.
+ *
+ * The finish time is the result and gets the white rule the split card uses;
+ * the longest clean line is the speed engine and gets the accent, exactly as
+ * #engine does in the live readout. It is a co-headline because it is the
+ * only number on this card that a single contact in mile three cannot take
+ * away, and the only one still worth chasing on the ~99% of days the record
+ * dies early. It used to be the fourth row of a six-row table. */
+#endHead {
+  display: flex; flex-wrap: wrap; align-items: flex-start;
+  gap: 12px 30px;
+}
+.endCell { border-left: 4px solid #fffdf5; padding-left: 11px; min-width: 0; }
+.endCell + .endCell { border-left-color: var(--accent); }
+.panel .endBig {
+  font-size: clamp(34px, 9vw, 52px); font-weight: 900;
+  letter-spacing: -0.03em; line-height: 1.0; margin-top: 2px;
+}
+.endSub {
+  font-size: 10px; font-weight: 800; letter-spacing: 0.06em;
+  opacity: 0.55; margin-top: 4px;
+}
+.endSub.ahead { opacity: 1; }
+
+/* The grade, and the next rung. A solid band, legible across a room -- but a
+ * band that now has five possible readings instead of two, so ~99% of
+ * sessions stop ending on a flat negative. Nothing here is pink: the ladder
+ * reports where you finished, and the rung above says what to do about it. */
+#tierRow {
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: 6px 11px; margin-top: 15px;
+}
 #verdict {
-  display: inline-block; margin-top: 10px;
-  font-size: 13px; font-weight: 900; letter-spacing: 0.1em;
-  padding: 6px 14px;
+  display: inline-block;
+  font-size: 13px; font-weight: 900; letter-spacing: 0.12em;
+  padding: 6px 13px;
 }
-#verdict.beat { background: var(--ahead); color: #06301c; }
-#verdict.miss { background: var(--behind); color: #35060f; }
+#verdict.t0 { background: var(--ahead); color: #06301c; }
+#verdict.t1, #verdict.t2, #verdict.t3 { background: var(--accent); color: #14183a; }
+#verdict.t4 { background: rgba(255, 253, 245, 0.92); color: #14183a; }
+#tierNext {
+  font-size: 11px; font-weight: 800; letter-spacing: 0.09em; opacity: 0.72;
+}
 
+#endBadges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+#endBadges:empty { display: none; }
+.ebadge {
+  font-size: 9px; font-weight: 900; letter-spacing: 0.12em;
+  padding: 3px 7px; color: var(--accent);
+  border: 1px solid rgba(255, 228, 94, 0.55);
+}
+#endMem {
+  font-size: 10.5px; font-weight: 800; letter-spacing: 0.05em;
+  opacity: 0.62; margin-top: 9px;
+}
+#endMem:empty { display: none; }
+
+/* ONE RHYTHM, TWO GRIDS.
+ *
+ * These were two independent grids with their own row gaps and their own
+ * header padding, which put their baselines about three pixels out of phase
+ * -- close enough to read as a rendering fault. They now share --endRow and
+ * each opens with exactly one header row, so every line of one sits on the
+ * same baseline as the matching line of the other at every breakpoint. */
 #endCols {
-  display: flex; flex-wrap: wrap; gap: 14px 30px;
-  justify-content: center; align-items: flex-start;
-  margin-top: 18px;
+  --endRow: 21px;
+  display: flex; flex-wrap: wrap; gap: 14px 34px;
+  justify-content: flex-start; align-items: flex-start;
+  margin-top: 16px;
 }
-#resultStats {
-  display: grid; grid-template-columns: auto auto;
-  gap: 4px 20px; font-size: 12.5px; font-weight: 700;
-}
-#resultStats .k { opacity: 0.55; text-align: right; }
-#resultStats .v { text-align: left; }
-
-#splitTable {
-  display: grid; grid-template-columns: auto auto auto;
-  gap: 4px 16px; font-size: 12.5px; font-weight: 700;
+#resultStats, #splitTable {
+  display: grid; align-content: start; align-items: center;
+  row-gap: 0; grid-auto-rows: var(--endRow);
   font-variant-numeric: tabular-nums;
 }
-#splitTable .k {
-  font-size: 9px; font-weight: 900; letter-spacing: 0.14em;
-  opacity: 0.45; text-align: right; padding-bottom: 2px;
+#resultStats { grid-template-columns: auto auto; column-gap: 18px; }
+#splitTable  { grid-template-columns: auto auto auto; column-gap: 16px; }
+
+#endCols .k {
+  font-size: 9px; font-weight: 800; letter-spacing: 0.16em;
+  text-transform: uppercase; opacity: 0.6;
 }
-#splitTable .v { text-align: right; }
+/* The header row sits on the bottom of its own row, which buys the table a
+ * little air without moving any baseline off the shared grid. */
+#endCols .k.hd {
+  align-self: end; padding-bottom: 3px;
+  letter-spacing: 0.18em; opacity: 0.4;
+}
+#endCols .v { font-size: 13px; font-weight: 900; }
+
+#resultStats .k, #resultStats .v { text-align: left; }
+#splitTable .k, #splitTable .v { text-align: right; }
+#splitTable .v { font-weight: 800; }
+#splitTable .v.fin { font-weight: 900; }
 /* A rule spanning the grid, not a border per cell -- per-cell borders break
  * across the column gaps and read as three dashes. */
 #splitTable .sep {
-  grid-column: 1 / -1; height: 1px;
-  background: rgba(255, 253, 245, 0.25); margin: 3px 0 1px;
+  grid-column: 1 / -1; height: 1px; align-self: center;
+  background: rgba(255, 253, 245, 0.25);
 }
-#splitTable .v.fin { font-weight: 900; }
+
+/* THE CAUSAL LINE.
+ *
+ * This is where the card used to print TIME LOST +0:18 for twelve contacts
+ * that really cost thirteen and a half minutes. The number is now measured
+ * against a flawless run of this exact course, and it is set in plain ink
+ * rather than in pink: the colour system reserves red for losing the record,
+ * and this is not a grade, it is the player's own arithmetic. The line under
+ * it -- the time they would have run -- is the one that has to be attractive,
+ * so it is the one in accent. */
+#endCost {
+  margin-top: 17px; padding: 5px 0 5px 11px;
+  border-left: 4px solid rgba(255, 107, 132, 0.8);
+}
+#endCost.clean { border-left-color: var(--ahead); }
+#endCost .endBig { font-size: clamp(24px, 5.5vw, 32px); }
+#endCost .endSub {
+  color: var(--accent); opacity: 0.88;
+  font-weight: 900; letter-spacing: 0.05em;
+}
+
+#endTurn {
+  font-size: 11px; font-weight: 900; letter-spacing: 0.12em;
+  opacity: 0.7; margin-top: 15px;
+}
+#endTurn:empty { display: none; }
+
+/* TOMORROW.
+ *
+ * The card never said the word, and the date seed makes tomorrow's road
+ * computable for nothing -- pickSettings() is a hash and twelve names, no
+ * course generation. A route is the one thing about tomorrow that is visibly
+ * different from today, which makes this line an appointment rather than a
+ * description of one. */
+#tomorrow {
+  font-size: 10.5px; font-weight: 900; letter-spacing: 0.1em;
+  color: var(--accent); opacity: 0.9; line-height: 1.5;
+  margin-top: 16px; padding-top: 12px;
+  border-top: 1px solid rgba(255, 253, 245, 0.16);
+}
+#tomorrow:empty { display: none; }
+
+/* The only tap target on the screen, on a screen that is now taller: full
+ * width so it cannot be missed at the bottom of a phone. */
+#endPanel .cta { display: block; width: 100%; margin-top: 16px; }
 
 /* ---- countdown ---- */
 #count {
@@ -600,11 +747,25 @@ html, body {
   .gaugeLeg { font-size: 12px; }
   .panel .keys { font-size: 14px; margin-top: 24px; }
   .panel .keys kbd { font-size: 13px; }
-  #verdict { font-size: 17px; padding: 8px 20px; margin-top: 14px; }
-  #endCols { margin-top: 24px; gap: 18px 46px; }
-  #resultStats, #splitTable { font-size: 16px; gap: 6px 26px; }
-  #splitTable .k { font-size: 11px; }
   .cta { font-size: 18px; padding: 16px 44px; margin-top: 28px; }
+
+  .mplate { min-width: 118px; padding: 8px 13px 9px; }
+  .mplate .mv { font-size: 25px; }
+  .mplate .ms { font-size: 10px; }
+
+  .endDate { font-size: 11px; }
+  #endHead { gap: 16px 44px; }
+  .endSub { font-size: 12px; }
+  #verdict { font-size: 17px; padding: 8px 20px; }
+  #tierNext { font-size: 14px; }
+  .ebadge { font-size: 11px; padding: 4px 9px; }
+  #endMem { font-size: 13px; }
+  #endCols { --endRow: 26px; margin-top: 22px; gap: 18px 46px; }
+  #endCols .k { font-size: 11px; }
+  #endCols .v { font-size: 16px; }
+  #endTurn { font-size: 13px; }
+  #tomorrow { font-size: 13px; }
+  #endPanel .cta { margin-top: 22px; }
 }
 
 /* Landscape phones have almost no vertical room, so the readout tightens up

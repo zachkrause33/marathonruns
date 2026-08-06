@@ -2,3 +2,5 @@ node_modules/
 shots/
 *.tgz
 play.html
+
+shots/video/

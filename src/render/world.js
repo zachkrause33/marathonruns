@@ -152,7 +152,7 @@ MR.World = (function () {
   //           SETTING_LOOK and its mood shift from BIOME_MOD below.
   const BIOME_LOOK = {
     'CITY START': {
-      sky: [0x2b3fa8, 0x9fdcff], ground: 0x63c96b, road: 0xb1b8f8, fog: 0x9fdcff,
+      sky: [0x2b3fa8, 0x9fdcff], ground: 0x63c96b, road: 0x5f6285, fog: 0x9fdcff,
       edge: 'barrier', street: 0.70,
       mix: { building: 1.5, tree: 1.1, grove: 0.3, crowd: 2.3, walkers: 1.1 },
     },
@@ -160,7 +160,7 @@ MR.World = (function () {
     // to the road; at full shoulder width the river sat 35 units out and read
     // as a smear on the horizon.
     'RIVERSIDE': {
-      sky: [0x1f6fb8, 0xbdf0ff], ground: 0x57c7a8, road: 0xa4cff8, fog: 0xbdf0ff,
+      sky: [0x1f6fb8, 0xbdf0ff], ground: 0x57c7a8, road: 0x52677b, fog: 0xbdf0ff,
       edge: 'hedge', bank: -1, street: 0.26,
       mix: { building: 0.35, tree: 2.0, grove: 2.0, crowd: 1.0, walkers: 0.8 },
     },
@@ -168,22 +168,22 @@ MR.World = (function () {
     // spectator out there would be standing on the river. What the leg gets
     // instead is the span itself, which is the setting's to choose.
     'THE BRIDGE': {
-      sky: [0x3a4fc0, 0xffd9a8], ground: 0x2f8fc4, road: 0xd5c1f8, fog: 0xffd9a8,
+      sky: [0x3a4fc0, 0xffd9a8], ground: 0x2f8fc4, road: 0x6a607b, fog: 0xffd9a8,
       edge: 'rail', street: 0,
       mix: {},
     },
     'PARKLAND': {
-      sky: [0x2e8fd0, 0xcdf5c0], ground: 0x6fd46a, road: 0xc1d1f8, fog: 0xcdf5c0,
+      sky: [0x2e8fd0, 0xcdf5c0], ground: 0x6fd46a, road: 0x5d6477, fog: 0xcdf5c0,
       edge: 'hedge', street: 0.05,
       mix: { building: 0.12, tree: 2.6, grove: 3.6, crowd: 1.1, walkers: 0.9 },
     },
     'THE WALL': {
-      sky: [0x8a3a6b, 0xffb27a], ground: 0x8f9a5e, road: 0xe5b1ca, fog: 0xffb27a,
+      sky: [0x8a3a6b, 0xffb27a], ground: 0x8f9a5e, road: 0x795d6a, fog: 0xffb27a,
       edge: 'wall', street: 0.46,
       mix: { building: 1.2, tree: 0.25, crowd: 0.35, walkers: 0.3 },
     },
     'FINAL MILE': {
-      sky: [0x24306e, 0xffcf6b], ground: 0x5cb46a, road: 0xc2baf8, fog: 0xffcf6b,
+      sky: [0x24306e, 0xffcf6b], ground: 0x5cb46a, road: 0x656181, fog: 0xffcf6b,
       edge: 'barrier', street: 0.52,
       mix: { building: 0.7, tree: 0.7, crowd: 3.4, walkers: 0.7 },
     },
@@ -274,7 +274,7 @@ MR.World = (function () {
   const SETTING_LOOK = {
 
     BOSTON: {
-      sky: [0x2a55b0, 0xc6e8ff], fog: 0xcfe6f2, ground: 0x86b45a, road: 0xc3c6e8,
+      sky: [0x2a55b0, 0xc6e8ff], fog: 0xcfe6f2, ground: 0x86b45a, road: 0x626374,
       water: 0x3f7fae, edge: 0xf4ece0,
       terrace: {
         colors: [0x9c5b4a, 0xb06a52, 0x8a5040, 0xc08a68, 0xa66a58],
@@ -294,7 +294,7 @@ MR.World = (function () {
     },
 
     LONDON: {
-      sky: [0x3a63b8, 0xdae8f4], fog: 0xd6e4f0, ground: 0x5fbf6b, road: 0xc0c4e0,
+      sky: [0x3a63b8, 0xdae8f4], fog: 0xd6e4f0, ground: 0x5fbf6b, road: 0x616372,
       water: 0x5a8fa8, edge: 0xffe8e8,
       terrace: {
         colors: [0xe8dcc8, 0xd8c8b0, 0xc8b8a4, 0xefe4d4, 0xb8a894],
@@ -314,7 +314,7 @@ MR.World = (function () {
     },
 
     BERLIN: {
-      sky: [0x2f52b0, 0xcfe2f8], fog: 0xc8dcf5, ground: 0x69c46e, road: 0xb8bcdc,
+      sky: [0x2f52b0, 0xcfe2f8], fog: 0xc8dcf5, ground: 0x69c46e, road: 0x616374,
       water: 0x4f86ae, edge: 0xeef0ff,
       terrace: {
         colors: [0xe4d8c0, 0xcfc0a8, 0xdcc8a8, 0xbfb098, 0xefe6d2],
@@ -334,7 +334,7 @@ MR.World = (function () {
     },
 
     CHICAGO: {
-      sky: [0x1f3fa0, 0xa8cfe8], fog: 0xa8cde0, ground: 0x63b46a, road: 0xb0b4d8,
+      sky: [0x1f3fa0, 0xa8cfe8], fog: 0xa8cde0, ground: 0x63b46a, road: 0x616377,
       water: 0x3f7fa8, edge: 0xe4e8f4,
       terrace: {
         colors: [0x9a8f7e, 0x8a8070, 0xa8998a, 0x7c7466, 0xb0a494],
@@ -354,7 +354,7 @@ MR.World = (function () {
     },
 
     NEWYORK: {
-      sky: [0x2b46b4, 0xbde0f8], fog: 0xbdd8ee, ground: 0x63c96b, road: 0xbdc0e4,
+      sky: [0x2b46b4, 0xbde0f8], fog: 0xbdd8ee, ground: 0x63c96b, road: 0x616376,
       water: 0x3d7ba6, edge: 0xfff0dc,
       terrace: {
         colors: [0x8f5442, 0xa6644c, 0x7c4838, 0xb87a5c, 0x96604a],
@@ -375,7 +375,7 @@ MR.World = (function () {
     },
 
     TOKYO: {
-      sky: [0x3a3f9e, 0xffd0d8], fog: 0xffd6dc, ground: 0x5fbf7a, road: 0xc8c0e8,
+      sky: [0x3a3f9e, 0xffd0d8], fog: 0xffd6dc, ground: 0x5fbf7a, road: 0x666276,
       water: 0x4f8fb0, edge: 0xffe4ec,
       terrace: {
         colors: [0xdcdce4, 0xc8ccd8, 0xe8e4e0, 0xb8bcc8, 0xd0c8c8],
@@ -395,7 +395,7 @@ MR.World = (function () {
     },
 
     SYDNEY: {
-      sky: [0x1f7fd0, 0xdcf4ff], fog: 0xd8f4ff, ground: 0x7fc86a, road: 0xc6cef0,
+      sky: [0x1f7fd0, 0xdcf4ff], fog: 0xd8f4ff, ground: 0x7fc86a, road: 0x606474,
       water: 0x2fa8d8, edge: 0xfff4e0,
       terrace: {
         colors: [0xd8b48c, 0xc49a74, 0xe8cfa8, 0xb08464, 0xefe0c4],
@@ -415,7 +415,7 @@ MR.World = (function () {
     },
 
     PARIS: {
-      sky: [0x3a58b8, 0xe2e4f2], fog: 0xe0dfe8, ground: 0x6fc274, road: 0xd0cbe0,
+      sky: [0x3a58b8, 0xe2e4f2], fog: 0xe0dfe8, ground: 0x6fc274, road: 0x65636d,
       water: 0x6a94a8, edge: 0xf4f0e4,
       terrace: {
         colors: [0xe8dcc0, 0xdcceb0, 0xf0e6cc, 0xd0c0a4, 0xe4d8bc],
@@ -435,7 +435,7 @@ MR.World = (function () {
     },
 
     VALENCIA: {
-      sky: [0x1f7fd8, 0xeaf6ff], fog: 0xe8f6ff, ground: 0x8fc45f, road: 0xd8d4ec,
+      sky: [0x1f7fd8, 0xeaf6ff], fog: 0xe8f6ff, ground: 0x8fc45f, road: 0x65636e,
       water: 0x30b0d0, edge: 0xfff8e8,
       terrace: {
         colors: [0xfff2d8, 0xf4e4c4, 0xffe8c8, 0xe8d8bc, 0xfff8e8],
@@ -455,7 +455,7 @@ MR.World = (function () {
     },
 
     AMSTERDAM: {
-      sky: [0x2f5fb8, 0xd4e8f6], fog: 0xcfe6f4, ground: 0x5fc07a, road: 0xb6bcd8,
+      sky: [0x2f5fb8, 0xd4e8f6], fog: 0xcfe6f4, ground: 0x5fc07a, road: 0x606472,
       water: 0x4f7f96, edge: 0xf0ece0,
       terrace: {
         colors: [0x7a4438, 0x8f5442, 0x64483c, 0x9c6250, 0x543c34],
@@ -475,7 +475,7 @@ MR.World = (function () {
     },
 
     ROME: {
-      sky: [0x2a63c0, 0xffe6c0], fog: 0xffe0bc, ground: 0x8fb45a, road: 0xd2c4d8,
+      sky: [0x2a63c0, 0xffe6c0], fog: 0xffe0bc, ground: 0x8fb45a, road: 0x69626c,
       water: 0x5f9fae, edge: 0xfff0d8,
       terrace: {
         colors: [0xd8964a, 0xc8823e, 0xe8ac60, 0xb87038, 0xefc484],
@@ -495,7 +495,7 @@ MR.World = (function () {
     },
 
     CAPETOWN: {
-      sky: [0x1666c8, 0xe4f2ff], fog: 0xdff0ff, ground: 0x9fb05a, road: 0xc8ccec,
+      sky: [0x1666c8, 0xe4f2ff], fog: 0xdff0ff, ground: 0x9fb05a, road: 0x616373,
       water: 0x2f9fd8, edge: 0xfff2e4,
       // Bo-Kaap: the one street in the world painted in flat saturated blocks,
       // and the cheapest possible way to say "Cape Town" at a hundred units.
@@ -2931,9 +2931,9 @@ MR.World = (function () {
         const jz = -TILE / 2 + i * ROAD_SLAB;
         const heavy = (i % 4) === 0;
         parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, heavy ? 0.24 : 0.15),
-          heavy ? 0x4b4866 : 0x5e5b7a, 0, 0.004, jz, flat));
+          heavy ? 0x272636 : 0x313040, 0, 0.004, jz, flat));
         parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, heavy ? 0.11 : 0.08),
-          heavy ? 0xeae7f6 : 0xdbd8ea, 0, 0.004, jz + (heavy ? 0.18 : 0.12), flat));
+          heavy ? 0x7b7a81 : 0x73727b, 0, 0.004, jz + (heavy ? 0.18 : 0.12), flat));
       }
       // Carriageway edge lines, on the outer lane boundary rather than at the
       // tarmac edge. The shoulder beyond them carries the kerb and the aid

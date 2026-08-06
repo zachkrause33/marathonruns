@@ -59,6 +59,7 @@
   const audio = MR.Audio.create();
   const hud = MR.HUD.create(document.getElementById('ui'));
   hud.setDate(dateKey);
+  hud.setCourse(course);
   hud.showPerf(DEBUG);
 
   const player = MR.Player.create();

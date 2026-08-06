@@ -54,6 +54,15 @@ MR.Controls = (function () {
     function onKey(e) {
       const a = KEYS[e.code];
       if (!a) return;
+      // Leave the focused control alone. This listener is on `window` and used
+      // to preventDefault unconditionally, which meant Space -- the canonical
+      // key for activating a focused button -- was swallowed before the CTA
+      // ever saw it: you could Tab to TOE THE LINE, press Space, and nothing
+      // happened. Enter worked, so it looked like a dead key rather than a
+      // trapped one. During a run nothing is focused and this never fires.
+      const t = e.target;
+      if (t && (t.tagName === 'BUTTON' || t.tagName === 'A' || t.tagName === 'INPUT' ||
+                t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
       e.preventDefault();
       if (e.repeat) return;
       push(a);

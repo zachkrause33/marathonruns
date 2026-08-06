@@ -2,7 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<!-- No maximum-scale / user-scalable=no. Blocking pinch-zoom is a WCAG 1.4.4
+     failure, and it removes the only remedy available to exactly the readers
+     the panel's smallest type fails. Gameplay is protected instead by
+     `touch-action: none` on the body, which stops browser gestures where the
+     swipe controls live; the start and finish panels opt back in so they can
+     be zoomed. -->
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0e1230">
 <title>DAILY MARATHON</title>
 <style>

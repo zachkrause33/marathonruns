@@ -304,8 +304,40 @@ html, body {
   color: var(--accent); margin-bottom: 8px;
 }
 .panel .blurb {
-  font-size: 13px; font-weight: 600; opacity: 0.8;
-  max-width: 380px; margin: 10px auto 0; line-height: 1.5;
+  font-size: 14px; font-weight: 600; opacity: 0.86;
+  max-width: 400px; margin: 12px auto 0; line-height: 1.5;
+}
+.panel .blurb b { font-weight: 900; opacity: 1; }
+
+/* Today's road. The one line on this panel that is different tomorrow, so it
+ * sits directly under the wordmark where a masthead's dateline would. */
+.panel .route {
+  /* Sized to hold four city names on one line at 390px and to break evenly
+     rather than orphan a city when it cannot. Tracking is 0.08em, not 0.13:
+     at the wider setting a four-stop route was exactly 362px inside a 362px
+     column, so any longer name wrapped. */
+  font-size: clamp(10.5px, 3.05vw, 12px);
+  font-weight: 900; letter-spacing: 0.08em;
+  color: var(--accent); opacity: 0.92;
+  margin-top: 9px; line-height: 1.5;
+  text-wrap: balance;
+}
+.panel .route:empty { display: none; }
+
+/* The wager, as a figure rather than a sentence. */
+.target {
+  display: flex; align-items: baseline; justify-content: center;
+  flex-wrap: wrap; gap: 0 10px;
+  margin-top: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.targetLab {
+  font-size: 10px; font-weight: 900; letter-spacing: 0.22em; opacity: 0.6;
+}
+.target b { font-size: 27px; font-weight: 900; color: var(--accent); line-height: 1; }
+.targetSub {
+  font-size: 11.5px; font-weight: 700; opacity: 0.72;
+  flex-basis: 100%; margin-top: 5px;
 }
 
 /* A labelled hairline instead of a heading: it separates without competing
@@ -319,7 +351,10 @@ html, body {
   content: ''; flex: 1; height: 1px; background: rgba(255, 253, 245, 0.22);
 }
 
-.mech { font-size: 12.5px; font-weight: 600; line-height: 1.5; opacity: 0.86; }
+/* Body copy is 13px at 0.88, not 12.5 at 0.86. The old pairing measured
+ * 5.21:1 -- it passed AA on the maths and still read as greyed-out furniture,
+ * which is a large part of why the panel's explanations went unread. */
+.mech { font-size: 13px; font-weight: 600; line-height: 1.55; opacity: 0.88; }
 .mech p { margin-top: 8px; }
 .mech b { font-weight: 900; opacity: 1; }
 .mechPace {
@@ -333,22 +368,53 @@ html, body {
 .gaugeLeg { font-size: 10px; font-weight: 700; opacity: 0.5; margin-top: 5px; }
 
 .panel .keys {
-  margin-top: 18px; font-size: 12px; font-weight: 700;
-  opacity: 0.7; line-height: 1.9;
+  margin-top: 20px; font-size: 12px; font-weight: 700;
+  opacity: 0.78; line-height: 1.9;
+  text-wrap: balance;
 }
+.panel .keys b { font-weight: 900; opacity: 1; color: var(--accent); }
+/* Dropped first when the line would otherwise wrap and strand a fragment. */
+@media (max-width: 380px) { .orSwipe { display: none; } }
 .panel .keys kbd {
   background: rgba(255, 253, 245, 0.12);
   border: 1px solid rgba(255, 253, 245, 0.25);
   padding: 2px 7px; font-family: inherit; font-size: 11px;
 }
 .cta {
-  margin-top: 20px;
+  margin-top: 22px;
   background: var(--accent); color: #14183a;
   font-size: 15px; font-weight: 900; letter-spacing: 0.1em;
-  padding: 13px 34px; border: none; cursor: pointer;
+  /* 46px tall, not 43. The old height was one pixel under the 44px target and
+   * this is the only tap target on the screen, so a near-miss costs a whole
+   * interaction rather than a correction. */
+  padding: 14px 34px; min-height: 46px; border: none; cursor: pointer;
   pointer-events: auto;
 }
 .cta:active { transform: translateY(1px); }
+/* The focus ring worked only because nobody had written `outline: none`.
+ * Owned now, and drawn against the yellow rather than on top of it. */
+.cta:focus-visible {
+  outline: 3px solid #fffdf5;
+  outline-offset: 3px;
+}
+
+/* The panel opts back into browser gestures so it can be pinch-zoomed -- the
+ * body sets `touch-action: none` for the swipe controls, which would otherwise
+ * block zoom on the one screen that carries small type. Panels are hidden
+ * during a run, so this never competes with a control gesture. */
+.panel { touch-action: pan-y pinch-zoom; }
+
+/* A scroll affordance for the short viewports where the button starts below
+ * the fold -- 320x460 put it 175px down with no scrollbar, no gutter and
+ * nothing on screen suggesting a swipe would help. */
+.panel::after {
+  content: '';
+  position: absolute; left: 0; right: 0; bottom: 0; height: 56px;
+  background: linear-gradient(rgba(10, 13, 36, 0), rgba(10, 13, 36, 0.92));
+  pointer-events: none; opacity: 0;
+  transition: opacity 0.2s;
+}
+.panel.canScroll::after { opacity: 1; }
 
 /* ---- finish panel ---- */
 .finLab {
@@ -527,7 +593,13 @@ html, body {
  * off the bottom of the screen. */
 @media (max-height: 430px) {
   .panel h1 { font-size: clamp(26px, 6vh, 40px); }
+  /* Landscape phone: the panel is thinnest exactly where the headline has the
+   * most work to do, so drop the explanation and keep what makes someone
+   * press the button. The route line and the target survive. */
   .panel .blurb, .rule, .mech { display: none; }
+  .panel .route { font-size: 11px; margin-top: 6px; }
+  .target { margin-top: 10px; }
+  .target b { font-size: 22px; }
   .panel .keys { margin-top: 10px; }
   .cta { margin-top: 12px; padding: 10px 26px; }
   #endCols { margin-top: 10px; gap: 8px 24px; }

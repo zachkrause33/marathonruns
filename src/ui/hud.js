@@ -112,41 +112,53 @@ MR.HUD = (function () {
 
       <div id="perf" class="num"></div>
 
-      <div class="panel" id="startPanel"><div class="panelInner">
+      <!--
+        THE START PANEL.
+
+        It used to carry 109 words in five stacked blocks: 28 to 33 seconds of
+        reading before a stranger could press the button, with the explanatory
+        sections alone taking 51-56% of the panel's height. A stranger who
+        clicks into a free browser game gives a start screen three to eight
+        seconds.
+
+        Worse, it spent all of that explaining a pace economy in vocabulary the
+        reader did not have yet -- "gate", "the streak", "the ghost" and
+        "PROJECTED FINISH" were each used before, or entirely without, being
+        defined -- while never once saying what kind of game this is. The word
+        "lanes" appeared exactly once, at character 565 of 622, inside the key
+        legend. You could read the whole panel and not learn you were about to
+        dodge things in three lanes.
+
+        So: genre first, then the wager, then the one rule you cannot infer.
+        Everything cut from here is either shown live by the HUD within fifteen
+        seconds (the pace gauge, the record margin, the projection) or is not
+        needed before the first obstacle.
+      -->
+      <div class="panel" id="startPanel" role="dialog" aria-modal="true"
+           aria-labelledby="startTitle"><div class="panelInner">
         <div class="date" id="startDate"></div>
-        <h1>DAILY MARATHON</h1>
+        <h1 id="startTitle">DAILY MARATHON</h1>
+        <div class="route" id="startRoute"></div>
+
         <div class="blurb">
-          One course. Same for everyone, everywhere, today.
-          26.2 miles, about four minutes.
+          Three lanes. Jump or slide past everything in the way.
+          <b>26.2 miles, about four minutes.</b>
         </div>
 
-        <div class="rule">HOW YOU GET FASTER</div>
-        <div class="mech">
-          <div class="mechPace"><b>${Pace.pace(K.START_PACE)}</b><span>&rarr;</span><b>${Pace.pace(K.FLOOR_PACE)}</b><i>/MI</i></div>
-          <div class="gauge" id="startGauge">
-            <div class="gaugeFill" style="width:100%"></div>
-            <div class="gaugeRec"></div>
-          </div>
-          <div class="gaugeLeg">the mark is record pace, ${Pace.pace(K.RECORD_PACE)}/mi</div>
-          <p>Clear a gate cleanly and you speed up. Every clean gate in a row buys
-             more. Touch one and you lose three quarters of the streak, and the
-             pace bleeds back down.</p>
+        <div class="mech" id="startRule">
+          <p>Every obstacle you clear in a row buys speed &mdash;
+             ${Pace.pace(K.START_PACE)} up to ${Pace.pace(K.FLOOR_PACE)} a mile.
+             Touch one and most of it is gone.</p>
         </div>
 
-        <div class="rule">THE RECORD</div>
-        <div class="mech">
-          <p><b>${K.RECORD_LABEL}</b> needs ${Pace.pace(K.RECORD_PACE)}/mi. You start slower than
-             that and reel it in, so the ghost leads for the first few miles by
-             design. <b>PROJECTED FINISH</b> is the number that tells you whether
-             the record is still on.</p>
+        <div class="target">
+          <span class="targetLab">TARGET</span>
+          <b class="num">${K.RECORD_LABEL}</b>
+          <span class="targetSub" id="targetSub">&nbsp;</span>
         </div>
 
-        <div class="keys">
-          <kbd>&larr;</kbd> <kbd>&rarr;</kbd> lanes &nbsp;&middot;&nbsp;
-          <kbd>&uarr;</kbd> jump &nbsp;&middot;&nbsp; <kbd>&darr;</kbd> duck
-          &nbsp;&middot;&nbsp; or swipe
-        </div>
-        <button class="cta" id="startBtn">TOE THE LINE</button>
+        <div class="keys" id="startKeys"></div>
+        <button class="cta" id="startBtn" type="button">TOE THE LINE</button>
       </div></div>
 
       <div class="panel hidden" id="endPanel"><div class="panelInner">
@@ -176,6 +188,7 @@ MR.HUD = (function () {
       toast: q('toast'), toastLab: q('toastLab'), toastBig: q('toastBig'),
       toastCum: q('toastCum'), toastDelta: q('toastDelta'),
       startPanel: q('startPanel'), startBtn: q('startBtn'), startDate: q('startDate'),
+      startRoute: q('startRoute'), startKeys: q('startKeys'), targetSub: q('targetSub'),
       endPanel: q('endPanel'), endTime: q('endTime'), endDate: q('endDate'),
       verdict: q('verdict'), stats: q('resultStats'), splitTable: q('splitTable'),
       againBtn: q('againBtn'),
@@ -243,6 +256,86 @@ MR.HUD = (function () {
       n.startDate.textContent = key + ' · GLOBAL COURSE';
       n.endDate.textContent = key + ' · GLOBAL COURSE';
     };
+
+    /**
+     * Name today's road, and price the wager.
+     *
+     * The route is the only thing on this panel that is visibly different
+     * tomorrow. A different gate layout is invisible before you press start; a
+     * different set of cities is not, which makes this the one line that earns
+     * a daily habit rather than describing one.
+     *
+     * The gate count is read off the real course rather than typed in, because
+     * the claim is a measurement -- the record survives exactly one mistake,
+     * and that was established by simulating this pace model against real
+     * generated courses.
+     */
+    api.setCourse = function (course) {
+      if (!course) return;
+      const set = course.settings;
+      n.startRoute.textContent = set && set.length
+        ? set.map(function (x) { return x.name; }).join(' → ')
+        : '';
+      const g = course.gates ? course.gates.length : 0;
+      n.targetSub.textContent = g ? 'survives one mistake in ' + g : '';
+      // The route and the gate count arrive after the panel is first laid out
+      // and both add height, so the overflow test has to run again here or it
+      // measures a panel shorter than the one on screen.
+      if (api.markScroll) requestAnimationFrame(api.markScroll);
+    };
+
+    /**
+     * Show the right instruction to the right device.
+     *
+     * The legend used to lead with four arrow-key chips and end with the word
+     * "swipe", on every device -- and at 360px and below it wrapped so that
+     * "swipe", the only instruction that applied to the phone in the reader's
+     * hand, was orphaned alone on the second line. Width was being used as a
+     * proxy for input type, and it is not one: a 1024px tablet got pure
+     * keyboard instructions and a narrow desktop window got told to swipe.
+     */
+    function inputHint() {
+      const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+      if (coarse) {
+        return 'Swipe <b>left</b> / <b>right</b> to change lane, ' +
+               '<b>up</b> to jump, <b>down</b> to slide';
+      }
+      return '<kbd>&larr;</kbd><kbd>&rarr;</kbd> lanes &nbsp;·&nbsp; ' +
+             '<kbd>&uarr;</kbd> jump &nbsp;·&nbsp; <kbd>&darr;</kbd> slide' +
+             '<span class="orSwipe"> &nbsp;·&nbsp; or swipe</span>';
+    }
+    n.startKeys.innerHTML = inputHint();
+
+    /**
+     * Flag a panel that overflows, so the fade at its bottom edge only appears
+     * when there is genuinely something below the fold.
+     *
+     * On a 320x460 viewport the CTA sat 175px past the bottom with no
+     * scrollbar, no reserved gutter and nothing on screen to suggest a swipe
+     * would help. Scrolling worked -- it was measured -- but on a full-screen
+     * game overlay "no button" reads as "broken", and a recovery nobody knows
+     * about is not a recovery.
+     */
+    function markScroll() {
+      for (const el of [n.startPanel, n.endPanel]) {
+        if (!el) continue;
+        el.classList.toggle('canScroll', el.scrollHeight - el.clientHeight > 4);
+      }
+    }
+    api.markScroll = markScroll;
+    window.addEventListener('resize', markScroll);
+    for (const el of [n.startPanel, n.endPanel]) {
+      el.addEventListener('scroll', function () {
+        el.classList.toggle('canScroll',
+          el.scrollHeight - el.clientHeight - el.scrollTop > 4);
+      }, { passive: true });
+    }
+    if (window.matchMedia) {
+      const mq = window.matchMedia('(pointer: coarse)');
+      const onMq = function () { n.startKeys.innerHTML = inputHint(); };
+      if (mq.addEventListener) mq.addEventListener('change', onMq);
+      else if (mq.addListener) mq.addListener(onMq);
+    }
 
     api.update = function (p, extra) {
       lastP = p;
@@ -419,6 +512,7 @@ MR.HUD = (function () {
 
     api.showStart = function (show) {
       n.startPanel.classList.toggle('hidden', !show);
+      if (show) requestAnimationFrame(markScroll);
       syncPanels();
     };
 

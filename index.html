@@ -2,7 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<!-- No maximum-scale / user-scalable=no. Blocking pinch-zoom is a WCAG 1.4.4
+     failure, and it removes the only remedy available to exactly the readers
+     the panel's smallest type fails. Gameplay is protected instead by
+     `touch-action: none` on the body, which stops browser gestures where the
+     swipe controls live; the start and finish panels opt back in so they can
+     be zoomed. -->
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0e1230">
 <title>DAILY MARATHON</title>
 <style>
@@ -312,8 +318,40 @@ html, body {
   color: var(--accent); margin-bottom: 8px;
 }
 .panel .blurb {
-  font-size: 13px; font-weight: 600; opacity: 0.8;
-  max-width: 380px; margin: 10px auto 0; line-height: 1.5;
+  font-size: 14px; font-weight: 600; opacity: 0.86;
+  max-width: 400px; margin: 12px auto 0; line-height: 1.5;
+}
+.panel .blurb b { font-weight: 900; opacity: 1; }
+
+/* Today's road. The one line on this panel that is different tomorrow, so it
+ * sits directly under the wordmark where a masthead's dateline would. */
+.panel .route {
+  /* Sized to hold four city names on one line at 390px and to break evenly
+     rather than orphan a city when it cannot. Tracking is 0.08em, not 0.13:
+     at the wider setting a four-stop route was exactly 362px inside a 362px
+     column, so any longer name wrapped. */
+  font-size: clamp(10.5px, 3.05vw, 12px);
+  font-weight: 900; letter-spacing: 0.08em;
+  color: var(--accent); opacity: 0.92;
+  margin-top: 9px; line-height: 1.5;
+  text-wrap: balance;
+}
+.panel .route:empty { display: none; }
+
+/* The wager, as a figure rather than a sentence. */
+.target {
+  display: flex; align-items: baseline; justify-content: center;
+  flex-wrap: wrap; gap: 0 10px;
+  margin-top: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.targetLab {
+  font-size: 10px; font-weight: 900; letter-spacing: 0.22em; opacity: 0.6;
+}
+.target b { font-size: 27px; font-weight: 900; color: var(--accent); line-height: 1; }
+.targetSub {
+  font-size: 11.5px; font-weight: 700; opacity: 0.72;
+  flex-basis: 100%; margin-top: 5px;
 }
 
 /* A labelled hairline instead of a heading: it separates without competing
@@ -327,7 +365,10 @@ html, body {
   content: ''; flex: 1; height: 1px; background: rgba(255, 253, 245, 0.22);
 }
 
-.mech { font-size: 12.5px; font-weight: 600; line-height: 1.5; opacity: 0.86; }
+/* Body copy is 13px at 0.88, not 12.5 at 0.86. The old pairing measured
+ * 5.21:1 -- it passed AA on the maths and still read as greyed-out furniture,
+ * which is a large part of why the panel's explanations went unread. */
+.mech { font-size: 13px; font-weight: 600; line-height: 1.55; opacity: 0.88; }
 .mech p { margin-top: 8px; }
 .mech b { font-weight: 900; opacity: 1; }
 .mechPace {
@@ -341,22 +382,53 @@ html, body {
 .gaugeLeg { font-size: 10px; font-weight: 700; opacity: 0.5; margin-top: 5px; }
 
 .panel .keys {
-  margin-top: 18px; font-size: 12px; font-weight: 700;
-  opacity: 0.7; line-height: 1.9;
+  margin-top: 20px; font-size: 12px; font-weight: 700;
+  opacity: 0.78; line-height: 1.9;
+  text-wrap: balance;
 }
+.panel .keys b { font-weight: 900; opacity: 1; color: var(--accent); }
+/* Dropped first when the line would otherwise wrap and strand a fragment. */
+@media (max-width: 380px) { .orSwipe { display: none; } }
 .panel .keys kbd {
   background: rgba(255, 253, 245, 0.12);
   border: 1px solid rgba(255, 253, 245, 0.25);
   padding: 2px 7px; font-family: inherit; font-size: 11px;
 }
 .cta {
-  margin-top: 20px;
+  margin-top: 22px;
   background: var(--accent); color: #14183a;
   font-size: 15px; font-weight: 900; letter-spacing: 0.1em;
-  padding: 13px 34px; border: none; cursor: pointer;
+  /* 46px tall, not 43. The old height was one pixel under the 44px target and
+   * this is the only tap target on the screen, so a near-miss costs a whole
+   * interaction rather than a correction. */
+  padding: 14px 34px; min-height: 46px; border: none; cursor: pointer;
   pointer-events: auto;
 }
 .cta:active { transform: translateY(1px); }
+/* The focus ring worked only because nobody had written `outline: none`.
+ * Owned now, and drawn against the yellow rather than on top of it. */
+.cta:focus-visible {
+  outline: 3px solid #fffdf5;
+  outline-offset: 3px;
+}
+
+/* The panel opts back into browser gestures so it can be pinch-zoomed -- the
+ * body sets `touch-action: none` for the swipe controls, which would otherwise
+ * block zoom on the one screen that carries small type. Panels are hidden
+ * during a run, so this never competes with a control gesture. */
+.panel { touch-action: pan-y pinch-zoom; }
+
+/* A scroll affordance for the short viewports where the button starts below
+ * the fold -- 320x460 put it 175px down with no scrollbar, no gutter and
+ * nothing on screen suggesting a swipe would help. */
+.panel::after {
+  content: '';
+  position: absolute; left: 0; right: 0; bottom: 0; height: 56px;
+  background: linear-gradient(rgba(10, 13, 36, 0), rgba(10, 13, 36, 0.92));
+  pointer-events: none; opacity: 0;
+  transition: opacity 0.2s;
+}
+.panel.canScroll::after { opacity: 1; }
 
 /* ---- finish panel ---- */
 .finLab {
@@ -535,7 +607,13 @@ html, body {
  * off the bottom of the screen. */
 @media (max-height: 430px) {
   .panel h1 { font-size: clamp(26px, 6vh, 40px); }
+  /* Landscape phone: the panel is thinnest exactly where the headline has the
+   * most work to do, so drop the explanation and keep what makes someone
+   * press the button. The route line and the target survive. */
   .panel .blurb, .rule, .mech { display: none; }
+  .panel .route { font-size: 11px; margin-top: 6px; }
+  .target { margin-top: 10px; }
+  .target b { font-size: 22px; }
   .panel .keys { margin-top: 10px; }
   .cta { margin-top: 12px; padding: 10px 26px; }
   #endCols { margin-top: 10px; gap: 8px 24px; }
@@ -5025,11 +5103,11 @@ MR.World = (function () {
       tower: { colors: [0xdce4ec, 0xc8d4e0, 0xf0f4f8], glass: 1, crown: 'flat' },
       tree: { kind: 'scrub', colors: [0x6f9a4a, 0x8fae5a, 0x5f8f56], h: 0.9 },
       marks: {
-        'CITY START': [{ k: 'tableMountain', x: 120, run: 220, side: -1 }, { k: 'clock', x: 15 }],
-        'RIVERSIDE': [{ k: 'tableMountain', x: 130, run: 220, side: -1 }, { k: 'ship', x: 34, y: -0.12 }],
-        'PARKLAND': [{ k: 'tableMountain', x: 120, run: 220, side: -1 }, { k: 'oak', x: 15 }],
-        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'tableMountain', x: 120, run: 220, side: -1 }],
-        'FINAL MILE': [{ k: 'tableMountain', x: 120, run: 220, side: -1 }, { k: 'jumbo', x: 13.5 }],
+        'CITY START': [{ k: 'tableMountain', x: 72, run: 220, side: -1 }, { k: 'clock', x: 15 }],
+        'RIVERSIDE': [{ k: 'tableMountain', x: 78, run: 220, side: -1 }, { k: 'ship', x: 34, y: -0.12 }],
+        'PARKLAND': [{ k: 'tableMountain', x: 72, run: 220, side: -1 }, { k: 'oak', x: 15 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'tableMountain', x: 72, run: 220, side: -1 }],
+        'FINAL MILE': [{ k: 'tableMountain', x: 72, run: 220, side: -1 }, { k: 'jumbo', x: 13.5 }],
       },
       bridge: 'tower',
     },
@@ -6606,24 +6684,27 @@ MR.World = (function () {
     hemisferic: function (look) {
       const parts = [];
       const W = 0xfbfbf6, W2 = 0xdfe6e6;
-      parts.push(part(new THREE.PlaneGeometry(42, 46), look.water, 0, 0.02, 0, -Math.PI / 2));
-      parts.push(bx(44, 0.6, 48, 0, -0.2, 0, 0xe8ece8));
+      // Centred on local +4 and 30 wide rather than 42 about the origin: at
+      // the table's x = 20 the old sheet reached world x = -1, i.e. across the
+      // road. Same bug as the canal had; see the note there.
+      parts.push(part(new THREE.PlaneGeometry(30, 46), look.water, 4, 0.02, 0, -Math.PI / 2));
+      parts.push(bx(32, 0.6, 48, 4, -0.2, 0, 0xe8ece8));
       // The pupil, and its reflection: a hemisphere over an inverted one.
       parts.push(part(new THREE.SphereGeometry(8.0, 16, 9, 0, 6.2832, 0, Math.PI / 2),
-        0xe8ecf0, 0, 0.2, 0));
+        0xe8ecf0, 3.0, 0.2, 0));
       parts.push(part(new THREE.SphereGeometry(8.0, 16, 9, 0, 6.2832, Math.PI / 2, Math.PI / 2),
-        0xb8c8d0, 0, 0.1, 0));
-      parts.push(cyl(8.2, 8.2, 0.5, 16, 0, 0.3, 0, W2));
+        0xb8c8d0, 3.0, 0.1, 0));
+      parts.push(cyl(8.2, 8.2, 0.5, 16, 3.0, 0.3, 0, W2));
       // The lid: a long shallow shell over the top, which is the whole read.
       for (let i = 0; i < 10; i++) {
         const t = (i - 4.5) / 4.5;
         const w = Math.sqrt(Math.max(0.05, 1 - t * t));
-        parts.push(bx(0.9, 1.0 + 12.0 * w, 2.6, -1.2 - 1.4 * (1 - w), 5.0 + 5.0 * w, t * 13.0,
+        parts.push(bx(0.9, 1.0 + 12.0 * w, 2.6, 1.8 - 1.4 * (1 - w), 5.0 + 5.0 * w, t * 13.0,
           i % 2 ? W : W2, 0, 0, -t * 0.5));
       }
-      parts.push(bx(1.4, 1.4, 30.0, -2.2, 13.4, 0, W));
+      parts.push(bx(1.4, 1.4, 30.0, 0.8, 13.4, 0, W));
       for (const sz of [-1, 1]) {
-        parts.push(bx(1.6, 8.0, 1.6, -2.2, 4.0, sz * 15.0, W2, 0, 0, 0.2));
+        parts.push(bx(1.6, 8.0, 1.6, 0.8, 4.0, sz * 15.0, W2, 0, 0, 0.2));
       }
       return merge(parts);
     },
@@ -6668,44 +6749,54 @@ MR.World = (function () {
       const parts = [];
       const W = look.water, QUAY = 0x8f8a7e, STONE = 0xa8a294, TREE = 0x3f8f52;
       const L = 40;
-      parts.push(part(new THREE.PlaneGeometry(17, L), W, -11.0, 0.02, 0, -Math.PI / 2));
+      // EVERYTHING SITS AT LOCAL x >= -8, and that is not a style choice.
+      // A landmark is placed at its centre and the mesh runs toward the road
+      // from there; the first version of this built the canal about local
+      // x = -11 with a quay wall at -19.6, so at the table's x = 20 the near
+      // wall landed at world x = 0.4 -- a stone kerb standing in the middle
+      // lane. Scenery that reaches into the corridor is a hazard the collision
+      // model has never heard of, which is the one bug this file must not
+      // ship. The near quay now stops at -8, i.e. world 12 at x = 20, just
+      // past the eight units of pavement the road tile carries.
+      const C = 2.0;                    // water centre, in local x
+      parts.push(part(new THREE.PlaneGeometry(15, L), W, C, 0.02, 0, -Math.PI / 2));
       for (const sx of [-1, 1]) {
-        const x = -11.0 + sx * 8.6;
+        const x = C + sx * 8.0;
         parts.push(bx(1.6, 2.4, L, x, 0.4, 0, QUAY));
         parts.push(bx(2.0, 0.4, L, x, 1.5, 0, STONE));
         for (let i = 0; i < 7; i++) {
-          parts.push(bx(0.24, 1.0, 0.24, x + sx * 0.7, 1.9, -L / 2 + 3 + i * 6, 0x3a3550));
+          parts.push(bx(0.24, 1.0, 0.24, x - sx * 0.7, 1.9, -L / 2 + 3 + i * 6, 0x3a3550));
         }
       }
-      // Elms along the quay and a couple of moored barges.
+      // Elms along the near quay and a couple of moored barges.
       for (let i = 0; i < 3; i++) {
         const tz = -L / 2 + 7 + i * 13;
-        parts.push(cyl(0.26, 0.4, 3.2, 6, -2.0, 1.6, tz, 0x7a6a58));
-        parts.push(sph(2.2, 8, -2.0, 5.4, tz, TREE));
-        parts.push(sph(1.6, 7, -3.2, 4.6, tz + 1.0, 0x4fa062));
+        parts.push(cyl(0.26, 0.4, 3.2, 6, C - 9.4, 1.6, tz, 0x7a6a58));
+        parts.push(sph(2.2, 8, C - 9.4, 5.4, tz, TREE));
+        parts.push(sph(1.6, 7, C - 10.4, 4.6, tz + 1.0, 0x4fa062));
       }
       for (let i = 0; i < 2; i++) {
         const bz = -10 + i * 20;
-        parts.push(bx(3.4, 1.0, 11.0, -6.6, 0.35, bz, 0x2f4a5e));
-        parts.push(bx(3.0, 0.3, 10.4, -6.6, 0.9, bz, 0x6a7a5e));
-        parts.push(bx(2.4, 1.4, 4.0, -6.6, 1.6, bz - 2.6, 0x3f6a4a));
-        parts.push(bx(2.6, 0.24, 4.2, -6.6, 2.4, bz - 2.6, 0xefe6d4));
+        parts.push(bx(3.4, 1.0, 11.0, C - 4.4, 0.35, bz, 0x2f4a5e));
+        parts.push(bx(3.0, 0.3, 10.4, C - 4.4, 0.9, bz, 0x6a7a5e));
+        parts.push(bx(2.4, 1.4, 4.0, C - 4.4, 1.6, bz - 2.6, 0x3f6a4a));
+        parts.push(bx(2.6, 0.24, 4.2, C - 4.4, 2.4, bz - 2.6, 0xefe6d4));
       }
       if (withBridge) {
         // The humpback: three shallow arches and a white balustrade.
         const sub = [];
         for (let i = 0; i < 3; i++) {
-          vArc(sub, { cx: (i - 1) * 6.0, cy: 0.4, cz: 0, rx: 2.6, ry: 2.2, n: 6, th: 0.7, d: 5.0, color: STONE });
+          vArc(sub, { cx: (i - 1) * 5.2, cy: 0.4, cz: 0, rx: 2.3, ry: 2.2, n: 6, th: 0.7, d: 5.0, color: STONE });
         }
         for (let i = 0; i < 9; i++) {
-          const x = -9.0 + i * 2.25;
-          const y = 3.4 + 1.3 * Math.cos(x / 9.0 * 1.4);
-          sub.push(bx(2.4, 0.5, 5.2, x, y, 0, STONE));
+          const x = -8.0 + i * 2.0;
+          const y = 3.4 + 1.3 * Math.cos(x / 8.0 * 1.4);
+          sub.push(bx(2.2, 0.5, 5.2, x, y, 0, STONE));
           for (const sz of [-1, 1]) {
-            sub.push(bx(2.4, 0.9, 0.3, x, y + 0.7, sz * 2.5, 0xf4f0e4));
+            sub.push(bx(2.2, 0.9, 0.3, x, y + 0.7, sz * 2.5, 0xf4f0e4));
           }
         }
-        placeAt(parts, sub, -11.0, 0, 0, Math.PI / 2);
+        placeAt(parts, sub, C, 0, 0, Math.PI / 2);
       }
       return merge(parts);
     },
@@ -6863,8 +6954,13 @@ MR.World = (function () {
      * Table Mountain: a flat top, a steep face and Devil's Peak beside it.
      *
      * Laid as a RUN 220 units long, because a mountain does not come and go.
-     * It stands at 120 units out, deep enough in the haze to read as distance
-     * and near enough that the flat top is unmistakable.
+     *
+     * It stands at 72 units, not the 120 it was first given. At 120 the massif
+     * sat 26 degrees off the camera axis and spent most of the leg outside the
+     * frame entirely -- a landmark you cannot see is not a landmark. At 72 it
+     * crops the shoulder of the frame the way the reference games' oversized
+     * props do, and the haze at that range still reads as distance because the
+     * thing is sixty units tall.
      */
     tableMountain: function () {
       const parts = [];
@@ -9654,7 +9750,12 @@ MR.World = (function () {
      * mesh a half-turn so its road-facing side (local -x, by convention above)
      * still faces the road. Nothing may be placed inside LANDMARK_IN.
      */
+    // Where a landmark stands, the street opens up for it. See the street-wall
+    // pass below: rows are laid AFTER the landmarks and skipped inside these
+    // spans, so a Colosseum at x = 21 is not buried behind a terrace at 15.
+    const markBlocks = [];
     function landmark(z, kind, side, x, y, rz, set) {
+      if (Math.abs(x) < 34) markBlocks.push({ z, side });
       structures.push({
         z, kind, side, set: set || 0,
         x: side * Math.max(x, LANDMARK_IN),
@@ -9665,6 +9766,8 @@ MR.World = (function () {
     }
     // Spanning pieces are symmetric and sit on the centre line.
     function landmarkOver(z, kind, set) {
+      // A spanning piece has piers on BOTH shoulders, so it clears both.
+      markBlocks.push({ z, side: 0 });
       structures.push({ z, kind, set: set || 0, side: 1, x: 0, y: 0, ry: 0, rz: 0 });
     }
 
@@ -9709,31 +9812,6 @@ MR.World = (function () {
       const sd = (Math.round(z / 155) % 2) ? 1 : -1;
       landmark(z, 'ship', sd, 24 + (Math.round(z / 155) % 3) * 8, -0.34 - WATER_DROP, 0,
         setIndexAt(z));
-    }
-
-    // ---- the street wall --------------------------------------------------
-    // Rows on a 30-unit grid down both shoulders, thinned by the biome's own
-    // `street` density so PARKLAND stays open and CITY START closes in. The
-    // front face lands at 12.2, just behind the pavement the road tile carries.
-    for (const b of BI) {
-      const dens = b.look.street || 0;
-      if (!dens) continue;
-      for (let z = b.from; z < b.to; z += STREET_LEN) {
-        for (const side of [-1, 1]) {
-          const take = rnd.chance(dens);
-          const si = settingIndexAt(z, rnd.next());
-          const v = rnd.int(0, 2);
-          if (!take) continue;
-          if (b.look.bank === side) continue;          // never over the water
-          if (deckLift(z) > 0.15) continue;            // nor on the bridge ramp
-          const depth = SETS[si].look.terrace.depth;
-          structures.push({
-            z: z + STREET_LEN / 2, kind: 'street', set: si, v, side,
-            x: side * (12.2 + depth / 2), y: 0,
-            ry: side < 0 ? Math.PI : 0, rz: 0,
-          });
-        }
-      }
     }
 
     // ---- landmarks --------------------------------------------------------
@@ -9828,6 +9906,43 @@ MR.World = (function () {
       const zz = nudgeOver(z);
       if (noBridgeSpans.some((sp) => zz > sp[0] && zz < sp[1])) continue;
       landmarkOver(zz, 'footbridge', 0);
+    }
+
+    // ---- the street wall --------------------------------------------------
+    /**
+     * Rows on a 30-unit grid down both shoulders, thinned by the biome's own
+     * `street` density so PARKLAND stays open and CITY START closes in. The
+     * front face lands at 12.2, just behind the pavement the road tile carries.
+     *
+     * Laid LAST, and that ordering is the whole reason it works. A terrace row
+     * occupies x = 12.2 to about 19, which is exactly the band the landmarks
+     * stand in -- the first version put the rows down first and every setting's
+     * signature silhouette ended up inside a block of flats. The street now
+     * opens for a landmark and closes again behind it, which is also what a
+     * real city does around its monuments.
+     */
+    for (const b of BI) {
+      const dens = b.look.street || 0;
+      if (!dens) continue;
+      for (let z = b.from; z < b.to; z += STREET_LEN) {
+        for (const side of [-1, 1]) {
+          const take = rnd.chance(dens);
+          const si = settingIndexAt(z, rnd.next());
+          const v = rnd.int(0, 2);
+          if (!take) continue;
+          if (b.look.bank === side) continue;          // never over the water
+          if (deckLift(z) > 0.15) continue;            // nor on the bridge ramp
+          const cz = z + STREET_LEN / 2;
+          if (markBlocks.some((m) => (m.side === 0 || m.side === side)
+            && Math.abs(m.z - cz) < 30)) continue;
+          const depth = SETS[si].look.terrace.depth;
+          structures.push({
+            z: cz, kind: 'street', set: si, v, side,
+            x: side * (12.2 + depth / 2), y: 0,
+            ry: side < 0 ? Math.PI : 0, rz: 0,
+          });
+        }
+      }
     }
 
     /**
@@ -11395,6 +11510,15 @@ MR.Controls = (function () {
     function onKey(e) {
       const a = KEYS[e.code];
       if (!a) return;
+      // Leave the focused control alone. This listener is on `window` and used
+      // to preventDefault unconditionally, which meant Space -- the canonical
+      // key for activating a focused button -- was swallowed before the CTA
+      // ever saw it: you could Tab to TOE THE LINE, press Space, and nothing
+      // happened. Enter worked, so it looked like a dead key rather than a
+      // trapped one. During a run nothing is focused and this never fires.
+      const t = e.target;
+      if (t && (t.tagName === 'BUTTON' || t.tagName === 'A' || t.tagName === 'INPUT' ||
+                t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
       e.preventDefault();
       if (e.repeat) return;
       push(a);
@@ -12124,41 +12248,53 @@ MR.HUD = (function () {
 
       <div id="perf" class="num"></div>
 
-      <div class="panel" id="startPanel"><div class="panelInner">
+      <!--
+        THE START PANEL.
+
+        It used to carry 109 words in five stacked blocks: 28 to 33 seconds of
+        reading before a stranger could press the button, with the explanatory
+        sections alone taking 51-56% of the panel's height. A stranger who
+        clicks into a free browser game gives a start screen three to eight
+        seconds.
+
+        Worse, it spent all of that explaining a pace economy in vocabulary the
+        reader did not have yet -- "gate", "the streak", "the ghost" and
+        "PROJECTED FINISH" were each used before, or entirely without, being
+        defined -- while never once saying what kind of game this is. The word
+        "lanes" appeared exactly once, at character 565 of 622, inside the key
+        legend. You could read the whole panel and not learn you were about to
+        dodge things in three lanes.
+
+        So: genre first, then the wager, then the one rule you cannot infer.
+        Everything cut from here is either shown live by the HUD within fifteen
+        seconds (the pace gauge, the record margin, the projection) or is not
+        needed before the first obstacle.
+      -->
+      <div class="panel" id="startPanel" role="dialog" aria-modal="true"
+           aria-labelledby="startTitle"><div class="panelInner">
         <div class="date" id="startDate"></div>
-        <h1>DAILY MARATHON</h1>
+        <h1 id="startTitle">DAILY MARATHON</h1>
+        <div class="route" id="startRoute"></div>
+
         <div class="blurb">
-          One course. Same for everyone, everywhere, today.
-          26.2 miles, about four minutes.
+          Three lanes. Jump or slide past everything in the way.
+          <b>26.2 miles, about four minutes.</b>
         </div>
 
-        <div class="rule">HOW YOU GET FASTER</div>
-        <div class="mech">
-          <div class="mechPace"><b>${Pace.pace(K.START_PACE)}</b><span>&rarr;</span><b>${Pace.pace(K.FLOOR_PACE)}</b><i>/MI</i></div>
-          <div class="gauge" id="startGauge">
-            <div class="gaugeFill" style="width:100%"></div>
-            <div class="gaugeRec"></div>
-          </div>
-          <div class="gaugeLeg">the mark is record pace, ${Pace.pace(K.RECORD_PACE)}/mi</div>
-          <p>Clear a gate cleanly and you speed up. Every clean gate in a row buys
-             more. Touch one and you lose three quarters of the streak, and the
-             pace bleeds back down.</p>
+        <div class="mech" id="startRule">
+          <p>Every obstacle you clear in a row buys speed &mdash;
+             ${Pace.pace(K.START_PACE)} up to ${Pace.pace(K.FLOOR_PACE)} a mile.
+             Touch one and most of it is gone.</p>
         </div>
 
-        <div class="rule">THE RECORD</div>
-        <div class="mech">
-          <p><b>${K.RECORD_LABEL}</b> needs ${Pace.pace(K.RECORD_PACE)}/mi. You start slower than
-             that and reel it in, so the ghost leads for the first few miles by
-             design. <b>PROJECTED FINISH</b> is the number that tells you whether
-             the record is still on.</p>
+        <div class="target">
+          <span class="targetLab">TARGET</span>
+          <b class="num">${K.RECORD_LABEL}</b>
+          <span class="targetSub" id="targetSub">&nbsp;</span>
         </div>
 
-        <div class="keys">
-          <kbd>&larr;</kbd> <kbd>&rarr;</kbd> lanes &nbsp;&middot;&nbsp;
-          <kbd>&uarr;</kbd> jump &nbsp;&middot;&nbsp; <kbd>&darr;</kbd> duck
-          &nbsp;&middot;&nbsp; or swipe
-        </div>
-        <button class="cta" id="startBtn">TOE THE LINE</button>
+        <div class="keys" id="startKeys"></div>
+        <button class="cta" id="startBtn" type="button">TOE THE LINE</button>
       </div></div>
 
       <div class="panel hidden" id="endPanel"><div class="panelInner">
@@ -12188,6 +12324,7 @@ MR.HUD = (function () {
       toast: q('toast'), toastLab: q('toastLab'), toastBig: q('toastBig'),
       toastCum: q('toastCum'), toastDelta: q('toastDelta'),
       startPanel: q('startPanel'), startBtn: q('startBtn'), startDate: q('startDate'),
+      startRoute: q('startRoute'), startKeys: q('startKeys'), targetSub: q('targetSub'),
       endPanel: q('endPanel'), endTime: q('endTime'), endDate: q('endDate'),
       verdict: q('verdict'), stats: q('resultStats'), splitTable: q('splitTable'),
       againBtn: q('againBtn'),
@@ -12255,6 +12392,86 @@ MR.HUD = (function () {
       n.startDate.textContent = key + ' · GLOBAL COURSE';
       n.endDate.textContent = key + ' · GLOBAL COURSE';
     };
+
+    /**
+     * Name today's road, and price the wager.
+     *
+     * The route is the only thing on this panel that is visibly different
+     * tomorrow. A different gate layout is invisible before you press start; a
+     * different set of cities is not, which makes this the one line that earns
+     * a daily habit rather than describing one.
+     *
+     * The gate count is read off the real course rather than typed in, because
+     * the claim is a measurement -- the record survives exactly one mistake,
+     * and that was established by simulating this pace model against real
+     * generated courses.
+     */
+    api.setCourse = function (course) {
+      if (!course) return;
+      const set = course.settings;
+      n.startRoute.textContent = set && set.length
+        ? set.map(function (x) { return x.name; }).join(' → ')
+        : '';
+      const g = course.gates ? course.gates.length : 0;
+      n.targetSub.textContent = g ? 'survives one mistake in ' + g : '';
+      // The route and the gate count arrive after the panel is first laid out
+      // and both add height, so the overflow test has to run again here or it
+      // measures a panel shorter than the one on screen.
+      if (api.markScroll) requestAnimationFrame(api.markScroll);
+    };
+
+    /**
+     * Show the right instruction to the right device.
+     *
+     * The legend used to lead with four arrow-key chips and end with the word
+     * "swipe", on every device -- and at 360px and below it wrapped so that
+     * "swipe", the only instruction that applied to the phone in the reader's
+     * hand, was orphaned alone on the second line. Width was being used as a
+     * proxy for input type, and it is not one: a 1024px tablet got pure
+     * keyboard instructions and a narrow desktop window got told to swipe.
+     */
+    function inputHint() {
+      const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+      if (coarse) {
+        return 'Swipe <b>left</b> / <b>right</b> to change lane, ' +
+               '<b>up</b> to jump, <b>down</b> to slide';
+      }
+      return '<kbd>&larr;</kbd><kbd>&rarr;</kbd> lanes &nbsp;·&nbsp; ' +
+             '<kbd>&uarr;</kbd> jump &nbsp;·&nbsp; <kbd>&darr;</kbd> slide' +
+             '<span class="orSwipe"> &nbsp;·&nbsp; or swipe</span>';
+    }
+    n.startKeys.innerHTML = inputHint();
+
+    /**
+     * Flag a panel that overflows, so the fade at its bottom edge only appears
+     * when there is genuinely something below the fold.
+     *
+     * On a 320x460 viewport the CTA sat 175px past the bottom with no
+     * scrollbar, no reserved gutter and nothing on screen to suggest a swipe
+     * would help. Scrolling worked -- it was measured -- but on a full-screen
+     * game overlay "no button" reads as "broken", and a recovery nobody knows
+     * about is not a recovery.
+     */
+    function markScroll() {
+      for (const el of [n.startPanel, n.endPanel]) {
+        if (!el) continue;
+        el.classList.toggle('canScroll', el.scrollHeight - el.clientHeight > 4);
+      }
+    }
+    api.markScroll = markScroll;
+    window.addEventListener('resize', markScroll);
+    for (const el of [n.startPanel, n.endPanel]) {
+      el.addEventListener('scroll', function () {
+        el.classList.toggle('canScroll',
+          el.scrollHeight - el.clientHeight - el.scrollTop > 4);
+      }, { passive: true });
+    }
+    if (window.matchMedia) {
+      const mq = window.matchMedia('(pointer: coarse)');
+      const onMq = function () { n.startKeys.innerHTML = inputHint(); };
+      if (mq.addEventListener) mq.addEventListener('change', onMq);
+      else if (mq.addListener) mq.addListener(onMq);
+    }
 
     api.update = function (p, extra) {
       lastP = p;
@@ -12431,6 +12648,7 @@ MR.HUD = (function () {
 
     api.showStart = function (show) {
       n.startPanel.classList.toggle('hidden', !show);
+      if (show) requestAnimationFrame(markScroll);
       syncPanels();
     };
 
@@ -12561,6 +12779,7 @@ MR.HUD = (function () {
   const audio = MR.Audio.create();
   const hud = MR.HUD.create(document.getElementById('ui'));
   hud.setDate(dateKey);
+  hud.setCourse(course);
   hud.showPerf(DEBUG);
 
   const player = MR.Player.create();

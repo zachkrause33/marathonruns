@@ -68,23 +68,36 @@ MR.Camera = (function () {
   const LOOK_Y = 1.16;
   const LOOK_AHEAD = 8.0;
 
-  // Step off the centreline during a slide, toward the side the runner's body
-  // is yawing away from. Dead astern is the worst possible angle from which to
-  // read a pose whose whole statement is length along the travel axis, and at
-  // the 4.6 chase distance a slide holds, this buys about four degrees of
-  // azimuth on it.
+  // THE SLIDE DOES NOT MOVE THE CAMERA. Not off the centreline, not into a
+  // bank, and not much up or in.
   //
-  // The look point follows most of the step rather than none of it, and that
-  // ratio is the safety property. At SLIDE_LOOK = 0 the camera would rotate by
-  // the full four degrees; portrait's horizontal field is only 30 wide, so
-  // that is an eighth of everything the player can see swinging sideways at
-  // the exact moment they are committed and cannot respond, and the next gate
-  // goes with it. At 0.62 the far road turns by a tenth of a degree -- gates
-  // stay where they were -- and the parallax is spent on the near geometry,
-  // which is the runner and his own wake. Measured, he drifts from 0.49 to
-  // 0.35 of frame width for half a second and comes back.
-  const SLIDE_SIDE = -0.34;
-  const SLIDE_LOOK = 0.62;
+  // It used to do all three. A sidestep off the centreline, a three-and-a-half
+  // degree roll, a 1.20 lift and a hard look-down were each added trying to
+  // make the slide read as feet-first rather than as kneeling -- and none of
+  // them worked. What actually fixed that was in the runner, not here: the
+  // head had to leave the silhouette (crown 1.313 -> 0.707 in runner.js). The
+  // camera work was left behind after the real fix landed.
+  //
+  // Measured against the jump, which is the same kind of event and the state
+  // the player is comparing it to, the leftovers cost:
+  //
+  //             jump    slide
+  //   aim       2.5deg  16.5deg     6.7x
+  //   lateral   0.03    0.37        11x
+  //   pull-in   0.06    0.61        10x
+  //
+  // Portrait's horizontal field is about 30 degrees, so a 16.5 degree swing is
+  // over half of everything the player can see moving at the exact moment they
+  // are committed and cannot respond -- and the next gate moves with it. The
+  // player's report was simply "when I jump the camera doesn't change but when
+  // I slide it does", which is the same observation from the other end.
+  //
+  // What survives is the pair that serve the pose rather than decorate it: a
+  // small lift and a small step back, because the feet-first slide really is
+  // nearly a metre longer along the travel axis than a run and would otherwise
+  // crowd the bottom of the frame. Both are held below the jump's own numbers.
+  const SLIDE_UP = 0.34;         // vs the jump's 0.64 peak
+  const SLIDE_BACK = 0.14;       // pull BACK, framing the longer pose
 
   // The honest band, in world units/sec. Derived rather than typed in, so a
   // pace retune moves the camera response with it.
@@ -218,8 +231,12 @@ MR.Camera = (function () {
       // second duck or leave the camera sitting low over a gate.
       const duckNow = p.duck01 || 0;
       if (duckNow > 0.18 && s.pDuck <= 0.18) {
-        s.dipV -= 3.1;
-        s.kick = Math.min(1, s.kick + 0.34);
+        // Kept, but a third of its old size. The entry beat is the slide's
+        // analogue of the jump's landing beat, and the jump gets exactly one
+        // such beat -- so this gets one, of comparable weight, and the pose
+        // itself is then left alone.
+        s.dipV -= 1.4;
+        s.kick = Math.min(1, s.kick + 0.12);
       }
       s.pDuck = duckNow;
 
@@ -282,13 +299,14 @@ MR.Camera = (function () {
       const back = BASE_BACK * s.fr.back
         - drive * 0.62
         + surge * 0.30
-        // Pull BACK in a slide rather than closing in. The feet-first pose is
-        // nearly a metre longer along the travel axis than a run, and at the
-        // old -0.22 the camera closed on it at exactly the wrong moment: the
-        // figure sat 87% down the frame with its legs clipped off the bottom
-        // edge. Backing off frames the whole body and shows more of the bar
-        // being cleared.
-        - duck * 0.55
+        // Pull BACK in a slide rather than closing in: the feet-first pose is
+        // nearly a metre longer along the travel axis than a run, so closing
+        // in put the figure 87% down the frame with its legs clipped off the
+        // bottom edge. This term has read `- duck * 0.55` under a comment
+        // saying it backed off -- `back` is subtracted from p.z, so a negative
+        // coefficient closes IN, and it had been closing in by 0.55 the whole
+        // time. Now it does what the comment always said.
+        + duck * SLIDE_BACK
         - s.gearT * s.gearT * 0.45
         + s.mileT * 0.45
         + s.winded * 0.28
@@ -301,13 +319,12 @@ MR.Camera = (function () {
       // camera was lowest, and the gates tightest, on the same stretch.
       const hgt = BASE_Y
         - drive * 0.20
-        // A slide RAISES the camera instead of lowering it. The old -0.34 was
-        // written for a head-first duck that stayed compact under the lens;
-        // the feet-first slide extends the body nearly a metre back along the
-        // travel axis, so dropping with it pushed the whole runner off the
-        // bottom of the frame just as the player needs to see both their own
-        // clearance and the road past it.
-        + duck * 1.20
+        // A slide RAISES the camera instead of lowering it -- the feet-first
+        // pose extends back along the travel axis, so dropping with it pushed
+        // the runner off the bottom of the frame. Enough to keep him framed,
+        // and no more: at the old 1.20 this alone was twice the jump's whole
+        // vertical travel.
+        + duck * SLIDE_UP
         + (p.y || 0) * 0.30            // keeps a third of the arc -- see aim
         + s.dip
         + s.mileT * 0.24
@@ -315,21 +332,21 @@ MR.Camera = (function () {
         + bobY + shY
         + fin * 1.7;
 
-      // See SLIDE_SIDE: a bounded step off the centreline, held only while the
-      // body is down.
-      const side = duck * SLIDE_SIDE;
-
-      cam.position.set(s.x + bobX + shX + side, hgt, p.z - back);
+      cam.position.set(s.x + bobX + shX, hgt, p.z - back);
 
       // ---- aim ------------------------------------------------------------
       // The look point follows the jump arc *more* than the camera does, so
       // the camera pitches up as the runner rises: the road falls away in
       // frame, which is what leaving the ground actually looks like. The old
       // 0.42/0.30 split had the camera chasing the arc and cancelled it.
+      // The slide's aim terms are deliberately small. They used to be -1.05 and
+      // -3.2, which between them pitched the camera down hard enough to throw
+      // the far road out of frame for the length of the slide. They now do just
+      // enough to acknowledge that the body went down.
       look.set(
-        s.x * s.fr.lookX + side * SLIDE_LOOK,
-        LOOK_Y + (p.y || 0) * 0.50 - duck * 1.05 - drive * 0.22 + fin * 0.55,
-        p.z + LOOK_AHEAD - duck * 3.2 + (p.y || 0) * 1.1 - drive * 0.5
+        s.x * s.fr.lookX,
+        LOOK_Y + (p.y || 0) * 0.50 - duck * 0.30 - drive * 0.22 + fin * 0.55,
+        p.z + LOOK_AHEAD - duck * 0.90 + (p.y || 0) * 1.1 - drive * 0.5
       );
       cam.lookAt(look);
 
@@ -341,13 +358,12 @@ MR.Camera = (function () {
       const whip = Math.max(-1, Math.min(1, s.vx / 20));
       const rollTgt = -((p.lean || 0) * 0.16 + whip * 0.07) * s.fr.roll * (1 - fin);
       s.roll += (rollTgt - s.roll) * (1 - Math.pow(0.00002, d));
-      // The slide gets its own small bank, in the same direction the runner's
-      // body yaws over in runner.js. Three and a half degrees is well below
-      // the threshold at which a tilted horizon costs readability, and it buys
-      // the one thing a dead-astern chase can never give a pose: a frame that
-      // is not bilaterally symmetric. A symmetric frame around a symmetric
-      // silhouette is most of why this state kept reading as "kneeling".
-      cam.rotation.z += s.roll + shR - s.punch * 0.055 + duck * 0.062;
+      // No bank on the slide. It was three and a half degrees of tilt bought to
+      // break the frame's bilateral symmetry, back when that was believed to be
+      // why the pose read as kneeling. It was not, and the horizon rolling
+      // under a committed player is exactly the kind of camera movement a jump
+      // never asks them to absorb.
+      cam.rotation.z += s.roll + shR - s.punch * 0.055;
 
       // ---- fov ------------------------------------------------------------
       // Widening while pulling in keeps the runner the same size on screen and
@@ -359,7 +375,7 @@ MR.Camera = (function () {
         + GEAR_FOV * gear
         + s.gearT * 5.0
         + surge * 3.5
-        + duck * 2.5
+        + duck * 1.0            // was 2.5 -- the jump's own air term is 1.6
         + air * 1.6
         + s.kick * 6
         - s.winded * 5.0

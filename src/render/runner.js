@@ -19,10 +19,13 @@
  *      a fatter skull hangs more of its own silhouette into the gap before
  *      the neck gets any use of it -- at this head size about 0.05 of it.
  *   2. The back needs its own value structure, and the order matters.
- *      Top to bottom it runs dark hair / bright headband / dark hair /
- *      light neck / red vest / white race bib. Hair on the crown with a
- *      bare nape put light on light and the head merged again; the dark
- *      mass has to sit directly above the lit neck for the pinch to read.
+ *      Top to bottom it runs red cap / bright band / dark brim / dark hair /
+ *      light neck / dark hood / red vest / white race bib. Hair on the crown
+ *      with a bare nape put light on light and the head merged again; the
+ *      dark mass has to sit directly above the lit neck for the pinch to
+ *      read. The hood is the same argument applied from below -- the neck is
+ *      now pinched from both sides rather than only from above -- and it is
+ *      why the hood is navy and not the vest's own red.
  *   3. Motion has to break the outline. Arm swing is almost entirely along
  *      the camera axis from here, so the cycle drives the elbows sideways
  *      and lets the pale shoes, gloves and wristbands flash against the
@@ -31,9 +34,9 @@
  *      may differ on the SAME axis. Measured in world units on the rig's own
  *      bounding box, against the run, on a 390x844 phone in portrait:
  *
- *        run    half-width 0.40  (1.00x)   crown 1.56  (1.00x)
+ *        run    half-width 0.40  (1.00x)   crown 1.57  (1.00x)
  *        jump   half-width 0.92  (2.3x)    -- a horizontal bar, airborne
- *        slide  half-width 0.59  (1.5x)    crown 0.71  (0.46x)
+ *        slide  half-width 0.60  (1.5x)    crown 0.72  (0.46x)
  *
  *      Width alone separates the jump from both others -- it is still half as
  *      wide again as the slide -- and height alone separates the slide from
@@ -63,11 +66,27 @@
  *      hard-edged ellipse for the whole arc, which is a landing reticle in a
  *      shadow's clothing. The soft contact blob is right for a body ON the
  *      road and exactly wrong for one above it.
+ *   7. A person reads as a person because they are WEARING something, and a
+ *      garment is only ever visible at its EDGES. The reference character from
+ *      behind is a stack of hems -- cap band, hood roll, collar, vest hem,
+ *      waistband, short cuff, sock, shoe collar -- and this one was a smooth
+ *      cylinder with a number on it. Every hem added here is welded into a
+ *      part that already existed, so the whole wardrobe costs two draw calls
+ *      (the hood, which has to move on its own) and not one vertex of extra
+ *      width: see the note above the colour block, and the hand, which pays
+ *      for its fingers out of its own palm.
+ *   8. Nothing on a rig where every part is bolted to a joint can arrive late,
+ *      and everything real does. Two things here are not bolted to a joint:
+ *      the hood, on a pair of underdamped springs, and the bib's hem, on a
+ *      travelling wave with its own clock. They are the two largest pieces of
+ *      cloth the back view sees, which is not a coincidence -- cloth is the
+ *      only thing on a runner that is allowed to lag.
  *
  * Pivot layout (all rotations are local X unless noted):
  *   root -> body -> hips -> thigh -> shin -> foot
  *                -> spine -> chest -> neck -> head
  *                                  -> shoulder -> upperArm -> forearm+hand
+ *                                  -> hoodPivot -> hood   (springs, not posed)
  *        -> shadowPivot -> contact shadow, landing reticle
  *                                              (cancels the jump and the bank)
  *        -> fxPivot     -> skid ribbon, dust, speed streaks
@@ -257,10 +276,13 @@ MR.Runner = (function () {
    * into a vertex-colour attribute.
    *
    * Every part is outlined, so a part costs two draw calls. Welding the
-   * pieces that never move relative to each other -- skull + hair + band +
-   * ears + neck, vest + shoulders, shoe + soles -- is what pays for the extra
-   * detail this silhouette needs while staying inside the budget. The whole
-   * character is 28 draws plus one for the shadow.
+   * pieces that never move relative to each other -- skull + cap + brim +
+   * hair + nape + band + ears + neck, vest + shoulders + collar + hem, shoe +
+   * sole + heel counter + laces -- is what pays for the extra detail this
+   * silhouette needs while staying inside the budget. The whole character is
+   * 30 draws plus one for the shadow, and the entire wardrobe pass that took
+   * it from a cylinder to a person cost two of those: the hood, which is the
+   * only added part that has to move independently of the bone it hangs off.
    *
    * Piece: { g, c, x,y,z, rx,ry,rz, sx,sy,sz }.
    */
@@ -715,19 +737,26 @@ MR.Runner = (function () {
     // the other way round yaws the finished ring instead of sliding the arc
     // round it. The arc is 234 degrees centred on the spine, so it wraps the
     // neck and dies out under the deltoids.
-    // The shorts' navy, not the vest's red, and that is a deliberate second
-    // try. In JACKET the roll rendered as "the top of the vest": a hood is a
-    // separate GARMENT and it has to be a separate colour or it is just a
-    // thicker collar. Navy also puts a dark mass directly beneath the lit neck,
-    // which is the half of the head/shoulder pinch this figure never had --
-    // the ladder now runs dark hair / lit neck / dark hood / red vest, with the
-    // neck pinched from both sides instead of one.
+    // Navy, not the vest's red, and that is a deliberate second try. In JACKET
+    // the roll rendered as "the top of the vest": a hood is a separate GARMENT
+    // and it has to be a separate colour or it is just a thicker collar. Navy
+    // also puts a dark mass directly beneath the lit neck, which is the half of
+    // the head/shoulder pinch this figure never had -- the ladder now runs dark
+    // hair / lit neck / dark hood / red vest, with the neck pinched from both
+    // sides instead of only from above.
+    //
+    // WAIST rather than the shorts' own darker navy, which was the third try:
+    // at the shorts' value the hood, the hair and the shorts made three near-
+    // black masses on a figure the references keep light, and the shoulders
+    // were the heaviest thing in frame. One step up is still unambiguously
+    // dark against the neck, and it gives WAIST its third hit -- hood,
+    // waistband, short cuff -- which is the rhythm TRIM already runs.
     const hoodPivot = pivot(chest, 0, 0.048, -0.045);
     const hood = multi([
       // sz, not sy: weld() composes T*R*S, so the squash lands on the geometry
       // BEFORE it is laid flat, and the tube's axis is still the original z.
       // Squashing y here would flatten the ring instead of the roll.
-      { g: new THREE.TorusGeometry(0.180, 0.074, 5, 12, Math.PI * 1.30), c: P.runnerShort,
+      { g: new THREE.TorusGeometry(0.180, 0.074, 5, 12, Math.PI * 1.30), c: WAIST,
         rx: -Math.PI / 2, rz: -0.42, sz: 0.76 },
     ]);
     hoodPivot.add(hood);
@@ -822,7 +851,20 @@ MR.Runner = (function () {
       // what lets one primitive do a haircut. It now reads as the hair showing
       // BELOW a cap rather than as the whole head of hair, which is why the
       // nape below matters more than it used to.
-      { g: new THREE.SphereGeometry(0.286, 14, 8, Math.PI * 1.5 - 1.83, 3.66, Math.PI * 0.33, Math.PI * 0.44), c: P.runnerHair, y: HY },
+      //
+      // phiStart moved 0.33pi -> 0.40pi, and this is a real bug fix rather
+      // than a tidy-up. The hair shell is r=0.286 and the crown shell is
+      // r=0.288, so through the whole band they used to overlap 0.002 apart --
+      // two surfaces closer together than a float is willing to sort -- and
+      // their facets interpenetrated in a ring. That was INVISIBLE while both
+      // were the same hair colour and became a row of red-and-black teeth the
+      // moment the crown became a cap. Starting the hair at 0.40pi puts its
+      // top edge at y=0.088, under the band's 0.097, so the band covers the
+      // join and the two shells never share a height again. Same class of
+      // error as the crown punching a coin of scalp through the hair; the
+      // lesson is that a colour change can expose geometry that was always
+      // wrong.
+      { g: new THREE.SphereGeometry(0.286, 14, 8, Math.PI * 1.5 - 1.83, 3.66, Math.PI * 0.40, Math.PI * 0.37), c: P.runnerHair, y: HY },
       // The hairline. The hair shell ends on a clean latitude arc, which is a
       // haircut no human has: what the back view of a real head shows is the
       // hair narrowing to a taper down the middle of the neck. 0.14 across and
@@ -854,8 +896,25 @@ MR.Runner = (function () {
       // it is a shelf seen from 20 degrees above, so what the player sees is
       // its TOP FACE, and a top face the same colour as the dome behind it is
       // a shape with no edge. One step darker and it separates into a plane.
-      { g: new THREE.CylinderGeometry(0.310, 0.310, 0.034, 14, 1, false, Math.PI * 0.5, Math.PI), c: JACKET,
-        y: HY + 0.048, z: -0.060, rx: 0.34 },
+      //
+      // An ELLIPSE, narrow across and long back, and that shape is the whole
+      // repair on this part. A round half-disc big enough to overhang put a
+      // third shell within 0.015 of the skull's 0.266 and the band's 0.294 --
+      // three surfaces inside one outline width -- and the ink shell punched
+      // through both in a ring of dark wedges: the same row of teeth the
+      // headband note warns about, arrived at from a different direction.
+      // Squashed to 0.185 across it is buried inside the skull everywhere
+      // except behind it, so the only part that draws at all is the shelf.
+      //
+      // Held nearly level (0.06rad) rather than cocked up, which is the
+      // difference between a brim and a stripe. The camera is only about 20
+      // degrees above it, so a point 0.33 nearer the lens draws 0.11 LOWER on
+      // screen than one at the same height on the skull -- a brim cocked up
+      // 0.34 climbs almost exactly that, the two cancel, and the first version
+      // projected as a band across the middle of the cap rather than as a
+      // shelf standing off the back of it.
+      { g: new THREE.CylinderGeometry(0.250, 0.250, 0.034, 12, 1, false, Math.PI * 0.5, Math.PI), c: JACKET,
+        y: HY + 0.030, z: -0.085, rx: 0.06, sx: 0.74, sz: 1.30 },
       { g: new THREE.SphereGeometry(0.080, 8, 6), c: P.runnerSkin, x: -0.254, y: HY - 0.020, z: -0.013, sx: 0.48, sz: 0.82 },
       { g: new THREE.SphereGeometry(0.080, 8, 6), c: P.runnerSkin, x: 0.254, y: HY - 0.020, z: -0.013, sx: 0.48, sz: 0.82 },
     ]);
@@ -882,7 +941,15 @@ MR.Runner = (function () {
     for (const side of [-1, 1]) {
       // leg
       const hip = pivot(hips, side * 0.128, -0.045, 0);
-      const thigh = part(new THREE.CapsuleGeometry(0.114, 0.100, 3, 10), P.runnerSkin);
+      // Hamstring, the same argument as the calf: from directly behind a leg
+      // is two muscles and a tube is neither. It is fatter than the capsule
+      // only in z -- 0.026 proud at the back, nothing at the sides -- so it
+      // adds form the ramp can shade without touching the width the lane
+      // budget is measured on.
+      const thigh = multi([
+        { g: new THREE.CapsuleGeometry(0.114, 0.100, 3, 10), c: P.runnerSkin },
+        { g: new THREE.SphereGeometry(0.120, 8, 6), c: P.runnerSkin, y: 0.052, z: -0.020, sx: 0.93, sy: 1.02 },
+      ]);
       thigh.position.y = -0.108;
       hip.add(thigh);
 
@@ -1885,7 +1952,11 @@ MR.Runner = (function () {
       // of reinforcing it, and that is what stops the whole figure reading as
       // one clockwork.
       bibT += dt * (5.2 + 6.4 * sp01);
-      const bibAmp = (0.026 + 0.014 * sp01) * (1 - slid * 0.55) + spread * 0.018;
+      // 0.036, not the 0.026 this started at: measured off a burst of frames,
+      // 0.026 moves a corner about four pixels at gameplay framing and the
+      // strip could not resolve it. Past about 0.05 the corner visibly leaves
+      // the vest and the panel reads as unstuck rather than as fluttering.
+      const bibAmp = (0.036 + 0.016 * sp01) * (1 - slid * 0.55) + spread * 0.018;
       const bp = bibPos.array;
       for (let i = 0; i < bibPos.count; i++) {
         const w = bibWeight[i];
@@ -1897,7 +1968,7 @@ MR.Runner = (function () {
         const k = 1 + lift / BIB_R;
         bp[i * 3] = bibRest[i * 3] * k;
         bp[i * 3 + 2] = bibRest[i * 3 + 2] * k;
-        bp[i * 3 + 1] = bibRest[i * 3 + 1] + lift * 0.45;
+        bp[i * 3 + 1] = bibRest[i * 3 + 1] + lift * 0.70;
       }
       bibPos.needsUpdate = true;
 

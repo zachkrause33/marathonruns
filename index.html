@@ -2410,10 +2410,13 @@ MR.shading = (function () {
  *      a fatter skull hangs more of its own silhouette into the gap before
  *      the neck gets any use of it -- at this head size about 0.05 of it.
  *   2. The back needs its own value structure, and the order matters.
- *      Top to bottom it runs dark hair / bright headband / dark hair /
- *      light neck / red vest / white race bib. Hair on the crown with a
- *      bare nape put light on light and the head merged again; the dark
- *      mass has to sit directly above the lit neck for the pinch to read.
+ *      Top to bottom it runs red cap / bright band / dark brim / dark hair /
+ *      light neck / dark hood / red vest / white race bib. Hair on the crown
+ *      with a bare nape put light on light and the head merged again; the
+ *      dark mass has to sit directly above the lit neck for the pinch to
+ *      read. The hood is the same argument applied from below -- the neck is
+ *      now pinched from both sides rather than only from above -- and it is
+ *      why the hood is navy and not the vest's own red.
  *   3. Motion has to break the outline. Arm swing is almost entirely along
  *      the camera axis from here, so the cycle drives the elbows sideways
  *      and lets the pale shoes, gloves and wristbands flash against the
@@ -2422,9 +2425,9 @@ MR.shading = (function () {
  *      may differ on the SAME axis. Measured in world units on the rig's own
  *      bounding box, against the run, on a 390x844 phone in portrait:
  *
- *        run    half-width 0.40  (1.00x)   crown 1.56  (1.00x)
+ *        run    half-width 0.40  (1.00x)   crown 1.57  (1.00x)
  *        jump   half-width 0.92  (2.3x)    -- a horizontal bar, airborne
- *        slide  half-width 0.59  (1.5x)    crown 0.71  (0.46x)
+ *        slide  half-width 0.60  (1.5x)    crown 0.72  (0.46x)
  *
  *      Width alone separates the jump from both others -- it is still half as
  *      wide again as the slide -- and height alone separates the slide from
@@ -2454,11 +2457,27 @@ MR.shading = (function () {
  *      hard-edged ellipse for the whole arc, which is a landing reticle in a
  *      shadow's clothing. The soft contact blob is right for a body ON the
  *      road and exactly wrong for one above it.
+ *   7. A person reads as a person because they are WEARING something, and a
+ *      garment is only ever visible at its EDGES. The reference character from
+ *      behind is a stack of hems -- cap band, hood roll, collar, vest hem,
+ *      waistband, short cuff, sock, shoe collar -- and this one was a smooth
+ *      cylinder with a number on it. Every hem added here is welded into a
+ *      part that already existed, so the whole wardrobe costs two draw calls
+ *      (the hood, which has to move on its own) and not one vertex of extra
+ *      width: see the note above the colour block, and the hand, which pays
+ *      for its fingers out of its own palm.
+ *   8. Nothing on a rig where every part is bolted to a joint can arrive late,
+ *      and everything real does. Two things here are not bolted to a joint:
+ *      the hood, on a pair of underdamped springs, and the bib's hem, on a
+ *      travelling wave with its own clock. They are the two largest pieces of
+ *      cloth the back view sees, which is not a coincidence -- cloth is the
+ *      only thing on a runner that is allowed to lag.
  *
  * Pivot layout (all rotations are local X unless noted):
  *   root -> body -> hips -> thigh -> shin -> foot
  *                -> spine -> chest -> neck -> head
  *                                  -> shoulder -> upperArm -> forearm+hand
+ *                                  -> hoodPivot -> hood   (springs, not posed)
  *        -> shadowPivot -> contact shadow, landing reticle
  *                                              (cancels the jump and the bank)
  *        -> fxPivot     -> skid ribbon, dust, speed streaks
@@ -2648,10 +2667,13 @@ MR.Runner = (function () {
    * into a vertex-colour attribute.
    *
    * Every part is outlined, so a part costs two draw calls. Welding the
-   * pieces that never move relative to each other -- skull + hair + band +
-   * ears + neck, vest + shoulders, shoe + soles -- is what pays for the extra
-   * detail this silhouette needs while staying inside the budget. The whole
-   * character is 28 draws plus one for the shadow.
+   * pieces that never move relative to each other -- skull + cap + brim +
+   * hair + nape + band + ears + neck, vest + shoulders + collar + hem, shoe +
+   * sole + heel counter + laces -- is what pays for the extra detail this
+   * silhouette needs while staying inside the budget. The whole character is
+   * 30 draws plus one for the shadow, and the entire wardrobe pass that took
+   * it from a cylinder to a person cost two of those: the hood, which is the
+   * only added part that has to move independently of the bone it hangs off.
    *
    * Piece: { g, c, x,y,z, rx,ry,rz, sx,sy,sz }.
    */
@@ -3106,13 +3128,27 @@ MR.Runner = (function () {
     // the other way round yaws the finished ring instead of sliding the arc
     // round it. The arc is 234 degrees centred on the spine, so it wraps the
     // neck and dies out under the deltoids.
-    const hoodPivot = pivot(chest, 0, 0.052, -0.045);
+    // Navy, not the vest's red, and that is a deliberate second try. In JACKET
+    // the roll rendered as "the top of the vest": a hood is a separate GARMENT
+    // and it has to be a separate colour or it is just a thicker collar. Navy
+    // also puts a dark mass directly beneath the lit neck, which is the half of
+    // the head/shoulder pinch this figure never had -- the ladder now runs dark
+    // hair / lit neck / dark hood / red vest, with the neck pinched from both
+    // sides instead of only from above.
+    //
+    // WAIST rather than the shorts' own darker navy, which was the third try:
+    // at the shorts' value the hood, the hair and the shorts made three near-
+    // black masses on a figure the references keep light, and the shoulders
+    // were the heaviest thing in frame. One step up is still unambiguously
+    // dark against the neck, and it gives WAIST its third hit -- hood,
+    // waistband, short cuff -- which is the rhythm TRIM already runs.
+    const hoodPivot = pivot(chest, 0, 0.048, -0.045);
     const hood = multi([
       // sz, not sy: weld() composes T*R*S, so the squash lands on the geometry
       // BEFORE it is laid flat, and the tube's axis is still the original z.
       // Squashing y here would flatten the ring instead of the roll.
-      { g: new THREE.TorusGeometry(0.175, 0.062, 5, 12, Math.PI * 1.30), c: JACKET,
-        rx: -Math.PI / 2, rz: -0.42, sz: 0.72 },
+      { g: new THREE.TorusGeometry(0.180, 0.074, 5, 12, Math.PI * 1.30), c: WAIST,
+        rx: -Math.PI / 2, rz: -0.42, sz: 0.76 },
     ]);
     hoodPivot.add(hood);
 
@@ -3206,7 +3242,20 @@ MR.Runner = (function () {
       // what lets one primitive do a haircut. It now reads as the hair showing
       // BELOW a cap rather than as the whole head of hair, which is why the
       // nape below matters more than it used to.
-      { g: new THREE.SphereGeometry(0.286, 14, 8, Math.PI * 1.5 - 1.83, 3.66, Math.PI * 0.33, Math.PI * 0.44), c: P.runnerHair, y: HY },
+      //
+      // phiStart moved 0.33pi -> 0.40pi, and this is a real bug fix rather
+      // than a tidy-up. The hair shell is r=0.286 and the crown shell is
+      // r=0.288, so through the whole band they used to overlap 0.002 apart --
+      // two surfaces closer together than a float is willing to sort -- and
+      // their facets interpenetrated in a ring. That was INVISIBLE while both
+      // were the same hair colour and became a row of red-and-black teeth the
+      // moment the crown became a cap. Starting the hair at 0.40pi puts its
+      // top edge at y=0.088, under the band's 0.097, so the band covers the
+      // join and the two shells never share a height again. Same class of
+      // error as the crown punching a coin of scalp through the hair; the
+      // lesson is that a colour change can expose geometry that was always
+      // wrong.
+      { g: new THREE.SphereGeometry(0.286, 14, 8, Math.PI * 1.5 - 1.83, 3.66, Math.PI * 0.40, Math.PI * 0.37), c: P.runnerHair, y: HY },
       // The hairline. The hair shell ends on a clean latitude arc, which is a
       // haircut no human has: what the back view of a real head shows is the
       // hair narrowing to a taper down the middle of the neck. 0.14 across and
@@ -3238,8 +3287,25 @@ MR.Runner = (function () {
       // it is a shelf seen from 20 degrees above, so what the player sees is
       // its TOP FACE, and a top face the same colour as the dome behind it is
       // a shape with no edge. One step darker and it separates into a plane.
-      { g: new THREE.CylinderGeometry(0.310, 0.310, 0.034, 14, 1, false, Math.PI * 0.5, Math.PI), c: JACKET,
-        y: HY + 0.048, z: -0.060, rx: 0.34 },
+      //
+      // An ELLIPSE, narrow across and long back, and that shape is the whole
+      // repair on this part. A round half-disc big enough to overhang put a
+      // third shell within 0.015 of the skull's 0.266 and the band's 0.294 --
+      // three surfaces inside one outline width -- and the ink shell punched
+      // through both in a ring of dark wedges: the same row of teeth the
+      // headband note warns about, arrived at from a different direction.
+      // Squashed to 0.185 across it is buried inside the skull everywhere
+      // except behind it, so the only part that draws at all is the shelf.
+      //
+      // Held nearly level (0.06rad) rather than cocked up, which is the
+      // difference between a brim and a stripe. The camera is only about 20
+      // degrees above it, so a point 0.33 nearer the lens draws 0.11 LOWER on
+      // screen than one at the same height on the skull -- a brim cocked up
+      // 0.34 climbs almost exactly that, the two cancel, and the first version
+      // projected as a band across the middle of the cap rather than as a
+      // shelf standing off the back of it.
+      { g: new THREE.CylinderGeometry(0.250, 0.250, 0.034, 12, 1, false, Math.PI * 0.5, Math.PI), c: JACKET,
+        y: HY + 0.030, z: -0.085, rx: 0.06, sx: 0.74, sz: 1.30 },
       { g: new THREE.SphereGeometry(0.080, 8, 6), c: P.runnerSkin, x: -0.254, y: HY - 0.020, z: -0.013, sx: 0.48, sz: 0.82 },
       { g: new THREE.SphereGeometry(0.080, 8, 6), c: P.runnerSkin, x: 0.254, y: HY - 0.020, z: -0.013, sx: 0.48, sz: 0.82 },
     ]);
@@ -3266,7 +3332,15 @@ MR.Runner = (function () {
     for (const side of [-1, 1]) {
       // leg
       const hip = pivot(hips, side * 0.128, -0.045, 0);
-      const thigh = part(new THREE.CapsuleGeometry(0.114, 0.100, 3, 10), P.runnerSkin);
+      // Hamstring, the same argument as the calf: from directly behind a leg
+      // is two muscles and a tube is neither. It is fatter than the capsule
+      // only in z -- 0.026 proud at the back, nothing at the sides -- so it
+      // adds form the ramp can shade without touching the width the lane
+      // budget is measured on.
+      const thigh = multi([
+        { g: new THREE.CapsuleGeometry(0.114, 0.100, 3, 10), c: P.runnerSkin },
+        { g: new THREE.SphereGeometry(0.120, 8, 6), c: P.runnerSkin, y: 0.052, z: -0.020, sx: 0.93, sy: 1.02 },
+      ]);
       thigh.position.y = -0.108;
       hip.add(thigh);
 
@@ -4269,7 +4343,11 @@ MR.Runner = (function () {
       // of reinforcing it, and that is what stops the whole figure reading as
       // one clockwork.
       bibT += dt * (5.2 + 6.4 * sp01);
-      const bibAmp = (0.026 + 0.014 * sp01) * (1 - slid * 0.55) + spread * 0.018;
+      // 0.036, not the 0.026 this started at: measured off a burst of frames,
+      // 0.026 moves a corner about four pixels at gameplay framing and the
+      // strip could not resolve it. Past about 0.05 the corner visibly leaves
+      // the vest and the panel reads as unstuck rather than as fluttering.
+      const bibAmp = (0.036 + 0.016 * sp01) * (1 - slid * 0.55) + spread * 0.018;
       const bp = bibPos.array;
       for (let i = 0; i < bibPos.count; i++) {
         const w = bibWeight[i];
@@ -4281,7 +4359,7 @@ MR.Runner = (function () {
         const k = 1 + lift / BIB_R;
         bp[i * 3] = bibRest[i * 3] * k;
         bp[i * 3 + 2] = bibRest[i * 3 + 2] * k;
-        bp[i * 3 + 1] = bibRest[i * 3 + 1] + lift * 0.45;
+        bp[i * 3 + 1] = bibRest[i * 3 + 1] + lift * 0.70;
       }
       bibPos.needsUpdate = true;
 
@@ -4653,6 +4731,308 @@ MR.World = (function () {
 
   const PROP_KINDS = ['building', 'tree', 'grove', 'crowd', 'walkers'];
 
+  /**
+   * ============================ THE SETTINGS ============================
+   *
+   * Twelve places, three or four of which the day's course draws (see
+   * pickSettings in course.js). This table is the whole of what makes one
+   * different from another: a palette, a street, a tree, and a short list of
+   * SILHOUETTES keyed by which beat of the race they belong to.
+   *
+   * It is deliberately a data table and not twelve piles of geometry. Every
+   * `k` below names a builder in MARKS, and almost every builder is a thin
+   * proportioning of one of a dozen shared parametric shapes -- a lattice
+   * tower, a truss span, an arcade, a shell, a terraced row. Cape Town's
+   * mountain and Paris's tower are built from the same four functions; what
+   * differs is the numbers. That is what keeps twelve settings affordable and
+   * what keeps them looking like one game.
+   *
+   * WHAT IDENTIFIES A CITY IS ITS SILHOUETTE, not its detail. At the distance
+   * a landmark is actually seen here -- 60 to 200 units, through fog that has
+   * taken a third of the contrast -- nothing survives except the outline
+   * against the sky. So each setting spends its budget on one or two shapes
+   * nobody could mistake (the Opera House shells, the Colosseum's arcade, a
+   * sphere on a needle, a flat-topped mountain) and takes everything else from
+   * the shared vocabulary.
+   *
+   * FIELDS
+   *   sky/fog/ground/road   the base palette. BIOME_MOD pulls these around per
+   *                         leg; nothing here is ever used raw at mile 20.
+   *   water                 rivers, harbours and the drop under a bridge deck.
+   *   edge                  a gentle tint on the roadside furniture. Multiplies
+   *                         a vertex colour, so it can only ever knock down --
+   *                         everything here stays close to white on purpose.
+   *   terrace               the street wall: what the buildings AT THE KERB
+   *                         are. This is doing more identification work than
+   *                         any single landmark, because there is one in frame
+   *                         essentially always.
+   *   tower                 the taller blocks set back behind them.
+   *   tree                  what a tree is here.
+   *   marks                 landmarks, by biome. Cycled along the leg.
+   *   bridge                what THE BRIDGE is in this city.
+   *
+   * A setting that has nothing to say about a beat simply omits it and takes
+   * the fallback, which is the generic set this file has always had.
+   */
+  const SETTING_LOOK = {
+
+    BOSTON: {
+      sky: [0x2a55b0, 0xc6e8ff], fog: 0xcfe6f2, ground: 0x86b45a, road: 0xc3c6e8,
+      water: 0x3f7fae, edge: 0xf4ece0,
+      terrace: {
+        colors: [0x9c5b4a, 0xb06a52, 0x8a5040, 0xc08a68, 0xa66a58],
+        trim: 0xe8dcc4, win: 0x3c4a72, roof: 'flat', roofColor: 0x5a5266,
+        h: [8.5, 11.5], bay: 4.6, depth: 7.0, rows: 4, stoop: 1, bow: 1, chimney: 2,
+      },
+      tower: { colors: [0x6a7ea8, 0x8a92b8, 0xb8b0a0], glass: 0, crown: 'flat' },
+      tree: { kind: 'round', colors: [0xe0692f, 0xd8952a, 0xc04a2a, 0xe8b13a], h: 1.05 },
+      marks: {
+        'CITY START': [{ k: 'citgo', x: 15 }, { k: 'spireWhite', x: 14 }, { k: 'clock', x: 14.5 }],
+        'RIVERSIDE': [{ k: 'citgo', x: 16 }, { k: 'ship', x: 34, y: -0.12 }],
+        'PARKLAND': [{ k: 'oak', x: 15 }, { k: 'pond', x: 27 }, { k: 'spireWhite', x: 15 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'spireWhite', x: 14 }],
+        'FINAL MILE': [{ k: 'clock', x: 15.5 }, { k: 'jumbo', x: 13.5 }, { k: 'citgo', x: 15 }],
+      },
+      bridge: 'zakim',
+    },
+
+    LONDON: {
+      sky: [0x3a63b8, 0xdae8f4], fog: 0xd6e4f0, ground: 0x5fbf6b, road: 0xc0c4e0,
+      water: 0x5a8fa8, edge: 0xffe8e8,
+      terrace: {
+        colors: [0xe8dcc8, 0xd8c8b0, 0xc8b8a4, 0xefe4d4, 0xb8a894],
+        trim: 0xfff6e8, win: 0x33405e, roof: 'parapet', roofColor: 0x4a4458,
+        h: [8.5, 11.0], bay: 4.4, depth: 7.0, rows: 4, stoop: 1, chimney: 3,
+      },
+      tower: { colors: [0x7a8ab0, 0x9aa4c0, 0xc8ccd8], glass: 1, crown: 'flat' },
+      tree: { kind: 'round', colors: [0x3e8f4a, 0x4fa85c, 0x5cbf6a], h: 1.15, trunk: 0x9a9a86 },
+      marks: {
+        'CITY START': [{ k: 'stPauls', x: 17 }, { k: 'bigBen', x: 14 }],
+        'RIVERSIDE': [{ k: 'stPauls', x: 18 }, { k: 'ship', x: 34, y: -0.12 }],
+        'PARKLAND': [{ k: 'oak', x: 15 }, { k: 'pond', x: 27 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'bigBen', x: 14 }],
+        'FINAL MILE': [{ k: 'bigBen', x: 14.5 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'towerBridge',
+    },
+
+    BERLIN: {
+      sky: [0x2f52b0, 0xcfe2f8], fog: 0xc8dcf5, ground: 0x69c46e, road: 0xb8bcdc,
+      water: 0x4f86ae, edge: 0xeef0ff,
+      terrace: {
+        colors: [0xe4d8c0, 0xcfc0a8, 0xdcc8a8, 0xbfb098, 0xefe6d2],
+        trim: 0xfff8ec, win: 0x384464, roof: 'mansard', roofColor: 0x59607a,
+        h: [10.0, 13.0], bay: 4.8, depth: 7.4, rows: 5, chimney: 2, balcony: 1,
+      },
+      tower: { colors: [0x8894b8, 0xa8b0cc, 0xd8dce8], glass: 1, crown: 'flat' },
+      tree: { kind: 'round', colors: [0x4aa055, 0x58b862, 0x6ccf74], h: 1.2 },
+      marks: {
+        'CITY START': [{ k: 'fernsehturm', x: 22 }, { k: 'brandenburg', over: 1 }],
+        'RIVERSIDE': [{ k: 'fernsehturm', x: 24 }, { k: 'ship', x: 34, y: -0.12 }],
+        'PARKLAND': [{ k: 'victoryColumn', x: 16 }, { k: 'oak', x: 15 }, { k: 'pond', x: 27 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'fernsehturm', x: 20 }],
+        'FINAL MILE': [{ k: 'brandenburg', over: 1 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'oberbaum',
+    },
+
+    CHICAGO: {
+      sky: [0x1f3fa0, 0xa8cfe8], fog: 0xa8cde0, ground: 0x63b46a, road: 0xb0b4d8,
+      water: 0x3f7fa8, edge: 0xe4e8f4,
+      terrace: {
+        colors: [0x9a8f7e, 0x8a8070, 0xa8998a, 0x7c7466, 0xb0a494],
+        trim: 0xd8cfc0, win: 0x2f3a58, roof: 'flat', roofColor: 0x4e4a5c,
+        h: [9.0, 12.0], bay: 4.6, depth: 7.0, rows: 4, stoop: 1, chimney: 1,
+      },
+      tower: { colors: [0x2f3550, 0x3a4160, 0x4a5270], glass: 1, crown: 'antenna' },
+      tree: { kind: 'round', colors: [0x3f9a52, 0x4faf5f, 0x62c470], h: 1.0 },
+      marks: {
+        'CITY START': [{ k: 'willis', x: 20 }, { k: 'lTrack', over: 1 }],
+        'RIVERSIDE': [{ k: 'lTrack', over: 1 }, { k: 'crane', x: 13 }, { k: 'willis', x: 22 }],
+        'PARKLAND': [{ k: 'oak', x: 15 }, { k: 'pond', x: 27 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'willis', x: 19 }],
+        'FINAL MILE': [{ k: 'willis', x: 20 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'bascule',
+    },
+
+    NEWYORK: {
+      sky: [0x2b46b4, 0xbde0f8], fog: 0xbdd8ee, ground: 0x63c96b, road: 0xbdc0e4,
+      water: 0x3d7ba6, edge: 0xfff0dc,
+      terrace: {
+        colors: [0x8f5442, 0xa6644c, 0x7c4838, 0xb87a5c, 0x96604a],
+        trim: 0xe4d4bc, win: 0x35406a, roof: 'flat', roofColor: 0x4c4658,
+        h: [9.5, 12.5], bay: 4.4, depth: 7.0, rows: 5, stoop: 1, tank: 1,
+        fireEscape: 1, chimney: 1,
+      },
+      tower: { colors: [0x8a8272, 0xa89c88, 0x6f7488], glass: 0, crown: 'stepped' },
+      tree: { kind: 'round', colors: [0x3f9a52, 0x4faf5f, 0x62c470], h: 1.1 },
+      marks: {
+        'CITY START': [{ k: 'empire', x: 21 }, { k: 'clock', x: 15 }],
+        'RIVERSIDE': [{ k: 'empire', x: 24 }, { k: 'ship', x: 34, y: -0.12 }],
+        'PARKLAND': [{ k: 'oak', x: 15 }, { k: 'pond', x: 27 }, { k: 'empire', x: 26 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'empire', x: 20 }],
+        'FINAL MILE': [{ k: 'empire', x: 20 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'verrazzano',
+    },
+
+    TOKYO: {
+      sky: [0x3a3f9e, 0xffd0d8], fog: 0xffd6dc, ground: 0x5fbf7a, road: 0xc8c0e8,
+      water: 0x4f8fb0, edge: 0xffe4ec,
+      terrace: {
+        colors: [0xdcdce4, 0xc8ccd8, 0xe8e4e0, 0xb8bcc8, 0xd0c8c8],
+        trim: 0xfffdf5, win: 0x2f3856, roof: 'flat', roofColor: 0x4a4a5e,
+        h: [9.0, 13.0], bay: 3.8, depth: 6.6, rows: 5, neon: 1,
+      },
+      tower: { colors: [0xb8bcd0, 0xd0d4e0, 0x8f96b0], glass: 1, crown: 'antenna' },
+      tree: { kind: 'columnar', colors: [0x3f9a68, 0x4fb078], h: 1.0 },
+      marks: {
+        'CITY START': [{ k: 'skytree', x: 26 }, { k: 'neon', x: 13.5 }, { k: 'torii', over: 1 }],
+        'RIVERSIDE': [{ k: 'skytree', x: 28 }, { k: 'neon', x: 14 }],
+        'PARKLAND': [{ k: 'torii', over: 1 }, { k: 'pagoda', x: 16 }, { k: 'oak', x: 15 }],
+        'THE WALL': [{ k: 'neon', x: 13 }, { k: 'hoarding', x: 12.6, rz: -0.16 }],
+        'FINAL MILE': [{ k: 'skytree', x: 24 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'rainbow',
+    },
+
+    SYDNEY: {
+      sky: [0x1f7fd0, 0xdcf4ff], fog: 0xd8f4ff, ground: 0x7fc86a, road: 0xc6cef0,
+      water: 0x2fa8d8, edge: 0xfff4e0,
+      terrace: {
+        colors: [0xd8b48c, 0xc49a74, 0xe8cfa8, 0xb08464, 0xefe0c4],
+        trim: 0xfff8e8, win: 0x3a4468, roof: 'pitch', roofColor: 0x7f4a3a,
+        h: [7.5, 9.5], bay: 4.4, depth: 7.0, rows: 3, balcony: 1, chimney: 2,
+      },
+      tower: { colors: [0x8fa8c8, 0xb0c4dc, 0xd8e4ee], glass: 1, crown: 'flat' },
+      tree: { kind: 'palm', colors: [0x3f9a5a, 0x4fb068], h: 1.1 },
+      marks: {
+        'CITY START': [{ k: 'operaHouse', x: 19 }, { k: 'sydneyTower', x: 20 }],
+        'RIVERSIDE': [{ k: 'operaHouse', x: 20 }, { k: 'ship', x: 34, y: -0.12 }],
+        'PARKLAND': [{ k: 'oak', x: 15 }, { k: 'pond', x: 27 }, { k: 'sydneyTower', x: 20 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'sydneyTower', x: 18 }],
+        'FINAL MILE': [{ k: 'operaHouse', x: 19 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'harbour',
+    },
+
+    PARIS: {
+      sky: [0x3a58b8, 0xe2e4f2], fog: 0xe0dfe8, ground: 0x6fc274, road: 0xd0cbe0,
+      water: 0x6a94a8, edge: 0xf4f0e4,
+      terrace: {
+        colors: [0xe8dcc0, 0xdcceb0, 0xf0e6cc, 0xd0c0a4, 0xe4d8bc],
+        trim: 0xfff8ea, win: 0x38446a, roof: 'mansard', roofColor: 0x5a6076,
+        h: [10.5, 12.5], bay: 4.6, depth: 7.2, rows: 5, balcony: 2, chimney: 4,
+      },
+      tower: { colors: [0xc8c0ac, 0xd8d0bc, 0xb0a894], glass: 0, crown: 'flat' },
+      tree: { kind: 'pollard', colors: [0x4a9a52, 0x5aae60], h: 1.1, trunk: 0xa8a894 },
+      marks: {
+        'CITY START': [{ k: 'eiffel', x: 24 }, { k: 'arcDeTriomphe', over: 1 }],
+        'RIVERSIDE': [{ k: 'eiffel', x: 26 }, { k: 'ship', x: 34, y: -0.12 }],
+        'PARKLAND': [{ k: 'eiffel', x: 26 }, { k: 'pond', x: 27 }, { k: 'oak', x: 15 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'eiffel', x: 22 }],
+        'FINAL MILE': [{ k: 'arcDeTriomphe', over: 1 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'stoneArch',
+    },
+
+    VALENCIA: {
+      sky: [0x1f7fd8, 0xeaf6ff], fog: 0xe8f6ff, ground: 0x8fc45f, road: 0xd8d4ec,
+      water: 0x30b0d0, edge: 0xfff8e8,
+      terrace: {
+        colors: [0xfff2d8, 0xf4e4c4, 0xffe8c8, 0xe8d8bc, 0xfff8e8],
+        trim: 0xffffff, win: 0x3f4a70, roof: 'tile', roofColor: 0xc86a42,
+        h: [8.0, 10.5], bay: 4.4, depth: 7.0, rows: 4, balcony: 1,
+      },
+      tower: { colors: [0xf4ecd8, 0xffffff, 0xe4dcc8], glass: 0, crown: 'flat' },
+      tree: { kind: 'palm', colors: [0x4faf62, 0x62c470], h: 1.25 },
+      marks: {
+        'CITY START': [{ k: 'calatravaRibs', x: 17 }, { k: 'hemisferic', x: 20 }],
+        'RIVERSIDE': [{ k: 'hemisferic', x: 20 }, { k: 'calatravaRibs', x: 17 }],
+        'PARKLAND': [{ k: 'calatravaRibs', x: 17 }, { k: 'pond', x: 27 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'calatravaRibs', x: 16 }],
+        'FINAL MILE': [{ k: 'hemisferic', x: 20 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'harp',
+    },
+
+    AMSTERDAM: {
+      sky: [0x2f5fb8, 0xd4e8f6], fog: 0xcfe6f4, ground: 0x5fc07a, road: 0xb6bcd8,
+      water: 0x4f7f96, edge: 0xf0ece0,
+      terrace: {
+        colors: [0x7a4438, 0x8f5442, 0x64483c, 0x9c6250, 0x543c34],
+        trim: 0xf4ece0, win: 0x2f3a5e, roof: 'stepgable', roofColor: 0x6a4438,
+        h: [10.0, 13.0], bay: 3.2, depth: 6.4, rows: 5, hoist: 1, lean: 1,
+      },
+      tower: { colors: [0x8f6a58, 0xa88070, 0xc8a890], glass: 0, crown: 'flat' },
+      tree: { kind: 'round', colors: [0x429a55, 0x52ae62, 0x64c070], h: 1.15 },
+      marks: {
+        'CITY START': [{ k: 'canal', x: 20 }, { k: 'westerkerk', x: 15 }],
+        'RIVERSIDE': [{ k: 'canal', x: 20 }, { k: 'westerkerk', x: 16 }],
+        'PARKLAND': [{ k: 'oak', x: 15 }, { k: 'pond', x: 27 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'westerkerk', x: 15 }],
+        'FINAL MILE': [{ k: 'westerkerk', x: 15 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'magere',
+    },
+
+    ROME: {
+      sky: [0x2a63c0, 0xffe6c0], fog: 0xffe0bc, ground: 0x8fb45a, road: 0xd2c4d8,
+      water: 0x5f9fae, edge: 0xfff0d8,
+      terrace: {
+        colors: [0xd8964a, 0xc8823e, 0xe8ac60, 0xb87038, 0xefc484],
+        trim: 0xfff0d0, win: 0x4a4058, roof: 'tile', roofColor: 0xb05a34,
+        h: [9.0, 11.5], bay: 4.6, depth: 7.2, rows: 4, balcony: 1, chimney: 2,
+      },
+      tower: { colors: [0xe8c48c, 0xd8a868, 0xf0dcb0], glass: 0, crown: 'flat' },
+      tree: { kind: 'umbrella', colors: [0x2f7a44, 0x3a8f50], h: 1.2 },
+      marks: {
+        'CITY START': [{ k: 'colosseum', x: 21 }, { k: 'aqueduct', over: 1 }],
+        'RIVERSIDE': [{ k: 'colosseum', x: 22 }, { k: 'ship', x: 34, y: -0.12 }],
+        'PARKLAND': [{ k: 'aqueduct', over: 1 }, { k: 'pond', x: 27 }, { k: 'oak', x: 15 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'aqueduct', over: 1 }],
+        'FINAL MILE': [{ k: 'colosseum', x: 21 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'stoneArch',
+    },
+
+    CAPETOWN: {
+      sky: [0x1666c8, 0xe4f2ff], fog: 0xdff0ff, ground: 0x9fb05a, road: 0xc8ccec,
+      water: 0x2f9fd8, edge: 0xfff2e4,
+      // Bo-Kaap: the one street in the world painted in flat saturated blocks,
+      // and the cheapest possible way to say "Cape Town" at a hundred units.
+      terrace: {
+        colors: [0x39c0d8, 0xf05a7a, 0x62d07a, 0xffc23a, 0x9a7bff, 0xff8a4a],
+        trim: 0xffffff, win: 0x2f3a5e, roof: 'pitch', roofColor: 0xb8b0a0,
+        h: [6.5, 8.0], bay: 4.4, depth: 6.6, rows: 2, stoop: 1,
+      },
+      tower: { colors: [0xdce4ec, 0xc8d4e0, 0xf0f4f8], glass: 1, crown: 'flat' },
+      tree: { kind: 'scrub', colors: [0x6f9a4a, 0x8fae5a, 0x5f8f56], h: 0.9 },
+      marks: {
+        'CITY START': [{ k: 'tableMountain', x: 120 }, { k: 'clock', x: 15 }],
+        'RIVERSIDE': [{ k: 'tableMountain', x: 130 }, { k: 'ship', x: 34, y: -0.12 }],
+        'PARKLAND': [{ k: 'tableMountain', x: 120 }, { k: 'oak', x: 15 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'tableMountain', x: 120 }],
+        'FINAL MILE': [{ k: 'tableMountain', x: 120 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'tower',
+    },
+  };
+
+  /** Palette fields a setting owes; used to build the no-settings fallback. */
+  function fallbackSetting(biomeName) {
+    const b = BIOME_LOOK[biomeName] || BIOME_LOOK['CITY START'];
+    return {
+      sky: b.sky, fog: b.fog, ground: b.ground, road: b.road,
+      water: 0x2f8fc4, edge: 0xffffff,
+      terrace: SETTING_LOOK.LONDON.terrace,
+      tower: SETTING_LOOK.LONDON.tower,
+      tree: { kind: 'cone', colors: [0x35a855, 0x3fbf63, 0x59d47a], h: 1 },
+      marks: {}, bridge: 'tower',
+    };
+  }
+
   // Scratch colours: applyBiome runs every frame and must not allocate.
   const _cA = new THREE.Color();
   const _cB = new THREE.Color();
@@ -4957,6 +5337,1471 @@ MR.World = (function () {
   function sph(r, seg, x, y, z, color) {
     return part(new THREE.SphereGeometry(r, seg || 7, Math.max(3, (seg || 7) - 2)), color, x, y, z);
   }
+
+  // ======================================================================
+  //  PARAMETRIC VOCABULARY
+  //
+  //  Twelve cities modelled independently would be twelve times the geometry,
+  //  twelve times the build time and twelve looks that do not match. So the
+  //  landmarks below are all assembled from this handful of shapes -- a
+  //  lattice, an arch, an arcade, a shell, a terraced row, a truss, a tree --
+  //  each taking proportions and a palette. The Eiffel Tower and the Skytree
+  //  are the same function with different numbers; so are the Colosseum and a
+  //  Roman aqueduct, and the Opera House and Valencia's shells.
+  //
+  //  CONVENTIONS, and they are the same ones the existing landmarks use:
+  //    * local -x faces the road. A landmark on the far shoulder is the same
+  //      mesh turned a half-turn, which is why one geometry serves both sides.
+  //    * local y = 0 is the ground.
+  //    * anything reaching back over the carriageway does so above OVERHEAD_Y,
+  //      and its supports stand at or beyond LANDMARK_IN. Nothing here may be
+  //      between the lens and the next gate -- see the corridor rule at the
+  //      top of the file.
+  // ======================================================================
+
+  /** Deterministic little generator, so a builder's jitter is the same daily. */
+  function lcg(seed) {
+    let s = (seed | 0) || 1;
+    return function () { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+  }
+
+  /**
+   * Compose a sub-assembly built in its own local frame into a parent parts
+   * list under a yaw + translation. This is what lets an arcade bay carry
+   * canted voussoirs and still be swung round onto a curve: the two rotations
+   * multiply as matrices instead of being crammed into one Euler, which is not
+   * the same thing and does not give the same answer.
+   */
+  function placeAt(parts, sub, x, y, z, ry) {
+    const m = new THREE.Matrix4().makeRotationY(ry || 0);
+    m.setPosition(x || 0, y || 0, z || 0);
+    for (const p of sub) {
+      parts.push({
+        geo: p.geo, color: p.color,
+        matrix: new THREE.Matrix4().multiplyMatrices(m, p.matrix),
+      });
+    }
+  }
+
+  /**
+   * A segmental arch, drawn as stone-sized voussoirs in the XY plane.
+   *
+   * The single most reused shape in the file: it is the Colosseum's arcade,
+   * a Roman aqueduct, the Arc de Triomphe, a Seine bridge, the Brandenburg
+   * Gate's openings and a bascule tower's portal. `rx`/`ry` are the half-span
+   * and the rise, so a flat segmental arch and a tall round-headed one differ
+   * only in their ratio.
+   */
+  function vArc(parts, o) {
+    const n = o.n || 7, th = o.th || 0.9, d = o.d || 3;
+    for (let i = 0; i < n; i++) {
+      const a0 = Math.PI * i / n, a1 = Math.PI * (i + 1) / n;
+      const x0 = o.cx - o.rx * Math.cos(a0), y0 = o.cy + o.ry * Math.sin(a0);
+      const x1 = o.cx - o.rx * Math.cos(a1), y1 = o.cy + o.ry * Math.sin(a1);
+      parts.push(bx(Math.hypot(x1 - x0, y1 - y0) + th * 0.5, th, d,
+        (x0 + x1) / 2, (y0 + y1) / 2, o.cz || 0,
+        (o.alt !== undefined && (i % 2)) ? o.alt : o.color,
+        0, 0, Math.atan2(y1 - y0, x1 - x0)));
+    }
+  }
+
+  /**
+   * A tapering four-legged lattice tower: Eiffel, the Skytree, Tokyo Tower.
+   *
+   * The taper is the identity. An iron tower is a curve, not a cone -- the
+   * legs fall away steeply at the base and are near vertical by half height --
+   * so the profile is a power law rather than a straight line, and `curve` is
+   * what separates the Eiffel Tower's flare from the Skytree's needle.
+   */
+  function vLattice(parts, o) {
+    const h = o.h, N = o.seg || 9, leg = o.leg || 0.9;
+    const col = o.color, col2 = o.color2 === undefined ? col : o.color2;
+    const prof = function (t) { return o.top + (o.base - o.top) * Math.pow(1 - t, o.curve || 1.8); };
+    for (let i = 0; i < N; i++) {
+      const t0 = i / N, t1 = (i + 1) / N;
+      const y0 = t0 * h, y1 = t1 * h;
+      const r0 = prof(t0), r1 = prof(t1);
+      const len = Math.hypot(y1 - y0, r0 - r1);
+      const ang = Math.atan2(r0 - r1, y1 - y0);
+      const th = leg * (0.45 + 0.55 * (1 - t0));
+      const rm = (r0 + r1) / 2, ym = (y0 + y1) / 2;
+      for (const sx of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          parts.push(bx(th, len, th, sx * rm, ym, sz * rm, i % 2 ? col : col2,
+            sz * ang, 0, -sx * ang));
+        }
+      }
+      // Belt at the top of every bay, and an X across the two faces the road
+      // can see. Without the bracing a lattice tower is four sticks; with it,
+      // it is a structure, and the X is what still reads at 150 units.
+      const b = o.belt || 0.28;
+      for (const sz of [-1, 1]) {
+        parts.push(bx(r1 * 2 + th, b, b, 0, y1, sz * r1, col2));
+        parts.push(bx(b, b, r1 * 2 + th, sz * r1, y1, 0, col2));
+      }
+      const dh = y1 - y0, dw = r0 + r1;
+      const dl = Math.hypot(dh, dw), da = Math.atan2(dh, dw);
+      parts.push(bx(dl, b * 0.8, b * 0.8, 0, ym, -rm, col2, 0, 0, da));
+      parts.push(bx(dl, b * 0.8, b * 0.8, 0, ym, -rm, col2, 0, 0, -da));
+    }
+    for (const p of (o.decks || [])) {
+      parts.push(bx(p.w, p.h, p.w, 0, p.y, 0, p.c === undefined ? col2 : p.c));
+      if (p.rim) parts.push(bx(p.w * 1.12, p.h * 0.3, p.w * 1.12, 0, p.y + p.h * 0.5, 0, p.rim));
+    }
+    if (o.mast) {
+      parts.push(cyl(o.mastR || 0.22, (o.mastR || 0.22) * 2.2, o.mast, 6, 0, h + o.mast / 2, 0, col2));
+    }
+    // The base arches. Four of them on the Eiffel Tower and they are half of
+    // why it is recognisable at a glance -- the tower reads as legs standing
+    // over a void, not as a pyramid.
+    if (o.arch) {
+      for (const sz of [-1, 1]) {
+        vArc(parts, {
+          cx: 0, cy: o.arch.y, cz: sz * prof(o.arch.y / h),
+          rx: prof(0) * 0.92, ry: o.arch.r, n: 6, th: o.arch.th || 0.8,
+          d: o.arch.d || 0.8, color: col2,
+        });
+      }
+    }
+  }
+
+  /**
+   * A tiered arcade: a wall pierced by rows of arches, optionally swung round
+   * a curve. The Colosseum, an aqueduct, a viaduct and a stone quay are all
+   * this function.
+   *
+   * `radius` bends the run away from the road so the far ends recede, which is
+   * what turns a straight arcade into an amphitheatre. The bays are built flat
+   * and placed under a yaw, so the arch voussoirs stay true.
+   */
+  function vArcade(parts, o) {
+    const n = o.bays, bw = o.bayW, tiers = o.tiers || 1;
+    const R = o.radius || 0;
+    const stone = o.color, stone2 = o.color2 === undefined ? o.color : o.color2;
+    const rnd = lcg(o.seed || 17);
+    for (let i = 0; i < n; i++) {
+      const u = (i - (n - 1) / 2);
+      const a = R ? (u * bw) / R : 0;
+      const px = R ? R * (1 - Math.cos(a)) : 0;
+      const pz = R ? R * Math.sin(a) : u * bw;
+      // How many tiers this bay still stands to. A ruin is identified by its
+      // BROKEN line as much as by its arches, so the height steps down away
+      // from the centre when `ruin` is set.
+      const keep = o.ruin
+        ? Math.max(o.ruin, tiers - Math.floor(Math.abs(u) / Math.max(1, n / 5)))
+        : tiers;
+      const sub = [];
+      for (let t = 0; t < keep; t++) {
+        const y0 = o.y0 + t * o.tierH;
+        sub.push(bx(o.d, o.tierH, bw, 0, y0 + o.tierH / 2, 0, t % 2 ? stone2 : stone));
+        if (t < (o.openTiers === undefined ? tiers : o.openTiers)) {
+          // The opening: a dark void behind a ring of voussoirs. The void is
+          // what makes an arcade read as pierced rather than as a decorated
+          // wall, and at distance it is the only part that survives.
+          sub.push(bx(o.d * 0.5, o.tierH * 0.62, bw * 0.62, -o.d * 0.26,
+            y0 + o.tierH * 0.42, 0, o.void || 0x4a4058));
+          vArc(sub, {
+            cx: 0, cy: y0 + o.tierH * 0.44, cz: 0,
+            rx: bw * 0.34, ry: o.tierH * 0.26, n: 5, th: o.tierH * 0.12,
+            d: o.d * 1.02, color: stone2,
+          });
+        }
+        sub.push(bx(o.d * 1.06, o.tierH * 0.1, bw, 0, y0 + o.tierH, 0, stone2));
+      }
+      if (keep >= tiers && o.attic) {
+        sub.push(bx(o.d, o.attic, bw, 0, o.y0 + tiers * o.tierH + o.attic / 2, 0, stone));
+      }
+      // Local -x is the road, so the bay is pushed out by its own depth and
+      // the facade lands where the caller asked for it.
+      placeAt(parts, sub, px - o.d / 2 + (o.inset || 0) + rnd() * 0.06, 0, pz, -a);
+    }
+  }
+
+  /**
+   * A row of terraced houses -- the STREET WALL, and the piece of geometry
+   * doing the most identification work in the whole feature.
+   *
+   * A landmark is in frame for a few seconds every minute or two. The street
+   * is in frame permanently, one row-length behind the crowd barrier, and it
+   * is what the eye actually reads a city off: London's stucco parapets,
+   * Amsterdam's stepped gables leaning over a canal, Boston's bow-fronted
+   * brownstones, Paris's mansards, Bo-Kaap's flat saturated colour. All of
+   * them are this one function with a different table.
+   */
+  function vTerrace(parts, t, seed) {
+    const rnd = lcg(seed);
+    const n = t.bays || 5, bw = t.bay, d = t.depth;
+    // The facade plane. The row is built about local x = 0 with the fronts
+    // toward -x, so the caller only has to know how deep it is.
+    const fx = -d / 2;
+    for (let i = 0; i < n; i++) {
+      const z = (i - (n - 1) / 2) * bw;
+      const h = t.h[0] + rnd() * (t.h[1] - t.h[0]);
+      const col = t.colors[Math.floor(rnd() * t.colors.length)];
+      const lean = t.lean ? (rnd() - 0.5) * 0.035 : 0;
+      const sub = [];
+      sub.push(bx(d, h, bw * 0.98, 0, h / 2, 0, col));
+      // Ground floor: a stone base course, which is what stops a terrace
+      // reading as a row of coloured slabs standing on grass.
+      sub.push(bx(d * 1.01, 1.5, bw * 0.99, 0, 0.75, 0, t.trim));
+      sub.push(bx(d * 1.02, 0.22, bw, 0, 1.55, 0, t.trim));
+      // Windows, proud of the facade so they catch a different band of the
+      // toon ramp than the wall does.
+      const rows = t.rows || 4;
+      for (let r = 0; r < rows; r++) {
+        const wy = 2.6 + r * ((h - 3.4) / Math.max(1, rows));
+        if (wy > h - 1.0) break;
+        for (const sz of [-1, 1]) {
+          sub.push(bx(0.22, 1.15, bw * 0.24, fx - 0.08, wy, sz * bw * 0.21, t.win));
+          sub.push(bx(0.30, 0.16, bw * 0.30, fx - 0.10, wy + 0.68, sz * bw * 0.21, t.trim));
+        }
+        if (t.balcony && r < t.balcony) {
+          sub.push(bx(0.34, 0.10, bw * 0.86, fx - 0.20, wy - 0.62, 0, t.trim));
+          for (let k = 0; k < 7; k++) {
+            sub.push(bx(0.07, 0.42, 0.07, fx - 0.24,
+              wy - 0.40, -bw * 0.40 + k * (bw * 0.80 / 6), 0x3a3550));
+          }
+          sub.push(bx(0.30, 0.08, bw * 0.86, fx - 0.22, wy - 0.18, 0, 0x3a3550));
+        }
+      }
+      // Door and stoop.
+      sub.push(bx(0.24, 1.6, bw * 0.26, fx - 0.10, 0.8, 0, 0x4a3a56));
+      if (t.stoop) {
+        for (let s = 0; s < 3; s++) {
+          sub.push(bx(0.9 - s * 0.22, 0.20, bw * 0.36, fx - 0.5 + s * 0.22, 0.10 + s * 0.20, 0, t.trim));
+        }
+      }
+      if (t.bow) {
+        // A bow front: the half-round bay window that is Back Bay's signature.
+        sub.push(cyl(bw * 0.30, bw * 0.30, h - 2.4, 8, fx + 0.1, (h - 2.4) / 2 + 1.6, 0, col));
+        sub.push(cyl(bw * 0.33, bw * 0.33, 0.24, 8, fx + 0.1, h - 0.9, 0, t.trim));
+      }
+      if (t.fireEscape) {
+        for (let r = 0; r < 3; r++) {
+          const fy = 3.4 + r * 2.5;
+          if (fy > h - 1.2) break;
+          sub.push(bx(0.7, 0.10, bw * 0.7, fx - 0.42, fy, 0, 0x2f3550));
+          sub.push(bx(0.08, 0.9, 0.08, fx - 0.74, fy + 0.45, bw * 0.3, 0x2f3550));
+          sub.push(bx(0.9, 0.08, 0.08, fx - 0.6, fy + 1.3, -bw * 0.2, 0x2f3550, 0, 0, 0.6));
+        }
+      }
+      if (t.neon) {
+        // A stack of signboards hanging off the facade, which is what a Tokyo
+        // street front is: the building is a rack for signage.
+        const glow = [0xff4d7a, 0x37d6ff, 0xffe45e, 0x62f0a8, 0xff9ad5];
+        for (let s = 0; s < 3; s++) {
+          const sy = 3.0 + s * 2.4;
+          if (sy > h - 1.0) break;
+          sub.push(bx(0.7, 1.7, 0.30, fx - 0.5, sy, bw * (rnd() > 0.5 ? 0.30 : -0.30),
+            glow[Math.floor(rnd() * glow.length)]));
+        }
+        sub.push(bx(0.5, 0.5, bw * 0.9, fx - 0.4, 2.0, 0, glow[Math.floor(rnd() * glow.length)]));
+      }
+      // ---- the roof, which is most of the silhouette ----
+      const rc = t.roofColor;
+      if (t.roof === 'pitch' || t.roof === 'tile') {
+        const rh = t.roof === 'tile' ? 1.5 : 1.9;
+        for (const sx of [-1, 1]) {
+          sub.push(bx(d * 0.60, 0.28, bw, sx * d * 0.26, h + rh * 0.5, 0, rc, 0, 0, -sx * 0.62));
+        }
+        sub.push(bx(0.5, 0.30, bw, 0, h + rh, 0, rc));
+        if (t.roof === 'tile') sub.push(bx(d * 1.08, 0.24, bw, 0, h + 0.06, 0, rc));
+      } else if (t.roof === 'mansard') {
+        // Steep slated lower slope, near-flat above: the Paris and Berlin
+        // roofline, and the reason those skylines read as one grey mass with
+        // dormers rather than as a row of boxes.
+        for (const sx of [-1, 1]) {
+          sub.push(bx(d * 0.34, 0.34, bw, sx * d * 0.36, h + 1.1, 0, rc, 0, 0, -sx * 0.95));
+        }
+        sub.push(bx(d * 0.62, 0.34, bw, 0, h + 2.0, 0, rc));
+        sub.push(bx(d * 1.06, 0.26, bw * 1.01, 0, h + 0.1, 0, t.trim));
+        sub.push(bx(0.6, 0.9, bw * 0.24, -d * 0.30, h + 1.5, 0, rc));
+        sub.push(bx(0.24, 0.6, bw * 0.18, -d * 0.42, h + 1.5, 0, t.win));
+      } else if (t.roof === 'stepgable') {
+        // Amsterdam. The gable is on the FACADE, stepping up to a point above
+        // the roofline, and a canal house is nothing else.
+        const steps = 4;
+        for (let s = 0; s < steps; s++) {
+          const w = bw * (0.98 - s * 0.20);
+          sub.push(bx(d * 0.34, 0.62, w, fx + d * 0.17, h + 0.31 + s * 0.62, 0, col));
+          sub.push(bx(d * 0.38, 0.16, w * 1.02, fx + d * 0.17, h + 0.62 + s * 0.62, 0, t.trim));
+        }
+        sub.push(bx(d * 0.34, 0.5, bw * 0.24, fx + d * 0.17, h + 0.31 + steps * 0.62, 0, t.trim));
+        for (const sx of [-1, 1]) {
+          sub.push(bx(d * 0.42, 0.26, bw, sx * d * 0.24, h + 0.9, 0, rc, 0, 0, -sx * 0.8));
+        }
+        if (t.hoist) {
+          sub.push(bx(0.9, 0.20, 0.20, fx - 0.35, h + 0.4 + steps * 0.55, 0, 0x2f2a3a));
+          sub.push(bx(0.16, 0.5, 0.16, fx - 0.72, h + 0.1 + steps * 0.55, 0, 0x2f2a3a));
+        }
+      } else {
+        // Flat, with a parapet. Two heights of parapet, because a row of
+        // identical cornices reads as extrusion rather than as buildings.
+        const ph = t.roof === 'parapet' ? 0.95 : 0.55;
+        sub.push(bx(d * 1.04, 0.30, bw, 0, h + 0.15, 0, t.trim));
+        sub.push(bx(d * 1.02, ph, bw * 0.99, 0, h + 0.3 + ph / 2, 0, rc));
+        sub.push(bx(d * 1.06, 0.18, bw, 0, h + 0.3 + ph, 0, t.trim));
+      }
+      if (t.tank) {
+        // The New York roof water tower: a cedar barrel on a steel frame, and
+        // the single most portable piece of that city's skyline.
+        const ty = h + 1.4;
+        for (const sx of [-1, 1]) {
+          for (const sz of [-1, 1]) {
+            parts.push(bx(0.14, 2.2, 0.14, sx * 0.55, ty + 1.1, z + sz * 0.55, 0x4a3a2e));
+          }
+        }
+        parts.push(cyl(1.0, 1.15, 2.4, 8, 0, ty + 3.4, z, 0x8a5a3c));
+        parts.push(cyl(1.06, 1.06, 0.2, 8, 0, ty + 2.5, z, 0x5f4028));
+        parts.push(cone(1.15, 1.1, 8, 0, ty + 5.1, z, 0x5f4028));
+      }
+      if (t.chimney) {
+        for (let c = 0; c < t.chimney; c++) {
+          parts.push(bx(0.7, 1.5 + rnd() * 0.9, 0.6,
+            (rnd() - 0.5) * d * 0.5, h + 1.4, z + (rnd() - 0.5) * bw * 0.6, t.roofColor));
+        }
+      }
+      placeAt(parts, sub, 0, 0, z, lean);
+    }
+  }
+
+  /**
+   * A modern block: stacked setbacks, an optional glass banding, a crown.
+   * Chicago's black tubes, the Empire State's wedding cake, a Tokyo office --
+   * the same stack with different steps.
+   */
+  function vTower(parts, o) {
+    const rnd = lcg(o.seed || 5);
+    const steps = o.steps || 3;
+    let w = o.w, d = o.d, y = 0;
+    for (let s = 0; s < steps; s++) {
+      const h = o.h * (o.split ? o.split[s] : (1 / steps));
+      parts.push(bx(d, h, w, 0, y + h / 2, 0, o.color));
+      // Spandrel bands. On a glass tower they are the whole read: a dark slab
+      // with light horizontals is a curtain wall, a dark slab without them is
+      // a monolith.
+      const bands = Math.max(2, Math.round(h / 2.2));
+      for (let b = 1; b < bands; b++) {
+        parts.push(bx(d * 1.01, o.glass ? 0.34 : 0.20, w * 1.01, 0,
+          y + h * b / bands, 0, o.glass ? o.band : o.color2));
+      }
+      parts.push(bx(d * 1.05, 0.3, w * 1.05, 0, y + h, 0, o.color2));
+      y += h;
+      w *= (o.taper || 0.74); d *= (o.taper || 0.74);
+    }
+    if (o.crown === 'stepped') {
+      for (let s = 0; s < 4; s++) {
+        parts.push(bx(d * (1 - s * 0.18), 1.5, w * (1 - s * 0.18), 0, y + 0.75 + s * 1.5, 0, o.color));
+      }
+      y += 6;
+      parts.push(cyl(0.5, 1.1, 3.2, 8, 0, y + 1.6, 0, o.color2));
+      parts.push(cyl(0.10, 0.24, 7.0, 6, 0, y + 6.6, 0, o.color2));
+    } else if (o.crown === 'antenna') {
+      for (const sx of [-1, 1]) {
+        parts.push(cyl(0.10, 0.22, o.h * 0.30, 6, sx * d * 0.22, y + o.h * 0.15, 0, o.color2));
+      }
+    } else if (o.crown === 'pyramid') {
+      parts.push(cone(Math.max(w, d) * 0.72, o.h * 0.16, 4, 0, y + o.h * 0.08, 0, o.color2));
+    }
+    if (o.lit) {
+      for (let i = 0; i < 4; i++) {
+        parts.push(bx(0.2, 0.2, 0.2, -d * 0.5, o.h * (0.3 + rnd() * 0.6), (rnd() - 0.5) * w, 0xffe45e));
+      }
+    }
+  }
+
+  /**
+   * A shell -- a quarter-sphere with a flat back, closed by a pair of half
+   * discs so it is never seen through.
+   *
+   * The Sydney Opera House and Valencia's Palau are both this, leaned and
+   * nested. It is a quarter sphere rather than a cone because the leading edge
+   * has to be a CURVE: a cone gives a straight edge and reads as a tent.
+   */
+  function vShell(parts, o) {
+    const r = o.r, col = o.color;
+    const g = new THREE.SphereGeometry(r, o.seg || 12, o.seg || 9, 0, Math.PI, 0, Math.PI / 2);
+    const sub = [part(g, col, 0, 0, 0, 0, 0, 0)];
+    // The flat back, both ways round, so the shell is solid from any angle the
+    // player can reach without either face being culled.
+    const cap = new THREE.CircleGeometry(r, o.seg || 12, 0, Math.PI);
+    sub.push(part(cap, o.back === undefined ? col : o.back, 0, 0, 0.001, 0, 0, 0));
+    sub.push(part(cap, o.back === undefined ? col : o.back, 0, 0, -0.001, 0, Math.PI, 0));
+    const m = new THREE.Matrix4().makeRotationFromEuler(
+      new THREE.Euler(o.tilt || 0, o.yaw || 0, o.roll || 0));
+    m.setPosition(o.x || 0, o.y || 0, o.z || 0);
+    for (const p of sub) {
+      parts.push({ geo: p.geo, color: p.color, matrix: new THREE.Matrix4().multiplyMatrices(m, p.matrix) });
+    }
+  }
+
+  /**
+   * A truss span: parallel chords with a zigzag web. The Harbour Bridge's
+   * arch, Chicago's elevated deck and a girder bridge are all this, straight
+   * or bent to a chord.
+   */
+  function vTruss(parts, o) {
+    const n = o.n || 10, col = o.color, col2 = o.color2 === undefined ? col : o.color2;
+    const y = o.curve
+      ? function (t) { return o.y0 + o.rise * Math.sin(Math.PI * t); }
+      : function () { return o.y0; };
+    const th = o.th || 0.34;
+    for (let i = 0; i < n; i++) {
+      const t0 = i / n, t1 = (i + 1) / n;
+      const x0 = o.x0 + (o.x1 - o.x0) * t0, x1 = o.x0 + (o.x1 - o.x0) * t1;
+      const y0 = y(t0), y1 = y(t1);
+      const len = Math.hypot(x1 - x0, y1 - y0);
+      const a = Math.atan2(y1 - y0, x1 - x0);
+      const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+      for (const sz of [-1, 1]) {
+        parts.push(bx(len + th, th, th, mx, my, o.z + sz * o.w, col, 0, 0, a));
+        parts.push(bx(len + th, th, th, mx, my - o.depth, o.z + sz * o.w, col, 0, 0, a));
+        // Web. One diagonal per bay plus the vertical is enough: at the
+        // distance a bridge is seen the web is a texture, not a structure.
+        const dl = Math.hypot(len, o.depth);
+        parts.push(bx(dl, th * 0.7, th * 0.7, mx, my - o.depth / 2, o.z + sz * o.w, col2,
+          0, 0, a - Math.atan2(o.depth, len)));
+        parts.push(bx(th * 0.8, o.depth, th * 0.8, x1, my - o.depth / 2, o.z + sz * o.w, col2));
+      }
+      parts.push(bx(th * 0.7, th * 0.7, o.w * 2, mx, my, o.z, col2));
+      parts.push(bx(th * 0.7, th * 0.7, o.w * 2, mx, my - o.depth, o.z, col2));
+    }
+  }
+
+  /** A tree, by profile. One function, seven silhouettes. */
+  function vTree(parts, o, k) {
+    const c = o.colors, s = (o.h || 1) * (k || 1);
+    const trunk = o.trunk === undefined ? 0x8a5a3c : o.trunk;
+    const kind = o.kind;
+    if (kind === 'palm') {
+      // A palm is a bare leaning stem and a burst at the top, and the LEAN is
+      // what tells it from a lamp post.
+      const lean = 0.12;
+      for (let i = 0; i < 5; i++) {
+        parts.push(cyl(0.18 * s, 0.24 * s, 1.5 * s, 6, i * 0.28 * s, (0.75 + i * 1.4) * s, 0,
+          i % 2 ? trunk : 0xa07a52, 0, 0, -lean));
+      }
+      const tx = 1.35 * s, ty = 7.4 * s;
+      for (let f = 0; f < 7; f++) {
+        const a = (f / 7) * Math.PI * 2;
+        parts.push(bx(3.4 * s, 0.14 * s, 0.9 * s,
+          tx + Math.cos(a) * 1.5 * s, ty - 0.35 * s, Math.sin(a) * 1.5 * s,
+          c[f % c.length], 0, a, -0.30));
+      }
+      parts.push(sph(0.5 * s, 6, tx, ty, 0, 0x6a4a2c));
+    } else if (kind === 'umbrella') {
+      // The Roman stone pine: a long bare trunk and a flat wide canopy sitting
+      // on top of it like a parasol.
+      parts.push(cyl(0.28 * s, 0.5 * s, 6.4 * s, 6, 0, 3.2 * s, 0, trunk));
+      parts.push(bx(0.4 * s, 2.4 * s, 0.4 * s, -0.8 * s, 6.4 * s, 0, trunk, 0, 0, 0.5));
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * 6.283;
+        parts.push(sph(1.9 * s, 7, Math.cos(a) * 1.9 * s, 7.4 * s, Math.sin(a) * 1.9 * s,
+          c[i % c.length]));
+      }
+      parts.push(sph(2.3 * s, 7, 0, 8.0 * s, 0, c[0]));
+    } else if (kind === 'columnar') {
+      parts.push(cyl(0.16 * s, 0.26 * s, 1.2 * s, 6, 0, 0.6 * s, 0, trunk));
+      for (let i = 0; i < 4; i++) {
+        parts.push(cone((1.05 - i * 0.16) * s, 2.2 * s, 7, 0, (1.9 + i * 1.35) * s, 0, c[i % c.length]));
+      }
+    } else if (kind === 'scrub') {
+      // Fynbos: low, dense, many-crowned and never a single trunk.
+      const r = lcg(31);
+      for (let i = 0; i < 6; i++) {
+        parts.push(sph((0.7 + r() * 0.7) * s, 6, (r() - 0.5) * 4 * s, (0.5 + r() * 0.5) * s,
+          (r() - 0.5) * 4 * s, c[i % c.length]));
+      }
+    } else if (kind === 'pollard') {
+      // The Paris plane tree: a pale stubby trunk under a tight clipped ball.
+      parts.push(cyl(0.30 * s, 0.42 * s, 3.0 * s, 6, 0, 1.5 * s, 0, trunk));
+      for (const a of [-0.6, 0.6]) {
+        parts.push(bx(0.24 * s, 1.4 * s, 0.24 * s, 0, 3.4 * s, 0, trunk, 0, 0, a));
+      }
+      parts.push(sph(2.0 * s, 8, 0, 5.0 * s, 0, c[0]));
+      parts.push(sph(1.5 * s, 7, -0.9 * s, 4.3 * s, 0.6 * s, c[1 % c.length]));
+      parts.push(sph(1.4 * s, 7, 0.9 * s, 4.4 * s, -0.7 * s, c[c.length - 1]));
+    } else if (kind === 'round') {
+      parts.push(cyl(0.20 * s, 0.34 * s, 2.6 * s, 6, 0, 1.3 * s, 0, trunk));
+      parts.push(sph(2.0 * s, 8, 0, 4.4 * s, 0, c[0]));
+      parts.push(sph(1.5 * s, 7, -1.4 * s, 3.7 * s, 0.6 * s, c[1 % c.length]));
+      parts.push(sph(1.4 * s, 7, 1.3 * s, 3.9 * s, -0.7 * s, c[2 % c.length]));
+      parts.push(sph(1.2 * s, 7, 0.2 * s, 5.7 * s, 0.3 * s, c[(c.length - 1) % c.length]));
+    } else {
+      parts.push(cyl(0.17 * s, 0.26 * s, 1.3 * s, 6, 0, 0.65 * s, 0, trunk));
+      parts.push(cone(1.30 * s, 1.7 * s, 8, 0, 2.0 * s, 0, c[0]));
+      parts.push(cone(1.05 * s, 1.5 * s, 8, 0, 2.9 * s, 0, c[1 % c.length]));
+      parts.push(cone(0.75 * s, 1.2 * s, 8, 0, 3.7 * s, 0, c[2 % c.length]));
+    }
+  }
+
+  // ======================================================================
+  //  THE LANDMARKS
+  //
+  //  One entry per silhouette, each a short call into the vocabulary above.
+  //  A builder takes the setting's own palette so a shared shape still comes
+  //  out the right colour, and returns a merged geometry: one draw call for
+  //  the whole thing, exactly like the generic landmarks already here.
+  //
+  //  Geometries are built LAZILY, and only for the three or four settings the
+  //  day actually drew. Twelve cities' worth of landmarks built eagerly would
+  //  be most of a second of start-up for geometry nine tenths of which is
+  //  never shown.
+  //
+  //  REACH. Every builder's road-facing extent is noted where it is not
+  //  obvious. A mark placed at x is clamped to LANDMARK_IN (11.75), so a
+  //  builder reaching -9 in local x must be given x >= 20.5 in the setting
+  //  table or it would stand on the pavement.
+  // ======================================================================
+
+  /** A suspension span, straddling the deck: the generic bridge. */
+  function mkSuspension(c1, c2, cable) {
+    const parts = [];
+    for (const sx of [-1, 1]) {
+      const x = sx * 9.6;
+      parts.push(bx(2.4, 30, 2.4, x, 12.5, 0, c1));
+      parts.push(bx(2.9, 1.0, 2.9, x, 27.0, 0, c2));
+      parts.push(bx(2.9, 1.0, 2.9, x, 16.0, 0, c2));
+      parts.push(bx(3.1, 1.2, 3.1, x, -1.0, 0, 0x3a4570));
+      for (let i = 0; i < 8; i++) {
+        const z0 = i * 13, z1 = (i + 1) * 13;
+        const y0 = 26 - Math.pow(i / 8, 1.7) * 22;
+        const y1 = 26 - Math.pow((i + 1) / 8, 1.7) * 22;
+        const len = Math.hypot(z1 - z0, y1 - y0);
+        const ang = Math.atan2(y1 - y0, z1 - z0);
+        for (const sz of [-1, 1]) {
+          parts.push(bx(0.34, 0.34, len, x, (y0 + y1) / 2, sz * (z0 + z1) / 2, cable, -sz * ang));
+        }
+      }
+    }
+    parts.push(bx(21, 1.6, 2.0, 0, 26.4, 0, c1));
+    parts.push(bx(21, 1.0, 1.6, 0, 21.0, 0, c2));
+    return merge(parts);
+  }
+
+  const MARKS = {
+
+    // ---- BOSTON --------------------------------------------------------
+    /** The Citgo sign: a lit triangle on a frame on a Kenmore Square roof. */
+    citgo: function () {
+      const parts = [];
+      parts.push(bx(6.0, 15.0, 9.0, 0, 7.5, 0, 0x6f5a52));
+      parts.push(bx(6.4, 0.8, 9.4, 0, 15.2, 0, 0x4a3f3a));
+      for (let i = 0; i < 3; i++) {
+        for (const sz of [-1, 1]) {
+          parts.push(bx(0.3, 2.0, 2.4, -3.05, 4.0 + i * 4.0, sz * 2.4, 0x3a4a72));
+        }
+      }
+      // The sign itself: white ground, a red inverted triangle, a blue border.
+      for (const sx of [-1, 1]) {
+        parts.push(bx(0.5, 12.0, 0.5, sx * 0.0 - 1.4, 21.5, sx * 4.6, 0x3a3550));
+      }
+      parts.push(bx(0.6, 9.4, 9.4, -1.6, 21.0, 0, 0xf4f6ff));
+      parts.push(bx(0.24, 8.4, 8.4, -1.95, 21.0, 0, 0x2f5fd0));
+      parts.push(bx(0.30, 7.0, 7.0, -2.05, 21.0, 0, 0xfffdf5));
+      for (let i = 0; i < 5; i++) {
+        const w = 6.2 * (1 - i / 5);
+        parts.push(bx(0.34, 1.24, w, -2.15, 23.6 - i * 1.24, 0, 0xef3a4a));
+      }
+      return merge(parts);
+    },
+
+    /** A white New England steeple. Reach -2.4. */
+    spireWhite: function () {
+      const parts = [];
+      const W = 0xfffdf5, W2 = 0xe0dcd0, T = 0x3a4a5e;
+      parts.push(bx(9.0, 7.0, 14.0, 2.0, 3.5, 0, W));
+      parts.push(bx(9.6, 0.6, 14.6, 2.0, 7.2, 0, W2));
+      for (const sx of [-1, 1]) {
+        parts.push(bx(5.0, 2.6, 14.0, 2.0, 8.6, 0, W2, 0, 0, -sx * 0.7));
+      }
+      parts.push(bx(5.2, 11.0, 5.2, -2.0, 5.5, 0, W));
+      parts.push(bx(5.8, 0.7, 5.8, -2.0, 11.2, 0, W2));
+      parts.push(bx(4.2, 5.0, 4.2, -2.0, 14.0, 0, W));
+      for (const sz of [-1, 1]) parts.push(bx(0.3, 3.0, 1.6, -4.15, 14.0, sz * 1.0, T));
+      parts.push(bx(4.8, 0.6, 4.8, -2.0, 16.8, 0, W2));
+      parts.push(bx(3.2, 3.6, 3.2, -2.0, 18.9, 0, W));
+      parts.push(cone(2.4, 12.0, 4, -2.0, 26.8, 0, W2));
+      parts.push(bx(0.22, 2.0, 0.22, -2.0, 33.6, 0, 0xffe45e));
+      return merge(parts);
+    },
+
+    // ---- LONDON --------------------------------------------------------
+    /** St Paul's: a drum, a dome, a lantern and a west tower. Reach -5.0. */
+    stPauls: function () {
+      const parts = [];
+      const S = 0xe8e0cc, S2 = 0xcfc4ac, LEAD = 0x8f9aa8;
+      parts.push(bx(9.0, 12.0, 22.0, 0, 6.0, 0, S));
+      parts.push(bx(9.6, 0.8, 22.6, 0, 12.4, 0, S2));
+      for (let i = 0; i < 6; i++) {
+        parts.push(bx(0.5, 6.0, 1.0, -4.6, 6.5, -9.0 + i * 3.6, S2));
+      }
+      parts.push(cyl(6.2, 6.6, 8.0, 14, 0, 16.8, 0, S));
+      for (let i = 0; i < 14; i++) {
+        const a = (i / 14) * 6.2832;
+        parts.push(cyl(0.42, 0.42, 7.0, 5, Math.cos(a) * 6.4, 16.6, Math.sin(a) * 6.4, S2));
+      }
+      parts.push(cyl(6.9, 6.9, 0.9, 14, 0, 21.3, 0, S2));
+      parts.push(part(new THREE.SphereGeometry(6.2, 14, 8, 0, 6.2832, 0, Math.PI / 2),
+        LEAD, 0, 21.6, 0));
+      parts.push(cyl(1.9, 2.3, 4.0, 10, 0, 29.4, 0, S));
+      parts.push(cone(1.7, 2.4, 10, 0, 32.6, 0, LEAD));
+      parts.push(bx(0.22, 1.8, 0.22, 0, 34.6, 0, 0xffe45e));
+      // The west towers, which is what makes the dome read as a cathedral
+      // rather than as a capitol.
+      for (const sz of [-1, 1]) {
+        parts.push(bx(5.0, 20.0, 5.0, -0.5, 10.0, sz * 8.4, S));
+        parts.push(bx(5.6, 0.7, 5.6, -0.5, 20.3, sz * 8.4, S2));
+        parts.push(cyl(2.0, 2.2, 4.0, 8, -0.5, 22.6, sz * 8.4, S));
+        parts.push(cone(2.0, 3.0, 8, -0.5, 26.2, sz * 8.4, LEAD));
+      }
+      return merge(parts);
+    },
+
+    /** The Elizabeth Tower. Reach -2.6. */
+    bigBen: function () {
+      const parts = [];
+      const S = 0xd8c49a, S2 = 0xbca87e, ROOF = 0x4f6a58, GOLD = 0xffd85e;
+      parts.push(bx(6.4, 3.0, 6.4, 0, 1.5, 0, S2));
+      parts.push(bx(5.2, 26.0, 5.2, 0, 15.0, 0, S));
+      for (let i = 0; i < 5; i++) {
+        for (const f of [[-2.65, 0, 0.3, 1.4], [0, -2.65, 1.4, 0.3]]) {
+          parts.push(bx(f[2], 3.0, f[3], f[0], 6.0 + i * 4.4, f[1], 0x4a4664));
+        }
+      }
+      parts.push(bx(6.2, 1.0, 6.2, 0, 28.4, 0, S2));
+      parts.push(bx(5.8, 5.4, 5.8, 0, 31.6, 0, S));
+      // Clock faces on the two the road can see.
+      for (const f of [[-2.95, 0, 0.34, 4.0], [0, -2.95, 4.0, 0.34]]) {
+        parts.push(bx(f[2], 4.0, f[3], f[0], 31.6, f[1], 0xfffdf5));
+        parts.push(bx(f[2] * 1.4, 4.5, f[3] * 1.4, f[0] * 1.02, 31.6, f[1] * 1.02, GOLD));
+        parts.push(bx(f[2] * 1.1, 3.9, f[3] * 1.1, f[0] * 1.06, 31.6, f[1] * 1.06, 0xfffdf5));
+      }
+      parts.push(bx(0.28, 1.5, 0.16, -3.16, 32.2, 0, 0x2b2f52));
+      parts.push(bx(0.16, 0.28, 1.2, -3.16, 31.6, 0.4, 0x2b2f52));
+      parts.push(bx(6.2, 0.8, 6.2, 0, 34.6, 0, GOLD));
+      for (const sx of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          parts.push(cone(0.8, 4.0, 4, sx * 2.5, 36.8, sz * 2.5, ROOF));
+        }
+      }
+      parts.push(cone(3.9, 8.0, 4, 0, 39.0, 0, ROOF));
+      parts.push(cyl(0.5, 0.9, 2.0, 6, 0, 43.8, 0, GOLD));
+      parts.push(bx(0.20, 2.4, 0.20, 0, 46.0, 0, GOLD));
+      return merge(parts);
+    },
+
+    /** Tower Bridge: two gothic towers along the deck and the high walkways. */
+    towerBridge: function () {
+      const parts = [];
+      const S = 0xdcd0b4, S2 = 0xbfae8e, BLUE = 0x2f7fb8, TOP = 0x4f7f9a;
+      for (const sz of [-1, 1]) {
+        const z = sz * 30;
+        for (const sx of [-1, 1]) {
+          const x = sx * 9.6;
+          parts.push(bx(5.6, 24.0, 5.6, x, 12.0, z, S));
+          parts.push(bx(6.2, 1.0, 6.2, x, 3.0, z, S2));
+          parts.push(bx(6.2, 0.9, 6.2, x, 18.0, z, S2));
+          parts.push(bx(5.0, 6.0, 5.0, x, 24.5, z, S));
+          for (const cx of [-1, 1]) {
+            for (const cz of [-1, 1]) {
+              parts.push(cone(1.0, 5.0, 4, x + cx * 2.4, 29.0, z + cz * 2.4, TOP));
+            }
+          }
+          parts.push(cone(3.9, 9.0, 4, x, 32.0, z, TOP));
+          parts.push(bx(0.22, 2.4, 0.22, x, 37.4, z, 0xffe45e));
+          // The gothic portal: the road really does pass through the towers.
+          vArc(parts, { cx: sx * 9.6, cy: 11.0, cz: z, rx: 3.6, ry: 5.0, n: 6, th: 0.7, d: 6.2, color: S2 });
+        }
+        // The cross member over the road, well above the overhead layer.
+        parts.push(bx(24.0, 1.6, 6.0, 0, 19.6, z, S2));
+      }
+      // The two high walkways: the shape everybody draws.
+      for (const y of [21.4, 24.6]) {
+        parts.push(bx(20.0, 0.8, 4.4, 0, y, 0, S));
+      }
+      for (let i = 0; i < 7; i++) {
+        parts.push(bx(0.5, 3.2, 4.6, 0, 23.0, -27 + i * 9, S2));
+      }
+      for (const sx of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          parts.push(bx(0.55, 0.55, 62, sx * 9.4, 22.0, 0, S2));
+        }
+      }
+      // Suspension chains, out beyond the towers.
+      for (const sx of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          for (let i = 0; i < 5; i++) {
+            const t0 = i / 5, t1 = (i + 1) / 5;
+            const z0 = sz * (32 + t0 * 34), z1 = sz * (32 + t1 * 34);
+            const y0 = 18 - 9 * Math.sin(Math.PI * t0 * 0.9);
+            const y1 = 18 - 9 * Math.sin(Math.PI * t1 * 0.9);
+            const len = Math.hypot(z1 - z0, y1 - y0);
+            parts.push(bx(0.5, 0.5, len, sx * 9.6, (y0 + y1) / 2, (z0 + z1) / 2, BLUE,
+              -Math.atan2(y1 - y0, z1 - z0)));
+          }
+        }
+      }
+      return merge(parts);
+    },
+
+    // ---- BERLIN --------------------------------------------------------
+    /** The Fernsehturm: a sphere on a needle, and nothing else is that. */
+    fernsehturm: function () {
+      const parts = [];
+      const C = 0xe4e8f0, C2 = 0xb8bfd0;
+      parts.push(cyl(3.2, 6.0, 3.0, 12, 0, 1.5, 0, C2));
+      parts.push(cyl(1.5, 3.2, 34.0, 12, 0, 20.0, 0, C));
+      for (let i = 0; i < 6; i++) {
+        parts.push(cyl(1.55 + 0.28 * (1 - i / 6) * 3, 1.55 + 0.28 * (1 - i / 6) * 3, 0.3, 12,
+          0, 8.0 + i * 5.0, 0, C2));
+      }
+      parts.push(sph(5.6, 12, 0, 39.5, 0, 0xd0d8e8));
+      parts.push(cyl(5.7, 5.7, 1.1, 14, 0, 39.5, 0, 0xf4f8ff));
+      parts.push(cyl(4.2, 4.2, 0.9, 14, 0, 43.4, 0, C2));
+      parts.push(cyl(1.1, 1.4, 6.0, 8, 0, 47.5, 0, C));
+      parts.push(cone(0.9, 22.0, 6, 0, 61.0, 0, 0xef4a5a));
+      parts.push(cyl(0.16, 0.16, 6.0, 5, 0, 74.0, 0, C2));
+      return merge(parts);
+    },
+
+    /** The Brandenburg Gate: the road runs through it. */
+    brandenburg: function (look) {
+      const parts = [];
+      const S = 0xe0d4b8, S2 = 0xc2b090, DARK = 0x6a5f4e;
+      for (const sx of [-1, 1]) {
+        // Columns at 12.4, 16.6 and 20.8: the road takes the central opening
+        // and the two flanking ones stay outside the corridor by a wide margin.
+        for (const cx of [12.4, 16.6, 20.8]) {
+          for (const cz of [-2.4, 2.4]) {
+            parts.push(cyl(0.95, 1.15, 13.0, 10, sx * cx, 6.5, cz, S));
+            parts.push(cyl(1.35, 1.35, 0.7, 10, sx * cx, 13.3, cz, S2));
+            parts.push(bx(2.8, 0.6, 2.8, sx * cx, 0.3, cz, S2));
+          }
+        }
+        parts.push(bx(12.0, 2.6, 7.6, sx * 16.6, 15.0, 0, S));
+        parts.push(bx(12.6, 0.8, 8.2, sx * 16.6, 16.7, 0, S2));
+      }
+      // The entablature over the road. Soffit at 13.8, well clear of
+      // OVERHEAD_Y and of everything the tile hangs at 10.9.
+      parts.push(bx(26.0, 2.6, 7.6, 0, 15.0, 0, S));
+      parts.push(bx(26.6, 0.8, 8.2, 0, 16.7, 0, S2));
+      parts.push(bx(48.0, 1.0, 8.6, 0, 17.4, 0, S2));
+      parts.push(bx(46.0, 3.4, 6.0, 0, 19.2, 0, S));
+      // The quadriga: four horses and a chariot, in silhouette only.
+      for (let i = 0; i < 4; i++) {
+        const x = -4.8 + i * 3.2;
+        parts.push(bx(1.5, 2.0, 3.4, x, 22.0, 0.4, DARK));
+        parts.push(bx(1.0, 1.6, 1.0, x - 0.2, 23.4, 1.9, DARK, 0.4));
+        parts.push(bx(0.5, 1.8, 0.5, x, 21.0, 1.4, DARK));
+        parts.push(bx(0.5, 1.8, 0.5, x, 21.0, -0.8, DARK));
+      }
+      parts.push(bx(3.4, 2.2, 3.0, 6.6, 22.1, 0, DARK));
+      parts.push(cyl(1.2, 1.2, 0.4, 10, 6.6, 21.2, 1.6, DARK, 0, 0, Math.PI / 2));
+      parts.push(bx(0.7, 3.0, 0.7, 7.4, 24.2, 0, DARK));
+      return merge(parts);
+    },
+
+    /** The Siegessäule: a column with a gold figure. Reach -3.2. */
+    victoryColumn: function () {
+      const parts = [];
+      const S = 0xd8cbb0, GOLD = 0xffd24a;
+      parts.push(cyl(4.6, 5.4, 2.0, 12, 0, 1.0, 0, 0xbfae90));
+      parts.push(cyl(3.6, 4.0, 4.0, 12, 0, 4.0, 0, S));
+      for (let i = 0; i < 3; i++) {
+        parts.push(cyl(2.0 - i * 0.15, 2.1 - i * 0.15, 6.0, 12, 0, 9.0 + i * 6.0, 0, S));
+        parts.push(cyl(2.2 - i * 0.15, 2.2 - i * 0.15, 0.5, 12, 0, 12.0 + i * 6.0, 0, GOLD));
+        // The gilded cannon barrels set into the drums -- pure Berlin.
+        for (let k = 0; k < 6; k++) {
+          const a = (k / 6) * 6.2832;
+          parts.push(cyl(0.28, 0.28, 4.6, 6, Math.cos(a) * (1.95 - i * 0.15), 9.0 + i * 6.0,
+            Math.sin(a) * (1.95 - i * 0.15), GOLD));
+        }
+      }
+      parts.push(cyl(3.0, 2.4, 1.6, 12, 0, 27.6, 0, S));
+      parts.push(cyl(3.2, 3.2, 0.6, 12, 0, 28.7, 0, GOLD));
+      parts.push(bx(1.4, 4.4, 1.4, 0, 31.2, 0, GOLD));
+      parts.push(bx(0.6, 1.2, 5.6, 0.2, 33.4, 0, GOLD, 0.3));
+      parts.push(bx(0.9, 3.4, 0.9, -1.0, 33.0, 0, GOLD, 0, 0, 0.5));
+      return merge(parts);
+    },
+
+    /** The Oberbaumbrücke: brick towers with the U-Bahn viaduct above. */
+    oberbaum: function () {
+      const parts = [];
+      const B = 0xa8543f, B2 = 0x86402f, S = 0xd8c8a8;
+      for (const sz of [-1, 1]) {
+        const z = sz * 26;
+        for (const sx of [-1, 1]) {
+          const x = sx * 9.6;
+          parts.push(bx(5.0, 20.0, 5.0, x, 10.0, z, B));
+          parts.push(bx(5.6, 0.8, 5.6, x, 15.4, z, B2));
+          parts.push(bx(4.2, 4.0, 4.2, x, 21.8, z, B));
+          parts.push(cone(3.2, 7.0, 6, x, 27.0, z, 0x4f5f6a));
+          parts.push(bx(0.2, 2.0, 0.2, x, 31.2, z, 0xffe45e));
+          vArc(parts, { cx: x, cy: 9.0, cz: z, rx: 3.2, ry: 4.4, n: 6, th: 0.6, d: 5.4, color: B2 });
+        }
+      }
+      // The railway deck: an arcade carried over the road on the towers.
+      for (const sx of [-1, 1]) {
+        parts.push(bx(1.2, 4.0, 66, sx * 9.2, 19.6, 0, B));
+      }
+      parts.push(bx(20.0, 1.2, 66, 0, 17.6, 0, B2));
+      for (let i = 0; i < 7; i++) {
+        vArc(parts, { cx: 0, cy: 12.4, cz: -30 + i * 10, rx: 4.4, ry: 4.6, n: 6, th: 0.7, d: 1.2, color: B2 });
+      }
+      parts.push(bx(21.0, 0.9, 66, 0, 22.2, 0, S));
+      return merge(parts);
+    },
+
+    // ---- CHICAGO -------------------------------------------------------
+    /** Willis Tower: bundled black tubes stepping down. Reach -8.0. */
+    willis: function () {
+      const parts = [];
+      const D = 0x272c44, D2 = 0x363d5c, BAND = 0x5a6488;
+      const tube = [
+        [-4.0, -4.0, 62], [0.0, -4.0, 44], [4.0, -4.0, 52],
+        [-4.0, 0.0, 52], [0.0, 0.0, 78], [4.0, 0.0, 44],
+        [-4.0, 4.0, 44], [0.0, 4.0, 78], [4.0, 4.0, 52],
+      ];
+      for (const t of tube) {
+        parts.push(bx(3.9, t[2], 3.9, t[0], t[2] / 2, t[1], D));
+        const n = Math.round(t[2] / 3.2);
+        for (let i = 1; i < n; i++) {
+          parts.push(bx(4.0, 0.34, 4.0, t[0], t[2] * i / n, t[1], BAND));
+        }
+        parts.push(bx(4.3, 0.5, 4.3, t[0], t[2], t[1], D2));
+      }
+      for (const z of [-4.0, 4.0]) {
+        parts.push(cyl(0.14, 0.30, 26.0, 6, 0, 91.0, z, D2));
+      }
+      return merge(parts);
+    },
+
+    /**
+     * The elevated L, running the length of the leg over the road.
+     *
+     * Laid as a RUN rather than as a point landmark: an elevated railway that
+     * appears in 48-unit chunks with gaps between them is not an elevated
+     * railway. The deck sits at 13.5 -- above everything the road tile hangs
+     * overhead (10.9 at the tallest mast), so the two layers stack instead of
+     * fighting, and the columns stand at 11.9, outside LANDMARK_IN.
+     */
+    lTrack: function (look, withTrain) {
+      const parts = [];
+      const STEEL = 0x4a5268, STEEL2 = 0x39405a, TIE = 0x5f4a38;
+      const L = 48, CX = 11.9;
+      for (const sx of [-1, 1]) {
+        for (let i = 0; i < 4; i++) {
+          const z = -L / 2 + 6 + i * 12;
+          parts.push(bx(1.5, 13.0, 1.5, sx * CX, 6.5, z, STEEL));
+          parts.push(bx(2.2, 0.7, 2.2, sx * CX, 0.35, z, STEEL2));
+          parts.push(bx(2.6, 2.2, 0.9, sx * (CX - 1.3), 12.4, z, STEEL2, 0, 0, sx * 0.7));
+        }
+        // Plate girders down each side, which is what an L structure is.
+        parts.push(bx(0.5, 2.2, L, sx * CX, 13.4, 0, STEEL));
+        parts.push(bx(0.9, 0.4, L, sx * CX, 14.6, 0, STEEL2));
+        parts.push(bx(0.9, 0.4, L, sx * CX, 12.3, 0, STEEL2));
+        parts.push(bx(0.16, 1.5, L, sx * (CX - 0.6), 15.9, 0, STEEL2));
+      }
+      parts.push(bx(CX * 2, 0.5, L, 0, 12.6, 0, STEEL2));
+      for (let i = 0; i < Math.round(L / 1.6); i++) {
+        parts.push(bx(CX * 1.6, 0.24, 0.7, 0, 13.0, -L / 2 + 0.8 + i * 1.6, TIE));
+      }
+      for (const rx of [-4.4, -2.6, 2.6, 4.4]) {
+        parts.push(bx(0.30, 0.30, L, rx, 13.3, 0, 0xa8b0c4));
+      }
+      if (withTrain) {
+        const car = [0xc8ccd8, 0x37a8d8];
+        for (let i = 0; i < 3; i++) {
+          const z = -16 + i * 16;
+          parts.push(bx(6.4, 3.0, 14.4, 0, 15.0, z, car[i % 2]));
+          parts.push(bx(6.5, 0.9, 14.5, 0, 16.1, z, 0x2b3350));
+          parts.push(bx(6.6, 0.4, 14.0, 0, 16.9, z, 0xd8dcf0));
+          parts.push(bx(6.0, 0.3, 13.0, 0, 13.5, z, 0x39405a));
+        }
+      }
+      return merge(parts);
+    },
+
+    lTrackTrain: function (look) { return MARKS.lTrack(look, true); },
+
+    /**
+     * A Chicago river bascule -- seen from the deck of its neighbour.
+     *
+     * A raised leaf cannot go over this road: the leaves of a bascule lift
+     * across the channel, which is the direction the runner is travelling. So
+     * what the leg gets is the pair of ornate bridgetender houses at the deck
+     * edge and the NEXT bridge downstream with its leaves up, out over the
+     * water where it is unmistakable and cannot touch anything.
+     */
+    bascule: function () {
+      const parts = [];
+      const S = 0xd8cbb0, S2 = 0xb4a68a, STEEL = 0x3f4860, RUST = 0x7f4a3a;
+      for (const sx of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          const x = sx * 8.4, z = sz * 16;
+          parts.push(bx(4.0, 6.0, 4.0, x, 3.0, z, S));
+          parts.push(bx(4.6, 0.6, 4.6, x, 6.3, z, S2));
+          parts.push(bx(3.4, 2.4, 3.4, x, 7.8, z, S));
+          parts.push(cone(2.6, 3.0, 4, x, 10.5, z, 0x4f6a58));
+          parts.push(bx(0.9, 1.6, 0.9, x, 1.6, z - sz * 2.2, 0x4a4664));
+        }
+      }
+      // The raised bridge downstream. Two leaves canted up out of the water.
+      for (const sz of [-1, 1]) {
+        const z = 44;
+        parts.push(bx(6.0, 9.0, 5.0, -26, 4.5 - 2.3, z + sz * 13, STEEL));
+        parts.push(bx(3.0, 22.0, 8.0, -26 + sz * 0.0, 9.0, z + sz * 7.4, RUST, sz * 1.15));
+        parts.push(bx(3.4, 4.4, 4.4, -26, 3.4, z + sz * 12.0, STEEL));
+        for (let i = 0; i < 4; i++) {
+          parts.push(bx(0.5, 0.5, 9.0, -26, 6.0 + i * 4.4, z + sz * (5.0 + i * 1.6), STEEL, sz * 1.15));
+        }
+      }
+      return merge(parts);
+    },
+
+    // ---- NEW YORK ------------------------------------------------------
+    /** The Empire State: setbacks and a mooring mast. Reach -7.5. */
+    empire: function () {
+      const parts = [];
+      vTower(parts, {
+        w: 15, d: 15, h: 46, steps: 3, split: [0.42, 0.34, 0.24], taper: 0.66,
+        color: 0xb0a48e, color2: 0x8f8472, band: 0x6f6858, glass: 0,
+        crown: 'stepped', lit: 1, seed: 9,
+      });
+      return merge(parts);
+    },
+
+    /** The Verrazzano: a grey steel suspension span. */
+    verrazzano: function () { return mkSuspension(0x9aa4bc, 0x6f7a98, 0xd8dce8); },
+
+    // ---- TOKYO ---------------------------------------------------------
+    /** The Skytree: a lattice needle. Reach -6.5. */
+    skytree: function () {
+      const parts = [];
+      vLattice(parts, {
+        h: 62, base: 6.2, top: 1.5, curve: 2.4, seg: 10, leg: 0.85, belt: 0.24,
+        color: 0xdfe4f0, color2: 0xa8b2c8,
+        decks: [
+          { y: 34, w: 9.0, h: 3.4, c: 0xeff2fa, rim: 0x8fa8d8 },
+          { y: 50, w: 6.4, h: 2.6, c: 0xeff2fa, rim: 0x8fa8d8 },
+        ],
+        mast: 26, mastR: 0.55,
+      });
+      parts.push(cyl(2.6, 4.2, 5.0, 10, 0, 2.5, 0, 0xc8cfe0));
+      return merge(parts);
+    },
+
+    /** A torii, with the road running through it. */
+    torii: function () {
+      const parts = [];
+      const RED = 0xd93a3a, DARK = 0x2f2a3a;
+      for (const sx of [-1, 1]) {
+        parts.push(cyl(1.0, 1.3, 17.0, 10, sx * 12.6, 8.5, 0, RED, 0, 0, sx * 0.035));
+        parts.push(cyl(1.7, 1.7, 0.9, 10, sx * 12.9, 0.45, 0, DARK));
+        parts.push(bx(3.0, 0.8, 3.0, sx * 12.4, 14.2, 0, RED));
+      }
+      parts.push(bx(32.0, 1.0, 2.0, 0, 15.6, 0, RED));
+      // The kasagi: the top rail, sweeping up at the ends. Two canted boxes
+      // and a flat centre is enough for the curve at this distance.
+      parts.push(bx(24.0, 1.5, 2.8, 0, 18.4, 0, DARK));
+      for (const sx of [-1, 1]) {
+        parts.push(bx(9.0, 1.5, 2.8, sx * 15.8, 18.9, 0, DARK, 0, 0, sx * 0.12));
+      }
+      parts.push(bx(38.0, 0.7, 3.2, 0, 19.5, 0, DARK));
+      parts.push(bx(1.6, 3.6, 2.2, 0, 17.0, 0, RED));
+      return merge(parts);
+    },
+
+    /** A five-storey pagoda. Reach -4.2. */
+    pagoda: function () {
+      const parts = [];
+      const RED = 0xc03a3a, WOOD = 0x8f4a3a, WHITE = 0xefe6d4, ROOF = 0x3f4a5e;
+      parts.push(bx(8.0, 1.2, 8.0, 0, 0.6, 0, 0xa8a090));
+      for (let i = 0; i < 5; i++) {
+        const y = 1.2 + i * 4.2;
+        const w = 6.4 - i * 0.7;
+        parts.push(bx(w, 3.0, w, 0, y + 1.5, 0, i % 2 ? WHITE : RED));
+        for (const sx of [-1, 1]) {
+          parts.push(cyl(0.26, 0.26, 3.0, 6, sx * w * 0.42, y + 1.5, -w * 0.42, WOOD));
+          parts.push(cyl(0.26, 0.26, 3.0, 6, sx * w * 0.42, y + 1.5, w * 0.42, WOOD));
+        }
+        const rw = w + 3.6;
+        parts.push(bx(rw, 0.5, rw, 0, y + 3.2, 0, ROOF));
+        parts.push(cone(rw * 0.78, 1.5, 4, 0, y + 4.0, 0, ROOF));
+        for (const sx of [-1, 1]) {
+          for (const sz of [-1, 1]) {
+            parts.push(bx(1.6, 0.35, 1.6, sx * rw * 0.44, y + 3.5, sz * rw * 0.44, ROOF, 0, 0, -sx * 0.3));
+          }
+        }
+      }
+      parts.push(cyl(0.3, 0.5, 5.0, 6, 0, 25.0, 0, 0xffd24a));
+      for (let i = 0; i < 4; i++) {
+        parts.push(cyl(0.9 - i * 0.14, 0.9 - i * 0.14, 0.24, 8, 0, 24.0 + i * 1.0, 0, 0xffd24a));
+      }
+      return merge(parts);
+    },
+
+    /** A signage stack: the Tokyo street front as one object. Reach -2.2. */
+    neon: function () {
+      const parts = [];
+      const glow = [0xff3a6a, 0x37d6ff, 0xffe45e, 0x62f0a8, 0xff9ad5, 0xf4f6ff];
+      const r = lcg(77);
+      parts.push(bx(5.0, 26.0, 9.0, 0, 13.0, 0, 0x3f4560));
+      parts.push(bx(5.2, 0.6, 9.2, 0, 26.4, 0, 0x2b3050));
+      for (let i = 0; i < 9; i++) {
+        const y = 3.0 + i * 2.6;
+        const z = (r() - 0.5) * 5.0;
+        const h = 1.6 + r() * 0.9;
+        parts.push(bx(1.4, h, 2.6 + r() * 2.4, -2.6, y, z, glow[Math.floor(r() * glow.length)]));
+        parts.push(bx(0.34, h * 0.7, 0.34, -1.6, y, z, 0x2b3050));
+      }
+      // A vertical banner sign down the corner, the tallest thing on the block.
+      parts.push(bx(1.0, 16.0, 2.2, -2.9, 15.0, -3.2, 0xff3a6a));
+      parts.push(bx(1.2, 15.0, 0.7, -3.0, 15.0, -3.2, 0xfffdf5));
+      parts.push(bx(9.0, 3.0, 0.8, 0, 28.4, 0, glow[1]));
+      for (const sz of [-1, 1]) parts.push(bx(0.4, 3.4, 0.4, 0, 28.0, sz * 4.0, 0x2b3050));
+      return merge(parts);
+    },
+
+    /** Rainbow Bridge: a white suspension span. */
+    rainbow: function () { return mkSuspension(0xf0f4ff, 0xc8cfe0, 0xe8ecf8); },
+
+    // ---- SYDNEY --------------------------------------------------------
+    /** The Opera House: nested shells on a podium. Reach -6.5. */
+    operaHouse: function () {
+      const parts = [];
+      const SHELL = 0xf4f2e8, SHELL2 = 0xdcd8cc, POD = 0xc8c0ae;
+      parts.push(bx(16.0, 2.4, 34.0, 2.0, 1.2, 0, POD));
+      parts.push(bx(17.0, 0.5, 35.0, 2.0, 2.6, 0, 0xe4dccc));
+      for (let i = 0; i < 8; i++) {
+        parts.push(bx(0.5, 2.4, 1.6, -5.6, 1.2, -14 + i * 4.0, 0x9a9282));
+      }
+      // Two clusters of three shells, each leaning back and stepping down --
+      // the "sails" everybody draws, and the LEAN is what makes them sails.
+      const cluster = [
+        { z: -9.0, r: [8.6, 6.4, 4.0] },
+        { z: 9.0, r: [7.4, 5.4, 3.2] },
+      ];
+      for (const c of cluster) {
+        for (let i = 0; i < c.r.length; i++) {
+          vShell(parts, {
+            r: c.r[i], color: i % 2 ? SHELL2 : SHELL, back: 0xbfb8a8,
+            x: -1.6 + i * 2.4, y: 2.4, z: c.z + i * 2.6,
+            tilt: 0, yaw: -0.35, roll: -0.45, seg: 11,
+          });
+        }
+      }
+      vShell(parts, { r: 3.0, color: SHELL, back: 0xbfb8a8, x: 3.0, y: 2.4, z: -20.0, yaw: -0.4, roll: -0.5, seg: 9 });
+      return merge(parts);
+    },
+
+    /** Sydney Tower: a gold bucket on a needle. Reach -3.0. */
+    sydneyTower: function () {
+      const parts = [];
+      const C = 0xd8dce8, GOLD = 0xe8b040;
+      parts.push(bx(9.0, 14.0, 9.0, 0, 7.0, 0, 0xb8bcd0));
+      parts.push(cyl(1.4, 2.2, 34.0, 10, 0, 31.0, 0, C));
+      for (let i = 0; i < 5; i++) {
+        parts.push(cyl(1.6, 1.6, 0.4, 10, 0, 20.0 + i * 6.0, 0, 0xa8b0c8));
+      }
+      parts.push(cyl(4.4, 3.6, 4.4, 12, 0, 50.0, 0, GOLD));
+      parts.push(cyl(4.8, 4.8, 0.7, 12, 0, 47.6, 0, 0xc08a2a));
+      parts.push(cyl(3.8, 3.8, 0.6, 12, 0, 52.4, 0, 0xc08a2a));
+      parts.push(cyl(1.3, 1.3, 5.0, 8, 0, 55.4, 0, C));
+      parts.push(cone(0.6, 14.0, 6, 0, 64.0, 0, C));
+      // The stay cables that make it read as a tower and not as a chimney.
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * 6.2832 + 0.4;
+        parts.push(bx(0.18, 34.0, 0.18, Math.cos(a) * 3.4, 31.0, Math.sin(a) * 3.4, 0xa8b0c8,
+          Math.sin(a) * 0.06, 0, -Math.cos(a) * 0.06));
+      }
+      return merge(parts);
+    },
+
+    /** The Harbour Bridge: a steel through-arch over the road. */
+    harbour: function () {
+      const parts = [];
+      const STEEL = 0x8f9aae, STEEL2 = 0x6f7a90, STONE = 0xc8bfa8;
+      const sub = [];
+      // Two arch trusses, one either side of the deck, springing above the
+      // overhead layer and rising to 30. Built along local x and swung a
+      // quarter turn so it runs up the course.
+      for (const sx of [-1, 1]) {
+        vTruss(sub, {
+          x0: -46, x1: 46, z: sx * 8.6, w: 0.9, depth: 3.2,
+          y0: 11.0, rise: 21.0, curve: 1, n: 14, th: 0.42,
+          color: STEEL, color2: STEEL2,
+        });
+      }
+      placeAt(parts, sub, 0, 0, 0, Math.PI / 2);
+      // Hangers down to the deck, and the cross bracing over the crown.
+      for (let i = 1; i < 14; i++) {
+        const t = i / 14;
+        const z = -46 + t * 92;
+        const y = 11.0 + 21.0 * Math.sin(Math.PI * t) - 3.2;
+        for (const sx of [-1, 1]) {
+          parts.push(bx(0.30, Math.max(0.5, y - 10.2), 0.30, sx * 8.6, (y + 10.2) / 2, z, STEEL2));
+        }
+        if (i % 3 === 0) parts.push(bx(17.2, 0.34, 0.34, 0, y, z, STEEL2));
+      }
+      // The granite pylons at each end: the Harbour Bridge's other half.
+      for (const sz of [-1, 1]) {
+        for (const sx of [-1, 1]) {
+          parts.push(bx(6.0, 24.0, 8.0, sx * 11.0, 12.0, sz * 44, STONE));
+          parts.push(bx(6.8, 1.0, 8.8, sx * 11.0, 24.6, sz * 44, 0xdcd2ba));
+          parts.push(bx(5.0, 3.0, 6.6, sx * 11.0, 26.6, sz * 44, STONE));
+        }
+      }
+      return merge(parts);
+    },
+
+    // ---- PARIS ---------------------------------------------------------
+    /** The Eiffel Tower. Reach -9.5, so it wants x >= 21. */
+    eiffel: function () {
+      const parts = [];
+      vLattice(parts, {
+        h: 52, base: 9.2, top: 1.0, curve: 2.2, seg: 10, leg: 1.15, belt: 0.34,
+        color: 0x9a7f5e, color2: 0x7d6449,
+        arch: { y: 11.0, r: 5.0, th: 0.9, d: 1.0 },
+        decks: [
+          { y: 12.5, w: 14.0, h: 1.3, c: 0x8f7554, rim: 0xb09a72 },
+          { y: 27.0, w: 8.4, h: 1.1, c: 0x8f7554, rim: 0xb09a72 },
+          { y: 46.0, w: 4.0, h: 1.4, c: 0x8f7554, rim: 0xb09a72 },
+        ],
+        mast: 12, mastR: 0.5,
+      });
+      for (const sx of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          parts.push(bx(3.4, 0.9, 3.4, sx * 8.6, 0.45, sz * 8.6, 0x8a8272));
+        }
+      }
+      return merge(parts);
+    },
+
+    /** The Arc de Triomphe, with the road running through it. */
+    arcDeTriomphe: function () {
+      const parts = [];
+      const S = 0xe4d8bc, S2 = 0xc8b898, DARK = 0x9a8a70;
+      for (const sx of [-1, 1]) {
+        parts.push(bx(9.6, 20.0, 15.0, sx * 16.8, 10.0, 0, S));
+        parts.push(bx(10.2, 1.0, 15.6, sx * 16.8, 20.4, 0, S2));
+        // Relief panels: two dark rectangles a side is all the ornament that
+        // survives the fog, and their rhythm is the arch's own.
+        for (const sz of [-1, 1]) {
+          parts.push(bx(4.4, 6.0, 0.4, sx * 19.0, 9.0, sz * 7.6, DARK));
+          parts.push(bx(3.0, 3.4, 0.4, sx * 14.4, 15.0, sz * 7.6, DARK));
+        }
+      }
+      vArc(parts, { cx: 0, cy: 9.6, rx: 12.0, ry: 7.4, n: 9, th: 1.3, d: 15.2, color: S2, alt: S });
+      parts.push(bx(24.0, 3.4, 15.0, 0, 18.7, 0, S));
+      parts.push(bx(45.0, 1.2, 16.0, 0, 21.0, 0, S2));
+      parts.push(bx(43.0, 4.6, 14.0, 0, 23.9, 0, S));
+      parts.push(bx(45.0, 1.0, 15.4, 0, 26.6, 0, S2));
+      for (let i = 0; i < 7; i++) {
+        parts.push(bx(1.2, 3.0, 15.4, -18 + i * 6, 23.9, 0, S2));
+      }
+      return merge(parts);
+    },
+
+    /** A Seine bridge: a low stone arch span with lamps and a parallel bridge. */
+    stoneArch: function (look) {
+      const parts = [];
+      const S = 0xd8cfba, S2 = 0xbfb49c, GREEN = 0x3f6a5a;
+      for (const sx of [-1, 1]) {
+        // Ornament on this deck's own parapet: piers, lamps and a statue.
+        for (const sz of [-1, 1]) {
+          const x = sx * 5.4, z = sz * 12;
+          parts.push(bx(1.8, 2.6, 2.4, x, 0.9, z, S));
+          parts.push(cyl(0.22, 0.30, 4.6, 8, x, 4.4, z, GREEN));
+          parts.push(sph(0.62, 8, x, 7.0, z, 0xffe45e));
+          parts.push(bx(0.9, 0.9, 0.9, x, 7.6, z, GREEN));
+        }
+        parts.push(bx(1.4, 2.0, 3.0, sx * 5.4, 0.6, 0, S2));
+        parts.push(bx(1.0, 3.2, 1.0, sx * 5.4, 3.0, 0, GREEN));
+        parts.push(bx(1.6, 1.4, 1.6, sx * 5.4, 5.2, 0, GREEN));
+      }
+      // The next bridge downstream, which is where the arches can be seen.
+      const sub = [];
+      for (let i = 0; i < 4; i++) {
+        const z = -30 + i * 20;
+        vArc(sub, { cx: 0, cy: -1.4, cz: z, rx: 8.6, ry: 5.2, n: 8, th: 1.1, d: 7.0, color: S, alt: S2 });
+        if (i) parts.push(bx(7.2, 8.0, 3.0, -34, 1.0, z - 10, S2));
+      }
+      sub.push(bx(72, 1.4, 7.6, 0, 4.4, 0, S));
+      sub.push(bx(73, 0.9, 8.4, 0, 5.4, 0, S2));
+      for (let i = 0; i < 8; i++) {
+        sub.push(bx(0.8, 1.5, 0.8, -28 + i * 8, 6.5, 3.4, S2));
+        sub.push(bx(0.8, 1.5, 0.8, -28 + i * 8, 6.5, -3.4, S2));
+      }
+      placeAt(parts, sub, -34, -2.3, 0, Math.PI / 2);
+      return merge(parts);
+    },
+
+    // ---- VALENCIA ------------------------------------------------------
+    /** Calatrava's white ribs: a comb of parabolic arches. Reach -5.0. */
+    calatravaRibs: function () {
+      const parts = [];
+      const W = 0xfbfbf6, W2 = 0xe0e4e4;
+      parts.push(bx(13.0, 0.8, 44.0, 1.0, 0.4, 0, 0xf0f0e8));
+      parts.push(bx(13.6, 0.3, 44.6, 1.0, 0.9, 0, 0xdde6e0));
+      for (let i = 0; i < 15; i++) {
+        const z = -20 + i * 2.86;
+        const k = 1 - 0.30 * Math.abs(i - 7) / 7;
+        vArc(parts, {
+          cx: 1.0, cy: 1.0, cz: z, rx: 5.6 * k, ry: 13.0 * k,
+          n: 8, th: 0.44, d: 0.7, color: i % 2 ? W : W2,
+        });
+      }
+      parts.push(bx(1.0, 1.0, 44.0, 1.0, 13.6, 0, W));
+      for (const sz of [-1, 1]) {
+        parts.push(bx(0.7, 0.7, 44.0, -3.4, 7.0, sz * 0, W2));
+      }
+      // The bare white spine, which is what makes the ribs read as a building.
+      parts.push(bx(4.0, 5.0, 44.0, 4.4, 2.5, 0, W));
+      return merge(parts);
+    },
+
+    /** The Hemisfèric: an eye over water. Reach -8.0, wants x >= 20. */
+    hemisferic: function (look) {
+      const parts = [];
+      const W = 0xfbfbf6, W2 = 0xdfe6e6;
+      parts.push(part(new THREE.PlaneGeometry(42, 46), look.water, 0, 0.02, 0, -Math.PI / 2));
+      parts.push(bx(44, 0.6, 48, 0, -0.2, 0, 0xe8ece8));
+      // The pupil, and its reflection: a hemisphere over an inverted one.
+      parts.push(part(new THREE.SphereGeometry(8.0, 16, 9, 0, 6.2832, 0, Math.PI / 2),
+        0xe8ecf0, 0, 0.2, 0));
+      parts.push(part(new THREE.SphereGeometry(8.0, 16, 9, 0, 6.2832, Math.PI / 2, Math.PI / 2),
+        0xb8c8d0, 0, 0.1, 0));
+      parts.push(cyl(8.2, 8.2, 0.5, 16, 0, 0.3, 0, W2));
+      // The lid: a long shallow shell over the top, which is the whole read.
+      for (let i = 0; i < 10; i++) {
+        const t = (i - 4.5) / 4.5;
+        const w = Math.sqrt(Math.max(0.05, 1 - t * t));
+        parts.push(bx(0.9, 1.0 + 12.0 * w, 2.6, -1.2 - 1.4 * (1 - w), 5.0 + 5.0 * w, t * 13.0,
+          i % 2 ? W : W2, 0, 0, -t * 0.5));
+      }
+      parts.push(bx(1.4, 1.4, 30.0, -2.2, 13.4, 0, W));
+      for (const sz of [-1, 1]) {
+        parts.push(bx(1.6, 8.0, 1.6, -2.2, 4.0, sz * 15.0, W2, 0, 0, 0.2));
+      }
+      return merge(parts);
+    },
+
+    /** A single inclined white pylon with harp cables. */
+    harp: function () {
+      const parts = [];
+      const W = 0xfbfbf6, W2 = 0xdde4e4;
+      parts.push(bx(5.0, 4.0, 9.0, 9.6, 1.0, 0, W2));
+      // The pylon leans back over the water, away from the road.
+      const H = 40;
+      parts.push(cyl(0.8, 2.4, H, 10, 12.6, H / 2 + 1.5, 0, W, 0, 0, -0.30));
+      parts.push(cyl(0.5, 0.9, 6.0, 8, 18.4, H + 3.0, 0, W2, 0, 0, -0.30));
+      for (let i = 0; i < 11; i++) {
+        const ty = 8.0 + i * 2.9;
+        const px = 12.6 + ty * 0.305;
+        const z = -34 + i * 6.4;
+        const len = Math.hypot(px - 9.6, ty - 2.0, z);
+        parts.push(bx(0.22, len, 0.22, (px + 9.6) / 2, (ty + 2.0) / 2, z / 2, W2,
+          Math.atan2(z, ty - 2.0), 0, Math.atan2(px - 9.6, ty - 2.0)));
+      }
+      parts.push(bx(3.0, 1.2, 76.0, 9.6, 1.6, 0, W));
+      return merge(parts);
+    },
+
+    // ---- AMSTERDAM -----------------------------------------------------
+    /**
+     * A canal running the length of the leg, with a humpback bridge on every
+     * third piece. Laid as a RUN: a canal in chunks is a series of ponds.
+     */
+    canal: function (look, withBridge) {
+      const parts = [];
+      const W = look.water, QUAY = 0x8f8a7e, STONE = 0xa8a294, TREE = 0x3f8f52;
+      const L = 40;
+      parts.push(part(new THREE.PlaneGeometry(17, L), W, -11.0, 0.02, 0, -Math.PI / 2));
+      for (const sx of [-1, 1]) {
+        const x = -11.0 + sx * 8.6;
+        parts.push(bx(1.6, 2.4, L, x, 0.4, 0, QUAY));
+        parts.push(bx(2.0, 0.4, L, x, 1.5, 0, STONE));
+        for (let i = 0; i < 7; i++) {
+          parts.push(bx(0.24, 1.0, 0.24, x + sx * 0.7, 1.9, -L / 2 + 3 + i * 6, 0x3a3550));
+        }
+      }
+      // Elms along the quay and a couple of moored barges.
+      for (let i = 0; i < 3; i++) {
+        const tz = -L / 2 + 7 + i * 13;
+        parts.push(cyl(0.26, 0.4, 3.2, 6, -2.0, 1.6, tz, 0x7a6a58));
+        parts.push(sph(2.2, 8, -2.0, 5.4, tz, TREE));
+        parts.push(sph(1.6, 7, -3.2, 4.6, tz + 1.0, 0x4fa062));
+      }
+      for (let i = 0; i < 2; i++) {
+        const bz = -10 + i * 20;
+        parts.push(bx(3.4, 1.0, 11.0, -6.6, 0.35, bz, 0x2f4a5e));
+        parts.push(bx(3.0, 0.3, 10.4, -6.6, 0.9, bz, 0x6a7a5e));
+        parts.push(bx(2.4, 1.4, 4.0, -6.6, 1.6, bz - 2.6, 0x3f6a4a));
+        parts.push(bx(2.6, 0.24, 4.2, -6.6, 2.4, bz - 2.6, 0xefe6d4));
+      }
+      if (withBridge) {
+        // The humpback: three shallow arches and a white balustrade.
+        const sub = [];
+        for (let i = 0; i < 3; i++) {
+          vArc(sub, { cx: (i - 1) * 6.0, cy: 0.4, cz: 0, rx: 2.6, ry: 2.2, n: 6, th: 0.7, d: 5.0, color: STONE });
+        }
+        for (let i = 0; i < 9; i++) {
+          const x = -9.0 + i * 2.25;
+          const y = 3.4 + 1.3 * Math.cos(x / 9.0 * 1.4);
+          sub.push(bx(2.4, 0.5, 5.2, x, y, 0, STONE));
+          for (const sz of [-1, 1]) {
+            sub.push(bx(2.4, 0.9, 0.3, x, y + 0.7, sz * 2.5, 0xf4f0e4));
+          }
+        }
+        placeAt(parts, sub, -11.0, 0, 0, Math.PI / 2);
+      }
+      return merge(parts);
+    },
+
+    canalBridge: function (look) { return MARKS.canal(look, true); },
+
+    /** The Westerkerk tower: brick, then the blue-and-gold crown. Reach -3.0. */
+    westerkerk: function () {
+      const parts = [];
+      const B = 0x9a6250, S = 0xdcd0b8, BLUE = 0x2f6fa8, GOLD = 0xffd24a;
+      parts.push(bx(11.0, 9.0, 18.0, 3.0, 4.5, 0, B));
+      for (const sx of [-1, 1]) {
+        parts.push(bx(6.0, 2.6, 18.0, 3.0, 10.3, 0, 0x5f5a68, 0, 0, -sx * 0.7));
+      }
+      parts.push(bx(6.2, 22.0, 6.2, -2.4, 11.0, 0, B));
+      parts.push(bx(6.8, 0.7, 6.8, -2.4, 22.4, 0, S));
+      for (let i = 0; i < 3; i++) {
+        parts.push(bx(0.4, 3.0, 1.4, -5.6, 8.0 + i * 5.0, 0, S));
+      }
+      parts.push(bx(5.2, 5.0, 5.2, -2.4, 25.4, 0, S));
+      for (const f of [[-2.7, 0, 0.3, 2.8], [0, -2.7, 2.8, 0.3]]) {
+        parts.push(bx(f[2], 2.8, f[3], -2.4 + f[0], 25.6, f[1], 0xfffdf5));
+      }
+      parts.push(bx(6.0, 0.7, 6.0, -2.4, 28.2, 0, GOLD));
+      parts.push(cone(3.6, 3.4, 8, -2.4, 30.2, 0, BLUE));
+      parts.push(cyl(2.2, 2.6, 3.4, 8, -2.4, 33.4, 0, BLUE));
+      parts.push(cyl(2.8, 2.8, 0.5, 8, -2.4, 35.3, 0, GOLD));
+      parts.push(cone(2.2, 4.0, 8, -2.4, 37.6, 0, BLUE));
+      parts.push(cyl(0.9, 1.2, 1.6, 8, -2.4, 40.4, 0, GOLD));
+      // The imperial crown on the top, which is the whole point of it.
+      parts.push(cyl(1.5, 1.2, 1.4, 8, -2.4, 42.0, 0, GOLD));
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * 6.2832;
+        parts.push(bx(0.24, 2.2, 0.24, -2.4 + Math.cos(a) * 1.0, 43.4, Math.sin(a) * 1.0,
+          0x2f5f9a, Math.sin(a) * 0.35, 0, -Math.cos(a) * 0.35));
+      }
+      parts.push(sph(0.7, 7, -2.4, 44.8, 0, GOLD));
+      return merge(parts);
+    },
+
+    /** The Magere Brug: a white timber double bascule. */
+    magere: function () {
+      const parts = [];
+      const W = 0xf4f2e6, W2 = 0xdcd6c4, DARK = 0x5f5648;
+      for (const sz of [-1, 1]) {
+        const z = sz * 11;
+        for (const sx of [-1, 1]) {
+          // A-frames over the deck. The crown beam sits at 12.6, comfortably
+          // above the overhead layer and far above anything the camera reaches.
+          parts.push(bx(0.9, 13.5, 0.9, sx * 8.0, 6.4, z, W, 0, 0, sx * 0.13));
+          parts.push(bx(0.7, 0.7, 3.0, sx * 7.2, 12.2, z, W2));
+        }
+        parts.push(bx(18.0, 0.9, 1.2, 0, 12.9, z, W));
+        parts.push(bx(17.0, 0.7, 0.7, 0, 11.2, z, W2));
+        // The counterweight beams, canted down toward the middle: this is the
+        // shape a drawbridge has and nothing else does.
+        for (const sx of [-1, 1]) {
+          parts.push(bx(13.0, 0.7, 0.7, sx * 5.6, 10.2, z - sz * 3.0, W, 0, 0, -sx * sz * 0.30));
+          parts.push(bx(2.0, 1.8, 1.6, sx * 11.0, 8.0, z - sz * 3.0, DARK));
+          for (let i = 0; i < 4; i++) {
+            parts.push(bx(0.3, 3.4, 0.3, sx * (3.0 + i * 2.6), 7.4 - i * 0.5, z - sz * 3.0, W2));
+          }
+        }
+      }
+      for (const sx of [-1, 1]) {
+        parts.push(bx(0.5, 1.8, 26.0, sx * 5.2, 1.4, 0, W));
+        for (let i = 0; i < 10; i++) {
+          parts.push(bx(0.3, 1.4, 0.3, sx * 5.2, 1.2, -12 + i * 2.6, W2));
+        }
+      }
+      return merge(parts);
+    },
+
+    // ---- ROME ----------------------------------------------------------
+    /** The Colosseum: a curved tiered arcade, broken at one end. Reach -9.0. */
+    colosseum: function () {
+      const parts = [];
+      vArcade(parts, {
+        bays: 15, bayW: 4.6, tiers: 3, tierH: 6.0, y0: 1.2, d: 5.0,
+        radius: 34, ruin: 2, attic: 4.4, openTiers: 3, inset: -4.2,
+        color: 0xe0c48c, color2: 0xc8a86c, void: 0x6a5540, seed: 23,
+      });
+      parts.push(bx(6.0, 1.2, 62.0, -6.6, 0.6, 0, 0xd8ccae));
+      return merge(parts);
+    },
+
+    /** An aqueduct arch, with the road passing under it. */
+    aqueduct: function () {
+      const parts = [];
+      const S = 0xd8c8a4, S2 = 0xbfab84;
+      for (const sx of [-1, 1]) {
+        parts.push(bx(7.0, 10.0, 8.0, sx * 15.8, 5.0, 0, S));
+        parts.push(bx(7.6, 0.8, 8.6, sx * 15.8, 10.4, 0, S2));
+        // Flanking arches, so it reads as a run of aqueduct rather than a gate.
+        vArc(parts, { cx: sx * 26.0, cy: 8.0, rx: 6.0, ry: 4.6, n: 7, th: 0.9, d: 7.0, color: S2, alt: S });
+        parts.push(bx(6.0, 8.0, 8.0, sx * 32.6, 4.0, 0, S));
+      }
+      vArc(parts, { cx: 0, cy: 9.6, rx: 12.4, ry: 8.2, n: 9, th: 1.1, d: 8.2, color: S2, alt: S });
+      parts.push(bx(80.0, 2.4, 8.4, 0, 19.2, 0, S));
+      parts.push(bx(81.0, 0.8, 9.2, 0, 20.8, 0, S2));
+      // The channel on top, which is what an aqueduct is FOR.
+      for (const sz of [-1, 1]) {
+        parts.push(bx(81.0, 1.6, 1.0, 0, 22.0, sz * 3.4, S));
+      }
+      return merge(parts);
+    },
+
+    // ---- CAPE TOWN -----------------------------------------------------
+    /**
+     * Table Mountain: a flat top, a steep face and Devil's Peak beside it.
+     *
+     * Laid as a RUN 220 units long, because a mountain does not come and go.
+     * It stands at 120 units out, deep enough in the haze to read as distance
+     * and near enough that the flat top is unmistakable.
+     */
+    tableMountain: function () {
+      const parts = [];
+      const ROCK = 0x9a8f8a, ROCK2 = 0x7f7570, SCRUB = 0x6f7a52, HAZE = 0xb0a8a4;
+      const L = 220;
+      // The table: a long block with a hard horizontal top edge. Everything
+      // about the identification is in that edge staying straight.
+      parts.push(bx(52, 42, L * 0.62, 6, 21, 0, ROCK));
+      parts.push(bx(56, 3.0, L * 0.63, 6, 43.5, 0, ROCK2));
+      parts.push(bx(58, 1.4, L * 0.64, 6, 45.4, 0, HAZE));
+      // The buttressed face toward the road: vertical gullies, which is what
+      // stops a flat-topped block reading as a wall.
+      for (let i = 0; i < 13; i++) {
+        const z = -L * 0.30 + i * (L * 0.60 / 12);
+        parts.push(bx(6.0, 34.0, 4.0, -19, 20.0, z, i % 2 ? ROCK2 : ROCK));
+        parts.push(bx(3.0, 26.0, 2.4, -22, 14.0, z + 2.0, ROCK2));
+      }
+      // The talus and the scrub apron.
+      for (let i = 0; i < 9; i++) {
+        const z = -L * 0.34 + i * (L * 0.68 / 8);
+        parts.push(cone(16 + (i % 3) * 5, 12 + (i % 2) * 5, 5, -20, 4, z, SCRUB));
+      }
+      // Devil's Peak at one end, Lion's Head at the other: the two pointed
+      // ends are what make the flat middle read as a table.
+      parts.push(cone(26, 44, 6, 2, 20, -L * 0.40, ROCK));
+      parts.push(cone(18, 26, 6, -6, 12, -L * 0.44, SCRUB));
+      parts.push(cone(20, 38, 6, 0, 18, L * 0.40, ROCK2));
+      parts.push(cone(13, 18, 6, -8, 8, L * 0.44, SCRUB));
+      return merge(parts);
+    },
+  };
 
   /**
    * bx() for hazard parts. Width and lateral offset follow the lane; height
@@ -8722,23 +10567,36 @@ MR.Camera = (function () {
   const LOOK_Y = 1.16;
   const LOOK_AHEAD = 8.0;
 
-  // Step off the centreline during a slide, toward the side the runner's body
-  // is yawing away from. Dead astern is the worst possible angle from which to
-  // read a pose whose whole statement is length along the travel axis, and at
-  // the 4.6 chase distance a slide holds, this buys about four degrees of
-  // azimuth on it.
+  // THE SLIDE DOES NOT MOVE THE CAMERA. Not off the centreline, not into a
+  // bank, and not much up or in.
   //
-  // The look point follows most of the step rather than none of it, and that
-  // ratio is the safety property. At SLIDE_LOOK = 0 the camera would rotate by
-  // the full four degrees; portrait's horizontal field is only 30 wide, so
-  // that is an eighth of everything the player can see swinging sideways at
-  // the exact moment they are committed and cannot respond, and the next gate
-  // goes with it. At 0.62 the far road turns by a tenth of a degree -- gates
-  // stay where they were -- and the parallax is spent on the near geometry,
-  // which is the runner and his own wake. Measured, he drifts from 0.49 to
-  // 0.35 of frame width for half a second and comes back.
-  const SLIDE_SIDE = -0.34;
-  const SLIDE_LOOK = 0.62;
+  // It used to do all three. A sidestep off the centreline, a three-and-a-half
+  // degree roll, a 1.20 lift and a hard look-down were each added trying to
+  // make the slide read as feet-first rather than as kneeling -- and none of
+  // them worked. What actually fixed that was in the runner, not here: the
+  // head had to leave the silhouette (crown 1.313 -> 0.707 in runner.js). The
+  // camera work was left behind after the real fix landed.
+  //
+  // Measured against the jump, which is the same kind of event and the state
+  // the player is comparing it to, the leftovers cost:
+  //
+  //             jump    slide
+  //   aim       2.5deg  16.5deg     6.7x
+  //   lateral   0.03    0.37        11x
+  //   pull-in   0.06    0.61        10x
+  //
+  // Portrait's horizontal field is about 30 degrees, so a 16.5 degree swing is
+  // over half of everything the player can see moving at the exact moment they
+  // are committed and cannot respond -- and the next gate moves with it. The
+  // player's report was simply "when I jump the camera doesn't change but when
+  // I slide it does", which is the same observation from the other end.
+  //
+  // What survives is the pair that serve the pose rather than decorate it: a
+  // small lift and a small step back, because the feet-first slide really is
+  // nearly a metre longer along the travel axis than a run and would otherwise
+  // crowd the bottom of the frame. Both are held below the jump's own numbers.
+  const SLIDE_UP = 0.34;         // vs the jump's 0.64 peak
+  const SLIDE_BACK = 0.14;       // pull BACK, framing the longer pose
 
   // The honest band, in world units/sec. Derived rather than typed in, so a
   // pace retune moves the camera response with it.
@@ -8872,8 +10730,12 @@ MR.Camera = (function () {
       // second duck or leave the camera sitting low over a gate.
       const duckNow = p.duck01 || 0;
       if (duckNow > 0.18 && s.pDuck <= 0.18) {
-        s.dipV -= 3.1;
-        s.kick = Math.min(1, s.kick + 0.34);
+        // Kept, but a third of its old size. The entry beat is the slide's
+        // analogue of the jump's landing beat, and the jump gets exactly one
+        // such beat -- so this gets one, of comparable weight, and the pose
+        // itself is then left alone.
+        s.dipV -= 1.4;
+        s.kick = Math.min(1, s.kick + 0.12);
       }
       s.pDuck = duckNow;
 
@@ -8936,13 +10798,14 @@ MR.Camera = (function () {
       const back = BASE_BACK * s.fr.back
         - drive * 0.62
         + surge * 0.30
-        // Pull BACK in a slide rather than closing in. The feet-first pose is
-        // nearly a metre longer along the travel axis than a run, and at the
-        // old -0.22 the camera closed on it at exactly the wrong moment: the
-        // figure sat 87% down the frame with its legs clipped off the bottom
-        // edge. Backing off frames the whole body and shows more of the bar
-        // being cleared.
-        - duck * 0.55
+        // Pull BACK in a slide rather than closing in: the feet-first pose is
+        // nearly a metre longer along the travel axis than a run, so closing
+        // in put the figure 87% down the frame with its legs clipped off the
+        // bottom edge. This term has read `- duck * 0.55` under a comment
+        // saying it backed off -- `back` is subtracted from p.z, so a negative
+        // coefficient closes IN, and it had been closing in by 0.55 the whole
+        // time. Now it does what the comment always said.
+        + duck * SLIDE_BACK
         - s.gearT * s.gearT * 0.45
         + s.mileT * 0.45
         + s.winded * 0.28
@@ -8955,13 +10818,12 @@ MR.Camera = (function () {
       // camera was lowest, and the gates tightest, on the same stretch.
       const hgt = BASE_Y
         - drive * 0.20
-        // A slide RAISES the camera instead of lowering it. The old -0.34 was
-        // written for a head-first duck that stayed compact under the lens;
-        // the feet-first slide extends the body nearly a metre back along the
-        // travel axis, so dropping with it pushed the whole runner off the
-        // bottom of the frame just as the player needs to see both their own
-        // clearance and the road past it.
-        + duck * 1.20
+        // A slide RAISES the camera instead of lowering it -- the feet-first
+        // pose extends back along the travel axis, so dropping with it pushed
+        // the runner off the bottom of the frame. Enough to keep him framed,
+        // and no more: at the old 1.20 this alone was twice the jump's whole
+        // vertical travel.
+        + duck * SLIDE_UP
         + (p.y || 0) * 0.30            // keeps a third of the arc -- see aim
         + s.dip
         + s.mileT * 0.24
@@ -8969,21 +10831,21 @@ MR.Camera = (function () {
         + bobY + shY
         + fin * 1.7;
 
-      // See SLIDE_SIDE: a bounded step off the centreline, held only while the
-      // body is down.
-      const side = duck * SLIDE_SIDE;
-
-      cam.position.set(s.x + bobX + shX + side, hgt, p.z - back);
+      cam.position.set(s.x + bobX + shX, hgt, p.z - back);
 
       // ---- aim ------------------------------------------------------------
       // The look point follows the jump arc *more* than the camera does, so
       // the camera pitches up as the runner rises: the road falls away in
       // frame, which is what leaving the ground actually looks like. The old
       // 0.42/0.30 split had the camera chasing the arc and cancelled it.
+      // The slide's aim terms are deliberately small. They used to be -1.05 and
+      // -3.2, which between them pitched the camera down hard enough to throw
+      // the far road out of frame for the length of the slide. They now do just
+      // enough to acknowledge that the body went down.
       look.set(
-        s.x * s.fr.lookX + side * SLIDE_LOOK,
-        LOOK_Y + (p.y || 0) * 0.50 - duck * 1.05 - drive * 0.22 + fin * 0.55,
-        p.z + LOOK_AHEAD - duck * 3.2 + (p.y || 0) * 1.1 - drive * 0.5
+        s.x * s.fr.lookX,
+        LOOK_Y + (p.y || 0) * 0.50 - duck * 0.30 - drive * 0.22 + fin * 0.55,
+        p.z + LOOK_AHEAD - duck * 0.90 + (p.y || 0) * 1.1 - drive * 0.5
       );
       cam.lookAt(look);
 
@@ -8995,13 +10857,12 @@ MR.Camera = (function () {
       const whip = Math.max(-1, Math.min(1, s.vx / 20));
       const rollTgt = -((p.lean || 0) * 0.16 + whip * 0.07) * s.fr.roll * (1 - fin);
       s.roll += (rollTgt - s.roll) * (1 - Math.pow(0.00002, d));
-      // The slide gets its own small bank, in the same direction the runner's
-      // body yaws over in runner.js. Three and a half degrees is well below
-      // the threshold at which a tilted horizon costs readability, and it buys
-      // the one thing a dead-astern chase can never give a pose: a frame that
-      // is not bilaterally symmetric. A symmetric frame around a symmetric
-      // silhouette is most of why this state kept reading as "kneeling".
-      cam.rotation.z += s.roll + shR - s.punch * 0.055 + duck * 0.062;
+      // No bank on the slide. It was three and a half degrees of tilt bought to
+      // break the frame's bilateral symmetry, back when that was believed to be
+      // why the pose read as kneeling. It was not, and the horizon rolling
+      // under a committed player is exactly the kind of camera movement a jump
+      // never asks them to absorb.
+      cam.rotation.z += s.roll + shR - s.punch * 0.055;
 
       // ---- fov ------------------------------------------------------------
       // Widening while pulling in keeps the runner the same size on screen and
@@ -9013,7 +10874,7 @@ MR.Camera = (function () {
         + GEAR_FOV * gear
         + s.gearT * 5.0
         + surge * 3.5
-        + duck * 2.5
+        + duck * 1.0            // was 2.5 -- the jump's own air term is 1.6
         + air * 1.6
         + s.kick * 6
         - s.winded * 5.0

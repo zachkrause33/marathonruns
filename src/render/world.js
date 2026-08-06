@@ -3192,11 +3192,88 @@ MR.World = (function () {
     }
 
     /**
+     * THE CURVED LAMP ARC -- the top-of-frame device, measured off tgr-city.png.
+     *
+     * Two posts were fitted through a common horizon there: the far one sits at
+     * 1.48x the near one's depth, so the spacing is about 0.48x the near lamp's
+     * distance. The near post runs 548 px from head to base against a
+     * carriageway 310 px wide at the same depth, i.e. THE HEAD STANDS 1.77 ROAD
+     * WIDTHS UP. That is an enormous exaggeration -- no real street lamp is
+     * anything like it -- and the exaggeration is exactly the point: it is what
+     * fills the top of a PORTRAIT frame instead of hugging the kerb, which is
+     * the half of the screen this game had almost nothing in.
+     *
+     * Our tarmac is 2 * TRACK_HALF_WIDTH = 7.50, so 1.77 * 7.50 = 13.3.
+     *
+     * THE FAIRNESS GUARANTEE IS GEOMETRIC, not a promise. The post stands at
+     * |x| = 5.4, which is outside CORRIDOR_HALF (3.75) and inside LANDMARK_IN
+     * (11.75) -- roadside furniture, in the same band as the kerb and the aid
+     * tables. The arm is a quarter ellipse from the post top (5.4, 9.6) to the
+     * head (1.6, 13.3), i.e. centre (1.6, 9.6) with semi-axes 3.8 and 3.7. The
+     * FIRST point of it to reach over the corridor is x = 3.75, and there
+     *
+     *   cos t = (3.75 - 1.6) / 3.8 = 0.566  ->  y = 9.6 + 3.7 * 0.824 = 12.65
+     *
+     * so the lowest over-corridor point of the whole lamp is 12.65 against an
+     * OVERHEAD_Y of 9.0: 3.65 units of clearance, against the 2.0 the spec asked
+     * for. Nothing about the arc can intersect a hazard (top 2.80) or the jump
+     * arc, and crossings() re-derives that from the built triangles every time
+     * tools/shoot.js runs, so it stays true if these numbers are ever retuned.
+     *
+     * PERIOD: one lamp per road tile, alternating sides, so an arc crosses the
+     * frame every TILE = 24 units and each side carries one every 48. At the
+     * race pace this build tops out at (~26 u/s) that is an arc a second, and
+     * the reference's ~0.48x-near-distance spacing is in the same family. It
+     * errs sparse, which is the right way to err against a device this large.
+     *
+     * COST: 72 triangles per tile -- post 12, arm 4 x 12, head 12. The spec
+     * budgeted 22 by assuming a ribbon arm; boxes are used instead because this
+     * file has twice lost days to quads that came out wound the wrong way and
+     * drew nothing, and 50 triangles a tile is not worth that risk. At ten live
+     * tiles the difference is 500 triangles on a 35k-99k frame.
+     */
+    const LAMP_POST_X = 5.4;
+    const LAMP_POST_Y = 9.6;
+    const LAMP_HEAD_X = 1.6;
+    const LAMP_HEAD_Y = 13.3;    // 1.77 x the 7.50-unit tarmac
+    const LAMP_SEGS = 4;
+    function lampArc(parts, sx, z, post, head) {
+      parts.push(bx(0.26, LAMP_POST_Y, 0.26, sx * LAMP_POST_X, LAMP_POST_Y / 2, z, post));
+      const ax = LAMP_POST_X - LAMP_HEAD_X;      // 3.8
+      const ay = LAMP_HEAD_Y - LAMP_POST_Y;      // 3.7
+      const at = (i) => {
+        const t = (i / LAMP_SEGS) * (Math.PI / 2);
+        return [sx * (LAMP_HEAD_X + ax * Math.cos(t)), LAMP_POST_Y + ay * Math.sin(t)];
+      };
+      for (let i = 0; i < LAMP_SEGS; i++) {
+        const a = at(i), b = at(i + 1);
+        const dx = b[0] - a[0], dy = b[1] - a[1];
+        parts.push(bx(Math.hypot(dx, dy) + 0.14, 0.20, 0.20,
+          (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, z, post, 0, 0, Math.atan2(dy, dx)));
+      }
+      // The luminaire hangs off the end of the arm, so its top meets the head
+      // height rather than straddling it.
+      parts.push(bx(0.92, 0.26, 0.44, sx * LAMP_HEAD_X, LAMP_HEAD_Y - 0.13, z, head));
+    }
+
+    // Which roadside kinds carry a lamp, and what colour it is. THE BRIDGE is
+    // not here because a post at |x| = 5.4 would stand on open water -- the deck
+    // ends at 4.75 -- and it already carries lighting portals every 12 units.
+    // THE WALL is not here either: it already has a scaffold birdcage over the
+    // carriageway at 9.5-10.2, and a second overhead system above that turns the
+    // top of the frame into a thicket, which is the exact failure the bracing
+    // was removed for.
+    const LAMP_EDGES = {
+      barrier: [0x2b2f52, 0xffe45e],
+      hedge: [0x3a4560, 0xfff2e0],
+    };
+
+    /**
      * Crowd-control barrier: the single strongest "this is a road race" cue.
      * The lamp standards are what give the city legs a vertical rhythm at the
      * distance where individual props have already fogged out.
      */
-    const barrierGeo = (function () {
+    function barrierParts() {
       const parts = [];
       for (const sx of [-1, 1]) {
         const x = sx * (K.TRACK_HALF_WIDTH + 0.85);
@@ -3244,11 +3321,11 @@ MR.World = (function () {
         }
         if (i) bunting(parts, MX, 9.44, sz + 0.09, 15);
       }
-      return merge(parts);
-    })();
+      return parts;
+    }
 
     /** Park/river edge: a clipped hedge, a gravel path and the odd bench. */
-    const hedgeGeo = (function () {
+    function hedgeParts() {
       const parts = [];
       for (const sx of [-1, 1]) {
         const x = sx * (K.TRACK_HALF_WIDTH + 1.6);
@@ -3292,8 +3369,33 @@ MR.World = (function () {
         parts.push(bx(MX * 2, 0.09, 0.09, 0, 9.76, sz, 0xfff2e0));
         bunting(parts, MX, 9.42, sz + 0.08, 11);
       }
-      return merge(parts);
-    })();
+      return parts;
+    }
+
+    /**
+     * One geometry per (roadside kind, lamp side). The lamp has to be baked into
+     * the tile's own merge or it is a draw call per live tile -- about a dozen,
+     * on a frame that already runs 150-260 -- and the only thing that differs
+     * between the two variants is which side the post stands on, so the pair is
+     * built once at start-up and the tile picks one by the parity of its index.
+     * Both are held on every pooled tile and one is made visible, exactly as the
+     * four kinds already were: a biome change stays a visibility flip.
+     */
+    const LIT_EDGES = {};
+    for (const kind in LAMP_EDGES) {
+      const build = kind === 'barrier' ? barrierParts : hedgeParts;
+      const col = LAMP_EDGES[kind];
+      for (const sx of [-1, 1]) {
+        const parts = build();
+        lampArc(parts, sx, 0, col[0], col[1]);
+        LIT_EDGES[kind + (sx < 0 ? 'L' : 'R')] = merge(parts);
+      }
+    }
+    /** The tile variant a given tile index wears. Alternates every TILE. */
+    function edgeVariant(kind, tileIdx) {
+      if (!LAMP_EDGES[kind]) return kind;
+      return kind + (((tileIdx % 2) + 2) % 2 ? 'R' : 'L');
+    }
 
     /**
      * THE WALL: concrete jersey barrier and a graffitied site hoarding. The leg
@@ -3472,11 +3574,10 @@ MR.World = (function () {
       // One of these is shown at a time; keeping all three built means a
       // biome change is a visibility flip rather than a rebuild.
       const edges = {
-        barrier: S.outlined(barrierGeo, mats.edge, S.INK.prop),
-        hedge: S.outlined(hedgeGeo, mats.edge, S.INK.prop),
         rail: S.outlined(railGeo, mats.edge, S.INK.prop),
         wall: S.outlined(wallGeo, mats.edge, S.INK.prop),
       };
+      for (const k in LIT_EDGES) edges[k] = S.outlined(LIT_EDGES[k], mats.edge, S.INK.prop);
       for (const k in edges) { edges[k].visible = false; t.add(edges[k]); }
       t.userData.shoulders = shoulders;
       t.userData.edges = edges;
@@ -6005,7 +6106,10 @@ MR.World = (function () {
         const tz = state.roadFrom * TILE;
         const obj = roadPool.claim();
         obj.position.z = tz;
-        const edge = lookAtZ(tz).look.edge;
+        // The lamp alternates on the parity of the tile index, not on the tile's
+        // z, so the pattern is a property of the course and identical for every
+        // player on the same day -- like everything else the course decides.
+        const edge = edgeVariant(lookAtZ(tz).look.edge, state.roadFrom);
         for (const k in obj.userData.edges) obj.userData.edges[k].visible = (k === edge);
         // On the deck the shoulders come off and the road becomes a ribbon
         // over water. Tiles are claimed 210 units out, so the swap always

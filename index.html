@@ -133,9 +133,18 @@ html, body {
 .chip.est { color: var(--accent); border: 1px solid rgba(255, 228, 94, 0.55); }
 .chip.on  { background: var(--ahead);  color: #06301c; }
 .chip.off { background: var(--behind); color: #35060f; }
+/* The record is gone and the headline has retargeted onto the ladder. It is
+ * neither winning nor losing any more -- it is HOLDING a rung -- so it takes
+ * the accent, the colour this HUD already uses for the thing you are earning,
+ * and the projection beside it goes back to plain ink. Leaving it red said
+ * "still failing" for up to two thirds of a run. */
+.chip.tier { background: var(--accent); color: #14183a; }
+#projCell.tier .val { color: #fffdf5; }
+#projCell.tier .sub { color: var(--accent); opacity: 0.92; }
 
 /* ---- left column: the mechanic, read top to bottom ----
- * Clean gates buy speed; the gauge shows how much of the 5:30 -> 4:20 range
+ * Clean gates buy speed; the gauge shows how much of the START_PACE ->
+ * FLOOR_PACE range
  * has been bought; the pace is the result. Putting them in one plate in that
  * order is the only place the game explains itself. */
 #leftCol {
@@ -448,50 +457,201 @@ html, body {
 }
 .panel.canScroll::after { opacity: 1; }
 
-/* ---- finish panel ---- */
-.finLab {
-  font-size: 10px; font-weight: 900; letter-spacing: 0.24em;
-  opacity: 0.5; margin-bottom: 2px;
+/* ---- the memory, on the start panel ----
+ * Plates, in the HUD's language: a 9px label over a large tabular figure.
+ * Rendered only when there is something to remember, so a first-ever visit
+ * gets the panel a stranger has always got. */
+#startMemory {
+  display: flex; flex-wrap: wrap; justify-content: center;
+  align-items: stretch; gap: 7px;
+  margin-top: 16px;
 }
-/* The verdict is the point of the screen, so it is a solid band rather than
- * coloured text -- it should be legible from across a room. */
+#startMemory:empty { display: none; }
+.mplate {
+  flex: 0 1 auto; min-width: 92px; max-width: 160px; text-align: left;
+  background: rgba(255, 253, 245, 0.055);
+  border-left: 3px solid var(--accent);
+  padding: 6px 10px 7px;
+}
+.mplate .mv {
+  font-size: 19px; font-weight: 900; line-height: 1.05; margin-top: 1px;
+}
+.mplate .ms {
+  font-size: 8.5px; font-weight: 800; letter-spacing: 0.07em;
+  opacity: 0.58; margin-top: 2px; line-height: 1.35;
+}
+
+/* ---- finish panel ----
+ *
+ * Rebuilt out of the HUD's own parts. The card was a spreadsheet dropped on a
+ * dimmed screenshot: 12.5px/700 for both the key and the value of every row,
+ * told apart only by `opacity: 0.55`, in a centred block, with a date line
+ * typeset larger, louder and more tracked than the label of the headline
+ * number it sat above. The live readout, two seconds earlier, had spent its
+ * entire budget on a 9px/800/0.16em label over a 25-40px/900 figure.
+ *
+ * So: the same label/value pair, the same plates with a 4px rule down their
+ * left edge, the same left-aligned columns. Uppercase throughout -- the HUD
+ * says /MI and CLEAN GATES; this card used to answer /mi and gates. */
+#endPanel .panelInner { text-align: left; }
+
+/* The dateline is furniture and is now typeset as furniture. It was 11px/800
+ * at 0.2em in accent yellow -- bigger, more tracked and more coloured than
+ * FINAL TIME, which labels the largest number on the screen. */
+.endDate {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; opacity: 0.42; margin-bottom: 11px;
+}
+
+/* TWO HEADLINES.
+ *
+ * The finish time is the result and gets the white rule the split card uses;
+ * the longest clean line is the speed engine and gets the accent, exactly as
+ * #engine does in the live readout. It is a co-headline because it is the
+ * only number on this card that a single contact in mile three cannot take
+ * away, and the only one still worth chasing on the ~99% of days the record
+ * dies early. It used to be the fourth row of a six-row table. */
+#endHead {
+  display: flex; flex-wrap: wrap; align-items: flex-start;
+  gap: 12px 30px;
+}
+.endCell { border-left: 4px solid #fffdf5; padding-left: 11px; min-width: 0; }
+.endCell + .endCell { border-left-color: var(--accent); }
+.panel .endBig {
+  font-size: clamp(34px, 9vw, 52px); font-weight: 900;
+  letter-spacing: -0.03em; line-height: 1.0; margin-top: 2px;
+}
+.endSub {
+  font-size: 10px; font-weight: 800; letter-spacing: 0.06em;
+  opacity: 0.55; margin-top: 4px;
+}
+.endSub.ahead { opacity: 1; }
+
+/* The grade, and the next rung. A solid band, legible across a room -- but a
+ * band that now has five possible readings instead of two, so ~99% of
+ * sessions stop ending on a flat negative. Nothing here is pink: the ladder
+ * reports where you finished, and the rung above says what to do about it. */
+#tierRow {
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: 6px 11px; margin-top: 15px;
+}
 #verdict {
-  display: inline-block; margin-top: 10px;
-  font-size: 13px; font-weight: 900; letter-spacing: 0.1em;
-  padding: 6px 14px;
+  display: inline-block;
+  font-size: 13px; font-weight: 900; letter-spacing: 0.12em;
+  padding: 6px 13px;
 }
-#verdict.beat { background: var(--ahead); color: #06301c; }
-#verdict.miss { background: var(--behind); color: #35060f; }
+#verdict.t0 { background: var(--ahead); color: #06301c; }
+#verdict.t1, #verdict.t2, #verdict.t3 { background: var(--accent); color: #14183a; }
+#verdict.t4 { background: rgba(255, 253, 245, 0.92); color: #14183a; }
+#tierNext {
+  font-size: 11px; font-weight: 800; letter-spacing: 0.09em; opacity: 0.72;
+}
 
+#endBadges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+#endBadges:empty { display: none; }
+.ebadge {
+  font-size: 9px; font-weight: 900; letter-spacing: 0.12em;
+  padding: 3px 7px; color: var(--accent);
+  border: 1px solid rgba(255, 228, 94, 0.55);
+}
+#endMem {
+  font-size: 10.5px; font-weight: 800; letter-spacing: 0.05em;
+  opacity: 0.62; margin-top: 9px;
+}
+#endMem:empty { display: none; }
+
+/* ONE RHYTHM, TWO GRIDS.
+ *
+ * These were two independent grids with their own row gaps and their own
+ * header padding, which put their baselines about three pixels out of phase
+ * -- close enough to read as a rendering fault. They now share --endRow and
+ * each opens with exactly one header row, so every line of one sits on the
+ * same baseline as the matching line of the other at every breakpoint. */
 #endCols {
-  display: flex; flex-wrap: wrap; gap: 14px 30px;
-  justify-content: center; align-items: flex-start;
-  margin-top: 18px;
+  --endRow: 21px;
+  display: flex; flex-wrap: wrap;
+  /* Fluid, so the two columns stay SIDE BY SIDE on a 360px phone instead of
+   * stacking and leaving half the card empty. At fixed 34/18/16 the pair
+   * measured 338px against 332px of content width and wrapped by six pixels. */
+  gap: 14px clamp(16px, 6vw, 34px);
+  justify-content: flex-start; align-items: flex-start;
+  margin-top: 16px;
 }
-#resultStats {
-  display: grid; grid-template-columns: auto auto;
-  gap: 4px 20px; font-size: 12.5px; font-weight: 700;
-}
-#resultStats .k { opacity: 0.55; text-align: right; }
-#resultStats .v { text-align: left; }
-
-#splitTable {
-  display: grid; grid-template-columns: auto auto auto;
-  gap: 4px 16px; font-size: 12.5px; font-weight: 700;
+#resultStats, #splitTable {
+  display: grid; align-content: start; align-items: center;
+  row-gap: 0; grid-auto-rows: var(--endRow);
   font-variant-numeric: tabular-nums;
 }
-#splitTable .k {
-  font-size: 9px; font-weight: 900; letter-spacing: 0.14em;
-  opacity: 0.45; text-align: right; padding-bottom: 2px;
+#resultStats { grid-template-columns: auto auto; column-gap: clamp(11px, 4.5vw, 18px); }
+#splitTable  { grid-template-columns: auto auto auto; column-gap: clamp(10px, 4vw, 16px); }
+
+#endCols .k {
+  font-size: 9px; font-weight: 800; letter-spacing: 0.16em;
+  text-transform: uppercase; opacity: 0.6;
 }
-#splitTable .v { text-align: right; }
+/* The header row sits on the bottom of its own row, which buys the table a
+ * little air without moving any baseline off the shared grid. */
+#endCols .k.hd {
+  align-self: end; padding-bottom: 3px;
+  letter-spacing: 0.18em; opacity: 0.4;
+}
+#endCols .v { font-size: 13px; font-weight: 900; }
+
+#resultStats .k, #resultStats .v { text-align: left; }
+#splitTable .k, #splitTable .v { text-align: right; }
+#splitTable .v { font-weight: 800; }
+#splitTable .v.fin { font-weight: 900; }
 /* A rule spanning the grid, not a border per cell -- per-cell borders break
  * across the column gaps and read as three dashes. */
 #splitTable .sep {
-  grid-column: 1 / -1; height: 1px;
-  background: rgba(255, 253, 245, 0.25); margin: 3px 0 1px;
+  grid-column: 1 / -1; height: 1px; align-self: center;
+  background: rgba(255, 253, 245, 0.25);
 }
-#splitTable .v.fin { font-weight: 900; }
+
+/* THE CAUSAL LINE.
+ *
+ * This is where the card used to print TIME LOST +0:18 for twelve contacts
+ * that really cost thirteen and a half minutes. The number is now measured
+ * against a flawless run of this exact course, and it is set in plain ink
+ * rather than in pink: the colour system reserves red for losing the record,
+ * and this is not a grade, it is the player's own arithmetic. The line under
+ * it -- the time they would have run -- is the one that has to be attractive,
+ * so it is the one in accent. */
+#endCost {
+  margin-top: 17px; padding: 5px 0 5px 11px;
+  border-left: 4px solid rgba(255, 107, 132, 0.8);
+}
+#endCost.clean { border-left-color: var(--ahead); }
+#endCost .endBig { font-size: clamp(24px, 5.5vw, 32px); }
+#endCost .endSub {
+  color: var(--accent); opacity: 0.88;
+  font-weight: 900; letter-spacing: 0.05em;
+}
+
+#endTurn {
+  font-size: 11px; font-weight: 900; letter-spacing: 0.12em;
+  opacity: 0.7; margin-top: 15px;
+}
+#endTurn:empty { display: none; }
+
+/* TOMORROW.
+ *
+ * The card never said the word, and the date seed makes tomorrow's road
+ * computable for nothing -- pickSettings() is a hash and twelve names, no
+ * course generation. A route is the one thing about tomorrow that is visibly
+ * different from today, which makes this line an appointment rather than a
+ * description of one. */
+#tomorrow {
+  font-size: 10.5px; font-weight: 900; letter-spacing: 0.1em;
+  color: var(--accent); opacity: 0.9; line-height: 1.5;
+  margin-top: 16px; padding-top: 12px;
+  border-top: 1px solid rgba(255, 253, 245, 0.16);
+}
+#tomorrow:empty { display: none; }
+
+/* The only tap target on the screen, on a screen that is now taller: full
+ * width so it cannot be missed at the bottom of a phone. */
+#endPanel .cta { display: block; width: 100%; margin-top: 16px; }
 
 /* ---- countdown ---- */
 #count {
@@ -614,11 +774,25 @@ html, body {
   .gaugeLeg { font-size: 12px; }
   .panel .keys { font-size: 14px; margin-top: 24px; }
   .panel .keys kbd { font-size: 13px; }
-  #verdict { font-size: 17px; padding: 8px 20px; margin-top: 14px; }
-  #endCols { margin-top: 24px; gap: 18px 46px; }
-  #resultStats, #splitTable { font-size: 16px; gap: 6px 26px; }
-  #splitTable .k { font-size: 11px; }
   .cta { font-size: 18px; padding: 16px 44px; margin-top: 28px; }
+
+  .mplate { min-width: 118px; padding: 8px 13px 9px; }
+  .mplate .mv { font-size: 25px; }
+  .mplate .ms { font-size: 10px; }
+
+  .endDate { font-size: 11px; }
+  #endHead { gap: 16px 44px; }
+  .endSub { font-size: 12px; }
+  #verdict { font-size: 17px; padding: 8px 20px; }
+  #tierNext { font-size: 14px; }
+  .ebadge { font-size: 11px; padding: 4px 9px; }
+  #endMem { font-size: 13px; }
+  #endCols { --endRow: 26px; margin-top: 22px; gap: 18px 46px; }
+  #endCols .k { font-size: 11px; }
+  #endCols .v { font-size: 16px; }
+  #endTurn { font-size: 13px; }
+  #tomorrow { font-size: 13px; }
+  #endPanel .cta { margin-top: 22px; }
 }
 
 /* Landscape phones have almost no vertical room, so the readout tightens up
@@ -635,7 +809,32 @@ html, body {
   .target b { font-size: 22px; }
   .panel .keys { margin-top: 10px; }
   .cta { margin-top: 12px; padding: 10px 26px; }
-  #endCols { margin-top: 10px; gap: 8px 24px; }
+
+  /* The finish card has the most to say and the least room to say it in, so
+   * it gives up vertical air first and then the one line it can afford to
+   * lose -- the race-report sentence, which is the only block here that is
+   * colour rather than fact. What survives is the grade, the two headlines,
+   * the tables, the true cost of contact and tomorrow.
+   *
+   * It still does not all fit at 844x390: the card runs about 40px past the
+   * fold and scrolls, which is what .canScroll's fade is for. Portrait is the
+   * reference experience and this is the deliberate trade. */
+  .panel { padding: 10px 14px; }
+  #startMemory { margin-top: 10px; gap: 6px; }
+  .mplate { padding: 4px 8px 5px; }
+  .mplate .mv { font-size: 15px; }
+  .endDate { margin-bottom: 6px; }
+  .panel .endBig { font-size: clamp(26px, 6vh, 38px); }
+  #endHead { gap: 8px 24px; }
+  .endSub { margin-top: 2px; }
+  #tierRow { margin-top: 8px; }
+  #endBadges, #endMem { margin-top: 5px; }
+  #endCols { --endRow: 16px; margin-top: 8px; gap: 8px 24px; }
+  #endCost { margin-top: 8px; }
+  #endCost .endBig { font-size: 22px; }
+  #endTurn { display: none; }
+  #tomorrow { margin-top: 8px; padding-top: 7px; }
+  #endPanel .cta { margin-top: 9px; padding: 10px; }
 
   #leftCol { top: calc(var(--bugH, 60px) + 6px); gap: 6px; }
   #engine { padding: 5px 10px 6px; }
@@ -775,6 +974,21 @@ MR.K = (function () {
   // for why this number and not another.
   const LANE_W = 1.70;
 
+  // Pace ramp. See the STREAK_FAST / STREAK_SLOW block below for the
+  // derivation; these live out here because AID_CEILING has to solve against
+  // the same curve and must not be able to drift from it.
+  const FLOOR_PACE = 254;                 // 4:14 /mi
+  const START = 330;
+  const FAST_SHARE = 0.685;
+  const K_FAST = 10, K_SLOW = 100;
+
+  function targetPaceAt(streak) {
+    const gap = START - FLOOR_PACE;
+    return FLOOR_PACE
+      + gap * FAST_SHARE * Math.exp(-streak / K_FAST)
+      + gap * (1 - FAST_SHARE) * Math.exp(-streak / K_SLOW);
+  }
+
   return {
     MARATHON_MILES,
     MARATHON_LABEL: '26.2',
@@ -787,8 +1001,47 @@ MR.K = (function () {
     // run with a single mistake squeaks in at 1:59:21, and two mistakes end
     // the record attempt. See tools/simulate.js.
     START_PACE: 330,                // 5:30 /mi
-    FLOOR_PACE: 260,                // 4:20 /mi -- the ceiling on a perfect line
-    STREAK_K: 20,                   // clean gates to close ~63% of the gap
+    FLOOR_PACE,                     // 4:14 /mi -- the ceiling on a perfect line
+
+    // THE RAMP HAS TWO TIME CONSTANTS, AND THAT IS THE WHOLE POINT.
+    //
+    // It used to be a single exponential with K=20 against a course of 189
+    // gates, and that made the race a sprint with a three-minute tail. The
+    // numbers, measured on this model:
+    //
+    //   one mistake at  5% of the race cost  69s
+    //                  15%                  105s   <- peak
+    //                  50%                   54s
+    //                  97%                   10s
+    //
+    // An eleven-fold swing. The exponential was 90% spent by streak 46, so by
+    // mile 13 -- two minutes in -- the next clean gate bought 0.06 s/mi and
+    // the last hundred gates bought essentially nothing. The second half of a
+    // good run had no reward left and a shrinking penalty: nothing to win and
+    // progressively less to lose.
+    //
+    // Simply slowing the ramp does not fix it. Total time is an integral, so a
+    // curve that keeps you slower for longer costs finish time, and holding
+    // FLOOR_PACE at 4:20 made the record unbeatable above K=25. Slowing it also
+    // makes things WORSE for a weak player: at K=45 a streak-20 runner is
+    // slower than they are today, and a 90%-accuracy player already never sees
+    // the speed system work at all.
+    //
+    // Two terms solve both at once. The fast term pays out early, so a player
+    // who is not near-perfect still feels the engine -- a streak-20 runner is
+    // now 4.4 s/mi faster than under the old curve. The slow term is a tail
+    // that is still unwinding at the finish, so the last gates keep buying
+    // real time and a late mistake still costs something.
+    //
+    //   target(s) = FLOOR + A*exp(-s/10) + B*exp(-s/100)
+    //
+    // Paid for with six seconds a mile of top gear: 4:20 -> 4:14. That is the
+    // whole cost. The flawless finish is unchanged at 1:58:03, the record still
+    // survives exactly one mistake, and the swing drops from 10.9x to 5.0x.
+    STREAK_FAST: 10,
+    STREAK_SLOW: 100,
+    // Share of the 5:30 -> 4:14 gap carried by the fast term.
+    STREAK_FAST_SHARE: FAST_SHARE,
 
     // Penalties. A hit keeps a quarter of the streak and costs race seconds.
     HIT_STREAK_KEEP: 0.25,
@@ -896,9 +1149,25 @@ MR.K = (function () {
     // which is the entire point of putting it in the game.
     AID_WATER: 10,
     AID_BANANA: 22,
-    AID_CEILING: Math.ceil(
-      -20 * Math.log((7170 / (42.195 / 1.609344) - 260) / (330 - 260))
-    ),
+    // Solved against the real curve rather than restated as a formula. The old
+    // line hard-coded 20, 260, 330 and 7170 -- four duplicates of constants
+    // defined a few lines above it -- so retuning the ramp would have left the
+    // ceiling silently describing a curve that no longer existed.
+    //
+    // It also aimed at exactly record pace, which measured badly in play: it
+    // put the ceiling at streak 33, and on a three-mistake run the streak was
+    // already 40, 40 and 59 at the moments aid was collected. The intended
+    // road back was inert at every one of them -- the mechanic documented as
+    // "a lifeline to a broken run" did nothing for most of the race.
+    //
+    // Now it aims halfway between record pace and the floor. Aid can carry a
+    // broken run back through half of what remains; the other half is still
+    // only buyable with an unbroken line, so the top gear is still earned.
+    AID_CEILING: (function () {
+      const aim = (RECORD_PACE + FLOOR_PACE) / 2;
+      for (let s = 0; s <= 400; s++) if (targetPaceAt(s) <= aim) return s;
+      return 400;
+    })(),
 
     // Hazard kinds
     CLEAR: 0,
@@ -927,7 +1196,13 @@ MR.Pace = (function () {
   const K = MR.K;
 
   function targetPace(streak) {
-    return K.FLOOR_PACE + (K.START_PACE - K.FLOOR_PACE) * Math.exp(-streak / K.STREAK_K);
+    // Two time constants. The fast term pays a weak player early; the slow
+    // term is still unwinding at the finish, so late gates keep buying time
+    // and a late mistake still costs something. See constants.js.
+    const gap = K.START_PACE - K.FLOOR_PACE;
+    return K.FLOOR_PACE
+      + gap * K.STREAK_FAST_SHARE * Math.exp(-streak / K.STREAK_FAST)
+      + gap * (1 - K.STREAK_FAST_SHARE) * Math.exp(-streak / K.STREAK_SLOW);
   }
 
   function create() {
@@ -1292,9 +1567,25 @@ MR.Course = (function () {
    * mile 20 -- the point where real marathoners hit the wall.
    */
   function difficulty(f) {
-    const base = Math.pow(f, 0.85);
+    // The exponent was 0.85, which put the hardest part of the course a long
+    // way behind the part of the race that actually decides it. Measured over
+    // 40 days, the share of gates that forced an action ran 0% / 7% / 10%
+    // across the first three tenths and 61% / 57% / 64% across the last three
+    // -- while the cost of a single mistake peaks between 15% and 50% of the
+    // race and has largely decayed by 80%. The most expensive stretch to make
+    // a mistake in was the stretch where the game barely asked for one.
+    //
+    // 0.62 pulls the ramp forward without touching the top: at f=1 this still
+    // lands on the same value, so the closing miles are as demanding as they
+    // were. It also tightens spacing early for free, since spacingAt() derives
+    // its mean from this number.
+    //
+    // The first few percent stay easy on purpose. START_GRACE already gives a
+    // clean run-up, and an opening that reads calmly is what lets a new player
+    // learn the lane geometry before the course starts asking questions.
+    const base = Math.pow(f, 0.62);
     const wall = 0.28 * Math.exp(-Math.pow((f - 0.763) / 0.055, 2));
-    return Math.min(1, base * 0.88 + wall);
+    return Math.min(1, base * 0.86 + wall);
   }
 
   function spacingAt(f, rnd) {
@@ -1614,6 +1905,362 @@ MR.Course = (function () {
            BIOMES, SETTINGS, pickSettings, ACTION_WINDOW };
 })();
 
+/* ==================== src/core/store.js ==================== */
+/**
+ * The daily loop's memory.
+ *
+ * The expensive precondition for a daily game -- a globally identical,
+ * deterministic, date-seeded course -- was already solved. Nothing remembered
+ * it. A player who ran a 2:01 yesterday arrived today with no evidence that
+ * yesterday happened, so there was no reason for today to be a different
+ * occasion from any other four minutes.
+ *
+ * Three facts are worth keeping, and only three:
+ *
+ *   day    the best finish and the best clean streak for ONE date. Keyed by
+ *          the date, so it expires by itself: tomorrow's first load simply
+ *          finds a date that is not today's and rotates it into `prev`.
+ *   days   consecutive dates played. This needs the DATE of the last play,
+ *          not a count alone -- a counter with no date cannot tell a second
+ *          run today from the first run tomorrow, and cannot break correctly.
+ *   best   the all-time marks. Finish and streak are tracked separately
+ *          because they are different achievements: a player's fastest race
+ *          is very often not the race with their longest clean line.
+ *
+ * ---- why this cannot break the game ----
+ *
+ * localStorage throws on access in Safari private browsing, is absent in some
+ * embeddings, and can throw QuotaExceededError on write at any time. Every
+ * entry point here is wrapped, and a failure degrades to an in-memory store
+ * that keeps the numbers alive for the length of the tab and forgets them
+ * afterwards. The game never sees an exception and never sees a missing API;
+ * it sees a summary object with zeroes in it.
+ *
+ * ---- why a schema change cannot corrupt a save ----
+ *
+ * The version is in the KEY as well as in the payload. A future v2 build
+ * writes to a different key entirely, so it can neither read nor overwrite a
+ * v1 blob; and this build re-checks `v` on the way in and discards anything
+ * that does not match rather than trusting field names to have kept their
+ * meaning. Every value is coerced through a type guard on load, so a
+ * hand-edited or half-written blob yields a blank save, never a NaN that
+ * propagates into the readout.
+ */
+MR.Store = (function () {
+
+  const KEY = 'marathonruns/save/v1';
+  const V = 1;
+
+  // ---- backing store ----------------------------------------------------
+
+  /**
+   * A localStorage that is known to work, or null. Probed with a real
+   * write/remove rather than a feature test: Safari's private mode HAS the
+   * object and throws only when you use it, so `'localStorage' in window` is
+   * not an answer to the question being asked.
+   */
+  function probe() {
+    try {
+      const ls = window.localStorage;
+      if (!ls) return null;
+      const t = '__mr__' + Math.random();
+      ls.setItem(t, '1');
+      ls.removeItem(t);
+      return ls;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  const ls = probe();
+
+  // The fallback is not a stub that throws everything away. Within one page it
+  // behaves exactly like the real thing, so a player in private mode still
+  // gets "your best today" and "you beat it by 3:16" across their second and
+  // third runs -- RUN IT AGAIN never leaves the document. It is lost on
+  // reload, which is the most that can honestly be promised there, and it is
+  // strictly more than the nothing the alternative offers.
+  let memBlob = null;
+  const persistent = !!ls;
+
+  function readRaw() {
+    if (!ls) return memBlob;
+    try { return ls.getItem(KEY); } catch (e) { return null; }
+  }
+
+  function writeRaw(str) {
+    memBlob = str;
+    if (!ls) return false;
+    try { ls.setItem(KEY, str); return true; } catch (e) { return false; }
+  }
+
+  // ---- dates ------------------------------------------------------------
+  // Course keys are UTC 'YYYY-MM-DD' (see rng.dateKey). They are compared as
+  // strings where only ordering matters -- ISO dates sort correctly as text --
+  // and parsed to UTC midnight only where a real difference in days is needed.
+
+  function parseKey(k) {
+    if (typeof k !== 'string') return NaN;
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(k);
+    if (!m) return NaN;
+    return Date.UTC(+m[1], +m[2] - 1, +m[3]);
+  }
+
+  /** Whole days from key `a` to key `b`; NaN if either is not a date key. */
+  function dayDiff(a, b) {
+    const ta = parseKey(a), tb = parseKey(b);
+    if (isNaN(ta) || isNaN(tb)) return NaN;
+    return Math.round((tb - ta) / 86400000);
+  }
+
+  /** The date key `n` days after `k`. */
+  function shift(k, n) {
+    const t = parseKey(k);
+    if (isNaN(t)) return null;
+    const d = new Date(t + n * 86400000);
+    return d.getUTCFullYear() + '-'
+      + String(d.getUTCMonth() + 1).padStart(2, '0') + '-'
+      + String(d.getUTCDate()).padStart(2, '0');
+  }
+
+  // ---- type guards ------------------------------------------------------
+
+  function num(v, fallback) {
+    return (typeof v === 'number' && isFinite(v)) ? v : fallback;
+  }
+  function pos(v) {
+    const n = num(v, 0);
+    return n > 0 ? n : 0;
+  }
+  function key(v) {
+    return isNaN(parseKey(v)) ? null : v;
+  }
+  function str(v) {
+    return typeof v === 'string' && v.length && v.length < 40 ? v : '';
+  }
+
+  function blank() {
+    return {
+      v: V,
+      day: null,    // { date, time, streak, tier, runs }  best for that date
+      prev: null,   // { date, time, streak, tier }        the previous date played
+      days: { count: 0, last: null },
+      best: null,   // { time, tier, date, streak, streakDate }
+    };
+  }
+
+  /** A run record, sanitised. Returns null if it is not a usable result. */
+  function cleanRun(r) {
+    if (!r) return null;
+    const time = pos(r.time);
+    if (!time) return null;
+    return {
+      date: key(r.date),
+      time: time,
+      streak: Math.max(0, Math.round(num(r.streak, 0))),
+      tier: str(r.tier),
+    };
+  }
+
+  function load() {
+    const raw = readRaw();
+    if (!raw) return blank();
+    let o;
+    try { o = JSON.parse(raw); } catch (e) { return blank(); }
+    if (!o || typeof o !== 'object' || o.v !== V) return blank();
+
+    const s = blank();
+
+    if (o.day && key(o.day.date) && pos(o.day.time)) {
+      s.day = {
+        date: o.day.date,
+        time: pos(o.day.time),
+        streak: Math.max(0, Math.round(num(o.day.streak, 0))),
+        tier: str(o.day.tier),
+        runs: Math.max(1, Math.round(num(o.day.runs, 1))),
+      };
+    }
+    if (o.prev && key(o.prev.date) && pos(o.prev.time)) {
+      s.prev = cleanRun(o.prev);
+    }
+    if (o.days) {
+      s.days.last = key(o.days.last);
+      s.days.count = s.days.last ? Math.max(0, Math.round(num(o.days.count, 0))) : 0;
+    }
+    if (o.best && pos(o.best.time)) {
+      s.best = {
+        time: pos(o.best.time),
+        tier: str(o.best.tier),
+        date: key(o.best.date),
+        streak: Math.max(0, Math.round(num(o.best.streak, 0))),
+        streakDate: key(o.best.streakDate),
+      };
+    }
+    return s;
+  }
+
+  function save(s) {
+    try { return writeRaw(JSON.stringify(s)); } catch (e) { return false; }
+  }
+
+  // ---- reading ----------------------------------------------------------
+
+  /**
+   * Everything the panels need for one date, in one object, with every field
+   * always present. The caller never has to null-check its way through a
+   * chain, which is what keeps a missing save from becoming a missing screen.
+   *
+   * `dayStreak` is answered AS OF the given date rather than read off the
+   * stored counter, because those are different questions. A stored count of
+   * 5 whose last play was three days ago is not a streak of 5, it is a streak
+   * of 0 that used to be 5 -- and the start panel has to say so before the
+   * player presses the button, not after.
+   */
+  function summary(dateKey) {
+    let s;
+    try { s = load(); } catch (e) { s = blank(); }
+
+    const today = (s.day && s.day.date === dateKey) ? s.day : null;
+
+    // "Last night's result": the most recent day that is not the one being
+    // played. When the stored day IS today, that is `prev`; when the player
+    // has not run today yet, the stored day itself is the last result.
+    let last = null;
+    if (s.day && s.day.date !== dateKey) last = s.day;
+    else if (s.prev) last = s.prev;
+    if (last && dayDiff(last.date, dateKey) <= 0) last = null;  // never "last" from the future
+
+    const d = s.days.last ? dayDiff(s.days.last, dateKey) : NaN;
+    // Alive if the last play was today (already counted) or yesterday (today
+    // will extend it). Anything else is a broken chain.
+    const alive = d === 0 || d === 1;
+
+    return {
+      persistent: persistent,
+      dateKey: dateKey,
+      today: today,                       // { time, streak, tier, runs } or null
+      last: last,                         // { date, time, streak, tier } or null
+      dayStreak: alive ? s.days.count : 0,
+      dayStreakCounted: d === 0,          // today already counts toward it
+      best: s.best,                       // all-time, or null
+      pbStreak: Math.max(
+        s.best ? s.best.streak : 0,
+        today ? today.streak : 0
+      ),
+    };
+  }
+
+  // ---- writing ----------------------------------------------------------
+
+  /**
+   * Fold one finished run into the save, and report what it changed.
+   *
+   * The report is the point. "Did this beat your best today" is a question
+   * only the store can answer and only at this instant -- one line later the
+   * best IS this run and the comparison is gone -- so it is captured before
+   * the mutation and handed back rather than left for the caller to
+   * reconstruct.
+   *
+   * Never throws. A store that cannot write still returns an honest report of
+   * what the run was worth, so the finish screen reads correctly even when
+   * nothing about it will survive the tab.
+   */
+  function record(dateKey, run) {
+    const r = cleanRun({ date: dateKey, time: run && run.time, streak: run && run.streak, tier: run && run.tier });
+    const before = summary(dateKey);
+    const out = {
+      persistent: persistent,
+      saved: false,
+      dateKey: dateKey,
+      prevToday: before.today,          // what "best today" was BEFORE this run
+      beatToday: false,
+      beatTodayStreak: false,
+      firstToday: !before.today,
+      // A first-ever run sets every all-time mark by definition, which is not
+      // an achievement and must not be announced as one -- a 2:08 disaster
+      // wearing an ALL-TIME BEST badge is the screen lying to a beginner.
+      firstEver: !before.best,
+      allTimeBest: false,
+      allTimeStreak: false,
+      dayStreak: before.dayStreak,
+      dayStreakGained: false,
+      today: before.today,
+      best: before.best,
+      pbStreak: before.pbStreak,
+    };
+    if (!r) return out;
+
+    let s;
+    try { s = load(); } catch (e) { s = blank(); }
+
+    // Guard the debug path: `?date=` can run an OLDER course than the last one
+    // played. Rotating the day record on that would silently throw away the
+    // real "today", and moving the streak's last-played date backwards would
+    // break a live streak. Old dates may still set all-time marks -- those are
+    // date-independent -- but they may not rewrite the calendar.
+    const backwards = (s.day && dateKey < s.day.date)
+                   || (s.days.last && dateKey < s.days.last);
+
+    if (!backwards) {
+      const newDay = !s.day || s.day.date !== dateKey;
+      if (newDay) {
+        if (s.day) s.prev = { date: s.day.date, time: s.day.time, streak: s.day.streak, tier: s.day.tier };
+        s.day = { date: dateKey, time: r.time, streak: r.streak, tier: r.tier, runs: 1 };
+        out.beatToday = true;
+        out.beatTodayStreak = true;
+      } else {
+        s.day.runs++;
+        if (r.time < s.day.time) { s.day.time = r.time; s.day.tier = r.tier; out.beatToday = true; }
+        if (r.streak > s.day.streak) { s.day.streak = r.streak; out.beatTodayStreak = true; }
+      }
+
+      // The day streak advances once per DATE, never once per run.
+      const d = s.days.last ? dayDiff(s.days.last, dateKey) : NaN;
+      if (d !== 0) {
+        s.days.count = (d === 1) ? s.days.count + 1 : 1;
+        s.days.last = dateKey;
+        out.dayStreakGained = true;
+      }
+      out.dayStreak = s.days.count;
+      out.today = s.day;
+    }
+
+    if (!s.best) {
+      s.best = { time: r.time, tier: r.tier, date: dateKey, streak: r.streak, streakDate: dateKey };
+      out.allTimeBest = true;
+      out.allTimeStreak = r.streak > 0;
+    } else {
+      if (r.time < s.best.time) {
+        s.best.time = r.time; s.best.tier = r.tier; s.best.date = dateKey;
+        out.allTimeBest = true;
+      }
+      if (r.streak > s.best.streak) {
+        s.best.streak = r.streak; s.best.streakDate = dateKey;
+        out.allTimeStreak = true;
+      }
+    }
+    out.best = s.best;
+    out.pbStreak = Math.max(s.best.streak, s.day ? s.day.streak : 0);
+
+    out.saved = save(s);
+    return out;
+  }
+
+  /** Wipe the save. Exposed for testing the first-visit path by hand. */
+  function clear() {
+    memBlob = null;
+    if (!ls) return;
+    try { ls.removeItem(KEY); } catch (e) { /* nothing to do and nothing to say */ }
+  }
+
+  return {
+    KEY, VERSION: V, persistent,
+    summary, record, clear,
+    load, save, blank,
+    dayDiff, shift, parseKey,
+  };
+})();
+
 /* ==================== src/render/shading.js ==================== */
 /**
  * Cel-shading toolkit: banded toon ramps, normal-extruded ink outlines, the
@@ -1899,8 +2546,25 @@ MR.shading = (function () {
   // goes 72% -> 37%, while anything past 200 still sits deep enough in the
   // haze to read as distance. The depth cue survives; the far half of the
   // spawn window becomes usable.
+  //
+  // THEN THE FAR PLANE WAS MEASURED AND IT NEVER COMPLETED. Nothing spawns
+  // past VIEW = 210, and at 210 units a far of 300 gives a fog factor of only
+  // (210-60)/(300-60) = 0.625 -- so the most distant object on screen still
+  // carried 37.5% of its own colour and chroma, and props POPPED IN at visible
+  // contrast instead of condensing out of the haze. Every reference frame has a
+  // fully dissolved far plane (Tom Gold Run's pyramid measures S=0.073, which is
+  // the sky's own saturation). far = 215 puts the spawn distance at fog factor
+  // 0.95 and closes that hole.
+  //
+  // The gameplay argument above is preserved because it was never about the far
+  // plane. Gates are committed to at 26-90 units: at 60/215 a gate at 90 sits at
+  // 0.19 hazed (was 0.13) and one at 120 at 0.39 (was 0.25) -- the read window
+  // is materially unchanged and the depth cue behind it is much stronger. What
+  // is given up is planning against a gate 150+ units out, which the racing line
+  // (ROUTE_FAR = 124) and the route rings now do far better than a silhouette in
+  // haze ever did.
   const FOG_NEAR = 60;
-  const FOG_FAR = 300;
+  const FOG_FAR = 215;
 
   const fogU = {
     inkFogColor: { value: new THREE.Color(1, 1, 1) },
@@ -2506,8 +3170,11 @@ MR.shading = (function () {
  *      with the head rather than stay fixed. The chase camera looks DOWN, so
  *      a fatter skull hangs more of its own silhouette into the gap before
  *      the neck gets any use of it -- at this head size about 0.05 of it.
+ *      Nothing may be added to the back of the head that is not part of the
+ *      ladder in rule 2. The cap's peak is at the FRONT for that reason and
+ *      not for any reason to do with caps -- see the peak's own note.
  *   2. The back needs its own value structure, and the order matters.
- *      Top to bottom it runs red cap / bright band / dark brim / dark hair /
+ *      Top to bottom it runs red cap / bright band / dark hair /
  *      light neck / dark hood / red vest / white race bib. Hair on the crown
  *      with a bare nape put light on light and the head merged again; the
  *      dark mass has to sit directly above the lit neck for the pinch to
@@ -2562,12 +3229,18 @@ MR.shading = (function () {
  *   7. A person reads as a person because they are WEARING something, and a
  *      garment is only ever visible at its EDGES. The reference character from
  *      behind is a stack of hems -- cap band, hood roll, collar, vest hem,
- *      waistband, short cuff, sock, shoe collar -- and this one was a smooth
- *      cylinder with a number on it. Every hem added here is welded into a
- *      part that already existed, so the whole wardrobe costs two draw calls
- *      (the hood, which has to move on its own) and not one vertex of extra
- *      width: see the note above the colour block, and the hand, which pays
- *      for its fingers out of its own palm.
+ *      short cuff, sock, shoe collar -- and this one was a smooth cylinder
+ *      with a number on it. Every hem added here is welded into a part that
+ *      already existed, so the whole wardrobe costs two draw calls (the hood,
+ *      which has to move on its own, and the bib, which flutters) and not one
+ *      vertex of extra width.
+ *
+ *      A hem also has to be MEASURED at the size the game ships, and half of
+ *      the first wardrobe pass was not. Anything under about three pixels, or
+ *      standing on a neighbour it barely differs from, is not detail; it is
+ *      cost. See the list above the colour block for what came out again and
+ *      why -- one item was not merely invisible but actively read as a hole in
+ *      the vest, which is the failure mode worth remembering.
  *   8. Nothing on a rig where every part is bolted to a joint can arrive late,
  *      and everything real does. Two things here are not bolted to a joint:
  *      the hood, on a pair of underdamped springs, and the bib's hem, on a
@@ -2717,7 +3390,6 @@ MR.Runner = (function () {
   // designed character instead of assorted parts. A fourth hit on the vest
   // hem put three yellows at the same height and just read as clutter.
   const TRIM = P.accent;
-  const GLOVE = P.runnerShoe;
 
   // ---- the wardrobe ------------------------------------------------------
   //
@@ -2725,7 +3397,7 @@ MR.Runner = (function () {
   // they read as a PERSON WEARING CLOTHES: every garment has an edge, and the
   // edges are where one tone meets a neighbouring one. Subway Surfers' runner
   // from behind is a stack of hems -- cap band, hood roll, jacket collar,
-  // jacket hem, waistband, short cuff, sock, shoe collar -- and none of them
+  // jacket hem, short cuff, sock, shoe collar -- and none of them
   // is a strong colour. They are all a step off the garment they trim.
   //
   // So every tone below is deliberately a NEIGHBOUR of the mass it edges,
@@ -2737,10 +3409,28 @@ MR.Runner = (function () {
   // They also have to survive the toon ramp's three bands. A tone less than
   // about 12% off its neighbour lands in the same band on most of the surface
   // and the hem simply is not there; these all sit between 15% and 30% off.
-  const JACKET = 0xd6394e;   // cap brim, vest collar, vest hem, sleeve cuff -- under the vest
-  const BASE = 0xb9c4de;     // base-layer tee, seen only as the sleeves
-  const WAIST = 0x434a80;    // hood, waistband, short cuff -- one step over the shorts
-  const SHOE_DK = 0x5f6796;  // heel counter and lace panel
+  //
+  // WHAT SURVIVES THE CAMERA, AND WHAT WAS TAKEN OUT AGAIN. The wardrobe pass
+  // that put this list here was reviewed at gameplay framing -- the runner is
+  // 110-200px tall in the frame that ships -- and half of it did not resolve.
+  // Detail that does not resolve is not free: it costs triangles, it costs the
+  // eye a moment, and one item was worse than that. Kept, because they were
+  // measured to read: the cap band, the vest's red against the shorts' navy,
+  // the short cuff, the shoe. Taken out:
+  //   BASE-LAYER SLEEVES  a pale blue cylinder under each deltoid. At 110px it
+  //     is two pale triangles at the shoulders and they read as HOLES in the
+  //     vest -- the one failure mode worse than being invisible. Its cuff went
+  //     with it; a cuff on a sleeve that is not there is nothing.
+  //   LACE PANEL  0.078 across on the instep, seen only on the top face of a
+  //     planted shoe, at 0.5px. Gone.
+  //   WAISTBAND  a third navy tone 0.052 tall inside a navy mass that already
+  //     had two. The vest's red meeting the shorts' navy IS the two-garment
+  //     read and it is enormous; the band added a stripe under it that at
+  //     gameplay scale only softened the edge that was doing the work.
+  // What the freed budget bought is the hand -- see the mitt below.
+  const JACKET = 0xd6394e;   // cap peak, vest collar, vest hem -- under the vest
+  const WAIST = 0x434a80;    // hood and short cuff -- one step over the shorts
+  const SHOE_DK = 0x5f6796;  // heel counter
   // The cap is the vest's own red rather than a new colour. It puts the
   // brightest garment tone at the top AND the middle of the figure, which is
   // the same "repeat one colour on a rhythm" trick TRIM runs, and it means the
@@ -2764,14 +3454,37 @@ MR.Runner = (function () {
   // cadence from behind.
   const SOLE = 0xd6cabb;
 
+  // ---- the mitt ----------------------------------------------------------
+  //
+  // The hand used to be the shoe's own colour, and that is most of why the
+  // review found the runner had none. At the back of the arm swing the trailing
+  // glove sits at world y~0.30 and the shoe tops sit at 0.25, a few pixels
+  // apart on screen -- so the biggest pale mass on the lower half of the figure
+  // had a second pale mass of exactly the same tone parked beside it, and the
+  // two averaged into one blob. No amount of finger geometry survives that.
+  //
+  // Cool where the shoe is warm, and a step darker. At gameplay scale the hand
+  // is about 14px across, which is enough for a shape and ONE value break and
+  // nothing else, so both are spent on saying "not the shoe": MITT against the
+  // shoe's 0xfff2e0 is a 22% value step AND a hue flip, which is the pair of
+  // axes MEASUREMENTS.md records the reference using to separate a car from the
+  // road it is the same brightness as. It is still far and away the palest
+  // thing at that height apart from the shoe, so rule 3 -- the gloves flash
+  // against the road -- is untouched.
+  const MITT = 0xc9d2ea;
+  // The curled fingers. Darker again, and it is the only interior detail the
+  // hand gets: at 14px a knuckle line is the difference between a mitt and a
+  // ball, and three separate fingers are three 4px lobes that alias into one.
+  const MITT_DK = 0x8791b7;
+
   /**
    * Weld several primitives into one geometry, baking each piece's colour
    * into a vertex-colour attribute.
    *
    * Every part is outlined, so a part costs two draw calls. Welding the
-   * pieces that never move relative to each other -- skull + cap + brim +
+   * pieces that never move relative to each other -- skull + cap + peak +
    * hair + nape + band + ears + neck, vest + shoulders + collar + hem, shoe +
-   * sole + heel counter + laces -- is what pays for the extra detail this
+   * sole + heel counter -- is what pays for the extra detail this
    * silhouette needs while staying inside the budget. The whole character is
    * 30 draws plus one for the shadow, and the entire wardrobe pass that took
    * it from a cylinder to a person cost two of those: the hood, which is the
@@ -2823,7 +3536,7 @@ MR.Runner = (function () {
 
   // There is no single-primitive part() any more. The last two holdouts were
   // the thigh and the upper arm, and the wardrobe pass gave both of them
-  // something welded on -- a hamstring and a sleeve -- so every part on the
+  // something welded on -- a hamstring and a triceps -- so every part on the
   // character is now a weld. That is the point rather than an accident: a
   // lone primitive is exactly the shape that reads as a raw primitive.
   function multi(pieces, steps) {
@@ -2839,34 +3552,192 @@ MR.Runner = (function () {
     return p;
   }
 
-  // The one thing on the character that says "marathon" rather than
-  // "runner", and it belongs on the back where the player can see it.
-  // Generated at runtime like world.js's mile banners -- still no assets.
-  let bibTex = null;
-  function raceBib() {
-    if (bibTex) return bibTex;
-    const c = document.createElement('canvas');
-    c.width = 160; c.height = 96;
-    const g = c.getContext('2d');
-    g.fillStyle = '#fffdf5';
-    g.fillRect(0, 0, c.width, c.height);
-    g.fillStyle = '#' + new THREE.Color(P.runnerVest).getHexString();
-    g.fillRect(0, 0, c.width, 8);
-    g.fillRect(0, c.height - 8, c.width, 8);
-    g.fillStyle = '#1b1633';
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    // Fit rather than trust: the first version hard-coded 62px and the
-    // string overflowed the canvas on a machine without Helvetica, so the
-    // back of the vest read "6." instead of a race number.
-    let px = 64;
-    do {
-      g.font = 'bold ' + px + 'px Helvetica, Arial, sans-serif';
-      px -= 2;
-    } while (px > 20 && g.measureText('26.2').width > c.width * 0.82);
-    g.fillText('26.2', c.width / 2, c.height / 2 + 3);
-    bibTex = new THREE.CanvasTexture(c);
-    return bibTex;
+  // ---- the race bib ------------------------------------------------------
+  //
+  // The one thing on the character that says "marathon" rather than "runner",
+  // and it belongs on the back where the player can see it.
+  //
+  // It was a canvas texture on an open cylinder segment, and that made it the
+  // only thing on the character with no ink line -- a stack of soft grey
+  // anti-aliased numerals on an edgeless white card, sitting on the nearest
+  // object in the frame while every hazard behind it wore a hard black rim. It
+  // read as a sticker because it was built like one.
+  //
+  // Three things had to change and only one of them is the numerals:
+  //
+  //   IT NEEDS AN EDGE. `outlined()` extrudes a mesh along its own normals and
+  //     draws the shell BACK-face-only, so an OPEN surface gets no line at all
+  //     -- its shell faces away from the lens everywhere and is culled. That is
+  //     why the panel never had one and why no amount of re-materialling would
+  //     have given it one. So it is a closed SLAB now: an outer face, an inner
+  //     face 0.014 behind it, and four rims joining them. The inner face and
+  //     the rims are never seen; they exist so the silhouette exists.
+  //
+  //   IT NEEDS TO SHADE. One smooth cylinder segment facing dead astern puts
+  //     every normal it owns into the same band of the toon ramp, so the panel
+  //     came out as one flat value however the light moved. Twelve facets
+  //     across the arc and four rims give the ramp something to break on, and
+  //     the rims give the bottom edge a lit lip -- which is what says the panel
+  //     is a piece of card lying on cloth and not a decal printed into it.
+  //
+  //   THE NUMERALS HAVE TO BE GEOMETRY. Not because it makes them legible: it
+  //     does not, and that has to be said plainly. The panel is 0.252 wide on a
+  //     1.60 figure and the figure is 110-200px, so the whole of "26.2" gets
+  //     17-31px and a stroke gets one. NOTHING makes four glyphs legible in
+  //     31px. What geometry buys is that the one pixel is the RIGHT one: a hard
+  //     dark stroke at full contrast rather than a minified texel averaged into
+  //     grey, so at gameplay scale the bib reads as white card with definite
+  //     print on it, and at the finish framing the number is crisp. Which is
+  //     what a real race bib does at twenty metres and at two.
+  //
+  // The numerals are single-sided quads standing 0.0035 off the panel's outer
+  // face, and being single-sided is load-bearing twice over: their own outline
+  // shell is culled, so the print gets no ink of its own (a 0.014 rim around a
+  // 0.015 stroke would swallow it whole), and they cost no closed volume.
+  const BIB_A = 0.50;          // half-arc, radians
+  const BIB_R0 = 0.268;        // radius at the top edge...
+  const BIB_R1 = 0.258;        // ...and at the bottom, matching the vest's taper
+  const BIB_H = 0.146;
+  const BIB_T = 0.014;         // slab thickness
+  const BIB_PROUD = 0.0035;    // how far the print stands off the face
+  const BIB_NC = 12, BIB_NR = 3;
+  // Nominal radius, so an amplitude in world units can be turned into the
+  // radial scale that produces it.
+  const BIB_R = 0.263;
+  const BIB_PAPER = 0xfffdf5;
+  const BIB_BACK = 0xd9d3c2;   // the reverse of the card; only ever edge-on
+  const BIB_INK = 0x232046;
+
+  // A 7x9 blocky face with two cells to a stroke. Finer and a stroke is under
+  // a pixel at gameplay framing; coarser and "26.2" stops fitting the panel.
+  const BIB_GLYPH = {
+    '2': ['0111110', '1100011', '0000011', '0000110', '0001100', '0011000', '0110000', '1100000', '1111111'],
+    '6': ['0011110', '0110000', '1100000', '1111100', '1100110', '1100011', '1100011', '0110110', '0011100'],
+    '.': ['000', '000', '000', '000', '000', '000', '000', '011', '011'],
+  };
+  const BIB_STR = '26.2';
+  const BIB_GAP = 1;           // cells between glyphs
+  // Where the print sits inside the panel, as fractions across and down it.
+  const BIB_TU0 = 0.10, BIB_TU1 = 0.90, BIB_TV0 = 0.17, BIB_TV1 = 0.85;
+
+  /**
+   * The slab, its print, and nothing else. Returns a geometry carrying
+   * position / normal / colour, ready for outlined() and a vertex-coloured
+   * toon material -- the same contract weld() produces, built by hand because
+   * no THREE primitive is a closed curved card.
+   */
+  function bibGeometry() {
+    const pos = [], nrm = [], col = [];
+    const c = new THREE.Color();
+
+    // (u, v) run across and DOWN the panel; `o` is a radial offset off the
+    // mid-surface, so +T/2 is the outer face and -T/2 the inner one.
+    // u runs LEFT TO RIGHT AS THE PLAYER SEES IT, which is why the sign is
+    // inverted: the panel faces -z, so screen-left is +x and a naive mapping
+    // prints the number in mirror writing.
+    function pt(u, v, o) {
+      const a = (0.5 - u) * 2 * BIB_A;
+      const r = BIB_R0 + (BIB_R1 - BIB_R0) * v + o;
+      return [r * Math.sin(a), BIB_H * (0.5 - v), -r * Math.cos(a)];
+    }
+    function out(u) {
+      const a = (0.5 - u) * 2 * BIB_A;
+      return [Math.sin(a), 0, -Math.cos(a)];
+    }
+    // Winding is derived rather than reasoned about: the quad is emitted with
+    // whichever order makes its geometric normal agree with `ref`. Getting a
+    // face inside out here would punch a hole in the outline shell that only
+    // shows from one angle, which is exactly the class of bug that is cheapest
+    // to make impossible.
+    function quad(p0, p1, p2, p3, ref, hex) {
+      const ax = p1[0] - p0[0], ay = p1[1] - p0[1], az = p1[2] - p0[2];
+      const bx = p3[0] - p0[0], by = p3[1] - p0[1], bz = p3[2] - p0[2];
+      const nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
+      if (nx * ref[0] + ny * ref[1] + nz * ref[2] < 0) { const t = p1; p1 = p3; p3 = t; }
+      const L = Math.sqrt(ref[0] * ref[0] + ref[1] * ref[1] + ref[2] * ref[2]) || 1;
+      const n = [ref[0] / L, ref[1] / L, ref[2] / L];
+      c.set(hex);
+      const tri = [p0, p1, p2, p0, p2, p3];
+      for (const p of tri) {
+        pos.push(p[0], p[1], p[2]);
+        nrm.push(n[0], n[1], n[2]);
+        col.push(c.r, c.g, c.b);
+      }
+    }
+
+    const H = BIB_T / 2;
+    // Outer face: the only one anybody sees, and the only one subdivided.
+    for (let i = 0; i < BIB_NC; i++) {
+      const u0 = i / BIB_NC, u1 = (i + 1) / BIB_NC;
+      const ref = out((u0 + u1) / 2);
+      for (let j = 0; j < BIB_NR; j++) {
+        const v0 = j / BIB_NR, v1 = (j + 1) / BIB_NR;
+        quad(pt(u0, v0, H), pt(u1, v0, H), pt(u1, v1, H), pt(u0, v1, H), ref, BIB_PAPER);
+      }
+    }
+    // Inner face, one row deep.
+    for (let i = 0; i < BIB_NC; i++) {
+      const u0 = i / BIB_NC, u1 = (i + 1) / BIB_NC;
+      const o = out((u0 + u1) / 2);
+      quad(pt(u0, 0, -H), pt(u1, 0, -H), pt(u1, 1, -H), pt(u0, 1, -H),
+        [-o[0], 0, -o[2]], BIB_BACK);
+    }
+    // Top and bottom rims.
+    for (let i = 0; i < BIB_NC; i++) {
+      const u0 = i / BIB_NC, u1 = (i + 1) / BIB_NC;
+      quad(pt(u0, 0, H), pt(u1, 0, H), pt(u1, 0, -H), pt(u0, 0, -H), [0, 1, 0], BIB_PAPER);
+      quad(pt(u0, 1, H), pt(u1, 1, H), pt(u1, 1, -H), pt(u0, 1, -H), [0, -1, 0], BIB_PAPER);
+    }
+    // Side rims. The normal is the arc's own tangent turned outward.
+    for (const [u, sg] of [[0, 1], [1, -1]]) {
+      const a = (0.5 - u) * 2 * BIB_A;
+      const ref = [sg * Math.cos(a), 0, sg * Math.sin(a)];
+      for (let j = 0; j < BIB_NR; j++) {
+        const v0 = j / BIB_NR, v1 = (j + 1) / BIB_NR;
+        quad(pt(u, v0, H), pt(u, v1, H), pt(u, v1, -H), pt(u, v0, -H), ref, BIB_PAPER);
+      }
+    }
+
+    // ---- the print -------------------------------------------------------
+    // Cells are merged along a row into runs, but never more than three at a
+    // time. A long run is a straight chord across an arc the panel underneath
+    // is subdivided far more finely than -- and once the hem flutters, a chord
+    // spanning a third of the panel dips further than the 0.0035 it stands
+    // proud and the number sinks into the card.
+    let cols = 0;
+    for (let k = 0; k < BIB_STR.length; k++) {
+      cols += BIB_GLYPH[BIB_STR[k]][0].length + (k ? BIB_GAP : 0);
+    }
+    const rows = BIB_GLYPH[BIB_STR[0]].length;
+    const uOf = (cx) => BIB_TU0 + (BIB_TU1 - BIB_TU0) * (cx / cols);
+    const vOf = (ry) => BIB_TV0 + (BIB_TV1 - BIB_TV0) * (ry / rows);
+    let cx0 = 0;
+    for (let k = 0; k < BIB_STR.length; k++) {
+      const gl = BIB_GLYPH[BIB_STR[k]];
+      if (k) cx0 += BIB_GAP;
+      for (let r = 0; r < gl.length; r++) {
+        const row = gl[r];
+        let x = 0;
+        while (x < row.length) {
+          if (row[x] !== '1') { x++; continue; }
+          let n = 0;
+          while (n < 3 && row[x + n] === '1') n++;
+          const u0 = uOf(cx0 + x), u1 = uOf(cx0 + x + n);
+          const v0 = vOf(r), v1 = vOf(r + 1);
+          const ref = out((u0 + u1) / 2);
+          quad(pt(u0, v0, H + BIB_PROUD), pt(u1, v0, H + BIB_PROUD),
+            pt(u1, v1, H + BIB_PROUD), pt(u0, v1, H + BIB_PROUD), ref, BIB_INK);
+          x += n;
+        }
+      }
+      cx0 += gl[0].length;
+    }
+
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    return g;
   }
 
   // ---- contact shadow ----------------------------------------------------
@@ -3158,17 +4029,21 @@ MR.Runner = (function () {
 
     const pelvis = multi([
       { g: new THREE.CylinderGeometry(0.228, 0.220, 0.25, 12), c: P.runnerShort, y: -0.020, sz: 0.78 },
-      // Waistband. The vest's hem stops at world 0.590 and the shorts run down
-      // to 0.407, so this is the only band that can turn one continuous dark
-      // mass into "a top tucked over a bottom" -- which is the single cheapest
-      // human read on the whole figure, because the eye already expects a
-      // person to be two garments. It has to sit BELOW the vest hem to exist
-      // at all; anything above 0.586 is inside the vest and invisible.
-      { g: new THREE.CylinderGeometry(0.234, 0.232, 0.052, 10), c: WAIST, y: 0.000, sz: 0.79 },
-      // ...and the short's own cuff at the leg opening, so the thighs come out
-      // of a hem rather than out of a hole. Straddles the shorts' bottom edge
-      // on purpose: a band that stops short of it leaves a sliver of the old
-      // hard cut still showing under it.
+      // There is no waistband here any more, and its own argument is why. It
+      // was put in to turn one dark mass into "a top tucked over a bottom" --
+      // but the thing that actually says that is the VEST'S RED meeting the
+      // shorts' NAVY, which is a 0.52-wide edge between the two most different
+      // tones on the figure and is legible at any size the game ever draws. The
+      // waistband sat 0.03 under that edge in a third navy, and at gameplay
+      // scale a 3px band of a near tone directly beneath a huge hard edge does
+      // not add a garment: it blurs the one that was already there.
+      //
+      // The short's own cuff at the leg opening stays, and the difference is
+      // the whole reason one went and one did not: the cuff's edge is against
+      // SKIN, not against more navy, so it is doing what the waistband was
+      // only claiming to do. The thighs come out of a hem rather than a hole.
+      // Straddles the shorts' bottom edge on purpose: a band that stops short
+      // of it leaves a sliver of the old hard cut still showing under it.
       { g: new THREE.CylinderGeometry(0.236, 0.230, 0.044, 10), c: WAIST, y: -0.126, sz: 0.79 },
     ]);
     spine.add(pelvis);
@@ -3182,7 +4057,7 @@ MR.Runner = (function () {
       // Vest. Nothing on the trunk may reach above the deltoids -- an earlier
       // version had it poking 0.03 higher and the head went straight back to
       // sitting on the shoulders. Short and barely tapered on purpose: a
-      // singlet worn over the waistband, so the red reads as one wide squat
+      // singlet worn over the shorts, so the red reads as one wide squat
       // block the way the reference shirts do rather than as a torso.
       { g: new THREE.CylinderGeometry(0.262, 0.238, 0.28, 12), c: P.runnerVest, y: -0.037, sz: 0.78 },
       // Deltoids. These are what make the shoulder line read wider than the
@@ -3243,8 +4118,8 @@ MR.Runner = (function () {
     // at the shorts' value the hood, the hair and the shorts made three near-
     // black masses on a figure the references keep light, and the shoulders
     // were the heaviest thing in frame. One step up is still unambiguously
-    // dark against the neck, and it gives WAIST its third hit -- hood,
-    // waistband, short cuff -- which is the rhythm TRIM already runs.
+    // dark against the neck, and it pairs WAIST with the short cuff at the
+    // other end of the figure, which is the rhythm TRIM already runs.
     const hoodPivot = pivot(chest, 0, 0.048, -0.045);
     const hood = multi([
       // sz, not sy: weld() composes T*R*S, so the squash lands on the geometry
@@ -3255,18 +4130,24 @@ MR.Runner = (function () {
     ]);
     hoodPivot.add(hood);
 
-    // Curved panel rather than a flat card so it hugs the vest at this size,
-    // and high on the back so it never straddles the shorts line -- but 0.042
-    // lower than it was, and 0.010 shorter, to clear the hood roll above it.
-    // The number is the one piece of type on the character and a hood crossing
-    // its top edge would read as a printing fault rather than as cloth.
+    // Curved rather than a flat card so it hugs the vest at this size, tapered
+    // to match the vest's own cone so the wider top of the vest cannot poke
+    // through the number, and hung so it clears BOTH neighbours: the hood roll
+    // ends around -0.008 in chest space and the vest hem starts at -0.151, so
+    // the panel runs 0.000 to -0.146 and touches neither. The number is the one
+    // piece of type on the character; a hood crossing its top edge or a hem its
+    // bottom would read as a printing fault rather than as cloth.
     //
-    // Cone, not cylinder: matched to the vest's taper. A constant-radius panel
-    // let the wider top of the vest poke through the number.
-    const bibGeo = new THREE.CylinderGeometry(0.266, 0.256, 0.150, 10, 1, true, Math.PI - 0.52, 1.04);
-    const bib = new THREE.Mesh(bibGeo, S.toon(0xffffff, 3));
-    bib.material.map = raceBib();
-    bib.position.y = -0.062;
+    // Straddling the vest/shorts line was the other half of the review's
+    // finding and it is a symptom, not a cause -- see the flutter below, which
+    // used to drive the bottom corners INWARD through the vest on half of every
+    // cycle. What showed was the red of the vest cutting across the white card
+    // in a wave, which looks exactly like a panel hung crooked over a hem.
+    const bibGeo = bibGeometry();
+    const bibMat = S.toon(0xffffff, 3);
+    bibMat.vertexColors = true;
+    const bib = S.outlined(bibGeo, bibMat, OUTLINE);
+    bib.position.y = -0.073;
     bib.scale.z = 0.78;
     chest.add(bib);
 
@@ -3277,10 +4158,11 @@ MR.Runner = (function () {
     // falls off as the square of the height so the top row never moves and the
     // texture cannot shear.
     //
-    // 22 vertices, rewritten in place each frame. The rest pose is kept
-    // because the deformation has to be absolute rather than incremental: an
-    // incremental one accumulates float error over a 2-hour race and the panel
-    // slowly inflates off the vest.
+    // Rewritten in place each frame -- fill and ink shell share the buffer, so
+    // the outline flutters with the card rather than staying behind on the
+    // vest. The rest pose is kept because the deformation has to be absolute
+    // rather than incremental: an incremental one accumulates float error over
+    // a 2-hour race and the panel slowly inflates off the vest.
     const bibPos = bibGeo.attributes.position;
     const bibRest = new Float32Array(bibPos.array);
     const bibWeight = new Float32Array(bibPos.count);
@@ -3311,7 +4193,6 @@ MR.Runner = (function () {
     // cloth would make the whole body twitch. The panel is on the upper back
     // and is never the lowest part of anything, so the 0.04 it is out by can
     // never reach the answer.
-    const BIB_R = 0.26;
 
     // Secondary-motion state. Two springs for the hood and a free-running
     // clock for the bib; see the block at the end of update() for why they are
@@ -3382,42 +4263,73 @@ MR.Runner = (function () {
       // Radius has to clear the shells everywhere: two this close together
       // interpenetrate on their facets and the crown grew a row of teeth.
       { g: new THREE.CylinderGeometry(0.294, 0.294, 0.074, 14), c: TRIM, y: HY + 0.060 },
-      // The brim, worn backwards -- which is the only way a brim is worth
-      // drawing here, because forwards it points down the view axis and is
-      // gone. Backwards it points AT the lens, and the chase camera looks down
-      // about 18 degrees, so what the player sees is the top face of it: a
-      // hard horizontal lozenge cutting across an otherwise perfectly round
-      // skull, and a shadow line where it overhangs the hair.
+      // The peak, and it is at the FRONT, where a running cap's peak is.
       //
-      // Tilted up 0.30rad so the far edge rises to 0.134 -- well under the
-      // crown at 0.288, so it adds nothing to HEIGHT, and 0.298 wide against
-      // the band's 0.294, so it adds nothing to the half-width either. It is
-      // pure value pattern, which is the only currency this camera has.
+      // It used to be worn backwards, on the argument that a forward peak
+      // points down the view axis and is therefore not worth drawing. That
+      // argument is sound about what a backward peak BUYS and silent about
+      // what it COSTS, and the cost was the defect: a shelf standing 0.12
+      // proud of the hair at the back, below the sweatband, drawing as a red
+      // block on the black hair in every frame of every race. The chase
+      // camera looks at the back of this head for two hours. The one thing
+      // that may never be wrong is the back of the head.
       //
-      // JACKET rather than the crown's own red, and that is the whole of
-      // whether it exists. Rendered in the cap colour the brim was invisible:
-      // it is a shelf seen from 20 degrees above, so what the player sees is
-      // its TOP FACE, and a top face the same colour as the dome behind it is
-      // a shape with no edge. One step darker and it separates into a plane.
+      // So the peak is now judged by two tests instead of one:
+      //   FRONT   it has to read from the three-quarter and front views, which
+      //           are what the start panel and the finish framing show, and
+      //           it is the single most legible thing a cap has from there.
+      //   ASTERN  it has to be INVISIBLE from behind -- not small, not subtle,
+      //           not the same colour as what is behind it. Zero pixels.
+      // The second test is measured rather than judged (see the report): the
+      // peak's fill is recoloured and counted from dead astern and from the
+      // chase angle, and the whole head is diffed against a build with the
+      // peak collapsed to a point. Both come back at zero.
       //
-      // An ELLIPSE, narrow across and long back, and that shape is the whole
-      // repair on this part. A round half-disc big enough to overhang put a
-      // third shell within 0.015 of the skull's 0.266 and the band's 0.294 --
-      // three surfaces inside one outline width -- and the ink shell punched
-      // through both in a ring of dark wedges: the same row of teeth the
-      // headband note warns about, arrived at from a different direction.
-      // Squashed to 0.185 across it is buried inside the skull everywhere
-      // except behind it, so the only part that draws at all is the shelf.
+      // The geometry is what makes that free. The peak is a half-disc lying
+      // in the FRONT half (thetaStart -pi/2), so nothing of it exists behind
+      // the skull's equator at all; the crown, the hair shell and the band are
+      // then a solid occluder 0.53 across standing between it and the lens.
       //
-      // Held nearly level (0.06rad) rather than cocked up, which is the
-      // difference between a brim and a stripe. The camera is only about 20
-      // degrees above it, so a point 0.33 nearer the lens draws 0.11 LOWER on
-      // screen than one at the same height on the skull -- a brim cocked up
-      // 0.34 climbs almost exactly that, the two cancel, and the first version
-      // projected as a band across the middle of the cap rather than as a
-      // shelf standing off the back of it.
-      { g: new THREE.CylinderGeometry(0.250, 0.250, 0.034, 12, 1, false, Math.PI * 0.5, Math.PI), c: JACKET,
-        y: HY + 0.030, z: -0.085, rx: 0.06, sx: 0.74, sz: 1.30 },
+      // The old note's real lesson is kept, and a second one had to be learned
+      // next to it. A round half-disc concentric with the skull is the one
+      // shape that CANNOT be used, because it leaves the skull almost
+      // tangentially and spends a long arc within one ink width of it -- three
+      // surfaces inside 0.014 and the outline punches through both in a row of
+      // dark wedges. But TANGENCY, not roundness, is the actual fault, and the
+      // first front-facing version reinvented it from the other side: drooped
+      // 0.24rad it left the head through the BAND'S FLAT UNDERSIDE at 13
+      // degrees, which is a grazing crossing 0.059 wide, and the teeth came
+      // straight back.
+      //
+      // So the plate is sized to the band rather than to the skull. It is
+      // 0.022 thick and rides at the band's own mid-height, which leaves 0.024
+      // of clear air above it and 0.028 below inside a band 0.074 tall -- both
+      // comfortably over one ink width -- and it is held nearly level (0.06rad)
+      // so it still has 0.015 of that clearance where it passes out through the
+      // band's VERTICAL wall, which a level plate crosses at eighty degrees.
+      // Every other surface it meets on the way (the skull, the hair) it meets
+      // deep inside the band, where nothing is drawn. Its own flat edge sits
+      // 0.025 inside the skull at z=0.08 and is never seen from any angle.
+      //
+      // Level, not cocked: the original note's argument survives the flip.
+      // What a peak has to be from the quarter view is a hard horizontal plane
+      // cutting the round skull, and a peak angled down enough to read as
+      // "pulled over the eyes" from the front reads as a stripe from anywhere
+      // else. Held level it overhangs 0.17 past the face, which is the whole
+      // of what makes it a peak.
+      //
+      // Width is free and is taken. The disc's widest points are its flat
+      // edge, buried at z=0.08, so what actually leaves the band is the arc:
+      // it emerges 0.48 across at x=+-0.242 and tapers to a point 0.26 further
+      // forward, which is the shape of a peak rather than a shelf. Because it
+      // emerges ON the band's own cylinder it can never be wider than the band
+      // is, so it costs the half-width nothing at all.
+      //
+      // JACKET rather than the crown's own red, unchanged and for the
+      // unchanged reason: the peak is a plane seen against the dome behind it
+      // and a plane the same colour as its background is a shape with no edge.
+      { g: new THREE.CylinderGeometry(0.250, 0.250, 0.022, 16, 1, false, -Math.PI * 0.5, Math.PI), c: JACKET,
+        y: HY + 0.062, z: 0.080, rx: 0.06, sz: 1.40 },
       { g: new THREE.SphereGeometry(0.080, 8, 6), c: P.runnerSkin, x: -0.254, y: HY - 0.020, z: -0.013, sx: 0.48, sz: 0.82 },
       { g: new THREE.SphereGeometry(0.080, 8, 6), c: P.runnerSkin, x: 0.254, y: HY - 0.020, z: -0.013, sx: 0.48, sz: 0.82 },
     ]);
@@ -3500,11 +4412,13 @@ MR.Runner = (function () {
         // the shell it sits on is the coin-of-scalp bug the hair cap had, and
         // this one is deliberately proud in z and inset in x.
         { g: new THREE.SphereGeometry(0.098, 8, 6), c: SHOE_DK, y: -0.030, z: -0.076, sx: 0.90, sy: 0.72, sz: 0.72 },
-        // Lace panel across the instep. Invisible head-on, which is why it is
-        // cheap -- but the camera looks DOWN about 18 degrees, so the top face
-        // of the planted shoe is in view on every footstrike, and a shoe with
-        // nothing on its upper reads as a clog.
-        { g: new THREE.BoxGeometry(0.078, 0.030, 0.150), c: SHOE_DK, y: 0.020, z: 0.070 },
+        // The lace panel that used to sit across the instep is gone. It was
+        // 0.078 across on the ONE face of the shoe the camera sees least -- the
+        // top of a planted foot, at a glancing angle -- and measured at
+        // gameplay framing it was half a pixel wide. The heel counter above is
+        // the same idea aimed at the face the camera never stops seeing, and it
+        // is the reason the shoe still reads as a trainer without it.
+        //
         // Thin accent stripe, and thin is the point: it is a crisp bright line
         // from behind and almost nothing from below, which is the opposite of
         // where the accent used to sit.
@@ -3526,21 +4440,25 @@ MR.Runner = (function () {
       // rotation.z as a clean abduction angle measured from straight down,
       // which is the single number the jump pose steers.
       shoulder.rotation.order = 'ZXY';
-      // The base layer, and the only place it is ever seen. "A race vest over
-      // a base layer" is what the reference wears and what a marathon runner
-      // wears, but from behind the trunk is entirely vest and entirely bib --
-      // there is nowhere on it for a second garment to show. The upper arm is
-      // where it can: a sleeve emerging from under the deltoid, ending in its
-      // own rolled cuff, turns a bare skin tube into an arm in a shirt. Two
-      // hits, symmetric, at the widest part of the figure.
+      // Bare, and that is a reversal. This carried a base-layer sleeve in a
+      // pale blue with its own rolled cuff, on the argument that "a race vest
+      // over a base layer" is what a marathon runner wears and the upper arm is
+      // the only place from behind where a second garment can show. The
+      // argument is true and the result was the worst thing on the character:
+      // seen from the chase camera the sleeve is not a cylinder, it is the
+      // sliver of one that clears the deltoid, so at gameplay scale it resolved
+      // as a pale triangle at each shoulder -- and a pale triangle inside a red
+      // mass reads as a HOLE IN THE VEST. Being invisible would have been the
+      // better outcome of the two.
       //
-      // The sleeve's top is tucked UNDER the deltoid sphere (which reaches to
-      // -0.100 in this frame) so the join is hidden by the shoulder's own
-      // curve rather than showing as a ring where the singlet ends.
+      // What replaces it is form rather than tone: a triceps swell, in skin,
+      // 0.020 proud at the back and nothing at the sides. Same argument as the
+      // hamstring and the calf -- it gives the ramp something to shade without
+      // introducing a value the silhouette has to pay for, and it keeps this
+      // part off the list of lone primitives.
       const upper = multi([
         { g: new THREE.CapsuleGeometry(0.086, 0.095, 3, 10), c: P.runnerSkin, y: -0.122 },
-        { g: new THREE.CylinderGeometry(0.101, 0.096, 0.090, 10), c: BASE, y: -0.108 },
-        { g: new THREE.CylinderGeometry(0.100, 0.098, 0.024, 10), c: JACKET, y: -0.160 },
+        { g: new THREE.SphereGeometry(0.088, 8, 6), c: P.runnerSkin, y: -0.108, z: -0.016, sx: 0.90, sy: 1.15 },
       ]);
       shoulder.add(upper);
 
@@ -3551,10 +4469,10 @@ MR.Runner = (function () {
       // unmistakable. At rest the extra is absorbed by the elbow's flexion and
       // never shows.
       const elbow = pivot(shoulder, 0, -0.262, 0);
-      // Forearm ending in a pale mitt over a trim wristband. Arms and thighs
+      // Forearm ending in a mitt over a trim wristband. Arms and thighs
       // are both skin, and from behind they overlap for most of the stride --
       // without a bright break at the wrist the whole lower half of the
-      // character reads as one undifferentiated mass. The mitt is 0.21 across
+      // character reads as one undifferentiated mass. The mitt is 0.19 across
       // against a 0.57 head, near the ratio Sonic's gloves run at, and it is
       // what makes both the arm swing and the spread jump pose land.
       const fore = multi([
@@ -3566,26 +4484,44 @@ MR.Runner = (function () {
         // the joint the back view was built to watch.
         { g: new THREE.SphereGeometry(0.088, 8, 5), c: P.runnerSkin, y: -0.012, sy: 0.92, sz: 0.96 },
         { g: new THREE.CylinderGeometry(0.088, 0.088, 0.048, 10), c: TRIM, y: -0.188 },
-        // The hand. It was a ball, and a ball is the one shape a hand is not.
-        // Palm plus three fingers, and the budget for the fingers is taken OUT
-        // of the palm -- 0.118 down to 0.112, sitting 0.008 higher -- so the
-        // hand ends at -0.361 where the ball ended at -0.376. That matters
-        // more than it sounds: the gloves are the outermost thing on the
-        // airborne pose, MEASUREMENTS.md puts the runner's lateral budget at
-        // 0.70 from the lane centre before it grazes hazards it legitimately
-        // cleared, and growing the reach to buy fingers would have spent it.
+        // ---- the hand ------------------------------------------------------
         //
-        // The fingers point forward and down, curled the way a running hand
-        // is, so from behind what shows is the knuckle line across the back of
-        // the hand and three lobes breaking the bottom of its outline. The
-        // capsule CAPS are the knuckles -- one primitive doing both jobs.
-        { g: new THREE.SphereGeometry(0.112, 10, 8), c: GLOVE, y: -0.250, sx: 0.88, sz: 1.02 },
-        { g: new THREE.CapsuleGeometry(0.030, 0.042, 1, 6), c: GLOVE, x: -0.048, y: -0.318, z: 0.010, rx: 0.60 },
-        { g: new THREE.CapsuleGeometry(0.032, 0.046, 1, 6), c: GLOVE, x: 0.000, y: -0.320, z: 0.012, rx: 0.60 },
-        { g: new THREE.CapsuleGeometry(0.029, 0.040, 1, 6), c: GLOVE, x: 0.048, y: -0.314, z: 0.008, rx: 0.60 },
-        // Thumb, on the inboard face, where it is a silhouette bump against
-        // the torso rather than a lump lost on the outside of the arm.
-        { g: new THREE.CapsuleGeometry(0.032, 0.036, 1, 6), c: GLOVE, x: -side * 0.086, y: -0.268, z: 0.030, rx: 0.55, rz: side * 0.55 },
+        // Sized to the frame that ships and not to a close-up. The figure is
+        // 110-200px tall in play, the hand is 0.20 across on a 1.60 figure, so
+        // the hand is 14-25 PIXELS. That number decides everything below:
+        //
+        //   - Three fingers do not exist at 14px. Each was 0.06 across, under
+        //     4px, in the palm's own colour, and the review's verdict on them
+        //     was "unarticulated rounded stump" -- which is what four pale
+        //     lobes of one tone at 4px are. They are replaced by ONE curled
+        //     roll carrying the whole hand's single value break. A knuckle line
+        //     is the only interior detail a 14px hand can hold, so it gets that
+        //     and nothing else.
+        //   - A ball reads as a ball at every size. The mass is now a flattened
+        //     BLOCK, deeper front-to-back than it is wide, with the wrist ball
+        //     above it and the finger roll below: three stacked shapes of two
+        //     tones, which at 14px resolves as forearm / band / hand / fingers
+        //     rather than as one pale oval.
+        //   - The thumb rides high and INBOARD, so it breaks the outline
+        //     against the vest and the thigh -- the two dark masses the hand
+        //     passes in front of -- rather than against the road, where the
+        //     mitt's own edge is already doing the work.
+        //
+        // Every dimension is inside the ones it replaces. The old hand reached
+        // -0.362 and was 0.197 across; this one reaches -0.361 and is 0.186,
+        // so the airborne span, which MEASUREMENTS.md caps at 0.70 from the
+        // lane centre, is spent DOWN rather than up. The extra mass is bought
+        // in z, which is the axis the back view does not measure at all.
+        { g: new THREE.SphereGeometry(0.086, 8, 6), c: MITT, y: -0.208, sy: 0.88, sz: 1.00 },
+        { g: new THREE.BoxGeometry(0.170, 0.116, 0.150), c: MITT, y: -0.262, z: 0.014 },
+        // Knuckles: the block's outboard-forward corner rounded off, so the
+        // hand has a leading edge instead of four square ones.
+        { g: new THREE.SphereGeometry(0.090, 8, 6), c: MITT, y: -0.258, z: 0.052, sx: 0.94, sy: 0.70, sz: 0.60 },
+        // The curled fingers, one roll lying across the hand. Its cap ends are
+        // the outer knuckles, exactly as the old three capsules used their caps
+        // -- one primitive doing both jobs, but at a size that survives.
+        { g: new THREE.CapsuleGeometry(0.048, 0.086, 2, 8), c: MITT_DK, y: -0.313, z: 0.048, rz: Math.PI / 2 },
+        { g: new THREE.CapsuleGeometry(0.036, 0.048, 2, 6), c: MITT, x: -side * 0.062, y: -0.242, z: 0.062, rx: 0.85, rz: side * 0.62 },
       ]);
       elbow.add(fore);
 
@@ -4447,24 +5383,35 @@ MR.Runner = (function () {
       // pinned along its top edge and held flat in the middle by the back
       // behind it, so the drive is a travelling wave in theta: the two free
       // bottom corners lift out of phase with each other and the number never
-      // moves. 22 vertices, one buffer upload, no draw call.
+      // moves. One buffer upload, no draw call.
       //
       // Rate and amplitude both climb with pace, which makes this a speed cue
       // as well as a life cue -- it is the only motion on the character that
       // is not locked to the stride, so it beats against the cadence instead
       // of reinforcing it, and that is what stops the whole figure reading as
       // one clockwork.
+      //
+      // The lift is now ONE-SIDED, and that is a bug fix rather than a taste
+      // change. A signed sine put the free corners 0.05 INTO a vest whose
+      // surface is only 0.008 behind the panel, so for half of every cycle the
+      // vest's red cut a wave across the bottom of the white card -- which the
+      // art review read, correctly, as the bib straddling the hem crooked. A
+      // panel pinned to a back can lift off it and cannot pass through it, so
+      // the drive is biased into [0, 1] and the corners now alternate between
+      // lifted and flat instead of between out and in. The amplitude is raised
+      // to compensate for losing half the swing.
       bibT += dt * (5.2 + 6.4 * sp01);
-      // 0.036, not the 0.026 this started at: measured off a burst of frames,
-      // 0.026 moves a corner about four pixels at gameplay framing and the
-      // strip could not resolve it. Past about 0.05 the corner visibly leaves
-      // the vest and the panel reads as unstuck rather than as fluttering.
-      const bibAmp = (0.036 + 0.016 * sp01) * (1 - slid * 0.55) + spread * 0.018;
+      // 0.046, not the 0.036 the two-sided version used: half the range is now
+      // spent on the flat side, and measured off a burst of frames a corner has
+      // to travel about 0.05 before the strip can resolve it moving at all.
+      // Past about 0.08 of outward travel the corner visibly leaves the vest
+      // and the panel reads as unstuck rather than as fluttering.
+      const bibAmp = (0.046 + 0.020 * sp01) * (1 - slid * 0.55) + spread * 0.018;
       const bp = bibPos.array;
       for (let i = 0; i < bibPos.count; i++) {
         const w = bibWeight[i];
         if (w <= 0) continue;
-        const lift = Math.sin(bibT + bibTheta[i] * 3.4) * bibAmp * w;
+        const lift = (0.5 + 0.5 * Math.sin(bibT + bibTheta[i] * 3.4)) * bibAmp * w;
         // Radial, because the panel is curved: scaling x and z about the
         // vest's own axis lifts the corner off the back, where moving it in a
         // straight line would shear it sideways across the number.
@@ -7357,6 +8304,7 @@ MR.World = (function () {
 
     // ---- sky + fog ------------------------------------------------------
     const sky = S.skyDome(900, P.skyTop, P.skyBot);
+    sky.userData.notScenery = true;
     group.add(sky);
 
     // Ground plane. The pooled shoulders are only 30 units wide, so without
@@ -7374,6 +8322,7 @@ MR.World = (function () {
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.34;
     ground.renderOrder = -500;
+    ground.userData.notScenery = true;
     group.add(ground);
     mats.ground = groundMat;
 
@@ -7407,6 +8356,7 @@ MR.World = (function () {
     const hills = new THREE.Mesh(hillsGeo, hillsMat);
     hills.renderOrder = -490;
     hills.frustumCulled = false;
+    hills.userData.notScenery = true;
     group.add(hills);
 
     // Ripples ride just above the water surface and are only shown when the
@@ -7419,6 +8369,7 @@ MR.World = (function () {
     ripples.rotation.x = -Math.PI / 2;
     ripples.renderOrder = -480;
     ripples.visible = false;
+    ripples.userData.notScenery = true;
     group.add(ripples);
 
     // ---- road tiles -----------------------------------------------------
@@ -7475,6 +8426,80 @@ MR.World = (function () {
     // nothing in the "lightest large mass" reckoning.
     const ROAD_MARGIN = 0xd0d0d0;
 
+    // The longitudinal marks. The lane seam is a two-level ladder -- a rail
+    // that runs the whole tile and a bead that rides it every PAVE_JOINT -- and
+    // the carriageway edge stays one solid bright line. See the Egypt device
+    // note in paintGeo for where the numbers come from and why the two are not
+    // treated the same.
+    const SEAM_RAIL = 0x8e8aa8;   // L 140 -- was 0xfff6d8, the bead's colour
+    const SEAM_BEAD = 0xfff6d8;   // L 245.7
+    const EDGE_LINE = 0xf2f4ff;   // L 244.4, unchanged
+
+    // The kerb-notch period, and now the road-bead period too. Declared here
+    // because paintGeo beats against it and is built first.
+    const PAVE_JOINT = 2.0;
+
+    /**
+     * ================== CAMBER, ON TOP OF THE STAIRCASE ==================
+     *
+     * Tom Gold Run's road is not a flat colour and it is not a staircase
+     * either: sampled across the carriageway at four depths it is a smooth
+     * continuous dome peaking at the crown, with the edge at 0.68-0.77 of the
+     * centre, twice at two depths to within half a level. It does not key to
+     * lane boundaries. Ours keys to nothing else -- three flat bands, a step at
+     * every seam and dead flat in between.
+     *
+     * Both reads are worth having and they are not in conflict, because they
+     * carry different information. The staircase says WHICH LANE, which is the
+     * whole game and is not being given up. The dome says ONE SURFACE, which is
+     * what stops three lanes reading as three separate strips of tarmac laid
+     * side by side. So the dome goes on top: keyed to |x| and not to lane
+     * index, multiplied into the band each strip belongs to.
+     *
+     * WHY IT CANNOT BE A GRADIENT. merge() paints one flat colour per part, so
+     * there is no per-vertex ramp to be had. Each band becomes five
+     * constant-colour strips of LANE/5 instead, and the quantisation is fine:
+     * five steps of about 4% across a lane is below the threshold the banded
+     * toon ramp itself resolves, so it reads as a curve and not as more stairs.
+     *
+     * THE DIVISOR IS THE CARRIAGEWAY, NOT TRACK_HALF_WIDTH, and this is a
+     * stated divergence from the spec that asked for it. The spec's formula
+     * divides by TRACK_HALF_WIDTH (3.75) and in the next sentence asks for
+     * "0.78 x 0.78 = 0.61 of the crown at the outer edge of lane 0". Those two
+     * cannot both be true: the lanes only reach 2.55, so dividing by 3.75 gets
+     * the outer lane edge to 0.90, not 0.78, and the combined figure to 0.70.
+     * TRACK_HALF_WIDTH includes the 1.2-unit shoulder each side, which is
+     * ROAD_MARGIN and is not part of the dome. Dividing by the carriageway
+     * delivers the number that was actually measured against.
+     *
+     * Cost: 30 triangles per road tile instead of 6, and NO extra draw calls --
+     * the strips merge into roadGeo exactly as the three bands did.
+     */
+    const CAMBER_DEPTH = 0.22;                 // 1.00 at the crown, 0.78 at the edge
+    const CARRIAGE_HALF = LANE * 1.5;          // 2.55 -- three lanes, no shoulder
+    const CAMBER_STRIPS = 5;
+    function camber(x) {
+      const t = Math.abs(x) / CARRIAGE_HALF;
+      return 1 - CAMBER_DEPTH * t * t;
+    }
+    /**
+     * Scale a tint IN sRGB BYTES, which is the space every number in this
+     * section was measured in and is not the space THREE.Color works in.
+     *
+     * ColorManagement is on, so `new THREE.Color(hex)` holds LINEAR values and
+     * multiplyScalar(0.78) darkens the linear value -- which arrives on screen
+     * as 0.78^(1/2.2) = 0.89, four fifths of the step gone. The reason
+     * LANE_BAND's own predictions match the frame to within 0.006 is that sRGB
+     * is a power law, so scaling the BYTES by k and letting the round trip
+     * cancel the exponent is what puts a factor of k on the displayed value.
+     */
+    function tintScale(hex, k) {
+      const r = Math.max(0, Math.min(255, Math.round(((hex >> 16) & 255) * k)));
+      const g = Math.max(0, Math.min(255, Math.round(((hex >> 8) & 255) * k)));
+      const b = Math.max(0, Math.min(255, Math.round((hex & 255) * k)));
+      return (r << 16) | (g << 8) | b;
+    }
+
     const roadGeo = (function () {
       const parts = [];
       // The slab is dropped 4mm so the banded surface laid on top of it can
@@ -7482,10 +8507,15 @@ MR.World = (function () {
       // distance. Its sides are what shows when the shoulders come off over
       // the river, so it keeps the margin tone rather than a lane tone.
       parts.push(bx(K.TRACK_HALF_WIDTH * 2, 0.5, TILE, 0, -0.004, 0, ROAD_MARGIN));
+      const sw = LANE / CAMBER_STRIPS;
       for (let l = 0; l < 3; l++) {
         // K.LANE_X is descending, so this walks screen-left to screen-right and
         // LANE_BAND is indexed by the lane the PLAYER names, not by world x.
-        parts.push(laneBand(K.LANE_X[l], LANE, LANE_BAND[l]));
+        // LANE_W is what sets the strip width; LANE_X is never differenced.
+        for (let s = 0; s < CAMBER_STRIPS; s++) {
+          const cx = K.LANE_X[l] - LANE / 2 + sw * (s + 0.5);
+          parts.push(laneBand(cx, sw, tintScale(LANE_BAND[l], camber(cx))));
+        }
       }
       return merge(parts);
     })();
@@ -7550,12 +8580,70 @@ MR.World = (function () {
         parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, heavy ? 0.11 : 0.08),
           heavy ? 0x7b7a81 : 0x73727b, 0, 0.004, jz + (heavy ? 0.18 : 0.12), flat));
       }
+      /**
+       * ============ THE EGYPT DEVICE: A RAIL THAT CARRIES BEADS ============
+       *
+       * The tiled runway in tgr-egypt.png is the one piece of ground pattern in
+       * the reference that survives to depth, and the reason is structural
+       * rather than decorative. It is a LONGITUDINAL RAIL CARRYING PERPENDICULAR
+       * BEADS. The rail converges on the vanishing point, so perspective
+       * lengthens it in screen space instead of foreshortening it away; the
+       * beads ride the rail and supply the beat. Measured, the beads step
+       * uniformly in world depth to within 4% and about 33 of them resolve
+       * individually before the period falls under four pixels.
+       *
+       * We had each half and neither whole. The expansion joints are
+       * full-width perpendicular stripes with no rail -- sub-pixel past forty
+       * units, as the note above already concedes. The lane seams are rails
+       * with no beads. So the beads go on the rails, at the measured period:
+       * 0.40 x the runway width, which on our 5.10-unit carriageway is 2.04,
+       * and PAVE_JOINT is already 2.0 -- so the kerb notches and the road beads
+       * beat together for free.
+       *
+       * DIVERGENCE, AND IT IS DELIBERATE. Egypt's beads are a CHROMA break --
+       * blue on gold, dL 42 but dB 124. Ours cannot be. The telegraph mats own
+       * amber, cyan and pink at full saturation, they are the device a race is
+       * lost by misreading, and nothing on the road may compete with them. So
+       * the same three-level ladder is drawn in VALUE: the rail drops well
+       * below the paint it used to be, and the bead keeps the paint colour. On
+       * the measured post-R1 tarmac (68 in lane 0, 91 in the centre) that is
+       * road 1.00 / seam rail 1.5-2.1x / bead 2.7-3.6x, against Egypt's
+       * grass 1.00 / gold rail 1.12 / cream deck 1.32 -- a wider ladder than
+       * theirs, which is right, because a banded toon ramp quantises and needs
+       * the extra step to survive it.
+       *
+       * TWO RAILS, NOT FOUR, and this is the second stated divergence. The spec
+       * asked for beads on all four longitudinal lines. Built that way and
+       * looked at, the carriageway edge becomes a dashed line as well, and that
+       * costs two things worth more than the beat it buys. R1's verified result
+       * is a solid marking at 3.5x the tarmac against Tom Gold Run's measured
+       * 3.3-3.9, and the carriageway edges are what carry it; beading them
+       * drops the continuous mark to 2.3x and only the beads stay in band.
+       * And solid-edge / dashed-divider is the convention every real road on
+       * earth uses, so the interior seams are exactly where a player already
+       * expects to see a break and the boundary is exactly where they do not.
+       * The edges therefore stay solid and bright, and only the two lane seams
+       * become beaded rails. It also halves the cost.
+       *
+       * Cost: 2 rails x 12 beads per 24-unit tile = 24 quads = 48 triangles,
+       * merged into paintGeo. Zero extra draw calls.
+       */
+      const BEAD = 0.30;
+      const BEAD_STEP = PAVE_JOINT;      // 2.0 -- the kerb notch spacing
+      function beads(cx, color, y) {
+        const n = Math.round(TILE / BEAD_STEP);
+        for (let i = 0; i < n; i++) {
+          const z = -TILE / 2 + BEAD_STEP * 0.5 + i * BEAD_STEP;
+          parts.push(part(new THREE.PlaneGeometry(BEAD, BEAD), color, cx, y, z, flat));
+        }
+      }
+
       // Carriageway edge lines, on the outer lane boundary rather than at the
       // tarmac edge. The shoulder beyond them carries the kerb and the aid
       // tables; painting it as road instead of as shoulder is what made three
       // lanes read as one enormous one.
       for (const sx of [-1, 1]) {
-        parts.push(part(new THREE.PlaneGeometry(0.26, TILE), 0xf2f4ff,
+        parts.push(part(new THREE.PlaneGeometry(0.26, TILE), EDGE_LINE,
           sx * (LANE * 1.5 + 0.13), 0.006, 0, flat));
       }
       /**
@@ -7588,7 +8676,8 @@ MR.World = (function () {
         for (const s of [-1, 1]) {
           parts.push(part(new THREE.PlaneGeometry(0.11, TILE), 0x77728f, lx + s * 0.12, 0.005, 0, flat));
         }
-        parts.push(part(new THREE.PlaneGeometry(0.15, TILE), 0xfff6d8, lx, 0.007, 0, flat));
+        parts.push(part(new THREE.PlaneGeometry(0.15, TILE), SEAM_RAIL, lx, 0.007, 0, flat));
+        beads(lx, SEAM_BEAD, 0.009);
       }
       return merge(parts);
     })();
@@ -7605,7 +8694,6 @@ MR.World = (function () {
      * into a tile mesh that is already being drawn: 24 little boxes cost
      * triangles, which are free, and no submissions, which are not.
      */
-    const PAVE_JOINT = 2.0;
     function pavement(parts, sx, top, kerb, joint) {
       const x = sx * (K.TRACK_HALF_WIDTH + 4.0);
       const kx = sx * (K.TRACK_HALF_WIDTH + 0.17);
@@ -7666,11 +8754,88 @@ MR.World = (function () {
     }
 
     /**
+     * THE CURVED LAMP ARC -- the top-of-frame device, measured off tgr-city.png.
+     *
+     * Two posts were fitted through a common horizon there: the far one sits at
+     * 1.48x the near one's depth, so the spacing is about 0.48x the near lamp's
+     * distance. The near post runs 548 px from head to base against a
+     * carriageway 310 px wide at the same depth, i.e. THE HEAD STANDS 1.77 ROAD
+     * WIDTHS UP. That is an enormous exaggeration -- no real street lamp is
+     * anything like it -- and the exaggeration is exactly the point: it is what
+     * fills the top of a PORTRAIT frame instead of hugging the kerb, which is
+     * the half of the screen this game had almost nothing in.
+     *
+     * Our tarmac is 2 * TRACK_HALF_WIDTH = 7.50, so 1.77 * 7.50 = 13.3.
+     *
+     * THE FAIRNESS GUARANTEE IS GEOMETRIC, not a promise. The post stands at
+     * |x| = 5.4, which is outside CORRIDOR_HALF (3.75) and inside LANDMARK_IN
+     * (11.75) -- roadside furniture, in the same band as the kerb and the aid
+     * tables. The arm is a quarter ellipse from the post top (5.4, 9.6) to the
+     * head (1.6, 13.3), i.e. centre (1.6, 9.6) with semi-axes 3.8 and 3.7. The
+     * FIRST point of it to reach over the corridor is x = 3.75, and there
+     *
+     *   cos t = (3.75 - 1.6) / 3.8 = 0.566  ->  y = 9.6 + 3.7 * 0.824 = 12.65
+     *
+     * so the lowest over-corridor point of the whole lamp is 12.65 against an
+     * OVERHEAD_Y of 9.0: 3.65 units of clearance, against the 2.0 the spec asked
+     * for. Nothing about the arc can intersect a hazard (top 2.80) or the jump
+     * arc, and crossings() re-derives that from the built triangles every time
+     * tools/shoot.js runs, so it stays true if these numbers are ever retuned.
+     *
+     * PERIOD: one lamp per road tile, alternating sides, so an arc crosses the
+     * frame every TILE = 24 units and each side carries one every 48. At the
+     * race pace this build tops out at (~26 u/s) that is an arc a second, and
+     * the reference's ~0.48x-near-distance spacing is in the same family. It
+     * errs sparse, which is the right way to err against a device this large.
+     *
+     * COST: 72 triangles per tile -- post 12, arm 4 x 12, head 12. The spec
+     * budgeted 22 by assuming a ribbon arm; boxes are used instead because this
+     * file has twice lost days to quads that came out wound the wrong way and
+     * drew nothing, and 50 triangles a tile is not worth that risk. At ten live
+     * tiles the difference is 500 triangles on a 35k-99k frame.
+     */
+    const LAMP_POST_X = 5.4;
+    const LAMP_POST_Y = 9.6;
+    const LAMP_HEAD_X = 1.6;
+    const LAMP_HEAD_Y = 13.3;    // 1.77 x the 7.50-unit tarmac
+    const LAMP_SEGS = 4;
+    function lampArc(parts, sx, z, post, head) {
+      parts.push(bx(0.26, LAMP_POST_Y, 0.26, sx * LAMP_POST_X, LAMP_POST_Y / 2, z, post));
+      const ax = LAMP_POST_X - LAMP_HEAD_X;      // 3.8
+      const ay = LAMP_HEAD_Y - LAMP_POST_Y;      // 3.7
+      const at = (i) => {
+        const t = (i / LAMP_SEGS) * (Math.PI / 2);
+        return [sx * (LAMP_HEAD_X + ax * Math.cos(t)), LAMP_POST_Y + ay * Math.sin(t)];
+      };
+      for (let i = 0; i < LAMP_SEGS; i++) {
+        const a = at(i), b = at(i + 1);
+        const dx = b[0] - a[0], dy = b[1] - a[1];
+        parts.push(bx(Math.hypot(dx, dy) + 0.14, 0.20, 0.20,
+          (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, z, post, 0, 0, Math.atan2(dy, dx)));
+      }
+      // The luminaire hangs off the end of the arm, so its top meets the head
+      // height rather than straddling it.
+      parts.push(bx(0.92, 0.26, 0.44, sx * LAMP_HEAD_X, LAMP_HEAD_Y - 0.13, z, head));
+    }
+
+    // Which roadside kinds carry a lamp, and what colour it is. THE BRIDGE is
+    // not here because a post at |x| = 5.4 would stand on open water -- the deck
+    // ends at 4.75 -- and it already carries lighting portals every 12 units.
+    // THE WALL is not here either: it already has a scaffold birdcage over the
+    // carriageway at 9.5-10.2, and a second overhead system above that turns the
+    // top of the frame into a thicket, which is the exact failure the bracing
+    // was removed for.
+    const LAMP_EDGES = {
+      barrier: [0x2b2f52, 0xffe45e],
+      hedge: [0x3a4560, 0xfff2e0],
+    };
+
+    /**
      * Crowd-control barrier: the single strongest "this is a road race" cue.
      * The lamp standards are what give the city legs a vertical rhythm at the
      * distance where individual props have already fogged out.
      */
-    const barrierGeo = (function () {
+    function barrierParts() {
       const parts = [];
       for (const sx of [-1, 1]) {
         const x = sx * (K.TRACK_HALF_WIDTH + 0.85);
@@ -7718,11 +8883,11 @@ MR.World = (function () {
         }
         if (i) bunting(parts, MX, 9.44, sz + 0.09, 15);
       }
-      return merge(parts);
-    })();
+      return parts;
+    }
 
     /** Park/river edge: a clipped hedge, a gravel path and the odd bench. */
-    const hedgeGeo = (function () {
+    function hedgeParts() {
       const parts = [];
       for (const sx of [-1, 1]) {
         const x = sx * (K.TRACK_HALF_WIDTH + 1.6);
@@ -7766,8 +8931,33 @@ MR.World = (function () {
         parts.push(bx(MX * 2, 0.09, 0.09, 0, 9.76, sz, 0xfff2e0));
         bunting(parts, MX, 9.42, sz + 0.08, 11);
       }
-      return merge(parts);
-    })();
+      return parts;
+    }
+
+    /**
+     * One geometry per (roadside kind, lamp side). The lamp has to be baked into
+     * the tile's own merge or it is a draw call per live tile -- about a dozen,
+     * on a frame that already runs 150-260 -- and the only thing that differs
+     * between the two variants is which side the post stands on, so the pair is
+     * built once at start-up and the tile picks one by the parity of its index.
+     * Both are held on every pooled tile and one is made visible, exactly as the
+     * four kinds already were: a biome change stays a visibility flip.
+     */
+    const LIT_EDGES = {};
+    for (const kind in LAMP_EDGES) {
+      const build = kind === 'barrier' ? barrierParts : hedgeParts;
+      const col = LAMP_EDGES[kind];
+      for (const sx of [-1, 1]) {
+        const parts = build();
+        lampArc(parts, sx, 0, col[0], col[1]);
+        LIT_EDGES[kind + (sx < 0 ? 'L' : 'R')] = merge(parts);
+      }
+    }
+    /** The tile variant a given tile index wears. Alternates every TILE. */
+    function edgeVariant(kind, tileIdx) {
+      if (!LAMP_EDGES[kind]) return kind;
+      return kind + (((tileIdx % 2) + 2) % 2 ? 'R' : 'L');
+    }
 
     /**
      * THE WALL: concrete jersey barrier and a graffitied site hoarding. The leg
@@ -7946,11 +9136,10 @@ MR.World = (function () {
       // One of these is shown at a time; keeping all three built means a
       // biome change is a visibility flip rather than a rebuild.
       const edges = {
-        barrier: S.outlined(barrierGeo, mats.edge, S.INK.prop),
-        hedge: S.outlined(hedgeGeo, mats.edge, S.INK.prop),
         rail: S.outlined(railGeo, mats.edge, S.INK.prop),
         wall: S.outlined(wallGeo, mats.edge, S.INK.prop),
       };
+      for (const k in LIT_EDGES) edges[k] = S.outlined(LIT_EDGES[k], mats.edge, S.INK.prop);
       for (const k in edges) { edges[k].visible = false; t.add(edges[k]); }
       t.userData.shoulders = shoulders;
       t.userData.edges = edges;
@@ -8008,6 +9197,7 @@ MR.World = (function () {
     // Below the hazard telegraph mats (5) and the finish checker (4): where the
     // line runs across a gate's own mat, the hazard has to win.
     routeMesh.renderOrder = 3;
+    routeMesh.userData.notScenery = true;
     routeMesh.frustumCulled = false;   // its bounds change every frame
     routeMesh.visible = !!routeLane;
     group.add(routeMesh);
@@ -8302,6 +9492,10 @@ MR.World = (function () {
         }
         variants[0].visible = true;
         g.add(telegraph(kind));
+        // A hazard is the thing the audit protects, not a thing it polices: it
+        // is meant to be in the corridor, and one gate hiding another is the
+        // game rather than a bug. See api.crossings().
+        g.userData.notScenery = true;
         g.userData.variants = variants;
         g.userData.bag = bag;
         g.userData.body = variants[0].userData.body;
@@ -8698,6 +9892,158 @@ MR.World = (function () {
         moving: blockPaddleGeo, pivot: [0.92, 0.80, 0.30], anim: 'paddle',
       },
     ]);
+
+    /**
+     * ============ CONTACT SHADING UNDER EVERY HAZARD ============
+     *
+     * Measured off tgr-city.png and tgr-egypt.png, and the measurement is the
+     * whole point: their contact shading is not a grey shape painted on the
+     * road, it is a MULTIPLY of the surface.
+     *
+     *   parked car, city    47,48,63  on  83,85,112   0.57 / 0.56 / 0.56
+     *   runner, Egypt      186,172,135 on 249,232,180  0.747 / 0.741 / 0.750
+     *   tram spill, city    78,83,104 on  91,96,122   0.857 / 0.865 / 0.852
+     *
+     * The same number on all three channels to within 0.01, every time. So the
+     * target is 0.60 directly under the footprint easing to 0.85 at the rim --
+     * a hard contact under a car, an ambient-occlusion spill several units out.
+     *
+     * The runner got a shadow when the first review asked for one. The hazards
+     * never did, and they are the objects the game is lost by misjudging.
+     *
+     * WHY ONE MESH. A flat opaque quad cannot multiply, and a blended material
+     * per hazard is a draw call per hazard -- up to thirty of them at mile 20.
+     * So every live hazard's quad is written into ONE pooled geometry whose
+     * vertices are rewritten in place each frame, exactly as the racing line
+     * does: no allocation, no growth with the course, ONE extra draw call for
+     * the whole road and two triangles per hazard.
+     *
+     * COLOUR SPACE, because a multiply is where it bites hardest. The renderer
+     * outputs sRGB, so blending happens on sRGB-encoded values in the default
+     * framebuffer, and the measurements above are sRGB byte ratios. Authoring
+     * the falloff as sRGB bytes and letting three decode and re-encode it puts
+     * exactly the measured factor on the destination. Fog stays ON: it mixes
+     * the multiplicand toward the near-white haze, so a distant hazard's shadow
+     * dissolves at the same rate the hazard does, for free.
+     */
+    const SHADOW_CORE = 0.60;     // directly under the footprint
+    const SHADOW_RIM = 0.85;      // the ambient spill at the edge of the mass
+    const shadowTex = (function () {
+      const N = 64;
+      const cv = canvas(N, N);
+      const g = cv.getContext('2d');
+      const img = g.createImageData(N, N);
+      const d = img.data;
+      const c = (N - 1) / 2;
+      for (let y = 0; y < N; y++) {
+        for (let x = 0; x < N; x++) {
+          const dx = (x - c) / c, dy = (y - c) / c;
+          const r = Math.sqrt(dx * dx + dy * dy);
+          // Flat core out to 0.55 of the radius (the footprint), the measured
+          // ease to 0.85 by 0.80 (the rim), then out to 1.0 -- which under a
+          // multiply is "no change" and is what keeps the quad's own square
+          // edge invisible.
+          let v;
+          if (r <= 0.55) v = SHADOW_CORE;
+          else if (r <= 0.80) {
+            const t = (r - 0.55) / 0.25;
+            v = SHADOW_CORE + (SHADOW_RIM - SHADOW_CORE) * (t * t * (3 - 2 * t));
+          } else {
+            const t = Math.min(1, (r - 0.80) / 0.20);
+            v = SHADOW_RIM + (1 - SHADOW_RIM) * (t * t * (3 - 2 * t));
+          }
+          const i = (y * N + x) * 4;
+          d[i] = d[i + 1] = d[i + 2] = Math.round(v * 255);
+          d[i + 3] = 255;
+        }
+      }
+      g.putImageData(img, 0, 0);
+      const t = new THREE.CanvasTexture(cv);
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.generateMipmaps = false;
+      t.minFilter = t.magFilter = THREE.LinearFilter;
+      t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+      return t;
+    })();
+
+    // Three lanes x the deepest gate cluster the spawn window ever holds, with
+    // room to spare. Quads past the live count collapse to a point rather than
+    // being removed, so the buffer never resizes.
+    const SHADOW_MAX = 72;
+    const shadowGeo = (function () {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(SHADOW_MAX * 18), 3));
+      // WINDING. Seen from +y -- which is the only side anything ever sees a
+      // road quad from -- the vertices have to run (x0,z0) (x0,z1) (x1,z1) /
+      // (x0,z0) (x1,z1) (x1,z0). The obvious order instead puts the cross
+      // product at -y, the quads face DOWN THROUGH THE ROAD, and FrontSide
+      // culls every one of them: the mesh reports a live draw range, its
+      // vertices are where they should be, and it draws nothing whatever. This
+      // file has lost a week to exactly that failure once already -- see the
+      // LANE_FIT note at the top -- and it presents identically both times.
+      const uv = new Float32Array(SHADOW_MAX * 12);
+      for (let i = 0; i < SHADOW_MAX; i++) {
+        const u = i * 12;
+        uv[u] = 0; uv[u + 1] = 0;
+        uv[u + 2] = 0; uv[u + 3] = 1;
+        uv[u + 4] = 1; uv[u + 5] = 1;
+        uv[u + 6] = 0; uv[u + 7] = 0;
+        uv[u + 8] = 1; uv[u + 9] = 1;
+        uv[u + 10] = 1; uv[u + 11] = 0;
+      }
+      g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+      return g;
+    })();
+    const shadowMesh = new THREE.Mesh(shadowGeo, new THREE.MeshBasicMaterial({
+      map: shadowTex,
+      blending: THREE.MultiplyBlending,
+      transparent: true,
+      depthWrite: false,
+    }));
+    // Above the road paint (0.005-0.009) and below the telegraph mats (0.012):
+    // the shadow darkens the tarmac and the markings, which is what a shadow
+    // does, and never touches the device the lane read depends on.
+    shadowMesh.renderOrder = 2;
+    shadowMesh.frustumCulled = false;
+    shadowMesh.userData.notScenery = true;
+    group.add(shadowMesh);
+
+    const SHADOW_Y = 0.0105;
+    // Wider than the lane so the rim falls off over tarmac rather than being
+    // cut at the seam, and long enough that the near end reads as the object
+    // sitting ON the road rather than as a disc in front of it.
+    const SHADOW_SPREAD = 0.95;
+    function updateShadows() {
+      const pos = shadowGeo.attributes.position.array;
+      const B = MR.Collision.BOX;
+      let n = 0;
+      for (const g of activeGates) {
+        for (let l = 0; l < 3 && n < SHADOW_MAX; l++) {
+          const kind = g.gate.lanes[l];
+          if (kind === K.CLEAR || !g.objs[l]) continue;
+          const box = B[kind];
+          if (!box) continue;
+          // Same span the body is stretched by, so a six-unit train drags its
+          // whole length of shadow instead of a disc at the cab.
+          const span = (kind === K.BLOCK && g.gate.train) ? 1 + g.gate.train * 0.9 : 1;
+          const z0 = g.gate.z - box.halfZ - SHADOW_SPREAD;
+          const z1 = g.gate.z + box.halfZ * (2 * span - 1) + SHADOW_SPREAD;
+          const cx = K.LANE_X[l];
+          // LANE_W, never a difference of LANE_X.
+          const hx = LANE * 0.5 + SHADOW_SPREAD;
+          const p = n * 18;
+          pos[p] = cx - hx; pos[p + 1] = SHADOW_Y; pos[p + 2] = z0;
+          pos[p + 3] = cx - hx; pos[p + 4] = SHADOW_Y; pos[p + 5] = z1;
+          pos[p + 6] = cx + hx; pos[p + 7] = SHADOW_Y; pos[p + 8] = z1;
+          pos[p + 9] = cx - hx; pos[p + 10] = SHADOW_Y; pos[p + 11] = z0;
+          pos[p + 12] = cx + hx; pos[p + 13] = SHADOW_Y; pos[p + 14] = z1;
+          pos[p + 15] = cx + hx; pos[p + 16] = SHADOW_Y; pos[p + 17] = z0;
+          n++;
+        }
+      }
+      shadowGeo.setDrawRange(0, n * 6);
+      shadowGeo.attributes.position.needsUpdate = true;
+    }
 
     /**
      * Which skin a gate wears. Derived from the gate's own z and lane, so it is
@@ -9101,11 +10447,18 @@ MR.World = (function () {
       return merge(parts);
     })();
 
+    // Aid stands IN the corridor on purpose -- it is collected by lane -- so it
+    // is exempt from the crossing audit the same way a hazard is. See
+    // api.crossings().
     const waterPool = Pool(function () {
-      return S.outlined(waterGeo, mats.propLit, S.INK.prop);
+      const o = S.outlined(waterGeo, mats.propLit, S.INK.prop);
+      o.userData.notScenery = true;
+      return o;
     }, group);
     const bananaPool = Pool(function () {
-      return S.outlined(bananaGeo, mats.propLit, S.INK.prop);
+      const o = S.outlined(bananaGeo, mats.propLit, S.INK.prop);
+      o.userData.notScenery = true;
+      return o;
     }, group);
 
     /**
@@ -9198,10 +10551,22 @@ MR.World = (function () {
     // London's, New York's and Tokyo's span, and building one copy eagerly for
     // a day that draws none of them was pure waste.
 
-    /** Abutment: caps the end of the deck so the water does not just stop. */
+    /**
+     * Abutment: caps the end of the deck so the water does not just stop.
+     *
+     * The coping used to be one 48-wide slab at y = 0.1, which put a 0.45-high
+     * step across all three lanes for ten units of road at each end of the
+     * bridge. Nothing in collision.js knows it is there, so the player runs
+     * through it -- and it is a lane-wide horizontal mass at hazard height,
+     * which is the silhouette of a BLOCK. It is now two pieces on the
+     * shoulders, clear of the corridor, and the carriageway runs unbroken
+     * between them exactly as a real bridge joint does.
+     */
+    const ABUT_COPE = (48 / 2) - (CORRIDOR_HALF + 2.6);
     const abutGeo = merge([
       bx(46, 4.0, 9, 0, -2.0, 0, 0x6f7aa8),
-      bx(48, 0.7, 10, 0, 0.1, 0, 0x8e99c6),
+      bx(ABUT_COPE, 0.7, 10, -(CORRIDOR_HALF + 2.6 + ABUT_COPE / 2), 0.1, 0, 0x8e99c6),
+      bx(ABUT_COPE, 0.7, 10, (CORRIDOR_HALF + 2.6 + ABUT_COPE / 2), 0.1, 0, 0x8e99c6),
       bx(3.0, 2.6, 9.4, -13, 1.2, 0, 0x8e99c6),
       bx(3.0, 2.6, 9.4, 13, 1.2, 0, 0x8e99c6),
     ]);
@@ -9231,17 +10596,41 @@ MR.World = (function () {
       return S.outlined(riverGeo, mats.prop, S.INK.prop);
     }, group);
 
-    /** Overpass: THE WALL runs under a string of these, so the light drops. */
-    const overpassGeo = merge([
-      bx(3.4, 8.2, 5.0, -10.5, 4.1, 0, 0x6f6580),
-      bx(3.4, 8.2, 5.0, 10.5, 4.1, 0, 0x6f6580),
-      bx(26, 1.9, 6.0, 0, 9.0, 0, 0x8b7f9c),
-      bx(27, 0.7, 6.4, 0, 10.2, 0, 0x5a4f66),
-      bx(26, 0.5, 0.4, 0, 8.0, -3.0, 0x2b2f52),
-      bx(26, 0.5, 0.4, 0, 8.0, 3.0, 0x2b2f52),
-      bx(27, 1.0, 0.35, 0, 11.0, -3.2, 0xffb020),
-      bx(27, 1.0, 0.35, 0, 11.0, 3.2, 0xffb020),
-    ]);
+    /**
+     * Overpass: THE WALL runs under a string of these, so the light drops.
+     *
+     * THE SOFFIT IS THE WHOLE SPECIFICATION. This deck spanned the road with
+     * its fascia bars at y = 8.0 and its underside at 8.05, both below
+     * OVERHEAD_Y -- and it had done since it was added, with the corridor
+     * comment at the top of this file citing "the WALL overpass has spanned the
+     * road at 8.0" as though that were a fact about the design rather than a
+     * defect. It is a defect. A structure hanging over the carriageway inside
+     * the height the collision model reasons about is geometry the game does
+     * not know is there: the player passes through it, and it is drawn in front
+     * of whatever is behind it.
+     *
+     * DECK_Y is the underside, and everything else is measured off it, so the
+     * clearance cannot be lost again by editing one number in the middle. The
+     * piers grow to meet the deck rather than the deck dropping to meet them.
+     */
+    const OVERPASS_SOFFIT = OVERHEAD_Y + 0.20;    // 9.20
+    const overpassGeo = (function () {
+      const soffit = OVERPASS_SOFFIT;
+      const deckH = 1.9;
+      const pierTop = soffit + deckH * 0.6;
+      return merge([
+        bx(3.4, pierTop, 5.0, -10.5, pierTop / 2, 0, 0x6f6580),
+        bx(3.4, pierTop, 5.0, 10.5, pierTop / 2, 0, 0x6f6580),
+        // Fascia first: it is the lowest thing over the road and therefore the
+        // number the audit checks, so it sits exactly on the soffit line.
+        bx(26, 0.5, 0.4, 0, soffit + 0.25, -3.0, 0x2b2f52),
+        bx(26, 0.5, 0.4, 0, soffit + 0.25, 3.0, 0x2b2f52),
+        bx(26, deckH, 6.0, 0, soffit + deckH / 2, 0, 0x8b7f9c),
+        bx(27, 0.7, 6.4, 0, soffit + deckH + 0.25, 0, 0x5a4f66),
+        bx(27, 1.0, 0.35, 0, soffit + deckH + 1.05, -3.2, 0xffb020),
+        bx(27, 1.0, 0.35, 0, soffit + deckH + 1.05, 3.2, 0xffb020),
+      ]);
+    })();
     const overpassPool = Pool(function () {
       return S.outlined(overpassGeo, mats.prop, S.INK.scenery);
     }, group);
@@ -9645,17 +11034,42 @@ MR.World = (function () {
     // the kerb rather than to a literal. Narrow the track and the banner comes
     // in with it, instead of being left standing out among the spectators.
     const GANTRY = K.TRACK_HALF_WIDTH + 1.2;
+    /**
+     * THE TRUSS SITS ABOVE THE CORRIDOR, and it did not used to.
+     *
+     * Every mile gantry crossed the carriageway with its lower chord at y=3.50
+     * and its sign panel at 3.73-5.83. MR.Collision.BOX puts a BLOCK at 0-2.80
+     * and the jump apex at 2.05, so the sign was hanging in and just over the
+     * band the player reads hazards in -- at ?skip=190 the MILE 21 panel passes
+     * straight through the runner's head, and any gate behind it is being read
+     * through a lit yellow board. Scenery in front of a hazard costs a streak
+     * for something outside the player's control, which in this game is the
+     * record.
+     *
+     * So the whole truss lifts by TRUSS_LIFT, putting its lowest member 0.35
+     * above OVERHEAD_Y. The legs grow to carry it; nothing else changes shape,
+     * and the painted stripe on the road stays exactly where it was, because
+     * that is the part that marks the moment of passing.
+     *
+     * It also reads better. A sign gantry at 9.5-11.8 is the same object every
+     * motorway has, it now belongs to the same overhead layer as the catenary
+     * and the footbridges instead of floating in its own band, and it sweeps
+     * top-to-bottom past the lens rather than across the middle of the frame.
+     */
+    const BANNER_CHORD = OVERHEAD_Y + 0.35;      // lowest member over the road
+    const TRUSS_LIFT = BANNER_CHORD - 3.50;      // 3.50 was the old chord bottom
     const bannerFrameGeo = (function () {
       const parts = [];
+      const legTop = 5.95 + TRUSS_LIFT + 0.25;
       for (const sx of [-1, 1]) {
-        parts.push(bx(0.42, 6.0, 0.42, sx * GANTRY, 3.0, 0, 0x2b2f52));
+        parts.push(bx(0.42, legTop, 0.42, sx * GANTRY, legTop / 2, 0, 0x2b2f52));
         parts.push(bx(0.90, 0.30, 0.90, sx * GANTRY, 0.15, 0, 0x1b1633));
-        parts.push(bx(0.30, 0.30, 1.8, sx * GANTRY, 5.4, 0, 0x2b2f52, 0, 0, 0));
+        parts.push(bx(0.30, 0.30, 1.8, sx * GANTRY, 5.4 + TRUSS_LIFT, 0, 0x2b2f52, 0, 0, 0));
       }
-      parts.push(bx(GANTRY * 2 + 0.4, 0.40, 0.40, 0, 5.95, 0, 0x2b2f52));
-      parts.push(bx(GANTRY * 2 + 0.4, 0.30, 0.30, 0, 3.65, 0, 0x2b2f52));
+      parts.push(bx(GANTRY * 2 + 0.4, 0.40, 0.40, 0, 5.95 + TRUSS_LIFT, 0, 0x2b2f52));
+      parts.push(bx(GANTRY * 2 + 0.4, 0.30, 0.30, 0, 3.65 + TRUSS_LIFT, 0, 0x2b2f52));
       for (let i = -4; i <= 4; i++) {
-        parts.push(bx(0.16, 2.4, 0.16, i * (GANTRY - 0.6) / 4, 4.8, 0, 0x3a4570, 0, 0, i % 2 ? 0.45 : -0.45));
+        parts.push(bx(0.16, 2.4, 0.16, i * (GANTRY - 0.6) / 4, 4.8 + TRUSS_LIFT, 0, 0x3a4570, 0, 0, i % 2 ? 0.45 : -0.45));
       }
       parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, 0.7), 0xfffdf5, 0, 0.011, 0, -Math.PI / 2));
       return merge(parts);
@@ -9666,10 +11080,10 @@ MR.World = (function () {
       g.add(S.outlined(bannerFrameGeo, mats.prop, S.INK.banner));
       const mat = new THREE.MeshBasicMaterial({ color: 0xffffff });
       const panel = new THREE.Mesh(new THREE.PlaneGeometry(GANTRY * 2 - 0.6, 2.1), mat);
-      panel.position.y = 4.78; panel.rotation.y = Math.PI;
+      panel.position.y = 4.78 + TRUSS_LIFT; panel.rotation.y = Math.PI;
       g.add(panel);
       const back = new THREE.Mesh(new THREE.PlaneGeometry(GANTRY * 2 - 0.6, 2.1), mat);
-      back.position.y = 4.78;
+      back.position.y = 4.78 + TRUSS_LIFT;
       g.add(back);
       g.userData.panel = panel;
       g.userData.mat = mat;
@@ -9679,30 +11093,45 @@ MR.World = (function () {
     // Start and finish get a heavier arch with a checker band.
     const checkTex = checkerTexture();
     const ARCH = K.TRACK_HALF_WIDTH + 3.0;   // heavier gantry, set further back
-    const archGeo = merge([
-      bx(1.5, 9.0, 1.5, -ARCH, 4.5, 0, 0xff3b6b),
-      bx(1.5, 9.0, 1.5, ARCH, 4.5, 0, 0xff3b6b),
-      bx(2.3, 0.6, 2.3, -ARCH, 0.3, 0, 0x1b1633),
-      bx(2.3, 0.6, 2.3, ARCH, 0.3, 0, 0x1b1633),
-      bx(ARCH * 2 + 2.4, 1.3, 1.6, 0, 8.7, 0, 0xff3b6b),
-      bx(ARCH * 2 + 2.4, 0.5, 1.2, 0, 6.2, 0, 0xd42a55),
-      bx(0.9, 4.2, 0.9, -(ARCH - 1.2), 10.9, 0, 0x2b2f52),
-      bx(0.9, 4.2, 0.9, ARCH - 1.2, 10.9, 0, 0x2b2f52),
-      bx(2.6, 1.8, 0.12, -(ARCH - 2.4), 12.4, 0, 0xffe45e),
-      bx(2.6, 1.8, 0.12, ARCH - 2.4, 12.4, 0, 0xffe45e),
-    ]);
+    // Same lift, same reason, and the same amount of it: the start and finish
+    // arches crossed the road at 5.95-9.35 with the sign panel at 6.25-8.65.
+    // START stands 30 units into the race with gates behind it.
+    const ARCH_LIFT = BANNER_CHORD - 5.95;
+    const archGeo = (function () {
+      const L = ARCH_LIFT;
+      const legTop = 8.7 + L + 0.65;
+      return merge([
+        bx(1.5, legTop, 1.5, -ARCH, legTop / 2, 0, 0xff3b6b),
+        bx(1.5, legTop, 1.5, ARCH, legTop / 2, 0, 0xff3b6b),
+        bx(2.3, 0.6, 2.3, -ARCH, 0.3, 0, 0x1b1633),
+        bx(2.3, 0.6, 2.3, ARCH, 0.3, 0, 0x1b1633),
+        bx(ARCH * 2 + 2.4, 1.3, 1.6, 0, 8.7 + L, 0, 0xff3b6b),
+        bx(ARCH * 2 + 2.4, 0.5, 1.2, 0, 6.2 + L, 0, 0xd42a55),
+        // The finials came down from 4.2 to 2.8 to pay for the lift. A finish
+        // arch reaching 17 units would have been half again the height of
+        // anything else on the course and would have cropped out of a portrait
+        // frame at the distance it is first read.
+        bx(0.9, 2.8, 0.9, -(ARCH - 1.2), 10.9 + L - 0.7, 0, 0x2b2f52),
+        bx(0.9, 2.8, 0.9, ARCH - 1.2, 10.9 + L - 0.7, 0, 0x2b2f52),
+        bx(2.6, 1.5, 0.12, -(ARCH - 2.4), 12.4 + L - 1.0, 0, 0xffe45e),
+        bx(2.6, 1.5, 0.12, ARCH - 2.4, 12.4 + L - 1.0, 0, 0xffe45e),
+      ]);
+    })();
     const archPool = Pool(function () {
       const g = new THREE.Group();
       g.add(S.outlined(archGeo, mats.prop, S.INK.banner));
       const mat = new THREE.MeshBasicMaterial({ color: 0xffffff });
       const panel = new THREE.Mesh(new THREE.PlaneGeometry(ARCH * 2 + 0.6, 2.4), mat);
-      panel.position.y = 7.45; panel.rotation.y = Math.PI;
+      panel.position.y = 7.45 + ARCH_LIFT; panel.rotation.y = Math.PI;
       g.add(panel);
       const back = new THREE.Mesh(new THREE.PlaneGeometry(ARCH * 2 + 0.6, 2.4), mat);
-      back.position.y = 7.45;
+      back.position.y = 7.45 + ARCH_LIFT;
       g.add(back);
       const band = new THREE.Mesh(new THREE.PlaneGeometry(ARCH * 2 + 0.6, 0.55), new THREE.MeshBasicMaterial({ map: checkTex }));
-      band.position.set(0, 5.95, 0.1); band.rotation.y = Math.PI;
+      // Nudged clear of the chord it hangs under so its own lower edge stays
+      // above OVERHEAD_Y too -- a 0.55 band centred on the chord would dip
+      // 0.02 under it, which is exactly the sort of thing the audit exists for.
+      band.position.set(0, 6.28 + ARCH_LIFT, 0.1); band.rotation.y = Math.PI;
       g.add(band);
       // Checker laid across the road: the line you actually cross.
       const line = new THREE.Mesh(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, 1.2),
@@ -10239,7 +11668,10 @@ MR.World = (function () {
         const tz = state.roadFrom * TILE;
         const obj = roadPool.claim();
         obj.position.z = tz;
-        const edge = lookAtZ(tz).look.edge;
+        // The lamp alternates on the parity of the tile index, not on the tile's
+        // z, so the pattern is a property of the course and identical for every
+        // player on the same day -- like everything else the course decides.
+        const edge = edgeVariant(lookAtZ(tz).look.edge, state.roadFrom);
         for (const k in obj.userData.edges) obj.userData.edges[k].visible = (k === edge);
         // On the deck the shoulders come off and the road becomes a ribbon
         // over water. Tiles are claimed 210 units out, so the swap always
@@ -10256,6 +11688,7 @@ MR.World = (function () {
           sh.scale.x = cut ? 0.30 : 1;
           sh.position.x = sx * (cut ? 8.9 : K.TRACK_HALF_WIDTH + 15);
         }
+        obj.userData.auditName = 'road tile / ' + edge;
         activeRoad.push({ z: tz, obj });
         state.roadFrom++;
       }
@@ -10351,6 +11784,7 @@ MR.World = (function () {
           obj.rotation.y = s.side > 0 ? Math.PI : 0;
           obj.userData.bounce = s.c;
         }
+        obj.userData.auditName = 'prop / ' + s.kind;
         activeScene.push({ s, obj, pool });
       }
       while (activeScene.length && activeScene[0].s.z < back) {
@@ -10441,6 +11875,7 @@ MR.World = (function () {
           obj.userData.mat.map = st.tex;
           obj.userData.mat.needsUpdate = true;
         }
+        obj.userData.auditName = 'set piece / ' + st.kind;
         activeStruct.push({ st, obj, pool });
       }
       while (activeStruct.length && activeStruct[0].st.z < back - 60) {
@@ -10466,6 +11901,7 @@ MR.World = (function () {
         obj.userData.mat.map = b.tex;
         obj.userData.mat.color.set(0xffffff);
         obj.userData.mat.needsUpdate = true;
+        obj.userData.auditName = finish ? 'finish arch' : 'mile banner ' + b.m.mile;
         activeBanner.push({ b, obj, pool });
       }
       while (activeBanner.length && activeBanner[0].b.m.z < back) {
@@ -10520,6 +11956,7 @@ MR.World = (function () {
         }
       }
 
+      updateShadows();
       updateRoute(z, now);
 
       api.applyBiome(Math.min(1, z / K.TOTAL_UNITS));
@@ -10563,6 +12000,129 @@ MR.World = (function () {
         aid: activeAid.length,
         road: activeRoad.length,
       };
+    };
+
+    /**
+     * ============ WHAT IS STANDING OVER THE PLAY CORRIDOR ============
+     *
+     * The corridor rule at the top of this file says no scenery may occupy the
+     * play space, and that "anything reaching back over the carriageway does so
+     * above OVERHEAD_Y". Both were prose. They were also both false: the WALL
+     * overpass carried two fascia bars across the road at y = 8.0 and every
+     * mile gantry crossed it at 3.5-6.0, which is the height a BLOCK occupies.
+     *
+     * A comment cannot catch that. This can. It walks the LIVE scene graph --
+     * not a hand-kept list, so geometry added tomorrow is audited the day it is
+     * added -- and reports every drawn triangle that passes over the corridor,
+     * grouped per mesh, with the lowest point of the over-corridor part.
+     *
+     * tools/shoot.js turns the result into two failing assertions:
+     *   1. nothing crosses the corridor below OVERHEAD_Y;
+     *   2. nothing crossing the corridor projects onto a gate behind it.
+     * The second is the one that matters. Scenery that hides a hazard costs the
+     * player a streak for something they could not see, which in this game is
+     * the record; it is a correctness bug and it should fail the build.
+     *
+     * EXEMPT, via userData.notScenery, and each for a stated reason:
+     *   hazards   they ARE the corridor's content, and one gate occluding
+     *             another is the game rather than a defect
+     *   aid       collected by lane, so it stands in the corridor by design
+     *   backdrop  sky dome, ground plane, hills, ripples -- unbounded surfaces
+     *             that pass over everything and are behind everything
+     *   route     the painted racing line, which is on the road, not over it
+     *
+     * Road paint, telegraph mats and the finish checker all sit under Y_FLOOR
+     * and drop out on height alone.
+     *
+     * Cost is a full triangle walk of the live graph, so it is a debug hook and
+     * nothing calls it per frame.
+     */
+    const Y_FLOOR = 0.06;      // above this is "over the road", below is paint
+    api.OVERHEAD_Y = OVERHEAD_Y;
+    api.CORRIDOR_HALF = CORRIDOR_HALF;
+    api.crossings = function (fromZ, toZ) {
+      // 0.05 of slack, so a kerb notch whose inner face is authored ON the
+      // corridor line (and overhangs it by a hundredth of a unit) is furniture
+      // rather than a crossing. Nothing that genuinely spans the road misses
+      // the corridor by less than five centimetres.
+      const CH = CORRIDOR_HALF - 0.05;
+      const z0lim = fromZ === undefined ? -1e9 : fromZ;
+      const z1lim = toZ === undefined ? 1e9 : toZ;
+      const out = [];
+      const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+      group.updateWorldMatrix(true, true);
+
+      function scan(o) {
+        if (!o.visible || o.userData.notScenery) return;
+        const g = o.geometry;
+        if (g && g.attributes && g.attributes.position) {
+          const pos = g.attributes.position;
+          const idx = g.index;
+          const n = idx ? idx.count : pos.count;
+          const m = o.matrixWorld;
+          let yMin = Infinity, yMax = -Infinity, zMin = Infinity, zMax = -Infinity, hits = 0;
+          for (let i = 0; i + 2 < n; i += 3) {
+            const i0 = idx ? idx.getX(i) : i;
+            const i1 = idx ? idx.getX(i + 1) : i + 1;
+            const i2 = idx ? idx.getX(i + 2) : i + 2;
+            a.fromBufferAttribute(pos, i0).applyMatrix4(m);
+            b.fromBufferAttribute(pos, i1).applyMatrix4(m);
+            c.fromBufferAttribute(pos, i2).applyMatrix4(m);
+            // The triangle counts only if its x span actually reaches into the
+            // corridor. A kerb whose inner face sits exactly on CORRIDOR_HALF
+            // is roadside furniture, not a crossing, so the test is strict.
+            const xlo = Math.min(a.x, b.x, c.x), xhi = Math.max(a.x, b.x, c.x);
+            if (xhi <= -CH || xlo >= CH) continue;
+            const ty = Math.min(a.y, b.y, c.y);
+            if (Math.max(a.y, b.y, c.y) <= Y_FLOOR) continue;
+            const tz0 = Math.min(a.z, b.z, c.z), tz1 = Math.max(a.z, b.z, c.z);
+            if (tz1 < z0lim || tz0 > z1lim) continue;
+            hits++;
+            if (ty < yMin) yMin = ty;
+            const th = Math.max(a.y, b.y, c.y);
+            if (th > yMax) yMax = th;
+            if (tz0 < zMin) zMin = tz0;
+            if (tz1 > zMax) zMax = tz1;
+          }
+          if (hits) {
+            let name = 'mesh', p = o;
+            while (p && p !== group) {
+              if (p.userData.auditName) { name = p.userData.auditName; break; }
+              p = p.parent;
+            }
+            out.push({ name, tris: hits, yMin, yMax, z0: zMin, z1: zMax });
+          }
+        }
+        for (let i = 0; i < o.children.length; i++) scan(o.children[i]);
+      }
+      for (let i = 0; i < group.children.length; i++) scan(group.children[i]);
+      return out;
+    };
+
+    /**
+     * The gates as the occlusion check needs to see them: a world-space box per
+     * live hazard, taken from MR.Collision.BOX so the audit is measured against
+     * the collision contract rather than against the art.
+     */
+    api.gateBoxes = function () {
+      const B = MR.Collision.BOX;
+      const out = [];
+      for (const g of activeGates) {
+        for (let l = 0; l < 3; l++) {
+          const kind = g.gate.lanes[l];
+          if (kind === K.CLEAR) continue;
+          const box = B[kind];
+          if (!box) continue;
+          const span = (kind === K.BLOCK && g.gate.train) ? 1 + g.gate.train * 0.9 : 1;
+          out.push({
+            kind, lane: l, z: g.gate.z,
+            x: K.LANE_X[l], halfX: LANE * 0.5,
+            yMin: box.yMin, yMax: box.yMax,
+            z0: g.gate.z - box.halfZ, z1: g.gate.z + box.halfZ * (2 * span - 1),
+          });
+        }
+      }
+      return out;
     };
 
     return api;
@@ -12190,11 +13750,91 @@ MR.Audio = (function () {
  * speed it can buy. Until then the chip says so in as many words, and the
  * estimate is shown in neutral ink rather than in red.
  */
+/**
+ * THE RESULT LADDER.
+ *
+ * A run used to have two possible endings: it beat 1:59:30, or it read
+ * "SHORT BY 11:58". The record survives exactly one mistake in 189 obstacles,
+ * so the second ending is what essentially every session got -- a pure
+ * negative, with no information in it about whether this run was better than
+ * the last one, and nothing to aim at next time except the thing that had
+ * just been proved out of reach.
+ *
+ * The ladder converts the same arithmetic into a graded result with a next
+ * rung. It changes no balance whatsoever -- nothing here is a difficulty
+ * knob, it is a way of reading the finish time the model already produces.
+ *
+ * The rungs are DERIVED, not typed. They hang off RECORD_SECONDS: the first
+ * is the next whole minute above the record, and the gaps double from there,
+ * because the spread of finish times widens as the mistakes multiply. The
+ * labels are formatted from the same numbers that gate the comparison, so a
+ * band can never be named one thing and tested as another.
+ *
+ * That derivation has already earned itself. These rungs were fitted against
+ * a single-exponential pace ramp, in which one mistake finished 1:58:49, two
+ * 1:59:40, five 2:02:17 and ten 2:05:22. The ramp was then rebuilt with two
+ * time constants and the floor moved 4:20 -> 4:14, and the ladder needed no
+ * edit at all: measured on the model as it stands (tools/simulate.js, aid
+ * taken), a one- and two-mistake run are RECORD, three is SUB-2:00 at
+ * 1:59:46, five is SUB-2:02 at 2:00:55, ten is SUB-2:06 at 2:03:32, and
+ * without aid the same counts read RECORD / SUB-2:02 / SUB-2:02 / SUB-2:06 /
+ * FINISHED. Roughly "one more mistake per rung" either way, which is the
+ * resolution a player can act on.
+ */
+MR.Tier = (function () {
+  const K = MR.K;
+
+  const BASE = Math.ceil(K.RECORD_SECONDS / 60) * 60;   // next whole minute up
+  const STEP = 120;                                     // then 2 min, then 4
+
+  /** 7320 -> "2:02". Rounds through whole minutes so 7170 cannot read "1:60". */
+  function mark(sec) {
+    if (!isFinite(sec)) return '';
+    const m = Math.round(sec / 60);
+    return Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0');
+  }
+
+  const LADDER = [
+    { max: K.RECORD_SECONDS, name: 'RECORD', label: K.RECORD_LABEL },
+    { max: BASE },
+    { max: BASE + STEP },
+    { max: BASE + STEP * 3 },
+    { max: Infinity, name: 'FINISHED', label: '' },
+  ];
+  LADDER.forEach(function (t, i) {
+    t.i = i;
+    if (!t.name) { t.label = mark(t.max); t.name = 'SUB-' + t.label; }
+  });
+
+  /** The band a finish time lands in. Never null. */
+  function of(sec) {
+    for (const t of LADDER) if (sec <= t.max) return t;
+    return LADDER[LADDER.length - 1];
+  }
+
+  /** The rung above that band -- the thing to chase -- or null at the top. */
+  function next(sec) {
+    const i = of(sec).i;
+    return i > 0 ? LADDER[i - 1] : null;
+  }
+
+  /** Seconds still to find to reach `rung`. */
+  function gapTo(sec, rung) {
+    return rung && isFinite(rung.max) ? Math.max(0, sec - rung.max) : 0;
+  }
+
+  return { LADDER, of, next, gapTo, mark };
+})();
+
 MR.HUD = (function () {
   const K = MR.K;
   const Pace = MR.Pace;
+  const Tier = MR.Tier;
+  const Store = MR.Store;
 
-  // Where record pace sits inside the 5:30 -> 4:20 range the streak unlocks.
+  // Where record pace sits inside the START_PACE -> FLOOR_PACE range the
+  // streak unlocks. Derived, so a retune of either end moves the tick: the
+  // floor has already moved once, 4:20 -> 4:14.
   // Everything that draws the speed gauge shares this so the tick, the fill
   // and the copy can never drift apart.
   const REC_MARK = (K.START_PACE - K.RECORD_PACE) / (K.START_PACE - K.FLOOR_PACE);
@@ -12312,19 +13952,80 @@ MR.HUD = (function () {
           <span class="targetSub" id="targetSub">&nbsp;</span>
         </div>
 
+        <!--
+          WHAT THE GAME REMEMBERS.
+
+          Empty on a first visit, and it stays out of the way when it is: a
+          stranger gets exactly the panel they got before. From the second run
+          onward it is the reason to have come back, so it sits directly under
+          the wager it is a record of.
+        -->
+        <div id="startMemory"></div>
+
         <div class="keys" id="startKeys"></div>
         <button class="cta" id="startBtn" type="button">TOE THE LINE</button>
       </div></div>
 
+      <!--
+        THE FINISH CARD.
+
+        It was a spreadsheet on a dimmed screenshot: two grids of 12.5px/700
+        text, keys and values at identical size and weight separated only by
+        opacity, on two baseline rhythms three pixels out of phase, under a
+        date line typeset larger and louder than the label of the headline
+        number. Nothing about it belonged to the same product as the HUD.
+
+        So it is rebuilt in the HUD's own language -- plates, left-aligned
+        columns, a 9px/800/0.16em label over a large tabular value -- and it
+        carries the things the old card could not:
+
+          - a GRADE, not a verdict. See MR.Tier.
+          - the longest clean streak as a co-headline. It is monotone, so a
+            contact can never take it away; it has 189 points of resolution
+            against the record's one bit; and it stays winnable for the whole
+            race long after the record has died.
+          - the TRUE cost of contact, measured against a flawless run of this
+            exact course rather than 1.5s per hit.
+          - what the player's best today was, and whether this beat it.
+          - tomorrow.
+      -->
       <div class="panel hidden" id="endPanel"><div class="panelInner">
-        <div class="date" id="endDate"></div>
-        <div class="finLab">FINAL TIME</div>
-        <h1 id="endTime">&mdash;</h1>
-        <div id="verdict"></div>
+        <div class="endDate" id="endDate"></div>
+
+        <div id="endHead">
+          <div class="endCell">
+            <div class="lab">FINAL TIME</div>
+            <h1 class="endBig num" id="endTime">&mdash;</h1>
+            <div class="endSub num" id="endVs"></div>
+          </div>
+          <div class="endCell">
+            <div class="lab">LONGEST CLEAN</div>
+            <div class="endBig num" id="endStreak">0</div>
+            <div class="endSub num" id="endStreakSub"></div>
+          </div>
+        </div>
+
+        <div id="tierRow">
+          <span id="verdict"></span>
+          <span id="tierNext" class="num"></span>
+        </div>
+
+        <div id="endBadges"></div>
+        <div id="endMem" class="num"></div>
+
         <div id="endCols">
           <div id="resultStats"></div>
           <div id="splitTable"></div>
         </div>
+
+        <div id="endCost">
+          <div class="lab" id="endCostLab">WHAT THE CONTACTS COST</div>
+          <div class="endBig num" id="endCostVal">0:00</div>
+          <div class="endSub" id="endCostSub"></div>
+        </div>
+
+        <div id="endTurn"></div>
+        <div id="tomorrow"></div>
         <button class="cta" id="againBtn">RUN IT AGAIN</button>
       </div></div>
 
@@ -12344,8 +14045,15 @@ MR.HUD = (function () {
       toastCum: q('toastCum'), toastDelta: q('toastDelta'),
       startPanel: q('startPanel'), startBtn: q('startBtn'), startDate: q('startDate'),
       startRoute: q('startRoute'), startKeys: q('startKeys'), targetSub: q('targetSub'),
+      startMemory: q('startMemory'),
       endPanel: q('endPanel'), endTime: q('endTime'), endDate: q('endDate'),
-      verdict: q('verdict'), stats: q('resultStats'), splitTable: q('splitTable'),
+      endVs: q('endVs'), endStreak: q('endStreak'), endStreakSub: q('endStreakSub'),
+      verdict: q('verdict'), tierNext: q('tierNext'),
+      endBadges: q('endBadges'), endMem: q('endMem'),
+      stats: q('resultStats'), splitTable: q('splitTable'),
+      endCost: q('endCost'), endCostLab: q('endCostLab'),
+      endCostVal: q('endCostVal'), endCostSub: q('endCostSub'),
+      endTurn: q('endTurn'), tomorrow: q('tomorrow'),
       againBtn: q('againBtn'),
       count: q('count'), countVal: q('countVal'),
       perf: q('perf'),
@@ -12404,13 +14112,124 @@ MR.HUD = (function () {
 
     let lastP = null;      // last state seen, so the split card can read splits
     let hintUntil = 0;     // while set, the why-line shows the streak-cut message
+    let mem = null;        // what MR.Store remembers, as of this run's start
+    let dateKey = '';
+    let course = null;
+    let cleanTime = null;  // this course's flawless finish, computed once
+
+    // Latched, and deliberately so. `recordPossible()` is a bound, not a
+    // guess, but at the exact boundary it can flicker: a player holding
+    // FLOOR_PACE keeps the required pace constant, so the comparison sits on a
+    // knife edge for several seconds. A verdict that un-says itself is worse
+    // than either answer, and the record genuinely does not come back.
+    let recordGone = false;
+    // The debounced RECORD ON / OFF RECORD verdict. See update().
+    let chipOn = null, chipAt = 0;
+    const CHIP_DEAD = 6;    // projected seconds either side of the record
+    const CHIP_HOLD = 900;  // ms a verdict must stand before it may flip back
 
     const api = { nodes: n };
 
+    /** Clear everything that belongs to one run. Called before each start. */
+    api.reset = function () {
+      recordGone = false;
+      chipOn = null;
+      chipAt = 0;
+      cache.chip = cache.chipCls = cache.projCls = undefined;
+      cache.need = cache.needCls = undefined;
+    };
+
     api.setDate = function (key) {
+      dateKey = key;
       n.startDate.textContent = key + ' · GLOBAL COURSE';
       n.endDate.textContent = key + ' · GLOBAL COURSE';
     };
+
+    // ---- memory ---------------------------------------------------------
+
+    /** 2026-08-05 -> "AUG 5". Relative where relative is clearer. */
+    function dayName(key, today) {
+      const d = Store ? Store.dayDiff(key, today) : NaN;
+      if (d === 1) return 'YESTERDAY';
+      const t = Store ? Store.parseKey(key) : NaN;
+      if (isNaN(t)) return key;
+      const dt = new Date(t);
+      const M = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
+                 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+      return M[dt.getUTCMonth()] + ' ' + dt.getUTCDate();
+    }
+
+    function plate(lab, val, sub) {
+      return '<div class="mplate"><div class="lab">' + lab + '</div>'
+           + '<div class="mv num">' + val + '</div>'
+           + '<div class="ms">' + (sub || '&nbsp;') + '</div></div>';
+    }
+
+    /**
+     * Put the save on the start panel.
+     *
+     * Three plates at most, and each one only when it has something true to
+     * say. A first-ever visit renders nothing at all -- the panel a stranger
+     * meets is unchanged, and the memory arrives as a reward for having come
+     * back rather than as an empty frame promising one.
+     */
+    api.setMemory = function (sum) {
+      mem = sum || null;
+      if (!n.startMemory) return;
+      if (!sum) { n.startMemory.innerHTML = ''; return; }
+
+      let html = '';
+      if (sum.today) {
+        html += plate("TODAY'S BEST", Pace.clock(sum.today.time),
+          Tier.of(sum.today.time).name + ' · ' + sum.today.streak + ' CLEAN');
+      }
+      if (sum.dayStreak > 0) {
+        html += plate('DAY STREAK', String(sum.dayStreak),
+          sum.dayStreakCounted
+            ? (sum.dayStreak === 1 ? 'DAY' : 'DAYS') + ' IN A ROW'
+            : 'RUN TODAY FOR ' + (sum.dayStreak + 1));
+      }
+      if (sum.last) {
+        html += plate('LAST RUN', Pace.clock(sum.last.time),
+          dayName(sum.last.date, sum.dateKey) + ' · ' + Tier.of(sum.last.time).name);
+      }
+      if (!html && sum.best) {
+        html += plate('ALL-TIME BEST', Pace.clock(sum.best.time),
+          Tier.of(sum.best.time).name + ' · ' + sum.best.streak + ' CLEAN');
+      }
+      n.startMemory.innerHTML = html;
+      if (api.markScroll) requestAnimationFrame(api.markScroll);
+    };
+
+    /**
+     * The flawless finish for THIS course, simulated once.
+     *
+     * This is the counterfactual the finish card is missing, and it cannot be
+     * approximated: `projectClean()` from a cold start models gates as
+     * arriving continuously and lands 50 seconds optimistic, because the real
+     * course opens with 150 units of empty runway during which the streak
+     * cannot grow. So this rolls the real pace model over the real gate
+     * positions -- the same code the race runs -- and takes the finish time.
+     *
+     * ~14400 steps, measured at 8.7ms, done once and cached. Aid is ignored on
+     * purpose: aid tops a streak up to a ceiling a flawless run is already
+     * above, so it is worth exactly zero to this hypothetical player.
+     */
+    function cleanFinish() {
+      if (cleanTime !== null) return cleanTime;
+      cleanTime = 0;
+      if (!course || !course.gates || !course.gates.length) return cleanTime;
+      const p = Pace.create();
+      let gi = 0, guard = 0;
+      while (!p.finished && guard++ < 40000) {
+        p.update(1 / 60);
+        while (gi < course.gates.length && p.units >= course.gates[gi].z) {
+          gi++; p.onClean();
+        }
+      }
+      cleanTime = p.finished ? p.finishTime : 0;
+      return cleanTime;
+    }
 
     /**
      * Name today's road, and price the wager.
@@ -12425,8 +14244,10 @@ MR.HUD = (function () {
      * and that was established by simulating this pace model against real
      * generated courses.
      */
-    api.setCourse = function (course) {
-      if (!course) return;
+    api.setCourse = function (c) {
+      if (!c) return;
+      course = c;
+      cleanTime = null;
       const set = course.settings;
       n.startRoute.textContent = set && set.length
         ? set.map(function (x) { return x.name; }).join(' → ')
@@ -12507,8 +14328,6 @@ MR.HUD = (function () {
       const proj = p.projectClean();
       const margin = K.RECORD_SECONDS - proj;         // positive = under the record
       set(n.projVal, 'proj', Pace.clock(proj));
-      set(n.margin, 'margin',
-        Pace.clock(Math.abs(margin)) + (margin >= 0 ? ' UNDER ' : ' OVER ') + K.RECORD_LABEL);
 
       // Pace required over the road that is left. This is the race-desk number
       // and it is also the exact test for a dead record: FLOOR_PACE is the
@@ -12516,32 +14335,74 @@ MR.HUD = (function () {
       // below it no run of clean gates can get the record back.
       const remain = K.MARATHON_MILES - p.miles;
       const need = remain > 0.01 ? (K.RECORD_SECONDS - p.raceTime) / remain : NaN;
-      const gone = remain > 0.01 && !(need >= K.FLOOR_PACE);
+      if (!recordGone && remain > 0.01 && !(need >= K.FLOOR_PACE)) recordGone = true;
+      const gone = recordGone;
 
-      // Share of the 5:30 -> 4:20 range the streak has already bought. While a
-      // lot of it is still unspent the projection is falling under the player
-      // every second, so it is an estimate and is labelled as one.
-      const unlocked = (K.START_PACE - p.targetPace()) / (K.START_PACE - K.FLOOR_PACE);
-      // The long "still buying speed" hold existed because the frozen-pace
-      // projection was useless until the streak had spent most of its range.
-      // projectClean() is within ~30s of the truth by the first mile, so the
-      // verdict can harden almost immediately; all that is held back is the
-      // opening stretch where too few gates have been seen to measure the
-      // gate rate the projection depends on.
+      // The projection is an estimate until enough of the race has gone past
+      // to measure the gate rate it depends on. `unlocked` -- the share of the
+      // START_PACE -> FLOOR_PACE range the streak had already bought -- used
+      // to gate this and was computed here for a test that no longer reads it;
+      // it has been removed rather than left as a dead line that looks load
+      // bearing. projectClean() is within ~30s of the truth by the first mile,
+      // so the verdict can harden almost immediately.
       const settled = p.miles > 0.6;
       const bleeding = p.targetPace() - p.pace > 1.5; // streak was cut, pace sliding back
 
-      let state, chip;
+      let state, chip, sub;
       if (gone) {
-        state = 'off'; chip = 'RECORD GONE';
+        // THE RECORD IS DEAD; THE RACE IS NOT.
+        //
+        // Measured on the model as it stands, a 90%-accuracy run loses the
+        // record at wall-second 96 of 267 and a 95% run at second 126 of 254
+        // -- so between half and two thirds of a typical session used to have
+        // no goal in it at all. Worse, the readout kept demanding a required
+        // pace the engine physically cannot produce, in red, for the rest of
+        // the race: the pace floor is 4:14 and the ask ran below 4:00. The
+        // screen was requesting something impossible and grading the player
+        // against it for two and a half minutes.
+        //
+        // So the headline retargets. The projection is unchanged -- it is
+        // still "where you finish if you hold a clean line from here" -- but
+        // it is now measured against the rung of the ladder the run is
+        // actually on, and the sub-line names the next rung up. Both move
+        // live, so clearing gates still changes the number the player is
+        // looking at, which is the whole job of a race readout.
+        const rung = Tier.of(proj);
+        const up = Tier.next(proj);
+        state = 'tier';
+        chip = rung.name;
+        sub = up
+          ? Pace.clock(Tier.gapTo(proj, up)) + ' OFF ' + up.name
+          : 'ON FOR ' + rung.name;
       } else if (!settled) {
         state = 'est';
         chip = bleeding ? 'BLEEDING SPEED ▲' : 'ESTIMATING';
-      } else if (margin > 0) {
-        state = 'on';  chip = 'RECORD ON';
       } else {
-        state = 'off'; chip = 'OFF RECORD';
+        // DEBOUNCED, because the underlying comparison is a coin landing on
+        // its edge. Around mile 2 of a clean run projectClean() crosses 7170
+        // by single seconds, and the chip flickered between RECORD ON and OFF
+        // RECORD several times in a couple of seconds -- which reads as a
+        // broken readout, and destroys the authority of the one number on
+        // screen that is supposed to be the verdict. A verdict has to stand
+        // for a moment to be a verdict: it flips only once the projection is
+        // CHIP_DEAD seconds clear on the other side, and never twice inside
+        // CHIP_HOLD milliseconds.
+        const now = performance.now();
+        const want = margin > 0;
+        if (chipOn === null) { chipOn = want; chipAt = now; }
+        else if (want !== chipOn
+                 && (want ? margin > CHIP_DEAD : margin < -CHIP_DEAD)
+                 && now - chipAt > CHIP_HOLD) {
+          chipOn = want; chipAt = now;
+        }
+        state = chipOn ? 'on' : 'off';
+        chip = chipOn ? 'RECORD ON' : 'OFF RECORD';
       }
+      if (sub === undefined) {
+        sub = Pace.clock(Math.abs(margin))
+            + (margin >= 0 ? ' UNDER ' : ' OVER ') + K.RECORD_LABEL;
+      }
+      set(n.margin, 'margin', sub);
       set(n.status, 'chip', chip);
       cls(n.status, 'chipCls', 'chip ' + state);
       cls(n.projCell, 'projCls', state);
@@ -12552,8 +14413,29 @@ MR.HUD = (function () {
         (clamp01((K.START_PACE - p.pace) / (K.START_PACE - K.FLOOR_PACE)) * 100) + '%';
       set(n.paceVal, 'pace', Pace.pace(p.pace));
       cls(n.paceVal, 'paceCls', 'val num' + (p.pace <= K.RECORD_PACE ? ' ahead' : ''));
-      set(n.needVal, 'need', 'NEED ' + Pace.pace(need) + '/MI');
-      cls(n.needVal, 'needCls', 'sub num' + (gone ? ' behind' : ''));
+      // The line under the pace. While the record lives it is the race-desk
+      // number: the pace the rest of the course demands. Once the record is
+      // gone that number is a lie -- it asks for a pace below the 4:14 floor
+      // -- so the plate switches to the one target that is still winnable and
+      // still live: the player's own longest clean line. It is monotone, so it
+      // can only ever be approached, never lost; it has 189 points of
+      // resolution; and it is the exact skill the game is teaching.
+      let needText, needCls;
+      if (!gone) {
+        needText = 'NEED ' + Pace.pace(need) + '/MI';
+        needCls = 'sub num';
+      } else if (mem && mem.pbStreak > 0) {
+        const togo = mem.pbStreak - p.bestStreak;
+        needText = togo > 0
+          ? 'PB ' + mem.pbStreak + ' CLEAN · ' + togo + ' TO GO'
+          : 'CLEAN PB · ' + p.bestStreak;
+        needCls = 'sub num' + (togo > 0 ? '' : ' pb');
+      } else {
+        needText = 'LONGEST CLEAN · ' + p.bestStreak;
+        needCls = 'sub num';
+      }
+      set(n.needVal, 'need', needText);
+      cls(n.needVal, 'needCls', needCls);
 
       // Nothing else on screen says why the pace moves, so the line stays up
       // until the player has plainly felt it, and comes back on every break.
@@ -12676,48 +14558,193 @@ MR.HUD = (function () {
       if (text !== null) n.countVal.textContent = text;
     };
 
-    api.showEnd = function (p) {
-      const beat = p.finishTime < K.RECORD_SECONDS;
-      n.endTime.textContent = Pace.clock(p.finishTime);
-      n.verdict.textContent = beat
-        ? `RECORD BEATEN BY ${Pace.clock(K.RECORD_SECONDS - p.finishTime)}`
-        : `SHORT BY ${Pace.clock(p.finishTime - K.RECORD_SECONDS)}`;
-      n.verdict.className = beat ? 'beat' : 'miss';
+    /**
+     * The one line of narrative the card is allowed.
+     *
+     * A record-beating run used to be graded pink for three of its six splits,
+     * because the ghost comparison is structurally negative early: the player
+     * starts at 5:30 by design and reels the ghost in. The comparison was not
+     * wrong, it was being asked the wrong question at the wrong mile. So the
+     * split column stops carrying it (see below) and the turn is NAMED
+     * instead, once, in the tense a race report would use.
+     *
+     * A run that never took the lead gets its fastest mile rather than a
+     * silence -- still a fact, still the player's own, and still the thing
+     * they did best.
+     */
+    function turnLine(p) {
+      const sp = p.splits;
+      if (!sp.length) return '';
+      if (p.finishTime < K.RECORD_SECONDS) {
+        let m = 1;
+        for (let i = sp.length - 1; i >= 0; i--) {
+          if (sp[i].time - sp[i].mile * K.RECORD_PACE >= 0) { m = sp[i].mile + 1; break; }
+        }
+        return m > 1 ? 'YOU TOOK THE LEAD AT MILE ' + m
+                     : 'AHEAD OF THE GHOST FROM THE GUN';
+      }
+      let best = null, prev = 0;
+      for (const s of sp) {
+        const mt = s.time - prev; prev = s.time;
+        if (!best || mt < best.mt) best = { mile: s.mile, mt: mt };
+      }
+      return best ? 'FASTEST MILE · MILE ' + best.mile + ' IN ' + Pace.pace(best.mt) + '/MI' : '';
+    }
 
+    /** Tomorrow's road. Free: the date seed already decides it. */
+    function tomorrowLine() {
+      try {
+        const k = Store && dateKey ? Store.shift(dateKey, 1) : null;
+        const s = k && MR.Course.pickSettings ? MR.Course.pickSettings(k) : null;
+        if (s && s.length) {
+          return 'TOMORROW · ' + s.map(function (x) { return x.name; }).join(' → ');
+        }
+      } catch (e) { /* a teaser is never worth an exception */ }
+      return '';
+    }
+
+    /**
+     * @param p    the finished pace state
+     * @param rec  what MR.Store made of it (see Store.record), or nothing
+     */
+    api.showEnd = function (p, rec) {
+      rec = rec || {};
+      const t = p.finishTime;
+      const rung = Tier.of(t);
+      const up = Tier.next(t);
+
+      // ---- headline: the time, and the streak beside it ------------------
+      // Two numbers, not one. The finish time is the result; the longest clean
+      // line is the SKILL, and unlike the time it cannot be taken away by a
+      // single contact in mile 3. It is monotone, it has 189 points of
+      // resolution, and it is still worth chasing on a day the record died
+      // ninety seconds in -- which is most days.
+      n.endTime.textContent = Pace.clock(t);
+      const vs = t - K.RECORD_SECONDS;
+      n.endVs.textContent = (vs <= 0 ? '-' : '+') + Pace.clock(Math.abs(vs))
+                          + ' VS ' + K.RECORD_LABEL;
+      cls(n.endVs, 'endVsCls', 'endSub num' + (vs <= 0 ? ' ahead' : ''));
+
+      n.endStreak.textContent = String(p.bestStreak);
+      const gates = course && course.gates ? course.gates.length : p.gatesSeen;
+      n.endStreakSub.textContent = 'OF ' + gates + ' GATES';
+
+      // ---- the grade -----------------------------------------------------
+      n.verdict.textContent = rung.name;
+      n.verdict.className = 'tier t' + rung.i;
+      n.tierNext.textContent = up
+        ? Pace.clock(Tier.gapTo(t, up)) + ' OFF ' + up.name
+        : 'RECORD BEATEN BY ' + Pace.clock(-vs);
+
+      // ---- what the save made of it --------------------------------------
+      const badges = [];
+      if (rec.allTimeBest && !rec.firstEver) badges.push('ALL-TIME BEST');
+      else if (rec.beatToday && !rec.firstToday) badges.push('BEST TODAY');
+      if (rec.allTimeStreak && !rec.firstEver) badges.push('LONGEST CLEAN EVER');
+      else if (rec.beatTodayStreak && !rec.firstToday) badges.push('LONGEST CLEAN TODAY');
+      if (rec.dayStreak > 1) badges.push(rec.dayStreak + ' DAY STREAK');
+      n.endBadges.innerHTML = badges
+        .map(function (b) { return '<span class="ebadge">' + b + '</span>'; }).join('');
+
+      const was = rec.prevToday;
+      n.endMem.textContent = was
+        ? (t < was.time
+            ? 'BEAT YOUR BEST TODAY BY ' + Pace.clock(was.time - t)
+            : 'YOUR BEST TODAY ' + Pace.clock(was.time)
+              + ' · THIS RUN +' + Pace.clock(t - was.time))
+        : (rec.dateKey ? 'FIRST RUN TODAY' : '');
+
+      // ---- summary -------------------------------------------------------
+      // Label and value are no longer the same type at two opacities: the
+      // label is the HUD's own 9px/800/0.16em and the value is a large
+      // tabular figure, which is the pairing every plate in the live readout
+      // already uses. Casing is uppercase throughout, because the HUD says
+      // /MI and CLEAN GATES and this card used to say /mi and gates.
       const rows = [
-        ['AVG PACE', Pace.pace(p.finishTime / K.MARATHON_MILES) + '/mi'],
+        ['AVG PACE', Pace.pace(t / K.MARATHON_MILES) + '/MI'],
         // p.pace at the line is the pace held into the finish, not the best of
         // the race -- a run that broke late finishes slower than it ever ran.
-        ['FINAL PACE', Pace.pace(p.pace) + '/mi'],
-        ['LONGEST CLEAN', String(p.bestStreak) + ' gates'],
+        ['FINAL PACE', Pace.pace(p.pace) + '/MI'],
+        ['CLEAN GATES', String(Math.max(0, p.gatesSeen - p.hits))],
         ['CONTACTS', String(p.hits)],
-        ['TIME LOST', '+' + Pace.clock(p.hits * K.HIT_TIME_PENALTY)],
-        ['RECORD', K.RECORD_LABEL],
+        ['AID TAKEN', String(p.aid)],
       ];
-      n.stats.innerHTML = rows
-        .map(([k, v]) => `<div class="k">${k}</div><div class="v num">${v}</div>`)
-        .join('');
+      // Both grids open with exactly one header row and then run on identical
+      // fixed-height rows, which is what puts them back in phase -- they were
+      // two grids on two rhythms about three pixels apart, which is close
+      // enough to look like a mistake and far enough to be one.
+      n.stats.innerHTML = '<div class="k hd">SUMMARY</div><div class="k hd"></div>' + rows
+        .map(function (r) {
+          return '<div class="k">' + r[0] + '</div><div class="v num">' + r[1] + '</div>';
+        }).join('');
 
-      // Five-mile splits plus the line: the shape of the race in six rows,
-      // which is the one thing the finish screen can show that the live
-      // readout never could.
-      let table = '<div class="k">MI</div><div class="k">TIME</div><div class="k">VS REC</div>';
-      const marks = p.splits.filter((s) => s.mile % 5 === 0);
+      // ---- splits --------------------------------------------------------
+      // PER-BLOCK PACE, NOT VS-RECORD.
+      //
+      // The old third column was the ghost delta, and it graded a WINNING run
+      // pink for its first three rows -- the race is built so the player opens
+      // at 5:30 and reels the record in, so the delta is positive for the
+      // whole first half of even a flawless line. A win that reads as
+      // three-fifths failure is a broken scorecard, and no amount of tinting
+      // fixes a column that is measuring the wrong thing.
+      //
+      // Pace over each five-mile block is the same data without the false
+      // verdict: it shows the shape of the race climbing from 5:30 toward the
+      // floor, and it goes green only where the block was AT or under record
+      // pace. Nothing on this card is tinted for failure any more; the tier
+      // band carries the result, once.
+      let table = '<div class="k hd">MI</div><div class="k hd">TIME</div>'
+                + '<div class="k hd">PACE</div>';
+      const marks = p.splits.filter(function (s) { return s.mile % 5 === 0; });
+      let pm = 0, pt = 0;
       for (const s of marks) {
-        const d = s.time - s.mile * K.RECORD_PACE;
-        table += `<div class="v num">${s.mile}</div>`
-              + `<div class="v num">${Pace.clock(s.time)}</div>`
-              + `<div class="v num ${d < 0 ? 'ahead' : 'behind'}">${Pace.delta(d)}</div>`;
+        const blk = (s.time - pt) / (s.mile - pm);
+        table += '<div class="v num">' + s.mile + '</div>'
+              + '<div class="v num">' + Pace.clock(s.time) + '</div>'
+              + '<div class="v num' + (blk <= K.RECORD_PACE ? ' ahead' : '') + '">'
+              + Pace.pace(blk) + '</div>';
+        pm = s.mile; pt = s.time;
       }
-      const fd = p.finishTime - K.RECORD_SECONDS;
-      table += '<div class="sep"></div>';
-      table += `<div class="v num fin">${K.MARATHON_LABEL}</div>`
-            + `<div class="v num fin">${Pace.clock(p.finishTime)}</div>`
-            + `<div class="v num fin ${fd < 0 ? 'ahead' : 'behind'}">${Pace.delta(fd)}</div>`;
+      const fblk = K.MARATHON_MILES > pm ? (t - pt) / (K.MARATHON_MILES - pm) : NaN;
+      table += '<div class="sep"></div>'
+            + '<div class="v num fin">' + K.MARATHON_LABEL + '</div>'
+            + '<div class="v num fin">' + Pace.clock(t) + '</div>'
+            + '<div class="v num fin' + (fblk <= K.RECORD_PACE ? ' ahead' : '') + '">'
+            + Pace.pace(fblk) + '</div>';
       n.splitTable.innerHTML = table;
+
+      // ---- the true cost of contact --------------------------------------
+      // This row used to print hits * HIT_TIME_PENALTY. On a twelve-contact
+      // run that is +0:18 against a real cost of over thirteen minutes -- the
+      // stopwatch penalty is a rounding error next to the speed those twelve
+      // contacts took away for the rest of the race. The screen understated
+      // the player's own causal contribution by a factor of forty-five and
+      // left an unexplained twelve-minute hole, which invites exactly one
+      // conclusion: "my mistakes cost 18 seconds, the game did the rest."
+      //
+      // The counterfactual is computable and is now computed. See
+      // cleanFinish(): the same pace model, over the same gates, cleared.
+      const clean = cleanFinish();
+      const lost = clean ? Math.max(0, t - clean) : p.hits * K.HIT_TIME_PENALTY;
+      n.endCost.classList.toggle('clean', !p.hits);
+      if (!p.hits) {
+        n.endCostLab.textContent = 'CLEAN LINE';
+        n.endCostVal.textContent = '0:00';
+        n.endCostSub.textContent = 'NOTHING LEFT ON THE ROAD';
+      } else {
+        n.endCostLab.textContent = p.hits + (p.hits === 1 ? ' CONTACT COST' : ' CONTACTS COST');
+        n.endCostVal.textContent = Pace.clock(lost);
+        n.endCostSub.textContent = clean
+          ? 'CLEAN, YOU FINISH ' + Pace.clock(clean) + ' ON THIS COURSE'
+          : 'AGAINST A FLAWLESS LINE';
+      }
+
+      n.endTurn.textContent = turnLine(p);
+      n.tomorrow.textContent = tomorrowLine();
 
       n.endPanel.classList.remove('hidden');
       syncPanels();
+      requestAnimationFrame(markScroll);
     };
 
     api.hideEnd = function () {
@@ -12748,6 +14775,7 @@ MR.HUD = (function () {
  *   ?skip=SECONDS     fast-forward this many race seconds before rendering
  *   ?debug=1          FPS and draw-call readout
  *   ?nocount=1        skip the countdown
+ *   ?nosave=1         play without writing to the save
  */
 (function () {
   const K = MR.K;
@@ -12761,6 +14789,8 @@ MR.HUD = (function () {
   const DEBUG = params.get('debug') === '1';
   const SKIP = parseFloat(params.get('skip') || '0');
   const NOCOUNT = params.get('nocount') === '1' || BOT;
+  // Inspecting the game should not be able to overwrite a real player's best.
+  const NOSAVE = params.get('nosave') === '1';
 
   // ---- renderer ---------------------------------------------------------
   const canvas = document.getElementById('gl');
@@ -12817,6 +14847,10 @@ MR.HUD = (function () {
   let mileShown = 0;
 
   function reset() {
+    // Re-read the save before every run, not once at boot: a second run in the
+    // same session has to chase the streak the first one just set.
+    hud.setMemory(MR.Store.summary(dateKey));
+    hud.reset();
     pace = Pace.create();
     player.reset();
     world.reset();
@@ -13014,7 +15048,17 @@ MR.HUD = (function () {
 
       if (pace.finished) {
         state = DONE;
-        hud.showEnd(pace);
+        // Fold the result into the save FIRST, because the only moment at
+        // which "did this beat your best today" can be answered is before the
+        // best today becomes this run. Store.record returns that comparison
+        // and never throws, so a browser with no usable localStorage produces
+        // the same finish screen minus the memory.
+        const saved = NOSAVE ? null : MR.Store.record(dateKey, {
+          time: pace.finishTime,
+          streak: pace.bestStreak,
+          tier: MR.Tier.of(pace.finishTime).name,
+        });
+        hud.showEnd(pace, saved);
         audio.finish(pace.finishTime < K.RECORD_SECONDS);
       }
     }

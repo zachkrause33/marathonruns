@@ -249,9 +249,9 @@ MR.Runner = (function () {
   // They also have to survive the toon ramp's three bands. A tone less than
   // about 12% off its neighbour lands in the same band on most of the surface
   // and the hem simply is not there; these all sit between 15% and 30% off.
-  const JACKET = 0xd6394e;   // vest collar, vest hem, hood -- one step under the vest
+  const JACKET = 0xd6394e;   // cap brim, vest collar, vest hem, sleeve cuff -- under the vest
   const BASE = 0xb9c4de;     // base-layer tee, seen only as the sleeves
-  const WAIST = 0x434a80;    // waistband and short cuff -- one step over the shorts
+  const WAIST = 0x434a80;    // hood, waistband, short cuff -- one step over the shorts
   const SHOE_DK = 0x5f6796;  // heel counter and lace panel
   // The cap is the vest's own red rather than a new colour. It puts the
   // brightest garment tone at the top AND the middle of the figure, which is
@@ -333,10 +333,11 @@ MR.Runner = (function () {
     return out;
   }
 
-  function part(geo, color, steps) {
-    return S.outlined(geo, S.toon(color, steps || 3), OUTLINE);
-  }
-
+  // There is no single-primitive part() any more. The last two holdouts were
+  // the thigh and the upper arm, and the wardrobe pass gave both of them
+  // something welded on -- a hamstring and a sleeve -- so every part on the
+  // character is now a weld. That is the point rather than an accident: a
+  // lone primitive is exactly the shape that reads as a raw primitive.
   function multi(pieces, steps) {
     const mat = S.toon(0xffffff, steps || 3);
     mat.vertexColors = true;

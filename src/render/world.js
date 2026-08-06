@@ -1946,8 +1946,12 @@ MR.World = (function () {
          * Top of the helmet is 2.72, which is the pennant height this variant
          * has always had and still inside the 2.80 the collision box records.
          */
-        hbx(1.14, 0.44, 0.56, 0, 1.52, 0.86, 0x2b2f52),
-        hbx(1.22, 0.34, 0.58, 0, 1.91, 0.86, 0xfff2e0),
+        // The cream starts AT the box line: only 0.17 of dark back shows above
+        // the cargo box, so what clears it is a hi-vis torso and a head rather
+        // than a dark lump with a head on it. Tested at 45 units against the
+        // marshals, whose visible half is exactly this and reads first time.
+        hbx(1.14, 0.24, 0.56, 0, 1.42, 0.86, 0x2b2f52),
+        hbx(1.22, 0.54, 0.58, 0, 1.81, 0.86, 0xfff2e0),
         hbx(1.10, 0.10, 0.54, 0, 2.13, 0.86, 0x2b2f52),
         hbx(0.60, 0.48, 0.50, 0, 2.44, 0.90, 0xffc79a),
         hbx(0.70, 0.22, 0.60, 0, 2.61, 0.90, 0xff3b6b),

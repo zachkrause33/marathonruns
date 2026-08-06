@@ -183,6 +183,25 @@ MR.HUD = (function () {
       perf: q('perf'),
     };
 
+    // The side columns hang below the top bug. Their offset used to be four
+    // independently hard-coded `top` values, one per breakpoint, each of them a
+    // guess at how tall the bug happened to be at that width -- and the narrow
+    // one guessed 2px short, so on every phone the bug's plate clipped the
+    // corners of both side panels. The overlap widened as the screen narrowed
+    // (69px at 420 wide, 99px at 360) because the bug is centred and fixed
+    // while the panels are pinned to the edges.
+    //
+    // Measure it instead. --bugH is the bug's real height, so the columns clear
+    // it at any width, at any font size, and after any future edit to the bar.
+    const bug = q('bug');
+    function measureBug() {
+      const h = bug.getBoundingClientRect().height;
+      if (h > 0) root.style.setProperty('--bugH', h + 'px');
+    }
+    measureBug();
+    if (window.ResizeObserver) new ResizeObserver(measureBug).observe(bug);
+    window.addEventListener('resize', measureBug);
+
     // Record pace is a fixed point in the unlockable range, so both gauges get
     // their tick from the same number rather than a hand-placed percentage.
     root.querySelectorAll('.gaugeRec').forEach((t) => { t.style.left = (REC_MARK * 100) + '%'; });

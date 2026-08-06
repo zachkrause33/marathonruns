@@ -144,9 +144,8 @@ html, body {
 
 /* ---- left column: the mechanic, read top to bottom ----
  * Clean gates buy speed; the gauge shows how much of the START_PACE ->
- * FLOOR_PACE range
- * has been bought; the pace is the result. Putting them in one plate in that
- * order is the only place the game explains itself. */
+ * FLOOR_PACE range has been bought; the pace is the result. Putting them in
+ * one plate in that order is the only place the game explains itself. */
 #leftCol {
   /* Clears the top bug by its MEASURED height (hud.js publishes --bugH), plus
      a gap. The fallback matches the desktop height so the layout is still
@@ -277,6 +276,10 @@ html, body {
 #gapTrend { font-size: 9px; font-weight: 900; letter-spacing: 0.12em; }
 .ahead { color: var(--ahead); }
 .behind { color: var(--behind); }
+/* Plain ink: a position stated without a grade attached. The ghost gap uses
+ * this whenever the projection is not itself red, so the rail can never
+ * contradict the verdict at the top of the screen. */
+.level { color: #fffdf5; }
 
 #rail { position: relative; height: 22px; }
 #railBg {
@@ -293,6 +296,7 @@ html, body {
 #railGap { position: absolute; top: 1px; bottom: 1px; }
 #railGap.behind { background: rgba(255, 107, 132, 0.42); }
 #railGap.ahead  { background: rgba(77, 251, 160, 0.42); }
+#railGap.level  { background: rgba(255, 253, 245, 0.26); }
 
 #railGhost {
   position: absolute; top: -5px; bottom: -5px;
@@ -641,13 +645,23 @@ html, body {
  * course generation. A route is the one thing about tomorrow that is visibly
  * different from today, which makes this line an appointment rather than a
  * description of one. */
+/* Promoted to a plate, at the weight of the grade chip, directly above the
+ * button. It was 10.5px at the very bottom of the card, under every stat --
+ * the faintest thing on the screen, and the only element on it whose job is
+ * to bring someone back. The pair now reads as two offers: run it again now,
+ * or come back for a different road. */
 #tomorrow {
-  font-size: 10.5px; font-weight: 900; letter-spacing: 0.1em;
-  color: var(--accent); opacity: 0.9; line-height: 1.5;
-  margin-top: 16px; padding-top: 12px;
-  border-top: 1px solid rgba(255, 253, 245, 0.16);
+  margin-top: 18px; padding: 9px 12px 10px;
+  border: 1px solid rgba(255, 228, 94, 0.45);
+  background: rgba(255, 228, 94, 0.07);
 }
-#tomorrow:empty { display: none; }
+#tomorrow.empty { display: none; }
+#tomorrow .lab { color: var(--accent); opacity: 0.8; }
+#tomorrow .tomRoute {
+  font-size: 13px; font-weight: 900; letter-spacing: 0.07em;
+  color: var(--accent); line-height: 1.45; margin-top: 3px;
+  text-wrap: balance;
+}
 
 /* The only tap target on the screen, on a screen that is now taller: full
  * width so it cannot be missed at the bottom of a phone. */
@@ -791,7 +805,8 @@ html, body {
   #endCols .k { font-size: 11px; }
   #endCols .v { font-size: 16px; }
   #endTurn { font-size: 13px; }
-  #tomorrow { font-size: 13px; }
+  #tomorrow { padding: 12px 16px 13px; }
+  #tomorrow .tomRoute { font-size: 16px; }
   #endPanel .cta { margin-top: 22px; }
 }
 
@@ -833,7 +848,8 @@ html, body {
   #endCost { margin-top: 8px; }
   #endCost .endBig { font-size: 22px; }
   #endTurn { display: none; }
-  #tomorrow { margin-top: 8px; padding-top: 7px; }
+  #tomorrow { margin-top: 8px; padding: 6px 9px 7px; }
+  #tomorrow .tomRoute { font-size: 11px; margin-top: 2px; }
   #endPanel .cta { margin-top: 9px; padding: 10px; }
 
   #leftCol { top: calc(var(--bugH, 60px) + 6px); gap: 6px; }
@@ -1108,8 +1124,15 @@ MR.K = (function () {
     LANE_CHANGE_TIME: 0.16 * Math.sqrt(LANE_W / 2.35),
     JUMP_HEIGHT: 2.05,
     // Airborne long enough to be humanly timeable, but still shorter than
-    // Course.ACTION_WINDOW (20 units) so a jump can never still be in the air
-    // at a gate demanding a slide: 0.70s * 26.3 u/s = 18.4 units.
+    // Course.ACTION_WINDOW, so a jump can never still be in the air at a gate
+    // demanding a slide.
+    //
+    // That comparison has to be made at the FASTEST the runner ever moves, not
+    // at record pace. This comment used to read "0.70s * 26.3 u/s = 18.4
+    // units" -- 26.3 is record pace, and the runner spends most of a good race
+    // faster than that. At the pace floor it is 28.35 u/s and the span is
+    // 19.84 units. course.js now derives ACTION_WINDOW from this number rather
+    // than restating a stale product of it.
     JUMP_TIME: 0.70,
     DUCK_TIME: 0.78,
     INPUT_BUFFER: 0.20,             // late/early press forgiveness
@@ -1470,7 +1493,21 @@ MR.Course = (function () {
 
   // A jump covers this much ground; two conflicting action gates closer than
   // this would demand being airborne and ducking at once.
-  const ACTION_WINDOW = 20;
+  //
+  // DERIVED, not typed, and that is not tidiness. It was the literal 20, with
+  // a comment in constants.js justifying it as "0.70s * 26.3 u/s = 18.4" --
+  // but 26.3 u/s is RECORD pace, not the fastest the runner ever goes. At the
+  // pace floor the airborne span is longer, and when the floor moved 4:20 ->
+  // 4:14 the span went to 19.84 against a window of 20. A 0.16-unit margin,
+  // 0.8%, on the invariant that stops the course demanding a jump and a slide
+  // at once -- reached silently, by editing a different file.
+  //
+  // Now it follows the arc and the top speed, so a retune of either moves it.
+  // The +1 is real headroom rather than a rounding artefact: the generator
+  // pushes gate spacing right down to this number, so the two are the same
+  // constraint seen from both ends.
+  const MAX_SPEED = (K.UNITS_PER_MILE * K.TIME_SCALE) / K.FLOOR_PACE;
+  const ACTION_WINDOW = Math.ceil(K.JUMP_TIME * MAX_SPEED) + 1;
   const START_GRACE = 150;   // clean runway so the first seconds read calmly
   const FINISH_GRACE = 190;  // clean straight into the tape
 
@@ -1590,12 +1627,15 @@ MR.Course = (function () {
 
   function spacingAt(f, rnd) {
     const d = difficulty(f);
-    // 44 units early -> 21 late. The floor is 20 rather than 22 because
-    // ACTION_WINDOW is 20 and the solver rejects anything that would demand
-    // two conflicting actions inside it -- so the generator can be pushed to
-    // the edge of that rule and let the proof hold the line.
+    // 44 units early, tightening as difficulty rises. The floor is
+    // ACTION_WINDOW itself rather than a number chosen to sit near it: the
+    // solver rejects anything that would demand two conflicting actions inside
+    // that distance, so the generator can be pushed right to the edge of the
+    // rule and let the proof hold the line. Tying the two together means a
+    // retune of the jump arc or the pace floor moves both ends of the same
+    // constraint at once, instead of moving one and leaving the other stale.
     const mean = 44 - 23 * d;
-    return Math.max(20, mean * rnd.range(0.84, 1.16));
+    return Math.max(ACTION_WINDOW, mean * rnd.range(0.84, 1.16));
   }
 
   /** Hazard mix widens as difficulty rises. */
@@ -2435,8 +2475,31 @@ MR.shading = (function () {
    * building's lit side and its shaded side are two colours rather than two
    * strengths of one.
    */
-  function ramp(steps) {
-    if (ramps.has(steps)) return ramps.get(steps);
+  /**
+   * `floor` is the darkest band, and it exists because ONE class of object in
+   * this game is not decoration.
+   *
+   * 0.31 is right for scenery: it is as low as the shading can go before the
+   * ambient stops keeping a shaded red vest from reading as brown, and it is
+   * what makes a building's lit and shaded sides two colours rather than two
+   * strengths of one. But a HAZARD is read as a flat silhouette at forty to
+   * ninety units, and its read face points at the camera -- away from the key
+   * light -- so at a 0.31 floor it is lit almost entirely by the blue bounce
+   * and the hemisphere. Measured through the contrast audit: the JUMP kerb's
+   * amber is authored at S 0.73 and rendered at S 0.34, and every BLOCK lands
+   * between 1.1x and 1.6x the centre lane's luminance when the reference sits
+   * at 2.1x to 2.56x. The chroma the whole readability system depends on was
+   * being spent on form shading nobody looks at.
+   *
+   * Raising the floor raises the COLOURED diffuse term against a fixed
+   * additive ambient, so it lifts value and saturation together, which is
+   * exactly the axis the measurement says is short. Form survives because the
+   * band above it is unchanged.
+   */
+  function ramp(steps, floor) {
+    const base = floor === undefined ? 0.31 : floor;
+    const key = steps + '/' + base;
+    if (ramps.has(key)) return ramps.get(key);
     const n = Math.max(2, steps);
     const data = new Uint8Array(n * 4);
     for (let i = 0; i < n; i++) {
@@ -2447,7 +2510,7 @@ MR.shading = (function () {
       // full brightness and the form stops reading. 0.31 is as low as this can
       // go before the ambient can no longer keep a shaded red vest from
       // reading as brown.
-      const v = 0.31 + 0.69 * Math.pow(k, 1.22);
+      const v = base + (1 - base) * Math.pow(k, 1.22);
       // Cool the dark end. Pushed too far this desaturates the base colour to
       // blue-grey instead of shading it, so it falls off fast toward the light.
       // The exponent is what keeps a 3-band ramp's MIDDLE band only slightly
@@ -2464,7 +2527,7 @@ MR.shading = (function () {
     tex.minFilter = tex.magFilter = THREE.NearestFilter;
     tex.generateMipmaps = false;
     tex.needsUpdate = true;
-    ramps.set(steps, tex);
+    ramps.set(key, tex);
     return tex;
   }
 
@@ -2501,10 +2564,10 @@ MR.shading = (function () {
   }
 
   /** Standard toon material. `steps` 2 for props, 3 for characters. */
-  function toon(color, steps) {
+  function toon(color, steps, floor) {
     const m = new THREE.MeshToonMaterial({
       color,
-      gradientMap: ramp(steps || 3),
+      gradientMap: ramp(steps || 3, floor),
     });
     m.onBeforeCompile = patchToonRamp;
     return m;
@@ -3471,11 +3534,17 @@ MR.Runner = (function () {
   // road it is the same brightness as. It is still far and away the palest
   // thing at that height apart from the shoe, so rule 3 -- the gloves flash
   // against the road -- is untouched.
-  const MITT = 0xc9d2ea;
+  // A mid blue rather than the near-white the first attempt used. Measured off
+  // the frames: a white shoe's SHADED side lands around 0xc8ccdd under the cool
+  // end of the toon ramp, so a near-white cool mitt's LIT side was the same
+  // colour as the thing it had to separate from. A step further down clears the
+  // shoe at both ends of its own ramp and is still 1.8x the road's luminance,
+  // so rule 3 -- the gloves flash against the road -- survives.
+  const MITT = 0xa8b6de;
   // The curled fingers. Darker again, and it is the only interior detail the
   // hand gets: at 14px a knuckle line is the difference between a mitt and a
   // ball, and three separate fingers are three 4px lobes that alias into one.
-  const MITT_DK = 0x8791b7;
+  const MITT_DK = 0x6b74a0;
 
   /**
    * Weld several primitives into one geometry, baking each piece's colour
@@ -4497,11 +4566,16 @@ MR.Runner = (function () {
         //     roll carrying the whole hand's single value break. A knuckle line
         //     is the only interior detail a 14px hand can hold, so it gets that
         //     and nothing else.
-        //   - A ball reads as a ball at every size. The mass is now a flattened
-        //     BLOCK, deeper front-to-back than it is wide, with the wrist ball
-        //     above it and the finger roll below: three stacked shapes of two
-        //     tones, which at 14px resolves as forearm / band / hand / fingers
-        //     rather than as one pale oval.
+        //   - A ball reads as a ball at every size, and a box reads as a card.
+        //     Both were built and both were looked at: the flat-faced block
+        //     shaded into two clean planes close up and, seen from the shallow
+        //     angle most of the cycle puts it at, presented its own edge and
+        //     read as a paddle held in the hand rather than as the hand. The
+        //     mass is a broad flattened ELLIPSOID -- half again as wide as it
+        //     is deep -- with the wrist ball above it and the finger roll
+        //     under it: three stacked shapes in two tones, which at 14px
+        //     resolves as forearm / band / hand / fingers rather than as one
+        //     pale oval.
         //   - The thumb rides high and INBOARD, so it breaks the outline
         //     against the vest and the thigh -- the two dark masses the hand
         //     passes in front of -- rather than against the road, where the
@@ -4512,16 +4586,27 @@ MR.Runner = (function () {
         // so the airborne span, which MEASUREMENTS.md caps at 0.70 from the
         // lane centre, is spent DOWN rather than up. The extra mass is bought
         // in z, which is the axis the back view does not measure at all.
-        { g: new THREE.SphereGeometry(0.086, 8, 6), c: MITT, y: -0.208, sy: 0.88, sz: 1.00 },
-        { g: new THREE.BoxGeometry(0.170, 0.116, 0.150), c: MITT, y: -0.262, z: 0.014 },
-        // Knuckles: the block's outboard-forward corner rounded off, so the
-        // hand has a leading edge instead of four square ones.
-        { g: new THREE.SphereGeometry(0.090, 8, 6), c: MITT, y: -0.258, z: 0.052, sx: 0.94, sy: 0.70, sz: 0.60 },
-        // The curled fingers, one roll lying across the hand. Its cap ends are
-        // the outer knuckles, exactly as the old three capsules used their caps
-        // -- one primitive doing both jobs, but at a size that survives.
-        { g: new THREE.CapsuleGeometry(0.048, 0.086, 2, 8), c: MITT_DK, y: -0.313, z: 0.048, rz: Math.PI / 2 },
-        { g: new THREE.CapsuleGeometry(0.036, 0.048, 2, 6), c: MITT, x: -side * 0.062, y: -0.242, z: 0.062, rx: 0.85, rz: side * 0.62 },
+        { g: new THREE.SphereGeometry(0.094, 8, 6), c: MITT, y: -0.202, sy: 0.86, sz: 1.00 },
+        { g: new THREE.SphereGeometry(0.104, 10, 8), c: MITT, y: -0.264, z: 0.018, sy: 0.76, sz: 0.86 },
+        // The curled fingers: one roll lying across the hand at its LOWER REAR
+        // edge, which took three placements to find and is worth writing down
+        // because the rule is not obvious. Where the break sits matters far
+        // more than what it is. Tucked UNDER the hand, where a real curled fist
+        // carries it, the body of the hand hides it completely. Out at the
+        // LEADING edge, which seemed right because the camera looks down about
+        // 17 degrees, it is worse: the forearm is already pitched forward, so
+        // the hand's leading edge is its FAR edge and the hand occludes it. The
+        // only part of a hand a camera dead astern can rely on seeing is the
+        // rear face and the bottom of the outline -- so that is where the one
+        // value break the size allows has to go, and there it reads as fingers
+        // breaking the underside of the mitt.
+        //
+        // Its cap ends are the outer knuckles -- one primitive doing both jobs,
+        // exactly as the three finger capsules it replaces used theirs, but at
+        // a size that survives the minification instead of aliasing into the
+        // palm it stands on.
+        { g: new THREE.CapsuleGeometry(0.050, 0.092, 2, 8), c: MITT_DK, y: -0.308, z: 0.016, rz: Math.PI / 2 },
+        { g: new THREE.CapsuleGeometry(0.041, 0.052, 2, 6), c: MITT, x: -side * 0.072, y: -0.238, z: 0.062, rx: 0.85, rz: side * 0.62 },
       ]);
       elbow.add(fore);
 
@@ -5222,14 +5307,33 @@ MR.Runner = (function () {
         // Worth 0.09 of span for nothing, and it keeps the arm root buried in
         // the deltoid instead of tearing a gap at the seam.
         A.shoulder.position.x = A.side * (0.222 + spread * 0.048);
-        // Flexion peaks with the arm forward -- glove up by the chest at the
-        // front of the swing, forearm opening out past the hip at the back,
-        // which is exactly when the pale glove clears the torso silhouette.
+        // Flexion, and it is now held at BOTH ends of the swing rather than
+        // only at the front. That is a readability fix, not an anatomy one.
+        //
+        // Shoulder-to-hand on this rig is 0.623 -- deliberately long, because
+        // reach is the only term in the spread jump pose. With flexion easing
+        // off as the arm swung back, the trailing hand fell to world y=0.274
+        // and the shoe tops sit at 0.25: for a third of every stride the only
+        // two pale terminals on the character were four pixels apart, and an
+        // art review's verdict on that was that the runner had no hands. No
+        // colour or geometry survives two objects landing in the same place.
+        //
+        // 0.18, and the ceiling on it is not taste. Flexing HARDER swings the
+        // trailing forearm further forward, not further back -- the shoulder
+        // only opens 0.89 behind vertical, so past about 0.2 of extra flexion
+        // the hand climbs to hip height and disappears BEHIND the hips, which
+        // are 0.234 wide and 0.19 nearer the lens. Tried at 0.40 it hid the
+        // hand for most of the cycle, which is a worse failure than the one it
+        // was fixing. At 0.18 the hand lands at y=0.306 with the shoe tops at
+        // 0.25: eight pixels of daylight at gameplay framing, low enough to
+        // stay outside the hip silhouette, and squarely against open road,
+        // which is the background the mitt was toned for.
+        //
         // A slide straightens it instead, so the whole arm becomes one long
         // brace trailing behind the body -- flat and low against the jump's
         // wide, and neither of them the run.
         A.elbow.rotation.x =
-          (-1.32 - fwd * 0.46) * (1 - spread * 0.95) * (1 - slid * 0.86) - slid * 0.10;
+          (-1.32 - fwd * 0.46 - back * 0.18) * (1 - spread * 0.95) * (1 - slid * 0.86) - slid * 0.10;
       }
 
       // ---- torso: forward lean, vertical bob, and a lateral bank on turns
@@ -5771,6 +5875,31 @@ MR.World = (function () {
    * the start, water in the middle, a purple-and-amber wall at mile 20, gold
    * into the tape -- in whichever city the day drew.
    */
+  /**
+   * A PULL ON THE ROAD IS A PULL ON THE PLAY SURFACE, and that is not the same
+   * kind of change as a pull on the sky.
+   *
+   * R1 halved every setting's `road` to land the centre lane at L = 100, and it
+   * did land: measured on the frame, CITY START and THE BRIDGE come out at 94.5
+   * and 95.0. But two biomes then lifted it straight back up, because both of
+   * their road pulls aimed at a pale colour:
+   *
+   *   THE WALL     road [0xe5b1ca, 0.42]  ->  centre lane L 142.3   1.42x target
+   *   FINAL MILE   road [0xffe0c0, 0.16]  ->  centre lane L 126.5   1.26x target
+   *
+   * That is R1 undone on the two legs the race is decided on, and it is not
+   * cosmetic: it is what the hazard-contrast assertion in tools/shoot.js fires
+   * on. THE WALL's road is dusty PINK and every BLOCK in the game is pink -- at
+   * 142 the road came within 1.05x of the ROAD CLOSED barrier's own luminance
+   * and within 0.19 of its saturation, which is a hazard invisible against the
+   * tarmac on both axes at once. Measured on 04-wall before the fix: the amber
+   * JUMP kerb rendered at L 136.7 on a road of L 136.6.
+   *
+   * The mood is not the casualty. The pull is retargeted at the SAME HUE two
+   * thirds of the way down in value, so mile 20 keeps its dusty pink cast and
+   * mile 26 keeps its gold one, and the surface the player reads stays where R1
+   * put it. Value belongs to the road; hue belongs to the leg.
+   */
   const BIOME_MOD = {
     'CITY START': {},
     'RIVERSIDE': { fog: [0xcfefff, 0.18] },
@@ -5781,10 +5910,12 @@ MR.World = (function () {
     // strongest pull in the table by a distance.
     'THE WALL': {
       sky: [0x8a3a6b, 0.62], fog: [0xffb27a, 0.58],
-      ground: [0x8f9a5e, 0.52], road: [0xe5b1ca, 0.42],
+      // 0x6e5560 is 0xe5b1ca at 0.483 -- same hue, half the value.
+      ground: [0x8f9a5e, 0.52], road: [0x6e5560, 0.42],
     },
     'FINAL MILE': {
-      sky: [0x3a2f7e, 0.34], fog: [0xffcf6b, 0.40], road: [0xffe0c0, 0.16],
+      // 0x7d6d5d is 0xffe0c0 at 0.49.
+      sky: [0x3a2f7e, 0.34], fog: [0xffcf6b, 0.40], road: [0x7d6d5d, 0.16],
     },
   };
 
@@ -8006,8 +8137,8 @@ MR.World = (function () {
   }
 
   /** Vertex-coloured toon material -- the workhorse for merged props. */
-  function vtoon(steps) {
-    const m = S.toon(0xffffff, steps || 2);
+  function vtoon(steps, floor) {
+    const m = S.toon(0xffffff, steps || 2, floor);
     m.vertexColors = true;
     return m;
   }
@@ -8298,7 +8429,16 @@ MR.World = (function () {
       // baked vertex colour, so the tints in SETTING_LOOK all sit near white:
       // this can knock a value down, never lift one.
       edge: vtoon(2),
-      propLit: vtoon(3),
+      // HAZARDS GET A LIFTED RAMP FLOOR, and nothing else does. A hazard's
+      // read face points at the camera and therefore away from the key light,
+      // so on the scenery floor of 0.31 it was lit almost entirely by the blue
+      // bounce: the contrast audit measured the JUMP kerb's authored S 0.73
+      // arriving at 0.34 and every BLOCK landing between 1.1x and 1.6x the
+      // centre lane when the reference sits at 2.1-2.56x. See ramp() in
+      // shading.js for the derivation. This is the one class of object the
+      // race is lost by misreading, so it is the one class that spends its
+      // shading budget on chroma rather than on form.
+      propLit: vtoon(3, 0.62),
       water: new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, depthWrite: false }),
     };
 
@@ -10735,8 +10875,51 @@ MR.World = (function () {
       }
       return merge(parts);
     })();
+
+    /**
+     * The same stand with its crowd drawn as a BAND instead of as 55 people.
+     *
+     * FINAL MILE carries the heaviest crowd mix in the race and twenty stands
+     * are live at once, which measured 28,560 triangles -- 28% of a 100k frame,
+     * on a budget whose working ceiling is 75k. Fifty-five spectators is 1,320
+     * of a stand's 1,428 triangles, and past about a hundred units a spectator
+     * is under a pixel wide: what survives is a warm speckled mass along each
+     * row, which is precisely what one box per row is.
+     *
+     * The swap distance is what makes it invisible. STAND_LOD is 130 units,
+     * where the fog is already 45% of the way in (near 60, far 215) and rising
+     * steeply, so the two versions differ only in detail that is both sub-pixel
+     * and half dissolved. The band colours are the mean of the six shirt tints
+     * and the mean skin, so the mass keeps its value and its warmth across the
+     * swap; only the speckle goes.
+     *
+     * 228 triangles against 1,428. Zero extra draw calls -- one of the pair is
+     * visible at a time, exactly as the road tile's four roadside kinds are.
+     */
+    const standFarGeo = (function () {
+      const parts = [];
+      for (let row = 0; row < 5; row++) {
+        const y = row * 0.74;
+        const x = 0.9 + row * 1.10;
+        parts.push(bx(1.10, 0.74, TILE, x, y + 0.37, 0, row % 2 ? 0x8e99c6 : 0x6f7aa8));
+        parts.push(bx(0.40, 0.48, TILE - 2.2, x - 0.1, y + 0.98, 0, 0xc2b087));
+        parts.push(bx(0.22, 0.22, TILE - 2.2, x - 0.1, y + 1.33, 0, 0xe8bd94));
+      }
+      for (const z of [-TILE / 2 + 1, TILE / 2 - 1]) {
+        parts.push(bx(0.28, 7.2, 0.28, 0.2, 3.6, z, 0x2b2f52));
+        parts.push(bx(0.14, 1.7, 2.3, 0.2, 6.4, z, z < 0 ? 0xff3b6b : 0x37d6ff));
+      }
+      return merge(parts);
+    })();
+    const STAND_LOD = 130;
     const standPool = Pool(function () {
-      return S.outlined(standGeo, mats.prop, S.INK.scenery);
+      const g = new THREE.Group();
+      const near = S.outlined(standGeo, mats.prop, S.INK.scenery);
+      const far = S.outlined(standFarGeo, mats.prop, S.INK.scenery);
+      far.visible = false;
+      g.add(near, far);
+      g.userData.lod = [near, far];
+      return g;
     }, group);
 
     // ---- landmarks --------------------------------------------------------
@@ -11884,6 +12067,16 @@ MR.World = (function () {
         obj.userData.auditName = 'set piece / ' + st.kind;
         activeStruct.push({ st, obj, pool });
       }
+      // Detail level, for the one set piece heavy enough to matter. See
+      // standFarGeo: twenty of these are live at mile 25 and the far half of
+      // them are drawing 55 sub-pixel spectators each through 45% of fog.
+      for (const e of activeStruct) {
+        const lod = e.obj.userData.lod;
+        if (!lod) continue;
+        const far = (e.st.z - z) > STAND_LOD;
+        lod[0].visible = !far;
+        lod[1].visible = far;
+      }
       while (activeStruct.length && activeStruct[0].st.z < back - 60) {
         const e = activeStruct.shift();
         e.pool.release(e.obj);
@@ -12103,6 +12296,229 @@ MR.World = (function () {
       }
       for (let i = 0; i < group.children.length; i++) scan(group.children[i]);
       return out;
+    };
+
+    /**
+     * ============ THE HAZARD CONTRAST RULE, MADE MEASURABLE ============
+     *
+     * Measured off tgr-city.png and tgr-sunset-ramp.png, five objects, own
+     * luminance against the tarmac they stand on:
+     *
+     *   guard rail  186.7 on 73.0  ratio 2.56   S 0.20 vs 0.47
+     *   ramp deck   181.6 on 73.0  ratio 2.49   S 0.56 vs 0.47
+     *   tram roof   163.5 on 78.0  ratio 2.10   S 0.28 vs 0.22
+     *   parked car   76.4 on 78.0  ratio 0.98   S 0.60 vs 0.22
+     *   trash can    73.7 on 73.0  ratio 1.01   S 0.25 vs 0.47
+     *
+     * The last two are the interesting ones. The blue car and the grey bin are
+     * the same LUMINANCE as the road to within 2% and are still instantly
+     * legible -- the car because its saturation is 2.7x the road's, the bin
+     * because its saturation is HALF the road's. Either direction works. What
+     * never happens in the reference is an object that matches the road on both
+     * axes at once. So the rule is not "value contrast is the whole game":
+     *
+     *   Every hazard's area-weighted mean must differ from the local road by a
+     *   factor of >= 1.6 in luminance, OR by >= 0.30 in saturation.
+     *
+     * tools/shoot.js applies it and fails the run. It is stated here rather
+     * than there because this is the file that owns the numbers on both sides.
+     *
+     * WEIGHTING, and it is the part that makes the rule mean anything. A hazard
+     * is read head on, down the road, so what matters is the area it presents
+     * TO THE LENS -- not its total surface area, which would count the top and
+     * both flanks of a train equally with the face you actually see. Each
+     * triangle is therefore weighted by the area of its projection onto the
+     * view plane, and back faces (cross.z >= 0, pointing away from a camera
+     * that looks down +z) are dropped. For a convex body that is exactly its
+     * silhouette area, which is what survives to sixty units.
+     *
+     * WHAT IS INCLUDED: the merged body, the one moving part a variant may
+     * carry, and the caution-stripe face plane -- which is unlit, textured and
+     * a big fraction of the frontal area, so its own canvas is averaged rather
+     * than guessed at. The telegraph mat is NOT included: it is painted on the
+     * road in front of the hazard, it is the lane cue rather than the object,
+     * and letting it into the average would let a bright mat excuse a hazard
+     * that has itself gone invisible. That is the exact failure this catches.
+     *
+     * IT IS MEASURED ON RENDERED PIXELS, not on authored hex. A first pass did
+     * the arithmetic on material colour x vertex colour and it was WRONG in the
+     * only cases that matter. The road is horizontal and a hazard's read face is
+     * vertical, so the toon ramp lands them in different bands: measured off
+     * 04-wall, the road comes back at 0.89 of its authored value while a
+     * hazard's rear faces come back at about 0.55 (this file already records
+     * 0x2b2f52 rendering near 0x111737). Authored arithmetic therefore put the
+     * marshal barrier at 1.36x the road -- in the dead zone -- when the shaded
+     * object is comfortably DARKER than the road and clears the rule from the
+     * other side. The rule is symmetric in luminance for exactly the reason the
+     * reference's grey bin is legible, and a model that gets the shading wrong
+     * cannot tell which side of the road an object has landed on.
+     *
+     * So each variant is rendered off screen, alone, with its real materials,
+     * the scene's real lights and the real gradient maps, into an alpha-cleared
+     * 128px target whose texture is tagged SRGBColorSpace so what comes back is
+     * display bytes -- the same quantity the reference frames were measured in.
+     * Covered pixels are averaged. That IS the area-weighted mean, done by the
+     * rasteriser, with occlusion between the object's own parts handled for
+     * free, which no amount of triangle arithmetic gets right.
+     *
+     * The camera is orthographic, aimed down the game's own sightline: BASE_Y
+     * 2.62 falling to LOOK_Y 1.16 over LOOK_AHEAD 8.0 is 10.35 degrees below
+     * horizontal. The road is measured through the SAME camera, so the grazing
+     * angle the tarmac is always seen at is in the number rather than assumed
+     * away. It sits 20 units out, inside the fog's near plane, so haze is not in
+     * either measurement -- correctly, since a hazard is committed to well
+     * before the fog reaches it.
+     */
+    function lumOf(rgb) { return 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]; }
+    function satOf(rgb) {
+      const hi = Math.max(rgb[0], rgb[1], rgb[2]), lo = Math.min(rgb[0], rgb[1], rgb[2]);
+      return hi <= 0 ? 0 : (hi - lo) / hi;
+    }
+
+    const AUDIT_PX = 128;
+    const _audit = { rt: null, cam: null, buf: null, lanes: null, holder: null };
+    function auditSetup() {
+      if (_audit.rt) return;
+      _audit.rt = new THREE.WebGLRenderTarget(AUDIT_PX, AUDIT_PX);
+      _audit.rt.texture.colorSpace = THREE.SRGBColorSpace;
+      _audit.rt.texture.generateMipmaps = false;
+      _audit.cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.05, 80);
+      _audit.buf = new Uint8Array(AUDIT_PX * AUDIT_PX * 4);
+      _audit.pitch = Math.atan2(2.62 - 1.16, 8.0);
+      _audit.holder = new THREE.Group();
+      // One lane's tarmac, exactly as roadGeo builds it -- same five camber
+      // strips, same tints, same uv remap onto the carriageway, so the mottle
+      // and the gutter grime land where they land on the real road.
+      _audit.lanes = [0, 1, 2].map(function (l) {
+        const parts = [];
+        const sw = LANE / CAMBER_STRIPS;
+        for (let s = 0; s < CAMBER_STRIPS; s++) {
+          const cx = K.LANE_X[l] - LANE / 2 + sw * (s + 0.5);
+          parts.push(laneBand(cx, sw, tintScale(LANE_BAND[l], camber(cx))));
+        }
+        return new THREE.Mesh(merge(parts), mats.road);
+      });
+    }
+
+    const _clr = new THREE.Color();
+    /**
+     * Render `obj` alone, down the game's sightline, and average the pixels it
+     * covers. Everything in the scene but the lights is hidden for the duration
+     * -- a light with `visible` false stops contributing, which would measure
+     * the object in the dark.
+     */
+    function shotMean(renderer, scene, obj, cx, cy, cz, halfW, halfH) {
+      auditSetup();
+      const saved = [];
+      for (const o of scene.children) {
+        if (o.isLight) continue;
+        saved.push([o, o.visible]);
+        o.visible = false;
+      }
+      _audit.holder.clear();
+      _audit.holder.add(obj);
+      scene.add(_audit.holder);
+
+      const cam = _audit.cam;
+      cam.left = -halfW; cam.right = halfW; cam.top = halfH; cam.bottom = -halfH;
+      cam.updateProjectionMatrix();
+      const d = 20;
+      cam.position.set(cx, cy + d * Math.sin(_audit.pitch), cz - d * Math.cos(_audit.pitch));
+      cam.lookAt(cx, cy, cz);
+
+      const prevRT = renderer.getRenderTarget();
+      renderer.getClearColor(_clr);
+      const prevA = renderer.getClearAlpha();
+      renderer.setRenderTarget(_audit.rt);
+      renderer.setClearColor(0x000000, 0);
+      renderer.clear();
+      renderer.render(scene, cam);
+      renderer.readRenderTargetPixels(_audit.rt, 0, 0, AUDIT_PX, AUDIT_PX, _audit.buf);
+      renderer.setRenderTarget(prevRT);
+      renderer.setClearColor(_clr, prevA);
+
+      scene.remove(_audit.holder);
+      _audit.holder.clear();
+      for (const s of saved) s[0].visible = s[1];
+
+      const b = _audit.buf;
+      let r = 0, g = 0, bl = 0, n = 0;
+      // Fully covered pixels only. A render target has no MSAA, so an edge
+      // pixel is either the object or the clear -- the threshold is belt and
+      // braces against a blended alpha, not a silhouette softener.
+      for (let i = 0; i < b.length; i += 4) {
+        if (b[i + 3] < 200) continue;
+        r += b[i]; g += b[i + 1]; bl += b[i + 2]; n++;
+      }
+      if (!n) return null;
+      const rgb = [r / n, g / n, bl / n];
+      const out = {
+        px: n, rgb: rgb.map((v) => +v.toFixed(1)),
+        L: +lumOf(rgb).toFixed(1), S: +satOf(rgb).toFixed(3),
+      };
+      // A failing assertion that cannot be looked at is an assertion nobody
+      // trusts. On request each swatch comes back as a png so the build can
+      // drop the exact pixels it measured next to the frame it measured them
+      // for. readRenderTargetPixels is bottom-up, hence the flip.
+      if (_audit.images) {
+        const cv = canvas(AUDIT_PX, AUDIT_PX);
+        const cg = cv.getContext('2d');
+        const img = cg.createImageData(AUDIT_PX, AUDIT_PX);
+        for (let y = 0; y < AUDIT_PX; y++) {
+          const src = (AUDIT_PX - 1 - y) * AUDIT_PX * 4;
+          img.data.set(b.subarray(src, src + AUDIT_PX * 4), y * AUDIT_PX * 4);
+        }
+        cg.putImageData(img, 0, 0);
+        out.png = cv.toDataURL('image/png');
+      }
+      return out;
+    }
+
+    /**
+     * Every hazard variant's rendered tone, and every lane's road tone under
+     * the palette live in this frame. Needs the renderer and the scene, which
+     * this file deliberately does not hold: it is a build-time audit, called
+     * from tools/shoot.js, and nothing in the game loop may reach for a
+     * framebuffer.
+     */
+    api.contrastAudit = function (renderer, scene, opts) {
+      auditSetup();
+      _audit.images = !!(opts && opts.images);
+      const NAME = { [K.JUMP]: 'JUMP', [K.DUCK]: 'DUCK', [K.BLOCK]: 'BLOCK' };
+      const hazards = [];
+      for (const grp of HAZARD_DEFS) {
+        grp.defs.forEach(function (d, vi) {
+          // The object as it is actually assembled at spawn: inked body, the
+          // caution face it turns toward the lens, and the one moving part.
+          // The telegraph mat is NOT here -- it is painted on the road in
+          // front of the hazard, and letting a bright mat into the average
+          // would excuse a hazard that had itself gone invisible.
+          const g = new THREE.Group();
+          g.add(S.outlined(d.geo, mats.propLit, S.INK.hazard));
+          const f = new THREE.Mesh(hplane(d.face[0], d.face[1]), faceMat[grp.tint]);
+          f.position.set(0, d.face[2], d.face[3]);
+          f.rotation.y = Math.PI;
+          g.add(f);
+          if (d.moving) {
+            const mv = S.outlined(d.moving, mats.propLit, S.INK.hazard);
+            mv.position.set(d.pivot[0] * LANE_FIT, d.pivot[1], d.pivot[2]);
+            g.add(mv);
+          }
+          d.geo.computeBoundingBox();
+          const bb = d.geo.boundingBox;
+          const h = Math.max(bb.max.y, d.face[2] + d.face[1] / 2);
+          const m = shotMean(renderer, scene, g, 0, h / 2, 0, LANE * 0.62, h * 0.62);
+          hazards.push(Object.assign({
+            kind: grp.kind, variant: vi, name: NAME[grp.kind] + ' v' + vi,
+          }, m));
+        });
+      }
+      const roads = [0, 1, 2].map(function (l) {
+        const m = shotMean(renderer, scene, _audit.lanes[l], K.LANE_X[l], 0.25, 0,
+          LANE * 0.44, LANE * 0.44);
+        return Object.assign({ lane: l }, m);
+      });
+      return { hazards, roads };
     };
 
     /**
@@ -14140,7 +14556,20 @@ MR.HUD = (function () {
         </div>
 
         <div id="endTurn"></div>
-        <div id="tomorrow"></div>
+
+        <!--
+          THE RETURN HOOK, next to the button it is competing with.
+
+          This was the faintest line on the card, below every stat, which is
+          an odd place for the only element on the screen whose job is to
+          bring someone back tomorrow. It is now a plate directly above RUN IT
+          AGAIN, at the weight of the grade chip, so the two read as a pair of
+          offers: run it again now, or come back for a different road.
+        -->
+        <div id="tomorrow" class="empty">
+          <div class="lab">TOMORROW</div>
+          <div class="tomRoute" id="tomorrowRoute"></div>
+        </div>
         <button class="cta" id="againBtn">RUN IT AGAIN</button>
       </div></div>
 
@@ -14168,7 +14597,7 @@ MR.HUD = (function () {
       stats: q('resultStats'), splitTable: q('splitTable'),
       endCost: q('endCost'), endCostLab: q('endCostLab'),
       endCostVal: q('endCostVal'), endCostSub: q('endCostSub'),
-      endTurn: q('endTurn'), tomorrow: q('tomorrow'),
+      endTurn: q('endTurn'), tomorrow: q('tomorrow'), tomorrowRoute: q('tomorrowRoute'),
       againBtn: q('againBtn'),
       count: q('count'), countVal: q('countVal'),
       perf: q('perf'),
@@ -14584,30 +15013,37 @@ MR.HUD = (function () {
       n.railGap.style.left = Math.min(you, gh) + '%';
       n.railGap.style.width = Math.abs(you - gh) + '%';
 
+      // THE GHOST GAP IS A POSITION, NOT A GRADE -- INCLUDING ITS COLOUR.
+      //
+      // The wording was fixed first: this used to read GAINING / LOSING off
+      // `p.pace < RECORD_PACE`, which is accurate and was still wrong. The
+      // race is DESIGNED to start at 5:30 and reel the ghost in, so a flawless
+      // run trails for the whole first half and the tag read LOSING for about
+      // three quarters of it, while the projection at the top of the same
+      // screen read RECORD ON.
+      //
+      // Fixing only the words was half a fix, because the COLOUR was still
+      // keyed off `d < 0` -- the sign of the positional gap. So on a clean run
+      // the top bug read RECORD ON / 1:24 UNDER 1:59:30 in green while the
+      // rail 700px below read +1:27.1 in red: one state, two opposite
+      // emotional readings, and at eight seconds in a player winning by 1:48
+      // was already being told in red that they were losing. That contradiction
+      // is why the start panel had grown a sentence explaining that the ghost
+      // leads "by design" -- copy papering over a HUD defect.
+      //
+      // The grade belongs to the projection, which integrates the whole
+      // remaining race and computes it correctly. So the tone comes from the
+      // projection's own state, and red appears here only when the top bug is
+      // also red. Being physically in front of the ghost is the one thing this
+      // line can claim on its own, and it earns green for it.
       const d = p.deltaVsRecord();
       const ahead = d < 0;
+      const tone = ahead ? 'ahead' : state === 'off' ? 'behind' : 'level';
       set(n.gapVal, 'gap', Pace.delta(d));
-      cls(n.gapVal, 'gapCls', 'num ' + (ahead ? 'ahead' : 'behind'));
-      cls(n.railGap, 'railGapCls', ahead ? 'ahead' : 'behind');
-
-      // THE GHOST GAP IS A POSITION, NOT A GRADE.
-      //
-      // This used to read GAINING / LOSING off `p.pace < RECORD_PACE`, which is
-      // accurate and was still wrong. The race is DESIGNED to start below
-      // record pace and reel it in, so a flawless run is slower than 4:33 for
-      // the whole first half and the tag read LOSING for about three quarters
-      // of it -- while the projection at the top of the same screen read
-      // RECORD ON. Two thirds of the readout told a perfect player they were
-      // failing, and the start panel had grown a sentence explaining that the
-      // ghost leads "by design", which is the game apologising for its own HUD.
-      //
-      // The projection already carries the verdict, and carries it correctly,
-      // because it integrates the whole remaining race. So this line gives up
-      // grading and states where the ghost is instead -- which is the one
-      // thing the projection cannot tell you and the thing you actually want
-      // when you are looking at the road.
+      cls(n.gapVal, 'gapCls', 'num ' + tone);
+      cls(n.railGap, 'railGapCls', tone);
       set(n.gapTrend, 'trend', Math.abs(d) < 1 ? 'LEVEL' : ahead ? 'BEHIND YOU' : 'UP THE ROAD');
-      cls(n.gapTrend, 'trendCls', ahead ? 'ahead' : 'behind');
+      cls(n.gapTrend, 'trendCls', tone);
 
       if (extra && extra.fps !== undefined) {
         set(n.perf, 'perf', extra.fps.toFixed(0) + ' FPS · ' + (extra.draws || 0) + ' DRAWS');
@@ -14724,7 +15160,7 @@ MR.HUD = (function () {
         const k = Store && dateKey ? Store.shift(dateKey, 1) : null;
         const s = k && MR.Course.pickSettings ? MR.Course.pickSettings(k) : null;
         if (s && s.length) {
-          return 'TOMORROW · ' + s.map(function (x) { return x.name; }).join(' → ');
+          return s.map(function (x) { return x.name; }).join(' → ');
         }
       } catch (e) { /* a teaser is never worth an exception */ }
       return '';
@@ -14794,7 +15230,11 @@ MR.HUD = (function () {
         ['FINAL PACE', Pace.pace(p.pace) + '/MI'],
         ['CLEAN GATES', String(Math.max(0, p.gatesSeen - p.hits))],
         ['CONTACTS', String(p.hits)],
-        ['AID TAKEN', String(p.aid)],
+        // "AID TAKEN 0" is meaningless to a player who never noticed aid was
+        // on the course. With the denominator it reads as something missed
+        // rather than a stat with no scale -- and on the runs the mechanic
+        // exists for, a broken race, it is very often 0 of 6.
+        ['AID TAKEN', p.aid + ' OF ' + (course && course.aid ? course.aid.length : '?')],
       ];
       // Both grids open with exactly one header row and then run on identical
       // fixed-height rows, which is what puts them back in phase -- they were
@@ -14867,7 +15307,9 @@ MR.HUD = (function () {
       }
 
       n.endTurn.textContent = turnLine(p);
-      n.tomorrow.textContent = tomorrowLine();
+      const tom = tomorrowLine();
+      n.tomorrowRoute.textContent = tom;
+      n.tomorrow.classList.toggle('empty', !tom);
 
       n.endPanel.classList.remove('hidden');
       syncPanels();

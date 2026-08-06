@@ -14444,11 +14444,28 @@ MR.Tier = (function () {
     return Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0');
   }
 
+  // The ladder had no bottom. It ran RECORD / 2:00 / 2:02 / 2:06 / FINISHED,
+  // and FINISHED was everything above 2:06 -- unbounded. A 16-contact run
+  // measured 2:10:58 and read "FINISHED · 4:52 OFF SUB-2:06", which is nearly
+  // five minutes from the lowest rung: not a next step, just the old SHORT BY
+  // wearing a new hat.
+  //
+  // The rungs below cover where real runs actually land, measured against the
+  // shipped model: 0.90 accuracy finishes 2:09:59, 0.75 2:22:11, 0.50 2:25:33,
+  // and a run that clears nothing at all 2:29:09. So the ladder now reaches to
+  // 2:24 in six-minute steps, and FINISHED means what it says rather than
+  // standing in for a fifth of the range.
+  //
+  // Still derived from RECORD_SECONDS rather than typed, which is what let the
+  // top of this ladder survive a pace-curve rebuild without an edit.
   const LADDER = [
     { max: K.RECORD_SECONDS, name: 'RECORD', label: K.RECORD_LABEL },
-    { max: BASE },
-    { max: BASE + STEP },
-    { max: BASE + STEP * 3 },
+    { max: BASE },                  // 2:00
+    { max: BASE + STEP },           // 2:02
+    { max: BASE + STEP * 3 },       // 2:06
+    { max: BASE + STEP * 6 },       // 2:12
+    { max: BASE + STEP * 9 },       // 2:18
+    { max: BASE + STEP * 12 },      // 2:24
     { max: Infinity, name: 'FINISHED', label: '' },
   ];
   LADDER.forEach(function (t, i) {
@@ -14542,7 +14559,7 @@ MR.HUD = (function () {
 
       <div id="railWrap">
         <div id="gapLine">
-          <span class="lab">RECORD GHOST</span>
+          <span class="lab" id="gapLabel">RECORD GHOST</span>
           <span class="num" id="gapVal">+0:00.0</span>
           <span id="gapTrend">GAINING</span>
         </div>
@@ -14703,7 +14720,7 @@ MR.HUD = (function () {
       gaugeFill: q('gaugeFill'), paceVal: q('paceVal'), needVal: q('needVal'),
       distVal: q('distVal'), toGo: q('toGo'),
       rail: q('rail'), railFill: q('railFill'), railGap: q('railGap'), railGhost: q('railGhost'),
-      gapVal: q('gapVal'), gapTrend: q('gapTrend'),
+      gapVal: q('gapVal'), gapTrend: q('gapTrend'), gapLabel: q('gapLabel'),
       toast: q('toast'), toastLab: q('toastLab'), toastBig: q('toastBig'),
       toastCum: q('toastCum'), toastDelta: q('toastDelta'),
       startPanel: q('startPanel'), startBtn: q('startBtn'), startDate: q('startDate'),
@@ -15157,12 +15174,38 @@ MR.HUD = (function () {
       // line can claim on its own, and it earns green for it.
       const d = p.deltaVsRecord();
       const ahead = d < 0;
-      const tone = ahead ? 'ahead' : state === 'off' ? 'behind' : 'level';
-      set(n.gapVal, 'gap', Pace.delta(d));
-      cls(n.gapVal, 'gapCls', 'num ' + tone);
-      cls(n.railGap, 'railGapCls', tone);
-      set(n.gapTrend, 'trend', Math.abs(d) < 1 ? 'LEVEL' : ahead ? 'BEHIND YOU' : 'UP THE ROAD');
-      cls(n.gapTrend, 'trendCls', tone);
+
+      // ONCE THE RECORD IS GONE, THE GHOST STOPS BEING NEWS.
+      //
+      // It no longer contradicts anything -- that was fixed above -- but on a
+      // dead run it becomes the largest irrelevant number on screen, counting
+      // a gap to a target that has already been conceded while the headline
+      // chases a rung further down the ladder. Measured mid-run at 7 contacts
+      // it read `+6:01.9 UP THE ROAD` and was still growing.
+      //
+      // So the plate reports the chase that is actually live. The rail keeps
+      // drawing the ghost marker, because where the record physically is on
+      // the road is still true and still worth seeing; it is only the headline
+      // number that retargets.
+      const goneTier = gone ? Tier.of(p.projected()) : null;
+      const goneNext = gone ? Tier.next(p.projected()) : null;
+      if (gone && goneNext) {
+        set(n.gapLabel, 'gapLab', 'CHASING');
+        set(n.gapVal, 'gap', goneNext.name);
+        cls(n.gapVal, 'gapCls', 'num level');
+        cls(n.railGap, 'railGapCls', 'level');
+        const togo = Math.max(0, p.projected() - goneNext.max);
+        set(n.gapTrend, 'trend', togo > 0 ? Pace.delta(togo).replace('+', '') + ' TO FIND' : 'HELD');
+        cls(n.gapTrend, 'trendCls', togo > 0 ? 'level' : 'ahead');
+      } else {
+        const tone = ahead ? 'ahead' : state === 'off' ? 'behind' : 'level';
+        set(n.gapLabel, 'gapLab', 'RECORD GHOST');
+        set(n.gapVal, 'gap', Pace.delta(d));
+        cls(n.gapVal, 'gapCls', 'num ' + tone);
+        cls(n.railGap, 'railGapCls', tone);
+        set(n.gapTrend, 'trend', Math.abs(d) < 1 ? 'LEVEL' : ahead ? 'BEHIND YOU' : 'UP THE ROAD');
+        cls(n.gapTrend, 'trendCls', tone);
+      }
 
       if (extra && extra.fps !== undefined) {
         set(n.perf, 'perf', extra.fps.toFixed(0) + ' FPS · ' + (extra.draws || 0) + ' DRAWS');

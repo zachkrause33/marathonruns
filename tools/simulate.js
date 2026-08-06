@@ -98,19 +98,41 @@ for (const [label, skill] of rows) {
  * A run that is clean except for exactly `n` hits, spread evenly. This is the
  * question that actually decides how forgiving the game is: what does one
  * mistake cost a player who is otherwise perfect?
+ *
+ * `take` is the fraction of aid items collected, and it is not optional
+ * detail. Aid tops the streak back up to a ceiling, which exists precisely so
+ * a broken run has a road back to record pace -- so a forgiveness table that
+ * ignores it is not measuring this game. It answers the question for a player
+ * who runs past every bottle on the course, which no real player does.
+ *
+ * Aid is collected on lane match alone (see player.resolveAid), so modelling
+ * it as "the first `take` fraction of items, by position" is exact for a
+ * player whose racing line happens to cover that share -- and aid is
+ * deliberately placed in the hardest legal lane, so a high take rate is
+ * itself a claim about skill.
  */
-function runWithNHits(n) {
+function runWithNHits(n, take) {
   const times = KEYS.map((key) => {
     const course = Course.generate(key);
     const p = Pace.create();
     const hitAt = new Set();
     for (let i = 1; i <= n; i++) hitAt.add(Math.floor((course.gates.length * i) / (n + 1)));
-    let gi = 0, gate = 0, guard = 0;
+    const aid = course.aid || [];
+    const nTake = Math.round(aid.length * take);
+    let gi = 0, ai = 0, gate = 0, got = 0, guard = 0;
     while (!p.finished && guard++ < 200000) {
       p.update(DT);
       while (gi < course.gates.length && p.units >= course.gates[gi].z) {
         gi++; gate++;
         if (hitAt.has(gate)) p.onHit(); else p.onClean();
+      }
+      while (ai < aid.length && p.units >= aid[ai].z) {
+        // Spread the misses evenly rather than skipping the tail, so a partial
+        // take rate is not secretly "collect everything, then stop".
+        if (got < nTake && (take >= 1 || Math.floor(ai * take) === got)) {
+          p.onAid(aid[ai].gain); got++;
+        }
+        ai++;
       }
     }
     return p.finishTime;
@@ -118,19 +140,29 @@ function runWithNHits(n) {
   return { finishTime: times.reduce((a, b) => a + b, 0) / times.length };
 }
 
+const nAid = Math.round(KEYS.reduce((a, k) => a + Course.generate(k).aid.length, 0) / KEYS.length);
 console.log('');
-console.log('mistakes  finish     vs record   cost of the last mistake');
-let prev = null;
+console.log(`how many mistakes the record survives (${nAid} aid items on course)`);
+console.log('');
+console.log('mistakes   no aid       half the aid    all of it');
 for (const n of [0, 1, 2, 3, 5, 10]) {
-  const p = runWithNHits(n);
-  const vs = p.finishTime - K.RECORD_SECONDS;
-  const marginal = prev === null ? '' : `${((p.finishTime - prev) / Math.max(1, 1)).toFixed(1)}s`;
-  console.log(
-    `${String(n).padStart(8)}  ${Pace.clock(p.finishTime).padStart(8)}  ` +
-    `${(vs >= 0 ? '+' : '') + vs.toFixed(0).padStart(6)}s   ${marginal}`
-  );
-  prev = p.finishTime;
+  const cells = [0, 0.5, 1].map((take) => {
+    const t = runWithNHits(n, take).finishTime;
+    const vs = t - K.RECORD_SECONDS;
+    return `${Pace.clock(t)} ${(vs <= 0 ? '' : '+') + vs.toFixed(0)}s`.padEnd(15);
+  });
+  console.log(`${String(n).padStart(8)}   ${cells.join(' ')}`);
 }
+// The headline the tuning actually turns on: with aid, how many can you drop?
+const budget = (take) => {
+  for (let n = 0; n <= 40; n++) {
+    if (runWithNHits(n, take).finishTime > K.RECORD_SECONDS) return n - 1;
+  }
+  return 40;
+};
+console.log('');
+console.log(`  mistakes the record survives:  ${budget(0)} with no aid, ` +
+            `${budget(0.5)} taking half, ${budget(1)} taking all of it`);
 
 console.log('');
 console.log(ok ? 'PASS  pace model satisfies its stated contract' : 'FAIL  see above');

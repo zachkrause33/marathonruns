@@ -26,7 +26,21 @@ MR.Course = (function () {
 
   // A jump covers this much ground; two conflicting action gates closer than
   // this would demand being airborne and ducking at once.
-  const ACTION_WINDOW = 20;
+  //
+  // DERIVED, not typed, and that is not tidiness. It was the literal 20, with
+  // a comment in constants.js justifying it as "0.70s * 26.3 u/s = 18.4" --
+  // but 26.3 u/s is RECORD pace, not the fastest the runner ever goes. At the
+  // pace floor the airborne span is longer, and when the floor moved 4:20 ->
+  // 4:14 the span went to 19.84 against a window of 20. A 0.16-unit margin,
+  // 0.8%, on the invariant that stops the course demanding a jump and a slide
+  // at once -- reached silently, by editing a different file.
+  //
+  // Now it follows the arc and the top speed, so a retune of either moves it.
+  // The +1 is real headroom rather than a rounding artefact: the generator
+  // pushes gate spacing right down to this number, so the two are the same
+  // constraint seen from both ends.
+  const MAX_SPEED = (K.UNITS_PER_MILE * K.TIME_SCALE) / K.FLOOR_PACE;
+  const ACTION_WINDOW = Math.ceil(K.JUMP_TIME * MAX_SPEED) + 1;
   const START_GRACE = 150;   // clean runway so the first seconds read calmly
   const FINISH_GRACE = 190;  // clean straight into the tape
 
@@ -146,12 +160,15 @@ MR.Course = (function () {
 
   function spacingAt(f, rnd) {
     const d = difficulty(f);
-    // 44 units early -> 21 late. The floor is 20 rather than 22 because
-    // ACTION_WINDOW is 20 and the solver rejects anything that would demand
-    // two conflicting actions inside it -- so the generator can be pushed to
-    // the edge of that rule and let the proof hold the line.
+    // 44 units early, tightening as difficulty rises. The floor is
+    // ACTION_WINDOW itself rather than a number chosen to sit near it: the
+    // solver rejects anything that would demand two conflicting actions inside
+    // that distance, so the generator can be pushed right to the edge of the
+    // rule and let the proof hold the line. Tying the two together means a
+    // retune of the jump arc or the pace floor moves both ends of the same
+    // constraint at once, instead of moving one and leaving the other stale.
     const mean = 44 - 23 * d;
-    return Math.max(20, mean * rnd.range(0.84, 1.16));
+    return Math.max(ACTION_WINDOW, mean * rnd.range(0.84, 1.16));
   }
 
   /** Hazard mix widens as difficulty rises. */

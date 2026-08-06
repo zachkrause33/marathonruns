@@ -162,8 +162,15 @@ MR.K = (function () {
     LANE_CHANGE_TIME: 0.16 * Math.sqrt(LANE_W / 2.35),
     JUMP_HEIGHT: 2.05,
     // Airborne long enough to be humanly timeable, but still shorter than
-    // Course.ACTION_WINDOW (20 units) so a jump can never still be in the air
-    // at a gate demanding a slide: 0.70s * 26.3 u/s = 18.4 units.
+    // Course.ACTION_WINDOW, so a jump can never still be in the air at a gate
+    // demanding a slide.
+    //
+    // That comparison has to be made at the FASTEST the runner ever moves, not
+    // at record pace. This comment used to read "0.70s * 26.3 u/s = 18.4
+    // units" -- 26.3 is record pace, and the runner spends most of a good race
+    // faster than that. At the pace floor it is 28.35 u/s and the span is
+    // 19.84 units. course.js now derives ACTION_WINDOW from this number rather
+    // than restating a stale product of it.
     JUMP_TIME: 0.70,
     DUCK_TIME: 0.78,
     INPUT_BUFFER: 0.20,             // late/early press forgiveness

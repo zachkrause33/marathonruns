@@ -328,6 +328,95 @@ MR.World = (function () {
     return texture(c, true);
   }
 
+  /**
+   * The road surface, and the single biggest thing this world was missing.
+   *
+   * Subway Surfers' track bed is railway sleepers -- a hard perpendicular
+   * stripe roughly every world unit. At speed that is a strobe streaming under
+   * the player and it is the dominant speed cue in the game. Our road carried
+   * lane dashes every twelve units, an order of magnitude less often, so the
+   * largest surface on screen was flat colour that never changed. The camera
+   * pass reported the same gap from its own side and had already been pushed to
+   * the limit of what framing can do; the remaining headroom was here.
+   *
+   * It is a TEXTURE and not geometry, and that is the whole reason it is
+   * affordable. The road is one merged box per tile and roughly half the frame;
+   * baking the detail into its map costs zero extra draws, zero extra fill and
+   * zero extra triangles, and mipmapping does the anti-aliasing for free -- the
+   * joints strobe hard in the near field, where the speed read lives, and
+   * dissolve into an even value at the vanishing point, where a real strobe
+   * would only alias.
+   *
+   * WHY THESE MARKS. A closed city road is concrete carriageway slabs, so the
+   * high frequency is expansion joints: a groove every 1.2 units, with a lit
+   * lip on one side of it. The PAIR is load-bearing. A single dark line mips
+   * down to a uniform grey by 40 units; a light/dark edge keeps an edge at
+   * every mip level, which is exactly the property a speed cue needs.
+   *
+   * WHY NOT CHEVRONS. They were on the list and they are wrong here: a
+   * forward-pointing triangle on the tarmac is the JUMP telegraph's icon, and
+   * the mats are the readability device the whole game rests on. Everything
+   * below is achromatic and low-contrast on purpose -- value variation the eye
+   * reads as motion, with no hue to compete with amber, cyan or pink.
+   *
+   * The period is chosen so the pattern is continuous down the whole course
+   * with no per-tile bookkeeping: eight slabs of 1.2 units is 9.6, the tile is
+   * 24, so repeat is 2.5 -- and half a texture is four slabs, which is itself a
+   * joint. Whichever half of the map a tile seam lands in, it lands on a joint.
+   */
+  const ROAD_SLAB = 1.2;
+  function roadSurfaceTexture() {
+    const SLABS = 8, PX = 48;
+    const c = canvas(128, SLABS * PX);
+    const g = c.getContext('2d');
+    let s = 7013;
+    const r = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+    g.fillStyle = '#ffffff';
+    g.fillRect(0, 0, c.width, c.height);
+
+    for (let i = 0; i < SLABS; i++) {
+      const y0 = i * PX;
+      // Slab tone, alternating with a little jitter on top. Without the jitter
+      // eight slabs read as one two-slab pattern repeated, which is a 2.4-unit
+      // beat the eye locks on to instead of a 1.2-unit strobe.
+      const t = (i & 1 ? 0.030 : 0.012) + r() * 0.020;
+      g.fillStyle = 'rgba(24,18,48,' + t.toFixed(3) + ')';
+      g.fillRect(0, y0, c.width, PX);
+      // Aggregate. Small and low contrast, but it is what stops the mid mip
+      // levels collapsing to dead flat colour between the joints.
+      for (let k = 0; k < 26; k++) {
+        g.fillStyle = r() > 0.5 ? 'rgba(255,255,255,0.085)' : 'rgba(24,18,48,0.065)';
+        g.fillRect(r() * c.width, y0 + r() * PX, 2 + r() * 7, 2 + r() * 3);
+      }
+      // The joint: groove, then lip.
+      g.fillStyle = 'rgba(20,14,42,0.30)';
+      g.fillRect(0, y0, c.width, 4);
+      g.fillStyle = 'rgba(255,255,255,0.26)';
+      g.fillRect(0, y0 + 4, c.width, 3);
+    }
+    // A patched repair, spanning two slabs and crossing their joints. It is the
+    // one irregular mark on the map and it is what stops the 9.6-unit period
+    // from reading as a tile once the eye has learned the joint rhythm.
+    g.fillStyle = 'rgba(24,18,48,0.075)';
+    g.fillRect(16, PX * 2 + 9, 52, PX * 2 - 14);
+    g.fillStyle = 'rgba(24,18,48,0.16)';
+    g.fillRect(16, PX * 2 + 9, 52, 3);
+    g.fillRect(16, PX * 4 - 8, 52, 3);
+    // Gutter grime, at the tarmac edge on both sides. repeat.x is 1, so u maps
+    // straight onto the carriageway and these land exactly at the kerb line.
+    g.fillStyle = 'rgba(24,18,48,0.10)';
+    g.fillRect(0, 0, 7, c.height);
+    g.fillRect(c.width - 7, 0, 7, c.height);
+
+    const t = texture(c, true);
+    // The road is the one surface seen at a grazing angle for its whole length,
+    // which is precisely the case trilinear filtering handles worst. Doubling
+    // anisotropy here and nowhere else is what carries the joints out to the
+    // middle distance instead of losing them at thirty units.
+    t.anisotropy = 8;
+    return t;
+  }
+
   /** Checker band for the finish gantry. */
   function checkerTexture() {
     const c = canvas(128, 32);
@@ -635,9 +724,10 @@ MR.World = (function () {
     const vergeTex = groundTex.clone();
     vergeTex.repeat.set(5, 4);
     vergeTex.needsUpdate = true;
-    const roadTex = groundTex.clone();
-    roadTex.repeat.set(3, 3);
-    roadTex.needsUpdate = true;
+    // 24 / (8 * 1.2) -- see roadSurfaceTexture for why the number has to be
+    // exactly this and why the tile seam lands on a joint either way.
+    const roadTex = roadSurfaceTexture();
+    roadTex.repeat.set(1, TILE / (8 * ROAD_SLAB));
 
     const mats = {
       road: S.toon(P.road, 2),
@@ -739,11 +829,73 @@ MR.World = (function () {
       return merge(parts);
     })();
 
-    /** Kerb + pavement: without it the tarmac sits straight on grass. */
-    function pavement(parts, sx, top, kerb) {
+    /**
+     * Kerb + pavement: without it the tarmac sits straight on grass.
+     *
+     * Both now carry the same high frequency the carriageway does, and the KERB
+     * is the more valuable of the two. It runs the full length of the frame
+     * right at the edge of the play corridor, so a notch every two units sits
+     * in the player's peripheral vision for the entire race -- which is where a
+     * speed cue does its work, because the centre of the frame is busy being
+     * read. Geometry rather than texture here only because these are merged
+     * into a tile mesh that is already being drawn: 24 little boxes cost
+     * triangles, which are free, and no submissions, which are not.
+     */
+    const PAVE_JOINT = 2.0;
+    function pavement(parts, sx, top, kerb, joint) {
       const x = sx * (K.TRACK_HALF_WIDTH + 4.0);
+      const kx = sx * (K.TRACK_HALF_WIDTH + 0.17);
       parts.push(bx(8.0, 0.30, TILE, x, -0.16, 0, top));
-      parts.push(bx(0.34, 0.34, TILE, sx * (K.TRACK_HALF_WIDTH + 0.17), 0.0, 0, kerb));
+      parts.push(bx(0.34, 0.34, TILE, kx, 0.0, 0, kerb));
+      const n = Math.round(TILE / PAVE_JOINT);
+      for (let i = 0; i < n; i++) {
+        const z = -TILE / 2 + PAVE_JOINT * 0.5 + i * PAVE_JOINT;
+        parts.push(bx(7.9, 0.05, 0.13, x, 0.0, z, joint));
+        parts.push(bx(0.36, 0.36, 0.09, kx, 0.0, z, joint));
+      }
+    }
+
+    // ---- the overhead layer -----------------------------------------------
+    /**
+     * Wires, spans and bunting crossing the road -- baked into the ROAD TILE
+     * rather than pooled as objects.
+     *
+     * This is the other half of Subway Surfers' depth and the layer we had
+     * least of. Something crosses that game's frame every second or two, at
+     * several depths; we had mile gantries every 240 units and nothing between,
+     * which is one crossing every nine seconds. Overhead earns its place
+     * because it passes CLOSE TO THE LENS and therefore sweeps top-to-bottom
+     * fast -- vertical parallax that no amount of ground detail can imitate,
+     * however dense the ground gets.
+     *
+     * Baking it into the tile is what makes it free. Each tile already draws
+     * one merged edge mesh per biome, so a mast, a span wire and fifteen
+     * bunting pennants cost triangles instead of draw calls. SPAN_Z puts two
+     * crossings in every 24-unit tile -- one every 12 units, or roughly every
+     * half second at race pace -- and offsets them from the tile boundary so
+     * neighbouring tiles never stack two spans in the same place.
+     *
+     * NOTHING HERE MAY OBSCURE THE NEXT GATE, and the geometry is what
+     * guarantees it rather than care. Everything is at or above OVERHEAD_Y.
+     * The chase camera sits near y = 2.7 and a gate is read at 40-90 units,
+     * where the road is at or below the camera axis; a member at 9.4 units is
+     * 9 degrees ABOVE that axis at 40 units and less further out, so it crops
+     * the top of the frame and can never come between the lens and a hazard.
+     */
+    const SPAN_Z = [-6, 6];
+
+    /**
+     * The pennant string. Race bunting is the one piece of overhead dressing
+     * that is unambiguously about a marathon rather than about a city, so it
+     * runs on every biome that gets a span. The flags face back down the course
+     * because that is the only face the runner ever sees.
+     */
+    const BUNTING = [0xff3b6b, 0xffe45e, 0x37d6ff, 0xfffdf5, 0x59d47a];
+    function bunting(parts, halfSpan, y, z, n) {
+      for (let k = 0; k < n; k++) {
+        const fx = -halfSpan + 0.5 + k * ((halfSpan * 2 - 1.0) / (n - 1));
+        parts.push(bx(0.44, 0.48, 0.05, fx, y, z, BUNTING[k % BUNTING.length]));
+      }
     }
 
     /**
@@ -755,7 +907,7 @@ MR.World = (function () {
       const parts = [];
       for (const sx of [-1, 1]) {
         const x = sx * (K.TRACK_HALF_WIDTH + 0.85);
-        pavement(parts, sx, 0xb9bdd6, 0xe8ecff);
+        pavement(parts, sx, 0xb9bdd6, 0xe8ecff, 0x8f93ad);
         parts.push(bx(0.10, 0.09, TILE, x, 0.92, 0, 0xf2f4ff));
         parts.push(bx(0.09, 0.07, TILE, x, 0.60, 0, 0xdfe6ff));
         for (let i = 0; i < 8; i++) {
@@ -772,6 +924,33 @@ MR.World = (function () {
           parts.push(bx(0.9, 1.1, 0.10, lx, 4.6, lz, sx > 0 ? 0x37d6ff : 0xff9ad5));
         }
       }
+      // City overhead: tram catenary, plus bunting on the second span.
+      //
+      // The LONGITUDINAL wires are the part that surprised me. Cross-spans give
+      // the strobe, but three wires running the whole length of the tile
+      // converge on the vanishing point, and that convergence is what actually
+      // reads as depth in the reference frames -- a hard perspective line above
+      // the road, which nothing else in this scene provides.
+      const MX = K.TRACK_HALF_WIDTH + 2.6;   // mast line, just outside the lamps
+      for (const wx of [-LANE, 0, LANE]) {
+        parts.push(bx(0.07, 0.07, TILE, wx, 9.30, 0, 0x2b2f52));
+      }
+      for (let i = 0; i < SPAN_Z.length; i++) {
+        const sz = SPAN_Z[i];
+        const h = i ? 10.1 : 10.9;
+        for (const sx of [-1, 1]) {
+          parts.push(bx(0.26, h, 0.26, sx * MX, h / 2, sz, 0x2b2f52));
+          parts.push(bx(0.95, 0.16, 0.16, sx * (MX - 0.48), h - 0.55, sz, 0x2b2f52));
+        }
+        parts.push(bx(MX * 2, 0.11, 0.11, 0, 9.74, sz, 0x2b2f52));
+        parts.push(bx(MX * 2, 0.07, 0.07, 0, 10.34, sz, 0x3a4570));
+        // Droppers, so the span visibly carries the contact wires rather than
+        // three wires and a beam happening to be at the same place.
+        for (const wx of [-LANE, 0, LANE]) {
+          parts.push(bx(0.06, 0.44, 0.06, wx, 9.52, sz, 0x2b2f52));
+        }
+        if (i) bunting(parts, MX, 9.44, sz + 0.09, 15);
+      }
       return merge(parts);
     })();
 
@@ -780,7 +959,7 @@ MR.World = (function () {
       const parts = [];
       for (const sx of [-1, 1]) {
         const x = sx * (K.TRACK_HALF_WIDTH + 1.6);
-        pavement(parts, sx, 0xd8c9a0, 0xefe3c2);
+        pavement(parts, sx, 0xd8c9a0, 0xefe3c2, 0xb0a37e);
         parts.push(bx(1.5, 0.78, TILE, x, 0.28, 0, 0x2f9f52));
         parts.push(bx(1.62, 0.16, TILE, x, 0.68, 0, 0x49c96b));
         for (let i = 0; i < 4; i++) {
@@ -805,6 +984,20 @@ MR.World = (function () {
           parts.push(cone(1.20 * k, 1.7 * k, 8, tx, 3.6 * k, tz, 0x3fbf63));
           parts.push(cone(0.82 * k, 1.4 * k, 8, tx, 4.6 * k, tz, 0x59d47a));
         }
+      }
+      // Park and riverside overhead: bunting on slim poles and nothing else.
+      // These legs are meant to feel open, so they get the crossing rhythm
+      // without the ironwork the city carries. The poles stand INSIDE the
+      // avenue, at the hedge line rather than beyond it, so a mast never grows
+      // out of a tree canopy.
+      const MX = K.TRACK_HALF_WIDTH + 0.9;
+      for (const sz of SPAN_Z) {
+        for (const sx of [-1, 1]) {
+          parts.push(cyl(0.12, 0.17, 10.0, 6, sx * MX, 5.0, sz, 0xfff2e0));
+          parts.push(bx(0.5, 0.14, 0.14, sx * (MX - 0.24), 9.72, sz, 0xfff2e0));
+        }
+        parts.push(bx(MX * 2, 0.09, 0.09, 0, 9.76, sz, 0xfff2e0));
+        bunting(parts, MX, 9.42, sz + 0.08, 11);
       }
       return merge(parts);
     })();
@@ -857,7 +1050,7 @@ MR.World = (function () {
       // Centres of the 4-unit openings left between them, in tile coordinates.
       const GAPS = [[-2, 10], [-10, 2]];
       for (const sx of [-1, 1]) {
-        pavement(parts, sx, 0x8c8a96, 0xb0aeba);
+        pavement(parts, sx, 0x8c8a96, 0xb0aeba, 0x6a6874);
         const x = sx * (K.TRACK_HALF_WIDTH + 0.9);
         parts.push(bx(1.0, 0.55, TILE, x, 0.27, 0, 0xc8c4cc));
         parts.push(bx(0.62, 0.55, TILE, x, 0.80, 0, 0xdedae2));
@@ -898,6 +1091,27 @@ MR.World = (function () {
           parts.push(bx(0.22, 0.22, 4.4, wx, 4.55, gz, 0x3d3846));
         }
       }
+      // THE WALL overhead: the scaffold continues over the road. This leg is
+      // the one place a birdcage above the carriageway is not a liberty -- the
+      // whole conceit is that the runner is passing through a works site -- and
+      // it closes the trench at the top as well as at the sides. The boards are
+      // deliberately narrow and staggered: a solid deck would drop the light on
+      // a leg that is already the darkest in the race.
+      const MX = K.TRACK_HALF_WIDTH + 7.6;
+      const TUBE = 0x8f8a9c, TUBE2 = 0x6f6a7c;
+      for (const tx of [-2.6, 0, 2.6]) {
+        parts.push(bx(0.13, 0.13, TILE, tx, 9.78, 0, TUBE));
+      }
+      for (let i = 0; i < SPAN_Z.length; i++) {
+        const sz = SPAN_Z[i];
+        for (const sx of [-1, 1]) {
+          parts.push(bx(0.24, 10.4, 0.24, sx * MX, 5.2, sz, TUBE));
+        }
+        parts.push(bx(MX * 2, 0.16, 0.16, 0, 9.48, sz, TUBE));
+        parts.push(bx(MX * 2, 0.13, 0.13, 0, 10.24, sz, TUBE2));
+        parts.push(bx(9.4, 0.11, 0.11, 0, 9.88, sz + 0.45, TUBE, 0, 0, i ? 0.15 : -0.15));
+        parts.push(bx(3.4, 0.10, 1.6, i ? -3.2 : 3.2, 10.08, sz, 0xc0a878));
+      }
       return merge(parts);
     })();
 
@@ -916,6 +1130,26 @@ MR.World = (function () {
           const z = -TILE / 2 + 6 + i * 12;
           parts.push(bx(0.16, 3.4, 0.16, x, 1.7, z, 0x2b2f52));
           parts.push(bx(0.5, 0.24, 0.5, x, 3.5, z, 0xffe45e));
+        }
+      }
+      // Bridge overhead: lighting portals. The deck is the one leg with no
+      // roadside at all, so it was also the leg with no crossing rhythm
+      // whatever -- a ribbon over open water, and a ribbon over nothing has no
+      // speed. The portals are the only structure a suspension deck can
+      // honestly carry, and the two runners above them give the same
+      // convergence the city wires do.
+      const MX = K.TRACK_HALF_WIDTH + 0.78;
+      for (const wx of [-LANE * 1.55, LANE * 1.55]) {
+        parts.push(bx(0.07, 0.07, TILE, wx, 9.98, 0, 0x2b2f52));
+      }
+      for (const sz of SPAN_Z) {
+        for (const sx of [-1, 1]) {
+          parts.push(bx(0.22, 9.7, 0.22, sx * MX, 4.85, sz, 0x2b2f52));
+        }
+        parts.push(bx(MX * 2, 0.26, 0.26, 0, 9.62, sz, 0x2b2f52));
+        parts.push(bx(MX * 2, 0.13, 0.13, 0, 10.14, sz, 0x3a4570));
+        for (const lx of [-LANE, LANE]) {
+          parts.push(bx(0.34, 0.30, 0.34, lx, 9.32, sz, 0xffe45e));
         }
       }
       return merge(parts);

@@ -126,6 +126,39 @@ MR.Runner = (function () {
   // silhouette rule this must not break.
   const SLIDE_YAW = 0.42;
 
+  // ---- the slide's head --------------------------------------------------
+  // The other half of the same problem, and the half three passes got exactly
+  // backwards. The reference frame is unambiguous: Temple Run's slider is flat
+  // on their back with the head COMPLETELY out of the silhouette -- legs up the
+  // path, torso, then arms out wide nearest the lens, a low wide X. Nothing
+  // stands above the back.
+  //
+  // This rig used to hold the head level right through the slide, which stands
+  // a skull 0.57 across straight up off a body lying at 15 degrees and rings it
+  // with the brightest colour on the character. Measured before this change:
+  // crown 1.31 with the hips at 0.44 -- two thirds of the figure's standing
+  // height, on a pose whose whole job is to be low. That is a crouch, and it is
+  // why extending the legs never worked; the top of the shape was a head.
+  //
+  // Three terms put it away, and it takes all three. Pitch alone leaves the
+  // skull sitting on the shoulder line, and sink alone leaves it a symmetric
+  // dome centred on the spine:
+  //   X  extension PAST the reclined chest, so the crown swings back and down
+  //      toward the shoulder blades instead of standing off the neck. The
+  //      chest reclines to -1.10, so -0.62 here lays the head at -1.72 from
+  //      vertical -- past flat, crown toward the camera, which is the one
+  //      direction this view foreshortens INTO the body.
+  //   Z  a roll onto the trailing shoulder, which breaks the symmetry and
+  //      turns the headband edge-on.
+  //   sink the neck pivot down the spine until the skull seats between the
+  //      deltoids. Rotation cannot do this part: it moves the crown but leaves
+  //      the jaw proud of the vest.
+  // Every one of them is scaled by `slid`, so recovery runs the whole tuck
+  // backwards in step with the body coming up and never pops.
+  const NECK_SLIDE_X = -0.62;
+  const NECK_SLIDE_Z = 0.34;
+  const NECK_SLIDE_SINK = 0.13;
+
   const OUTLINE = MR.shading.INK.character;
 
   // Accent that ties the silhouette together: headband, wristbands, shoe
@@ -1190,21 +1223,45 @@ MR.Runner = (function () {
       // from reading as a rigid block bolted to the spine.
       hips.rotation.z = Math.sin(p) * 0.055 * cycD;
 
-      // Head stays level: cancel most of the spine lean, add a small lag. The
-      // cancel is what the slide needs too, and for once it needs it at full
-      // strength -- the recline is nearly 45 degrees, and a head left in line
-      // with it stares at the sky and reads as falling over backwards. Level
-      // keeps the eyeline down the road and, incidentally, presents the hair
-      // and headband to the camera instead of the underside of a chin.
-      neck.rotation.x = -leanFwd * 0.86 + Math.sin(p * 2) * 0.035 * (1 - slid * 0.9);
-      neck.rotation.z = lean * 0.14;
-      // Unwind most of SLIDE_YAW at the neck. A slider keeps their eyes on the
-      // bag; leaving the head square to a body turned 26 degrees would point
-      // the face off into the barrier. It also pays twice over from behind --
-      // a head counter-turned against the shoulders is the clearest possible
-      // statement that the shoulders are turned at all, and it keeps the hair
-      // and headband presented flat to the camera where the pinch reads.
-      neck.rotation.y = -Math.sin(p) * 0.10 - slid * SLIDE_YAW * 0.70;
+      // Head. Running and airborne it stays level: cancel most of the spine
+      // lean, add a small lag, so the eyeline holds down the road and the dark
+      // hair sits above the lit neck where the pinch reads.
+      //
+      // The slide does the OPPOSITE, and this is the correction that settles
+      // three failed passes at the pose. The old code kept the level-cancel at
+      // full strength through a slide "so it presents hair and headband rather
+      // than a chin" -- and measured, that stood a 0.57 skull straight up off a
+      // body lying at 15 degrees: crown 1.31 against a hip line at 0.44, with
+      // the brightest object on the character (the headband) ringing it. From
+      // directly behind that is a head on top of a low mass, which is the
+      // definition of a crouch, and no amount of leg extension can outvote it
+      // because the legs point down the view axis and the head does not.
+      //
+      // Temple Run's slide has NO head in the silhouette: legs up the path,
+      // then torso, then arms out wide nearest the lens. So the neck here
+      // extends INTO the body instead of cancelling -- see NECK_SLIDE_X.
+      neck.rotation.x = (-leanFwd * 0.86 + Math.sin(p * 2) * 0.035) * (1 - slid)
+        + slid * NECK_SLIDE_X;
+      // Roll the crown down onto the trailing shoulder. Pitch alone leaves the
+      // skull symmetric about the spine, and a symmetric lump centred on the
+      // body reads as a head however low it is; tipped onto one shoulder it
+      // reads as part of the shoulder mass. It also turns the headband -- a
+      // cylinder around the skull -- from a bright disc facing the lens into a
+      // band seen nearly edge-on.
+      neck.rotation.z = lean * 0.14 + slid * NECK_SLIDE_Z;
+      // Turn the face off the camera axis. With the head laid back, a face left
+      // square would point up and back into the lens, which is a fall, not a
+      // slide; turned, the camera gets hair and an ear. The term is also what
+      // it always was -- a head counter-rotated against shoulders turned by
+      // SLIDE_YAW is the clearest possible statement that they are turned.
+      neck.rotation.y = -Math.sin(p) * 0.10 - slid * SLIDE_YAW * 1.15;
+      // ...and sink it. Rotation gets the crown down; only translation gets it
+      // INSIDE. The neck pivot drops along the spine until the skull is seated
+      // between the deltoids, so the welded neck column disappears into the
+      // vest and what is left above the back is a cap of hair rather than a
+      // head on a neck. Nothing else hangs off this pivot, so it costs the
+      // pose nothing anywhere else.
+      neck.position.y = (NECK_Y - CHEST_Y) - slid * NECK_SLIDE_SINK;
 
       // Whole-body bank into a lane change reads as weight, not a slide.
       // The slide adds its own, tipping onto the hip it is riding on: a body

@@ -142,7 +142,7 @@ MR.Course = (function () {
    * having.
    */
   function generateAid(key, gates) {
-    const rnd = MR.rng.stream(key, 'aid/v2');
+    const rnd = MR.rng.stream(key, 'aid/v3');
     const items = [];
     if (!gates.length) return items;
 
@@ -168,17 +168,46 @@ MR.Course = (function () {
           if (here !== K.BLOCK && next !== K.BLOCK) open.push(l);
         }
         if (open.length) {
-          // ONE item, never a cluster. A run of five bottles fired five
-          // pickups inside a second and a half, which read as a single smear
-          // rather than as a decision -- and the decision is the whole point,
-          // because the aid lane is often not the lane the racing line wants.
-          const lane = open[rnd.int(0, open.length - 1)];
-          // Fruit gets commoner as the race goes on: it is the bigger top-up,
-          // and the late race is where a broken run needs it.
-          const fruit = rnd.chance(0.12 + 0.46 * f * f);
+          // WHICH lane the aid goes in is the whole design of it.
+          //
+          // Dropping it in a random passable lane made it free: if the racing
+          // line already ran through that lane you collected it without
+          // deciding anything. Aid should be a trade -- leave the easy line,
+          // clear something, get paid -- so the lane is chosen to be the
+          // HARDEST one that is still legal, not an arbitrary one.
+          //
+          // Difficulty is scored from the gates either side of the gap,
+          // because those are what the player has to survive to be in this
+          // lane at this moment:
+          //   an action at the gate BEFORE  -- you had to clear something to
+          //                                   get here
+          //   an action at the gate AFTER   -- you have to clear something on
+          //                                   the way out, still in this lane
+          //   off-centre                    -- costs a lane change and gives
+          //                                   up the middle, which is the lane
+          //                                   with an escape on both sides
+          //
+          // The lane is still guaranteed passable at both gates, so this makes
+          // aid demanding without ever making it a trap. Nothing here can
+          // reach a BLOCK: `open` excluded those before scoring.
+          let lane = open[0], best = -1;
+          for (const l of open) {
+            const before = gates[gi].lanes[l];
+            const after = gi + 1 < gates.length ? gates[gi + 1].lanes[l] : K.CLEAR;
+            let score = 0;
+            if (before === K.JUMP || before === K.DUCK) score += 3;
+            if (after === K.JUMP || after === K.DUCK) score += 3;
+            if (l !== 1) score += 1;
+            // Break ties from the seeded stream so a course still varies.
+            score += rnd.next() * 0.9;
+            if (score > best) { best = score; lane = l; }
+          }
+
+          const f2 = z / K.TOTAL_UNITS;
+          const fruit = rnd.chance(0.12 + 0.46 * f2 * f2);
           items.push(fruit
-            ? { z, lane, kind: 'banana', gain: K.AID_BANANA }
-            : { z, lane, kind: 'water', gain: K.AID_WATER });
+            ? { z, lane, kind: 'banana', gain: K.AID_BANANA, guarded: best >= 3 }
+            : { z, lane, kind: 'water', gain: K.AID_WATER, guarded: best >= 3 });
         }
       }
 

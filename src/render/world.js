@@ -5403,6 +5403,452 @@ MR.World = (function () {
       return g;
     }, group);
 
+    /**
+     * ================== THE FINISH STAND ==================
+     *
+     * The chute's own grandstand, and the difference between it and the one
+     * above is DEPTH, not headcount.
+     *
+     * The stands that run the last mile put their nearest spectator 5.4 units
+     * off the centre line and five rows deep -- a low band at the edge of the
+     * frame that the eye reads as texture. A finish straight does not look
+     * like that. What makes one is people PRESSED AGAINST THE BARRIER, close
+     * enough that individual bodies are a hand's width of screen and their
+     * movement is legible: the front two rows are standing, leaning over the
+     * rail, and they are the only crowd in this game that the player ever sees
+     * as people rather than as a mass.
+     *
+     * So the budget goes to the front. Sixteen standing figures in two rows at
+     * x = 0.6 and 1.5 take 55% of the triangles; the six seated rows behind
+     * them take the rest, and the back three of those are already banded
+     * because at that depth they are behind the front rows anyway. The rear
+     * wall and roof line are what let the street wall be switched off in the
+     * chute (see the street pass) -- this becomes the thing the road runs
+     * between, which is what a finish arena actually is.
+     *
+     * FAIRNESS: local x runs from 0 outward and the object stands at
+     * TRACK_HALF_WIDTH + 0.55 = 4.30, so the nearest triangle is at 4.10
+     * against a CORRIDOR_HALF of 3.75 and a barrier line of 4.60. The crowd is
+     * BEHIND the barrier, which is both correct and the reason it can never be
+     * confused with anything on the road. Nothing reaches over the corridor at
+     * any height.
+     */
+    const FSTAND_X = K.TRACK_HALF_WIDTH + 0.55;
+    const FSTAND_LOD = 118;
+    function finishStandParts(seed, banded) {
+      const parts = [];
+      const shirts = [0xff4d5e, 0x37d6ff, 0xffe45e, 0x59d47a, 0xff9ad5, 0xffb020,
+                      0xfff2e0, 0x9a7bff];
+      const skins = [0xffc79a, 0xe0a173, 0xb87a4e, 0x8a5a3c];
+      const flags = [0xffe45e, 0xfffdf5, 0x37d6ff, 0xff9ad5, 0xff4d5e];
+      const r = lcg(seed);
+
+      // ---- the front rail: the reason this object exists -----------------
+      if (banded) {
+        for (const rx of [0.62, 1.52]) {
+          parts.push(wv(bx(0.46, 0.72, TILE - 1.0, rx, 1.05, 0, 0xc2926f), rx * 3.1, 0.5));
+          parts.push(wv(bx(0.30, 0.30, TILE - 1.0, rx, 1.56, 0, 0xe8bd94), rx * 3.1, 0.5));
+        }
+      } else {
+        for (let row = 0; row < 2; row++) {
+          const rx = 0.62 + row * 0.90;
+          const n = 8;
+          for (let i = 0; i < n; i++) {
+            const z = -TILE / 2 + 1.4 + i * ((TILE - 2.8) / (n - 1)) + (r() - 0.5) * 0.7;
+            const h = 0.94 + r() * 0.20;
+            const shirt = shirts[Math.floor(r() * shirts.length)];
+            const skin = skins[Math.floor(r() * skins.length)];
+            const ph = z * 0.55 + row * 2.3 + r() * 2.0;
+            parts.push(wv(bx(0.36, 0.66 * h, 0.26, rx, 0.33 * h, z, 0x2b2f52), ph, 0.6));
+            parts.push(wv(bx(0.50, 0.70 * h, 0.34, rx, 1.02 * h, z, shirt), ph, 1.15));
+            parts.push(wv(bx(0.30, 0.30, 0.28, rx, 1.52 * h, z, skin), ph, 1.15));
+            // One in three has both arms over their head, one in three is
+            // waving something. A crowd where everybody does the same thing
+            // is a chorus line; the mix is what makes it a crowd.
+            const k = (i + row) % 3;
+            if (k === 0) {
+              parts.push(wv(bx(0.13, 0.62, 0.13, rx - 0.30, 1.44 * h, z, skin, 0, 0, 0.40), ph, 1.7));
+              parts.push(wv(bx(0.13, 0.62, 0.13, rx + 0.30, 1.44 * h, z, skin, 0, 0, -0.40), ph, 1.7));
+            } else if (k === 1) {
+              parts.push(wv(bx(0.10, 0.86, 0.10, rx - 0.24, 1.72 * h, z, 0x8a5a3c), ph, 1.9));
+              parts.push(wv(bx(0.62, 0.42, 0.06, rx - 0.24, 2.16 * h, z,
+                flags[Math.floor(r() * flags.length)]), ph, 2.3));
+            } else {
+              parts.push(wv(bx(0.13, 0.50, 0.13, rx - 0.30, 1.06 * h, z, shirt, 0, 0, 0.22), ph, 1.0));
+              parts.push(wv(bx(0.13, 0.50, 0.13, rx + 0.30, 1.06 * h, z, shirt, 0, 0, -0.22), ph, 1.0));
+            }
+          }
+        }
+      }
+
+      // ---- stepped seating behind ---------------------------------------
+      for (let row = 0; row < 6; row++) {
+        const y = 0.55 + row * 0.80;
+        const x = 2.65 + row * 1.05;
+        parts.push(bx(1.05, 0.80, TILE, x, y - 0.40, 0, row % 2 ? 0x8e99c6 : 0x6f7aa8));
+        if (banded || row >= 3) {
+          parts.push(wv(bx(0.42, 0.50, TILE - 2.0, x - 0.08, y + 0.61, 0, 0xc2b087), row * 1.9, 0.34));
+          parts.push(wv(bx(0.24, 0.24, TILE - 2.0, x - 0.08, y + 0.98, 0, 0xe8bd94), row * 1.9, 0.34));
+        } else {
+          for (let i = 0; i < 9; i++) {
+            const z = -TILE / 2 + 1.4 + i * 2.6 + (r() - 0.5) * 0.6;
+            const ph = z * 0.44 + row * 1.6 + r() * 1.6;
+            parts.push(wv(bx(0.44, 0.52, 0.30, x - 0.08, y + 0.62, z,
+              shirts[Math.floor(r() * shirts.length)]), ph));
+            parts.push(wv(bx(0.24, 0.24, 0.22, x - 0.08, y + 1.00, z,
+              skins[Math.floor(r() * skins.length)]), ph));
+          }
+        }
+      }
+
+      // ---- the back of the arena ----------------------------------------
+      // This is what replaces the street wall in the chute: a solid rear
+      // elevation at 9.3 with a roof fascia and pennant masts on top of it, so
+      // the horizon behind the crowd is the stadium rather than a hole.
+      parts.push(bx(0.5, 9.6, TILE, 9.30, 4.80, 0, 0x3a3f6e));
+      parts.push(bx(1.5, 0.9, TILE, 8.70, 9.90, 0, 0x2b2f52));
+      parts.push(bx(1.4, 0.35, TILE, 8.75, 10.45, 0, 0xff3b6b));
+      for (const z of [-TILE / 2 + 3, 0, TILE / 2 - 3]) {
+        parts.push(bx(0.20, 3.4, 0.20, 8.75, 12.2, z, 0x2b2f52));
+        parts.push(wv(bx(0.12, 1.5, 1.9, 8.75, 13.3, z,
+          flags[Math.floor(r() * flags.length)]), z * 0.7, 0.9));
+      }
+      return parts;
+    }
+    const finishStandGeo = merge(finishStandParts(4211, false));
+    const finishStandFarGeo = merge(finishStandParts(4211, true));
+    const finishStandPool = Pool(function () {
+      const g = new THREE.Group();
+      const near = S.outlined(finishStandGeo, mats.crowd, S.INK.scenery);
+      const far = S.outlined(finishStandFarGeo, mats.crowd, S.INK.scenery);
+      far.visible = false;
+      g.add(near, far);
+      g.userData.lod = [near, far];
+      return g;
+    }, group);
+
+    /**
+     * ================== THE CHUTE ==================
+     *
+     * One object per road tile across the last CHUTE units, carrying the three
+     * things that say "this is no longer the race, this is the finish":
+     *
+     *   BUNTING   a sagging pennant line across the road. It is the only thing
+     *             in the ending that passes CLOSE to the lens, so it sweeps
+     *             top-to-bottom every 24 units and does more for the sense of
+     *             closing speed than anything on the ground can. Its lowest
+     *             point is 9.72, against an OVERHEAD_Y of 9.0 -- the same rule
+     *             the catenary and the mile gantries obey, checked by
+     *             api.crossings() rather than promised here.
+     *   CARPET    the finish chute laid over the tarmac. Every road race in the
+     *             world does this and it is instantly legible as an ending.
+     *             It sits at y = 0.016, under Y_FLOOR, so it is road paint as
+     *             far as the corridor audit is concerned -- and it is held to
+     *             the last CHUTE units, which course.js keeps clear of gates by
+     *             FINISH_GRACE = 190 with 40 units to spare. Nothing ever
+     *             stands on it, so it cannot change the tarmac a hazard is read
+     *             against. It is a DARK violet, deliberately: hazards are pink,
+     *             amber and cyan, and darkening the surface can only ever
+     *             increase their contrast, never reduce it.
+     *   THE STRIP the pace lights, and the only part of the ending that says a
+     *             number. Two scrolling dashed lines along the kerb, running
+     *             at the speed of the thing being chased -- gold for the
+     *             record, green for a rung still in reach, and cool and slow
+     *             for a run that has settled. It is the athletics Wavelight,
+     *             which is exactly the right borrow: it is what a stadium puts
+     *             beside a runner in the last lap of a record attempt.
+     */
+    const carpetTex = (function () {
+      const c = canvas(64, 128);
+      const g = c.getContext('2d');
+      g.fillStyle = '#2c2352'; g.fillRect(0, 0, 64, 128);
+      g.fillStyle = 'rgba(255,255,255,0.10)';
+      for (let i = 0; i < 4; i++) g.fillRect(0, i * 32, 64, 3);
+      g.fillStyle = 'rgba(255,255,255,0.06)';
+      g.fillRect(2, 0, 3, 128); g.fillRect(59, 0, 3, 128);
+      return texture(c, true);
+    })();
+    const stripTex = (function () {
+      const c = canvas(8, 64);
+      const g = c.getContext('2d');
+      g.fillStyle = '#000000'; g.fillRect(0, 0, 8, 64);
+      g.fillStyle = '#ffffff'; g.fillRect(0, 0, 8, 26);
+      return texture(c, true);
+    })();
+    // One material, one map, one offset: every strip in the chute shares them,
+    // so the whole run of lights moves as a single travelling front and the
+    // per-frame cost is one number.
+    const stripMat = new THREE.MeshBasicMaterial({ map: stripTex, color: 0xffe45e });
+    const carpetMat = new THREE.MeshBasicMaterial({ map: carpetTex });
+    const chuteGeo = (function () {
+      const parts = [];
+      const BUNT = [0xff4d5e, 0xffe45e, 0x37d6ff, 0x59d47a, 0xff9ad5, 0xfff2e0];
+      // Same reach as the mile gantry's legs: the bunting is strung from the
+      // same line of posts the rest of the overhead layer hangs off.
+      const span = K.TRACK_HALF_WIDTH + 1.2;
+      // A catenary in five chords. Ends at 11.35, centre at 10.45.
+      const SAG = 0.90, TOP = 11.35, N = 5;
+      const at = (i) => {
+        const u = (i / N) * 2 - 1;
+        return [u * span, TOP - SAG * (1 - u * u)];
+      };
+      for (const sz of [-TILE / 4, TILE / 4]) {
+        for (let i = 0; i < N; i++) {
+          const a = at(i), b = at(i + 1);
+          const dx = b[0] - a[0], dy = b[1] - a[1];
+          parts.push(bx(Math.hypot(dx, dy) + 0.06, 0.08, 0.08,
+            (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, sz, 0x2b2f52, 0, 0, Math.atan2(dy, dx)));
+        }
+        for (let i = 0; i <= 8; i++) {
+          const u = i / 8 * 2 - 1;
+          const y = TOP - SAG * (1 - u * u);
+          parts.push(bx(0.50, 0.62, 0.05, u * span, y - 0.37, sz,
+            BUNT[i % BUNT.length]));
+        }
+      }
+      return merge(parts);
+    })();
+    const chutePool = Pool(function () {
+      const g = new THREE.Group();
+      g.add(S.outlined(chuteGeo, mats.prop, S.INK.banner));
+
+      const carpet = new THREE.Mesh(
+        new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, TILE), carpetMat);
+      carpet.rotation.x = -Math.PI / 2;
+      carpet.position.y = 0.016;
+      carpet.renderOrder = 1;      // under the racing line (3) and the mats (5)
+      g.add(carpet);
+
+      for (const sx of [-1, 1]) {
+        const st = new THREE.Mesh(new THREE.PlaneGeometry(0.26, TILE), stripMat);
+        st.rotation.x = -Math.PI / 2;
+        st.position.set(sx * (K.TRACK_HALF_WIDTH - 0.22), 0.020, 0);
+        st.renderOrder = 2;
+        g.add(st);
+      }
+      return g;
+    }, group);
+    carpetTex.repeat.set(1, TILE / 8);
+    // Two units per dash, and TILE/2 is a whole number of them, so the lights
+    // run continuously from tile to tile instead of restarting at every seam.
+    stripTex.repeat.set(1, TILE / 2);
+
+    /**
+     * ================== THE TAPE ==================
+     *
+     * The single object this whole task is about. Four boxes, two of which
+     * move, and it is worth more than everything else in the ending put
+     * together, because it is the only thing on the course that BREAKS.
+     *
+     * Built as two halves hinged on their own posts rather than as one ribbon
+     * that vanishes. When the runner arrives, each half swings back and
+     * outward about its post and sags: the tape ends up trailing along the
+     * barrier line, which is what a broken tape does and what a photograph of
+     * a marathon finish always shows. Nothing is deleted and nothing fades --
+     * this renderer has no transparency to spare, and a thing that swings is
+     * more legible than a thing that disappears anyway.
+     *
+     * IT IS EXEMPT FROM THE CORRIDOR AUDIT, and this is the only new exemption
+     * in the ending. The tape crosses the carriageway at chest height, which is
+     * squarely inside the band a BLOCK occupies, so api.crossings() would call
+     * it a low crossing -- correctly, by the letter of the rule.
+     *
+     * The reason it is safe is structural rather than careful: the tape stands
+     * at z = TOTAL_UNITS, the last coordinate the course has. Occlusion means
+     * being BETWEEN THE LENS AND A GATE, and there is no gate beyond the finish
+     * line -- there cannot be, because the race ends there. The screen half of
+     * the audit already reaches that conclusion on its own (it skips any
+     * scenery that is not strictly in front of a gate); only the blanket height
+     * rule needs the exemption, and it needs it for exactly one object whose
+     * whole purpose is to be at chest height across the road.
+     */
+    const TAPE_X = K.TRACK_HALF_WIDTH + 0.30;   // 4.05: outside 3.75, inside the barrier
+    const TAPE_Y = 1.34;
+    const tape = (function () {
+      const g = new THREE.Group();
+      g.userData.notScenery = true;
+      g.userData.auditName = 'finish tape';
+
+      const postGeo = merge([
+        bx(0.16, TAPE_Y + 0.24, 0.16, TAPE_X, (TAPE_Y + 0.24) / 2, 0, 0x2b2f52),
+        bx(0.16, TAPE_Y + 0.24, 0.16, -TAPE_X, (TAPE_Y + 0.24) / 2, 0, 0x2b2f52),
+        bx(0.44, 0.14, 0.44, TAPE_X, 0.07, 0, 0x1b1633),
+        bx(0.44, 0.14, 0.44, -TAPE_X, 0.07, 0, 0x1b1633),
+      ]);
+      g.add(S.outlined(postGeo, mats.prop, S.INK.banner));
+
+      // A half, built running from its own post toward the centre line, so the
+      // group's origin IS the hinge and the swing is one rotation.
+      function halfGeo() {
+        return merge([
+          bx(TAPE_X, 0.22, 0.035, -TAPE_X / 2, 0, 0, 0xfffdf5),
+          bx(TAPE_X, 0.07, 0.045, -TAPE_X / 2, 0.09, 0, 0xff3b6b),
+          bx(TAPE_X, 0.07, 0.045, -TAPE_X / 2, -0.09, 0, 0xffe45e),
+        ]);
+      }
+      const halves = [];
+      for (const sx of [1, -1]) {
+        const h = new THREE.Group();
+        const m = S.outlined(halfGeo(), mats.prop, S.INK.banner);
+        if (sx < 0) m.rotation.y = Math.PI;
+        h.add(m);
+        h.position.set(sx * TAPE_X, TAPE_Y, 0);
+        g.add(h);
+        halves.push(h);
+      }
+      g.position.z = FINISH_Z;
+      g.visible = false;
+      group.add(g);
+
+      return {
+        group: g,
+        halves,
+        reset() {
+          for (const h of halves) { h.rotation.set(0, 0, 0); h.position.y = TAPE_Y; }
+          g.visible = false;
+        },
+        /** @param b seconds since the break, or -1 while it is still up. */
+        update(z, b) {
+          g.visible = z > FINISH_Z - 300;
+          if (!g.visible) return;
+          if (b < 0) {
+            for (const h of halves) { h.rotation.set(0, 0, 0); h.position.y = TAPE_Y; }
+            return;
+          }
+          // Swing hard for the first third of a second, then settle. The ease
+          // is cubic out so the snap is at the front, where the eye is.
+          const t = Math.min(1, b / 1.1);
+          const e = 1 - Math.pow(1 - t, 3);
+          for (let i = 0; i < 2; i++) {
+            const s = i === 0 ? 1 : -1;
+            halves[i].rotation.y = s * 1.85 * e;
+            halves[i].rotation.z = -s * 0.55 * e;
+            // Whip up on the break, then hang.
+            halves[i].position.y = TAPE_Y + Math.sin(Math.min(1, b / 0.42) * Math.PI) * 0.42
+              - 0.55 * e;
+          }
+        },
+      };
+    })();
+
+    /**
+     * ================== CONFETTI ==================
+     *
+     * One InstancedMesh, 300 quads, one draw call and 600 triangles -- the
+     * cheapest thing in the ending and the one that does the most work, because
+     * it is the only element that occupies the MIDDLE of the frame. Everything
+     * else the finish has (arch, stands, bunting, tape) is at the edges or
+     * above; a celebration the camera has to look away from the runner to see
+     * is not a celebration.
+     *
+     * It is also where the verdict is spent hardest. The burst is sized and
+     * coloured from finale: a record fires the whole magazine in gold and white
+     * from four cannons, a run that came apart gets a third of it in cooler
+     * house colours. The difference is meant to be obvious at a glance and
+     * without reading a number, which is the entire brief.
+     *
+     * Exempt from the corridor audit for the same structural reason as the
+     * tape: it does not exist until the runner is ON the finish line, and there
+     * is no gate beyond the finish line.
+     */
+    const CONFETTI_N = 300;
+    const confetti = (function () {
+      const geo = new THREE.PlaneGeometry(0.26, 0.15);
+      const mat = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, vertexColors: false });
+      const mesh = new THREE.InstancedMesh(geo, mat, CONFETTI_N);
+      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      mesh.frustumCulled = false;
+      mesh.visible = false;
+      mesh.userData.notScenery = true;
+      mesh.userData.auditName = 'confetti';
+      mesh.renderOrder = 7;
+      const col = new THREE.InstancedBufferAttribute(new Float32Array(CONFETTI_N * 3), 3);
+      mesh.instanceColor = col;
+      group.add(mesh);
+
+      const px = new Float32Array(CONFETTI_N), py = new Float32Array(CONFETTI_N),
+            pz = new Float32Array(CONFETTI_N);
+      const vx = new Float32Array(CONFETTI_N), vy = new Float32Array(CONFETTI_N),
+            vz = new Float32Array(CONFETTI_N);
+      const sp = new Float32Array(CONFETTI_N);   // spin phase
+      const life = new Float32Array(CONFETTI_N);
+      let live = 0;
+      const m4 = new THREE.Matrix4();
+      const q = new THREE.Quaternion();
+      const e3 = new THREE.Euler();
+      const one = new THREE.Vector3(1, 1, 1);
+      const p3 = new THREE.Vector3();
+      const GOLD = [0xffe45e, 0xfff2c0, 0xffb020, 0xfffdf5, 0xff9ad5];
+      const HOUSE = [0x37d6ff, 0xff4d5e, 0xffe45e, 0xfffdf5, 0x59d47a];
+
+      return {
+        mesh,
+        reset() { live = 0; mesh.visible = false; mesh.count = 0; },
+        /**
+         * @param gold 0..1 -- how much of a record this was.
+         * @param scale 0..1 -- how much of the magazine to fire.
+         */
+        fire(gold, scale) {
+          const n = Math.round(CONFETTI_N * (0.34 + 0.66 * scale));
+          const pal = gold > 0.5 ? GOLD : HOUSE;
+          const r = lcg(9001 + Math.round(gold * 97));
+          for (let i = 0; i < n; i++) {
+            // Two sources, and both are needed. The cannons at the posts throw
+            // ACROSS the frame, which is the part that reads as an event; the
+            // overhead rain fills the air the camera pulls back through.
+            const cannon = i % 3 !== 0;
+            if (cannon) {
+              const s = (i % 2) ? 1 : -1;
+              px[i] = s * TAPE_X; py[i] = 1.5 + r() * 0.4; pz[i] = FINISH_Z + (r() - 0.5) * 2;
+              vx[i] = -s * (5.5 + r() * 5.0);
+              vy[i] = 7.0 + r() * 5.5;
+              vz[i] = (r() - 0.5) * 6.0 - 2.0;
+            } else {
+              px[i] = (r() - 0.5) * 13; py[i] = 11 + r() * 5; pz[i] = FINISH_Z + (r() - 0.5) * 26;
+              vx[i] = (r() - 0.5) * 2.2; vy[i] = -0.4 - r() * 1.2; vz[i] = (r() - 0.5) * 2.4;
+            }
+            sp[i] = r() * 6.28;
+            life[i] = 0;
+            _cA.set(pal[Math.floor(r() * pal.length)]);
+            col.setXYZ(i, _cA.r, _cA.g, _cA.b);
+          }
+          col.needsUpdate = true;
+          live = n;
+          mesh.count = n;
+          mesh.visible = true;
+        },
+        update(dt, camZ) {
+          if (!live) return;
+          let any = 0;
+          for (let i = 0; i < live; i++) {
+            life[i] += dt;
+            // Gravity, air drag, and a lateral flutter that is what makes a
+            // rectangle of card read as paper rather than as gravel.
+            vy[i] -= 11.0 * dt;
+            const drag = Math.pow(0.28, dt);
+            vx[i] *= drag; vz[i] *= drag;
+            vy[i] = Math.max(vy[i], -3.4);
+            px[i] += (vx[i] + Math.sin(life[i] * 5.4 + sp[i]) * 1.5) * dt;
+            py[i] += vy[i] * dt;
+            pz[i] += vz[i] * dt;
+            if (py[i] < 0.03) { py[i] = 0.03; vy[i] = 0; vx[i] = 0; vz[i] = 0; }
+            // Anything the camera has left behind is recycled to the bottom of
+            // the buffer rather than drawn: after the pull-back the far half of
+            // a 300-piece burst is off the back of the lens.
+            const gone = pz[i] < camZ - 6 || life[i] > 14;
+            if (!gone) any++;
+            e3.set(life[i] * 3.1 + sp[i], life[i] * 4.7 + sp[i] * 1.7, sp[i]);
+            q.setFromEuler(e3);
+            p3.set(px[i], gone ? -50 : py[i], pz[i]);
+            m4.compose(p3, q, one);
+            mesh.setMatrixAt(i, m4);
+          }
+          mesh.instanceMatrix.needsUpdate = true;
+          if (!any) { live = 0; mesh.visible = false; }
+        },
+      };
+    })();
+
     // ---- landmarks --------------------------------------------------------
     /**
      * The oversized set dressing: things too big to fit in frame.
@@ -5840,6 +6286,13 @@ MR.World = (function () {
         // weighted(); a building standing in the middle of the river is the
         // kind of thing nobody notices until a screenshot.
         if (kind && !look.mix[kind]) kind = null;
+        // Nothing roadside inside the chute. The lottery's knots stand at
+        // TRACK_HALF_WIDTH + 1.9 to + 5.3, which is now INSIDE the finish
+        // stand: nine spectators buried in a grandstand, at 1,700 triangles a
+        // knot. The chute's crowd is the stand's, and it is a better crowd.
+        // The rng stream is untouched -- the draw is still made and thrown
+        // away -- so every other prop in the race lands exactly where it did.
+        if (z > FINISH_Z - CHUTE) kind = null;
         const set = settingIndexAt(Math.max(0, z), rnd.next());
         if (kind) {
           scenery.push({
@@ -5915,8 +6368,16 @@ MR.World = (function () {
       }
       if (b.name === 'FINAL MILE') {
         for (let z = b.from; z < K.TOTAL_UNITS + 30; z += TILE) {
-          structures.push({ z, kind: 'stand', side: -1, set: 0 });
-          structures.push({ z, kind: 'stand', side: 1, set: 0 });
+          // Inside the chute the ordinary stand is replaced rather than
+          // supplemented: two grandstands a metre apart would be a wall of
+          // triangles the player never sees the back of. See finishStandParts.
+          const k = z > FINISH_Z - CHUTE ? 'fstand' : 'stand';
+          structures.push({ z, kind: k, side: -1, set: 0 });
+          structures.push({ z, kind: k, side: 1, set: 0 });
+        }
+        // The chute's overhead layer and its carpet, one per road tile.
+        for (let z = FINISH_Z - CHUTE; z < K.TOTAL_UNITS + TILE; z += TILE) {
+          structures.push({ z, kind: 'chute', side: 1, set: 0 });
         }
       }
     }
@@ -6051,6 +6512,16 @@ MR.World = (function () {
           if (b.look.bank === side) continue;          // never over the water
           if (deckLift(z) > 0.15) continue;            // nor on the bridge ramp
           const cz = z + STREET_LEN / 2;
+          // THE STREET STOPS AT THE CHUTE, and this is where the finish is
+          // paid for. A terrace row is 3,270 triangles and there are ten live
+          // at mile 25 -- 33k, the single largest line in the frame, and the
+          // most expensive frame in the game. Inside the chute every one of
+          // them stands BEHIND a finish stand whose rear elevation is 9.6
+          // units tall and whose roof line is at 12.2, so what the row buys is
+          // a strip of roof visible over the top of a wall. Switching it off
+          // pays for the packed barrier crowd twice over and the horizon it
+          // used to draw is now drawn by the stand. Measured: -18.6k.
+          if (cz > FINISH_Z - CHUTE - 15) continue;
           if (markBlocks.some((m) => (m.side === 0 || m.side === side)
             && Math.abs(m.z - cz) < 30)) continue;
           const depth = SETS[si].look.terrace.depth;
@@ -6163,6 +6634,8 @@ MR.World = (function () {
         if (kind === 'river') return riverPool;
         if (kind === 'overpass') return overpassPool;
         if (kind === 'stand') return standPool;
+        if (kind === 'fstand') return finishStandPool;
+        if (kind === 'chute') return chutePool;
         if (kind === 'footbridge') return footbridgePool;
         if (kind === 'arch') return archPool;
         if (kind === 'aidTable') return aidTablePool;
@@ -6380,12 +6853,24 @@ MR.World = (function () {
         finale.broke = -1;
         finale.done = false;
         crowdU.uHot.value = finale.hot;
+        tape.update(z, -1);
+        confetti.update(dt, z);
         return;
       }
       if (now >= finale.next) { readVerdict(z); finale.next = now + 0.25; }
 
       const past = z >= FINISH_Z - 0.25;
-      if (past && finale.broke < 0) finale.broke = now;
+      if (past && finale.broke < 0) {
+        finale.broke = now;
+        // Read the verdict one last time on the line itself, so the burst is
+        // sized against the finish that actually happened rather than against
+        // a projection taken a quarter of a second earlier.
+        readVerdict(z);
+        confetti.fire(finale.record ? 1 : finale.chase,
+          finale.record ? 1 : 0.20 + 0.55 * finale.chase);
+        const A = MR.game && MR.game.audio;
+        if (A && A.roar) A.roar(finale.record ? 1 : 0.55 + 0.35 * finale.chase);
+      }
       finale.done = past;
 
       // The build is not linear. t^1.7 keeps the first half of the approach
@@ -6406,6 +6891,24 @@ MR.World = (function () {
       finale.gold += (goldTgt - finale.gold) * Math.min(1, dt * 1.5);
 
       crowdU.uHot.value = finale.hot;
+
+      // ---- the pace lights ----------------------------------------------
+      // Gold on a record, green while a rung is still live, and a slow cool
+      // white once the run has settled into the band it is going to finish in.
+      // The SPEED carries as much of the message as the colour: the lights run
+      // away from the runner when there is something left to chase and drift
+      // when there is not, so a player nine seconds off a rung is being pulled
+      // down the road by something they can see moving.
+      _cA.setHex(0xdfe6ff);
+      _cB.setHex(finale.record ? 0xffd23a : 0x59d47a);
+      stripMat.color.copy(_cA).lerp(_cB, Math.min(1, finale.gold + finale.chase * 0.7));
+      const runSpeed = 0.55 + 1.9 * Math.min(1, finale.chase + (finale.record ? 0.5 : 0));
+      // Negative v is toward the finish -- the plane's uv runs against +z once
+      // it is laid flat, so this is the direction that reads as pulling away.
+      stripTex.offset.y = (stripTex.offset.y - dt * runSpeed) % 1;
+
+      tape.update(z, finale.broke < 0 ? -1 : now - finale.broke);
+      confetti.update(dt, z);
     }
 
     // Exposed so the camera and the audio can react to the same verdict the
@@ -6661,6 +7164,11 @@ MR.World = (function () {
           obj.position.x = st.side * (K.TRACK_HALF_WIDTH + 1.3);
           obj.rotation.y = st.side < 0 ? Math.PI : 0;
         }
+        if (st.kind === 'fstand') {
+          obj.position.x = st.side * FSTAND_X;
+          obj.rotation.y = st.side < 0 ? Math.PI : 0;
+          obj.userData.lodAt = FSTAND_LOD;
+        }
         if (st.kind === 'arch' && obj.userData.mat) {
           if (!st.tex) st.tex = labelTexture(st.label, st.bg, st.fg, 768, 128, st.sub);
           obj.userData.mat.map = st.tex;
@@ -6675,7 +7183,7 @@ MR.World = (function () {
       for (const e of activeStruct) {
         const lod = e.obj.userData.lod;
         if (!lod) continue;
-        const far = (e.st.z - z) > STAND_LOD;
+        const far = (e.st.z - z) > (e.obj.userData.lodAt || STAND_LOD);
         lod[0].visible = !far;
         lod[1].visible = far;
       }
@@ -6769,6 +7277,7 @@ MR.World = (function () {
       aidTablePool.releaseAll(); bannerPool.releaseAll(); archPool.releaseAll();
       abutPool.releaseAll(); riverPool.releaseAll();
       overpassPool.releaseAll(); standPool.releaseAll();
+      finishStandPool.releaseAll(); chutePool.releaseAll();
       footbridgePool.releaseAll();
       waterPool.releaseAll(); bananaPool.releaseAll();
       for (const k in landmarkPools) landmarkPools[k].releaseAll();

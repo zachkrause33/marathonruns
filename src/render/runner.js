@@ -1351,11 +1351,16 @@ MR.Runner = (function () {
         //     roll carrying the whole hand's single value break. A knuckle line
         //     is the only interior detail a 14px hand can hold, so it gets that
         //     and nothing else.
-        //   - A ball reads as a ball at every size. The mass is now a flattened
-        //     BLOCK, deeper front-to-back than it is wide, with the wrist ball
-        //     above it and the finger roll below: three stacked shapes of two
-        //     tones, which at 14px resolves as forearm / band / hand / fingers
-        //     rather than as one pale oval.
+        //   - A ball reads as a ball at every size, and a box reads as a card.
+        //     Both were built and both were looked at: the flat-faced block
+        //     shaded into two clean planes close up and, seen from the shallow
+        //     angle most of the cycle puts it at, presented its own edge and
+        //     read as a paddle held in the hand rather than as the hand. The
+        //     mass is a broad flattened ELLIPSOID -- half again as wide as it
+        //     is deep -- with the wrist ball above it and the finger roll
+        //     under it: three stacked shapes in two tones, which at 14px
+        //     resolves as forearm / band / hand / fingers rather than as one
+        //     pale oval.
         //   - The thumb rides high and INBOARD, so it breaks the outline
         //     against the vest and the thigh -- the two dark masses the hand
         //     passes in front of -- rather than against the road, where the
@@ -1366,22 +1371,26 @@ MR.Runner = (function () {
         // so the airborne span, which MEASUREMENTS.md caps at 0.70 from the
         // lane centre, is spent DOWN rather than up. The extra mass is bought
         // in z, which is the axis the back view does not measure at all.
-        { g: new THREE.SphereGeometry(0.094, 8, 6), c: MITT, y: -0.204, sy: 0.86, sz: 1.00 },
-        { g: new THREE.BoxGeometry(0.206, 0.140, 0.168), c: MITT, y: -0.270, z: 0.018 },
-        // The curled fingers, one roll lying across the hand, at its LEADING
-        // edge rather than under it. Where the break sits matters more than
-        // what it is: the chase camera looks down about 17 degrees onto a
-        // forearm already pitched forward, so what it sees of a hand is the
-        // upper-rear surface and the far edge. A knuckle line on the far edge
-        // is in view for the whole cycle; the same roll tucked underneath,
-        // which is where a curled hand really carries it, was in view for none
-        // of it and measured as invisible.
+        { g: new THREE.SphereGeometry(0.094, 8, 6), c: MITT, y: -0.202, sy: 0.86, sz: 1.00 },
+        { g: new THREE.SphereGeometry(0.104, 10, 8), c: MITT, y: -0.264, z: 0.018, sy: 0.76, sz: 0.86 },
+        // The curled fingers: one roll lying across the hand at its LOWER REAR
+        // edge, which took three placements to find and is worth writing down
+        // because the rule is not obvious. Where the break sits matters far
+        // more than what it is. Tucked UNDER the hand, where a real curled fist
+        // carries it, the body of the hand hides it completely. Out at the
+        // LEADING edge, which seemed right because the camera looks down about
+        // 17 degrees, it is worse: the forearm is already pitched forward, so
+        // the hand's leading edge is its FAR edge and the hand occludes it. The
+        // only part of a hand a camera dead astern can rely on seeing is the
+        // rear face and the bottom of the outline -- so that is where the one
+        // value break the size allows has to go, and there it reads as fingers
+        // breaking the underside of the mitt.
         //
         // Its cap ends are the outer knuckles -- one primitive doing both jobs,
         // exactly as the three finger capsules it replaces used theirs, but at
         // a size that survives the minification instead of aliasing into the
         // palm it stands on.
-        { g: new THREE.CapsuleGeometry(0.057, 0.096, 2, 8), c: MITT_DK, y: -0.296, z: 0.082, rz: Math.PI / 2 },
+        { g: new THREE.CapsuleGeometry(0.050, 0.092, 2, 8), c: MITT_DK, y: -0.308, z: 0.016, rz: Math.PI / 2 },
         { g: new THREE.CapsuleGeometry(0.041, 0.052, 2, 6), c: MITT, x: -side * 0.072, y: -0.238, z: 0.062, rx: 0.85, rz: side * 0.62 },
       ]);
       elbow.add(fore);

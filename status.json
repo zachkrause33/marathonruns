@@ -1,8 +1,8 @@
 {
-  "updated": "2026-08-05",
-  "wave": 2,
+  "updated": "2026-08-06",
+  "wave": 4,
   "branch": "claude/effort-estimation-emdxm8",
-  "headline": "Wave 2 landed. Hazards now paint <b>shape-coded telegraph mats</b> on the road ahead, so a blocked lane reads from a long way out &mdash; the clean-line mechanic finally has a forward read. The record ghost is on the road, the track is narrowed to the measured reference ratio, and the projection was rebuilt: it read <b>2:24:12</b> at the gun on a run heading for 1:58:14, and now reads <b>1:57:48</b>. Outstanding: <b>27fps under software rendering</b>, diagnosed to per-frame scene traversal, not fill rate.",
+  "headline": "Wave 4 in flight. The course now draws <b>three or four settings per run from a pool of twelve marathon cities</b>, seeded by the date &mdash; so every day is a different journey, not just a different layout, and something new arrives roughly every 60 seconds. The renderer is being taught those twelve places now. Landed this wave: the three lanes are <b>three distinct surfaces</b> rather than one flat road, so a hazard's lane can be named from a still frame; <b>~70% of impassable blocks are now inhabited</b> by a rider or marshals instead of bare barriers; and forced-action gates went from 6% to 38% after the record was called too easy. Outstanding: <b>portrait HUD panels overlap</b>, and the ramp mechanic (vehicles you climb and jump from) is still unbuilt.",
   "pieces": [
     {
       "name": "Pace &amp; record model",
@@ -14,58 +14,86 @@
     {
       "name": "Course generation",
       "state": "done",
-      "wave": 1,
-      "verdict": "90 dates deterministic and provably solvable",
-      "gap": "Difficulty curve has not been judged by a human \u2014 only proved fair"
+      "wave": 3,
+      "verdict": "90 dates deterministic and provably solvable; 38% of gates now force an action",
+      "gap": "Raised difficulty has not been re-judged by a human since the record was called too easy"
+    },
+    {
+      "name": "Daily settings (12 cities)",
+      "state": "building",
+      "wave": 4,
+      "verdict": "3-4 settings per run drawn from twelve; shortest segment 3.93mi over 200 days",
+      "gap": "Generated and carried on the course, but the renderer does not draw them yet"
     },
     {
       "name": "Collision &amp; fairness",
       "state": "done",
-      "wave": 2,
-      "verdict": "Thresholds fixed; audit now gates every screenshot",
-      "gap": "Forgiveness windows still untuned against human play"
+      "wave": 3,
+      "verdict": "Thresholds fixed; audit gates every screenshot; windows widened to 0.571s / 0.725s",
+      "gap": "None known"
     },
     {
       "name": "Runner character",
       "state": "building",
-      "wave": 2,
-      "verdict": "Head separates, 28 draws, bib on the back",
-      "gap": "Wristbands read as slabs; no landing squash"
+      "wave": 4,
+      "verdict": "Slide reads feet-first &mdash; the head leaves the silhouette, which was the whole fix",
+      "gap": "Human features and secondary motion still in build"
+    },
+    {
+      "name": "Lane individuation",
+      "state": "done",
+      "wave": 4,
+      "verdict": "Three vertex-tinted lane bands + continuous seams; 147/188/166 value ladder, no draw-call cost",
+      "gap": "A full-width gate lays three mats side by side and hides the bands; only the seams carry it"
     },
     {
       "name": "Cel-shading &amp; sky",
       "state": "done",
       "wave": 2,
-      "verdict": "Sky rewritten, colour-space fixed, outlines reweighted",
-      "gap": "Nothing casts occlusion &mdash; no contact shadow yet"
+      "verdict": "Sky rewritten, colour-space fixed, outlines reweighted to world-space units",
+      "gap": "Nothing casts occlusion beyond the contact shadow"
     },
     {
       "name": "World &amp; obstacles",
       "state": "done",
-      "wave": 2,
-      "verdict": "Telegraph mats; biomes differ in substance",
-      "gap": "No silhouette language above the fog line"
+      "wave": 4,
+      "verdict": "Cones, signs, detours, cyclists, marshals; ~70% of blocks inhabited; variant picker is now a real hash",
+      "gap": "Mile-gantry occlusion never fixed; crowd still reads as blocks, not people"
+    },
+    {
+      "name": "Ramps &amp; climbable vehicles",
+      "state": "queued",
+      "wave": 0,
+      "verdict": "Requested; not started",
+      "gap": "Roof-running needs the solver extended from lane to lane-plus-height"
     },
     {
       "name": "Camera &amp; speed feel",
       "state": "done",
-      "wave": 2,
-      "verdict": "Honest +15% speed turned into +37% screen flow",
-      "gap": "Road surface carries no motion signal between dashes"
+      "wave": 3,
+      "verdict": "Raised above the head so the road ahead is readable; +15% speed reads as +37% screen flow",
+      "gap": "Ground frequency, not camera work, is the remaining speed cue"
     },
     {
       "name": "HUD &amp; typography",
+      "state": "review",
+      "wave": 4,
+      "verdict": "Projected finish leads; exact RECORD GONE bound; numerically precise throughout",
+      "gap": "Portrait panels overlap &mdash; proj finish, clean gates, mile split and FPS all collide"
+    },
+    {
+      "name": "Aid (water &amp; bananas)",
       "state": "done",
-      "wave": 2,
-      "verdict": "Projected finish leads; exact RECORD GONE bound",
-      "gap": "Finish panel FINAL PACE is not BEST PACE"
+      "wave": 3,
+      "verdict": "One at a time, placed in the hardest legal lane; tops streak to a ceiling, never buys top gear",
+      "gap": "None &mdash; worthless to a perfect run, a lifeline to a broken one, by design"
     },
     {
       "name": "Controls &amp; game feel",
-      "state": "queued",
-      "wave": 0,
-      "verdict": "Never play-tested by a human",
-      "gap": "No human has played it yet"
+      "state": "done",
+      "wave": 3,
+      "verdict": "Swipe direction corrected; forgiveness windows widened after a 0-clean-gate human run",
+      "gap": "Only one human has played it"
     },
     {
       "name": "Audio",
@@ -75,25 +103,11 @@
       "gap": "Cannot be verified by screenshot"
     },
     {
-      "name": "Track geometry ratio",
-      "state": "done",
-      "wave": 2,
-      "verdict": "LANE_W seeds lanes, tarmac and every hazard width",
-      "gap": "Ratio hit; needs a human eye to confirm it feels right"
-    },
-    {
       "name": "Frame rate",
       "state": "blocked",
-      "wave": 2,
-      "verdict": "27fps under SwiftShader, down from 60",
-      "gap": "render() 15ms; not fill rate, not game logic. 491 scene objects need matrixAutoUpdate=false"
-    },
-    {
-      "name": "Record ghost on road",
-      "state": "review",
-      "wave": 2,
-      "verdict": "Renders as a marker travelling at exact record pace",
-      "gap": "Reads as a sign, not yet as a runner you race"
+      "wave": 3,
+      "verdict": "5-10fps under SwiftShader software rendering in CI",
+      "gap": "Never measured on real hardware with a GPU &mdash; the CI number may not mean anything"
     }
   ]
 }

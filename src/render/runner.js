@@ -726,17 +726,58 @@ MR.Runner = (function () {
     hoodPivot.add(hood);
 
     // Curved panel rather than a flat card so it hugs the vest at this size,
-    // and high on the back so it never straddles the shorts line.
-    const bib = new THREE.Mesh(
-      // Cone, not cylinder: matched to the vest's taper. A constant-radius
-      // panel let the wider top of the vest poke through the number.
-      new THREE.CylinderGeometry(0.266, 0.256, 0.16, 10, 1, true, Math.PI - 0.52, 1.04),
-      S.toon(0xffffff, 3)
-    );
+    // and high on the back so it never straddles the shorts line -- but 0.042
+    // lower than it was, and 0.010 shorter, to clear the hood roll above it.
+    // The number is the one piece of type on the character and a hood crossing
+    // its top edge would read as a printing fault rather than as cloth.
+    //
+    // Cone, not cylinder: matched to the vest's taper. A constant-radius panel
+    // let the wider top of the vest poke through the number.
+    const bibGeo = new THREE.CylinderGeometry(0.266, 0.256, 0.150, 10, 1, true, Math.PI - 0.52, 1.04);
+    const bib = new THREE.Mesh(bibGeo, S.toon(0xffffff, 3));
     bib.material.map = raceBib();
-    bib.position.y = -0.020;
+    bib.position.y = -0.062;
     bib.scale.z = 0.78;
     chest.add(bib);
+
+    // The bib's own flutter, precomputed. It is a paper panel pinned along its
+    // top edge and held flat in the middle by the back behind it, so the free
+    // CORNERS of the hem are the only part that can lift -- which is also the
+    // only part with an edge against the vest for the eye to track. Weight
+    // falls off as the square of the height so the top row never moves and the
+    // texture cannot shear.
+    //
+    // 22 vertices, rewritten in place each frame. The rest pose is kept
+    // because the deformation has to be absolute rather than incremental: an
+    // incremental one accumulates float error over a 2-hour race and the panel
+    // slowly inflates off the vest.
+    const bibPos = bibGeo.attributes.position;
+    const bibRest = new Float32Array(bibPos.array);
+    const bibWeight = new Float32Array(bibPos.count);
+    const bibTheta = new Float32Array(bibPos.count);
+    {
+      let yLo = Infinity, yHi = -Infinity;
+      for (let i = 0; i < bibPos.count; i++) {
+        const y = bibRest[i * 3 + 1];
+        if (y < yLo) yLo = y;
+        if (y > yHi) yHi = y;
+      }
+      for (let i = 0; i < bibPos.count; i++) {
+        const v = (bibRest[i * 3 + 1] - yLo) / (yHi - yLo);
+        // Angle around the panel, zero at its centre line.
+        const a = Math.atan2(bibRest[i * 3], -bibRest[i * 3 + 2]);
+        bibTheta[i] = a;
+        bibWeight[i] = (1 - v) * (1 - v) * Math.min(1, Math.abs(a) / 0.42);
+      }
+    }
+    // Nominal panel radius, so an amplitude in world units can be turned into
+    // the radial scale that produces it.
+    const BIB_R = 0.26;
+
+    // Secondary-motion state. Two springs for the hood and a free-running
+    // clock for the bib; see the block at the end of update() for why they are
+    // integrated rather than driven straight off the stride phase.
+    let hoodA = 0, hoodV = 0, hoodZ = 0, hoodZV = 0, lastBob = 0, bibT = 0;
 
     // ---- head -----------------------------------------------------------
     // The neck pivot sits at the top of the trunk so head tilt rotates from
@@ -754,22 +795,54 @@ MR.Runner = (function () {
       // Long enough to start inside the vest so no gap opens on a head tilt.
       { g: new THREE.CylinderGeometry(0.104, 0.122, 0.32, 10), c: P.runnerSkin, y: HY - 0.300 },
       { g: new THREE.SphereGeometry(0.266, 16, 12), c: P.runnerSkin, y: HY, sy: 1.06, sz: 0.97 },
-      // Crown cap for the top of the skull. 0.288, not the 0.280 it was: the
+      // The cap. Geometrically this is the same shell that used to be the hair
+      // crown -- the fit was already right and the note below is still the
+      // reason for every number in it -- but it is now the vest's red, which
+      // turns it from "the top of a head" into "a garment on a head". A cap is
+      // the single most legible thing the reference puts on its characters
+      // from behind, and it costs nothing: no vertex moved.
+      //
+      // 0.288, not the 0.280 it was: the
       // skull under it is r=0.266 scaled 1.06 in Y, so its pole reached 0.282
       // and punched a coin-sized disc of SCALP through the middle of the hair.
       // It was there in every frame ever shot of this character and only became
       // obvious once the slide started presenting the crown to the camera --
       // the tucked head rendered as a dark cap with a tan rivet in it. Still
       // inside the headband's 0.294, which is the other clearance that matters.
-      { g: new THREE.SphereGeometry(0.288, 14, 6, 0, Math.PI * 2, 0, Math.PI * 0.42), c: P.runnerHair, y: HY },
+      { g: new THREE.SphereGeometry(0.288, 14, 6, 0, Math.PI * 2, 0, Math.PI * 0.42), c: CAP, y: HY },
       // ...and a rear-only shell that carries the hair down to the nape but
       // leaves the face clear. Restricting phi to the back 210 degrees is
-      // what lets one primitive do a haircut.
+      // what lets one primitive do a haircut. It now reads as the hair showing
+      // BELOW a cap rather than as the whole head of hair, which is why the
+      // nape below matters more than it used to.
       { g: new THREE.SphereGeometry(0.286, 14, 8, Math.PI * 1.5 - 1.83, 3.66, Math.PI * 0.33, Math.PI * 0.44), c: P.runnerHair, y: HY },
-      // Headband sits above the eye line -- lower and it reads as goggles.
-      // Radius has to clear the hair everywhere: shells this close together
+      // The hairline. The hair shell ends on a clean latitude arc, which is a
+      // haircut no human has: what the back view of a real head shows is the
+      // hair narrowing to a taper down the middle of the neck. 0.14 across and
+      // 0.14 long, standing 0.018 proud of the neck cylinder so it is a shape
+      // rather than a decal, and it is the single detail that most turns the
+      // head/neck junction from an assembly into an anatomy.
+      { g: new THREE.SphereGeometry(0.090, 8, 6), c: P.runnerHair, y: HY - 0.205, z: -0.055, sx: 0.78, sy: 0.80, sz: 0.80 },
+      // Cap band, sitting above the eye line -- lower and it reads as goggles.
+      // Unchanged: it was the headband and it is now the cap's sweatband, and
+      // holding its exact geometry is what keeps the measured value ladder
+      // (dark / bright / dark / lit neck) untouched by all of this.
+      // Radius has to clear the shells everywhere: two this close together
       // interpenetrate on their facets and the crown grew a row of teeth.
       { g: new THREE.CylinderGeometry(0.294, 0.294, 0.074, 14), c: TRIM, y: HY + 0.060 },
+      // The brim, worn backwards -- which is the only way a brim is worth
+      // drawing here, because forwards it points down the view axis and is
+      // gone. Backwards it points AT the lens, and the chase camera looks down
+      // about 18 degrees, so what the player sees is the top face of it: a
+      // hard horizontal lozenge cutting across an otherwise perfectly round
+      // skull, and a shadow line where it overhangs the hair.
+      //
+      // Tilted up 0.30rad so the far edge rises to 0.134 -- well under the
+      // crown at 0.288, so it adds nothing to HEIGHT, and 0.298 wide against
+      // the band's 0.294, so it adds nothing to the half-width either. It is
+      // pure value pattern, which is the only currency this camera has.
+      { g: new THREE.CylinderGeometry(0.298, 0.298, 0.032, 14, 1, false, Math.PI * 0.5, Math.PI), c: CAP,
+        y: HY + 0.050, z: -0.052, rx: 0.30 },
       { g: new THREE.SphereGeometry(0.080, 8, 6), c: P.runnerSkin, x: -0.254, y: HY - 0.020, z: -0.013, sx: 0.48, sz: 0.82 },
       { g: new THREE.SphereGeometry(0.080, 8, 6), c: P.runnerSkin, x: 0.254, y: HY - 0.020, z: -0.013, sx: 0.48, sz: 0.82 },
     ]);
@@ -805,6 +878,20 @@ MR.Runner = (function () {
       // scissor of the run cycle legible from directly behind.
       const shin = multi([
         { g: new THREE.CapsuleGeometry(0.096, 0.050, 3, 10), c: P.runnerSkin, y: -0.076 },
+        // The joint itself, sitting exactly on the pivot. The recovery knee
+        // flexes to 1.48rad and at that angle two straight capsules meeting at
+        // a point open a visible notch on the outside of the bend -- the leg
+        // read as two parts hinged rather than as a leg. A ball on the pivot
+        // is always the joint whatever the angle, and it is skin-coloured
+        // because a knee is not a garment: it adds FORM for the ramp to catch,
+        // not a new value.
+        { g: new THREE.SphereGeometry(0.098, 8, 5), c: P.runnerSkin, sz: 0.94 },
+        // Calf. The one muscle the back view actually sees, and the reason a
+        // straight tube reads as a doll's leg: a human shin is thickest just
+        // under the knee and tapers to nothing at the ankle. Kept inside the
+        // thigh's radius at rest so it only emerges as the knee bends, which
+        // is exactly when a calf should show.
+        { g: new THREE.SphereGeometry(0.101, 8, 6), c: P.runnerSkin, y: -0.055, z: -0.012, sx: 0.92, sy: 1.20, sz: 0.94 },
         { g: new THREE.CylinderGeometry(0.110, 0.102, 0.085, 10), c: P.runnerShoe, y: -0.118 },
       ]);
       knee.add(shin);
@@ -820,6 +907,21 @@ MR.Runner = (function () {
         { g: new THREE.BoxGeometry(0.190, 0.110, 0.225), c: P.runnerShoe, y: -0.036, z: 0.036 },
         { g: new THREE.SphereGeometry(0.095, 10, 8), c: P.runnerShoe, y: -0.036, z: 0.150, sy: 0.82, sz: 0.66 },
         { g: new THREE.SphereGeometry(0.092, 8, 6), c: P.runnerShoe, y: -0.026, z: -0.072, sy: 0.86, sz: 0.74 },
+        // Heel counter. The best-value detail on the whole character, because
+        // the back of a shoe is the ONE face of the runner the chase camera
+        // gets square-on for the entire race -- no foreshortening, no angle,
+        // both of them, all the time. A real trainer puts a stiffened cup
+        // there in a different material and every reference shoe shows it.
+        // Narrower in x than the heel dome behind it so the two surfaces cross
+        // transversally instead of nesting: a patch fractionally SMALLER than
+        // the shell it sits on is the coin-of-scalp bug the hair cap had, and
+        // this one is deliberately proud in z and inset in x.
+        { g: new THREE.SphereGeometry(0.098, 8, 6), c: SHOE_DK, y: -0.030, z: -0.076, sx: 0.90, sy: 0.72, sz: 0.72 },
+        // Lace panel across the instep. Invisible head-on, which is why it is
+        // cheap -- but the camera looks DOWN about 18 degrees, so the top face
+        // of the planted shoe is in view on every footstrike, and a shoe with
+        // nothing on its upper reads as a clog.
+        { g: new THREE.BoxGeometry(0.078, 0.030, 0.150), c: SHOE_DK, y: 0.020, z: 0.070 },
         // Thin accent stripe, and thin is the point: it is a crisp bright line
         // from behind and almost nothing from below, which is the opposite of
         // where the accent used to sit.
@@ -841,8 +943,22 @@ MR.Runner = (function () {
       // rotation.z as a clean abduction angle measured from straight down,
       // which is the single number the jump pose steers.
       shoulder.rotation.order = 'ZXY';
-      const upper = part(new THREE.CapsuleGeometry(0.086, 0.095, 3, 10), P.runnerSkin);
-      upper.position.y = -0.122;
+      // The base layer, and the only place it is ever seen. "A race vest over
+      // a base layer" is what the reference wears and what a marathon runner
+      // wears, but from behind the trunk is entirely vest and entirely bib --
+      // there is nowhere on it for a second garment to show. The upper arm is
+      // where it can: a sleeve emerging from under the deltoid, ending in its
+      // own rolled cuff, turns a bare skin tube into an arm in a shirt. Two
+      // hits, symmetric, at the widest part of the figure.
+      //
+      // The sleeve's top is tucked UNDER the deltoid sphere (which reaches to
+      // -0.100 in this frame) so the join is hidden by the shoulder's own
+      // curve rather than showing as a ring where the singlet ends.
+      const upper = multi([
+        { g: new THREE.CapsuleGeometry(0.086, 0.095, 3, 10), c: P.runnerSkin, y: -0.122 },
+        { g: new THREE.CylinderGeometry(0.101, 0.096, 0.090, 10), c: BASE, y: -0.108 },
+        { g: new THREE.CylinderGeometry(0.100, 0.098, 0.024, 10), c: JACKET, y: -0.160 },
+      ]);
       shoulder.add(upper);
 
       // Arms are the one place the toy proportion is knowingly broken: shoulder
@@ -860,8 +976,33 @@ MR.Runner = (function () {
       // what makes both the arm swing and the spread jump pose land.
       const fore = multi([
         { g: new THREE.CapsuleGeometry(0.078, 0.090, 3, 10), c: P.runnerSkin, y: -0.103 },
+        // Elbow, on the pivot, for the reason the knee has one: the flexion
+        // reaches 1.78rad at the front of the swing and two capsules meeting
+        // at a point open a notch there. This one shows more than the knee
+        // does, because the run cycle drives the elbows LATERALLY -- they are
+        // the joint the back view was built to watch.
+        { g: new THREE.SphereGeometry(0.088, 8, 5), c: P.runnerSkin, y: -0.012, sy: 0.92, sz: 0.96 },
         { g: new THREE.CylinderGeometry(0.088, 0.088, 0.048, 10), c: TRIM, y: -0.188 },
-        { g: new THREE.SphereGeometry(0.118, 10, 8), c: GLOVE, y: -0.258, sx: 0.90, sz: 1.06 },
+        // The hand. It was a ball, and a ball is the one shape a hand is not.
+        // Palm plus three fingers, and the budget for the fingers is taken OUT
+        // of the palm -- 0.118 down to 0.112, sitting 0.008 higher -- so the
+        // hand ends at -0.361 where the ball ended at -0.376. That matters
+        // more than it sounds: the gloves are the outermost thing on the
+        // airborne pose, MEASUREMENTS.md puts the runner's lateral budget at
+        // 0.70 from the lane centre before it grazes hazards it legitimately
+        // cleared, and growing the reach to buy fingers would have spent it.
+        //
+        // The fingers point forward and down, curled the way a running hand
+        // is, so from behind what shows is the knuckle line across the back of
+        // the hand and three lobes breaking the bottom of its outline. The
+        // capsule CAPS are the knuckles -- one primitive doing both jobs.
+        { g: new THREE.SphereGeometry(0.112, 10, 8), c: GLOVE, y: -0.250, sx: 0.88, sz: 1.02 },
+        { g: new THREE.CapsuleGeometry(0.030, 0.042, 1, 6), c: GLOVE, x: -0.048, y: -0.318, z: 0.010, rx: 0.60 },
+        { g: new THREE.CapsuleGeometry(0.032, 0.046, 1, 6), c: GLOVE, x: 0.000, y: -0.320, z: 0.012, rx: 0.60 },
+        { g: new THREE.CapsuleGeometry(0.029, 0.040, 1, 6), c: GLOVE, x: 0.048, y: -0.314, z: 0.008, rx: 0.60 },
+        // Thumb, on the inboard face, where it is a silhouette bump against
+        // the torso rather than a lump lost on the outside of the arm.
+        { g: new THREE.CapsuleGeometry(0.032, 0.036, 1, 6), c: GLOVE, x: -side * 0.086, y: -0.268, z: 0.030, rx: 0.55, rz: side * 0.55 },
       ]);
       elbow.add(fore);
 
@@ -1671,6 +1812,81 @@ MR.Runner = (function () {
       // moves with it.
       head.position.y = -slid * NECK_SLIDE_RETRACT;
       head.scale.setScalar(1 - slid * NECK_SLIDE_SQUASH);
+
+      // ---- secondary motion ------------------------------------------------
+      //
+      // Everything above this line is welded to a bone, so every part of the
+      // figure starts, stops and turns on exactly the frame the skeleton does.
+      // That is what makes a procedural character move like a marionette, and
+      // a previous review named it as the biggest remaining gap in this one.
+      // Two things now lag the body, and both were picked because the camera
+      // is dead astern: they are the two largest pieces of CLOTH the back view
+      // sees, and cloth is the only thing on a runner that is allowed to
+      // arrive late.
+      //
+      // The hood hangs off the collar, not off a joint, so it is integrated
+      // rather than posed: the target is what the body is doing and the hood
+      // gets there afterwards. Underdamped at zeta ~0.45, because the
+      // overshoot IS the effect -- a critically damped hood is a rigid part
+      // with a delay and reads as one.
+      //
+      // dt is clamped for the integrator alone. This harness runs at 7fps
+      // under SwiftShader and a phone runs at 60; a spring stiff enough to be
+      // worth having at 60 diverges at 7. Clamping the step makes one set of
+      // constants behave at both, at the cost of the hood settling in real
+      // seconds rather than in frames -- which is the right way round, since
+      // nothing reads its value.
+      const hdt = Math.min(dt, 1 / 50);
+      // The divided difference is clamped before it is used: one long frame
+      // after an alt-tab hands this a spike no spring should be asked to
+      // follow, and the clamp is cheaper than filtering it.
+      const bobV = dt > 1e-4 ? Math.max(-1.6, Math.min(1.6, (bob - lastBob) / dt)) : 0;
+      lastBob = bob;
+      // Body drops, hood swings up the back; jump throws it up; slide presses
+      // it flat. The positive clamp is tighter than the negative one because
+      // up is toward the head: at +0.30 the roll's far edge rises to 0.167 in
+      // chest space, still 0.05 clear of the skull, and anything past that
+      // starts filling the head/shoulder pinch the silhouette is built on.
+      const hoodRest = spread * 0.34 - slid * 0.30 - bobV * 0.18;
+      hoodV += ((hoodRest - hoodA) * 96 - hoodV * 8.8) * hdt;
+      hoodA += hoodV * hdt;
+      hoodPivot.rotation.x = Math.max(-0.50, Math.min(0.30, hoodA));
+      // ...and a second spring across the lane, so a lane change throws the
+      // hood sideways and it swings back a beat after the body has settled.
+      const hoodZRest = -lean * 0.30 - knock * 0.30;
+      hoodZV += ((hoodZRest - hoodZ) * 96 - hoodZV * 8.8) * hdt;
+      hoodZ += hoodZV * hdt;
+      hoodPivot.rotation.z = Math.max(-0.42, Math.min(0.42, hoodZ));
+
+      // The bib's hem. The reference's runner has a printed graphic that is
+      // dead still and CLOTH around it that is not, and that contrast is most
+      // of why theirs reads as worn and ours read as painted on. The panel is
+      // pinned along its top edge and held flat in the middle by the back
+      // behind it, so the drive is a travelling wave in theta: the two free
+      // bottom corners lift out of phase with each other and the number never
+      // moves. 22 vertices, one buffer upload, no draw call.
+      //
+      // Rate and amplitude both climb with pace, which makes this a speed cue
+      // as well as a life cue -- it is the only motion on the character that
+      // is not locked to the stride, so it beats against the cadence instead
+      // of reinforcing it, and that is what stops the whole figure reading as
+      // one clockwork.
+      bibT += dt * (5.2 + 6.4 * sp01);
+      const bibAmp = (0.026 + 0.014 * sp01) * (1 - slid * 0.55) + spread * 0.018;
+      const bp = bibPos.array;
+      for (let i = 0; i < bibPos.count; i++) {
+        const w = bibWeight[i];
+        if (w <= 0) continue;
+        const lift = Math.sin(bibT + bibTheta[i] * 3.4) * bibAmp * w;
+        // Radial, because the panel is curved: scaling x and z about the
+        // vest's own axis lifts the corner off the back, where moving it in a
+        // straight line would shear it sideways across the number.
+        const k = 1 + lift / BIB_R;
+        bp[i * 3] = bibRest[i * 3] * k;
+        bp[i * 3 + 2] = bibRest[i * 3 + 2] * k;
+        bp[i * 3 + 1] = bibRest[i * 3 + 1] + lift * 0.45;
+      }
+      bibPos.needsUpdate = true;
 
       // Whole-body bank into a lane change reads as weight, not a slide.
       // The slide adds its own, tipping onto the hip it is riding on: a body

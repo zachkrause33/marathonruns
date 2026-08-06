@@ -5209,8 +5209,51 @@ MR.World = (function () {
       }
       return merge(parts);
     })();
+
+    /**
+     * The same stand with its crowd drawn as a BAND instead of as 55 people.
+     *
+     * FINAL MILE carries the heaviest crowd mix in the race and twenty stands
+     * are live at once, which measured 28,560 triangles -- 28% of a 100k frame,
+     * on a budget whose working ceiling is 75k. Fifty-five spectators is 1,320
+     * of a stand's 1,428 triangles, and past about a hundred units a spectator
+     * is under a pixel wide: what survives is a warm speckled mass along each
+     * row, which is precisely what one box per row is.
+     *
+     * The swap distance is what makes it invisible. STAND_LOD is 130 units,
+     * where the fog is already 45% of the way in (near 60, far 215) and rising
+     * steeply, so the two versions differ only in detail that is both sub-pixel
+     * and half dissolved. The band colours are the mean of the six shirt tints
+     * and the mean skin, so the mass keeps its value and its warmth across the
+     * swap; only the speckle goes.
+     *
+     * 228 triangles against 1,428. Zero extra draw calls -- one of the pair is
+     * visible at a time, exactly as the road tile's four roadside kinds are.
+     */
+    const standFarGeo = (function () {
+      const parts = [];
+      for (let row = 0; row < 5; row++) {
+        const y = row * 0.74;
+        const x = 0.9 + row * 1.10;
+        parts.push(bx(1.10, 0.74, TILE, x, y + 0.37, 0, row % 2 ? 0x8e99c6 : 0x6f7aa8));
+        parts.push(bx(0.40, 0.48, TILE - 2.2, x - 0.1, y + 0.98, 0, 0xc2b087));
+        parts.push(bx(0.22, 0.22, TILE - 2.2, x - 0.1, y + 1.33, 0, 0xe8bd94));
+      }
+      for (const z of [-TILE / 2 + 1, TILE / 2 - 1]) {
+        parts.push(bx(0.28, 7.2, 0.28, 0.2, 3.6, z, 0x2b2f52));
+        parts.push(bx(0.14, 1.7, 2.3, 0.2, 6.4, z, z < 0 ? 0xff3b6b : 0x37d6ff));
+      }
+      return merge(parts);
+    })();
+    const STAND_LOD = 130;
     const standPool = Pool(function () {
-      return S.outlined(standGeo, mats.prop, S.INK.scenery);
+      const g = new THREE.Group();
+      const near = S.outlined(standGeo, mats.prop, S.INK.scenery);
+      const far = S.outlined(standFarGeo, mats.prop, S.INK.scenery);
+      far.visible = false;
+      g.add(near, far);
+      g.userData.lod = [near, far];
+      return g;
     }, group);
 
     // ---- landmarks --------------------------------------------------------
@@ -6357,6 +6400,16 @@ MR.World = (function () {
         }
         obj.userData.auditName = 'set piece / ' + st.kind;
         activeStruct.push({ st, obj, pool });
+      }
+      // Detail level, for the one set piece heavy enough to matter. See
+      // standFarGeo: twenty of these are live at mile 25 and the far half of
+      // them are drawing 55 sub-pixel spectators each through 45% of fog.
+      for (const e of activeStruct) {
+        const lod = e.obj.userData.lod;
+        if (!lod) continue;
+        const far = (e.st.z - z) > STAND_LOD;
+        lod[0].visible = !far;
+        lod[1].visible = far;
       }
       while (activeStruct.length && activeStruct[0].st.z < back - 60) {
         const e = activeStruct.shift();

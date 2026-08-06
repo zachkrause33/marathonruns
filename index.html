@@ -4731,7 +4731,12 @@ MR.World = (function () {
       name: b.name,
       from: b.from * K.TOTAL_UNITS,
       to: (i + 1 < MR.Course.BIOMES.length ? MR.Course.BIOMES[i + 1].from : 1) * K.TOTAL_UNITS,
-      look: BIOME_LOOK[b.name],
+      // Fall back rather than hand out undefined. Every caller of lookAtZ reads
+      // `.edge` or `.bank` straight off this, so a biome added to course.js
+      // without a BIOME_LOOK entry used to take the whole render down on
+      // `undefined.road` instead of simply looking like CITY START until
+      // someone gave it a palette.
+      look: BIOME_LOOK[b.name] || BIOME_LOOK['CITY START'],
     }));
     function lookAtZ(z) {
       let b = BI[0];
@@ -7375,7 +7380,7 @@ MR.World = (function () {
       const b = MR.Course.biomeAt(f);
       const look = BIOME_LOOK[b.name] || BIOME_LOOK['CITY START'];
       const idx = MR.Course.BIOMES.indexOf(b);
-      const prev = idx > 0 ? BIOME_LOOK[MR.Course.BIOMES[idx - 1].name] : look;
+      const prev = (idx > 0 && BIOME_LOOK[MR.Course.BIOMES[idx - 1].name]) || look;
 
       // Cross-fade over the first 0.03 of a biome instead of popping.
       const t = Math.min(1, (f - b.from) / 0.03);

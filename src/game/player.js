@@ -103,9 +103,14 @@ MR.Player = (function () {
         } else {
           // Asymmetric arc: quick rise, floatier fall. Reads as athletic.
           const a = s.airT;
+          // Flatter apex than a ballistic arc. The exponents are the whole
+          // point: at 1.7/1.85 the runner spent most of the airtime climbing
+          // or falling and only 0.46s above the clearance height. Raising them
+          // rushes the take-off and hangs the top of the arc, which buys
+          // timing window without changing the height or the duration.
           const shape = a < 0.42
-            ? 1 - Math.pow(1 - a / 0.42, 1.7)
-            : 1 - Math.pow((a - 0.42) / 0.58, 1.85);
+            ? 1 - Math.pow(1 - a / 0.42, 2.6)
+            : 1 - Math.pow((a - 0.42) / 0.58, 2.6);
           s.y = K.JUMP_HEIGHT * shape;
         }
       }
@@ -117,7 +122,7 @@ MR.Player = (function () {
       }
       // Fast in, slower out.
       const target = s.ducking ? 1 : 0;
-      const rate = s.ducking ? 16 : 9;
+      const rate = s.ducking ? K.DUCK_IN_RATE : K.DUCK_OUT_RATE;
       s.duck01 += (target - s.duck01) * Math.min(1, rate * dt);
 
       s.stumble = Math.max(0, s.stumble - dt * 2.2);

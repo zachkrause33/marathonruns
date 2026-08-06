@@ -151,3 +151,81 @@ acts on exact distances; a human on a phone does not.
 
 The whole game rests on building a clean streak, and on this evidence a human
 currently cannot start one.
+
+---
+
+# Evaluation against the video reference
+
+Frame-by-frame, from `tools/frames.py` at 10fps. Strips in `shots/video/`.
+
+## Subway Surfers — what its depth is actually made of
+
+Six distinct layers, and we have three of them.
+
+| # | Layer | Subway Surfers | This game |
+|---|---|---|---|
+| 1 | Play surface | train roofs, the LIGHTEST, most saturated mass in frame | road, lifted but still the flattest |
+| 2 | Track bed | **dense repeating sleepers**, every ~1 unit | lane dashes every ~12 units |
+| 3 | Roadside furniture | barriers, crates, traffic lights, chevron signs | barriers, kerbs |
+| 4 | Midground | buildings, tents, hoardings with signage | buildings |
+| 5 | **Overhead** | catenary wires + gantries crossing the frame CONSTANTLY, at several depths | mile gantries only, every 240 units |
+| 6 | Sky | banded | banded |
+
+### The single biggest thing we lack: ground frequency
+
+Subway Surfers' track bed is railway sleepers -- a hard perpendicular stripe
+roughly every world unit. At speed that is a strobe streaming under the
+player, and it is the dominant speed cue in the game. Our road carries lane
+dashes about every 12 units: an order of magnitude less frequent, so most of
+the largest surface on screen is flat colour that never changes.
+
+This is the same gap the camera pass reported from the other side -- "the road
+carries no motion signal between the dashes" -- and it is a WORLD fix, not a
+camera one. The camera has already been pushed to the edge of what framing can
+do (it turns an honest +15% ground speed into +37% of screen flow); the
+remaining headroom is in the surface itself.
+
+### Overhead is half the parallax
+
+Wires and gantries cross the frame every second or two, at several depths.
+Because they pass close to the lens and sweep top-to-bottom fast, they give
+vertical parallax that ground detail cannot. We have nothing between mile
+markers.
+
+## Subway Surfers — animation
+
+- **Jump: orange radial speed streaks burst from the character**, plus arms
+  flung wide. The VFX does as much work as the pose.
+- **A hard-edged elliptical drop shadow sits on the surface below** through
+  the whole arc. It is a landing reticle: you always know where you will come
+  down. Ours has a contact shadow but it is soft and fades in air.
+- **Landing fires another burst.**
+- **Coins arc vertically through the air** along the jump path, so the route
+  is drawn in 3D rather than painted flat on the ground.
+- Obstacles are REAL STREET AND RAIL FURNITURE -- traffic lights, red/white
+  chevron barriers, crates, train cars -- never abstract coloured blocks.
+
+## Temple Run — the slide, settled
+
+Frames 1-3 sliding, 4-6 recovering. Sliding, the character is FLAT ON THEIR
+BACK with the head completely out of the silhouette: legs extended fully
+forward up the path, then torso, then arms out wide nearest the lens. The
+shape is a low wide X. Recovering, the head appears and the figure becomes an
+upright column. The two states cannot be confused for one frame.
+
+Ours keeps the head level and bright (headband) at the top of the figure, so
+it reads as a crouch. See the note above: extending the legs can never fix a
+shape whose top is a head.
+
+## Priority order for this game
+
+1. **Widen the action forgiveness windows.** A human cannot currently start a
+   streak; the whole game rests on it. Blocking.
+2. **High-frequency road surface.** Biggest single win for speed and depth.
+3. **Overhead structure between mile gantries.**
+4. **Drop the head out of the slide silhouette.**
+5. **Jump/landing VFX and a hard landing shadow.**
+6. **Obstacles as street furniture** -- cones, works signs, detour arrows,
+   barriers -- rather than abstract blocks.
+7. **Living cross traffic** -- pedestrians on crossings, cyclists -- to sell a
+   city closed for a race rather than an empty corridor.

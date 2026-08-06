@@ -107,9 +107,20 @@ MR.K = (function () {
     // starts to read as a teleport rather than a movement.
     LANE_CHANGE_TIME: 0.16 * Math.sqrt(LANE_W / 2.35),
     JUMP_HEIGHT: 2.05,
-    JUMP_TIME: 0.62,
-    DUCK_TIME: 0.55,
-    INPUT_BUFFER: 0.14,             // late/early press forgiveness
+    // Airborne long enough to be humanly timeable, but still shorter than
+    // Course.ACTION_WINDOW (20 units) so a jump can never still be in the air
+    // at a gate demanding a slide: 0.70s * 26.3 u/s = 18.4 units.
+    JUMP_TIME: 0.70,
+    DUCK_TIME: 0.78,
+    INPUT_BUFFER: 0.20,             // late/early press forgiveness
+
+    // How fast the slide commits and releases. The ramp-in rate is the number
+    // that mattered: at 16 the slide did not reach DUCK_CLEAR until 0.138s
+    // after the swipe, so the first seventh of a second of every slide was
+    // dead time in which the player was already committed and still counted
+    // as standing.
+    DUCK_IN_RATE: 34,
+    DUCK_OUT_RATE: 9,
 
     // ---- aid: the way back into a race you are losing --------------------
     //

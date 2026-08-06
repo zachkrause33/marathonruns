@@ -46,18 +46,25 @@
  * just been proved out of reach.
  *
  * The ladder converts the same arithmetic into a graded result with a next
- * rung. It changes no balance whatsoever: the bands below are measured off
- * the shipped pace model (tools/simulate.js, aid included), where a
- * one-mistake run finishes 1:58:49, two 1:59:40, five 2:02:17 and ten
- * 2:05:22. Each rung is therefore roughly "one more mistake than the last",
- * which is exactly the resolution a player can act on.
+ * rung. It changes no balance whatsoever -- nothing here is a difficulty
+ * knob, it is a way of reading the finish time the model already produces.
  *
  * The rungs are DERIVED, not typed. They hang off RECORD_SECONDS: the first
  * is the next whole minute above the record, and the gaps double from there,
- * because the spread of finish times widens as the mistakes multiply. Retune
- * the pace model and the whole ladder moves with it -- including the labels,
- * which are formatted from the same numbers that gate the comparison, so a
+ * because the spread of finish times widens as the mistakes multiply. The
+ * labels are formatted from the same numbers that gate the comparison, so a
  * band can never be named one thing and tested as another.
+ *
+ * That derivation has already earned itself. These rungs were fitted against
+ * a single-exponential pace ramp, in which one mistake finished 1:58:49, two
+ * 1:59:40, five 2:02:17 and ten 2:05:22. The ramp was then rebuilt with two
+ * time constants and the floor moved 4:20 -> 4:14, and the ladder needed no
+ * edit at all: measured on the model as it stands (tools/simulate.js, aid
+ * taken), a one- and two-mistake run are RECORD, three is SUB-2:00 at
+ * 1:59:46, five is SUB-2:02 at 2:00:55, ten is SUB-2:06 at 2:03:32, and
+ * without aid the same counts read RECORD / SUB-2:02 / SUB-2:02 / SUB-2:06 /
+ * FINISHED. Roughly "one more mistake per rung" either way, which is the
+ * resolution a player can act on.
  */
 MR.Tier = (function () {
   const K = MR.K;
@@ -631,12 +638,14 @@ MR.HUD = (function () {
       if (gone) {
         // THE RECORD IS DEAD; THE RACE IS NOT.
         //
-        // Measured on the shipped build, at 90% accuracy the record dies at
-        // wall-second 80 of 240 and at 95% at second 100 -- so up to 69% of a
-        // run had no goal at all. Worse, it kept demanding NEED 3:54/MI in
-        // red: a pace the engine physically cannot produce, since the floor is
-        // 4:20. The screen was asking for something impossible and grading the
-        // player against it for two and a half minutes.
+        // Measured on the model as it stands, a 90%-accuracy run loses the
+        // record at wall-second 96 of 267 and a 95% run at second 126 of 254
+        // -- so between half and two thirds of a typical session used to have
+        // no goal in it at all. Worse, the readout kept demanding a required
+        // pace the engine physically cannot produce, in red, for the rest of
+        // the race: the pace floor is 4:14 and the ask ran below 4:00. The
+        // screen was requesting something impossible and grading the player
+        // against it for two and a half minutes.
         //
         // So the headline retargets. The projection is unchanged -- it is
         // still "where you finish if you hold a clean line from here" -- but
@@ -692,7 +701,7 @@ MR.HUD = (function () {
       cls(n.paceVal, 'paceCls', 'val num' + (p.pace <= K.RECORD_PACE ? ' ahead' : ''));
       // The line under the pace. While the record lives it is the race-desk
       // number: the pace the rest of the course demands. Once the record is
-      // gone that number is a lie -- it asks for 3:54/mi against a 4:20 floor
+      // gone that number is a lie -- it asks for a pace below the 4:14 floor
       // -- so the plate switches to the one target that is still winnable and
       // still live: the player's own longest clean line. It is monotone, so it
       // can only ever be approached, never lost; it has 189 points of

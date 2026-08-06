@@ -782,7 +782,25 @@ html, body {
   .target b { font-size: 22px; }
   .panel .keys { margin-top: 10px; }
   .cta { margin-top: 12px; padding: 10px 26px; }
-  #endCols { margin-top: 10px; gap: 8px 24px; }
+
+  /* The finish card has the most to say and the least room to say it in, so
+   * it gives up its vertical air rather than its content -- everything still
+   * fits above the fold on a 430px-tall landscape phone except the splits,
+   * which are the one block that is a nice-to-have. */
+  #startMemory { margin-top: 10px; gap: 6px; }
+  .mplate { padding: 4px 8px 5px; }
+  .mplate .mv { font-size: 15px; }
+  .endDate { margin-bottom: 6px; }
+  .panel .endBig { font-size: clamp(26px, 6vh, 38px); }
+  #endHead { gap: 8px 24px; }
+  .endSub { margin-top: 2px; }
+  #tierRow { margin-top: 9px; }
+  #endBadges, #endMem { margin-top: 6px; }
+  #endCols { --endRow: 18px; margin-top: 9px; gap: 8px 24px; }
+  #endCost { margin-top: 9px; }
+  #endTurn { margin-top: 8px; }
+  #tomorrow { margin-top: 9px; padding-top: 8px; }
+  #endPanel .cta { margin-top: 10px; }
 
   #leftCol { top: calc(var(--bugH, 60px) + 6px); gap: 6px; }
   #engine { padding: 5px 10px 6px; }

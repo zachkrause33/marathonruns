@@ -4599,10 +4599,22 @@ MR.World = (function () {
     // London's, New York's and Tokyo's span, and building one copy eagerly for
     // a day that draws none of them was pure waste.
 
-    /** Abutment: caps the end of the deck so the water does not just stop. */
+    /**
+     * Abutment: caps the end of the deck so the water does not just stop.
+     *
+     * The coping used to be one 48-wide slab at y = 0.1, which put a 0.45-high
+     * step across all three lanes for ten units of road at each end of the
+     * bridge. Nothing in collision.js knows it is there, so the player runs
+     * through it -- and it is a lane-wide horizontal mass at hazard height,
+     * which is the silhouette of a BLOCK. It is now two pieces on the
+     * shoulders, clear of the corridor, and the carriageway runs unbroken
+     * between them exactly as a real bridge joint does.
+     */
+    const ABUT_COPE = (48 / 2) - (CORRIDOR_HALF + 2.6);
     const abutGeo = merge([
       bx(46, 4.0, 9, 0, -2.0, 0, 0x6f7aa8),
-      bx(48, 0.7, 10, 0, 0.1, 0, 0x8e99c6),
+      bx(ABUT_COPE, 0.7, 10, -(CORRIDOR_HALF + 2.6 + ABUT_COPE / 2), 0.1, 0, 0x8e99c6),
+      bx(ABUT_COPE, 0.7, 10, (CORRIDOR_HALF + 2.6 + ABUT_COPE / 2), 0.1, 0, 0x8e99c6),
       bx(3.0, 2.6, 9.4, -13, 1.2, 0, 0x8e99c6),
       bx(3.0, 2.6, 9.4, 13, 1.2, 0, 0x8e99c6),
     ]);
@@ -5070,17 +5082,42 @@ MR.World = (function () {
     // the kerb rather than to a literal. Narrow the track and the banner comes
     // in with it, instead of being left standing out among the spectators.
     const GANTRY = K.TRACK_HALF_WIDTH + 1.2;
+    /**
+     * THE TRUSS SITS ABOVE THE CORRIDOR, and it did not used to.
+     *
+     * Every mile gantry crossed the carriageway with its lower chord at y=3.50
+     * and its sign panel at 3.73-5.83. MR.Collision.BOX puts a BLOCK at 0-2.80
+     * and the jump apex at 2.05, so the sign was hanging in and just over the
+     * band the player reads hazards in -- at ?skip=190 the MILE 21 panel passes
+     * straight through the runner's head, and any gate behind it is being read
+     * through a lit yellow board. Scenery in front of a hazard costs a streak
+     * for something outside the player's control, which in this game is the
+     * record.
+     *
+     * So the whole truss lifts by TRUSS_LIFT, putting its lowest member 0.35
+     * above OVERHEAD_Y. The legs grow to carry it; nothing else changes shape,
+     * and the painted stripe on the road stays exactly where it was, because
+     * that is the part that marks the moment of passing.
+     *
+     * It also reads better. A sign gantry at 9.5-11.8 is the same object every
+     * motorway has, it now belongs to the same overhead layer as the catenary
+     * and the footbridges instead of floating in its own band, and it sweeps
+     * top-to-bottom past the lens rather than across the middle of the frame.
+     */
+    const BANNER_CHORD = OVERHEAD_Y + 0.35;      // lowest member over the road
+    const TRUSS_LIFT = BANNER_CHORD - 3.50;      // 3.50 was the old chord bottom
     const bannerFrameGeo = (function () {
       const parts = [];
+      const legTop = 5.95 + TRUSS_LIFT + 0.25;
       for (const sx of [-1, 1]) {
-        parts.push(bx(0.42, 6.0, 0.42, sx * GANTRY, 3.0, 0, 0x2b2f52));
+        parts.push(bx(0.42, legTop, 0.42, sx * GANTRY, legTop / 2, 0, 0x2b2f52));
         parts.push(bx(0.90, 0.30, 0.90, sx * GANTRY, 0.15, 0, 0x1b1633));
-        parts.push(bx(0.30, 0.30, 1.8, sx * GANTRY, 5.4, 0, 0x2b2f52, 0, 0, 0));
+        parts.push(bx(0.30, 0.30, 1.8, sx * GANTRY, 5.4 + TRUSS_LIFT, 0, 0x2b2f52, 0, 0, 0));
       }
-      parts.push(bx(GANTRY * 2 + 0.4, 0.40, 0.40, 0, 5.95, 0, 0x2b2f52));
-      parts.push(bx(GANTRY * 2 + 0.4, 0.30, 0.30, 0, 3.65, 0, 0x2b2f52));
+      parts.push(bx(GANTRY * 2 + 0.4, 0.40, 0.40, 0, 5.95 + TRUSS_LIFT, 0, 0x2b2f52));
+      parts.push(bx(GANTRY * 2 + 0.4, 0.30, 0.30, 0, 3.65 + TRUSS_LIFT, 0, 0x2b2f52));
       for (let i = -4; i <= 4; i++) {
-        parts.push(bx(0.16, 2.4, 0.16, i * (GANTRY - 0.6) / 4, 4.8, 0, 0x3a4570, 0, 0, i % 2 ? 0.45 : -0.45));
+        parts.push(bx(0.16, 2.4, 0.16, i * (GANTRY - 0.6) / 4, 4.8 + TRUSS_LIFT, 0, 0x3a4570, 0, 0, i % 2 ? 0.45 : -0.45));
       }
       parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, 0.7), 0xfffdf5, 0, 0.011, 0, -Math.PI / 2));
       return merge(parts);
@@ -5091,10 +5128,10 @@ MR.World = (function () {
       g.add(S.outlined(bannerFrameGeo, mats.prop, S.INK.banner));
       const mat = new THREE.MeshBasicMaterial({ color: 0xffffff });
       const panel = new THREE.Mesh(new THREE.PlaneGeometry(GANTRY * 2 - 0.6, 2.1), mat);
-      panel.position.y = 4.78; panel.rotation.y = Math.PI;
+      panel.position.y = 4.78 + TRUSS_LIFT; panel.rotation.y = Math.PI;
       g.add(panel);
       const back = new THREE.Mesh(new THREE.PlaneGeometry(GANTRY * 2 - 0.6, 2.1), mat);
-      back.position.y = 4.78;
+      back.position.y = 4.78 + TRUSS_LIFT;
       g.add(back);
       g.userData.panel = panel;
       g.userData.mat = mat;
@@ -5104,30 +5141,45 @@ MR.World = (function () {
     // Start and finish get a heavier arch with a checker band.
     const checkTex = checkerTexture();
     const ARCH = K.TRACK_HALF_WIDTH + 3.0;   // heavier gantry, set further back
-    const archGeo = merge([
-      bx(1.5, 9.0, 1.5, -ARCH, 4.5, 0, 0xff3b6b),
-      bx(1.5, 9.0, 1.5, ARCH, 4.5, 0, 0xff3b6b),
-      bx(2.3, 0.6, 2.3, -ARCH, 0.3, 0, 0x1b1633),
-      bx(2.3, 0.6, 2.3, ARCH, 0.3, 0, 0x1b1633),
-      bx(ARCH * 2 + 2.4, 1.3, 1.6, 0, 8.7, 0, 0xff3b6b),
-      bx(ARCH * 2 + 2.4, 0.5, 1.2, 0, 6.2, 0, 0xd42a55),
-      bx(0.9, 4.2, 0.9, -(ARCH - 1.2), 10.9, 0, 0x2b2f52),
-      bx(0.9, 4.2, 0.9, ARCH - 1.2, 10.9, 0, 0x2b2f52),
-      bx(2.6, 1.8, 0.12, -(ARCH - 2.4), 12.4, 0, 0xffe45e),
-      bx(2.6, 1.8, 0.12, ARCH - 2.4, 12.4, 0, 0xffe45e),
-    ]);
+    // Same lift, same reason, and the same amount of it: the start and finish
+    // arches crossed the road at 5.95-9.35 with the sign panel at 6.25-8.65.
+    // START stands 30 units into the race with gates behind it.
+    const ARCH_LIFT = BANNER_CHORD - 5.95;
+    const archGeo = (function () {
+      const L = ARCH_LIFT;
+      const legTop = 8.7 + L + 0.65;
+      return merge([
+        bx(1.5, legTop, 1.5, -ARCH, legTop / 2, 0, 0xff3b6b),
+        bx(1.5, legTop, 1.5, ARCH, legTop / 2, 0, 0xff3b6b),
+        bx(2.3, 0.6, 2.3, -ARCH, 0.3, 0, 0x1b1633),
+        bx(2.3, 0.6, 2.3, ARCH, 0.3, 0, 0x1b1633),
+        bx(ARCH * 2 + 2.4, 1.3, 1.6, 0, 8.7 + L, 0, 0xff3b6b),
+        bx(ARCH * 2 + 2.4, 0.5, 1.2, 0, 6.2 + L, 0, 0xd42a55),
+        // The finials came down from 4.2 to 2.8 to pay for the lift. A finish
+        // arch reaching 17 units would have been half again the height of
+        // anything else on the course and would have cropped out of a portrait
+        // frame at the distance it is first read.
+        bx(0.9, 2.8, 0.9, -(ARCH - 1.2), 10.9 + L - 0.7, 0, 0x2b2f52),
+        bx(0.9, 2.8, 0.9, ARCH - 1.2, 10.9 + L - 0.7, 0, 0x2b2f52),
+        bx(2.6, 1.5, 0.12, -(ARCH - 2.4), 12.4 + L - 1.0, 0, 0xffe45e),
+        bx(2.6, 1.5, 0.12, ARCH - 2.4, 12.4 + L - 1.0, 0, 0xffe45e),
+      ]);
+    })();
     const archPool = Pool(function () {
       const g = new THREE.Group();
       g.add(S.outlined(archGeo, mats.prop, S.INK.banner));
       const mat = new THREE.MeshBasicMaterial({ color: 0xffffff });
       const panel = new THREE.Mesh(new THREE.PlaneGeometry(ARCH * 2 + 0.6, 2.4), mat);
-      panel.position.y = 7.45; panel.rotation.y = Math.PI;
+      panel.position.y = 7.45 + ARCH_LIFT; panel.rotation.y = Math.PI;
       g.add(panel);
       const back = new THREE.Mesh(new THREE.PlaneGeometry(ARCH * 2 + 0.6, 2.4), mat);
-      back.position.y = 7.45;
+      back.position.y = 7.45 + ARCH_LIFT;
       g.add(back);
       const band = new THREE.Mesh(new THREE.PlaneGeometry(ARCH * 2 + 0.6, 0.55), new THREE.MeshBasicMaterial({ map: checkTex }));
-      band.position.set(0, 5.95, 0.1); band.rotation.y = Math.PI;
+      // Nudged clear of the chord it hangs under so its own lower edge stays
+      // above OVERHEAD_Y too -- a 0.55 band centred on the chord would dip
+      // 0.02 under it, which is exactly the sort of thing the audit exists for.
+      band.position.set(0, 6.28 + ARCH_LIFT, 0.1); band.rotation.y = Math.PI;
       g.add(band);
       // Checker laid across the road: the line you actually cross.
       const line = new THREE.Mesh(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, 1.2),

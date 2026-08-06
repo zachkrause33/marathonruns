@@ -231,18 +231,37 @@ html, body {
  * You, the ghost, and the road between you. The honest split lives here
  * rather than in the headline, because next to the marker it describes it
  * reads as a position on the course instead of as a grade. */
+/* PLATED, like every other readout.
+ *
+ * This band was the one part of the HUD left sitting directly on the moving
+ * road with nothing but a text-shadow under it, and it is on screen 100% of
+ * the time. Measured against the road beneath it across all twelve settings,
+ * the `behind` pink reached 3.2:1 in exactly two of them and fell below 1.4:1
+ * in eight -- in Valencia it measured 1.03:1, which is not dim, it is gone.
+ *
+ * The other three readouts each sit on `var(--ink)` and were never in doubt;
+ * the accent yellow clears 8.4:1 against the lightest of the twelve. So this
+ * is not a colour problem to solve with a colour. It is the one plate that was
+ * never drawn.
+ *
+ * Also lifted clear of the safe area: at `bottom: 13px` on an 844px phone the
+ * mile caps sat under the home indicator. */
 #railWrap {
-  position: absolute; left: 50%; bottom: 13px;
+  position: absolute; left: 50%;
+  bottom: calc(13px + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
   width: min(660px, 88vw);
+  background: var(--ink);
+  border: 2px solid var(--hair);
+  padding: 9px 14px 8px;
+  backdrop-filter: blur(6px);
 }
 /* Clearance here is not slack: the ghost marker's cap sticks up out of the
  * rail and would otherwise strike through this line whenever the ghost is
  * near the middle of the course. */
 #gapLine {
   display: flex; align-items: baseline; justify-content: center; gap: 9px;
-  margin-bottom: 15px;
-  text-shadow: 0 1px 3px rgba(14, 18, 48, 0.9);
+  margin-bottom: 11px;
 }
 #gapLine .lab { opacity: 0.75; }
 #gapVal { font-size: 17px; font-weight: 900; line-height: 1; }
@@ -253,8 +272,8 @@ html, body {
 #rail { position: relative; height: 22px; }
 #railBg {
   position: absolute; inset: 0;
-  background: rgba(14, 18, 48, 0.8);
-  border: 1px solid rgba(255, 253, 245, 0.22);
+  background: rgba(0, 0, 0, 0.32);
+  border: 1px solid rgba(255, 253, 245, 0.18);
 }
 #railFill {
   position: absolute; top: 1px; bottom: 1px; left: 1px;
@@ -291,8 +310,7 @@ html, body {
   position: relative;
   display: flex; justify-content: space-between;
   font-size: 9px; font-weight: 800; letter-spacing: 0.1em;
-  opacity: 0.45; margin-top: 3px;
-  text-shadow: 0 1px 3px rgba(14, 18, 48, 0.9);
+  opacity: 0.78; margin-top: 4px;
 }
 #railHalf { position: absolute; left: 50%; transform: translateX(-50%); }
 
@@ -527,7 +545,8 @@ html, body {
   #toast .big { font-size: 21px; }
   #toast .small { font-size: 10px; }
 
-  #railWrap { width: 92vw; bottom: 10px; }
+  #railWrap { width: 92vw; bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+              padding: 7px 11px 6px; }
   #rail { height: 17px; }
   #gapLine { margin-bottom: 13px; gap: 7px; }
   #gapVal { font-size: 15px; }

@@ -215,11 +215,10 @@ html, body {
   padding: 8px 14px 9px;
   min-width: 152px; max-width: 178px;
 }
-#engine #streakVal {
-  font-size: 36px; font-weight: 700; line-height: 1;
-  color: var(--accent);
-  text-shadow: 0 2px 0 rgba(14, 18, 48, 0.6);
-}
+/* The count is a sub-line now, not the headline -- it explains the tank above
+   it rather than competing with the pace below. Accent still, because it is
+   the same quantity the gauge draws. */
+#engine #streakVal { font-weight: 700; color: var(--accent); }
 #engine #paceLab { margin-top: 1px; }
 #engine .val { font-size: 27px; font-weight: 500; line-height: 1.05; }
 #engine .val.ahead { color: var(--ahead); }
@@ -232,7 +231,8 @@ html, body {
 /* Contact flashes the whole plate, not just the number: the cost is the
  * streak and the speed together, and they live in the same box. */
 #engine.broken { border-left-color: var(--behind); background: rgba(58, 14, 32, 0.86); }
-#engine.broken #streakVal { color: var(--behind); }
+#engine.broken #streakVal,
+#engine.broken .gaugeFill { color: var(--behind); background: var(--behind); }
 
 .gauge {
   position: relative;
@@ -241,6 +241,19 @@ html, body {
   background: rgba(255, 253, 245, 0.13);
   border: 1px solid rgba(255, 253, 245, 0.16);
 }
+/* The in-race gauge is a tank, not a progress bar. It is the primary readout
+   of the engine now that the integer has stepped back, so it gets the height
+   to be read at a glance and a segmented face -- a continuous bar reads as
+   "how far through", a divided one reads as "how much is left". */
+.gauge.tank {
+  height: 14px;
+  margin: 5px 0 8px;
+  background:
+    repeating-linear-gradient(90deg,
+      rgba(255, 253, 245, 0.13) 0 calc(12.5% - 1px),
+      rgba(14, 18, 48, 0.55) calc(12.5% - 1px) 12.5%);
+}
+.gauge.tank .gaugeFill { opacity: 0.92; }
 .gaugeFill { position: absolute; inset: 0 auto 0 0; background: var(--accent); width: 0; }
 /* Record pace as a mark on the range you are unlocking: once the fill passes
  * it, you are running faster than 1:59:30 needs. */
@@ -768,7 +781,7 @@ html, body {
 
   #leftCol { left: 9px; top: 22px; gap: 7px; }
   #engine { min-width: 124px; max-width: 142px; padding: 6px 11px 7px; }
-  #engine #streakVal { font-size: 27px; }
+  #engine #streakLine { opacity: 0.62; }
   #engine .val { font-size: 21px; }
   #engine .sub { font-size: 8px; }
   #why { font-size: 8px; margin-top: 4px; }
@@ -808,7 +821,6 @@ html, body {
 
   #leftCol { left: 20px; top: 28px; gap: 11px; }
   #engine { min-width: 190px; max-width: 220px; padding: 10px 17px 12px; }
-  #engine #streakVal { font-size: 45px; }
   #engine .val { font-size: 33px; }
   #engine .unit { font-size: 13px; }
   #engine .sub, #why { font-size: 11px; }
@@ -916,7 +928,6 @@ html, body {
 
   #leftCol { top: 20px; gap: 6px; }
   #engine { padding: 5px 10px 6px; }
-  #engine #streakVal { font-size: 23px; }
   #engine .val { font-size: 18px; }
   .gauge { margin: 4px 0 5px; }
   #toast { padding: 5px 10px 6px; }
@@ -1586,7 +1597,15 @@ MR.Course = (function () {
   const MAX_SPEED = (K.UNITS_PER_MILE * K.TIME_SCALE) / K.FLOOR_PACE;
   const ACTION_WINDOW = Math.ceil(K.JUMP_TIME * MAX_SPEED) + 1;
   const START_GRACE = 150;   // clean runway so the first seconds read calmly
-  const FINISH_GRACE = 190;  // clean straight into the tape
+  // Clean straight into the tape. It was 190 units -- 0.80 of a mile, about
+  // seven seconds at race pace -- and combined with the difficulty ramp's
+  // natural tail it left the entire last mile holding TWO gates. The closing
+  // act of a four-minute race was an empty road.
+  //
+  // 55 keeps what the grace was for: a beat of clear tarmac so the tape is a
+  // moment you run through rather than something you scramble into. Two
+  // seconds is enough to see it coming, and not enough to get bored.
+  const FINISH_GRACE = 55;
 
   const BIOMES = [
     { name: 'CITY START', from: 0.00 },
@@ -1699,7 +1718,17 @@ MR.Course = (function () {
     // learn the lane geometry before the course starts asking questions.
     const base = Math.pow(f, 0.62);
     const wall = 0.28 * Math.exp(-Math.pow((f - 0.763) / 0.055, 2));
-    return Math.min(1, base * 0.86 + wall);
+    // THE RUN-IN. A second, sharper spike over the closing half-mile.
+    //
+    // The wall at mile 20 is the race's hard middle; this is its last question.
+    // Without it the difficulty curve simply tails off into the finish, which
+    // is the wrong shape for an ending -- a player arrives at the tape having
+    // been asked nothing for the better part of a minute. Narrower and later
+    // than the wall so the two read as separate events rather than one long
+    // grind, and it saturates the dial, which also pulls gate spacing to its
+    // floor through spacingAt().
+    const home = 0.34 * Math.exp(-Math.pow((f - 0.972) / 0.028, 2));
+    return Math.min(1, base * 0.86 + wall + home);
   }
 
   function spacingAt(f, rnd) {
@@ -5913,6 +5942,32 @@ MR.World = (function () {
   const LANDMARK_IN = CORRIDOR_HALF + 8.0;
   const OVERHEAD_Y = 9.0;
 
+  // ---- the finish, as a shape in distance -------------------------------
+  //
+  // The ending is not one moment, it is three, and they are laid out in world
+  // units because that is what the player experiences -- seconds of road, not
+  // a fraction of a race.
+  //
+  //   APPROACH  the last ~14 seconds. The stands grow, the crowd comes up off
+  //             its seat, the light goes gold, the camera starts to open out.
+  //             Nothing structural changes: gates are still arriving and every
+  //             one of these effects only ever shows MORE road, never less.
+  //   CHUTE     the last ~5 seconds, which course.js guarantees is clean road
+  //             (FINISH_GRACE is 190 units). This is where the game stops
+  //             asking anything of the player and starts paying them: packed
+  //             stands right against the barrier, bunting overhead, the finish
+  //             carpet, the tape visible at the end of it.
+  //   TAPE      the line itself.
+  //
+  // CHUTE is deliberately SHORTER than course.js's FINISH_GRACE. The carpet
+  // and the barrier crowd are the only two things in this file that sit inside
+  // the last stretch of road, and both are held 40 units clear of the earliest
+  // place a gate could legally be, so the closing-stretch gameplay can be
+  // retuned without either of them landing under a hazard.
+  const FINISH_Z = K.TOTAL_UNITS;
+  const APPROACH = 400;
+  const CHUTE = 150;
+
   // ---- biome palettes ---------------------------------------------------
   // `edge` names the roadside furniture the road tile wears; `mix` weights the
   // roadside prop lottery. Together they are what distinguishes a biome, the
@@ -6631,19 +6686,32 @@ MR.World = (function () {
    * vertices means a whole knot of them, or a bridge tower with its cables,
    * ships as one mesh under one shared material.
    */
+  /**
+   * A part may additionally carry `wave: [phase, amp]`, which merge() bakes
+   * into an `aWave` vertex attribute. That is what lets one merged mesh hold a
+   * grandstand whose STRUCTURE is rigid and whose SPECTATORS move: the seating
+   * decks get amp 0, the bodies get amp 1, and mats.crowd displaces per vertex
+   * on the GPU. Nothing is spent on it -- no extra draw, no extra triangle, no
+   * per-frame CPU work -- and it is the whole difference between a crowd and a
+   * pattern. The attribute is only emitted if some part asked for it, so every
+   * other merged prop is byte-identical to before.
+   */
   function merge(parts) {
     let n = 0;
+    let anyWave = false;
     const prepared = [];
     for (const p of parts) {
       const g = p.geo.index ? p.geo.toNonIndexed() : p.geo.clone();
       if (p.matrix) g.applyMatrix4(p.matrix);
-      prepared.push({ g, color: p.color });
+      prepared.push({ g, color: p.color, wave: p.wave });
+      if (p.wave) anyWave = true;
       n += g.attributes.position.count;
     }
     const pos = new Float32Array(n * 3);
     const nor = new Float32Array(n * 3);
     const col = new Float32Array(n * 3);
     const uv = new Float32Array(n * 2);
+    const wav = anyWave ? new Float32Array(n * 2) : null;
     let o = 0;
     for (const item of prepared) {
       const g = item.g;
@@ -6657,6 +6725,12 @@ MR.World = (function () {
         col[(o + i) * 3 + 1] = _cA.g;
         col[(o + i) * 3 + 2] = _cA.b;
       }
+      if (wav && item.wave) {
+        for (let i = 0; i < count; i++) {
+          wav[(o + i) * 2] = item.wave[0];
+          wav[(o + i) * 2 + 1] = item.wave[1];
+        }
+      }
       o += count;
       g.dispose();
     }
@@ -6665,6 +6739,7 @@ MR.World = (function () {
     out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
     out.setAttribute('color', new THREE.BufferAttribute(col, 3));
     out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    if (wav) out.setAttribute('aWave', new THREE.BufferAttribute(wav, 2));
     out.computeBoundingSphere();
     return out;
   }
@@ -6684,6 +6759,11 @@ MR.World = (function () {
   }
   function cone(r, h, seg, x, y, z, color) {
     return part(new THREE.ConeGeometry(r, h, seg), color, x, y, z);
+  }
+  /** Tag a part as crowd flesh: `phase` staggers it, `amp` scales its move. */
+  function wv(p, phase, amp) {
+    p.wave = [phase, amp === undefined ? 1 : amp];
+    return p;
   }
   /** Low-poly blob, for canopies and anything that must not read as a box. */
   function sph(r, seg, x, y, z, color) {
@@ -8282,6 +8362,81 @@ MR.World = (function () {
     return m;
   }
 
+  // ---- the crowd wave ---------------------------------------------------
+  /**
+   * A CROWD IS NOT A TEXTURE. IT IS A THING THAT REACTS TO YOU.
+   *
+   * The grandstands beside the last mile were 1,100 people who did not move,
+   * and a still crowd is scenery: the eye files it with the buildings and
+   * stops reading it. What makes a finish straight feel like a finish straight
+   * is that the noise arrives BEFORE you do and follows you through -- a
+   * stadium rises in a band that travels with the runner.
+   *
+   * Doing that on the CPU is impossible at this budget: it is thousands of
+   * bodies, and every one of them is already merged into a single mesh
+   * precisely so it costs one draw. So it is done in the vertex shader, off
+   * three numbers:
+   *
+   *   uT    clock
+   *   uZ    where the runner is, in world z
+   *   uHot  0..1, how much this run has earned -- see `finale` in create().
+   *         The last mile ramps it; the tape pins it; a run that came apart
+   *         never gets it all the way up, and that is the point.
+   *
+   * and one baked attribute, aWave = (phase, amplitude), which merge() writes.
+   * Amplitude 0 is structure and is not touched at all, so the seating decks,
+   * the stanchions and the roof stay rigid while the bodies on them move.
+   *
+   * The travelling part is `near`: excitement peaks in a band around the
+   * runner's own z and falls away over ~120 units, so a stand 150 units out is
+   * simmering, the one you are level with is on its feet, and the transition
+   * sweeps past the lens at running speed. That is the Mexican wave, and it
+   * costs one subtraction per vertex.
+   *
+   * COST: zero draws, zero triangles, one extra shader program. The whole
+   * feature is 8 bytes a vertex on the geometries that opt in.
+   */
+  const crowdU = {
+    uT: { value: 0 },
+    uZ: { value: 0 },
+    uHot: { value: 0 },
+  };
+  const WAVE_CHUNK = [
+    '#include <begin_vertex>',
+    'if (aWave.y > 0.0) {',
+    '  float wz = (modelMatrix * vec4(transformed, 1.0)).z - uZ;',
+    // Ahead of the runner the band reaches further than behind it: a crowd
+    // hears you coming, and the leading edge is the half that reads as
+    // anticipation rather than as applause.
+    '  float lead = wz > 0.0 ? 150.0 : 70.0;',
+    '  float near = 1.0 - smoothstep(4.0, lead, abs(wz));',
+    '  float exc = clamp(0.16 + 0.42 * uHot + near * (0.34 + 0.68 * uHot), 0.0, 1.55);',
+    '  float b = sin(uT * (4.1 + 3.4 * exc) + aWave.x);',
+    // Two terms and they say different things. The first is standing UP -- a
+    // constant lift that grows with excitement, which is what turns a seated
+    // block into a crowd on its feet. The second is the jumping.
+    '  transformed.y += aWave.y * (0.30 * exc + (0.05 + 0.26 * exc) * abs(b));',
+    '  transformed.x += aWave.y * exc * 0.085 * sin(uT * 5.7 + aWave.x * 1.73);',
+    '}',
+  ].join('\n');
+
+  function vwave(steps, floor) {
+    const m = vtoon(steps, floor);
+    const prev = m.onBeforeCompile;
+    m.onBeforeCompile = function (shader, renderer) {
+      if (prev) prev.call(this, shader, renderer);
+      shader.uniforms.uT = crowdU.uT;
+      shader.uniforms.uZ = crowdU.uZ;
+      shader.uniforms.uHot = crowdU.uHot;
+      shader.vertexShader = 'attribute vec2 aWave;\nuniform float uT;\nuniform float uZ;\nuniform float uHot;\n'
+        + shader.vertexShader.replace('#include <begin_vertex>', WAVE_CHUNK);
+    };
+    // Pinned, so this compiles once rather than being hashed off the function
+    // source -- see the note on the shared ramp patch in shading.js.
+    m.customProgramCacheKey = function () { return 'mr/crowdwave/' + (steps || 2); };
+    return m;
+  }
+
   // ---- generic pool -----------------------------------------------------
   function Pool(factory, parent) {
     const free = [];
@@ -8578,6 +8733,9 @@ MR.World = (function () {
       // race is lost by misreading, so it is the one class that spends its
       // shading budget on chroma rather than on form.
       propLit: vtoon(3, 0.62),
+      // Everything that is made of people. Same toon ramp as `prop`, plus the
+      // vertex wave -- see vwave() above.
+      crowd: vwave(2),
       water: new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, depthWrite: false }),
     };
 
@@ -10482,30 +10640,38 @@ MR.World = (function () {
         const h = 1.02 + r() * 0.26;
         const shirt = shirts[Math.floor(r() * shirts.length)];
         const skin = skins[Math.floor(r() * skins.length)];
-        parts.push(bx(0.32, 0.60 * h, 0.24, x, 0.30 * h, z, 0x2b2f52));
-        parts.push(bx(0.46, 0.62 * h, 0.32, x, 0.92 * h, z, shirt));
-        parts.push(bx(0.28, 0.28, 0.26, x, 1.38 * h, z, skin));
-        parts.push(bx(0.30, 0.10, 0.28, x, 1.52 * h, z, 0x3a2b46));
+        // One phase per FIGURE. The knot used to bob as a single rigid group
+        // from JS -- nine people rising and falling in lockstep, which is the
+        // silhouette of a lift, not of a crowd. Individually phased on the
+        // GPU it costs nothing and nine people jump at nine different moments.
+        const ph = i * 1.31 + r() * 2.2;
+        parts.push(wv(bx(0.32, 0.60 * h, 0.24, x, 0.30 * h, z, 0x2b2f52), ph, 0.55));
+        parts.push(wv(bx(0.46, 0.62 * h, 0.32, x, 0.92 * h, z, shirt), ph));
+        parts.push(wv(bx(0.28, 0.28, 0.26, x, 1.38 * h, z, skin), ph));
+        parts.push(wv(bx(0.30, 0.10, 0.28, x, 1.52 * h, z, 0x3a2b46), ph));
         // Arms up, or holding a placard -- a still crowd looks dead, and the
         // placards are what read as "spectators" at the distance the figures
-        // themselves have collapsed to two pixels.
+        // themselves have collapsed to two pixels. The placard gets the
+        // biggest amplitude in the knot: it is the highest, brightest and
+        // largest thing on the figure, so it is the part whose movement
+        // survives to the distance the knot is actually read at.
         if (i % 3 === 0) {
-          parts.push(bx(0.12, 0.56, 0.12, x - 0.30, 1.22 * h, z, skin, 0, 0, 0.32));
-          parts.push(bx(0.12, 0.56, 0.12, x + 0.30, 1.22 * h, z, skin, 0, 0, -0.32));
+          parts.push(wv(bx(0.12, 0.56, 0.12, x - 0.30, 1.22 * h, z, skin, 0, 0, 0.32), ph, 1.25));
+          parts.push(wv(bx(0.12, 0.56, 0.12, x + 0.30, 1.22 * h, z, skin, 0, 0, -0.32), ph, 1.25));
         } else if (i % 4 === 1) {
-          parts.push(bx(0.12, 0.70, 0.12, x + 0.26, 1.35 * h, z, skin));
-          parts.push(bx(0.10, 0.9, 0.10, x + 0.26, 1.9 * h, z, 0x8a5a3c));
-          parts.push(bx(0.86, 0.62, 0.08, x + 0.26, 2.45 * h, z, signs[Math.floor(r() * signs.length)]));
+          parts.push(wv(bx(0.12, 0.70, 0.12, x + 0.26, 1.35 * h, z, skin), ph, 1.35));
+          parts.push(wv(bx(0.10, 0.9, 0.10, x + 0.26, 1.9 * h, z, 0x8a5a3c), ph, 1.6));
+          parts.push(wv(bx(0.86, 0.62, 0.08, x + 0.26, 2.45 * h, z, signs[Math.floor(r() * signs.length)]), ph, 1.85));
         } else {
-          parts.push(bx(0.12, 0.46, 0.12, x - 0.28, 0.92 * h, z, shirt));
-          parts.push(bx(0.12, 0.46, 0.12, x + 0.28, 0.92 * h, z, shirt));
+          parts.push(wv(bx(0.12, 0.46, 0.12, x - 0.28, 0.92 * h, z, shirt), ph, 1.1));
+          parts.push(wv(bx(0.12, 0.46, 0.12, x + 0.28, 0.92 * h, z, shirt), ph, 1.1));
         }
       }
       return merge(parts);
     }
     const crowdGeos = [crowdGeo(3), crowdGeo(17), crowdGeo(41), crowdGeo(88)];
     const crowdPool = crowdGeos.map((geo) => Pool(function () {
-      return S.outlined(geo, mats.prop, S.INK.prop);
+      return S.outlined(geo, mats.crowd, S.INK.prop);
     }, group));
 
     /**
@@ -11004,8 +11170,12 @@ MR.World = (function () {
         parts.push(bx(1.10, 0.74, TILE, x, y + 0.37, 0, row % 2 ? 0x8e99c6 : 0x6f7aa8));
         for (let i = 0; i < 11; i++) {
           const z = -TILE / 2 + 1.2 + i * 2.15 + r() * 0.5;
-          parts.push(bx(0.40, 0.48, 0.28, x - 0.1, y + 0.98, z, shirts[Math.floor(r() * shirts.length)]));
-          parts.push(bx(0.22, 0.22, 0.20, x - 0.1, y + 1.33, z, 0xffc79a));
+          // Phase off the seat, not off a counter: neighbours in a row are a
+          // beat apart and the rows are offset from each other, which is what
+          // keeps a stand from pumping like one object.
+          const ph = z * 0.42 + row * 1.7 + r() * 1.4;
+          parts.push(wv(bx(0.40, 0.48, 0.28, x - 0.1, y + 0.98, z, shirts[Math.floor(r() * shirts.length)]), ph));
+          parts.push(wv(bx(0.22, 0.22, 0.20, x - 0.1, y + 1.33, z, 0xffc79a), ph));
         }
       }
       for (const z of [-TILE / 2 + 1, TILE / 2 - 1]) {
@@ -11041,8 +11211,14 @@ MR.World = (function () {
         const y = row * 0.74;
         const x = 0.9 + row * 1.10;
         parts.push(bx(1.10, 0.74, TILE, x, y + 0.37, 0, row % 2 ? 0x8e99c6 : 0x6f7aa8));
-        parts.push(bx(0.40, 0.48, TILE - 2.2, x - 0.1, y + 0.98, 0, 0xc2b087));
-        parts.push(bx(0.22, 0.22, TILE - 2.2, x - 0.1, y + 1.33, 0, 0xe8bd94));
+        // The band waves too, at a third of the amplitude and one phase per
+        // row. A band cannot ripple along its own length -- it is one box --
+        // so what survives the swap is the SWELL, which is the part that is
+        // still legible through 45% of fog. Splitting each row into chunks to
+        // buy back the ripple would cost more triangles than the whole far
+        // variant currently is, for detail that is sub-pixel by construction.
+        parts.push(wv(bx(0.40, 0.48, TILE - 2.2, x - 0.1, y + 0.98, 0, 0xc2b087), row * 1.9, 0.34));
+        parts.push(wv(bx(0.22, 0.22, TILE - 2.2, x - 0.1, y + 1.33, 0, 0xe8bd94), row * 1.9, 0.34));
       }
       for (const z of [-TILE / 2 + 1, TILE / 2 - 1]) {
         parts.push(bx(0.28, 7.2, 0.28, 0.2, 3.6, z, 0x2b2f52));
@@ -11053,8 +11229,8 @@ MR.World = (function () {
     const STAND_LOD = 130;
     const standPool = Pool(function () {
       const g = new THREE.Group();
-      const near = S.outlined(standGeo, mats.prop, S.INK.scenery);
-      const far = S.outlined(standFarGeo, mats.prop, S.INK.scenery);
+      const near = S.outlined(standGeo, mats.crowd, S.INK.scenery);
+      const far = S.outlined(standFarGeo, mats.crowd, S.INK.scenery);
       far.visible = false;
       g.add(near, far);
       g.userData.lod = [near, far];
@@ -12110,7 +12286,10 @@ MR.World = (function () {
           // is where a real course puts the overflow.
           obj.position.set(s.side * (K.TRACK_HALF_WIDTH + 1.9 + s.b * 3.4), 0, s.z);
           obj.rotation.y = s.side > 0 ? Math.PI : 0;
-          obj.userData.bounce = s.c;
+          // A pooled knot inherits the last tenant's lift, and the lift is now
+          // the shader's. Zero it on claim rather than leaving a knot standing
+          // 13cm in the air for the rest of the race.
+          obj.position.y = 0;
         }
         obj.userData.auditName = 'prop / ' + s.kind;
         activeScene.push({ s, obj, pool });
@@ -12247,11 +12426,11 @@ MR.World = (function () {
         e.pool.release(e.obj);
       }
 
-      // Crowd idle: a cheap bob keeps the roadside alive without animation data.
+      // Crowd idle used to live here as a whole-knot bob. It is now per figure
+      // and on the GPU -- see vwave() -- so this loop only has the walkers
+      // left in it, and nine spectators no longer rise and fall as one object.
       for (const e of activeScene) {
-        if (e.s.kind === 'crowd') {
-          e.obj.position.y = Math.abs(Math.sin(now * 4 + e.obj.userData.bounce * 6.3)) * 0.13;
-        } else if (e.s.kind === 'walkers') {
+        if (e.s.kind === 'walkers') {
           // Pavement life, and the reason it moves ACROSS rather than along.
           // Lateral motion is far more visible at a glance than forward motion
           // at a speed the runner is already beating, and "people crossing"
@@ -14570,16 +14749,35 @@ MR.HUD = (function () {
           <div class="sub num" id="margin">VS ${K.RECORD_LABEL}</div>
         </div>
 
+        <!--
+          THE STREAK IS FUEL, NOT A SCORE.
+
+          It used to lead with CLEAN GATES over a large integer, and every
+          review of this game independently said the same thing about it: a big
+          number with a label like that is a SCOREBOARD, and people read
+          scoreboards with the loss-aversion circuit -- "points I could lose".
+          The variable is not a score. It is a tank: it fills while you run
+          clean, it drains most of the way on contact, water and bananas refill
+          it, and the pace you get is read straight off how full it is. The
+          shipped aid toast already says FUEL out loud while crediting a
+          counter called CLEAN GATES -- three names for one thing.
+
+          So the gauge leads and the integer stops being the headline. Same
+          variable, same maths, nothing balanced changed; what changes is
+          whether a player reads it as something to protect or something to
+          spend and rebuild. It also costs one large number less on a screen
+          the owner asked to declutter.
+        -->
         <div id="engine">
-          <div class="lab">CLEAN GATES</div>
-          <div class="val num" id="streakVal">0</div>
-          <div class="gauge" id="paceGauge">
+          <div class="lab">FUEL</div>
+          <div class="gauge tank" id="paceGauge">
             <div class="gaugeFill" id="gaugeFill"></div>
             <div class="gaugeRec"></div>
           </div>
           <div class="lab" id="paceLab">PACE</div>
           <div><span class="val num" id="paceVal">5:30</span><span class="unit">/MI</span></div>
           <div class="sub num" id="needVal">NEED ${Pace.pace(K.RECORD_PACE)}/MI</div>
+          <div class="sub num" id="streakLine"><span id="streakVal">0</span> CLEAN</div>
           <div id="why">EACH CLEAN GATE BUYS SPEED</div>
         </div>
 

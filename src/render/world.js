@@ -108,6 +108,32 @@ MR.World = (function () {
   const LANDMARK_IN = CORRIDOR_HALF + 8.0;
   const OVERHEAD_Y = 9.0;
 
+  // ---- the finish, as a shape in distance -------------------------------
+  //
+  // The ending is not one moment, it is three, and they are laid out in world
+  // units because that is what the player experiences -- seconds of road, not
+  // a fraction of a race.
+  //
+  //   APPROACH  the last ~14 seconds. The stands grow, the crowd comes up off
+  //             its seat, the light goes gold, the camera starts to open out.
+  //             Nothing structural changes: gates are still arriving and every
+  //             one of these effects only ever shows MORE road, never less.
+  //   CHUTE     the last ~5 seconds, which course.js guarantees is clean road
+  //             (FINISH_GRACE is 190 units). This is where the game stops
+  //             asking anything of the player and starts paying them: packed
+  //             stands right against the barrier, bunting overhead, the finish
+  //             carpet, the tape visible at the end of it.
+  //   TAPE      the line itself.
+  //
+  // CHUTE is deliberately SHORTER than course.js's FINISH_GRACE. The carpet
+  // and the barrier crowd are the only two things in this file that sit inside
+  // the last stretch of road, and both are held 40 units clear of the earliest
+  // place a gate could legally be, so the closing-stretch gameplay can be
+  // retuned without either of them landing under a hazard.
+  const FINISH_Z = K.TOTAL_UNITS;
+  const APPROACH = 400;
+  const CHUTE = 150;
+
   // ---- biome palettes ---------------------------------------------------
   // `edge` names the roadside furniture the road tile wears; `mix` weights the
   // roadside prop lottery. Together they are what distinguishes a biome, the
@@ -826,19 +852,32 @@ MR.World = (function () {
    * vertices means a whole knot of them, or a bridge tower with its cables,
    * ships as one mesh under one shared material.
    */
+  /**
+   * A part may additionally carry `wave: [phase, amp]`, which merge() bakes
+   * into an `aWave` vertex attribute. That is what lets one merged mesh hold a
+   * grandstand whose STRUCTURE is rigid and whose SPECTATORS move: the seating
+   * decks get amp 0, the bodies get amp 1, and mats.crowd displaces per vertex
+   * on the GPU. Nothing is spent on it -- no extra draw, no extra triangle, no
+   * per-frame CPU work -- and it is the whole difference between a crowd and a
+   * pattern. The attribute is only emitted if some part asked for it, so every
+   * other merged prop is byte-identical to before.
+   */
   function merge(parts) {
     let n = 0;
+    let anyWave = false;
     const prepared = [];
     for (const p of parts) {
       const g = p.geo.index ? p.geo.toNonIndexed() : p.geo.clone();
       if (p.matrix) g.applyMatrix4(p.matrix);
-      prepared.push({ g, color: p.color });
+      prepared.push({ g, color: p.color, wave: p.wave });
+      if (p.wave) anyWave = true;
       n += g.attributes.position.count;
     }
     const pos = new Float32Array(n * 3);
     const nor = new Float32Array(n * 3);
     const col = new Float32Array(n * 3);
     const uv = new Float32Array(n * 2);
+    const wav = anyWave ? new Float32Array(n * 2) : null;
     let o = 0;
     for (const item of prepared) {
       const g = item.g;
@@ -852,6 +891,12 @@ MR.World = (function () {
         col[(o + i) * 3 + 1] = _cA.g;
         col[(o + i) * 3 + 2] = _cA.b;
       }
+      if (wav && item.wave) {
+        for (let i = 0; i < count; i++) {
+          wav[(o + i) * 2] = item.wave[0];
+          wav[(o + i) * 2 + 1] = item.wave[1];
+        }
+      }
       o += count;
       g.dispose();
     }
@@ -860,6 +905,7 @@ MR.World = (function () {
     out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
     out.setAttribute('color', new THREE.BufferAttribute(col, 3));
     out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    if (wav) out.setAttribute('aWave', new THREE.BufferAttribute(wav, 2));
     out.computeBoundingSphere();
     return out;
   }
@@ -879,6 +925,11 @@ MR.World = (function () {
   }
   function cone(r, h, seg, x, y, z, color) {
     return part(new THREE.ConeGeometry(r, h, seg), color, x, y, z);
+  }
+  /** Tag a part as crowd flesh: `phase` staggers it, `amp` scales its move. */
+  function wv(p, phase, amp) {
+    p.wave = [phase, amp === undefined ? 1 : amp];
+    return p;
   }
   /** Low-poly blob, for canopies and anything that must not read as a box. */
   function sph(r, seg, x, y, z, color) {
@@ -2477,6 +2528,81 @@ MR.World = (function () {
     return m;
   }
 
+  // ---- the crowd wave ---------------------------------------------------
+  /**
+   * A CROWD IS NOT A TEXTURE. IT IS A THING THAT REACTS TO YOU.
+   *
+   * The grandstands beside the last mile were 1,100 people who did not move,
+   * and a still crowd is scenery: the eye files it with the buildings and
+   * stops reading it. What makes a finish straight feel like a finish straight
+   * is that the noise arrives BEFORE you do and follows you through -- a
+   * stadium rises in a band that travels with the runner.
+   *
+   * Doing that on the CPU is impossible at this budget: it is thousands of
+   * bodies, and every one of them is already merged into a single mesh
+   * precisely so it costs one draw. So it is done in the vertex shader, off
+   * three numbers:
+   *
+   *   uT    clock
+   *   uZ    where the runner is, in world z
+   *   uHot  0..1, how much this run has earned -- see `finale` in create().
+   *         The last mile ramps it; the tape pins it; a run that came apart
+   *         never gets it all the way up, and that is the point.
+   *
+   * and one baked attribute, aWave = (phase, amplitude), which merge() writes.
+   * Amplitude 0 is structure and is not touched at all, so the seating decks,
+   * the stanchions and the roof stay rigid while the bodies on them move.
+   *
+   * The travelling part is `near`: excitement peaks in a band around the
+   * runner's own z and falls away over ~120 units, so a stand 150 units out is
+   * simmering, the one you are level with is on its feet, and the transition
+   * sweeps past the lens at running speed. That is the Mexican wave, and it
+   * costs one subtraction per vertex.
+   *
+   * COST: zero draws, zero triangles, one extra shader program. The whole
+   * feature is 8 bytes a vertex on the geometries that opt in.
+   */
+  const crowdU = {
+    uT: { value: 0 },
+    uZ: { value: 0 },
+    uHot: { value: 0 },
+  };
+  const WAVE_CHUNK = [
+    '#include <begin_vertex>',
+    'if (aWave.y > 0.0) {',
+    '  float wz = (modelMatrix * vec4(transformed, 1.0)).z - uZ;',
+    // Ahead of the runner the band reaches further than behind it: a crowd
+    // hears you coming, and the leading edge is the half that reads as
+    // anticipation rather than as applause.
+    '  float lead = wz > 0.0 ? 150.0 : 70.0;',
+    '  float near = 1.0 - smoothstep(4.0, lead, abs(wz));',
+    '  float exc = clamp(0.16 + 0.42 * uHot + near * (0.34 + 0.68 * uHot), 0.0, 1.55);',
+    '  float b = sin(uT * (4.1 + 3.4 * exc) + aWave.x);',
+    // Two terms and they say different things. The first is standing UP -- a
+    // constant lift that grows with excitement, which is what turns a seated
+    // block into a crowd on its feet. The second is the jumping.
+    '  transformed.y += aWave.y * (0.30 * exc + (0.05 + 0.26 * exc) * abs(b));',
+    '  transformed.x += aWave.y * exc * 0.085 * sin(uT * 5.7 + aWave.x * 1.73);',
+    '}',
+  ].join('\n');
+
+  function vwave(steps, floor) {
+    const m = vtoon(steps, floor);
+    const prev = m.onBeforeCompile;
+    m.onBeforeCompile = function (shader, renderer) {
+      if (prev) prev.call(this, shader, renderer);
+      shader.uniforms.uT = crowdU.uT;
+      shader.uniforms.uZ = crowdU.uZ;
+      shader.uniforms.uHot = crowdU.uHot;
+      shader.vertexShader = 'attribute vec2 aWave;\nuniform float uT;\nuniform float uZ;\nuniform float uHot;\n'
+        + shader.vertexShader.replace('#include <begin_vertex>', WAVE_CHUNK);
+    };
+    // Pinned, so this compiles once rather than being hashed off the function
+    // source -- see the note on the shared ramp patch in shading.js.
+    m.customProgramCacheKey = function () { return 'mr/crowdwave/' + (steps || 2); };
+    return m;
+  }
+
   // ---- generic pool -----------------------------------------------------
   function Pool(factory, parent) {
     const free = [];
@@ -2773,6 +2899,9 @@ MR.World = (function () {
       // race is lost by misreading, so it is the one class that spends its
       // shading budget on chroma rather than on form.
       propLit: vtoon(3, 0.62),
+      // Everything that is made of people. Same toon ramp as `prop`, plus the
+      // vertex wave -- see vwave() above.
+      crowd: vwave(2),
       water: new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, depthWrite: false }),
     };
 
@@ -4677,30 +4806,38 @@ MR.World = (function () {
         const h = 1.02 + r() * 0.26;
         const shirt = shirts[Math.floor(r() * shirts.length)];
         const skin = skins[Math.floor(r() * skins.length)];
-        parts.push(bx(0.32, 0.60 * h, 0.24, x, 0.30 * h, z, 0x2b2f52));
-        parts.push(bx(0.46, 0.62 * h, 0.32, x, 0.92 * h, z, shirt));
-        parts.push(bx(0.28, 0.28, 0.26, x, 1.38 * h, z, skin));
-        parts.push(bx(0.30, 0.10, 0.28, x, 1.52 * h, z, 0x3a2b46));
+        // One phase per FIGURE. The knot used to bob as a single rigid group
+        // from JS -- nine people rising and falling in lockstep, which is the
+        // silhouette of a lift, not of a crowd. Individually phased on the
+        // GPU it costs nothing and nine people jump at nine different moments.
+        const ph = i * 1.31 + r() * 2.2;
+        parts.push(wv(bx(0.32, 0.60 * h, 0.24, x, 0.30 * h, z, 0x2b2f52), ph, 0.55));
+        parts.push(wv(bx(0.46, 0.62 * h, 0.32, x, 0.92 * h, z, shirt), ph));
+        parts.push(wv(bx(0.28, 0.28, 0.26, x, 1.38 * h, z, skin), ph));
+        parts.push(wv(bx(0.30, 0.10, 0.28, x, 1.52 * h, z, 0x3a2b46), ph));
         // Arms up, or holding a placard -- a still crowd looks dead, and the
         // placards are what read as "spectators" at the distance the figures
-        // themselves have collapsed to two pixels.
+        // themselves have collapsed to two pixels. The placard gets the
+        // biggest amplitude in the knot: it is the highest, brightest and
+        // largest thing on the figure, so it is the part whose movement
+        // survives to the distance the knot is actually read at.
         if (i % 3 === 0) {
-          parts.push(bx(0.12, 0.56, 0.12, x - 0.30, 1.22 * h, z, skin, 0, 0, 0.32));
-          parts.push(bx(0.12, 0.56, 0.12, x + 0.30, 1.22 * h, z, skin, 0, 0, -0.32));
+          parts.push(wv(bx(0.12, 0.56, 0.12, x - 0.30, 1.22 * h, z, skin, 0, 0, 0.32), ph, 1.25));
+          parts.push(wv(bx(0.12, 0.56, 0.12, x + 0.30, 1.22 * h, z, skin, 0, 0, -0.32), ph, 1.25));
         } else if (i % 4 === 1) {
-          parts.push(bx(0.12, 0.70, 0.12, x + 0.26, 1.35 * h, z, skin));
-          parts.push(bx(0.10, 0.9, 0.10, x + 0.26, 1.9 * h, z, 0x8a5a3c));
-          parts.push(bx(0.86, 0.62, 0.08, x + 0.26, 2.45 * h, z, signs[Math.floor(r() * signs.length)]));
+          parts.push(wv(bx(0.12, 0.70, 0.12, x + 0.26, 1.35 * h, z, skin), ph, 1.35));
+          parts.push(wv(bx(0.10, 0.9, 0.10, x + 0.26, 1.9 * h, z, 0x8a5a3c), ph, 1.6));
+          parts.push(wv(bx(0.86, 0.62, 0.08, x + 0.26, 2.45 * h, z, signs[Math.floor(r() * signs.length)]), ph, 1.85));
         } else {
-          parts.push(bx(0.12, 0.46, 0.12, x - 0.28, 0.92 * h, z, shirt));
-          parts.push(bx(0.12, 0.46, 0.12, x + 0.28, 0.92 * h, z, shirt));
+          parts.push(wv(bx(0.12, 0.46, 0.12, x - 0.28, 0.92 * h, z, shirt), ph, 1.1));
+          parts.push(wv(bx(0.12, 0.46, 0.12, x + 0.28, 0.92 * h, z, shirt), ph, 1.1));
         }
       }
       return merge(parts);
     }
     const crowdGeos = [crowdGeo(3), crowdGeo(17), crowdGeo(41), crowdGeo(88)];
     const crowdPool = crowdGeos.map((geo) => Pool(function () {
-      return S.outlined(geo, mats.prop, S.INK.prop);
+      return S.outlined(geo, mats.crowd, S.INK.prop);
     }, group));
 
     /**
@@ -5199,8 +5336,12 @@ MR.World = (function () {
         parts.push(bx(1.10, 0.74, TILE, x, y + 0.37, 0, row % 2 ? 0x8e99c6 : 0x6f7aa8));
         for (let i = 0; i < 11; i++) {
           const z = -TILE / 2 + 1.2 + i * 2.15 + r() * 0.5;
-          parts.push(bx(0.40, 0.48, 0.28, x - 0.1, y + 0.98, z, shirts[Math.floor(r() * shirts.length)]));
-          parts.push(bx(0.22, 0.22, 0.20, x - 0.1, y + 1.33, z, 0xffc79a));
+          // Phase off the seat, not off a counter: neighbours in a row are a
+          // beat apart and the rows are offset from each other, which is what
+          // keeps a stand from pumping like one object.
+          const ph = z * 0.42 + row * 1.7 + r() * 1.4;
+          parts.push(wv(bx(0.40, 0.48, 0.28, x - 0.1, y + 0.98, z, shirts[Math.floor(r() * shirts.length)]), ph));
+          parts.push(wv(bx(0.22, 0.22, 0.20, x - 0.1, y + 1.33, z, 0xffc79a), ph));
         }
       }
       for (const z of [-TILE / 2 + 1, TILE / 2 - 1]) {
@@ -5236,8 +5377,14 @@ MR.World = (function () {
         const y = row * 0.74;
         const x = 0.9 + row * 1.10;
         parts.push(bx(1.10, 0.74, TILE, x, y + 0.37, 0, row % 2 ? 0x8e99c6 : 0x6f7aa8));
-        parts.push(bx(0.40, 0.48, TILE - 2.2, x - 0.1, y + 0.98, 0, 0xc2b087));
-        parts.push(bx(0.22, 0.22, TILE - 2.2, x - 0.1, y + 1.33, 0, 0xe8bd94));
+        // The band waves too, at a third of the amplitude and one phase per
+        // row. A band cannot ripple along its own length -- it is one box --
+        // so what survives the swap is the SWELL, which is the part that is
+        // still legible through 45% of fog. Splitting each row into chunks to
+        // buy back the ripple would cost more triangles than the whole far
+        // variant currently is, for detail that is sub-pixel by construction.
+        parts.push(wv(bx(0.40, 0.48, TILE - 2.2, x - 0.1, y + 0.98, 0, 0xc2b087), row * 1.9, 0.34));
+        parts.push(wv(bx(0.22, 0.22, TILE - 2.2, x - 0.1, y + 1.33, 0, 0xe8bd94), row * 1.9, 0.34));
       }
       for (const z of [-TILE / 2 + 1, TILE / 2 - 1]) {
         parts.push(bx(0.28, 7.2, 0.28, 0.2, 3.6, z, 0x2b2f52));
@@ -5248,8 +5395,8 @@ MR.World = (function () {
     const STAND_LOD = 130;
     const standPool = Pool(function () {
       const g = new THREE.Group();
-      const near = S.outlined(standGeo, mats.prop, S.INK.scenery);
-      const far = S.outlined(standFarGeo, mats.prop, S.INK.scenery);
+      const near = S.outlined(standGeo, mats.crowd, S.INK.scenery);
+      const far = S.outlined(standFarGeo, mats.crowd, S.INK.scenery);
       far.visible = false;
       g.add(near, far);
       g.userData.lod = [near, far];
@@ -6155,6 +6302,116 @@ MR.World = (function () {
      * Advance the spawn window. `z` is the runner's distance along the course
      * in world units; the world itself does not move, the camera does.
      */
+    // ---- THE FINALE, AND WHY IT READS THE RACE ---------------------------
+    /**
+     * One state object, recomputed a few times a second, that every part of
+     * the ending hangs off: the crowd's excitement, the colour of the light
+     * strip, how much confetti goes up and what colour it is, and how hard the
+     * camera opens out.
+     *
+     * The whole argument for it is this: a finish that plays the same however
+     * the run went is a cutscene, and a player learns to stop watching a
+     * cutscene by the third time. What this game actually has at mile 25 is a
+     * live verdict -- pace.projectClean() says where the run lands if it holds,
+     * MR.Tier says which rung of the ladder that is and how far the next one
+     * is -- and that verdict is the most interesting thing on the screen. So
+     * the road spends it.
+     *
+     *   record   the record is still on. The crowd goes all the way up, the
+     *            strip runs gold, the tape burst is the full one.
+     *   chase    the next rung is within reach. THIS is the case the ending
+     *            was missing: nine seconds off SUB-2:02 on the last straight
+     *            used to look exactly like eleven minutes off it. Now the
+     *            crowd lifts, the strip turns and quickens, and the closer the
+     *            rung the more of both.
+     *   neither  the run came apart. The stands still fill, the tape still
+     *            breaks and there is still confetti, because finishing a
+     *            marathon is the accomplishment and the game should say so --
+     *            but it is a warm ovation, not a stadium coming down.
+     *
+     * It reads MR.game.pace rather than being pushed the numbers, because
+     * main.js calls world.update(z, lane) and nothing else, and adding a
+     * parameter would put a render concern into the game loop's signature.
+     * Everything here is read-only and every access is guarded: a world built
+     * without a game around it (tools/course-test.js does exactly that) simply
+     * gets the neutral ending.
+     */
+    const finale = {
+      t: 0,          // 0..1 across APPROACH -- the build
+      hot: 0,        // crowd excitement, smoothed
+      gold: 0,       // 0 = warm ovation, 1 = the record went
+      chase: 0,      // 0..1 how close the next rung is
+      record: false,
+      broke: -1,     // performance clock at which the tape went, -1 = intact
+      done: false,
+      next: 0,       // when to re-read the verdict
+      proj: 0,
+    };
+    let lastNow = -1;
+
+    function readVerdict(z) {
+      const P = MR.game && MR.game.pace;
+      if (!P) return;
+      // finishTime once it exists: after the line the verdict is a fact, not a
+      // projection, and it must not keep twitching under the celebration.
+      const proj = P.finished ? P.finishTime : (P.projectClean ? P.projectClean() : P.projected());
+      finale.proj = proj;
+      finale.record = proj <= K.RECORD_SECONDS;
+      const T = MR.Tier;
+      if (T && !finale.record) {
+        const up = T.next(proj);
+        // 40 seconds is about six clean gates of pace at this end of the
+        // race -- the range in which a rung is genuinely still live.
+        finale.chase = up ? 1 - Math.min(1, T.gapTo(proj, up) / 40) : 0;
+      } else {
+        finale.chase = finale.record ? 1 : 0;
+      }
+    }
+
+    /** Drive the finale from the runner's z. Called once per frame. */
+    function updateFinale(z, now, dt) {
+      const t = Math.max(0, Math.min(1, (z - (FINISH_Z - APPROACH)) / APPROACH));
+      finale.t = t;
+      if (t <= 0) {
+        // Outside the ending entirely: the crowd still reacts to the runner
+        // going past (that is `near` in the shader), it just is not lit up.
+        finale.hot += (0 - finale.hot) * Math.min(1, dt * 2.0);
+        finale.gold += (0 - finale.gold) * Math.min(1, dt * 2.0);
+        finale.broke = -1;
+        finale.done = false;
+        crowdU.uHot.value = finale.hot;
+        return;
+      }
+      if (now >= finale.next) { readVerdict(z); finale.next = now + 0.25; }
+
+      const past = z >= FINISH_Z - 0.25;
+      if (past && finale.broke < 0) finale.broke = now;
+      finale.done = past;
+
+      // The build is not linear. t^1.7 keeps the first half of the approach
+      // calm so the last three seconds have somewhere to go -- a ramp that
+      // starts rising immediately arrives at the tape with nothing left.
+      const ramp = Math.pow(t, 1.7);
+      const earned = 0.34 + 0.34 * finale.chase + 0.32 * (finale.record ? 1 : 0);
+      let target = ramp * earned;
+      if (past) {
+        // The tape. Everyone gets a roar; the record gets the roof off.
+        const since = now - finale.broke;
+        target = (finale.record ? 1.0 : 0.78) * (1 - Math.min(0.35, since * 0.045));
+      }
+      // Rise fast, fall slow: a crowd finds its voice quicker than it loses it.
+      const rate = target > finale.hot ? 2.6 : 0.7;
+      finale.hot += (target - finale.hot) * Math.min(1, dt * rate);
+      const goldTgt = finale.record ? 1 : finale.chase * 0.55;
+      finale.gold += (goldTgt - finale.gold) * Math.min(1, dt * 1.5);
+
+      crowdU.uHot.value = finale.hot;
+    }
+
+    // Exposed so the camera and the audio can react to the same verdict the
+    // road is reacting to, instead of each computing their own and drifting.
+    api.finale = finale;
+
     api.update = function (z, playerLane) {
       if (playerLane !== undefined && playerLane !== routePlannedLane) {
         routePlannedLane = playerLane;
@@ -6168,6 +6425,14 @@ MR.World = (function () {
       const ahead = z + VIEW;
       const back = z - BEHIND;
       const now = performance.now() * 0.001;
+      const dt = lastNow < 0 ? 1 / 60 : Math.min(0.1, Math.max(0, now - lastNow));
+      lastNow = now;
+
+      // The crowd wave, and the ending it belongs to. Two uniform writes for
+      // every spectator in the world -- see vwave().
+      crowdU.uT.value = now;
+      crowdU.uZ.value = z;
+      updateFinale(z, now, dt);
 
       // Keep the ground under the runner; the sky dome likewise, so the
       // gradient never slides off as the race progresses.
@@ -6305,7 +6570,10 @@ MR.World = (function () {
           // is where a real course puts the overflow.
           obj.position.set(s.side * (K.TRACK_HALF_WIDTH + 1.9 + s.b * 3.4), 0, s.z);
           obj.rotation.y = s.side > 0 ? Math.PI : 0;
-          obj.userData.bounce = s.c;
+          // A pooled knot inherits the last tenant's lift, and the lift is now
+          // the shader's. Zero it on claim rather than leaving a knot standing
+          // 13cm in the air for the rest of the race.
+          obj.position.y = 0;
         }
         obj.userData.auditName = 'prop / ' + s.kind;
         activeScene.push({ s, obj, pool });
@@ -6442,11 +6710,11 @@ MR.World = (function () {
         e.pool.release(e.obj);
       }
 
-      // Crowd idle: a cheap bob keeps the roadside alive without animation data.
+      // Crowd idle used to live here as a whole-knot bob. It is now per figure
+      // and on the GPU -- see vwave() -- so this loop only has the walkers
+      // left in it, and nine spectators no longer rise and fall as one object.
       for (const e of activeScene) {
-        if (e.s.kind === 'crowd') {
-          e.obj.position.y = Math.abs(Math.sin(now * 4 + e.obj.userData.bounce * 6.3)) * 0.13;
-        } else if (e.s.kind === 'walkers') {
+        if (e.s.kind === 'walkers') {
           // Pavement life, and the reason it moves ACROSS rather than along.
           // Lateral motion is far more visible at a glance than forward motion
           // at a speed the runner is already beating, and "people crossing"
@@ -6514,6 +6782,13 @@ MR.World = (function () {
       activeBanner.length = 0; activeRoad.length = 0; activeAid.length = 0;
       state.roadFrom = 0; state.gateIdx = 0; state.sceneIdx = 0;
       state.structIdx = 0; state.bannerIdx = 0; state.aidIdx = 0;
+      finale.t = 0; finale.hot = 0; finale.gold = 0; finale.chase = 0;
+      finale.record = false; finale.broke = -1; finale.done = false;
+      finale.next = 0; finale.proj = 0;
+      crowdU.uHot.value = 0;
+      lastNow = -1;
+      confetti.reset();
+      tape.reset();
     };
 
     /**

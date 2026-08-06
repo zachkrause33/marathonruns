@@ -2864,6 +2864,80 @@ MR.World = (function () {
     // nothing in the "lightest large mass" reckoning.
     const ROAD_MARGIN = 0xd0d0d0;
 
+    // The longitudinal marks. The lane seam is a two-level ladder -- a rail
+    // that runs the whole tile and a bead that rides it every PAVE_JOINT -- and
+    // the carriageway edge stays one solid bright line. See the Egypt device
+    // note in paintGeo for where the numbers come from and why the two are not
+    // treated the same.
+    const SEAM_RAIL = 0x8e8aa8;   // L 140 -- was 0xfff6d8, the bead's colour
+    const SEAM_BEAD = 0xfff6d8;   // L 245.7
+    const EDGE_LINE = 0xf2f4ff;   // L 244.4, unchanged
+
+    // The kerb-notch period, and now the road-bead period too. Declared here
+    // because paintGeo beats against it and is built first.
+    const PAVE_JOINT = 2.0;
+
+    /**
+     * ================== CAMBER, ON TOP OF THE STAIRCASE ==================
+     *
+     * Tom Gold Run's road is not a flat colour and it is not a staircase
+     * either: sampled across the carriageway at four depths it is a smooth
+     * continuous dome peaking at the crown, with the edge at 0.68-0.77 of the
+     * centre, twice at two depths to within half a level. It does not key to
+     * lane boundaries. Ours keys to nothing else -- three flat bands, a step at
+     * every seam and dead flat in between.
+     *
+     * Both reads are worth having and they are not in conflict, because they
+     * carry different information. The staircase says WHICH LANE, which is the
+     * whole game and is not being given up. The dome says ONE SURFACE, which is
+     * what stops three lanes reading as three separate strips of tarmac laid
+     * side by side. So the dome goes on top: keyed to |x| and not to lane
+     * index, multiplied into the band each strip belongs to.
+     *
+     * WHY IT CANNOT BE A GRADIENT. merge() paints one flat colour per part, so
+     * there is no per-vertex ramp to be had. Each band becomes five
+     * constant-colour strips of LANE/5 instead, and the quantisation is fine:
+     * five steps of about 4% across a lane is below the threshold the banded
+     * toon ramp itself resolves, so it reads as a curve and not as more stairs.
+     *
+     * THE DIVISOR IS THE CARRIAGEWAY, NOT TRACK_HALF_WIDTH, and this is a
+     * stated divergence from the spec that asked for it. The spec's formula
+     * divides by TRACK_HALF_WIDTH (3.75) and in the next sentence asks for
+     * "0.78 x 0.78 = 0.61 of the crown at the outer edge of lane 0". Those two
+     * cannot both be true: the lanes only reach 2.55, so dividing by 3.75 gets
+     * the outer lane edge to 0.90, not 0.78, and the combined figure to 0.70.
+     * TRACK_HALF_WIDTH includes the 1.2-unit shoulder each side, which is
+     * ROAD_MARGIN and is not part of the dome. Dividing by the carriageway
+     * delivers the number that was actually measured against.
+     *
+     * Cost: 30 triangles per road tile instead of 6, and NO extra draw calls --
+     * the strips merge into roadGeo exactly as the three bands did.
+     */
+    const CAMBER_DEPTH = 0.22;                 // 1.00 at the crown, 0.78 at the edge
+    const CARRIAGE_HALF = LANE * 1.5;          // 2.55 -- three lanes, no shoulder
+    const CAMBER_STRIPS = 5;
+    function camber(x) {
+      const t = Math.abs(x) / CARRIAGE_HALF;
+      return 1 - CAMBER_DEPTH * t * t;
+    }
+    /**
+     * Scale a tint IN sRGB BYTES, which is the space every number in this
+     * section was measured in and is not the space THREE.Color works in.
+     *
+     * ColorManagement is on, so `new THREE.Color(hex)` holds LINEAR values and
+     * multiplyScalar(0.78) darkens the linear value -- which arrives on screen
+     * as 0.78^(1/2.2) = 0.89, four fifths of the step gone. The reason
+     * LANE_BAND's own predictions match the frame to within 0.006 is that sRGB
+     * is a power law, so scaling the BYTES by k and letting the round trip
+     * cancel the exponent is what puts a factor of k on the displayed value.
+     */
+    function tintScale(hex, k) {
+      const r = Math.max(0, Math.min(255, Math.round(((hex >> 16) & 255) * k)));
+      const g = Math.max(0, Math.min(255, Math.round(((hex >> 8) & 255) * k)));
+      const b = Math.max(0, Math.min(255, Math.round((hex & 255) * k)));
+      return (r << 16) | (g << 8) | b;
+    }
+
     const roadGeo = (function () {
       const parts = [];
       // The slab is dropped 4mm so the banded surface laid on top of it can
@@ -2871,10 +2945,15 @@ MR.World = (function () {
       // distance. Its sides are what shows when the shoulders come off over
       // the river, so it keeps the margin tone rather than a lane tone.
       parts.push(bx(K.TRACK_HALF_WIDTH * 2, 0.5, TILE, 0, -0.004, 0, ROAD_MARGIN));
+      const sw = LANE / CAMBER_STRIPS;
       for (let l = 0; l < 3; l++) {
         // K.LANE_X is descending, so this walks screen-left to screen-right and
         // LANE_BAND is indexed by the lane the PLAYER names, not by world x.
-        parts.push(laneBand(K.LANE_X[l], LANE, LANE_BAND[l]));
+        // LANE_W is what sets the strip width; LANE_X is never differenced.
+        for (let s = 0; s < CAMBER_STRIPS; s++) {
+          const cx = K.LANE_X[l] - LANE / 2 + sw * (s + 0.5);
+          parts.push(laneBand(cx, sw, tintScale(LANE_BAND[l], camber(cx))));
+        }
       }
       return merge(parts);
     })();
@@ -2939,12 +3018,70 @@ MR.World = (function () {
         parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, heavy ? 0.11 : 0.08),
           heavy ? 0x7b7a81 : 0x73727b, 0, 0.004, jz + (heavy ? 0.18 : 0.12), flat));
       }
+      /**
+       * ============ THE EGYPT DEVICE: A RAIL THAT CARRIES BEADS ============
+       *
+       * The tiled runway in tgr-egypt.png is the one piece of ground pattern in
+       * the reference that survives to depth, and the reason is structural
+       * rather than decorative. It is a LONGITUDINAL RAIL CARRYING PERPENDICULAR
+       * BEADS. The rail converges on the vanishing point, so perspective
+       * lengthens it in screen space instead of foreshortening it away; the
+       * beads ride the rail and supply the beat. Measured, the beads step
+       * uniformly in world depth to within 4% and about 33 of them resolve
+       * individually before the period falls under four pixels.
+       *
+       * We had each half and neither whole. The expansion joints are
+       * full-width perpendicular stripes with no rail -- sub-pixel past forty
+       * units, as the note above already concedes. The lane seams are rails
+       * with no beads. So the beads go on the rails, at the measured period:
+       * 0.40 x the runway width, which on our 5.10-unit carriageway is 2.04,
+       * and PAVE_JOINT is already 2.0 -- so the kerb notches and the road beads
+       * beat together for free.
+       *
+       * DIVERGENCE, AND IT IS DELIBERATE. Egypt's beads are a CHROMA break --
+       * blue on gold, dL 42 but dB 124. Ours cannot be. The telegraph mats own
+       * amber, cyan and pink at full saturation, they are the device a race is
+       * lost by misreading, and nothing on the road may compete with them. So
+       * the same three-level ladder is drawn in VALUE: the rail drops well
+       * below the paint it used to be, and the bead keeps the paint colour. On
+       * the measured post-R1 tarmac (68 in lane 0, 91 in the centre) that is
+       * road 1.00 / seam rail 1.5-2.1x / bead 2.7-3.6x, against Egypt's
+       * grass 1.00 / gold rail 1.12 / cream deck 1.32 -- a wider ladder than
+       * theirs, which is right, because a banded toon ramp quantises and needs
+       * the extra step to survive it.
+       *
+       * TWO RAILS, NOT FOUR, and this is the second stated divergence. The spec
+       * asked for beads on all four longitudinal lines. Built that way and
+       * looked at, the carriageway edge becomes a dashed line as well, and that
+       * costs two things worth more than the beat it buys. R1's verified result
+       * is a solid marking at 3.5x the tarmac against Tom Gold Run's measured
+       * 3.3-3.9, and the carriageway edges are what carry it; beading them
+       * drops the continuous mark to 2.3x and only the beads stay in band.
+       * And solid-edge / dashed-divider is the convention every real road on
+       * earth uses, so the interior seams are exactly where a player already
+       * expects to see a break and the boundary is exactly where they do not.
+       * The edges therefore stay solid and bright, and only the two lane seams
+       * become beaded rails. It also halves the cost.
+       *
+       * Cost: 2 rails x 12 beads per 24-unit tile = 24 quads = 48 triangles,
+       * merged into paintGeo. Zero extra draw calls.
+       */
+      const BEAD = 0.30;
+      const BEAD_STEP = PAVE_JOINT;      // 2.0 -- the kerb notch spacing
+      function beads(cx, color, y) {
+        const n = Math.round(TILE / BEAD_STEP);
+        for (let i = 0; i < n; i++) {
+          const z = -TILE / 2 + BEAD_STEP * 0.5 + i * BEAD_STEP;
+          parts.push(part(new THREE.PlaneGeometry(BEAD, BEAD), color, cx, y, z, flat));
+        }
+      }
+
       // Carriageway edge lines, on the outer lane boundary rather than at the
       // tarmac edge. The shoulder beyond them carries the kerb and the aid
       // tables; painting it as road instead of as shoulder is what made three
       // lanes read as one enormous one.
       for (const sx of [-1, 1]) {
-        parts.push(part(new THREE.PlaneGeometry(0.26, TILE), 0xf2f4ff,
+        parts.push(part(new THREE.PlaneGeometry(0.26, TILE), EDGE_LINE,
           sx * (LANE * 1.5 + 0.13), 0.006, 0, flat));
       }
       /**
@@ -2977,7 +3114,8 @@ MR.World = (function () {
         for (const s of [-1, 1]) {
           parts.push(part(new THREE.PlaneGeometry(0.11, TILE), 0x77728f, lx + s * 0.12, 0.005, 0, flat));
         }
-        parts.push(part(new THREE.PlaneGeometry(0.15, TILE), 0xfff6d8, lx, 0.007, 0, flat));
+        parts.push(part(new THREE.PlaneGeometry(0.15, TILE), SEAM_RAIL, lx, 0.007, 0, flat));
+        beads(lx, SEAM_BEAD, 0.009);
       }
       return merge(parts);
     })();
@@ -2994,7 +3132,6 @@ MR.World = (function () {
      * into a tile mesh that is already being drawn: 24 little boxes cost
      * triangles, which are free, and no submissions, which are not.
      */
-    const PAVE_JOINT = 2.0;
     function pavement(parts, sx, top, kerb, joint) {
       const x = sx * (K.TRACK_HALF_WIDTH + 4.0);
       const kx = sx * (K.TRACK_HALF_WIDTH + 0.17);

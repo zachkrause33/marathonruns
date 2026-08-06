@@ -136,46 +136,399 @@ MR.World = (function () {
   // measurement against the reference was about: the play surface has to stay
   // the lightest large mass in frame, and a banding scheme that only darkened
   // would have quietly handed the eye back to the grass.
+  // BIOME_LOOK'S ROLE HAS NARROWED. It used to own the whole look; it now owns
+  // only what is STRUCTURAL about a leg and is therefore true wherever the leg
+  // is being run:
+  //
+  //   edge    which roadside furniture the road tile wears (a bridge deck has a
+  //           parapet, a park has a hedge, a works site has a jersey barrier)
+  //   bank    which side the shoulder is cut back on for water
+  //   mix     how much BUILT / GREEN / CROWD this leg carries -- a proportion,
+  //           not a style. What a building or a tree actually looks like is the
+  //           setting's business, not the biome's.
+  //   street  how densely a continuous street wall runs beside the road
+  //   sky/ground/road/fog  KEPT ONLY AS THE FALLBACK for a course with no
+  //           settings on it. Every real frame takes its palette from
+  //           SETTING_LOOK and its mood shift from BIOME_MOD below.
   const BIOME_LOOK = {
     'CITY START': {
       sky: [0x2b3fa8, 0x9fdcff], ground: 0x63c96b, road: 0xb1b8f8, fog: 0x9fdcff,
-      edge: 'barrier',
-      mix: { building: 2.6, tree: 1.1, grove: 0.3, crowd: 2.3, walkers: 1.1 },
+      edge: 'barrier', street: 0.70,
+      mix: { building: 1.5, tree: 1.1, grove: 0.3, crowd: 2.3, walkers: 1.1 },
     },
     // `bank` cuts the shoulder back on one side so the water can come right up
     // to the road; at full shoulder width the river sat 35 units out and read
     // as a smear on the horizon.
     'RIVERSIDE': {
       sky: [0x1f6fb8, 0xbdf0ff], ground: 0x57c7a8, road: 0xa4cff8, fog: 0xbdf0ff,
-      edge: 'hedge', bank: -1,
-      mix: { building: 0.45, tree: 2.0, grove: 2.0, crowd: 1.0, walkers: 0.8 },
+      edge: 'hedge', bank: -1, street: 0.26,
+      mix: { building: 0.35, tree: 2.0, grove: 2.0, crowd: 1.0, walkers: 0.8 },
     },
     // Nothing stands beside a bridge deck -- the emptiness is the point, and a
     // spectator out there would be standing on the river. What the leg gets
-    // instead is the towers and a ship on the water, both set pieces.
+    // instead is the span itself, which is the setting's to choose.
     'THE BRIDGE': {
       sky: [0x3a4fc0, 0xffd9a8], ground: 0x2f8fc4, road: 0xd5c1f8, fog: 0xffd9a8,
-      edge: 'rail',
+      edge: 'rail', street: 0,
       mix: {},
     },
     'PARKLAND': {
       sky: [0x2e8fd0, 0xcdf5c0], ground: 0x6fd46a, road: 0xc1d1f8, fog: 0xcdf5c0,
-      edge: 'hedge',
+      edge: 'hedge', street: 0.05,
       mix: { building: 0.12, tree: 2.6, grove: 3.6, crowd: 1.1, walkers: 0.9 },
     },
     'THE WALL': {
       sky: [0x8a3a6b, 0xffb27a], ground: 0x8f9a5e, road: 0xe5b1ca, fog: 0xffb27a,
-      edge: 'wall',
-      mix: { building: 2.0, tree: 0.25, crowd: 0.35, walkers: 0.3 },
+      edge: 'wall', street: 0.46,
+      mix: { building: 1.2, tree: 0.25, crowd: 0.35, walkers: 0.3 },
     },
     'FINAL MILE': {
       sky: [0x24306e, 0xffcf6b], ground: 0x5cb46a, road: 0xc2baf8, fog: 0xffcf6b,
-      edge: 'barrier',
-      mix: { building: 1.1, tree: 0.7, crowd: 3.4, walkers: 0.7 },
+      edge: 'barrier', street: 0.52,
+      mix: { building: 0.7, tree: 0.7, crowd: 3.4, walkers: 0.7 },
+    },
+  };
+
+  /**
+   * WHAT THE BIOME DOES TO A SETTING'S PALETTE.
+   *
+   * The two axes are not the same thing and must not be collapsed into one
+   * table. The SETTING says what colour the place is; the BIOME says what is
+   * happening to the light and the ground on this leg of the race, and that is
+   * true in every city: mile 20 is a low sun and a closing-in road in Tokyo
+   * exactly as it is in Rome, and the deck of a bridge is over water wherever
+   * the bridge happens to be.
+   *
+   * So each entry here is a set of PULLS applied to whatever palette the
+   * setting supplied, never an absolute colour. `sky`, `fog`, `road` and
+   * `ground` are `[target, amount]` mixes; `groundWater` swaps the ground for
+   * the setting's own water colour, which is how one table gives twelve
+   * different rivers.
+   *
+   * The mood arc of the race therefore survives a reskin: bright and open at
+   * the start, water in the middle, a purple-and-amber wall at mile 20, gold
+   * into the tape -- in whichever city the day drew.
+   */
+  const BIOME_MOD = {
+    'CITY START': {},
+    'RIVERSIDE': { fog: [0xcfefff, 0.18] },
+    'THE BRIDGE': { groundWater: 1, fog: [0xffd9a8, 0.30], sky: [0xffd9a8, 0.16] },
+    'PARKLAND': { ground: [0x6fd46a, 0.42], fog: [0xd8f5c8, 0.20] },
+    // The one leg that genuinely overrides the place. A marathon breaks people
+    // at mile 20 and the light is meant to go with them, so this is the
+    // strongest pull in the table by a distance.
+    'THE WALL': {
+      sky: [0x8a3a6b, 0.62], fog: [0xffb27a, 0.58],
+      ground: [0x8f9a5e, 0.52], road: [0xe5b1ca, 0.42],
+    },
+    'FINAL MILE': {
+      sky: [0x3a2f7e, 0.34], fog: [0xffcf6b, 0.40], road: [0xffe0c0, 0.16],
     },
   };
 
   const PROP_KINDS = ['building', 'tree', 'grove', 'crowd', 'walkers'];
+
+  /**
+   * ============================ THE SETTINGS ============================
+   *
+   * Twelve places, three or four of which the day's course draws (see
+   * pickSettings in course.js). This table is the whole of what makes one
+   * different from another: a palette, a street, a tree, and a short list of
+   * SILHOUETTES keyed by which beat of the race they belong to.
+   *
+   * It is deliberately a data table and not twelve piles of geometry. Every
+   * `k` below names a builder in MARKS, and almost every builder is a thin
+   * proportioning of one of a dozen shared parametric shapes -- a lattice
+   * tower, a truss span, an arcade, a shell, a terraced row. Cape Town's
+   * mountain and Paris's tower are built from the same four functions; what
+   * differs is the numbers. That is what keeps twelve settings affordable and
+   * what keeps them looking like one game.
+   *
+   * WHAT IDENTIFIES A CITY IS ITS SILHOUETTE, not its detail. At the distance
+   * a landmark is actually seen here -- 60 to 200 units, through fog that has
+   * taken a third of the contrast -- nothing survives except the outline
+   * against the sky. So each setting spends its budget on one or two shapes
+   * nobody could mistake (the Opera House shells, the Colosseum's arcade, a
+   * sphere on a needle, a flat-topped mountain) and takes everything else from
+   * the shared vocabulary.
+   *
+   * FIELDS
+   *   sky/fog/ground/road   the base palette. BIOME_MOD pulls these around per
+   *                         leg; nothing here is ever used raw at mile 20.
+   *   water                 rivers, harbours and the drop under a bridge deck.
+   *   edge                  a gentle tint on the roadside furniture. Multiplies
+   *                         a vertex colour, so it can only ever knock down --
+   *                         everything here stays close to white on purpose.
+   *   terrace               the street wall: what the buildings AT THE KERB
+   *                         are. This is doing more identification work than
+   *                         any single landmark, because there is one in frame
+   *                         essentially always.
+   *   tower                 the taller blocks set back behind them.
+   *   tree                  what a tree is here.
+   *   marks                 landmarks, by biome. Cycled along the leg.
+   *   bridge                what THE BRIDGE is in this city.
+   *
+   * A setting that has nothing to say about a beat simply omits it and takes
+   * the fallback, which is the generic set this file has always had.
+   */
+  const SETTING_LOOK = {
+
+    BOSTON: {
+      sky: [0x2a55b0, 0xc6e8ff], fog: 0xcfe6f2, ground: 0x86b45a, road: 0xc3c6e8,
+      water: 0x3f7fae, edge: 0xf4ece0,
+      terrace: {
+        colors: [0x9c5b4a, 0xb06a52, 0x8a5040, 0xc08a68, 0xa66a58],
+        trim: 0xe8dcc4, win: 0x3c4a72, roof: 'flat', roofColor: 0x5a5266,
+        h: [8.5, 11.5], bay: 4.6, depth: 7.0, rows: 4, stoop: 1, bow: 1, chimney: 2,
+      },
+      tower: { colors: [0x6a7ea8, 0x8a92b8, 0xb8b0a0], glass: 0, crown: 'flat' },
+      tree: { kind: 'round', colors: [0xe0692f, 0xd8952a, 0xc04a2a, 0xe8b13a], h: 1.05 },
+      marks: {
+        'CITY START': [{ k: 'citgo', x: 15 }, { k: 'spireWhite', x: 14 }, { k: 'clock', x: 14.5 }],
+        'RIVERSIDE': [{ k: 'citgo', x: 16 }, { k: 'ship', x: 34, y: -0.12 }],
+        'PARKLAND': [{ k: 'oak', x: 15 }, { k: 'pond', x: 27 }, { k: 'spireWhite', x: 15 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'spireWhite', x: 14 }],
+        'FINAL MILE': [{ k: 'clock', x: 15.5 }, { k: 'jumbo', x: 13.5 }, { k: 'citgo', x: 15 }],
+      },
+      bridge: 'zakim',
+    },
+
+    LONDON: {
+      sky: [0x3a63b8, 0xdae8f4], fog: 0xd6e4f0, ground: 0x5fbf6b, road: 0xc0c4e0,
+      water: 0x5a8fa8, edge: 0xffe8e8,
+      terrace: {
+        colors: [0xe8dcc8, 0xd8c8b0, 0xc8b8a4, 0xefe4d4, 0xb8a894],
+        trim: 0xfff6e8, win: 0x33405e, roof: 'parapet', roofColor: 0x4a4458,
+        h: [8.5, 11.0], bay: 4.4, depth: 7.0, rows: 4, stoop: 1, chimney: 3,
+      },
+      tower: { colors: [0x7a8ab0, 0x9aa4c0, 0xc8ccd8], glass: 1, crown: 'flat' },
+      tree: { kind: 'round', colors: [0x3e8f4a, 0x4fa85c, 0x5cbf6a], h: 1.15, trunk: 0x9a9a86 },
+      marks: {
+        'CITY START': [{ k: 'stPauls', x: 17 }, { k: 'bigBen', x: 14 }],
+        'RIVERSIDE': [{ k: 'stPauls', x: 18 }, { k: 'ship', x: 34, y: -0.12 }],
+        'PARKLAND': [{ k: 'oak', x: 15 }, { k: 'pond', x: 27 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'bigBen', x: 14 }],
+        'FINAL MILE': [{ k: 'bigBen', x: 14.5 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'towerBridge',
+    },
+
+    BERLIN: {
+      sky: [0x2f52b0, 0xcfe2f8], fog: 0xc8dcf5, ground: 0x69c46e, road: 0xb8bcdc,
+      water: 0x4f86ae, edge: 0xeef0ff,
+      terrace: {
+        colors: [0xe4d8c0, 0xcfc0a8, 0xdcc8a8, 0xbfb098, 0xefe6d2],
+        trim: 0xfff8ec, win: 0x384464, roof: 'mansard', roofColor: 0x59607a,
+        h: [10.0, 13.0], bay: 4.8, depth: 7.4, rows: 5, chimney: 2, balcony: 1,
+      },
+      tower: { colors: [0x8894b8, 0xa8b0cc, 0xd8dce8], glass: 1, crown: 'flat' },
+      tree: { kind: 'round', colors: [0x4aa055, 0x58b862, 0x6ccf74], h: 1.2 },
+      marks: {
+        'CITY START': [{ k: 'fernsehturm', x: 22 }, { k: 'brandenburg', over: 1 }],
+        'RIVERSIDE': [{ k: 'fernsehturm', x: 24 }, { k: 'ship', x: 34, y: -0.12 }],
+        'PARKLAND': [{ k: 'victoryColumn', x: 16 }, { k: 'oak', x: 15 }, { k: 'pond', x: 27 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'fernsehturm', x: 20 }],
+        'FINAL MILE': [{ k: 'brandenburg', over: 1 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'oberbaum',
+    },
+
+    CHICAGO: {
+      sky: [0x1f3fa0, 0xa8cfe8], fog: 0xa8cde0, ground: 0x63b46a, road: 0xb0b4d8,
+      water: 0x3f7fa8, edge: 0xe4e8f4,
+      terrace: {
+        colors: [0x9a8f7e, 0x8a8070, 0xa8998a, 0x7c7466, 0xb0a494],
+        trim: 0xd8cfc0, win: 0x2f3a58, roof: 'flat', roofColor: 0x4e4a5c,
+        h: [9.0, 12.0], bay: 4.6, depth: 7.0, rows: 4, stoop: 1, chimney: 1,
+      },
+      tower: { colors: [0x2f3550, 0x3a4160, 0x4a5270], glass: 1, crown: 'antenna' },
+      tree: { kind: 'round', colors: [0x3f9a52, 0x4faf5f, 0x62c470], h: 1.0 },
+      marks: {
+        'CITY START': [{ k: 'willis', x: 20 }, { k: 'lTrack', over: 1 }],
+        'RIVERSIDE': [{ k: 'lTrack', over: 1 }, { k: 'crane', x: 13 }, { k: 'willis', x: 22 }],
+        'PARKLAND': [{ k: 'oak', x: 15 }, { k: 'pond', x: 27 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'willis', x: 19 }],
+        'FINAL MILE': [{ k: 'willis', x: 20 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'bascule',
+    },
+
+    NEWYORK: {
+      sky: [0x2b46b4, 0xbde0f8], fog: 0xbdd8ee, ground: 0x63c96b, road: 0xbdc0e4,
+      water: 0x3d7ba6, edge: 0xfff0dc,
+      terrace: {
+        colors: [0x8f5442, 0xa6644c, 0x7c4838, 0xb87a5c, 0x96604a],
+        trim: 0xe4d4bc, win: 0x35406a, roof: 'flat', roofColor: 0x4c4658,
+        h: [9.5, 12.5], bay: 4.4, depth: 7.0, rows: 5, stoop: 1, tank: 1,
+        fireEscape: 1, chimney: 1,
+      },
+      tower: { colors: [0x8a8272, 0xa89c88, 0x6f7488], glass: 0, crown: 'stepped' },
+      tree: { kind: 'round', colors: [0x3f9a52, 0x4faf5f, 0x62c470], h: 1.1 },
+      marks: {
+        'CITY START': [{ k: 'empire', x: 21 }, { k: 'clock', x: 15 }],
+        'RIVERSIDE': [{ k: 'empire', x: 24 }, { k: 'ship', x: 34, y: -0.12 }],
+        'PARKLAND': [{ k: 'oak', x: 15 }, { k: 'pond', x: 27 }, { k: 'empire', x: 26 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'empire', x: 20 }],
+        'FINAL MILE': [{ k: 'empire', x: 20 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'verrazzano',
+    },
+
+    TOKYO: {
+      sky: [0x3a3f9e, 0xffd0d8], fog: 0xffd6dc, ground: 0x5fbf7a, road: 0xc8c0e8,
+      water: 0x4f8fb0, edge: 0xffe4ec,
+      terrace: {
+        colors: [0xdcdce4, 0xc8ccd8, 0xe8e4e0, 0xb8bcc8, 0xd0c8c8],
+        trim: 0xfffdf5, win: 0x2f3856, roof: 'flat', roofColor: 0x4a4a5e,
+        h: [9.0, 13.0], bay: 3.8, depth: 6.6, rows: 5, neon: 1,
+      },
+      tower: { colors: [0xb8bcd0, 0xd0d4e0, 0x8f96b0], glass: 1, crown: 'antenna' },
+      tree: { kind: 'columnar', colors: [0x3f9a68, 0x4fb078], h: 1.0 },
+      marks: {
+        'CITY START': [{ k: 'skytree', x: 26 }, { k: 'neon', x: 13.5 }, { k: 'torii', over: 1 }],
+        'RIVERSIDE': [{ k: 'skytree', x: 28 }, { k: 'neon', x: 14 }],
+        'PARKLAND': [{ k: 'torii', over: 1 }, { k: 'pagoda', x: 16 }, { k: 'oak', x: 15 }],
+        'THE WALL': [{ k: 'neon', x: 13 }, { k: 'hoarding', x: 12.6, rz: -0.16 }],
+        'FINAL MILE': [{ k: 'skytree', x: 24 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'rainbow',
+    },
+
+    SYDNEY: {
+      sky: [0x1f7fd0, 0xdcf4ff], fog: 0xd8f4ff, ground: 0x7fc86a, road: 0xc6cef0,
+      water: 0x2fa8d8, edge: 0xfff4e0,
+      terrace: {
+        colors: [0xd8b48c, 0xc49a74, 0xe8cfa8, 0xb08464, 0xefe0c4],
+        trim: 0xfff8e8, win: 0x3a4468, roof: 'pitch', roofColor: 0x7f4a3a,
+        h: [7.5, 9.5], bay: 4.4, depth: 7.0, rows: 3, balcony: 1, chimney: 2,
+      },
+      tower: { colors: [0x8fa8c8, 0xb0c4dc, 0xd8e4ee], glass: 1, crown: 'flat' },
+      tree: { kind: 'palm', colors: [0x3f9a5a, 0x4fb068], h: 1.1 },
+      marks: {
+        'CITY START': [{ k: 'operaHouse', x: 19 }, { k: 'sydneyTower', x: 20 }],
+        'RIVERSIDE': [{ k: 'operaHouse', x: 20 }, { k: 'ship', x: 34, y: -0.12 }],
+        'PARKLAND': [{ k: 'oak', x: 15 }, { k: 'pond', x: 27 }, { k: 'sydneyTower', x: 20 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'sydneyTower', x: 18 }],
+        'FINAL MILE': [{ k: 'operaHouse', x: 19 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'harbour',
+    },
+
+    PARIS: {
+      sky: [0x3a58b8, 0xe2e4f2], fog: 0xe0dfe8, ground: 0x6fc274, road: 0xd0cbe0,
+      water: 0x6a94a8, edge: 0xf4f0e4,
+      terrace: {
+        colors: [0xe8dcc0, 0xdcceb0, 0xf0e6cc, 0xd0c0a4, 0xe4d8bc],
+        trim: 0xfff8ea, win: 0x38446a, roof: 'mansard', roofColor: 0x5a6076,
+        h: [10.5, 12.5], bay: 4.6, depth: 7.2, rows: 5, balcony: 2, chimney: 4,
+      },
+      tower: { colors: [0xc8c0ac, 0xd8d0bc, 0xb0a894], glass: 0, crown: 'flat' },
+      tree: { kind: 'pollard', colors: [0x4a9a52, 0x5aae60], h: 1.1, trunk: 0xa8a894 },
+      marks: {
+        'CITY START': [{ k: 'eiffel', x: 24 }, { k: 'arcDeTriomphe', over: 1 }],
+        'RIVERSIDE': [{ k: 'eiffel', x: 26 }, { k: 'ship', x: 34, y: -0.12 }],
+        'PARKLAND': [{ k: 'eiffel', x: 26 }, { k: 'pond', x: 27 }, { k: 'oak', x: 15 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'eiffel', x: 22 }],
+        'FINAL MILE': [{ k: 'arcDeTriomphe', over: 1 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'stoneArch',
+    },
+
+    VALENCIA: {
+      sky: [0x1f7fd8, 0xeaf6ff], fog: 0xe8f6ff, ground: 0x8fc45f, road: 0xd8d4ec,
+      water: 0x30b0d0, edge: 0xfff8e8,
+      terrace: {
+        colors: [0xfff2d8, 0xf4e4c4, 0xffe8c8, 0xe8d8bc, 0xfff8e8],
+        trim: 0xffffff, win: 0x3f4a70, roof: 'tile', roofColor: 0xc86a42,
+        h: [8.0, 10.5], bay: 4.4, depth: 7.0, rows: 4, balcony: 1,
+      },
+      tower: { colors: [0xf4ecd8, 0xffffff, 0xe4dcc8], glass: 0, crown: 'flat' },
+      tree: { kind: 'palm', colors: [0x4faf62, 0x62c470], h: 1.25 },
+      marks: {
+        'CITY START': [{ k: 'calatravaRibs', x: 17 }, { k: 'hemisferic', x: 20 }],
+        'RIVERSIDE': [{ k: 'hemisferic', x: 20 }, { k: 'calatravaRibs', x: 17 }],
+        'PARKLAND': [{ k: 'calatravaRibs', x: 17 }, { k: 'pond', x: 27 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'calatravaRibs', x: 16 }],
+        'FINAL MILE': [{ k: 'hemisferic', x: 20 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'harp',
+    },
+
+    AMSTERDAM: {
+      sky: [0x2f5fb8, 0xd4e8f6], fog: 0xcfe6f4, ground: 0x5fc07a, road: 0xb6bcd8,
+      water: 0x4f7f96, edge: 0xf0ece0,
+      terrace: {
+        colors: [0x7a4438, 0x8f5442, 0x64483c, 0x9c6250, 0x543c34],
+        trim: 0xf4ece0, win: 0x2f3a5e, roof: 'stepgable', roofColor: 0x6a4438,
+        h: [10.0, 13.0], bay: 3.2, depth: 6.4, rows: 5, hoist: 1, lean: 1,
+      },
+      tower: { colors: [0x8f6a58, 0xa88070, 0xc8a890], glass: 0, crown: 'flat' },
+      tree: { kind: 'round', colors: [0x429a55, 0x52ae62, 0x64c070], h: 1.15 },
+      marks: {
+        'CITY START': [{ k: 'canal', x: 20 }, { k: 'westerkerk', x: 15 }],
+        'RIVERSIDE': [{ k: 'canal', x: 20 }, { k: 'westerkerk', x: 16 }],
+        'PARKLAND': [{ k: 'oak', x: 15 }, { k: 'pond', x: 27 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'westerkerk', x: 15 }],
+        'FINAL MILE': [{ k: 'westerkerk', x: 15 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'magere',
+    },
+
+    ROME: {
+      sky: [0x2a63c0, 0xffe6c0], fog: 0xffe0bc, ground: 0x8fb45a, road: 0xd2c4d8,
+      water: 0x5f9fae, edge: 0xfff0d8,
+      terrace: {
+        colors: [0xd8964a, 0xc8823e, 0xe8ac60, 0xb87038, 0xefc484],
+        trim: 0xfff0d0, win: 0x4a4058, roof: 'tile', roofColor: 0xb05a34,
+        h: [9.0, 11.5], bay: 4.6, depth: 7.2, rows: 4, balcony: 1, chimney: 2,
+      },
+      tower: { colors: [0xe8c48c, 0xd8a868, 0xf0dcb0], glass: 0, crown: 'flat' },
+      tree: { kind: 'umbrella', colors: [0x2f7a44, 0x3a8f50], h: 1.2 },
+      marks: {
+        'CITY START': [{ k: 'colosseum', x: 21 }, { k: 'aqueduct', over: 1 }],
+        'RIVERSIDE': [{ k: 'colosseum', x: 22 }, { k: 'ship', x: 34, y: -0.12 }],
+        'PARKLAND': [{ k: 'aqueduct', over: 1 }, { k: 'pond', x: 27 }, { k: 'oak', x: 15 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'aqueduct', over: 1 }],
+        'FINAL MILE': [{ k: 'colosseum', x: 21 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'stoneArch',
+    },
+
+    CAPETOWN: {
+      sky: [0x1666c8, 0xe4f2ff], fog: 0xdff0ff, ground: 0x9fb05a, road: 0xc8ccec,
+      water: 0x2f9fd8, edge: 0xfff2e4,
+      // Bo-Kaap: the one street in the world painted in flat saturated blocks,
+      // and the cheapest possible way to say "Cape Town" at a hundred units.
+      terrace: {
+        colors: [0x39c0d8, 0xf05a7a, 0x62d07a, 0xffc23a, 0x9a7bff, 0xff8a4a],
+        trim: 0xffffff, win: 0x2f3a5e, roof: 'pitch', roofColor: 0xb8b0a0,
+        h: [6.5, 8.0], bay: 4.4, depth: 6.6, rows: 2, stoop: 1,
+      },
+      tower: { colors: [0xdce4ec, 0xc8d4e0, 0xf0f4f8], glass: 1, crown: 'flat' },
+      tree: { kind: 'scrub', colors: [0x6f9a4a, 0x8fae5a, 0x5f8f56], h: 0.9 },
+      marks: {
+        'CITY START': [{ k: 'tableMountain', x: 120 }, { k: 'clock', x: 15 }],
+        'RIVERSIDE': [{ k: 'tableMountain', x: 130 }, { k: 'ship', x: 34, y: -0.12 }],
+        'PARKLAND': [{ k: 'tableMountain', x: 120 }, { k: 'oak', x: 15 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'tableMountain', x: 120 }],
+        'FINAL MILE': [{ k: 'tableMountain', x: 120 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'tower',
+    },
+  };
+
+  /** Palette fields a setting owes; used to build the no-settings fallback. */
+  function fallbackSetting(biomeName) {
+    const b = BIOME_LOOK[biomeName] || BIOME_LOOK['CITY START'];
+    return {
+      sky: b.sky, fog: b.fog, ground: b.ground, road: b.road,
+      water: 0x2f8fc4, edge: 0xffffff,
+      terrace: SETTING_LOOK.LONDON.terrace,
+      tower: SETTING_LOOK.LONDON.tower,
+      tree: { kind: 'cone', colors: [0x35a855, 0x3fbf63, 0x59d47a], h: 1 },
+      marks: {}, bridge: 'tower',
+    };
+  }
 
   // Scratch colours: applyBiome runs every frame and must not allocate.
   const _cA = new THREE.Color();

@@ -715,13 +715,20 @@ MR.Runner = (function () {
     // the other way round yaws the finished ring instead of sliding the arc
     // round it. The arc is 234 degrees centred on the spine, so it wraps the
     // neck and dies out under the deltoids.
-    const hoodPivot = pivot(chest, 0, 0.052, -0.045);
+    // The shorts' navy, not the vest's red, and that is a deliberate second
+    // try. In JACKET the roll rendered as "the top of the vest": a hood is a
+    // separate GARMENT and it has to be a separate colour or it is just a
+    // thicker collar. Navy also puts a dark mass directly beneath the lit neck,
+    // which is the half of the head/shoulder pinch this figure never had --
+    // the ladder now runs dark hair / lit neck / dark hood / red vest, with the
+    // neck pinched from both sides instead of one.
+    const hoodPivot = pivot(chest, 0, 0.048, -0.045);
     const hood = multi([
       // sz, not sy: weld() composes T*R*S, so the squash lands on the geometry
       // BEFORE it is laid flat, and the tube's axis is still the original z.
       // Squashing y here would flatten the ring instead of the roll.
-      { g: new THREE.TorusGeometry(0.175, 0.062, 5, 12, Math.PI * 1.30), c: JACKET,
-        rx: -Math.PI / 2, rz: -0.42, sz: 0.72 },
+      { g: new THREE.TorusGeometry(0.180, 0.074, 5, 12, Math.PI * 1.30), c: P.runnerShort,
+        rx: -Math.PI / 2, rz: -0.42, sz: 0.76 },
     ]);
     hoodPivot.add(hood);
 
@@ -822,7 +829,7 @@ MR.Runner = (function () {
       // 0.14 long, standing 0.018 proud of the neck cylinder so it is a shape
       // rather than a decal, and it is the single detail that most turns the
       // head/neck junction from an assembly into an anatomy.
-      { g: new THREE.SphereGeometry(0.090, 8, 6), c: P.runnerHair, y: HY - 0.205, z: -0.055, sx: 0.78, sy: 0.80, sz: 0.80 },
+      { g: new THREE.SphereGeometry(0.090, 8, 6), c: P.runnerHair, y: HY - 0.225, z: -0.058, sx: 0.62, sy: 1.05, sz: 0.85 },
       // Cap band, sitting above the eye line -- lower and it reads as goggles.
       // Unchanged: it was the headband and it is now the cap's sweatband, and
       // holding its exact geometry is what keeps the measured value ladder
@@ -841,8 +848,14 @@ MR.Runner = (function () {
       // crown at 0.288, so it adds nothing to HEIGHT, and 0.298 wide against
       // the band's 0.294, so it adds nothing to the half-width either. It is
       // pure value pattern, which is the only currency this camera has.
-      { g: new THREE.CylinderGeometry(0.298, 0.298, 0.032, 14, 1, false, Math.PI * 0.5, Math.PI), c: CAP,
-        y: HY + 0.050, z: -0.052, rx: 0.30 },
+      //
+      // JACKET rather than the crown's own red, and that is the whole of
+      // whether it exists. Rendered in the cap colour the brim was invisible:
+      // it is a shelf seen from 20 degrees above, so what the player sees is
+      // its TOP FACE, and a top face the same colour as the dome behind it is
+      // a shape with no edge. One step darker and it separates into a plane.
+      { g: new THREE.CylinderGeometry(0.310, 0.310, 0.034, 14, 1, false, Math.PI * 0.5, Math.PI), c: JACKET,
+        y: HY + 0.048, z: -0.060, rx: 0.34 },
       { g: new THREE.SphereGeometry(0.080, 8, 6), c: P.runnerSkin, x: -0.254, y: HY - 0.020, z: -0.013, sx: 0.48, sz: 0.82 },
       { g: new THREE.SphereGeometry(0.080, 8, 6), c: P.runnerSkin, x: 0.254, y: HY - 0.020, z: -0.013, sx: 0.48, sz: 0.82 },
     ]);
@@ -1487,7 +1500,7 @@ MR.Runner = (function () {
       group: root,
       height: HEIGHT,
       shadow,
-      parts: { body, hips, spine, chest, neck, head, legs, arms },
+      parts: { body, hips, spine, chest, neck, head, hood: hoodPivot, legs, arms },
       phase: 0,
     };
 

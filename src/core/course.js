@@ -39,6 +39,79 @@ MR.Course = (function () {
     { name: 'FINAL MILE', from: 0.92 },
   ];
 
+
+  /**
+   * THE SETTING POOL.
+   *
+   * Twelve places, led by the World Marathon Majors, because a daily marathon
+   * game should be run somewhere you have heard of. Each is a real marathon
+   * city with landmarks that can be modelled in this game's own flat-shaded
+   * style -- no photography, no licensed imagery, nothing fetched at runtime.
+   *
+   * `tag` is the stable key world.js looks up for palette and content. `hint`
+   * is not decorative: it is the contract for what that setting owes the
+   * frame, so a renderer pass can be judged against something written down
+   * rather than against taste.
+   */
+  const SETTINGS = [
+    { tag: 'BOSTON',    name: 'BOSTON',        hint: 'brownstones, autumn maples, the Citgo sign, a right on Hereford and a left on Boylston' },
+    { tag: 'LONDON',    name: 'LONDON',        hint: 'Tower Bridge, red buses, black cabs, plane trees, the Thames' },
+    { tag: 'BERLIN',    name: 'BERLIN',        hint: 'the Brandenburg Gate, the Fernsehturm, linden avenues, the Spree' },
+    { tag: 'CHICAGO',   name: 'CHICAGO',       hint: 'elevated L track over the road, river bascule bridges, a black glass skyline' },
+    { tag: 'NEWYORK',   name: 'NEW YORK',      hint: 'the Verrazzano span, brownstones, yellow cabs, Central Park stone walls' },
+    { tag: 'TOKYO',     name: 'TOKYO',         hint: 'the Imperial Palace moat, torii, neon signage, the Skytree' },
+    { tag: 'SYDNEY',    name: 'SYDNEY',        hint: 'the Harbour Bridge, the Opera House shells, ferries, harbour water' },
+    { tag: 'PARIS',     name: 'PARIS',         hint: 'the Eiffel Tower, Haussmann facades, Seine bridges, kiosks' },
+    { tag: 'VALENCIA',  name: 'VALENCIA',      hint: 'the City of Arts and Sciences, palms, orange groves, white stone' },
+    { tag: 'AMSTERDAM', name: 'AMSTERDAM',     hint: 'canals, gabled houses, bicycle racks, humpback bridges' },
+    { tag: 'ROME',      name: 'ROME',          hint: 'the Colosseum, an aqueduct, umbrella pines, ochre walls' },
+    { tag: 'CAPETOWN',  name: 'CAPE TOWN',     hint: 'Table Mountain, the coast road, fynbos, Atlantic surf' },
+  ];
+
+  /**
+   * Pick this date's course settings.
+   *
+   * Three or four per run, drawn from the twelve. That number is chosen from
+   * the clock rather than by feel: at four minutes a race, three settings is
+   * ~80 seconds each and four is ~60, which is long enough for a place to
+   * register and short enough that something new is always coming. One setting
+   * for the whole race would be four minutes of the same street.
+   *
+   * Every day therefore gets a genuinely different course -- a different
+   * layout AND a different journey -- from the same twelve places, and the
+   * pool can grow without any of this changing.
+   */
+  function pickSettings(key) {
+    const rnd = MR.rng.stream(key, 'settings/v1');
+    const n = rnd.chance(0.5) ? 3 : 4;
+
+    // Draw without replacement.
+    const bag = SETTINGS.slice();
+    const chosen = [];
+    for (let i = 0; i < n; i++) chosen.push(bag.splice(rnd.int(0, bag.length - 1), 1)[0]);
+
+    // Segment boundaries. Even splits, jittered, but never so far that a
+    // setting becomes a blink: no segment may be under 60% of an even share.
+    const even = 1 / n;
+    const cuts = [0];
+    for (let i = 1; i < n; i++) cuts.push(i * even + rnd.range(-0.35, 0.35) * even);
+    cuts.push(1);
+    for (let i = 1; i < cuts.length; i++) {
+      if (cuts[i] - cuts[i - 1] < even * 0.6) cuts[i] = cuts[i - 1] + even * 0.6;
+    }
+    const span = cuts[cuts.length - 1] - cuts[0];
+    for (let i = 0; i < cuts.length; i++) cuts[i] = cuts[i] / span;
+
+    return chosen.map(function (s, i) {
+      return {
+        tag: s.tag, name: s.name, hint: s.hint,
+        from: cuts[i], to: cuts[i + 1],
+        first: i === 0,
+        last: i === chosen.length - 1,
+      };
+    });
+  }
+
   function biomeAt(f) {
     let b = BIOMES[0];
     for (const x of BIOMES) if (f >= x.from) b = x;
@@ -354,5 +427,6 @@ MR.Course = (function () {
     return { ok: errors.length === 0, errors, gates: g.length };
   }
 
-  return { generate, generateAid, validate, solvable, biomeAt, difficulty, BIOMES, ACTION_WINDOW };
+  return { generate, generateAid, validate, solvable, biomeAt, difficulty,
+           BIOMES, SETTINGS, pickSettings, ACTION_WINDOW };
 })();

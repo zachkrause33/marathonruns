@@ -130,9 +130,8 @@ html, body {
 
 /* ---- left column: the mechanic, read top to bottom ----
  * Clean gates buy speed; the gauge shows how much of the START_PACE ->
- * FLOOR_PACE range
- * has been bought; the pace is the result. Putting them in one plate in that
- * order is the only place the game explains itself. */
+ * FLOOR_PACE range has been bought; the pace is the result. Putting them in
+ * one plate in that order is the only place the game explains itself. */
 #leftCol {
   /* Clears the top bug by its MEASURED height (hud.js publishes --bugH), plus
      a gap. The fallback matches the desktop height so the layout is still
@@ -263,6 +262,10 @@ html, body {
 #gapTrend { font-size: 9px; font-weight: 900; letter-spacing: 0.12em; }
 .ahead { color: var(--ahead); }
 .behind { color: var(--behind); }
+/* Plain ink: a position stated without a grade attached. The ghost gap uses
+ * this whenever the projection is not itself red, so the rail can never
+ * contradict the verdict at the top of the screen. */
+.level { color: #fffdf5; }
 
 #rail { position: relative; height: 22px; }
 #railBg {
@@ -279,6 +282,7 @@ html, body {
 #railGap { position: absolute; top: 1px; bottom: 1px; }
 #railGap.behind { background: rgba(255, 107, 132, 0.42); }
 #railGap.ahead  { background: rgba(77, 251, 160, 0.42); }
+#railGap.level  { background: rgba(255, 253, 245, 0.26); }
 
 #railGhost {
   position: absolute; top: -5px; bottom: -5px;
@@ -627,13 +631,23 @@ html, body {
  * course generation. A route is the one thing about tomorrow that is visibly
  * different from today, which makes this line an appointment rather than a
  * description of one. */
+/* Promoted to a plate, at the weight of the grade chip, directly above the
+ * button. It was 10.5px at the very bottom of the card, under every stat --
+ * the faintest thing on the screen, and the only element on it whose job is
+ * to bring someone back. The pair now reads as two offers: run it again now,
+ * or come back for a different road. */
 #tomorrow {
-  font-size: 10.5px; font-weight: 900; letter-spacing: 0.1em;
-  color: var(--accent); opacity: 0.9; line-height: 1.5;
-  margin-top: 16px; padding-top: 12px;
-  border-top: 1px solid rgba(255, 253, 245, 0.16);
+  margin-top: 18px; padding: 9px 12px 10px;
+  border: 1px solid rgba(255, 228, 94, 0.45);
+  background: rgba(255, 228, 94, 0.07);
 }
-#tomorrow:empty { display: none; }
+#tomorrow.empty { display: none; }
+#tomorrow .lab { color: var(--accent); opacity: 0.8; }
+#tomorrow .tomRoute {
+  font-size: 13px; font-weight: 900; letter-spacing: 0.07em;
+  color: var(--accent); line-height: 1.45; margin-top: 3px;
+  text-wrap: balance;
+}
 
 /* The only tap target on the screen, on a screen that is now taller: full
  * width so it cannot be missed at the bottom of a phone. */
@@ -777,7 +791,8 @@ html, body {
   #endCols .k { font-size: 11px; }
   #endCols .v { font-size: 16px; }
   #endTurn { font-size: 13px; }
-  #tomorrow { font-size: 13px; }
+  #tomorrow { padding: 12px 16px 13px; }
+  #tomorrow .tomRoute { font-size: 16px; }
   #endPanel .cta { margin-top: 22px; }
 }
 
@@ -819,7 +834,8 @@ html, body {
   #endCost { margin-top: 8px; }
   #endCost .endBig { font-size: 22px; }
   #endTurn { display: none; }
-  #tomorrow { margin-top: 8px; padding-top: 7px; }
+  #tomorrow { margin-top: 8px; padding: 6px 9px 7px; }
+  #tomorrow .tomRoute { font-size: 11px; margin-top: 2px; }
   #endPanel .cta { margin-top: 9px; padding: 10px; }
 
   #leftCol { top: calc(var(--bugH, 60px) + 6px); gap: 6px; }

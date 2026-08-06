@@ -310,7 +310,20 @@ MR.HUD = (function () {
         </div>
 
         <div id="endTurn"></div>
-        <div id="tomorrow"></div>
+
+        <!--
+          THE RETURN HOOK, next to the button it is competing with.
+
+          This was the faintest line on the card, below every stat, which is
+          an odd place for the only element on the screen whose job is to
+          bring someone back tomorrow. It is now a plate directly above RUN IT
+          AGAIN, at the weight of the grade chip, so the two read as a pair of
+          offers: run it again now, or come back for a different road.
+        -->
+        <div id="tomorrow" class="empty">
+          <div class="lab">TOMORROW</div>
+          <div class="tomRoute" id="tomorrowRoute"></div>
+        </div>
         <button class="cta" id="againBtn">RUN IT AGAIN</button>
       </div></div>
 
@@ -338,7 +351,7 @@ MR.HUD = (function () {
       stats: q('resultStats'), splitTable: q('splitTable'),
       endCost: q('endCost'), endCostLab: q('endCostLab'),
       endCostVal: q('endCostVal'), endCostSub: q('endCostSub'),
-      endTurn: q('endTurn'), tomorrow: q('tomorrow'),
+      endTurn: q('endTurn'), tomorrow: q('tomorrow'), tomorrowRoute: q('tomorrowRoute'),
       againBtn: q('againBtn'),
       count: q('count'), countVal: q('countVal'),
       perf: q('perf'),
@@ -754,30 +767,37 @@ MR.HUD = (function () {
       n.railGap.style.left = Math.min(you, gh) + '%';
       n.railGap.style.width = Math.abs(you - gh) + '%';
 
+      // THE GHOST GAP IS A POSITION, NOT A GRADE -- INCLUDING ITS COLOUR.
+      //
+      // The wording was fixed first: this used to read GAINING / LOSING off
+      // `p.pace < RECORD_PACE`, which is accurate and was still wrong. The
+      // race is DESIGNED to start at 5:30 and reel the ghost in, so a flawless
+      // run trails for the whole first half and the tag read LOSING for about
+      // three quarters of it, while the projection at the top of the same
+      // screen read RECORD ON.
+      //
+      // Fixing only the words was half a fix, because the COLOUR was still
+      // keyed off `d < 0` -- the sign of the positional gap. So on a clean run
+      // the top bug read RECORD ON / 1:24 UNDER 1:59:30 in green while the
+      // rail 700px below read +1:27.1 in red: one state, two opposite
+      // emotional readings, and at eight seconds in a player winning by 1:48
+      // was already being told in red that they were losing. That contradiction
+      // is why the start panel had grown a sentence explaining that the ghost
+      // leads "by design" -- copy papering over a HUD defect.
+      //
+      // The grade belongs to the projection, which integrates the whole
+      // remaining race and computes it correctly. So the tone comes from the
+      // projection's own state, and red appears here only when the top bug is
+      // also red. Being physically in front of the ghost is the one thing this
+      // line can claim on its own, and it earns green for it.
       const d = p.deltaVsRecord();
       const ahead = d < 0;
+      const tone = ahead ? 'ahead' : state === 'off' ? 'behind' : 'level';
       set(n.gapVal, 'gap', Pace.delta(d));
-      cls(n.gapVal, 'gapCls', 'num ' + (ahead ? 'ahead' : 'behind'));
-      cls(n.railGap, 'railGapCls', ahead ? 'ahead' : 'behind');
-
-      // THE GHOST GAP IS A POSITION, NOT A GRADE.
-      //
-      // This used to read GAINING / LOSING off `p.pace < RECORD_PACE`, which is
-      // accurate and was still wrong. The race is DESIGNED to start below
-      // record pace and reel it in, so a flawless run is slower than 4:33 for
-      // the whole first half and the tag read LOSING for about three quarters
-      // of it -- while the projection at the top of the same screen read
-      // RECORD ON. Two thirds of the readout told a perfect player they were
-      // failing, and the start panel had grown a sentence explaining that the
-      // ghost leads "by design", which is the game apologising for its own HUD.
-      //
-      // The projection already carries the verdict, and carries it correctly,
-      // because it integrates the whole remaining race. So this line gives up
-      // grading and states where the ghost is instead -- which is the one
-      // thing the projection cannot tell you and the thing you actually want
-      // when you are looking at the road.
+      cls(n.gapVal, 'gapCls', 'num ' + tone);
+      cls(n.railGap, 'railGapCls', tone);
       set(n.gapTrend, 'trend', Math.abs(d) < 1 ? 'LEVEL' : ahead ? 'BEHIND YOU' : 'UP THE ROAD');
-      cls(n.gapTrend, 'trendCls', ahead ? 'ahead' : 'behind');
+      cls(n.gapTrend, 'trendCls', tone);
 
       if (extra && extra.fps !== undefined) {
         set(n.perf, 'perf', extra.fps.toFixed(0) + ' FPS · ' + (extra.draws || 0) + ' DRAWS');
@@ -894,7 +914,7 @@ MR.HUD = (function () {
         const k = Store && dateKey ? Store.shift(dateKey, 1) : null;
         const s = k && MR.Course.pickSettings ? MR.Course.pickSettings(k) : null;
         if (s && s.length) {
-          return 'TOMORROW · ' + s.map(function (x) { return x.name; }).join(' → ');
+          return s.map(function (x) { return x.name; }).join(' → ');
         }
       } catch (e) { /* a teaser is never worth an exception */ }
       return '';
@@ -964,7 +984,11 @@ MR.HUD = (function () {
         ['FINAL PACE', Pace.pace(p.pace) + '/MI'],
         ['CLEAN GATES', String(Math.max(0, p.gatesSeen - p.hits))],
         ['CONTACTS', String(p.hits)],
-        ['AID TAKEN', String(p.aid)],
+        // "AID TAKEN 0" is meaningless to a player who never noticed aid was
+        // on the course. With the denominator it reads as something missed
+        // rather than a stat with no scale -- and on the runs the mechanic
+        // exists for, a broken race, it is very often 0 of 6.
+        ['AID TAKEN', p.aid + ' OF ' + (course && course.aid ? course.aid.length : '?')],
       ];
       // Both grids open with exactly one header row and then run on identical
       // fixed-height rows, which is what puts them back in phase -- they were
@@ -1037,7 +1061,9 @@ MR.HUD = (function () {
       }
 
       n.endTurn.textContent = turnLine(p);
-      n.tomorrow.textContent = tomorrowLine();
+      const tom = tomorrowLine();
+      n.tomorrowRoute.textContent = tom;
+      n.tomorrow.classList.toggle('empty', !tom);
 
       n.endPanel.classList.remove('hidden');
       syncPanels();

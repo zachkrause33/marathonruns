@@ -172,7 +172,15 @@ MR.Player = (function () {
               s.laneT = 0.35;
             }
             s.stumble = 1;
-            s.airborne = false; s.airT = 0;
+            // Do NOT clear `airborne` here. `y` is only ever written inside
+            // the airborne branch of update(), so dropping the flag mid-jump
+            // froze the runner's height at whatever it was -- a wall taken at
+            // the apex left them hanging 2.05 units above the road for the
+            // REST OF THE RACE. Instead, throw them to the end of the arc so
+            // update() flies the last fraction of the descent and fires its
+            // own 'land' event: the player is knocked down rather than
+            // teleported, and the height always resolves to zero.
+            if (s.airborne) s.airT = Math.max(s.airT, 0.86);
             s.ducking = false; s.duckT = 0;
             s.events.push('bounce');
           } else {

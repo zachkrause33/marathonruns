@@ -375,6 +375,20 @@ MR.Course = (function () {
 
     const aid = generateAid(key, gates);
     const course = { key, gates, aid, mileMarkers, biomes: BIOMES, length: K.TOTAL_UNITS };
+
+    // This date's places, in the order they will be run through. Carried
+    // ALONGSIDE `biomes` rather than replacing it: `biomes` describes the shape
+    // of the race (where the bridge is, where the wall is) and is the same
+    // every day by design, while `settings` describes where that race is being
+    // run and is redrawn daily. The renderer can key palette and content off
+    // the setting and still ask `biomes` whether it is currently on a bridge.
+    course.settings = pickSettings(key);
+    course.settingAt = function (f) {
+      const list = course.settings;
+      for (let i = list.length - 1; i >= 0; i--) if (f >= list[i].from) return list[i];
+      return list[0];
+    };
+
     course.valid = validate(course);
     return course;
   }

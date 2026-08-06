@@ -207,6 +207,35 @@ MR.Runner = (function () {
   const TRIM = P.accent;
   const GLOVE = P.runnerShoe;
 
+  // ---- the wardrobe ------------------------------------------------------
+  //
+  // What separates the reference characters from a coloured cylinder is that
+  // they read as a PERSON WEARING CLOTHES: every garment has an edge, and the
+  // edges are where one tone meets a neighbouring one. Subway Surfers' runner
+  // from behind is a stack of hems -- cap band, hood roll, jacket collar,
+  // jacket hem, waistband, short cuff, sock, shoe collar -- and none of them
+  // is a strong colour. They are all a step off the garment they trim.
+  //
+  // So every tone below is deliberately a NEIGHBOUR of the mass it edges,
+  // never a contrast to it, for the same reason SOLE is a half-step off the
+  // shoe upper: a hem that jumps hue stops being an edge of the garment and
+  // becomes a second object stuck to it. The bright accents (TRIM) already
+  // carry the character's rhythm and there are only ever three of them.
+  //
+  // They also have to survive the toon ramp's three bands. A tone less than
+  // about 12% off its neighbour lands in the same band on most of the surface
+  // and the hem simply is not there; these all sit between 15% and 30% off.
+  const JACKET = 0xd6394e;   // vest collar, vest hem, hood -- one step under the vest
+  const BASE = 0xb9c4de;     // base-layer tee, seen only as the sleeves
+  const WAIST = 0x434a80;    // waistband and short cuff -- one step over the shorts
+  const SHOE_DK = 0x5f6796;  // heel counter and lace panel
+  // The cap is the vest's own red rather than a new colour. It puts the
+  // brightest garment tone at the top AND the middle of the figure, which is
+  // the same "repeat one colour on a rhythm" trick TRIM runs, and it means the
+  // slide's tucked head resolves into the trunk instead of standing off it as
+  // a differently coloured lump. See the slide note below.
+  const CAP = P.runnerVest;
+
   // The outsole, and the fix for a bug that had been visible in every
   // gameplay screenshot: the whole underside used to be TRIM. The recovery
   // ankle plantarflexes until the sole faces the camera square-on, so the
@@ -613,6 +642,18 @@ MR.Runner = (function () {
 
     const pelvis = multi([
       { g: new THREE.CylinderGeometry(0.228, 0.220, 0.25, 12), c: P.runnerShort, y: -0.020, sz: 0.78 },
+      // Waistband. The vest's hem stops at world 0.590 and the shorts run down
+      // to 0.407, so this is the only band that can turn one continuous dark
+      // mass into "a top tucked over a bottom" -- which is the single cheapest
+      // human read on the whole figure, because the eye already expects a
+      // person to be two garments. It has to sit BELOW the vest hem to exist
+      // at all; anything above 0.586 is inside the vest and invisible.
+      { g: new THREE.CylinderGeometry(0.234, 0.232, 0.052, 10), c: WAIST, y: 0.000, sz: 0.79 },
+      // ...and the short's own cuff at the leg opening, so the thighs come out
+      // of a hem rather than out of a hole. Straddles the shorts' bottom edge
+      // on purpose: a band that stops short of it leaves a sliver of the old
+      // hard cut still showing under it.
+      { g: new THREE.CylinderGeometry(0.236, 0.230, 0.044, 10), c: WAIST, y: -0.126, sz: 0.79 },
     ]);
     spine.add(pelvis);
 
@@ -637,8 +678,52 @@ MR.Runner = (function () {
       { g: new THREE.SphereGeometry(0.140, 10, 8), c: P.runnerVest, x: 0.244, y: 0.002, sy: 0.76, sz: 0.84 },
       // No shoulder-blade bumps: the race bib is a panel standing proud of
       // the vest and it covers the entire area they would have shown in.
+      //
+      // Collar. A bound neckline, not a stand-up collar: it has to stay under
+      // the deltoid line (0.108) or the head starts sitting on the shoulders
+      // again, and a ring standing proud ABOVE the vest was tried on paper and
+      // costs 0.019 of the 0.112 head/shoulder gap, which is a fifth of the
+      // pinch the whole silhouette is built around. Dark rather than light for
+      // the same reason the hair is: the ladder from the crown down has to run
+      // dark / light / dark, and the lit neck needs something dark UNDER it as
+      // well as over it or it bleeds into the vest.
+      { g: new THREE.CylinderGeometry(0.266, 0.259, 0.026, 12), c: JACKET, y: 0.088, sz: 0.79 },
+      // Hem. The vest used to end on a hard cut into the shorts, which is what
+      // made the trunk read as one moulded mass from the neck to the knees.
+      { g: new THREE.CylinderGeometry(0.244, 0.242, 0.030, 12), c: JACKET, y: -0.166, sz: 0.79 },
     ]);
     chest.add(trunk);
+
+    // ---- the hood, and the only part of this character that is not bolted
+    // to a bone --------------------------------------------------------------
+    //
+    // A previous review named secondary motion as the biggest remaining gap in
+    // the character, and it is the right call: everything else here is welded
+    // rigidly to a joint, so every part of the figure starts and stops on the
+    // same frame and the whole thing moves like a marionette. Cloth does not.
+    //
+    // The hood is the piece that can carry it, because it is the one garment
+    // the back view sees in full and it hangs off the collar rather than off a
+    // bone. It is a torus arc laid flat around the base of the neck -- a hood
+    // pushed down, which is exactly what the reference wears -- rather than a
+    // lump on the back, because a lump would cover the race number and the
+    // slot between the collar (0.103) and the top of the bib is only 0.09
+    // deep. Ring geometry uses that slot end to end instead of fighting it.
+    //
+    // The arc is rotated in its own plane FIRST (rz) and then laid flat (rx):
+    // weld() composes Euler XYZ, so rz is the innermost rotation, and doing it
+    // the other way round yaws the finished ring instead of sliding the arc
+    // round it. The arc is 234 degrees centred on the spine, so it wraps the
+    // neck and dies out under the deltoids.
+    const hoodPivot = pivot(chest, 0, 0.052, -0.045);
+    const hood = multi([
+      // sz, not sy: weld() composes T*R*S, so the squash lands on the geometry
+      // BEFORE it is laid flat, and the tube's axis is still the original z.
+      // Squashing y here would flatten the ring instead of the roll.
+      { g: new THREE.TorusGeometry(0.175, 0.062, 5, 12, Math.PI * 1.30), c: JACKET,
+        rx: -Math.PI / 2, rz: -0.42, sz: 0.72 },
+    ]);
+    hoodPivot.add(hood);
 
     // Curved panel rather than a flat card so it hugs the vest at this size,
     // and high on the back so it never straddles the shorts line.

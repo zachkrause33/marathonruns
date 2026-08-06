@@ -126,9 +126,19 @@ MR.World = (function () {
   // These are lifted several stops and given chroma per biome. Lane paint and
   // the hazard telegraph mats still have to sit on top of them, so nothing
   // here goes near white.
+  //
+  // `road` IS THE CENTRE LANE, not the average of the carriageway. Since the
+  // lane banding below can only ever multiply this DOWN -- a vertex colour
+  // cannot exceed 1 -- the biome road is the brightest stop of the ramp and
+  // the outer lanes step off it. Each entry was therefore raised ~13% when the
+  // bands went in, which is what keeps the mean carriageway value slightly
+  // ABOVE the flat road it replaced. That mean is the number the earlier
+  // measurement against the reference was about: the play surface has to stay
+  // the lightest large mass in frame, and a banding scheme that only darkened
+  // would have quietly handed the eye back to the grass.
   const BIOME_LOOK = {
     'CITY START': {
-      sky: [0x2b3fa8, 0x9fdcff], ground: 0x63c96b, road: 0x9aa0d8, fog: 0x9fdcff,
+      sky: [0x2b3fa8, 0x9fdcff], ground: 0x63c96b, road: 0xb1b8f8, fog: 0x9fdcff,
       edge: 'barrier',
       mix: { building: 2.6, tree: 1.1, grove: 0.3, crowd: 2.3, walkers: 1.1 },
     },
@@ -136,7 +146,7 @@ MR.World = (function () {
     // to the road; at full shoulder width the river sat 35 units out and read
     // as a smear on the horizon.
     'RIVERSIDE': {
-      sky: [0x1f6fb8, 0xbdf0ff], ground: 0x57c7a8, road: 0x8fb4dc, fog: 0xbdf0ff,
+      sky: [0x1f6fb8, 0xbdf0ff], ground: 0x57c7a8, road: 0xa4cff8, fog: 0xbdf0ff,
       edge: 'hedge', bank: -1,
       mix: { building: 0.45, tree: 2.0, grove: 2.0, crowd: 1.0, walkers: 0.8 },
     },
@@ -144,22 +154,22 @@ MR.World = (function () {
     // spectator out there would be standing on the river. What the leg gets
     // instead is the towers and a ship on the water, both set pieces.
     'THE BRIDGE': {
-      sky: [0x3a4fc0, 0xffd9a8], ground: 0x2f8fc4, road: 0xb9a8e0, fog: 0xffd9a8,
+      sky: [0x3a4fc0, 0xffd9a8], ground: 0x2f8fc4, road: 0xd5c1f8, fog: 0xffd9a8,
       edge: 'rail',
       mix: {},
     },
     'PARKLAND': {
-      sky: [0x2e8fd0, 0xcdf5c0], ground: 0x6fd46a, road: 0xa8b6e2, fog: 0xcdf5c0,
+      sky: [0x2e8fd0, 0xcdf5c0], ground: 0x6fd46a, road: 0xc1d1f8, fog: 0xcdf5c0,
       edge: 'hedge',
       mix: { building: 0.12, tree: 2.6, grove: 3.6, crowd: 1.1, walkers: 0.9 },
     },
     'THE WALL': {
-      sky: [0x8a3a6b, 0xffb27a], ground: 0x8f9a5e, road: 0xc79ab0, fog: 0xffb27a,
+      sky: [0x8a3a6b, 0xffb27a], ground: 0x8f9a5e, road: 0xe5b1ca, fog: 0xffb27a,
       edge: 'wall',
       mix: { building: 2.0, tree: 0.25, crowd: 0.35, walkers: 0.3 },
     },
     'FINAL MILE': {
-      sky: [0x24306e, 0xffcf6b], ground: 0x5cb46a, road: 0xa9a2e4, fog: 0xffcf6b,
+      sky: [0x24306e, 0xffcf6b], ground: 0x5cb46a, road: 0xc2baf8, fog: 0xffcf6b,
       edge: 'barrier',
       mix: { building: 1.1, tree: 0.7, crowd: 3.4, walkers: 0.7 },
     },
@@ -494,6 +504,30 @@ MR.World = (function () {
     return bx(w, h, d, (x || 0) * LANE_FIT, y, z, color, rx, ry, rz);
   }
 
+  /**
+   * One lane's surface: a road-length quad, laid flat on the slab and tinted
+   * with a vertex colour so it multiplies whatever the biome has made the road.
+   *
+   * The u coordinate is re-mapped onto the CARRIAGEWAY rather than onto the
+   * quad. Two reasons, and the second is the one that bites: the tarmac mottle
+   * has to run continuously across a band edge instead of restarting there, and
+   * roadSurfaceTexture paints its gutter grime at u = 0 and u = 1 -- at the
+   * quad's own uv that grime would land on every lane boundary as a dirty
+   * smear, six of them, exactly where the banding needs a clean step.
+   *
+   * y sits at the slab's original top; the slab itself was dropped to make room.
+   */
+  function laneBand(cx, w, tint) {
+    const g = new THREE.PlaneGeometry(w, TILE);
+    const uv = g.attributes.uv;
+    const full = K.TRACK_HALF_WIDTH * 2;
+    for (let i = 0; i < uv.count; i++) {
+      const x = cx + (uv.getX(i) - 0.5) * w;
+      uv.setX(i, (x + K.TRACK_HALF_WIDTH) / full);
+    }
+    return part(g, tint, cx, 0.25, 0, -Math.PI / 2);
+  }
+
   /** Vertex-coloured toon material -- the workhorse for merged props. */
   function vtoon(steps) {
     const m = S.toon(0xffffff, steps || 2);
@@ -703,6 +737,9 @@ MR.World = (function () {
     roadTex.repeat.set(1, TILE / (8 * ROAD_SLAB));
 
     const mats = {
+      // vertexColors so the lane bands baked into roadGeo can multiply the
+      // biome's road colour -- one draw call for three individuated lanes, and
+      // the ramp follows the cross-fade without anything having to drive it.
       road: S.toon(P.road, 2),
       shoulder: S.toon(P.ground, 2),
       paint: new THREE.MeshBasicMaterial({ vertexColors: true }),
@@ -725,6 +762,7 @@ MR.World = (function () {
     groundMat.map = groundTex;
     mats.shoulder.map = vergeTex;
     mats.road.map = roadTex;
+    mats.road.vertexColors = true;
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(1400, 1400), groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.34;
@@ -777,7 +815,73 @@ MR.World = (function () {
     group.add(ripples);
 
     // ---- road tiles -----------------------------------------------------
-    const roadGeo = new THREE.BoxGeometry(K.TRACK_HALF_WIDTH * 2, 0.5, TILE);
+    /**
+     * LANE INDIVIDUATION -- three lanes as three surfaces, not one sheet.
+     *
+     * In the reference frames the three lanes are three physically different
+     * OBJECTS: a crimson train roof, a blue-grey roof, brown ballast, at
+     * different heights, values and saturations. That is why you always know
+     * which lane you are in and which lane a hazard is sitting in, without ever
+     * looking for a marking. Ours was a single 7.5-unit sheet of one colour and
+     * carried lane identity entirely on two hairline dashes -- the nearer of
+     * which the runner's own body covers from about 35 units out, which is
+     * inside the distance the lane choice is actually made at.
+     *
+     * WHY VALUE AND HUE AND NOT HEIGHT. Lifting the centre lane was the obvious
+     * way to copy the reference and it cannot be done here. Two things lie ON
+     * this surface at fixed heights that this file is not allowed to move: the
+     * hazard telegraph mats sit at y = 0.012 with depthWrite off, and every
+     * hazard's footing is authored from y = 0. Raise one lane by anything the
+     * eye would notice and that lane's mats sink into the tarmac while the
+     * hazards standing in it float. So the whole step is carried in colour.
+     *
+     * WHY IT COSTS NOTHING. The bands are quads merged into the tile's existing
+     * road mesh and tinted with VERTEX COLOURS, which multiply the material's
+     * own colour -- so the ramp rides the per-biome cross-fade for free and the
+     * tile is still exactly one draw call. Ten triangles a tile.
+     *
+     * THE RAMP, and why it is not symmetric. A vertex colour cannot exceed 1,
+     * so every band is a multiply DOWN from the biome road colour (which was
+     * raised to compensate -- see BIOME_LOOK). The centre lane takes the colour
+     * neat and is the brightest; the two outer lanes are not merely darker than
+     * it, they are different from EACH OTHER, one cooled and one warmed, in
+     * both value and hue. That asymmetry is the whole point: with two matching
+     * outer lanes the runner's body still leaves "left or right?" unanswered,
+     * because the only band you can see past your own shoulders is one of them.
+     *
+     * The steps are ~10% apart in value, which is a stop the eye reads at the
+     * far end of the run-up but which is an order of magnitude weaker than the
+     * telegraph mats. That is deliberate: the mats own amber, cyan and pink at
+     * full saturation and they are the device a race is lost by misreading.
+     * These are tints of the road's own hue and must never be mistaken for a
+     * fourth colour language.
+     */
+    const LANE_BAND = [
+      0xbac7de,   // lane 0, screen LEFT  -- coolest and darkest
+      0xffffff,   // lane 1, centre       -- the biome road colour, neat
+      0xe8e0d4,   // lane 2, screen RIGHT -- warmed, and a stop between the two
+    ];
+    // The hard shoulder outside the carriageway edge lines. Knocked well down
+    // so the three lanes read as the bright mass and the tarmac beyond them as
+    // the frame around it -- the same job the brown ballast does in the
+    // reference. It is only 1.2 units wide a side, so it costs the play surface
+    // nothing in the "lightest large mass" reckoning.
+    const ROAD_MARGIN = 0xcccccc;
+
+    const roadGeo = (function () {
+      const parts = [];
+      // The slab is dropped 4mm so the banded surface laid on top of it can
+      // never z-fight with its own top face at the far end of the draw
+      // distance. Its sides are what shows when the shoulders come off over
+      // the river, so it keeps the margin tone rather than a lane tone.
+      parts.push(bx(K.TRACK_HALF_WIDTH * 2, 0.5, TILE, 0, -0.004, 0, ROAD_MARGIN));
+      for (let l = 0; l < 3; l++) {
+        // K.LANE_X is descending, so this walks screen-left to screen-right and
+        // LANE_BAND is indexed by the lane the PLAYER names, not by world x.
+        parts.push(laneBand(K.LANE_X[l], LANE, LANE_BAND[l]));
+      }
+      return merge(parts);
+    })();
     const shoulderGeo = new THREE.BoxGeometry(30, 0.42, TILE);
 
     // All the road paint in one merged mesh: two solid edge lines, two dashed
@@ -847,11 +951,37 @@ MR.World = (function () {
         parts.push(part(new THREE.PlaneGeometry(0.26, TILE), 0xf2f4ff,
           sx * (LANE * 1.5 + 0.13), 0.006, 0, flat));
       }
-      // Dividers sit on the lane boundaries, so they move with LANE_W. The
-      // stripe itself does not scale -- road paint is road paint whatever the
-      // lane is, and a hairline dash stops reading at 60 units.
+      /**
+       * LANE SEAMS -- continuous, and a groove rather than a dash.
+       *
+       * These used to be 0.16-wide dashes over half the tile. A dash is a
+       * PERPENDICULAR mark: at this camera it is foreshortened to nothing by
+       * forty units and it is the first thing the runner's own body covers.
+       * A seam that runs the whole length of the tile is the opposite -- it is
+       * the one kind of mark perspective makes MORE of, because it converges on
+       * the vanishing point and so keeps a screen-space length no matter how
+       * far away its far end is. That is what the reference's roof edges are
+       * doing, and it is why they survive to the horizon.
+       *
+       * A warm-white line with a soft shadow either side, which is the same
+       * dark-plus-lit pairing the expansion joints use and for the same reason:
+       * a lone line reads as a stain on one surface, a line with a shadow under
+       * it reads as the EDGE of a surface that has a thickness. The shadow is a
+       * knocked-back road tone rather than ink -- the first pass made it near
+       * black and 0.24 wide, and two of those turned the carriageway into three
+       * strips separated by chasms, which is a much louder claim than the 10%
+       * value steps the bands are making and drowned them.
+       *
+       * Total width is 0.35 against a 1.70 lane: enough to hold a pixel at the
+       * far end of the run-up, narrow enough that a telegraph mat (1.41 wide,
+       * centred) still clears it with room on both sides, so a gate never
+       * buries the boundary the player is reading it against.
+       */
       for (const lx of [-LANE / 2, LANE / 2]) {
-        parts.push(part(new THREE.PlaneGeometry(0.16, TILE * 0.52), 0xfff6d8, lx, 0.006, 0, flat));
+        for (const s of [-1, 1]) {
+          parts.push(part(new THREE.PlaneGeometry(0.11, TILE), 0x77728f, lx + s * 0.12, 0.005, 0, flat));
+        }
+        parts.push(part(new THREE.PlaneGeometry(0.15, TILE), 0xfff6d8, lx, 0.007, 0, flat));
       }
       return merge(parts);
     })();

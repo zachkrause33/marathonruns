@@ -57,8 +57,12 @@ MR.Course = (function () {
 
   function spacingAt(f, rnd) {
     const d = difficulty(f);
-    const mean = 46 - 22 * d;                 // 46 units early -> 24 late
-    return Math.max(22, mean * rnd.range(0.82, 1.18));
+    // 44 units early -> 21 late. The floor is 20 rather than 22 because
+    // ACTION_WINDOW is 20 and the solver rejects anything that would demand
+    // two conflicting actions inside it -- so the generator can be pushed to
+    // the edge of that rule and let the proof hold the line.
+    const mean = 44 - 23 * d;
+    return Math.max(20, mean * rnd.range(0.84, 1.16));
   }
 
   /** Hazard mix widens as difficulty rises. */
@@ -80,9 +84,30 @@ MR.Course = (function () {
     const d = difficulty(f);
     const lanes = [K.CLEAR, K.CLEAR, K.CLEAR];
 
-    // How many lanes carry a hazard: 1 early, up to 2-3 late.
-    const maxHaz = d < 0.22 ? 1 : d < 0.6 ? 2 : rnd.chance(0.72) ? 2 : 3;
-    const nHaz = Math.max(1, rnd.int(1, maxHaz));
+    // How many lanes carry a hazard.
+    //
+    // This is the difficulty dial and it was set far too low. A gate with any
+    // CLEAR lane can be answered by moving into it, so the jump and the slide
+    // are optional at that gate. Measured on the shipped course: 94% of gates
+    // had a totally clear lane and only 6% forced an action -- nine of those
+    // ten in the final third. A player could run the whole marathon by finding
+    // the free lane and never once using the mechanic the game is built on,
+    // which is exactly what the first record-breaking run did.
+    //
+    // A three-hazard gate is the one that forces the issue: makeGate never
+    // puts a BLOCK on a full-width gate (see allowBlock below), so all three
+    // lanes are JUMP or DUCK and every one of them is passable WITH the right
+    // action. Forcing an action is therefore never unfair -- it is the
+    // difference between choosing a lane and playing the game.
+    const full = d < 0.14 ? 0
+      : d < 0.34 ? 0.10
+      : d < 0.58 ? 0.30
+      : d < 0.80 ? 0.48
+      : 0.62;
+    const nHaz = rnd.chance(full) ? 3
+      : d < 0.18 ? 1
+      : d < 0.42 ? rnd.int(1, 2)
+      : 2;
 
     const order = [0, 1, 2];
     for (let i = order.length - 1; i > 0; i--) {

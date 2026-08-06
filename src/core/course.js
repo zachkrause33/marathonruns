@@ -42,7 +42,15 @@ MR.Course = (function () {
   const MAX_SPEED = (K.UNITS_PER_MILE * K.TIME_SCALE) / K.FLOOR_PACE;
   const ACTION_WINDOW = Math.ceil(K.JUMP_TIME * MAX_SPEED) + 1;
   const START_GRACE = 150;   // clean runway so the first seconds read calmly
-  const FINISH_GRACE = 190;  // clean straight into the tape
+  // Clean straight into the tape. It was 190 units -- 0.80 of a mile, about
+  // seven seconds at race pace -- and combined with the difficulty ramp's
+  // natural tail it left the entire last mile holding TWO gates. The closing
+  // act of a four-minute race was an empty road.
+  //
+  // 55 keeps what the grace was for: a beat of clear tarmac so the tape is a
+  // moment you run through rather than something you scramble into. Two
+  // seconds is enough to see it coming, and not enough to get bored.
+  const FINISH_GRACE = 55;
 
   const BIOMES = [
     { name: 'CITY START', from: 0.00 },
@@ -155,7 +163,17 @@ MR.Course = (function () {
     // learn the lane geometry before the course starts asking questions.
     const base = Math.pow(f, 0.62);
     const wall = 0.28 * Math.exp(-Math.pow((f - 0.763) / 0.055, 2));
-    return Math.min(1, base * 0.86 + wall);
+    // THE RUN-IN. A second, sharper spike over the closing half-mile.
+    //
+    // The wall at mile 20 is the race's hard middle; this is its last question.
+    // Without it the difficulty curve simply tails off into the finish, which
+    // is the wrong shape for an ending -- a player arrives at the tape having
+    // been asked nothing for the better part of a minute. Narrower and later
+    // than the wall so the two read as separate events rather than one long
+    // grind, and it saturates the dial, which also pulls gate spacing to its
+    // floor through spacingAt().
+    const home = 0.34 * Math.exp(-Math.pow((f - 0.972) / 0.028, 2));
+    return Math.min(1, base * 0.86 + wall + home);
   }
 
   function spacingAt(f, rnd) {

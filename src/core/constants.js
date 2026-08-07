@@ -186,6 +186,13 @@ MR.K = (function () {
     // faster than that. At the pace floor it is 28.35 u/s and the span is
     // 19.84 units. course.js now derives ACTION_WINDOW from this number rather
     // than restating a stale product of it.
+    //
+    // AND THE PACE FLOOR IS NO LONGER THE FASTEST THE RUNNER EVER MOVES. With
+    // hills the pace at a point is FLOOR_PACE + GRADE_SPM * grade, so on a 4%
+    // descent it is 234 s/mi, the speed is 30.77 u/s and the span is 21.54 --
+    // past the constant window of 21. The window is therefore a function of z
+    // now; see Course.actionWindowAt and Elevation.windowExtra. The margin at
+    // every point is the same 1.16 units it is on the flat, by construction.
     JUMP_TIME: 0.70,
     DUCK_TIME: 0.78,
     INPUT_BUFFER: 0.20,             // late/early press forgiveness
@@ -244,6 +251,58 @@ MR.K = (function () {
       for (let s = 0; s <= 400; s++) if (targetPaceAt(s) <= aim) return s;
       return 400;
     })(),
+
+    // ---- hills -----------------------------------------------------------
+    //
+    // GRADE_SPM is the only place the terrain touches the race, and the FORM of
+    // the term is the whole argument for it:
+    //
+    //   paceNow = pace + GRADE_SPM * grade_percent(z)
+    //
+    // ADDITIVE IN SECONDS PER MILE. Total race time is the integral of paceNow
+    // over distance, which is the flat-course integral plus
+    // GRADE_SPM * INTEGRAL(grade dm), and
+    //
+    //   INTEGRAL(g dm) = INTEGRAL((dE/dz) dz) / UNITS_PER_MILE
+    //                  = (E_end - E_start) / UNITS_PER_MILE = 0
+    //
+    // exactly, because every hill in elevation.js is a hump that returns to
+    // zero. So the finish time is unchanged from the flat course for ANY
+    // sequence of gate outcomes and independent of how the pace happened to
+    // vary along the way -- the record needs no recalibration and simulate.js
+    // measures the same numbers it measured before hills existed.
+    //
+    // A multiplicative form (pace * (1 + k*g)) does NOT have this property. It
+    // weights each grade by the pace there, so a climb early would cost more
+    // than the same descent late repays, and the finish would drift with the
+    // player's streak history. Do not "simplify" this into a percentage.
+    //
+    // THE SIZE, 5.0 s/mi per 1% of grade, is a judgement and is the one number
+    // in the hill design chosen rather than derived. At the steepest legal
+    // grade (4%) it is +/-20 s/mi against a streak range of 76 s/mi
+    // (330 -> 254), so the biggest hill on the course moves the pace by about a
+    // quarter of everything a perfect line can ever buy. Real running economy
+    // is 12-15 s/mi per 1% uphill; this is ~40% of that, on purpose, because a
+    // physically honest hill would swamp the mechanic the game is about.
+    // Tuning range 3.0-7.0 -- and moving it does not move the finish time,
+    // which is exactly what the additive form buys.
+    GRADE_SPM: 5.0,
+    // A backstop that provably never fires: elevation.js caps the grade at 4.0%
+    // and 5.0 * 4.0 = 20.0. It exists so that a future retune of GRADE_SPM or
+    // of the grade cap cannot silently produce a negative pace -- but note that
+    // if it ever DID fire the zero-net integral above would stop being exact,
+    // so a clamp that binds is a bug and not a safety net.
+    GRADE_CLAMP: 20.0,
+
+    // The eye the sightline cap on hill shape is derived against. camera.js
+    // sits at BASE_Y 2.62 above the local road and drops 0.20 at race pace, so
+    // the honest figure is 2.42; 2.30 is taken instead to absorb the stride bob
+    // and the landing dip. It lives here rather than in camera.js because
+    // elevation.js runs headless in tools/ where no camera exists, and because
+    // cap(L) tightens as the square of it -- if BASE_Y is ever lowered, this
+    // must follow and Elevation.validate() will fail the build if it does not.
+    HILL_EYE_Y: 2.30,
+    HILL_EYE_BACK: 4.35,            // camera.js BASE_BACK
 
     // Hazard kinds
     CLEAR: 0,

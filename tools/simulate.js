@@ -12,9 +12,10 @@ const path = require('path');
 const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..');
-const ctx = { MR: {}, Math, console, isFinite, String, Number };
+const ctx = { MR: {}, Math, console, isFinite, String, Number, Float64Array };
 vm.createContext(ctx);
-for (const f of ['src/core/rng.js', 'src/core/constants.js', 'src/core/pace.js', 'src/core/course.js']) {
+for (const f of ['src/core/rng.js', 'src/core/constants.js', 'src/core/elevation.js',
+                 'src/core/pace.js', 'src/core/course.js']) {
   vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: f });
 }
 const { Pace, Course, K } = ctx.MR;
@@ -31,7 +32,7 @@ const KEYS = ['2026-08-05', '2026-08-06', '2026-12-25', '2027-03-14'];
  */
 function raceOnce(key, skill) {
   const course = Course.generate(key);
-  const p = Pace.create();
+  const p = Pace.create(course.elevation);
   let gi = 0, n = 0, guard = 0;
   while (!p.finished && guard++ < 200000) {
     p.update(DT);
@@ -114,7 +115,7 @@ for (const [label, skill] of rows) {
 function runWithNHits(n, take) {
   const times = KEYS.map((key) => {
     const course = Course.generate(key);
-    const p = Pace.create();
+    const p = Pace.create(course.elevation);
     const hitAt = new Set();
     for (let i = 1; i <= n; i++) hitAt.add(Math.floor((course.gates.length * i) / (n + 1)));
     const aid = course.aid || [];

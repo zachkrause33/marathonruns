@@ -41,6 +41,32 @@ MR.Course = (function () {
   // constraint seen from both ends.
   const MAX_SPEED = (K.UNITS_PER_MILE * K.TIME_SCALE) / K.FLOOR_PACE;
   const ACTION_WINDOW = Math.ceil(K.JUMP_TIME * MAX_SPEED) + 1;
+
+  /**
+   * ...and the pace floor stopped being the fastest the runner ever moves the
+   * day hills landed.
+   *
+   * With a grade term the local top speed is (UNITS_PER_MILE * TIME_SCALE) /
+   * (FLOOR_PACE + GRADE_SPM * grade), so on the steepest legal descent the
+   * airborne span is 21.54 units against a constant window of 21. The margin
+   * is not merely thin, it is negative -- so the window becomes a function of
+   * z and the BFS proof holds BY CONSTRUCTION rather than by luck.
+   *
+   * `Elevation.windowExtra(z)` is the extra span the steepest descent within
+   * one airborne reach of z would buy, so this preserves the SAME 1.16-unit
+   * absolute margin the flat course has today at every point of the profile.
+   * On the steepest descent the solver demands ~22.7 units between conflicting
+   * gates instead of 21 -- an 8% loosening of the tightest spacing, invisible
+   * in play.
+   *
+   * This is what forces the elevation to be generated BEFORE the gates in
+   * generate() below. Elevation reads nothing from the course, so there is no
+   * cycle -- but the ordering is load-bearing and not incidental.
+   */
+  function actionWindowAt(z, elev) {
+    return ACTION_WINDOW + (elev ? elev.windowExtra(z) : 0);
+  }
+
   const START_GRACE = 150;   // clean runway so the first seconds read calmly
   // Clean straight into the tape. It was 190 units -- 0.80 of a mile, about
   // seven seconds at race pace -- and combined with the difficulty ramp's
@@ -176,7 +202,7 @@ MR.Course = (function () {
     return Math.min(1, base * 0.86 + wall + home);
   }
 
-  function spacingAt(f, rnd) {
+  function spacingAt(f, rnd, z, elev) {
     const d = difficulty(f);
     // 44 units early, tightening as difficulty rises. The floor is
     // ACTION_WINDOW itself rather than a number chosen to sit near it: the
@@ -186,7 +212,11 @@ MR.Course = (function () {
     // retune of the jump arc or the pace floor moves both ends of the same
     // constraint at once, instead of moving one and leaving the other stale.
     const mean = 44 - 23 * d;
-    return Math.max(ACTION_WINDOW, mean * rnd.range(0.84, 1.16));
+    // The floor is the SAME call the solver makes, evaluated at the same z, so
+    // a descent widens the generator's tightest spacing and the proof's window
+    // together. Moving one without the other is how this invariant went stale
+    // the first time.
+    return Math.max(actionWindowAt(z, elev), mean * rnd.range(0.84, 1.16));
   }
 
   /** Hazard mix widens as difficulty rises. */
@@ -433,7 +463,44 @@ MR.Course = (function () {
     return items;
   }
 
+  /**
+   * Where the hills may not go, and where one is mandated.
+   *
+   * COMPOSITION LIVES HERE, not in elevation.js, because this file is the one
+   * that knows what shape a race is: where the bridge is and where the wall is.
+   *
+   * THE BRIDGE. `deckLift` in world.js turns the ground plane into water across
+   * the BRIDGE biome and 190 units either side of it. A seeded hill there would
+   * arch the river with the road, so the whole span is excluded and the leg
+   * over the water stays flat -- which is also what a real bridge deck is.
+   *
+   * THE WALL. difficulty() puts a Gaussian spike at f = 0.763, and measured on
+   * two dates that band carries 35-36 gates against only 2 aid items. A hill
+   * crested at the centre of it makes the player CLIMB INTO the density peak
+   * and DESCEND OUT of it. The two reinforce rather than compete: the grade
+   * changes no gate's difficulty, because clearance is measured against the
+   * local road -- and uphill buys reaction time while downhill spends it, so at
+   * +4% the 1.16 s gate interval goes to 1.24 and at -4% to 1.09. The hardest
+   * stretch of the course is therefore also, very slightly, the most forgiving
+   * one to react in, and the reward for cresting it has teeth.
+   */
+  function elevationPlan() {
+    const bridge = BIOMES.find(function (b) { return b.name === 'THE BRIDGE'; });
+    const after = BIOMES[BIOMES.indexOf(bridge) + 1];
+    const PAD = 230;   // the water ramp, plus a little
+    return {
+      exclude: [[bridge.from * K.TOTAL_UNITS - PAD, after.from * K.TOTAL_UNITS + PAD]],
+      mandate: [{ z: 0.763 * K.TOTAL_UNITS, L: 180 }],
+    };
+  }
+
   function generate(key) {
+    // ELEVATION FIRST, AND THE ORDER IS THE POINT. actionWindowAt() reads the
+    // profile, spacingAt() and solvable() both read actionWindowAt(), and the
+    // generator calls both on every gate -- so the ground has to exist before
+    // the first gate is placed. Elevation reads nothing back from the course.
+    const elevation = MR.Elevation.create(key, elevationPlan());
+
     const rnd = MR.rng.stream(key, 'course/v1');
     const gates = [];
 
@@ -458,7 +525,7 @@ MR.Course = (function () {
         if (cand.every((l) => l === K.BLOCK)) continue;
 
         const trial = gates.concat([{ z, lanes: cand, f }]);
-        if (solvable(trial)) { lanes = cand; break; }
+        if (solvable(trial, elevation)) { lanes = cand; break; }
       }
       if (!lanes) {
         // Degrade to a guaranteed-safe gate rather than emit something unfair.
@@ -479,7 +546,7 @@ MR.Course = (function () {
       }
 
       gates.push({ z, lanes, f, train: span });
-      z += spacingAt(f, rnd);
+      z += spacingAt(f, rnd, z, elevation);
     }
 
     const mileMarkers = [];
@@ -487,7 +554,8 @@ MR.Course = (function () {
     mileMarkers.push({ mile: K.MARATHON_MILES, z: K.TOTAL_UNITS, finish: true });
 
     const aid = generateAid(key, gates);
-    const course = { key, gates, aid, mileMarkers, biomes: BIOMES, length: K.TOTAL_UNITS };
+    const course = { key, gates, aid, mileMarkers, biomes: BIOMES, length: K.TOTAL_UNITS,
+                     elevation };
 
     // This date's places, in the order they will be run through. Carried
     // ALONGSIDE `biomes` rather than replacing it: `biomes` describes the shape
@@ -512,7 +580,7 @@ MR.Course = (function () {
    * conflicts are rejected: two gates closer than ACTION_WINDOW may not demand
    * a jump and a duck back to back on the chosen path.
    */
-  function solvable(gates) {
+  function solvable(gates, elev) {
     if (!gates.length) return true;
     // state: set of (lane, lastAction, lastActionZ) -- collapse by lane+action.
     let states = [];
@@ -526,11 +594,16 @@ MR.Course = (function () {
         for (let l = 0; l < 3; l++) {
           const h = g.lanes[l];
           if (h === K.BLOCK) continue;
-          // Conflicting actions inside one window are unplayable.
-          if (h !== K.CLEAR && s.act !== K.CLEAR && h !== s.act && g.z - s.z < ACTION_WINDOW) continue;
+          // Conflicting actions inside one window are unplayable. The window is
+          // measured at the EARLIER gate, which is where the action was
+          // committed and therefore where the airborne span starts; the profile
+          // already looked one airborne reach forward from there when it built
+          // the table. See actionWindowAt.
+          if (h !== K.CLEAR && s.act !== K.CLEAR && h !== s.act
+            && g.z - s.z < actionWindowAt(s.z, elev)) continue;
           const act = h === K.CLEAR ? s.act : h;
           const az = h === K.CLEAR ? s.z : g.z;
-          const tag = l + ':' + act + ':' + (g.z - az < ACTION_WINDOW ? 1 : 0);
+          const tag = l + ':' + act + ':' + (g.z - az < actionWindowAt(az, elev) ? 1 : 0);
           if (seen.has(tag)) continue;
           seen.add(tag);
           next.push({ lane: l, act, z: az });
@@ -545,15 +618,25 @@ MR.Course = (function () {
   function validate(course) {
     const errors = [];
     const g = course.gates;
+    const elev = course.elevation;
     for (let i = 0; i < g.length; i++) {
       if (g[i].lanes.every((l) => l === K.BLOCK)) errors.push(`gate ${i}: all lanes blocked`);
       if (i > 0 && g[i].z <= g[i - 1].z) errors.push(`gate ${i}: not ordered in z`);
       if (i > 0 && g[i].z - g[i - 1].z < 18) errors.push(`gate ${i}: spacing ${(g[i].z - g[i - 1].z).toFixed(1)} too tight`);
     }
-    if (!solvable(g)) errors.push('course has no solvable lane path');
+    if (!solvable(g, elev)) errors.push('course has no solvable lane path');
+    // The sightline sweep. A profile that hides the road beyond a crest hides
+    // the lane telegraph mats with it, which is the same class of failure
+    // tools/shoot.js fails a build for when a prop occludes a hazard -- so it
+    // is a course validation error, not a rendering note.
+    if (elev) {
+      const e = elev.validate();
+      if (!e.ok) for (const m of e.errors) errors.push('elevation: ' + m);
+    }
     return { ok: errors.length === 0, errors, gates: g.length };
   }
 
   return { generate, generateAid, validate, solvable, biomeAt, difficulty,
-           BIOMES, SETTINGS, pickSettings, ACTION_WINDOW };
+           BIOMES, SETTINGS, pickSettings, ACTION_WINDOW, actionWindowAt,
+           elevationPlan };
 })();

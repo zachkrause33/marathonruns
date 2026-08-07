@@ -16,6 +16,7 @@ const ROOT = path.resolve(__dirname, '..');
 const MODULES = [
   'src/core/rng.js',
   'src/core/constants.js',
+  'src/core/elevation.js',
   'src/core/pace.js',
   'src/core/course.js',
   'src/core/store.js',

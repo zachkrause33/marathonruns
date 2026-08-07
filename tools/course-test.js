@@ -11,9 +11,10 @@ const path = require('path');
 const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..');
-const ctx = { MR: {}, Math, console, isFinite, String, Number, Set, Array, JSON };
+const ctx = { MR: {}, Math, console, isFinite, String, Number, Set, Array, JSON, Float64Array };
 vm.createContext(ctx);
-for (const f of ['src/core/rng.js', 'src/core/constants.js', 'src/core/pace.js', 'src/core/course.js']) {
+for (const f of ['src/core/rng.js', 'src/core/constants.js', 'src/core/elevation.js',
+                 'src/core/pace.js', 'src/core/course.js']) {
   vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: f });
 }
 const { Course, K } = ctx.MR;

@@ -25,7 +25,24 @@ MR.Pace = (function () {
       + gap * (1 - K.STREAK_FAST_SHARE) * Math.exp(-streak / K.STREAK_SLOW);
   }
 
-  function create() {
+  /**
+   * @param elev  an MR.Elevation profile, or nothing for a flat course.
+   *
+   * THE GRADE TERM IS ADDITIVE IN SECONDS PER MILE AND THAT IS THE WHOLE
+   * ARGUMENT. See K.GRADE_SPM: because every hill returns to zero, the grade
+   * contribution to the finish integrates to exactly zero over the race, so a
+   * hilly course finishes in the same time as a flat one for any sequence of
+   * gate outcomes. Nothing here needs recalibrating and neither does the
+   * record.
+   *
+   * Three things deliberately do NOT read it -- projected(), projectClean() and
+   * needPace() all keep using `s.pace`. That is correct rather than an
+   * oversight: the grade term integrates to zero, so a projection that included
+   * it would swing wildly on every crest and be wrong, and needPace() > FLOOR
+   * remains a valid bound on the AVERAGE.
+   */
+  function create(elev) {
+    const E = elev || (MR.Elevation ? MR.Elevation.FLAT : null);
     const s = {
       raceTime: 0,          // seconds of simulated race time
       realTime: 0,          // seconds of wall clock since the gun
@@ -33,7 +50,13 @@ MR.Pace = (function () {
       units: 0,             // world units travelled
       streak: 0,
       bestStreak: 0,
-      pace: K.START_PACE,   // seconds per mile, instantaneous
+      pace: K.START_PACE,   // seconds per mile, instantaneous, GRADE-FREE
+      // The pace the ground is actually being covered at: `pace` plus the
+      // grade term. This is what the world scrolls at and what the HUD's pace
+      // number reads; `pace` is the engine, and the speed gauge stays on it so
+      // a descent cannot light up the top-gear flourish.
+      paceNow: K.START_PACE,
+      grade: 0,             // percent, positive uphill, at the runner
       hits: 0,
       gatesSeen: 0,
       aid: 0,
@@ -57,7 +80,13 @@ MR.Pace = (function () {
       const step = K.PACE_EASE * dRace;
       s.pace += Math.abs(d) <= step ? d : Math.sign(d) * step;
 
-      const dMiles = dRace / s.pace;
+      // The hill. Sampled at the runner's own z, which is s.units.
+      s.grade = E ? E.gradeAt(s.units) : 0;
+      const gt = K.GRADE_SPM * s.grade;
+      s.paceNow = s.pace + (gt < -K.GRADE_CLAMP ? -K.GRADE_CLAMP
+        : gt > K.GRADE_CLAMP ? K.GRADE_CLAMP : gt);
+
+      const dMiles = dRace / s.paceNow;
       s.miles += dMiles;
 
       // Mile splits.
@@ -69,7 +98,10 @@ MR.Pace = (function () {
       if (s.miles >= K.MARATHON_MILES) {
         const over = s.miles - K.MARATHON_MILES;
         s.miles = K.MARATHON_MILES;
-        s.raceTime -= over * s.pace;   // trim the overshoot for an exact finish
+        // Trim the overshoot for an exact finish. paceNow, not pace: this
+        // undoes distance that was covered at the local pace, and the last
+        // hill ends 200 units before the tape so the two are equal anyway.
+        s.raceTime -= over * s.paceNow;
         s.finished = true;
         s.finishTime = s.raceTime;
       }
@@ -132,8 +164,26 @@ MR.Pace = (function () {
       return s.miles > 1.5 ? s.gatesSeen / s.miles : 6.7;
     };
 
-    /** World units per real second at the current pace. */
+    /**
+     * World units per real second, INCLUDING the grade. This is the honest
+     * ground speed: it drives the world scroll, the runner's cadence and the
+     * camera's framing, all of which should quicken on a descent.
+     */
     s.speed = function () {
+      return (K.UNITS_PER_MILE * K.TIME_SCALE) / s.paceNow;
+    };
+
+    /**
+     * World units per real second at the STREAK's pace, ignoring the hill.
+     *
+     * Splitting these is not fussiness. The camera's top-gear latch fires at
+     * sp01 > 0.93 and brings a one-shot flourish and a permanent rumble with
+     * it, and the HUD's speed gauge is the engine readout. Without this a steep
+     * descent would fire both spuriously -- the game would tell the player they
+     * had found another gear when all they had done was point downhill, which
+     * is exactly the kind of thing that ships as a bug.
+     */
+    s.streakSpeed = function () {
       return (K.UNITS_PER_MILE * K.TIME_SCALE) / s.pace;
     };
 

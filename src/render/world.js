@@ -2803,48 +2803,159 @@ MR.World = (function () {
   }
 
   /**
-   * Two round road wheels, axis along x, so the chase camera sees the curved
-   * rear tread and the bottom of the wheel is round.
+   * ============ THE UNDERBODY ============
    *
-   * At 15 units a 0.20-world tyre is about fifteen pixels, which resolves
-   * roundness; by 30 units it does not, and that is fine -- the arch above it is
-   * what carries the read at distance.
+   * What replaced a sill, a flat arch lip and two bare cylinders, and the
+   * reason it had to.
    *
-   * There are only two. The front pair every vehicle used to carry sat at
-   * z = +0.36 to +0.44 inside a body 1.16-1.30 deep whose rear plane is at
-   * -0.65, so they were occluded by their own bodywork from a chase camera at
-   * every distance. Geometry that can never be seen is not built.
+   * THE DEFECT, seen at gameplay scale and not before. The old underbody was a
+   * narrow sill spanning only BETWEEN the wheels, a 0.09-tall flat lip over
+   * each tyre, and a cylinder about x under each. From the chase camera that
+   * composites into: a straight horizontal lower edge across the whole body,
+   * two dark rectangles hanging below it, and LIT ROAD in the gaps between and
+   * outboard of them. That is a table. It is the owner's "they look like boxes
+   * and not actual vehicles", and at 15 units it is the loudest thing about
+   * the fleet.
    *
-   * 40 triangles a 10-segment cylinder, 80 for the pair, against the 48 the four
-   * boxes cost.
+   * Two separate mistakes made it, and the file's own comments asserted the
+   * opposite of both:
+   *
+   *   "round wheels ... the chase camera sees the curved rear tread and the
+   *     bottom of the wheel is round" -- it does not. A cylinder about x, seen
+   *     from behind, is viewed PERPENDICULAR to its axis, so its silhouette is
+   *     the barrel: a rectangle, with a straight bottom edge. The roundness of
+   *     a cylinder about x is only ever visible from the side, which is the one
+   *     angle this game does not have. The tyres were rectangles the whole time.
+   *   "every road vehicle here shows daylight between its underframe and the
+   *     tarmac, with wheels in it" -- the reference does not. In tgr-traffic
+   *     and tgr-taxi-street every vehicle's underside is a continuous DARK
+   *     mass that merges into its contact shadow. Lit road is never seen
+   *     through a vehicle, and seeing it is exactly what turns an underframe
+   *     into a pair of legs.
+   *
+   * WHAT THIS BUILDS INSTEAD, and each piece answers one of those:
+   *
+   *   A SKIRT ACROSS THE FULL BODY WIDTH, down to a small shadow gap above the
+   *     road, so the body has a bottom edge instead of a pair of posts.
+   *   A REAL ARCH CUT INTO IT. The skirt is emitted as columns whose lower edge
+   *     lifts along a circle over each tyre, so the body's lower outline is
+   *     notched upward by a genuine curve. That is the silhouette fact the old
+   *     flat lip only claimed: a straight-sided opening cannot notch anything.
+   *   A WHEEL WELL behind the opening, so what is seen beside the tyre inside
+   *     the arch is a dark recess rather than the road behind the vehicle.
+   *   A SHADOW PANEL between the arches, so the space under the vehicle is
+   *     dark. This is the piece that stops it reading as a table.
+   *
+   * The tyre stays a cylinder about x, because that IS its axis and the arch
+   * above it is now what carries the round read -- which is how the reference
+   * does it too, and it survives to distance where a tread never would.
+   *
+   * THE SKIRT IS THE VEHICLE'S OWN MID TONE, not its dark, and that is a
+   * contrast finding rather than a styling one. Built first in each body's
+   * DARK, the skirt added enough near-black area low on the object to drag the
+   * bus's area mean from L 101 to L 94 and push it under the audit's 1.6x
+   * target -- a colour regression bought with a shape fix, which is the trade
+   * the last two passes kept making in the other direction. The crease hue
+   * holds the value step against the body above it, keeps the chroma the
+   * colour pass bought, and is what the reference actually shows: a bus is
+   * painted down to a thin black bumper, not blacked out from the waist.
+   * The dark is spent where it earns its keep instead -- inside the arch,
+   * where a near-black recess is what makes the opening read as an opening.
+   *
+   * COST. The skirt is `cols` columns mirrored, so 2 x cols boxes; at the
+   * default 26 that is ~624 triangles a vehicle, plus a 16-segment tyre pair
+   * (~128) and two wells. Call it 900 against the old 130. All of it merges
+   * into the variant's single geometry, so it costs ZERO extra draw calls --
+   * which is the budget that actually binds here.
    */
-  function vWheels(parts, x, y, z, r, w, col) {
+  function vUnder(parts, o) {
+    const halfW = (o.bodyW * LANE_FIT) / 2;
+    const wx = o.wheelX * LANE_FIT;                       // wheel centre, world
+    const r = o.wheelR;
+    const tw = o.wheelW;
+    // The arch opening hugs the tyre: its half-width is the tyre's plus a
+    // little clearance, NOT the tyre's radius. Seen from behind, a wheel
+    // opening is as wide as the tyre is wide -- an opening a full diameter
+    // across is a hole with a rectangle in the middle of it.
+    const aw = tw * (o.dual ? 1 : 0.5) + (o.archPad === undefined ? 0.09 : o.archPad);
+    const bot = o.skirtBot;                               // shadow gap above the road
+    const top = o.skirtTop;
+    // Where the arc springs from. The opening's top lands at spring + aw.
+    const spring = o.spring === undefined ? bot + 0.06 : o.spring;
+    const cols = o.cols || 26;
+    const step = halfW / cols;
+    for (let i = 0; i < cols; i++) {
+      const xc = (i + 0.5) * step;
+      const dx = Math.abs(xc - wx);
+      let low = bot;
+      if (dx < aw) low = Math.max(low, spring + Math.sqrt(aw * aw - dx * dx));
+      if (low >= top - 0.005) continue;
+      for (const sx of [-1, 1]) {
+        // 1.02 so neighbouring columns overlap a hair and the ink shell cannot
+        // find a seam between them.
+        parts.push(bx(step * 1.02, top - low, o.d, sx * xc, (top + low) / 2, o.z, o.skirt));
+      }
+    }
+    // The recess behind each opening, and the shadow between them. Both sit
+    // FORWARD of the skirt (larger z is further from a camera at -z) so the
+    // tyre stands in front of them and nothing reaches behind the gate line.
     for (const sx of [-1, 1]) {
-      parts.push(cyl(r, r, w, 10, sx * x * LANE_FIT, y, z, col === undefined ? TYRE : col, 0, 0, Math.PI / 2));
+      parts.push(bx(aw * 2, spring + aw, o.d * 0.55, sx * wx, (spring + aw) / 2, o.z + o.d * 0.22, o.under));
+    }
+    // Deliberately NO panel closing the last `skirtBot` above the road. The
+    // skirt drops the old 0.68-tall void to about 0.13, which is what kills
+    // the table read; closing it entirely would give the vehicle the tram's
+    // skirt-to-the-road profile, and that contrast is how a bus is told from a
+    // tram from directly behind. The gap that remains is a sliver the contact
+    // quad has already darkened to 0.60 of the road.
+    // The tyres, in front of their wells. 16 segments: the arch is what reads
+    // at distance, but at 15 units the tyre is ~20px and octagons show.
+    const tz = o.z + (o.wheelZ || 0);
+    for (const sx of [-1, 1]) {
+      if (o.dual) {
+        // Twin rear tyres, which is a refuse truck's own tell and nothing
+        // else in the fleet has them.
+        for (const k of [-1, 1]) {
+          parts.push(cyl(r, r, tw * 0.86, 16, sx * wx + k * tw * 0.56, r, tz, o.tyre, 0, 0, Math.PI / 2));
+        }
+      } else {
+        parts.push(cyl(r, r, tw, 16, sx * wx, r, tz, o.tyre, 0, 0, Math.PI / 2));
+      }
     }
   }
 
   /**
-   * The arch lip: the top of a real wheel opening, one step darker than the
-   * body and standing proud of it.
+   * A GENUINELY CURVED CROWN, for the one vehicle whose roofline is a curve.
    *
-   * The point of the arch is not the lip, it is that the SILL BAND IS NOT THERE
-   * between the lip and the body's outer corner -- so the tyre is seen through a
-   * genuine gap in the mesh and the body's lower outline is notched by a round
-   * thing instead of ending in a straight line at the road.
+   * `vRoof` below steps in twice, which is a chamfer: at gameplay scale it is a
+   * square corner with a nick in it, and six of the fleet wear it, so it is a
+   * shared feature rather than a distinguishing one. A city bus's roof is an
+   * arc from flank to flank, and that arc is the single most nameable thing
+   * about a bus seen from directly behind -- it is what `tgr-bus-front` and the
+   * distant bus in `tgr-traffic` both read by before any of their detail
+   * resolves.
    *
-   * Divergence, stated: the reference cuts a smooth curve into a smooth-shaded
-   * panel with the wheel's shadow softening into it, and on a 2.2-wide body its
-   * arch runs right out to the corner rather than leaving a flank outboard of
-   * the wheel (`tgr-shopfronts`: "the tyres sit at its outer corners"). Ours is
-   * a straight-sided opening with a hard lip, and it too runs to the corner --
-   * so the split is centre-plus-lips rather than the three-part flank/centre/
-   * flank an earlier draft assumed, and it costs 12 authored triangles instead
-   * of 24. The transferable part is that the tyre BREAKS THE LOWER OUTLINE,
-   * which is a silhouette fact and survives banding intact.
+   * Emitted as `segs` columns whose top follows a circular arc, mirrored about
+   * the centreline. 14 segments is ~336 triangles, which buys the fleet's only
+   * curved roofline; the old chamfer cost 24 and bought a shape six other
+   * variants already had.
+   *
+   * `rise` is how far the crown's centre stands above `y`, and the caller is
+   * responsible for `y + rise` staying inside the 2.80 a BLOCK may reach.
    */
-  function vArch(parts, x, w, y, d, z, col) {
-    for (const sx of [-1, 1]) parts.push(hbx(w, 0.09, d, sx * x, y, z, col));
+  function vCrown(parts, w, d, y, z, rise, segs, col) {
+    const halfW = (w * LANE_FIT) / 2;
+    const n = segs || 14;
+    const step = halfW / n;
+    for (let i = 0; i < n; i++) {
+      const xc = (i + 0.5) * step;
+      const t = xc / halfW;
+      const h = rise * Math.sqrt(Math.max(0, 1 - t * t));
+      if (h <= 0.004) continue;
+      for (const sx of [-1, 1]) {
+        parts.push(bx(step * 1.02, h, d * (0.94 - 0.06 * t), sx * xc, y + h / 2, z, col));
+      }
+    }
   }
 
   /**
@@ -5089,14 +5200,15 @@ MR.World = (function () {
      */
     const blockBusGeo = (function () {
       const parts = [];
-      vWheels(parts, 0.94, 0.34, -0.06, 0.34, 0.30);
-      // The sill spans the gap BETWEEN the arches and nothing fills the span
-      // under it, so lit road shows beneath the vehicle exactly as it does under
-      // every reference vehicle. The pooled contact quad already multiplies that
-      // road to 0.60; the reference measures its own underbody at 0.67x the
-      // local road, so no new geometry is needed for the shadow itself.
-      parts.push(hbx(1.42, 0.26, 1.18, 0, 0.55, 0, BUS_DARK));
-      vArch(parts, 0.94, 0.66, 0.685, 1.22, -0.02, 0x0a1f1a);
+      // A bus stands over the road on the biggest wheels in the fleet, and its
+      // skirt is the highest -- so the arch is the deepest notch here and the
+      // lower outline is the least straight of the four road vehicles.
+      vUnder(parts, {
+        bodyW: 2.20, d: 1.18, z: 0,
+        skirtTop: 0.68, skirtBot: 0.13, spring: 0.17,
+        wheelX: 0.88, wheelR: 0.36, wheelW: 0.32,
+        skirt: BUS_CREASE, under: 0x081a16, tyre: TYRE,
+      });
       vBumper(parts, 2.14, 0.36, 0.86, -0.65, BUS_DARK, 0.62);
       vLamps(parts, 0.96, 0.86, -0.65, 0.16);
       parts.push(
@@ -5107,8 +5219,19 @@ MR.World = (function () {
       vGlass(parts, 1.96, 0.96, 1.30, 0, 2.08, 0);
       for (const sx of [-1, 1]) parts.push(hbx(0.14, 0.96, 1.26, sx * 1.03, 2.08, 0, BUS_BODY));
       parts.push(hbx(2.20, 0.08, 1.26, 0, 2.60, 0, BUS_BODY));   // header 2.56-2.64
-      vRoof(parts, 2.20, 1.26, 2.64, 0, CHROME, BUS_BODY);        // 2.64-2.77
-      parts.push(hbx(0.72, 0.20, 0.08, 0, 2.34, -0.62, CHROME));  // route blind
+      // The fleet's only curved roofline, and the bus's whole read at distance.
+      // Crest lands at 2.78, inside the 2.80 the collision box records.
+      vCrown(parts, 2.20, 1.26, 2.64, 0, 0.14, 14, BUS_BODY);
+      // THE ROUTE BLIND CARRIES THE BUS'S CONTRAST, so it is the size a real
+      // one is. At 0.72 x 0.20 it was decoration; the underbody rebuild cost
+      // the body ~1.5 of luminance and left the bus at 1.59x against the 1.6x
+      // target on the finish carpet, which is the one shot where the road is
+      // brightest. A destination display is the largest pale element on the
+      // back of a bus and CHROME is both brighter (L 150.8) and more chromatic
+      // (S 0.43) than the teal it replaces, so widening it pays the luminance
+      // back and the saturation with it -- rather than paying with cream,
+      // which is what flattened the fleet the last time this was needed.
+      parts.push(hbx(1.24, 0.26, 0.08, 0, 2.36, -0.62, CHROME));  // route blind
       return merge(parts);
     })();
 
@@ -5136,9 +5259,15 @@ MR.World = (function () {
      */
     const blockTaxiGeo = (function () {
       const parts = [];
-      vWheels(parts, 0.92, 0.28, -0.10, 0.28, 0.26, TYRE_WARM);
-      parts.push(hbx(1.34, 0.14, 1.10, 0, 0.49, 0, TAXI_DARK));   // sill 0.42-0.56
-      vArch(parts, 0.92, 0.62, 0.565, 1.14, -0.04, 0x14100a);
+      // The lowest skirt and the smallest wheels in the fleet, which is most of
+      // what makes a car a car from behind: the body is close to the road and
+      // the tyres barely clear it.
+      vUnder(parts, {
+        bodyW: 2.18, d: 1.10, z: -0.02,
+        skirtTop: 0.56, skirtBot: 0.10, spring: 0.14,
+        wheelX: 0.90, wheelR: 0.30, wheelW: 0.28, archPad: 0.08,
+        skirt: TAXI_CREASE, under: 0x14100a, tyre: TYRE_WARM,
+      });
       vBumper(parts, 2.12, 0.24, 0.68, -0.65, TAXI_DARK, 0.56);   // 0.56-0.80
       vLamps(parts, 0.96, 0.68, -0.65, 0.145);
       parts.push(
@@ -5203,9 +5332,12 @@ MR.World = (function () {
      */
     const blockVanGeo = (function () {
       const parts = [];
-      vWheels(parts, 0.96, 0.31, -0.14, 0.31, 0.30, TYRE_WARM);
-      parts.push(hbx(1.32, 0.22, 1.08, 0, 0.51, -0.06, VAN_DARK));
-      vArch(parts, 0.96, 0.64, 0.625, 1.14, -0.08, 0x1c1204);
+      vUnder(parts, {
+        bodyW: 2.22, d: 1.08, z: -0.06,
+        skirtTop: 0.62, skirtBot: 0.14, spring: 0.16,
+        wheelX: 0.92, wheelR: 0.33, wheelW: 0.30,
+        skirt: VAN_CREASE, under: 0x1c1204, tyre: TYRE_WARM,
+      });
       vBumper(parts, 2.12, 0.32, 0.78, -0.65, VAN_DARK, 0.60);
       vLamps(parts, 0.96, 0.78, -0.65, 0.15);
       parts.push(
@@ -5264,18 +5396,32 @@ MR.World = (function () {
      */
     const blockRefuseGeo = (function () {
       const parts = [];
-      vWheels(parts, 0.96, 0.31, 0.00, 0.31, 0.30, TYRE_WARM);
-      parts.push(hbx(1.32, 0.22, 1.06, 0, 0.51, 0, BIN_DARK));
-      vArch(parts, 0.96, 0.64, 0.625, 1.10, 0.00, 0x121a04);
+      // TWIN REAR TYRES, which no other vehicle in the fleet has and which a
+      // rear loader always does. It widens the arch into a single broad notch
+      // instead of the narrow one the car and the van carry, so the refuse
+      // truck differs from them along the bottom edge as well as the top.
+      vUnder(parts, {
+        bodyW: 2.24, d: 1.06, z: 0,
+        skirtTop: 0.62, skirtBot: 0.16, spring: 0.16,
+        wheelX: 0.90, wheelR: 0.33, wheelW: 0.26, archPad: 0.04, dual: true,
+        skirt: BIN_CREASE, under: 0x121a04, tyre: TYRE_WARM,
+      });
       vBumper(parts, 2.12, 0.30, 0.77, -0.65, BIN_DARK, 0.58);
       vLamps(parts, 0.96, 0.77, -0.65, 0.15);
       parts.push(
         hbx(2.24, 0.90, 0.62, 0, 1.37, -0.30, BIN_BODY),   // hopper 0.92-1.82
         hbx(2.26, 0.05, 0.64, 0, 1.845, -0.30, BIN_CREASE),// hopper crease 1.82-1.87
         hbx(2.18, 0.08, 0.66, 0, 1.91, -0.30, VAN_BODY),   // hopper cap 1.87-1.95
-        hbx(2.14, 0.56, 0.60, 0, 2.23, 0.32, BIN_BODY),    // packer body 1.95-2.51
-        hbx(2.20, 0.08, 0.64, 0, 2.55, 0.32, VAN_BODY),    // body cap 2.51-2.59
-        hbx(1.92, 0.06, 0.54, 0, 2.62, 0.32, BIN_BODY)     // roof chamfer 2.59-2.65
+        // THE PACKER IS NARROWER THAN THE HOPPER, not merely taller than it.
+        // At 2.14 on a 2.24 hopper the step was 0.05 a side -- invisible at
+        // gameplay scale, so the truck read as one slab with a bar across it
+        // and its outline was interchangeable with the bus's. At 1.72 the
+        // shoulder is 0.26 a side and the object is visibly two masses: a low
+        // wide tail with a tall narrow body standing behind it, which is what a
+        // rear loader is and what nothing else on this road has.
+        hbx(1.72, 0.56, 0.60, 0, 2.23, 0.32, BIN_BODY),    // packer body 1.95-2.51
+        hbx(1.78, 0.08, 0.64, 0, 2.55, 0.32, VAN_BODY),    // body cap 2.51-2.59
+        hbx(1.54, 0.06, 0.54, 0, 2.62, 0.32, BIN_BODY)     // roof chamfer 2.59-2.65
       );
       vGlass(parts, 1.28, 0.34, 0.06, 0, 2.24, -0.05, true); // packer inspection window
       parts.push(

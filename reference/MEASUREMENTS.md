@@ -861,6 +861,18 @@ The chase camera only ever sees a hazard's rear faces, which are the shaded band
 of the toon ramp. Measured off `api.contrastAudit`'s own swatches, a shaded face
 returns at `(0.639R, 0.723G, 0.826B)` of its authored colour, so its luminance is
 
+
+> **CORRECTION (measured during the build pass).** The two statements of the
+> shaded response in this section disagree with each other: `(0.639R, 0.723G,
+> 0.826B)` and `L = 0.136R + 0.517G + 0.060B` imply different factors, and only
+> the second fits the swatch table above. Neither is right. Forty-six flat
+> swatches rendered through the audit's own camera give the real response as
+> **`(0.660R, 0.732G, 0.828B)`, i.e. `L = 0.197R + 0.430G + 0.094B`**. Checks:
+> cream predicts 175.4 and measures 175.5; BLOCK pink predicts 85.7 and
+> measures 85.4. The formula as originally written puts pink at 71.6, which is
+> 17% low. `world.js` now carries this as `shadedL()` so nothing has to restate
+> it. Every colour chosen in the build was picked against the measured map.
+
 ```
 L = 0.136 R + 0.517 G + 0.060 B          (green is 76% of it)
 ```
@@ -1532,7 +1544,7 @@ failure mode: the window gets slightly lighter with distance and nothing else
 happens.**
 
 **B5. Balconies on more of the fleet of settings.** `t.balcony` exists and is
-switched on for Berlin only. The reference has one on nearly every upper floor,
+switched on for Berlin only. **CORRECTION: `t.balcony` was already on for Berlin, Sydney, Paris, Valencia and Rome before this pass began.** The reference has one on nearly every upper floor,
 and a projecting slab with a railing is the strongest depth cue on a facade
 because it is the only part that casts its own outline against the wall behind.
 Turning it on for the two or three other settings whose architecture supports it

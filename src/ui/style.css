@@ -336,6 +336,21 @@ html, body {
 #gapLine #distVal { margin-left: auto; font-size: 12px; font-weight: 700; }
 #gapLine #distUnit { font-size: 8px; font-weight: 700; opacity: 0.55; margin-left: 2px; }
 #gapLine .lab { opacity: 0.75; }
+/* THIS PLATE IS NOT ALLOWED TO CHANGE HEIGHT, and it was.
+ *
+ * Same defect as the one #projCell already carries a nowrap for, in the same
+ * words: anything allowed to wrap will wrap on a phone the moment the string
+ * gets longer. Here it is RECORD GHOST breaking across two lines once the gap
+ * reads +1:30.3 instead of +0:12, which makes the whole plate 14px taller.
+ *
+ * That is worse than untidy, because this plate is the floor the runner stands
+ * on. Measured at 320x568 by tools/footroom.js: the top of #railWrap sits at
+ * 508 early in a race and at 494 late in one, so the plate grows INTO the
+ * runner exactly when the numbers get big -- and it took the mid-jump and
+ * mid-slide clearances from passing to failing on that alone. A readout whose
+ * height depends on its own contents cannot be reasoned about at all. */
+#gapLine .lab, #gapLine #gapVal, #gapLine #gapTrend,
+#gapLine #clock, #gapLine #distVal { white-space: nowrap; }
 #gapVal { font-size: 17px; font-weight: 700; line-height: 1; }
 #gapTrend { font-size: 9px; font-weight: 700; letter-spacing: 0.12em; }
 .ahead { color: var(--ahead); }
@@ -863,7 +878,8 @@ html, body {
  * in the line immediately above it. The bar itself is the readout and it stays.
  */
 @media (max-height: 620px) {
-  #rail { height: 14px; }
+  #railWrap { padding-top: 4px; padding-bottom: 3px; }
+  #rail { height: 12px; }
   #railCaps { display: none; }
   #gapLine { margin-bottom: 11px; }
 }

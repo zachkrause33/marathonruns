@@ -4235,8 +4235,38 @@ MR.shading = (function () {
  * that reading as rubber. Applying the cloth treatment to a limb is exactly the
  * floppy failure the brief forbids, and it is one constant away in each case.
  *
- * Stage 3 (speed responsiveness) is NOT here. The cadence curve and sp01 are
- * untouched on purpose.
+ * ANIMATION POLISH, STAGE 3 -- speed responsiveness. Same POLISH knob again.
+ * The starting measurement is that the character barely had any: across the
+ * WHOLE honest pace band, a 5:30 mile against a 4:14 one, stride amplitude
+ * moved 21% and lean moved 0.12 rad, and nothing else in the file read `speed`
+ * at all except cadence and the bib. Two halves:
+ *
+ *   PACE, on `sp01`. Stride amplitude 21% -> 38% across the band, lean 0.12 ->
+ *     0.19 rad, elbow flexion on the front swing +0.16, and shoulder abduction
+ *     on the back swing +0.18 -- which is derived rather than chosen, being the
+ *     largest value that leaves the run's silhouette half-width bit for bit
+ *     where it is. The cadence curve is deliberately NOT touched; see its own
+ *     note for the audio calibration that depends on it.
+ *
+ *   ACCELERATION, on `surge`, which did not exist -- nothing here had ever
+ *     differentiated anything. A smoothed derivative of ground speed with the
+ *     HILL TAKEN BACK OUT, driving lean, hip extension, knee drive and the
+ *     toe. Taking the hill out is the whole design: the raw derivative of the
+ *     grade-inclusive speed this file is handed is three to four times larger
+ *     on terrain than on effort, and at the top of a climb it has the opposite
+ *     sign, so it would lean the character hardest exactly where gravity is
+ *     doing the work. See SURGE_FULL and the block in update().
+ *
+ * Stage 3 also has to be read against the instrument. tools/stride.js settles
+ * its contact sheets and does NOT settle its measurement sweep, which was
+ * harmless while every filter in this file was seeded lazily off its own posed
+ * value and is not harmless now that one of them is driven by the HISTORY of
+ * `speed`: the page runs at whatever speed ?skip= produces before the tool
+ * re-poses the rig at lo/mid/hi, and the step between the two is differentiated
+ * as though the runner had accelerated. It inflates the polish-1 travel table
+ * by up to 3.3x on the chest and 6% on the head, and it cannot touch polish 0,
+ * where every surge term is multiplied by zero.
+ *
  *
  * Pivot layout (all rotations are local X unless noted):
  *   root -> body -> hips -> thigh -> shin -> foot
@@ -4261,6 +4291,44 @@ MR.Runner = (function () {
   // full range of stride and lean instead of quietly clipping it.
   const SPEED_LO = (K.UNITS_PER_MILE * K.TIME_SCALE) / K.START_PACE;
   const SPEED_HI = (K.UNITS_PER_MILE * K.TIME_SCALE) / K.FLOOR_PACE;
+
+  // ---- the surge signal, stage 3 -----------------------------------------
+  // What follows exists so that "acceleration" means the runner working
+  // harder, and never means gravity.
+  //
+  // The numerator of every speed in this file: pace is seconds per mile, and
+  // speed = SPEED_NUM / pace. Named rather than repeated because the surge
+  // signal below has to go BACK through it to recover a pace.
+  const SPEED_NUM = K.UNITS_PER_MILE * K.TIME_SCALE;
+  // The seconds per mile the hill adds at the steepest legal grade, i.e. at
+  // st.grade = +/-1. pace.js writes paceNow = pace + GRADE_SPM * gradePercent
+  // and main.js hands this file gradeNorm = gradePercent / (MAX_GRADE * 100),
+  // so the two constants below are exactly what turns one into the other.
+  // Derived from both rather than written as the 20.0 they currently multiply
+  // to, so retuning either one follows here instead of silently drifting.
+  // (K.GRADE_CLAMP is the same 20.0 and is deliberately NOT used: it is a
+  // backstop that provably never fires, and borrowing a safety limit as a
+  // calibration is how a constant ends up meaning two things.)
+  const GRADE_SPM_FULL = K.GRADE_SPM
+    * ((MR.Elevation && MR.Elevation.MAX_GRADE) || 0.040) * 100;
+  // Full surge, in u/s^2 of grade-free ground speed after the two filters
+  // below. MEASURED, not chosen: 40 whole races -- 10 course seeds x 4 skill
+  // levels, 637,653 frames -- put the positive acceleration a clean streak can
+  // ever produce at p99 0.420, p99.9 0.435 and a hard maximum of 0.4424. The
+  // pace ease is what bounds it: PACE_EASE could move the pace ten times
+  // faster than this, but the streak target it is chasing only moves when a
+  // gate is passed, so 0.44 is the real ceiling on gaining pace in this game.
+  //
+  // Deceleration is a different size entirely and is NOT given its own scale:
+  // the same 40 races put it at p90 0.758 and a maximum of 1.9861, four and a
+  // half times the positive ceiling, because a contact drops the streak in one
+  // frame where a clean line rebuilds it over many. So the negative half of the
+  // signal saturates almost at once, and it is given a much smaller gain below
+  // rather than a larger divisor -- a runner who is losing pace eases off, and
+  // the game already has `stumble`, `trip` and `bounce` to say that they were
+  // hit. Sizing both halves off one number and letting the clamp do the rest is
+  // what keeps a surge from turning into a brake.
+  const SURGE_FULL = 0.44;
 
   // ---- the animation A/B --------------------------------------------------
   // 0 renders the run cycle exactly as it was before the polish pass, 1 renders
@@ -5378,6 +5446,12 @@ MR.Runner = (function () {
     // travel the cycle does not have. `null` means "not yet running"; the first
     // frame plants each filter on its own drive.
     let elbF = [null, null], elbV = [0, 0], headRF = null, headRV = 0;
+    // STAGE 3. The surge signal's two filters. `accSp` is a smoothed grade-free
+    // ground speed and `accA` its smoothed derivative; `accPrimed` is what stops
+    // ?skip= from opening a deep-race screenshot on a phantom 6 u/s surge that
+    // never happens in a real run. Same three-part shape camera.js uses, and for
+    // the same reason -- see SURGE_FULL and the block in update().
+    let accSp = 0, accA = 0, accPrimed = false;
 
     // ---- head -----------------------------------------------------------
     // The neck pivot sits at the top of the trunk so head tilt rotates from
@@ -6289,6 +6363,18 @@ MR.Runner = (function () {
       // Start pace is the reference; the exponent keeps cadence rising more
       // slowly than speed, which is how real runners gain pace -- the rest
       // of the gain shows up as stride length and lean below.
+      //
+      // STAGE 3 DELIBERATELY DID NOT TOUCH THIS CURVE, and the reason is not
+      // animation. main.js fires footsteps off api.phase, so the exponent is
+      // the tempo of the per-step audio layer as well as of the legs, and the
+      // grade-audio work SIZED that layer against it -- 4.7-5.3% slower on a 4%
+      // climb, 4.6-6.1% faster on a 4% descent, with the footstep timbre tilted
+      // to forefoot climbing and heel-first descending. Move the exponent and
+      // those tilts are calibrated against a number that changed. The gain this
+      // stage was asked for went into amplitude, lean and push-off instead,
+      // which is what the sentence above always said the exponent was shaped
+      // for. Across the honest band it already carries cadence 2.55 -> 3.08 Hz,
+      // +20.7%, against +29.9% of ground speed.
       const cadence = 2.55 * Math.pow(speed / SPEED_LO, 0.72);
       // Bleed the cycle out over the jump instead of hard-stopping at a
       // threshold -- a frozen scissor at the moment of takeoff was visible.
@@ -6298,7 +6384,97 @@ MR.Runner = (function () {
       // 0..1 across the honest pace band, used only for the terms that should
       // read as "trying harder": stride length and forward lean.
       const sp01 = Math.max(0, Math.min(1, (speed - SPEED_LO) / (SPEED_HI - SPEED_LO)));
-      const swing = 0.94 + 0.20 * sp01;
+      // STAGE 3. Stride amplitude, and the slope on sp01 is what the stage is
+      // mostly made of.
+      //
+      // Before this pass the whole speed response of the character was 21% of
+      // stride amplitude and 0.12 rad of lean across the ENTIRE pace band --
+      // the difference between a 5:30 mile and a 4:14 one, which is the whole
+      // range the game has. 0.20 -> 0.36 makes that 38%, and it is spent
+      // where stage 1 said it could be: because the ankle is now SOLVED for a
+      // flat sole through stance rather than tuned, sole depth no longer
+      // depends on stride amplitude, so raising it does not reopen foot
+      // planting. Measured, it does the opposite of costing anything -- a
+      // longer stride at the same cadence carries the planted foot further
+      // backward in the time it is down, so skate FALLS as the stride opens.
+      //
+      // `swing` drives hip flexion and shoulder flexion, both of which are
+      // rotations about x. Neither has a lateral component, so this cannot
+      // move the run's silhouette half-width, which is the number the jump has
+      // to stay legible against. That is why the amplitude is the safe place
+      // to put the gain and abduction is not.
+      const swing = 0.94 + (0.20 + POLISH * 0.16) * sp01;
+
+      // ---- surge: is the runner GAINING pace, not just holding it ----------
+      // STAGE 3, and the owner's third item: "acceleration = temporary stronger
+      // push-off/lean". Nothing in this file differentiated anything before
+      // this; `st.speed` arrived and was used as a level.
+      //
+      // THE HILL IS TAKEN BACK OUT FIRST, and that is the whole design of this
+      // signal rather than a detail of it. `speed` is grade-inclusive by the
+      // time it reaches this file (see `grade` above, and main.js), so the raw
+      // derivative of it is dominated by the terrain: measured over a real
+      // course, cresting into a descent reads +0.666 u/s^2 where the runner's
+      // own effort is +0.181, and starting a climb reads -0.265 where the
+      // effort is +0.115 -- three to four times the size and, at the top of a
+      // climb, the OPPOSITE SIGN. A surge term fed that would lean the
+      // character hardest exactly when gravity is doing the work, and on a
+      // descent it would fight `gradePitch` (which sits back, correctly) and
+      // win by 3x. It would also be the second grade term this file is not
+      // allowed to have, wearing a derivative as a disguise.
+      //
+      // So the grade is removed the same way camera.js removes it for the
+      // top-gear latch, and for the same stated reason: speed you did not earn
+      // is not a thing to celebrate. pace.js's grade term is ADDITIVE in
+      // seconds per mile, which is what makes the removal exact rather than
+      // approximate -- go back through SPEED_NUM to a pace, subtract the grade's
+      // own seconds, come forward again. Checked against pace.js's private
+      // `pace` over 40 whole races: worst error 0.0145 u/s out of ~22, i.e.
+      // 0.07%, and all of it is gradeNorm clipping at +/-1 where the raw slope
+      // does not.
+      //
+      // Clamped at 1/25 rather than at `hdt`'s 1/50. This is not a spring being
+      // kept stable, it is a filter that should mean the same thing in real
+      // seconds at 7 fps as at 60, and halving its step would double its time
+      // constant on a slow frame. Same clamp camera.js uses.
+      const accDt = dt > 0 ? (dt < 1 / 25 ? dt : 1 / 25) : 0;
+      const flatSpeed = speed > 1
+        ? SPEED_NUM / Math.max(1, SPEED_NUM / speed - GRADE_SPM_FULL * grade)
+        : speed;
+      if (!accPrimed) { accPrimed = true; accSp = flatSpeed; }
+      if (accDt > 0) {
+        const was = accSp;
+        // Two filters, not one. The pace model steps its target on every gate
+        // passed, so a single derivative is a train of spikes at gate spacing;
+        // smoothing the speed first is what turns that into the thing a player
+        // would call "picking it up". Time constants 0.26 s and 0.33 s, the
+        // pair camera.js already runs its own surge cue on, so the two cues
+        // arrive together instead of beating against each other.
+        accSp += (flatSpeed - accSp) * (1 - Math.pow(0.02, accDt));
+        // The divided difference is clamped before it is used, for the reason
+        // the collar's is fifty lines below: a step in the input that no race
+        // can produce should not be treated as an acceleration that no race can
+        // produce. Over the same 40 races the worst gap between the raw speed
+        // and this filter is 0.976 u/s, which the clamped step turns into at
+        // most ~3.5 u/s^2, so +/-4 never touches anything the game does. What
+        // it bounds is everything the game does NOT do: a tab returning from
+        // the background, and ?skip= landing the page mid-race.
+        const raw = (accSp - was) / accDt;
+        accA += ((raw < -4 ? -4 : raw > 4 ? 4 : raw) - accA) * (1 - Math.pow(0.05, accDt));
+      }
+      // +1 is a clean streak gaining pace as fast as this game allows. -1 is
+      // reached by any contact worth the name and then some -- see SURGE_FULL.
+      const surge = Math.max(-1, Math.min(1, accA / SURGE_FULL));
+      // The half of it that means "driving". Kept separate because push-off is
+      // a one-sided idea: a runner losing pace does not push BACKWARDS, they
+      // simply stop pushing, which is what surge falling to 0 already says.
+      const surgeUp = surge > 0 ? surge : 0;
+      // ...and the signed form, with the losing half at 40% of the gain of the
+      // winning one. Deceleration saturates this signal four and a half times
+      // more easily than acceleration does (SURGE_FULL), so equal gains would
+      // make every contact a bigger event than every surge -- the opposite of
+      // what was asked for, and a job three other inputs already do.
+      const surgeLean = surgeUp + (surge - surgeUp) * 0.40;
 
       // How far into the airborne pose everything is. Smoothstepped rather
       // than linear so the spread snaps open just after takeoff and holds,
@@ -6447,8 +6623,13 @@ MR.Runner = (function () {
         // them. Only the cycle's own contribution is wanted there, not the jump
         // tuck or the slide's figure-four, so the split happens here rather than
         // off the finished joint angle.
+        // The trailing lobe is the hip's share of push-off, so STAGE 3 opens it
+        // with the surge: a runner picking up pace drives the thigh further
+        // behind them and gets it back under the hip the same way. One-sided on
+        // `trail` for the reason the lobe exists at all -- the pass under the
+        // hip does not move, only the extension at the end of it.
         const hipRun = -sS * swing * 0.86
-          + POLISH * (0.11 * trail - 0.16 * drive);
+          + POLISH * ((0.11 + 0.10 * surgeUp) * trail - 0.16 * drive);
         // Knee only bends one way; bias so it flexes hardest on recovery.
         const bend = Math.max(0, -kc * 0.5 + 0.5);
         // ...and two corrections on top of the fundamental fold. The knee gives
@@ -6457,8 +6638,13 @@ MR.Runner = (function () {
         // that meets the road and a leg that is passing through the place the
         // road happens to be. Both are gated on the stance window above, so
         // neither can fire while the foot is in the air.
+        // ...and STAGE 3 straightens it harder off the toe when the runner is
+        // gaining pace. `land` is left alone on purpose: absorbing a landing is
+        // not something a surge makes you do more of, and softening the knee
+        // further under load is the one direction here that would read as
+        // sinking rather than as driving.
         const kneeRun = bend * (1.22 + 0.26 * sp01)
-          + POLISH * (0.14 * land - 0.22 * push);
+          + POLISH * (0.14 * land - (0.22 + 0.18 * surgeUp) * push);
         L.hip.rotation.x = hipRun * cyc + tuck * 0.70
           - slid * (lead ? 1.80 : 1.66);
         L.knee.rotation.x = 0.18 + kneeRun * cyc + tuck * 1.25
@@ -6496,8 +6682,14 @@ MR.Runner = (function () {
         // where the shoe is actually passing the road. It also keeps the pale
         // outsole turned toward the camera on the swing, which the shoe's own
         // note says is deliberate.
+        // STAGE 3 puts the surge into the toe as well. This is the term the
+        // owner's "stronger push-off" most literally names, and it is safe to
+        // grow for the reason above: `ankFlat` is solved from whatever hipRun
+        // and kneeRun turn out to be, INCLUDING their own surge lobes, so the
+        // sole is still flat on the road at midstance no matter how hard the
+        // ankle is asked to drive a quarter-cycle later.
         const ankDrive = mix(s * 0.34,
-          stance * ankFlat + push * 0.30 - airW * 0.34, POLISH);
+          stance * ankFlat + push * (0.30 + 0.26 * surgeUp) - airW * 0.34, POLISH);
         L.ankle.rotation.x = -0.16 + ankDrive * cyc - tuck * 0.45
           - slid * (lead ? 0.30 : 0.04);
         // A little splay keeps the two legs from overlapping into one shape
@@ -6613,7 +6805,32 @@ MR.Runner = (function () {
         // maximum and buys travel, and travel is what the eye tracks. A runner
         // does this anyway -- the elbow goes out and back together and comes
         // through close to the ribs.
-        A.shoulder.rotation.z = A.side * ((0.13 + back * (0.15 + POLISH * 0.11)
+        //
+        // STAGE 3 opens that band further with PACE, and the size of it is
+        // derived rather than chosen -- but the note above had to be corrected
+        // first, because it is the reason a smaller number was tried.
+        //
+        // "Every degree taken off the run widens the gap the jump has to clear"
+        // reads as though abduction is what sets the run's half-width. It is
+        // not. Asked which vertex is actually the widest one in a running
+        // silhouette at top pace, the rig answers the CHEST at 0.4157 before
+        // this stage and the HEAD at 0.4208 after it -- the elbow is inboard of
+        // both and does not reach the outline at all. So the band was swept
+        // until it did: +0.10 and +0.18 of sp01 both leave the run at 0.4184,
+        // bit for bit the width it has with no arm term whatever, and +0.26
+        // pushes it to 0.4364. 0.18 is where the elbow arrives at the outline
+        // without crossing it, which is the most travel this axis can buy for
+        // exactly zero silhouette.
+        //
+        // The first draft did the opposite -- closed the FRONT swing harder,
+        // on the theory that travel bought below the maximum is free. It is
+        // free, and it is also worth less than nothing here: measured, the mitt
+        // LOST 17% of its lateral range, because a deeper front fold and a
+        // bigger `swing` both rotate the hand out of the plane the camera reads.
+        // Same amplitude, wrong axis. Opening the back instead takes the mitt
+        // to 0.1994 against 0.1816 before the stage, and it is the only one of
+        // the four arm variants tried that gains on ALL THREE axes at once.
+        A.shoulder.rotation.z = A.side * ((0.13 + back * (0.15 + POLISH * (0.11 + 0.18 * sp01))
           - POLISH * 0.05 * fwd) * cycD + spread * 1.56 + slid * 0.16);
         A.shoulder.rotation.y = -A.side * (0.16 + fwd * (0.22 + POLISH * 0.10)) * cycD;
         // Ride the whole shoulder outboard in the air as well as rotating it.
@@ -6663,8 +6880,16 @@ MR.Runner = (function () {
         // and opens as it goes away. 0.46 -> 0.64 is on the axis the ceiling
         // does not apply to, because the hand is climbing in FRONT of the chest
         // where nothing on this character can hide it.
+        //
+        // STAGE 3 puts pace on the same axis for the same reason: the ceiling
+        // in the note above applies to the BACK term, where a deeper fold hides
+        // the hand behind the hips, and not to this one, where the hand is
+        // climbing in front of the chest with nothing on the character able to
+        // cover it. So the front fold is where a faster runner's arms are
+        // allowed to get bigger, and 0.18 -> 0.34 across the band costs no
+        // width and no risk of losing the mitt.
         const elbowPosed =
-          (-1.32 - fwd * (0.46 + POLISH * 0.18) - back * 0.18) * (1 - spread * 0.95) * (1 - slid * 0.86) - slid * 0.10;
+          (-1.32 - fwd * (0.46 + POLISH * (0.18 + 0.16 * sp01)) - back * 0.18) * (1 - spread * 0.95) * (1 - slid * 0.86) - slid * 0.10;
         // ...and the mitt arrives after the elbow does. STAGE 2.
         //
         // This is a LAG FILTER, not a driven spring, and the difference is the
@@ -6731,7 +6956,26 @@ MR.Runner = (function () {
       // the steepest descent, and both fold away in a slide with everything
       // else. Pure feel; nothing depends on the numbers.
       const gradePitch = grade > 0 ? grade * GRADE_PITCH_UP : grade * GRADE_PITCH_DOWN;
-      const leanFwd = (0.26 + 0.12 * sp01 + stumble * 0.5) * (1 - slid * 0.94)
+      //
+      // STAGE 3, two terms, and they are the two the owner named: the held lean
+      // grows with PACE and takes a temporary extra on top of it when the
+      // runner is GAINING pace.
+      //
+      // 0.12 -> 0.19 across the band. Deliberately short of the amplitude
+      // change beside it: lean has more leverage on this rig than its size
+      // suggests, because a trunk tipped out of the yaw axis converts the
+      // pelvis's yaw into lateral travel -- that is the mechanism stage 2
+      // measured, and it is why the head's sideways sweep already grows 32%
+      // from the bottom of the band to the top with nothing but lean moving.
+      // Past about 0.20 the figure starts reading as bent rather than driving.
+      //
+      // The surge term is 0.065 at full, ~3.7 degrees, and it is the smaller of
+      // this stage's two answers to "acceleration" on purpose. Lean is the cue
+      // a player reads from the silhouette and push-off is the cue they read
+      // from the legs, and a lean that arrives faster than the legs do is the
+      // one failure mode here that looks like the character falling forward.
+      const leanFwd = (0.26 + (0.12 + POLISH * 0.07) * sp01 + stumble * 0.5
+          + POLISH * 0.065 * surgeLean) * (1 - slid * 0.94)
         - spread * 0.30
         - slid * SLIDE_RECLINE
         + gradePitch * (1 - slid * 0.94) * (1 - spread);

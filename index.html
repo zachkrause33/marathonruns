@@ -33,14 +33,15 @@
  * Nothing here animates except the numbers themselves.
  *
  * Colour carries meaning and nothing else, so it stays a closed set:
- *   accent  the speed engine -- streak, gauge, rail fill. What you are buying.
+ *   accent  the speed engine -- the fuel gauge, the rail fill, tomorrow's
+ *           road. What you are buying, and what you would come back for.
  *   ahead   beating the record.
  *   behind  losing the record.
- *   ink     plain fact -- clock, distance.
+ *   ink     plain fact -- clock, distance, position on the road.
  * A number is never tinted for emphasis alone.
  *
  * Layout rule: the middle of the frame belongs to the road and the next gate.
- * Everything here lives on the edges, and the split card comes in at the side
+ * Everything here lives on the edges, and the aid card comes in at the side
  * rather than across the runner.
  */
 
@@ -215,24 +216,19 @@ html, body {
   padding: 8px 14px 9px;
   min-width: 152px; max-width: 178px;
 }
-/* The count is a sub-line now, not the headline -- it explains the tank above
-   it rather than competing with the pace below. Accent still, because it is
-   the same quantity the gauge draws. */
-#engine #streakVal { font-weight: 700; color: var(--accent); }
+/* The plate is now the tank and one number. The clean count and the
+   required-pace line that used to sit under here were three encodings of the
+   crossing the fill and the tick already draw; hud.js carries the measurement.
+   PACE turning green IS that crossing, which is why it is the survivor. */
 #engine #paceLab { margin-top: 1px; }
 #engine .val { font-size: 27px; font-weight: 500; line-height: 1.05; }
 #engine .val.ahead { color: var(--ahead); }
 #engine .unit { font-size: 11px; font-weight: 700; opacity: 0.6; margin-left: 3px; }
-#engine .sub { font-size: 9px; font-weight: 700; opacity: 0.68; margin-top: 2px; }
-/* The required pace turning red is the moment the record stops being possible;
- * it must not stay dimmed like an aside. */
-#engine .sub.behind { opacity: 1; }
 
-/* Contact flashes the whole plate, not just the number: the cost is the
- * streak and the speed together, and they live in the same box. */
+/* Contact flashes the whole plate, not just the number: the cost is the fuel
+ * and the speed together, and they live in the same box. */
 #engine.broken { border-left-color: var(--behind); background: rgba(58, 14, 32, 0.86); }
-#engine.broken #streakVal,
-#engine.broken .gaugeFill { color: var(--behind); background: var(--behind); }
+#engine.broken .gaugeFill { background: var(--behind); }
 
 .gauge {
   position: relative;
@@ -267,7 +263,13 @@ html, body {
   margin-top: 6px; color: var(--accent);
   transition: opacity 0.3s;
 }
-#why.off { opacity: 0; }
+/* It gives the space back, not just the ink. This line is up for the first two
+ * and a half miles and for two seconds after each contact; for the rest of the
+ * race it was an invisible 18px row holding the bottom of the plate down, and
+ * the plate sits in the top-left corner where the only part of the road that is
+ * still undecided -- 25 to 150 units out -- is competing for about 5% of the
+ * frame. An empty row there is not free. */
+#why.off { opacity: 0; height: 0; margin-top: 0; overflow: hidden; }
 #why.cut { color: var(--behind); }
 
 /* ---- distance, right ---- */
@@ -282,11 +284,11 @@ html, body {
 #dist .unit { font-size: 12px; font-weight: 700; opacity: 0.6; margin-left: 3px; }
 #dist .sub { font-size: 10px; font-weight: 700; opacity: 0.62; margin-top: 3px; }
 
-/* ---- mile split card ----
- * Docked under the left plate instead of thrown across the middle of the
- * screen: a split is worth reading, but never at the price of the gate the
- * player is about to hit. It shows the mile's own time, which is what a
- * runner means by a split. */
+/* ---- aid card ----
+ * Docked under the left plate, never across the middle of the screen. It used
+ * to carry the mile split as well; every fact in that card was already on the
+ * frame it was drawn over (see hud.js), so what is left is the one event
+ * nothing else reports -- fuel going back into the tank. */
 #toast {
   background: var(--ink);
   border-left: 4px solid #fffdf5;
@@ -296,12 +298,8 @@ html, body {
   transition: opacity 0.22s ease-out, transform 0.22s ease-out;
 }
 #toast.show { opacity: 1; transform: none; }
-#toast.noBig #toastRow { display: none; }
 #toast .lab { opacity: 0.85; color: #fffdf5; }
 #toast .big { font-size: 27px; font-weight: 700; line-height: 1.05; }
-#toast .unit { font-size: 11px; font-weight: 700; opacity: 0.6; margin-left: 3px; }
-#toast .small { font-size: 11px; font-weight: 500; margin-top: 1px; }
-#toast .small #toastCum { opacity: 0.8; }
 
 /* ---- progress rail ----
  * You, the ghost, and the road between you. The honest split lives here
@@ -614,14 +612,26 @@ html, body {
   display: flex; align-items: center; flex-wrap: wrap;
   gap: 6px 11px; margin-top: 15px;
 }
+/* EVERY RUNG RENDERS, INCLUDING THE ONES THIS SHEET HAS NOT MET.
+ *
+ * The ladder is derived from RECORD_SECONDS in MR.Tier, not typed, which is
+ * how it survived a pace-curve rebuild without an edit -- and how it grew a
+ * bottom without telling the stylesheet. It runs t0 to t7; these rules stopped
+ * at t4. Measured: a 2:14:30 run (SUB-2:18, t5) and a 2:21:33 run (SUB-2:24,
+ * t6) both rendered `background: rgba(0,0,0,0)` -- a bare word floating where
+ * every faster run gets a solid band. Those are precisely the runs the bottom
+ * of the ladder was added for, and the runs a first-time player produces.
+ *
+ * So the neutral band is the DEFAULT and the rungs that earn a colour override
+ * it. A rung added tomorrow renders correctly the day it is added. */
 #verdict {
   display: inline-block;
   font-size: 13px; font-weight: 700; letter-spacing: 0.12em;
   padding: 6px 13px;
+  background: rgba(255, 253, 245, 0.92); color: #14183a;
 }
 #verdict.t0 { background: var(--ahead); color: #06301c; }
 #verdict.t1, #verdict.t2, #verdict.t3 { background: var(--accent); color: #14183a; }
-#verdict.t4 { background: rgba(255, 253, 245, 0.92); color: #14183a; }
 #tierNext {
   font-size: 11px; font-weight: 500; letter-spacing: 0.09em; opacity: 0.72;
 }
@@ -638,54 +648,6 @@ html, body {
   opacity: 0.62; margin-top: 9px;
 }
 #endMem:empty { display: none; }
-
-/* ONE RHYTHM, TWO GRIDS.
- *
- * These were two independent grids with their own row gaps and their own
- * header padding, which put their baselines about three pixels out of phase
- * -- close enough to read as a rendering fault. They now share --endRow and
- * each opens with exactly one header row, so every line of one sits on the
- * same baseline as the matching line of the other at every breakpoint. */
-#endCols {
-  --endRow: 21px;
-  display: flex; flex-wrap: wrap;
-  /* Fluid, so the two columns stay SIDE BY SIDE on a 360px phone instead of
-   * stacking and leaving half the card empty. At fixed 34/18/16 the pair
-   * measured 338px against 332px of content width and wrapped by six pixels. */
-  gap: 14px clamp(16px, 6vw, 34px);
-  justify-content: flex-start; align-items: flex-start;
-  margin-top: 16px;
-}
-#resultStats, #splitTable {
-  display: grid; align-content: start; align-items: center;
-  row-gap: 0; grid-auto-rows: var(--endRow);
-  font-variant-numeric: tabular-nums;
-}
-#resultStats { grid-template-columns: auto auto; column-gap: clamp(11px, 4.5vw, 18px); }
-#splitTable  { grid-template-columns: auto auto auto; column-gap: clamp(10px, 4vw, 16px); }
-
-#endCols .k {
-  font-size: 9px; font-weight: 500; letter-spacing: 0.16em;
-  text-transform: uppercase; opacity: 0.6;
-}
-/* The header row sits on the bottom of its own row, which buys the table a
- * little air without moving any baseline off the shared grid. */
-#endCols .k.hd {
-  align-self: end; padding-bottom: 3px;
-  letter-spacing: 0.18em; opacity: 0.4;
-}
-#endCols .v { font-size: 13px; font-weight: 700; }
-
-#resultStats .k, #resultStats .v { text-align: left; }
-#splitTable .k, #splitTable .v { text-align: right; }
-#splitTable .v { font-weight: 500; }
-#splitTable .v.fin { font-weight: 700; }
-/* A rule spanning the grid, not a border per cell -- per-cell borders break
- * across the column gaps and read as three dashes. */
-#splitTable .sep {
-  grid-column: 1 / -1; height: 1px; align-self: center;
-  background: rgba(255, 253, 245, 0.25);
-}
 
 /* THE CAUSAL LINE.
  *
@@ -707,9 +669,16 @@ html, body {
   font-weight: 700; letter-spacing: 0.05em;
 }
 
+/* THE NOTES.
+ *
+ * All that is left of a five-row summary and a six-row split table, both of
+ * which said either nothing new or nothing at all -- see hud.js for the
+ * measurements. The turn names one moment in the race; AID TAKEN is the one
+ * row of the old summary that was not arithmetic on a number printed
+ * elsewhere on the same card. Two 11px lines in place of twenty-two cells. */
 #endTurn {
   font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
-  opacity: 0.7; margin-top: 15px;
+  line-height: 1.5; opacity: 0.7; margin-top: 15px;
 }
 #endTurn:empty { display: none; }
 
@@ -781,9 +750,7 @@ html, body {
 
   #leftCol { left: 9px; top: 22px; gap: 7px; }
   #engine { min-width: 124px; max-width: 142px; padding: 6px 11px 7px; }
-  #engine #streakLine { opacity: 0.62; }
   #engine .val { font-size: 21px; }
-  #engine .sub { font-size: 8px; }
   #why { font-size: 8px; margin-top: 4px; }
 
   #dist { right: 9px; top: 22px; min-width: 112px; padding: 6px 11px 7px; }
@@ -792,7 +759,6 @@ html, body {
 
   #toast { min-width: 124px; padding: 6px 11px 7px; }
   #toast .big { font-size: 21px; }
-  #toast .small { font-size: 10px; }
 
   #railWrap { width: 92vw; bottom: calc(10px + env(safe-area-inset-bottom, 0px));
               padding: 7px 11px 6px; }
@@ -823,7 +789,7 @@ html, body {
   #engine { min-width: 190px; max-width: 220px; padding: 10px 17px 12px; }
   #engine .val { font-size: 33px; }
   #engine .unit { font-size: 13px; }
-  #engine .sub, #why { font-size: 11px; }
+  #why { font-size: 11px; }
   .gauge { height: 9px; }
 
   #dist { right: 20px; top: 28px; min-width: 172px; padding: 10px 17px 12px; }
@@ -833,8 +799,6 @@ html, body {
 
   #toast { min-width: 190px; padding: 9px 16px 11px; }
   #toast .big { font-size: 33px; }
-  #toast .unit { font-size: 13px; }
-  #toast .small { font-size: 13px; }
 
   #railWrap { width: min(1000px, 62vw); bottom: 20px; }
   #rail { height: 28px; }
@@ -875,9 +839,6 @@ html, body {
   #tierNext { font-size: 14px; }
   .ebadge { font-size: 11px; padding: 4px 9px; }
   #endMem { font-size: 13px; }
-  #endCols { --endRow: 26px; margin-top: 22px; gap: 18px 46px; }
-  #endCols .k { font-size: 11px; }
-  #endCols .v { font-size: 16px; }
   #endTurn { font-size: 13px; }
   #tomorrow { padding: 12px 16px 13px; }
   #tomorrow .tomRoute { font-size: 16px; }
@@ -899,32 +860,40 @@ html, body {
   .panel .keys { margin-top: 10px; }
   .cta { margin-top: 12px; padding: 10px 26px; }
 
-  /* The finish card has the most to say and the least room to say it in, so
-   * it gives up vertical air first and then the one line it can afford to
-   * lose -- the race-report sentence, which is the only block here that is
-   * colour rather than fact. What survives is the grade, the two headlines,
-   * the tables, the true cost of contact and tomorrow.
+  /* THE LANDSCAPE OVERFLOW IS CLOSED.
    *
-   * It still does not all fit at 844x390: the card runs about 40px past the
-   * fold and scrolls, which is what .canScroll's fade is for. Portrait is the
-   * reference experience and this is the deliberate trade. */
-  .panel { padding: 10px 14px; }
+   * This card used to give up its vertical air, then the race-report sentence
+   * as well, and STILL ran 89px past the fold at 844x390 -- carried on the
+   * roadmap as a known defect traded for portrait. With the five-row summary
+   * and the six-row split table gone the block stack measured 408px against
+   * 390, so the last 18 came out of margins rather than out of content: two
+   * pixels off each gap and a little off the two plates' own padding. The
+   * sentence is back, and landscape now shows the SAME card portrait does.
+   *
+   * Measured on the FULLEST card the game can produce -- two badges and a
+   * best-today line, which is the state a returning player sees, not the bare
+   * first-run card the 89px was measured on. At 844x390 it now fits with room.
+   * Shorter landscape phones (800x360, 740x360) still run about 21px past the
+   * fold, down from roughly 119px, and that last 21 is left to .canScroll's
+   * fade rather than bought by hiding a block: everything still on this card
+   * earned its place, and a card that scrolls one line is a smaller defect
+   * than a card that silently drops the player's best-today comparison. */
+  .panel { padding: 8px 14px; }
   #startMemory { margin-top: 10px; gap: 6px; }
   .mplate { padding: 4px 8px 5px; }
   .mplate .mv { font-size: 15px; }
-  .endDate { margin-bottom: 6px; }
+  .endDate { margin-bottom: 4px; }
   .panel .endBig { font-size: clamp(26px, 6vh, 38px); }
   #endHead { gap: 8px 24px; }
   .endSub { margin-top: 2px; }
-  #tierRow { margin-top: 8px; }
-  #endBadges, #endMem { margin-top: 5px; }
-  #endCols { --endRow: 16px; margin-top: 8px; gap: 8px 24px; }
-  #endCost { margin-top: 8px; }
+  #tierRow { margin-top: 6px; }
+  #endBadges, #endMem { margin-top: 4px; }
+  #endCost { margin-top: 6px; padding-top: 3px; padding-bottom: 3px; }
   #endCost .endBig { font-size: 22px; }
-  #endTurn { display: none; }
-  #tomorrow { margin-top: 8px; padding: 6px 9px 7px; }
+  #endTurn { margin-top: 6px; font-size: 10px; line-height: 1.4; }
+  #tomorrow { margin-top: 6px; padding: 5px 9px 5px; }
   #tomorrow .tomRoute { font-size: 11px; margin-top: 2px; }
-  #endPanel .cta { margin-top: 9px; padding: 10px; }
+  #endPanel .cta { margin-top: 7px; padding: 10px; }
 
   #leftCol { top: 20px; gap: 6px; }
   #engine { padding: 5px 10px 6px; }
@@ -1070,6 +1039,11 @@ MR.K = (function () {
   const START = 330;
   const FAST_SHARE = 0.685;
   const K_FAST = 10, K_SLOW = 100;
+
+  // The chase camera's resting eye, seeded here rather than in camera.js. See
+  // CAM_BASE_Y in the returned object for why.
+  const CAM_BASE_Y = 3.10;
+  const CAM_BASE_BACK = 4.35;
 
   function targetPaceAt(streak) {
     const gap = START - FLOOR_PACE;
@@ -1221,6 +1195,13 @@ MR.K = (function () {
     // faster than that. At the pace floor it is 28.35 u/s and the span is
     // 19.84 units. course.js now derives ACTION_WINDOW from this number rather
     // than restating a stale product of it.
+    //
+    // AND THE PACE FLOOR IS NO LONGER THE FASTEST THE RUNNER EVER MOVES. With
+    // hills the pace at a point is FLOOR_PACE + GRADE_SPM * grade, so on a 4%
+    // descent it is 234 s/mi, the speed is 30.77 u/s and the span is 21.54 --
+    // past the constant window of 21. The window is therefore a function of z
+    // now; see Course.actionWindowAt and Elevation.windowExtra. The margin at
+    // every point is the same 1.16 units it is on the flat, by construction.
     JUMP_TIME: 0.70,
     DUCK_TIME: 0.78,
     INPUT_BUFFER: 0.20,             // late/early press forgiveness
@@ -1280,12 +1261,484 @@ MR.K = (function () {
       return 400;
     })(),
 
+    // ---- hills -----------------------------------------------------------
+    //
+    // GRADE_SPM is the only place the terrain touches the race, and the FORM of
+    // the term is the whole argument for it:
+    //
+    //   paceNow = pace + GRADE_SPM * grade_percent(z)
+    //
+    // ADDITIVE IN SECONDS PER MILE. Total race time is the integral of paceNow
+    // over distance, which is the flat-course integral plus
+    // GRADE_SPM * INTEGRAL(grade dm), and
+    //
+    //   INTEGRAL(g dm) = INTEGRAL((dE/dz) dz) / UNITS_PER_MILE
+    //                  = (E_end - E_start) / UNITS_PER_MILE = 0
+    //
+    // exactly, because every hill in elevation.js is a hump that returns to
+    // zero. So the finish time is unchanged from the flat course for ANY
+    // sequence of gate outcomes and independent of how the pace happened to
+    // vary along the way -- the record needs no recalibration and simulate.js
+    // measures the same numbers it measured before hills existed.
+    //
+    // A multiplicative form (pace * (1 + k*g)) does NOT have this property. It
+    // weights each grade by the pace there, so a climb early would cost more
+    // than the same descent late repays, and the finish would drift with the
+    // player's streak history. Do not "simplify" this into a percentage.
+    //
+    // THE SIZE, 5.0 s/mi per 1% of grade, is a judgement and is the one number
+    // in the hill design chosen rather than derived. At the steepest legal
+    // grade (4%) it is +/-20 s/mi against a streak range of 76 s/mi
+    // (330 -> 254), so the biggest hill on the course moves the pace by about a
+    // quarter of everything a perfect line can ever buy. Real running economy
+    // is 12-15 s/mi per 1% uphill; this is ~40% of that, on purpose, because a
+    // physically honest hill would swamp the mechanic the game is about.
+    // Tuning range 3.0-7.0 -- and moving it does not move the finish time,
+    // which is exactly what the additive form buys.
+    GRADE_SPM: 5.0,
+    // A backstop that provably never fires: elevation.js caps the grade at 4.0%
+    // and 5.0 * 4.0 = 20.0. It exists so that a future retune of GRADE_SPM or
+    // of the grade cap cannot silently produce a negative pace -- but note that
+    // if it ever DID fire the zero-net integral above would stop being exact,
+    // so a clamp that binds is a bug and not a safety net.
+    GRADE_CLAMP: 20.0,
+
+    // THE CHASE CAMERA'S RESTING EYE, AND WHY IT LIVES HERE.
+    //
+    // camera.js owns the framing and always will, but two of its numbers are
+    // now load-bearing outside it: elevation.js derives the sightline cap on
+    // hill shape from the eye height, and it runs headless in tools/ where no
+    // camera exists. Worse, the dependency is silent and quadratic -- the
+    // steepest legal crest goes as the eye height, so a camera drop that nobody
+    // connected to the terrain would make every hill on every course
+    // fractionally too steep to see over.
+    //
+    // So the seed lives here and camera.js reads it. IF YOU ARE RETUNING THE
+    // CAMERA, change CAM_BASE_Y and the hill cap follows automatically -- that
+    // is the point, not a coincidence. Elevation.validate() ray-marches the
+    // result at generation either way and fails the course if it is wrong, so
+    // the coupling is belt and braces rather than a single point of failure.
+    //
+    // 3.10, RAISED FROM 2.62, AND WHAT IT DOES AND DOES NOT BUY.
+    //
+    // The playtest asked "is it moving the camera angle up slightly?" and the
+    // honest answer is: yes for one of the two things hiding the road ahead,
+    // and no for the other. Both were measured before this moved.
+    //
+    // WHAT IT BUYS. Road at distance d sits atan(eye / d) below the horizon, so
+    // for small angles the whole road stretches down the frame IN PROPORTION TO
+    // THE EYE. The band from 25 to 150 units -- everything still undecided --
+    // subtended 4.75 degrees at the live eye of 2.50 and subtends 5.64 at 2.97,
+    // +18.7%, and its share of frame height goes 0.0504 to 0.0599. Measured
+    // over twenty-two frames across a real race at 620x1344, not derived.
+    //
+    // AND IT DOES NOT DO WHAT THE FIRST DRAFT OF THIS COMMENT CLAIMED. It does
+    // not push the already-committed road off the bottom of the frame: that
+    // band grows too, 0.3051 to 0.3579, because the same atan scaling applies
+    // to it. What actually happens is that the road as a whole takes frame from
+    // the sky and the scenery above the horizon, and the future's share of it
+    // rises. The gain is real and it is 19%, not a reapportionment.
+    //
+    // It also ends DUCK-bar occlusion, which is a third of all gates. The bar
+    // spans 1.41 to 1.83, so the sightline over it comes back down to the road
+    // and the only question is where; raising the eye both narrows that shadow
+    // (its depth goes as 0.42 / (eye - target top)) and pushes it out to ratios
+    // the gate spacing no longer produces.
+    //
+    // WHAT IT DOES NOT BUY, and this is why the camera is not the whole fix. A
+    // BLOCK's collision box tops out at 2.80. Clearing it is not a matter of
+    // getting above 2.80: to see a JUMP at 0.80 past a BLOCK halfway to it
+    // needs an eye at 4.80, because the sightline has to come back DOWN to 0.80
+    // by the far gate. 4.80 is a helicopter. The BLOCK case is answered in
+    // course.js by spacing instead -- see readWindowAt -- and this constant was
+    // swept from 2.62 to 4.82 against real courses first, which is how that was
+    // settled rather than argued.
+    //
+    // The cost is small and was measured, not assumed: the runner goes from
+    // 0.2388 of frame height to 0.2330, a 2.4% loss, and his feet drop from
+    // -0.572 to -0.700 -- further down the frame, which is where the Subway
+    // Surfers and Sonic references put theirs.
+    //
+    // WHAT IT AND THE SPACING FLOOR TOGETHER DO TO WHAT THE PLAYER CAN SEE,
+    // over twenty-two frames of a real race, 114 gates before and 110 after:
+    //
+    //   mean share of an upcoming gate visible   76.0%  ->  80.4%
+    //   gates under half visible                 29     ->  24
+    //   gates fully blank                        13     ->   6
+    //
+    // AND THE FIRST VERSION OF THIS COMMENT SAID 86.2%, off ten frames. That
+    // was not a typo, it was too small a sample read as a result: the same
+    // measurement on twenty-two frames is 80.4%, so the ten-frame figure
+    // overstated the gain by more than double. The number that survives is the
+    // one above. Halving the fully-blank gates is the honest headline; the
+    // mean moves 4.4 points, which is real and is not a transformation.
+    CAM_BASE_Y,
+    CAM_BASE_BACK,
+    // What the sightline is actually derived against. The camera drops 0.20 at
+    // race pace, so the honest resting figure is CAM_BASE_Y - 0.20; 0.32 is
+    // taken instead to absorb the stride bob and the landing dip on top of it.
+    HILL_EYE_Y: CAM_BASE_Y - 0.32,
+    HILL_EYE_BACK: CAM_BASE_BACK,
+
     // Hazard kinds
     CLEAR: 0,
     JUMP: 1,                        // low block -- clear it by jumping
     DUCK: 2,                        // overhead bar -- clear it by ducking
     BLOCK: 3,                       // impassable -- must not be in this lane
   };
+})();
+
+/* ==================== src/core/elevation.js ==================== */
+/**
+ * Date-seeded course elevation.
+ *
+ * The race has been flat since the gun. The measured argument for changing
+ * that is not visual: gate cadence is a median 1.16 s with no lull anywhere in
+ * the distribution, and a descent is the only content this game can add that
+ * gives the player a breath inside four minutes WITHOUT thinning the
+ * obstacles. A hill asks for nothing the player was not already doing -- it
+ * changes the pace, the camera's whole vocabulary and the shape of the
+ * horizon, and adds no decision to a distribution with no gap to put one in.
+ *
+ * THE PROFILE
+ *
+ *   E(z) = SUM  h_i * (1 + cos(pi * (z - c_i)/L_i)) / 2     for |z - c_i| <= L_i
+ *
+ * A raised cosine, compactly supported. Grade is dE/dz, positive uphill.
+ *
+ * EVERY HILL IS A HUMP. It starts at zero, rises, and returns to zero, and the
+ * centres are separated so no two ever overlap. That is not decoration, it is
+ * what makes the pace-neutrality proof in pace.js hold for every PREFIX of the
+ * race rather than merely for the whole of it: no hill can leave the runner
+ * higher than it found them, so no sequence of hills compounds into a mountain
+ * and no partial race is out of balance.
+ *
+ * WHY THIS FILE LOADS BEFORE course.js. The airborne span grows on a descent,
+ * so Course.ACTION_WINDOW -- the rule that stops the course demanding a jump
+ * and a slide inside one airborne span -- has to become a function of z. The
+ * generator therefore needs the profile before it places a single gate. See
+ * `windowAt` below and Course.actionWindowAt.
+ *
+ * WHAT IT IS NOT ALLOWED TO TOUCH. `player.y` stays relative to the LOCAL road
+ * surface and elevation is added at render time only, so collision.js keeps
+ * testing y >= 0.84 and duck01 >= 0.90 against a flat zero and every clearance
+ * threshold in the game is untouched. That is the finding this whole feature
+ * rests on and it is why hills are cheap.
+ */
+MR.Elevation = (function () {
+  const K = MR.K;
+
+  // ---- the two caps on hill shape --------------------------------------
+  //
+  // GRADE. hπ/2L <= MAX_GRADE, so h <= (2/pi) * MAX_GRADE * L. 4% is the
+  // ceiling because it is where real marathon hills sit (Boston's Newton hills
+  // are 3-4%) and because it is where GRADE_SPM was calibrated: at 4% the pace
+  // term is exactly K.GRADE_CLAMP, so the clamp in pace.js is a backstop that
+  // provably never fires and the zero-net integral stays exact.
+  //
+  // SIGHTLINE, and this one is the fairness rule. A crest is convex, so it
+  // occludes the road beyond it -- including the lane telegraph mats, which lie
+  // ON the road surface and are the readability device this game is built
+  // around. For an eye h above the road over a crest of curvature c, the
+  // surface stops being visible beyond d = sqrt(2h/c). Requiring d >= SIGHT_MIN
+  // at an eye height of K.HILL_EYE_Y gives c <= 2h/d^2, and a raised cosine's
+  // crest curvature is h*pi^2/(2L^2), so h <= (2/pi^2) * c_max * L^2.
+  //
+  // A hazard hidden over a rise is exactly the fairness bug tools/shoot.js
+  // fails the build for, so it is not enough to derive the cap and assert it:
+  // validate() ray-marches the SUMMED profile and reports the worst visible
+  // distance over the whole course.
+  const MAX_GRADE = 0.040;
+  const SIGHT_MIN = 90;                        // units of road that must stay visible
+  // SIGHT_SAFETY, and it is here because the analytic bound is OPTIMISTIC, not
+  // conservative. The derivation puts the eye directly over the crest; the real
+  // camera is K.HILL_EYE_BACK = 4.35 units behind it and therefore lower down
+  // the near flank, so the true eye height above the crest tangent is less than
+  // K.HILL_EYE_Y. Swept numerically against the real offset, a single hill sat
+  // exactly on the analytic cap measures:
+  //
+  //     L    130    150    180    200    221    240
+  //   d/d_a  1.035  1.013  0.993  0.985  0.979  0.978
+  //
+  // -- so at the crossover (L = 221, where the two rules meet) the analytic cap
+  // overshoots by 2.1%. The design document this was built from records the
+  // opposite ("conservative by 5-10%"), and three courses in a 90-day sweep
+  // failed validate() at 89.7 units because of it. Designing the cap against
+  // SIGHT_MIN / 0.95 puts every measured worst case comfortably clear, and
+  // validate() -- not this constant -- remains the authority.
+  const SIGHT_SAFETY = 0.95;
+  const SIGHT_DESIGN = SIGHT_MIN / SIGHT_SAFETY;
+  const CURV_MAX = 2 * K.HILL_EYE_Y / (SIGHT_DESIGN * SIGHT_DESIGN);
+  const K_GRADE = (2 / Math.PI) * MAX_GRADE;           // 0.02546 * L
+  const K_CURV = (2 / (Math.PI * Math.PI)) * CURV_MAX;  // 1.039e-4 * L^2
+
+  /** The tallest a hill of half-length L may legally be. */
+  function cap(L) { return Math.min(K_GRADE * L, K_CURV * L * L); }
+
+  // Placement, and the range is LONGER than the design asked for because of a
+  // property that only shows up once the numbers are put in.
+  //
+  // Under the sightline cap h = K_CURV * L^2, so the maximum grade of a legal
+  // hill is h*pi/2L = K_CURV*pi*L/2 -- LINEAR IN L. A longer hill is a STEEPER
+  // one, not a gentler one, right up to L = 245 where the 4% grade rule takes
+  // over. The design's 130-240 band therefore tops out at 3.9% and averages
+  // about 2.6%, and 2.6% was measured on screen as a real but modest read: the
+  // horizon moves, the road tilts, and a player would have to be looking for
+  // it. At 4% the same frames are unmistakable -- the climb crops the skyline
+  // out of the top of the frame and the descent opens the whole city up.
+  //
+  // So: 200-300, which puts every hill between 2.7% and the 4% ceiling and
+  // makes each one 400-600 units -- 15-22 s of wall clock, 1.7-2.5 race miles.
+  // Four or five of them cover 35-45% of the race, which is more grade than the
+  // design costed and is the right way round: the descent is the breath, and a
+  // longer descent is a longer breath.
+  const L_MIN = 200, L_MAX = 300;
+  // Fewer, because they are bigger and because the bridge is excluded. The
+  // placement loop gives up gracefully if a day cannot fit them all.
+  const N_MIN = 3, N_MAX = 5;
+  // Clear of the start runway and of the run-in to the tape: the opening should
+  // read calmly and the last gates should be run on the flat.
+  const EDGE_PAD = 200;
+
+  /**
+   * How far ahead the airborne span is allowed to look for a steeper descent.
+   * A jump taken at a gate is in the air for JUMP_TIME, covering a little over
+   * 21 units at the very fastest, so the window has to be sized against the
+   * steepest grade anywhere in the span it covers -- not against the grade at
+   * the gate line, which on the shoulder of a hill is the gentler end of it.
+   */
+  const SPAN_LOOK = 28;
+
+  /**
+   * @param key   date key, the same seed as the course
+   * @param opts  { exclude: [[z0,z1], ...], mandate: [{z, L, h?}] }
+   *              Composition lives in course.js -- which stretch of the race is
+   *              a bridge, and where the wall's spike is -- so it is passed in
+   *              rather than restated here.
+   */
+  function create(key, opts) {
+    opts = opts || {};
+    const rnd = MR.rng.stream(key, 'elevation/v1');
+    const total = K.TOTAL_UNITS;
+    const exclude = opts.exclude || [];
+    const hills = [];
+
+    function blocked(c, L) {
+      if (c - L < EDGE_PAD * 0.5 || c + L > total - EDGE_PAD * 0.5) return true;
+      for (const h of hills) if (Math.abs(c - h.c) < L + h.L) return true;
+      for (const e of exclude) if (c + L > e[0] && c - L < e[1]) return true;
+      return false;
+    }
+
+    // Mandated hills first, so a seeded one can never take their ground.
+    // They are still subject to cap(): a composition note may say WHERE a hill
+    // goes, never how steep it is allowed to be.
+    for (const m of (opts.mandate || [])) {
+      const L = Math.max(L_MIN, Math.min(L_MAX, m.L));
+      const h = Math.min(cap(L), m.h === undefined ? cap(L) * 0.92 : m.h);
+      if (!blocked(m.z, L)) hills.push({ c: m.z, L, h, mandated: true });
+    }
+
+    const want = rnd.int(N_MIN, N_MAX);
+    let guard = 0;
+    while (hills.length < want + (opts.mandate || []).length && guard++ < 400) {
+      const L = rnd.range(L_MIN, L_MAX);
+      const c = rnd.range(EDGE_PAD + L, total - EDGE_PAD - L);
+      if (blocked(c, L)) continue;
+      // 0.82 rather than the design's 0.55 floor: at the bottom of that range
+      // a hill's grade halves and it stops reading at all, which is a hill
+      // that costs the same and delivers nothing.
+      hills.push({ c, L, h: cap(L) * rnd.range(0.82, 1.0), mandated: false });
+    }
+    hills.sort(function (a, b) { return a.c - b.c; });
+
+    // ---- the profile ---------------------------------------------------
+    // A loop over <= 7 compactly-supported terms with one cos. Called five
+    // times a frame by the renderer and once per metre by the validator, so it
+    // is written to be boring rather than clever.
+    function at(z) {
+      let e = 0;
+      for (let i = 0; i < hills.length; i++) {
+        const H = hills[i];
+        const d = z - H.c;
+        if (d <= -H.L || d >= H.L) continue;
+        e += H.h * (1 + Math.cos(Math.PI * d / H.L)) * 0.5;
+      }
+      return e;
+    }
+
+    /** dE/dz. Positive uphill. */
+    function slope(z) {
+      let g = 0;
+      for (let i = 0; i < hills.length; i++) {
+        const H = hills[i];
+        const d = z - H.c;
+        if (d <= -H.L || d >= H.L) continue;
+        g -= H.h * Math.PI / (2 * H.L) * Math.sin(Math.PI * d / H.L);
+      }
+      return g;
+    }
+
+    /** Grade as a PERCENT, which is the unit GRADE_SPM is quoted in. */
+    function gradeAt(z) { return slope(z) * 100; }
+
+    /** -1..1 against the steepest legal grade -- for the runner's trunk. */
+    function gradeNorm(z) {
+      const g = slope(z) / MAX_GRADE;
+      return g < -1 ? -1 : g > 1 ? 1 : g;
+    }
+
+    // ---- the action window, as a function of z -------------------------
+    //
+    // THE ONE INVARIANT HILLS BREAK, and it was already nearly broken before
+    // they existed. course.js requires the airborne span to stay shorter than
+    // ACTION_WINDOW so a jump can never still be in the air at a gate demanding
+    // a slide. At the pace floor that span is 19.84 units against a window of
+    // 21 -- a margin of 1.16 units. A descent makes the runner faster, so the
+    // span grows: at -4% it is 21.54 and the margin is gone.
+    //
+    // The fix is not to slow the descent (2.3 s/mi of headroom kills the
+    // mechanic) and not to shorten JUMP_TIME (that retunes the core jump and
+    // the clearance window). It is to make the invariant a function of z and
+    // let the BFS hold the line by construction, with the SAME absolute margin
+    // everywhere it holds today:
+    //
+    //   window(z) = ACTION_WINDOW + (span at the steepest grade in reach - span on the flat)
+    //
+    // Precomputed at 1-unit resolution with a forward sliding window, so
+    // solvable() -- which runs once per generation attempt over every gate
+    // placed so far -- pays an array index and nothing else.
+    const flatSpeed = (K.UNITS_PER_MILE * K.TIME_SCALE) / K.FLOOR_PACE;
+    const flatSpan = K.JUMP_TIME * flatSpeed;
+    function spanAtGrade(gPct) {
+      const p = K.FLOOR_PACE + K.GRADE_SPM * gPct;
+      return K.JUMP_TIME * (K.UNITS_PER_MILE * K.TIME_SCALE) / p;
+    }
+
+    const N = Math.ceil(total) + SPAN_LOOK + 2;
+    const gradeTab = new Float64Array(N);
+    for (let i = 0; i < N; i++) gradeTab[i] = gradeAt(i);
+    const winTab = new Float64Array(N);
+    {
+      // Steepest DESCENT (most negative grade) anywhere in [i, i+SPAN_LOOK].
+      // A monotone deque would be asymptotically nicer; at 6300 x 28 this is
+      // 180k comparisons once per course and not worth the machinery.
+      let extra = 0;
+      for (let i = 0; i < N; i++) {
+        let g = 0;
+        const end = Math.min(N - 1, i + SPAN_LOOK);
+        for (let j = i; j <= end; j++) if (gradeTab[j] < g) g = gradeTab[j];
+        extra = Math.max(0, spanAtGrade(g) - flatSpan);
+        winTab[i] = extra;
+      }
+    }
+    /** Extra units of action window owed to the descent at z. Never negative. */
+    function windowExtra(z) {
+      const i = z <= 0 ? 0 : z >= N - 1 ? N - 1 : Math.floor(z);
+      return winTab[i];
+    }
+
+    // ---- the proof -----------------------------------------------------
+    /**
+     * THE SIGHTLINE SWEEP, and it must be proved rather than asserted.
+     *
+     * The per-hill cap plus non-overlap makes the whole profile's curvature
+     * equal the per-hill curvature, so the analytic bound ought to hold. It is
+     * ray-marched anyway, at 1-unit steps over all 6293 units, against the real
+     * camera offset -- because "a hazard the player could not see" is the one
+     * class of defect this project already fails a build for, and a crest is a
+     * new way to produce it.
+     *
+     * From an eye K.HILL_EYE_Y above the road at z - K.HILL_EYE_BACK, walk
+     * forward tracking the maximum slope seen so far. A surface point is
+     * visible exactly when the line to it clears everything nearer, i.e. when
+     * its own slope from the eye is not below that running maximum.
+     */
+    function validate() {
+      const NEAR = K.HILL_EYE_BACK;
+      const H = K.HILL_EYE_Y;
+      const STEP = 0.5;                  // sample pitch, in units, both loops
+      // Precomputed so the sweep is array lookups rather than ~8M cosines.
+      // Runs at generation, exactly like the BFS, so it costs once per course.
+      const lo = -Math.ceil(NEAR / STEP) - 2;
+      const hi = Math.ceil((total + SIGHT_MIN + NEAR) / STEP) + 2;
+      const tab = new Float64Array(hi - lo + 1);
+      for (let i = lo; i <= hi; i++) tab[i - lo] = at(i * STEP);
+      const E = function (i) { return tab[i - lo]; };
+
+      let worst = Infinity, worstZ = 0;
+      const REACH = Math.ceil((SIGHT_MIN + NEAR) / STEP);
+      for (let zi = 0; zi * STEP <= total; zi++) {
+        const ei = zi - Math.round(NEAR / STEP);
+        const ey = E(ei) + H;
+        let maxSlope = -Infinity;
+        let vis = SIGHT_MIN;
+        for (let k = 1; k <= REACH; k++) {
+          const d = k * STEP;
+          const s = (E(ei + k) - ey) / d;
+          if (s < maxSlope - 1e-12) { vis = d - NEAR; break; }
+          if (s > maxSlope) maxSlope = s;
+        }
+        if (vis < worst) { worst = vis; worstZ = zi * STEP; }
+      }
+      const ok = worst >= SIGHT_MIN;
+      return {
+        ok, worst, worstZ, hills: hills.length,
+        errors: ok ? [] : [`sightline ${worst.toFixed(1)}u at z=${worstZ.toFixed(0)}`
+          + ` -- under the ${SIGHT_MIN}u minimum`],
+      };
+    }
+
+    /** Reported by tools, not used by the game. */
+    function summary() {
+      let up = 0, dn = 0, covered = 0, gmax = 0;
+      for (const h of hills) {
+        covered += 2 * h.L;
+        gmax = Math.max(gmax, h.h * Math.PI / (2 * h.L) * 100);
+      }
+      for (let z = 0; z < total; z++) {
+        const g = gradeTab[z];
+        if (g > 0.5) up++; else if (g < -0.5) dn++;
+      }
+      return {
+        hills: hills.map(function (h) {
+          return {
+            c: +h.c.toFixed(0), L: +h.L.toFixed(0), h: +h.h.toFixed(2),
+            grade: +(h.h * Math.PI / (2 * h.L) * 100).toFixed(2),
+            mandated: !!h.mandated,
+          };
+        }),
+        maxGrade: +gmax.toFixed(2),
+        coverage: +(covered / total).toFixed(3),
+        upUnits: up, downUnits: dn,
+        netRise: +at(total).toFixed(6),
+      };
+    }
+
+    return {
+      key, hills, at, slope, gradeAt, gradeNorm, windowExtra,
+      validate, summary, cap, MAX_GRADE, SIGHT_MIN,
+    };
+  }
+
+  /**
+   * A flat profile. Anything that has to work without a course -- an early
+   * frame, a tool that only loaded pace.js -- gets this rather than a null
+   * check at every call site.
+   */
+  const FLAT = {
+    key: null, hills: [],
+    at: function () { return 0; },
+    slope: function () { return 0; },
+    gradeAt: function () { return 0; },
+    gradeNorm: function () { return 0; },
+    windowExtra: function () { return 0; },
+    validate: function () { return { ok: true, worst: Infinity, worstZ: 0, hills: 0, errors: [] }; },
+    summary: function () { return { hills: [], maxGrade: 0, coverage: 0, upUnits: 0, downUnits: 0, netRise: 0 }; },
+    cap, MAX_GRADE, SIGHT_MIN,
+  };
+
+  return { create, cap, FLAT, MAX_GRADE, SIGHT_MIN, L_MIN, L_MAX };
 })();
 
 /* ==================== src/core/pace.js ==================== */
@@ -1316,7 +1769,24 @@ MR.Pace = (function () {
       + gap * (1 - K.STREAK_FAST_SHARE) * Math.exp(-streak / K.STREAK_SLOW);
   }
 
-  function create() {
+  /**
+   * @param elev  an MR.Elevation profile, or nothing for a flat course.
+   *
+   * THE GRADE TERM IS ADDITIVE IN SECONDS PER MILE AND THAT IS THE WHOLE
+   * ARGUMENT. See K.GRADE_SPM: because every hill returns to zero, the grade
+   * contribution to the finish integrates to exactly zero over the race, so a
+   * hilly course finishes in the same time as a flat one for any sequence of
+   * gate outcomes. Nothing here needs recalibrating and neither does the
+   * record.
+   *
+   * Three things deliberately do NOT read it -- projected(), projectClean() and
+   * needPace() all keep using `s.pace`. That is correct rather than an
+   * oversight: the grade term integrates to zero, so a projection that included
+   * it would swing wildly on every crest and be wrong, and needPace() > FLOOR
+   * remains a valid bound on the AVERAGE.
+   */
+  function create(elev) {
+    const E = elev || (MR.Elevation ? MR.Elevation.FLAT : null);
     const s = {
       raceTime: 0,          // seconds of simulated race time
       realTime: 0,          // seconds of wall clock since the gun
@@ -1324,7 +1794,13 @@ MR.Pace = (function () {
       units: 0,             // world units travelled
       streak: 0,
       bestStreak: 0,
-      pace: K.START_PACE,   // seconds per mile, instantaneous
+      pace: K.START_PACE,   // seconds per mile, instantaneous, GRADE-FREE
+      // The pace the ground is actually being covered at: `pace` plus the
+      // grade term. This is what the world scrolls at and what the HUD's pace
+      // number reads; `pace` is the engine, and the speed gauge stays on it so
+      // a descent cannot light up the top-gear flourish.
+      paceNow: K.START_PACE,
+      grade: 0,             // percent, positive uphill, at the runner
       hits: 0,
       gatesSeen: 0,
       aid: 0,
@@ -1348,7 +1824,13 @@ MR.Pace = (function () {
       const step = K.PACE_EASE * dRace;
       s.pace += Math.abs(d) <= step ? d : Math.sign(d) * step;
 
-      const dMiles = dRace / s.pace;
+      // The hill. Sampled at the runner's own z, which is s.units.
+      s.grade = E ? E.gradeAt(s.units) : 0;
+      const gt = K.GRADE_SPM * s.grade;
+      s.paceNow = s.pace + (gt < -K.GRADE_CLAMP ? -K.GRADE_CLAMP
+        : gt > K.GRADE_CLAMP ? K.GRADE_CLAMP : gt);
+
+      const dMiles = dRace / s.paceNow;
       s.miles += dMiles;
 
       // Mile splits.
@@ -1360,7 +1842,10 @@ MR.Pace = (function () {
       if (s.miles >= K.MARATHON_MILES) {
         const over = s.miles - K.MARATHON_MILES;
         s.miles = K.MARATHON_MILES;
-        s.raceTime -= over * s.pace;   // trim the overshoot for an exact finish
+        // Trim the overshoot for an exact finish. paceNow, not pace: this
+        // undoes distance that was covered at the local pace, and the last
+        // hill ends 200 units before the tape so the two are equal anyway.
+        s.raceTime -= over * s.paceNow;
         s.finished = true;
         s.finishTime = s.raceTime;
       }
@@ -1423,8 +1908,26 @@ MR.Pace = (function () {
       return s.miles > 1.5 ? s.gatesSeen / s.miles : 6.7;
     };
 
-    /** World units per real second at the current pace. */
+    /**
+     * World units per real second, INCLUDING the grade. This is the honest
+     * ground speed: it drives the world scroll, the runner's cadence and the
+     * camera's framing, all of which should quicken on a descent.
+     */
     s.speed = function () {
+      return (K.UNITS_PER_MILE * K.TIME_SCALE) / s.paceNow;
+    };
+
+    /**
+     * World units per real second at the STREAK's pace, ignoring the hill.
+     *
+     * Splitting these is not fussiness. The camera's top-gear latch fires at
+     * sp01 > 0.93 and brings a one-shot flourish and a permanent rumble with
+     * it, and the HUD's speed gauge is the engine readout. Without this a steep
+     * descent would fire both spuriously -- the game would tell the player they
+     * had found another gear when all they had done was point downhill, which
+     * is exactly the kind of thing that ships as a bug.
+     */
+    s.streakSpeed = function () {
       return (K.UNITS_PER_MILE * K.TIME_SCALE) / s.pace;
     };
 
@@ -1596,6 +2099,113 @@ MR.Course = (function () {
   // constraint seen from both ends.
   const MAX_SPEED = (K.UNITS_PER_MILE * K.TIME_SCALE) / K.FLOOR_PACE;
   const ACTION_WINDOW = Math.ceil(K.JUMP_TIME * MAX_SPEED) + 1;
+
+  /**
+   * ...and the pace floor stopped being the fastest the runner ever moves the
+   * day hills landed.
+   *
+   * With a grade term the local top speed is (UNITS_PER_MILE * TIME_SCALE) /
+   * (FLOOR_PACE + GRADE_SPM * grade), so on the steepest legal descent the
+   * airborne span is 21.54 units against a constant window of 21. The margin
+   * is not merely thin, it is negative -- so the window becomes a function of
+   * z and the BFS proof holds BY CONSTRUCTION rather than by luck.
+   *
+   * `Elevation.windowExtra(z)` is the extra span the steepest descent within
+   * one airborne reach of z would buy, so this preserves the SAME 1.16-unit
+   * absolute margin the flat course has today at every point of the profile.
+   * On the steepest descent the solver demands ~22.7 units between conflicting
+   * gates instead of 21 -- an 8% loosening of the tightest spacing, invisible
+   * in play.
+   *
+   * This is what forces the elevation to be generated BEFORE the gates in
+   * generate() below. Elevation reads nothing from the course, so there is no
+   * cycle -- but the ordering is load-bearing and not incidental.
+   */
+  function actionWindowAt(z, elev) {
+    return ACTION_WINDOW + (elev ? elev.windowExtra(z) : 0);
+  }
+
+  /**
+   * ---- THE SECOND REASON GATE SPACING HAS A FLOOR -------------------------
+   *
+   * ACTION_WINDOW is the floor the ARM needs: two conflicting gates closer than
+   * one airborne span would demand being in the air and on the ground at once.
+   * That rule has been enforced from both ends since the generator was written.
+   *
+   * The EYE needs a floor too, and nobody had written it down. A hazard is a
+   * solid object standing in the lane, so while it is in front of the lens it
+   * hides whatever is behind it in that lane -- and the shipped camera makes
+   * that absolute rather than approximate for one of the three kinds:
+   * Collision.BOX puts a BLOCK's top at 2.80 and the resting eye, K.CAM_BASE_Y,
+   * at 2.62. The sightline over a BLOCK never comes back down to the road, so a
+   * hazard behind one in the same lane is not merely dim, it is at zero, at
+   * every distance and every camera height the framing can afford. (Raising the
+   * eye to clear it takes 4.8 units, which is a helicopter, not a chase camera.
+   * That was measured before this was written.)
+   *
+   * So the only thing that gives the read back is passing the occluder. The
+   * near gate leaves the lens once the eye has travelled its own distance, and
+   * at that instant the far gate is (z_far - z_near) in front of the lens. For
+   * the player to still have a full action window to answer it:
+   *
+   *     z_far - z_near  >=  actionWindow + K.CAM_BASE_BACK
+   *
+   * -- the chase distance is in there because the LENS is what does the seeing
+   * and it sits K.CAM_BASE_BACK behind the runner the window is measured for.
+   *
+   * That is 25.35 units against an action floor of 21, so it binds only on the
+   * tightest spacings the difficulty curve asks for, which is precisely where
+   * the complaint came from: "when there are so many obstacles back to back it
+   * makes it a tad tough to see what's ahead of you." Holding it makes gaps
+   * BETWEEN gates always wider than the read window, so no gate can ever be the
+   * tight occluder of another, and tools/shoot.js's BLANKS assertion passes by
+   * construction rather than by luck -- the same bargain solvable() and
+   * Elevation.validate() already make with their own invariants.
+   *
+   * It costs about 5% of the gates on a course and nothing at all in finish
+   * time; see tools/simulate.js, which is unchanged to the second by it because
+   * pace integrates over distance and not over gates.
+   */
+  function readWindowAt(z, elev) {
+    return actionWindowAt(z, elev) + K.CAM_BASE_BACK;
+  }
+
+  /**
+   * The deepest hazard collision box, as a half-depth.
+   *
+   * This is Collision.BOX[K.BLOCK].halfZ and it is written twice, which is a
+   * thing this file otherwise refuses to do. The reason: collision.js loads
+   * AFTER this one, and course generation also runs headless in tools/
+   * course-test.js and tools/simulate.js, where collision.js is not loaded at
+   * all. Reading MR.Collision from here would work in the browser and crash
+   * both proofs.
+   *
+   * So it is duplicated and then GUARDED: tools/shoot.js compares this against
+   * the real MR.Collision.BOX in the live page and fails the build if they ever
+   * disagree. A number nobody checks is how the last four corrections in this
+   * project started.
+   */
+  const HAZARD_HALF_Z = 0.65;
+
+  /**
+   * How far a gate's geometry reaches FORWARD of its own gate line, in units.
+   *
+   * A hazard is not a plane at z, it is a box, and a BLOCK train is a long one:
+   * world.js builds it with span = 1 + train * 0.9 gate-spans and a rear face at
+   * halfZ * (2 * span - 1), which is 5.33 units at the longest train. That
+   * matters here for one reason only -- the sightline argument in readWindowAt
+   * turns on WHEN THE OCCLUDER LEAVES THE LENS, and a box leaves the lens when
+   * its REAR face passes it, not when its gate line does. Measuring gate line to
+   * gate line credits a train with clearing the shot up to five units early,
+   * which is 21% of the window it is being checked against.
+   *
+   * The first draft of this fix did exactly that, and it made the assertion pass.
+   */
+  function reachOf(train) {
+    const span = train ? 1 + train * 0.9 : 1;
+    return HAZARD_HALF_Z * (2 * span - 1);
+  }
+
   const START_GRACE = 150;   // clean runway so the first seconds read calmly
   // Clean straight into the tape. It was 190 units -- 0.80 of a mile, about
   // seven seconds at race pace -- and combined with the difficulty ramp's
@@ -1731,7 +2341,7 @@ MR.Course = (function () {
     return Math.min(1, base * 0.86 + wall + home);
   }
 
-  function spacingAt(f, rnd) {
+  function spacingAt(f, rnd, z, elev, train) {
     const d = difficulty(f);
     // 44 units early, tightening as difficulty rises. The floor is
     // ACTION_WINDOW itself rather than a number chosen to sit near it: the
@@ -1741,7 +2351,24 @@ MR.Course = (function () {
     // retune of the jump arc or the pace floor moves both ends of the same
     // constraint at once, instead of moving one and leaving the other stale.
     const mean = 44 - 23 * d;
-    return Math.max(ACTION_WINDOW, mean * rnd.range(0.84, 1.16));
+    // The floor is the SAME call the solver makes, evaluated at the same z, so
+    // a descent widens the generator's tightest spacing and the proof's window
+    // together. Moving one without the other is how this invariant went stale
+    // the first time.
+    //
+    // ...and it is readWindowAt, not actionWindowAt, because the floor answers
+    // to the eye as well as to the arm and the eye asks for more. See the
+    // derivation on readWindowAt. This is still the solver's own call with a
+    // constant added, so a retune of the jump arc, the pace floor or the terrain
+    // still moves both ends of the constraint together.
+    //
+    // reachOf(train) is the gate BEHIND this gap -- how far its geometry sticks
+    // forward past its own gate line. The eye is clear of it only once its rear
+    // face has gone by, so the gap it owes the next gate is measured from there.
+    // A standing hazard costs 0.65 of this; a four-span BLOCK train costs 5.33,
+    // and pays it rather than being waved through on its gate line.
+    return Math.max(readWindowAt(z, elev) + reachOf(train),
+                    mean * rnd.range(0.84, 1.16));
   }
 
   /** Hazard mix widens as difficulty rises. */
@@ -1988,7 +2615,48 @@ MR.Course = (function () {
     return items;
   }
 
+  /**
+   * Where the hills may not go, and where one is mandated.
+   *
+   * COMPOSITION LIVES HERE, not in elevation.js, because this file is the one
+   * that knows what shape a race is: where the bridge is and where the wall is.
+   *
+   * THE BRIDGE. `deckLift` in world.js turns the ground plane into water across
+   * the BRIDGE biome and 190 units either side of it. A seeded hill there would
+   * arch the river with the road, so the whole span is excluded and the leg
+   * over the water stays flat -- which is also what a real bridge deck is.
+   *
+   * THE WALL. difficulty() puts a Gaussian spike at f = 0.763, and measured on
+   * two dates that band carries 35-36 gates against only 2 aid items. A hill
+   * crested at the centre of it makes the player CLIMB INTO the density peak
+   * and DESCEND OUT of it. The two reinforce rather than compete: the grade
+   * changes no gate's difficulty, because clearance is measured against the
+   * local road -- and uphill buys reaction time while downhill spends it, so at
+   * +4% the 1.16 s gate interval goes to 1.24 and at -4% to 1.09. The hardest
+   * stretch of the course is therefore also, very slightly, the most forgiving
+   * one to react in, and the reward for cresting it has teeth.
+   */
+  function elevationPlan() {
+    const bridge = BIOMES.find(function (b) { return b.name === 'THE BRIDGE'; });
+    const after = BIOMES[BIOMES.indexOf(bridge) + 1];
+    const PAD = 230;   // the water ramp, plus a little
+    return {
+      exclude: [[bridge.from * K.TOTAL_UNITS - PAD, after.from * K.TOTAL_UNITS + PAD]],
+      // L = 280 is chosen to match the spike rather than to look good: the
+      // Gaussian has sigma 0.055, so the wall band is roughly z 4460-5140 and a
+      // hill of this half-length spans 4521-5081. The climb and the density
+      // peak arrive together and the descent lands exactly as the gates thin.
+      mandate: [{ z: 0.763 * K.TOTAL_UNITS, L: 280 }],
+    };
+  }
+
   function generate(key) {
+    // ELEVATION FIRST, AND THE ORDER IS THE POINT. actionWindowAt() reads the
+    // profile, spacingAt() and solvable() both read actionWindowAt(), and the
+    // generator calls both on every gate -- so the ground has to exist before
+    // the first gate is placed. Elevation reads nothing back from the course.
+    const elevation = MR.Elevation.create(key, elevationPlan());
+
     const rnd = MR.rng.stream(key, 'course/v1');
     const gates = [];
 
@@ -2013,7 +2681,7 @@ MR.Course = (function () {
         if (cand.every((l) => l === K.BLOCK)) continue;
 
         const trial = gates.concat([{ z, lanes: cand, f }]);
-        if (solvable(trial)) { lanes = cand; break; }
+        if (solvable(trial, elevation)) { lanes = cand; break; }
       }
       if (!lanes) {
         // Degrade to a guaranteed-safe gate rather than emit something unfair.
@@ -2034,7 +2702,9 @@ MR.Course = (function () {
       }
 
       gates.push({ z, lanes, f, train: span });
-      z += spacingAt(f, rnd);
+      // The span goes in because the gap after a gate is owed by the geometry of
+      // THAT gate, and a train's is five units longer than its gate line says.
+      z += spacingAt(f, rnd, z, elevation, span);
     }
 
     const mileMarkers = [];
@@ -2042,7 +2712,8 @@ MR.Course = (function () {
     mileMarkers.push({ mile: K.MARATHON_MILES, z: K.TOTAL_UNITS, finish: true });
 
     const aid = generateAid(key, gates);
-    const course = { key, gates, aid, mileMarkers, biomes: BIOMES, length: K.TOTAL_UNITS };
+    const course = { key, gates, aid, mileMarkers, biomes: BIOMES, length: K.TOTAL_UNITS,
+                     elevation };
 
     // This date's places, in the order they will be run through. Carried
     // ALONGSIDE `biomes` rather than replacing it: `biomes` describes the shape
@@ -2067,7 +2738,7 @@ MR.Course = (function () {
    * conflicts are rejected: two gates closer than ACTION_WINDOW may not demand
    * a jump and a duck back to back on the chosen path.
    */
-  function solvable(gates) {
+  function solvable(gates, elev) {
     if (!gates.length) return true;
     // state: set of (lane, lastAction, lastActionZ) -- collapse by lane+action.
     let states = [];
@@ -2081,11 +2752,16 @@ MR.Course = (function () {
         for (let l = 0; l < 3; l++) {
           const h = g.lanes[l];
           if (h === K.BLOCK) continue;
-          // Conflicting actions inside one window are unplayable.
-          if (h !== K.CLEAR && s.act !== K.CLEAR && h !== s.act && g.z - s.z < ACTION_WINDOW) continue;
+          // Conflicting actions inside one window are unplayable. The window is
+          // measured at the EARLIER gate, which is where the action was
+          // committed and therefore where the airborne span starts; the profile
+          // already looked one airborne reach forward from there when it built
+          // the table. See actionWindowAt.
+          if (h !== K.CLEAR && s.act !== K.CLEAR && h !== s.act
+            && g.z - s.z < actionWindowAt(s.z, elev)) continue;
           const act = h === K.CLEAR ? s.act : h;
           const az = h === K.CLEAR ? s.z : g.z;
-          const tag = l + ':' + act + ':' + (g.z - az < ACTION_WINDOW ? 1 : 0);
+          const tag = l + ':' + act + ':' + (g.z - az < actionWindowAt(az, elev) ? 1 : 0);
           if (seen.has(tag)) continue;
           seen.add(tag);
           next.push({ lane: l, act, z: az });
@@ -2100,17 +2776,50 @@ MR.Course = (function () {
   function validate(course) {
     const errors = [];
     const g = course.gates;
+    const elev = course.elevation;
     for (let i = 0; i < g.length; i++) {
       if (g[i].lanes.every((l) => l === K.BLOCK)) errors.push(`gate ${i}: all lanes blocked`);
       if (i > 0 && g[i].z <= g[i - 1].z) errors.push(`gate ${i}: not ordered in z`);
       if (i > 0 && g[i].z - g[i - 1].z < 18) errors.push(`gate ${i}: spacing ${(g[i].z - g[i - 1].z).toFixed(1)} too tight`);
+      // THE SIGHTLINE FLOOR, PROVED RATHER THAN TRUSTED.
+      //
+      // spacingAt() enforces this when it lays the gates down; this checks the
+      // finished course, so course-test.js re-proves it on 90 days of real
+      // courses every run rather than leaving it to the seven frames
+      // tools/shoot.js happens to capture. Same bargain as solvable(): the
+      // generator makes it true, validate() refuses to ship a course where it
+      // is not. See readWindowAt for why the number is what it is.
+      //
+      // The epsilon is float slop only -- spacingAt returns this quantity
+      // exactly when the floor binds, which late in a course is most gates.
+      if (i > 0) {
+        const need = readWindowAt(g[i - 1].z, elev) + reachOf(g[i - 1].train);
+        if (g[i].z - g[i - 1].z < need - 1e-9) {
+          errors.push(`gate ${i}: ${(g[i].z - g[i - 1].z).toFixed(2)} behind gate ${i - 1} `
+            + `needs ${need.toFixed(2)} to stay readable past it`);
+        }
+      }
     }
-    if (!solvable(g)) errors.push('course has no solvable lane path');
+    if (!solvable(g, elev)) errors.push('course has no solvable lane path');
+    // The sightline sweep. A profile that hides the road beyond a crest hides
+    // the lane telegraph mats with it, which is the same class of failure
+    // tools/shoot.js fails a build for when a prop occludes a hazard -- so it
+    // is a course validation error, not a rendering note.
+    if (elev) {
+      const e = elev.validate();
+      if (!e.ok) for (const m of e.errors) errors.push('elevation: ' + m);
+    }
     return { ok: errors.length === 0, errors, gates: g.length };
   }
 
   return { generate, generateAid, validate, solvable, biomeAt, difficulty,
-           BIOMES, SETTINGS, pickSettings, ACTION_WINDOW };
+           BIOMES, SETTINGS, pickSettings, ACTION_WINDOW, actionWindowAt,
+           // Exported so tools/shoot.js reads the read window from the file
+           // that enforces it instead of recomputing the same sum. The two
+           // cannot drift, which is the whole point of the invariant.
+           READ_NEAR: ACTION_WINDOW + K.CAM_BASE_BACK, readWindowAt,
+           HAZARD_HALF_Z, reachOf,
+           elevationPlan };
 })();
 
 /* ==================== src/core/store.js ==================== */
@@ -3561,6 +4270,12 @@ MR.Runner = (function () {
   // what the reference shows and, once the trail foot stopped digging (see the
   // hip term), what the road clamp is finally free to allow.
   const SLIDE_RECLINE = 1.34;
+
+  // Trunk pitch on a grade, in radians at the steepest legal one (4%). A
+  // climber leans into the hill and a descender sits back off it; the descent
+  // gets half the angle because it is a controlled fall rather than an effort.
+  const GRADE_PITCH_UP = 6 * Math.PI / 180;
+  const GRADE_PITCH_DOWN = 3 * Math.PI / 180;
 
   // ---- the slide's head --------------------------------------------------
   // The other half of the same problem, and the half three passes got exactly
@@ -5445,6 +6160,11 @@ MR.Runner = (function () {
       // forward pitch) do not collapse into the same animation.
       const trip = st.trip || 0;
       const knock = st.bounce || 0;
+      // The road's grade at the runner, -1..1 against the steepest legal one.
+      // It is the ONLY thing hills hand this file: the stride slows on the
+      // climb and quickens on the descent for nothing, because cadence already
+      // falls out of `speed`, and `speed` is grade-inclusive.
+      const grade = st.grade || 0;
 
       // ghost.js re-materials every mesh under this rig to draw the record
       // runner as one translucent body. That is right for limbs and wrong for
@@ -5687,9 +6407,17 @@ MR.Runner = (function () {
       // the head at the front of the figure, closest to the thing it was
       // trying to get under, and that is exactly what the playtest read as
       // "diving into it".
+      // Hills, one bone. A climber leans into the hill from the ankles and a
+      // descender sits back off it, and the two are not symmetrical -- the
+      // climb is a whole-body effort and the descent is a controlled fall, so
+      // it gets half the angle. +6 degrees at the steepest legal climb, -3 at
+      // the steepest descent, and both fold away in a slide with everything
+      // else. Pure feel; nothing depends on the numbers.
+      const gradePitch = grade > 0 ? grade * GRADE_PITCH_UP : grade * GRADE_PITCH_DOWN;
       const leanFwd = (0.26 + 0.12 * sp01 + stumble * 0.5) * (1 - slid * 0.94)
         - spread * 0.30
-        - slid * SLIDE_RECLINE;
+        - slid * SLIDE_RECLINE
+        + gradePitch * (1 - slid * 0.94) * (1 - spread);
       spine.rotation.x = leanFwd + trip * 0.46;
       // Slide the whole torso BACK along the direction of travel, not just
       // recline it.
@@ -9271,6 +9999,32 @@ MR.World = (function () {
 
   function create(course) {
     const group = new THREE.Group();
+
+    /**
+     * ============ THE HILL, AND WHERE IT IS ALLOWED TO SHOW UP ============
+     *
+     * `EL` is the course's own elevation profile (core/elevation.js). Two rules
+     * govern every use of it in this file and they are worth stating once here
+     * rather than at thirty call sites:
+     *
+     *   1. IT IS A RENDER-TIME OFFSET AND NOTHING ELSE. The simulation places
+     *      the player, the hazards and the aid at y = 0 relative to the LOCAL
+     *      road surface, and collision.js tests its clearances against that
+     *      flat zero. So elevation is added when a thing is drawn, never when
+     *      it is decided. Every clearance threshold in the game is untouched.
+     *
+     *   2. IT IS APPLIED AT THE CLAIM, NOT AT THE PARTS. A pooled object is
+     *      claimed once and then sits still for two hundred units, so its lift
+     *      is written where its z is written -- at the six activeX.push sites
+     *      below -- rather than at the ~30 individual position.set calls inside
+     *      them. One line each, and a missed site is then impossible.
+     *
+     * `eAt` is hot: five or six calls a frame from the update loop plus one per
+     * ground row. It is a loop over at most seven compactly-supported terms
+     * with a single cos, about 200 ns.
+     */
+    const EL = course.elevation || MR.Elevation.FLAT;
+    const eAt = EL.at;
     // v4: the prop lottery gained a 'walkers' entry, which moves every draw
     // after the first and so re-rolls the whole layout. Naming that is cheaper
     // than wondering later why a day's scenery moved. (v3 was the pass that
@@ -9427,15 +10181,73 @@ MR.World = (function () {
     // finite plane can stand in for an infinite one, and it sits below the
     // road surface so the road always wins the depth test. On the bridge it
     // drops away and becomes the river.
+    //
+    // IT IS THE ONE THING HILLS COST GEOMETRY. Left as the single quad it was,
+    // it would slice straight across the descending road at every crest and
+    // hide it -- a flat sheet through a curved surface, with the horizon drawn
+    // on the wrong side of the road the player is about to run down. So it is
+    // cut into strips along z and each strip's row is displaced to E(z) every
+    // frame.
+    //
+    // The pitch is not uniform, because the eye's need for it is not. Four
+    // units through the band the fog lets the player see (fog is opaque at 235,
+    // and nothing spawns past VIEW = 210) puts the worst tangent kink at
+    // c * 4 = 5.7e-4 * 4 = 0.0023 rad = 0.13 degrees, which is beneath
+    // anything; beyond it the rows coarsen hard because a strip out at 500
+    // units is behind an opaque wall of fog. 113 rows, 226 triangles, one draw
+    // -- the same mesh, the same material, the same everything else.
+    const GROUND_ROWS = (function () {
+      const rows = [];
+      for (let z = -700; z < -100; z += 100) rows.push(z);
+      for (let z = -100; z <= 264; z += 4) rows.push(z);
+      for (let z = 300; z <= 700; z += 50) rows.push(z);
+      return rows;
+    })();
     const groundMat = S.toon(P.ground, 2);
     groundMat.map = groundTex;
     mats.shoulder.map = vergeTex;
     mats.road.map = roadTex;
     mats.road.vertexColors = true;
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(1400, 1400), groundMat);
-    ground.rotation.x = -Math.PI / 2;
+    const groundGeo = (function () {
+      const g = new THREE.BufferGeometry();
+      const n = GROUND_ROWS.length;
+      const pos = new Float32Array(n * 2 * 3);
+      const uv = new Float32Array(n * 2 * 2);
+      const idx = [];
+      // Laid flat in XZ with y as height, rather than a PlaneGeometry turned on
+      // its side: a row displacement is then one write to .y instead of a
+      // rotation to reason about. UVs reproduce the old plane's 0..1 across
+      // 1400 units, so groundTex.repeat(48, 48) tiles exactly as before.
+      for (let i = 0; i < n; i++) {
+        const zz = GROUND_ROWS[i];
+        pos[i * 6] = -700; pos[i * 6 + 2] = zz;
+        pos[i * 6 + 3] = 700; pos[i * 6 + 5] = zz;
+        uv[i * 4] = 0; uv[i * 4 + 1] = (zz + 700) / 1400;
+        uv[i * 4 + 2] = 1; uv[i * 4 + 3] = (zz + 700) / 1400;
+        if (i) {
+          const a = (i - 1) * 2, b = a + 1, c = i * 2, d = c + 1;
+          idx.push(a, c, d, a, d, b);
+        }
+      }
+      g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+      g.setIndex(idx);
+      // Normals are computed ONCE, flat and upward, and are deliberately never
+      // recomputed as the rows move. A 4% grade turns the true normal by 2.3
+      // degrees, which is nothing in a smooth renderer and is not nothing here:
+      // the toon ramp is banded, so a normal that drifts across a band boundary
+      // draws a hard stripe along the hill. The ground's shape is carried by its
+      // silhouette against the sky and by the road running over it, which is
+      // where a flat-shaded game should carry it.
+      g.computeVertexNormals();
+      return g;
+    })();
+    const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.position.y = -0.34;
     ground.renderOrder = -500;
+    // Its vertices are rewritten every frame, so its bounding sphere is stale
+    // by construction. It is also always in frame; there is nothing to cull.
+    ground.frustumCulled = false;
     ground.userData.notScenery = true;
     group.add(ground);
     mats.ground = groundMat;
@@ -10457,13 +11269,17 @@ MR.World = (function () {
         const w1 = ROUTE_W * (1 - 0.5 * ((i + 1) / ROUTE_SEGS));
         const v0 = z0 * ROUTE_UV, v1 = z1 * ROUTE_UV;
         const p = i * 18, u = i * 12;
+        // The ribbon is PAINT: it has to lie on the road over the whole 124
+        // units it reaches, or it leaves the surface at the first crest and the
+        // one forward read the player has starts floating in the air.
+        const ry0 = 0.010 + eAt(z0), ry1 = 0.010 + eAt(z1);
         // l0, r1, r0 -- then l0, l1, r1.
-        routePos[p] = x0 - w0; routePos[p + 1] = 0.010; routePos[p + 2] = z0;
-        routePos[p + 3] = x1 + w1; routePos[p + 4] = 0.010; routePos[p + 5] = z1;
-        routePos[p + 6] = x0 + w0; routePos[p + 7] = 0.010; routePos[p + 8] = z0;
-        routePos[p + 9] = x0 - w0; routePos[p + 10] = 0.010; routePos[p + 11] = z0;
-        routePos[p + 12] = x1 - w1; routePos[p + 13] = 0.010; routePos[p + 14] = z1;
-        routePos[p + 15] = x1 + w1; routePos[p + 16] = 0.010; routePos[p + 17] = z1;
+        routePos[p] = x0 - w0; routePos[p + 1] = ry0; routePos[p + 2] = z0;
+        routePos[p + 3] = x1 + w1; routePos[p + 4] = ry1; routePos[p + 5] = z1;
+        routePos[p + 6] = x0 + w0; routePos[p + 7] = ry0; routePos[p + 8] = z0;
+        routePos[p + 9] = x0 - w0; routePos[p + 10] = ry0; routePos[p + 11] = z0;
+        routePos[p + 12] = x1 - w1; routePos[p + 13] = ry1; routePos[p + 14] = z1;
+        routePos[p + 15] = x1 + w1; routePos[p + 16] = ry1; routePos[p + 17] = z1;
         routeUvs[u] = 0; routeUvs[u + 1] = v0;
         routeUvs[u + 2] = 1; routeUvs[u + 3] = v1;
         routeUvs[u + 4] = 1; routeUvs[u + 5] = v0;
@@ -10491,7 +11307,7 @@ MR.World = (function () {
         const a = 0.95 * Math.max(0, 1 - Math.pow(Math.min(1, (cz - z) / RING_FADE), 2.2));
         if (a <= 0.01) { for (let v = 0; v < 18; v++) ringPos[p + v] = 0; continue; }
         const cx = routeX(cz);
-        const cy = RING_Y + Math.sin(now * 1.9 + n * 1.1) * 0.045;
+        const cy = RING_Y + eAt(cz) + Math.sin(now * 1.9 + n * 1.1) * 0.045;
         routeQuad(ringPos, p, cx - RING_R, cy - RING_R, cx + RING_R, cy + RING_R, cz);
         for (let v = 0; v < 6; v++) ringCol[c + v * 4 + 3] = a;
       }
@@ -11853,12 +12669,16 @@ MR.World = (function () {
           // LANE_W, never a difference of LANE_X.
           const hx = LANE * 0.5 + SHADOW_SPREAD;
           const p = n * 18;
-          pos[p] = cx - hx; pos[p + 1] = SHADOW_Y; pos[p + 2] = z0;
-          pos[p + 3] = cx - hx; pos[p + 4] = SHADOW_Y; pos[p + 5] = z1;
-          pos[p + 6] = cx + hx; pos[p + 7] = SHADOW_Y; pos[p + 8] = z1;
-          pos[p + 9] = cx - hx; pos[p + 10] = SHADOW_Y; pos[p + 11] = z0;
-          pos[p + 12] = cx + hx; pos[p + 13] = SHADOW_Y; pos[p + 14] = z1;
-          pos[p + 15] = cx + hx; pos[p + 16] = SHADOW_Y; pos[p + 17] = z0;
+          // The quad lies ON the road, so each z-end takes the road's own
+          // height there. One value for the whole quad would sink the far end
+          // of a train's shadow 16 cm into the tarmac on a 4% grade.
+          const sy0 = SHADOW_Y + eAt(z0), sy1 = SHADOW_Y + eAt(z1);
+          pos[p] = cx - hx; pos[p + 1] = sy0; pos[p + 2] = z0;
+          pos[p + 3] = cx - hx; pos[p + 4] = sy1; pos[p + 5] = z1;
+          pos[p + 6] = cx + hx; pos[p + 7] = sy1; pos[p + 8] = z1;
+          pos[p + 9] = cx - hx; pos[p + 10] = sy0; pos[p + 11] = z0;
+          pos[p + 12] = cx + hx; pos[p + 13] = sy1; pos[p + 14] = z1;
+          pos[p + 15] = cx + hx; pos[p + 16] = sy0; pos[p + 17] = z0;
           n++;
         }
       }
@@ -14482,13 +15302,34 @@ MR.World = (function () {
       const lift = deckLift(z);
       ground.position.z = z;
       ground.position.y = -0.34 - WATER_DROP * lift;
+      // Displace the ground rows onto the profile. World z of row i is
+      // z + GROUND_ROWS[i], and the mesh's own y is the water drop, so the row
+      // carries E() alone. Course.elevationPlan() excludes the whole bridge
+      // span from hill placement, so on the deck E is zero here and the river
+      // stays a flat sheet rather than arching with a road that is not there.
+      {
+        const gp = groundGeo.attributes.position;
+        const arr = gp.array;
+        for (let i = 0; i < GROUND_ROWS.length; i++) {
+          const y = eAt(z + GROUND_ROWS[i]);
+          arr[i * 6 + 1] = y;
+          arr[i * 6 + 4] = y;
+        }
+        gp.needsUpdate = true;
+      }
+      const eHere = eAt(z);
       sky.position.z = z;
+      sky.position.y = eHere;
       hills.position.z = z;
+      hills.position.y = eHere;
       // On the bridge there is no land to see, only water to the horizon.
       hills.visible = lift < 0.6;
       ripples.visible = lift > 0.02;
       if (ripples.visible) {
-        ripples.position.set(0, ground.position.y + 0.05, z);
+        // Water is level. The bridge is excluded from hill placement, so eAt(z)
+        // is zero wherever the ripples are visible; adding it anyway keeps the
+        // sheet welded to the ground plane if that exclusion is ever relaxed.
+        ripples.position.set(0, ground.position.y + eAt(z) + 0.05, z);
         ripples.material.opacity = 0.9 * lift;
         // A slow crawl is all a flat plane needs to stop reading as lino.
         rippleTex.offset.y = (now * 0.014) % 1;
@@ -14499,6 +15340,22 @@ MR.World = (function () {
         const tz = state.roadFrom * TILE;
         const obj = roadPool.claim();
         obj.position.z = tz;
+        // THE ROAD STAYS RIGID PER TILE, and that is why hills cost it nothing.
+        //
+        // The tile's geometry spans local z of -TILE/2 .. +TILE/2, so setting
+        // its y to the CHORD's midpoint and its pitch to the chord's angle puts
+        // its far end at exactly E(tz + TILE/2) -- which is exactly where the
+        // next tile's near end lands. Adjacent tiles therefore meet EXACTLY in
+        // y and only the tangent kinks. At the tightest legal curvature that
+        // kink is c * TILE = 5.7e-4 * 24 = 0.0137 rad = 0.8 degrees.
+        //
+        // Everything the tile carries -- both shoulders, the paint, the kerb
+        // rail or wall, the lamp arcs -- are its children, so they ride for
+        // free. One position, one rotation, one atan, about 1.1 claims a second
+        // at race pace.
+        const ey0 = eAt(tz - TILE / 2), ey1 = eAt(tz + TILE / 2);
+        obj.position.y = (ey0 + ey1) * 0.5;
+        obj.rotation.x = -Math.atan2(ey1 - ey0, TILE);
         // The lamp alternates on the parity of the tile index, not on the tile's
         // z, so the pattern is a property of the course and identical for every
         // player on the same day -- like everything else the course decides.
@@ -14535,7 +15392,13 @@ MR.World = (function () {
           const kind = gate.lanes[l];
           if (kind === K.CLEAR) { objs.push(null); continue; }
           const o = hazardObject(kind);
-          o.position.set(K.LANE_X[l], 0, gate.z);
+          // Claim site 2: hazards. The hazard's y is the LOCAL road surface --
+          // its geometry is authored from y = 0 and collision.js measures every
+          // clearance from that same zero, so this lift is purely where it is
+          // drawn. It pitches with the road as well, or a 2.8-unit block on a
+          // 4% grade would stand with one edge 10 cm off the tarmac.
+          o.position.set(K.LANE_X[l], eAt(gate.z), gate.z);
+          o.rotation.x = -Math.atan(EL.slope(gate.z));
           // Pick the skin. Pooled, so EVERY variant's visibility is written on
           // every claim -- a hazard inheriting the previous tenant's body is
           // the kind of defect that only shows up in one screenshot in twenty,
@@ -14618,6 +15481,14 @@ MR.World = (function () {
           // 13cm in the air for the rest of the race.
           obj.position.y = 0;
         }
+        // Claim site 3: roadside props. Every branch above has already written
+        // its own y (a building's is half its height, a crowd knot's is zero),
+        // so the lift is added rather than assigned -- one line for all five
+        // kinds instead of five that can drift apart. They do NOT pitch:
+        // buildings and trees stand vertical on a hillside, and the kerb and
+        // barrier that must follow the road are children of the road tile.
+        obj.position.y += eAt(s.z);
+        obj.userData.baseY = obj.position.y;
         obj.userData.auditName = 'prop / ' + s.kind;
         activeScene.push({ s, obj, pool });
       }
@@ -14635,9 +15506,12 @@ MR.World = (function () {
         const it = aidItems[state.aidIdx++];
         const pool = it.kind === 'banana' ? bananaPool : waterPool;
         const obj = pool.claim();
-        obj.position.set(K.LANE_X[it.lane], 0, it.z);
+        // Claim site 4: aid. Same rule as a hazard -- resolveAid matches on
+        // lane alone, so this is drawing only.
+        const aidY = eAt(it.z);
+        obj.position.set(K.LANE_X[it.lane], aidY, it.z);
         obj.scale.setScalar(1);
-        activeAid.push({ it, obj, pool, pop: -1 });
+        activeAid.push({ it, obj, pool, pop: -1, y0: aidY });
       }
       for (let i = activeAid.length - 1; i >= 0; i--) {
         const e = activeAid[i];
@@ -14684,7 +15558,7 @@ MR.World = (function () {
           // swell is kept to 1.35, which is noticed rather than looked at.
           const s = (1 + 0.55 * Math.sin(Math.PI * t)) * (1 - t * t);
           e.obj.scale.setScalar(Math.max(0.001, s));
-          e.obj.position.y = 3.4 * Math.sqrt(t);
+          e.obj.position.y = e.y0 + 3.4 * Math.sqrt(t);
           e.obj.rotation.y += 0.3;
         }
       }
@@ -14713,6 +15587,20 @@ MR.World = (function () {
           obj.userData.mat.map = st.tex;
           obj.userData.mat.needsUpdate = true;
         }
+        // Claim site 5: biome set pieces. Written last, after the per-kind
+        // overrides above, so none of them can quietly drop it.
+        //
+        // AND THEY PITCH, which props do not. The reason is the corridor rule:
+        // a structure spanning z and placed flat against the road height at its
+        // centre loses clearance at its uphill end, and the footbridge's soffit
+        // sits at 9.05 against an OVERHEAD_Y of 9.00 -- five centimetres of
+        // margin that a 4% grade eats over its own 1.8-unit half-span. Pitching
+        // with the local slope holds the clearance to within a millimetre
+        // (the residual is curvature * halfspan^2 / 2) and costs a 2.3-degree
+        // lean on a lamp standard, which is under anything the eye resolves.
+        // Buildings and trees stay plumb because nothing hangs off them.
+        obj.position.y += eAt(st.z);
+        obj.rotation.x = -Math.atan(EL.slope(st.z));
         obj.userData.auditName = 'set piece / ' + st.kind;
         activeStruct.push({ st, obj, pool });
       }
@@ -14735,7 +15623,12 @@ MR.World = (function () {
         }
         const pool = finish ? archPool : bannerPool;
         const obj = pool.claim();
-        obj.position.set(0, 0, b.m.z);
+        // Claim site 6: mile banners and the finish arch. The arch is on flat
+        // ground by construction -- no hill is placed within EDGE_PAD of the
+        // tape -- but it rides the same rule as everything else rather than
+        // depending on that.
+        obj.position.set(0, eAt(b.m.z), b.m.z);
+        obj.rotation.x = -Math.atan(EL.slope(b.m.z));   // see claim site 5
         obj.userData.mat.map = b.tex;
         obj.userData.mat.color.set(0xffffff);
         obj.userData.mat.needsUpdate = true;
@@ -14762,7 +15655,8 @@ MR.World = (function () {
           const b = e.obj.userData;
           const d = Math.min(11, (now - b.t0) * 0.85) * b.dir;
           e.obj.position.x = b.side * Math.max(WALK_IN, Math.abs(b.baseX) + d);
-          e.obj.position.y = Math.abs(Math.sin(now * 3.2 + b.phase)) * 0.075;
+          // baseY carries the claim's elevation lift; the bob is on top of it.
+          e.obj.position.y = (b.baseY || 0) + Math.abs(Math.sin(now * 3.2 + b.phase)) * 0.075;
         }
       }
 
@@ -14928,6 +15822,22 @@ MR.World = (function () {
           const n = idx ? idx.count : pos.count;
           const m = o.matrixWorld;
           let yMin = Infinity, yMax = -Infinity, zMin = Infinity, zMax = -Infinity, hits = 0;
+          // HILLS SPLIT THIS MEASUREMENT IN TWO, and both halves are needed.
+          //
+          // The corridor rule -- "anything reaching back over the carriageway
+          // does so above OVERHEAD_Y" -- has always meant height above the
+          // ROAD, and the road used to be at y = 0 so world y was the same
+          // number. It no longer is: a mile gantry standing correctly at 9.0
+          // over a crest 6.5 units up is at world y = 15.5, and a road tile
+          // itself is 6.5 up when it used to be 0. Testing the corridor rule in
+          // world space would therefore report every road tile on every hill as
+          // a crossing below OVERHEAD_Y and fail the build for it.
+          //
+          // So yMin/yMax stay in WORLD space, because tools/shoot.js projects
+          // them through the real camera and a projection needs world
+          // coordinates; and yMinLocal/yMaxLocal are the same points measured
+          // from the road directly under them, which is what the rule is about.
+          let yLoMin = Infinity, yLoMax = -Infinity;
           for (let i = 0; i + 2 < n; i += 3) {
             const i0 = idx ? idx.getX(i) : i;
             const i1 = idx ? idx.getX(i + 1) : i + 1;
@@ -14940,16 +15850,28 @@ MR.World = (function () {
             // is roadside furniture, not a crossing, so the test is strict.
             const xlo = Math.min(a.x, b.x, c.x), xhi = Math.max(a.x, b.x, c.x);
             if (xhi <= -CH || xlo >= CH) continue;
-            const ty = Math.min(a.y, b.y, c.y);
-            if (Math.max(a.y, b.y, c.y) <= Y_FLOOR) continue;
             const tz0 = Math.min(a.z, b.z, c.z), tz1 = Math.max(a.z, b.z, c.z);
             if (tz1 < z0lim || tz0 > z1lim) continue;
+            // Y_FLOOR IS MEASURED FROM THE ROAD, per vertex. A 24-unit road
+            // tile spans 0.96 of elevation on a 4% grade, which is larger than
+            // most of the clearances this audit protects, so one value for the
+            // triangle is not good enough. Doing it in world space instead
+            // would let every piece of road paint on a hill through the floor
+            // and into the element box, which turns the screen test below into
+            // "the road overlaps everything".
+            const la = a.y - eAt(a.z), lb = b.y - eAt(b.z), lc = c.y - eAt(c.z);
+            const lHi = Math.max(la, lb, lc);
+            if (lHi <= Y_FLOOR) continue;
+            const lLo = Math.min(la, lb, lc);
             hits++;
+            const ty = Math.min(a.y, b.y, c.y);
             if (ty < yMin) yMin = ty;
             const th = Math.max(a.y, b.y, c.y);
             if (th > yMax) yMax = th;
             if (tz0 < zMin) zMin = tz0;
             if (tz1 > zMax) zMax = tz1;
+            if (lLo < yLoMin) yLoMin = lLo;
+            if (lHi > yLoMax) yLoMax = lHi;
           }
           if (hits) {
             let name = 'mesh', p = o;
@@ -14957,7 +15879,8 @@ MR.World = (function () {
               if (p.userData.auditName) { name = p.userData.auditName; break; }
               p = p.parent;
             }
-            out.push({ name, tris: hits, yMin, yMax, z0: zMin, z1: zMax });
+            out.push({ name, tris: hits, yMin, yMax, z0: zMin, z1: zMax,
+                       yMinLocal: yLoMin, yMaxLocal: yLoMax });
           }
         }
         for (let i = 0; i < o.children.length; i++) scan(o.children[i]);
@@ -15314,10 +16237,16 @@ MR.World = (function () {
           const box = B[kind];
           if (!box) continue;
           const span = (kind === K.BLOCK && g.gate.train) ? 1 + g.gate.train * 0.9 : 1;
+          // Collision.BOX is measured from the LOCAL road surface, and the
+          // occlusion check projects these boxes through the real camera -- so
+          // they are lifted onto the profile here, exactly as the art is at the
+          // claim site. Leaving them at zero would move every hazard the audit
+          // is looking for down the frame on a hill and quietly stop it working.
+          const ey = eAt(g.gate.z);
           out.push({
             kind, lane: l, z: g.gate.z,
             x: K.LANE_X[l], halfX: LANE * 0.5,
-            yMin: box.yMin, yMax: box.yMax,
+            yMin: box.yMin + ey, yMax: box.yMax + ey,
             z0: g.gate.z - box.halfZ, z1: g.gate.z + box.halfZ * (2 * span - 1),
           });
         }
@@ -15635,6 +16564,13 @@ MR.Ghost = (function () {
   function create() {
     const group = new THREE.Group();
 
+    // The road profile, handed over by main.js. The ghost's own arithmetic is
+    // untouched by hills -- ghostMiles() is raceTime / RECORD_PACE and race
+    // time is grade-neutral by construction -- so this is only ever used to
+    // DRAW the record holder on the same road the player is running.
+    let elev = MR.Elevation.FLAT;
+    const elevAt = function (zz) { return elev.at(zz); };
+
     // One material for the whole body, so a per-frame opacity or colour change
     // is a single write rather than fourteen.
     const mat = S.toon(COOL, 3);
@@ -15800,7 +16736,11 @@ MR.Ghost = (function () {
         // is why it cannot use the shared, opaque, cached ink material.
         rim.uniforms.rimAlpha.value = Math.min(1, alpha * 1.45 + 0.10);
         body.update(dt, { speed: SPEED });
-        body.group.position.set(s.x, 0, gz);
+        // The ghost runs the same road. Its own maths is untouched -- ghostMiles
+        // is raceTime / RECORD_PACE and race time is grade-neutral by
+        // construction -- so this is the record holder being DRAWN on the
+        // profile, nothing more.
+        body.group.position.set(s.x, elevAt(gz), gz);
       }
 
       // ---- tag -----------------------------------------------------------
@@ -15835,7 +16775,7 @@ MR.Ghost = (function () {
         // cannot act on has no business sitting on top of them.
         const lift = 0.5 + 1.15 * smoothstep(55, HAZE, gap);
         tagWorld.scale.set(TAG_SIZE * TAG_ASPECT * pulse, TAG_SIZE * pulse, 1);
-        tagWorld.position.set(s.x, HEAD_Y + depth * TAG_SIZE * pulse * lift, tz);
+        tagWorld.position.set(s.x, elevAt(tz) + HEAD_Y + depth * TAG_SIZE * pulse * lift, tz);
       }
 
       tagRear.material.opacity = rear * 0.96;
@@ -15883,6 +16823,8 @@ MR.Ghost = (function () {
 
     /** Signed gap in world units, for tooling that wants to assert on it. */
     s.gapUnits = function () { return s.gap; };
+
+    s.setElevation = function (e) { elev = e || MR.Elevation.FLAT; };
 
     return s;
   }
@@ -15952,14 +16894,52 @@ MR.Camera = (function () {
   // the lane they were standing in. Playtest verdict, exactly: "it's hard to
   // see what is in front of you."
   //
-  // 2.62 lands ~2.30 at full pace, which brings that sightline in to about 10
-  // units -- the road immediately ahead is visible again -- and drops the
+  // 2.62 landed ~2.30 at full pace, which brought that sightline in to about 10
+  // units -- the road immediately ahead is visible again -- and dropped the
   // runner from 47% down the frame to roughly 65%, which is also where the
   // Subway Surfers and Sonic references put theirs (see reference/).
-  const BASE_Y = 2.62;
-  const BASE_BACK = 4.35;
+  //
+  // That fixed the near road. It did not fix the FAR road, and the same
+  // playtest sentence came back a second time about a different distance:
+  // "when there are so many obstacles back to back it makes it a tad tough to
+  // see what's ahead of you." Hence the raise below.
+  //
+  // THE VALUE ITSELF LIVES IN constants.js, and moving it there was not
+  // tidiness. elevation.js derives the maximum steepness of a crest from the
+  // eye height -- a lower camera sees less of the far side of a rise -- and it
+  // runs headless in tools/ where this file does not exist. The dependency is
+  // silent and it goes as the square. Retune the camera by changing
+  // K.CAM_BASE_Y and the hill cap follows; Elevation.validate() ray-marches
+  // the result at generation and fails the course if it does not.
+  // 2.62 became 3.10 in constants.js, and the derivation for it is there
+  // because elevation.js reads the same number. The short version: road at
+  // distance d sits atan(eye / d) below the horizon, so raising the eye
+  // stretches the whole road down the frame in proportion -- the 25-to-150
+  // band, which is everything the player can still do something about, goes
+  // from 4.75 degrees to 5.64, +18.7%, measured over twenty-two frames of a
+  // real race. It does NOT push the already-committed road off the bottom of
+  // the frame -- that band grows by the same scaling. The road as a whole takes
+  // frame from the sky, and the future's share of it rises.
+  const BASE_Y = K.CAM_BASE_Y;
+  const BASE_BACK = K.CAM_BASE_BACK;
   const LOOK_Y = 1.16;
-  const LOOK_AHEAD = 8.0;
+  // 8.0 -> 11.0, and it is the other half of the same move.
+  //
+  // Raising the eye without moving the aim point pitches the camera DOWN, which
+  // hands the gain straight back: the frame centre was already looking at road
+  // 18.5 units ahead, and a lower aim from a higher eye looks at road nearer
+  // still. Pushing the look point out re-levels it, so the eye height buys frame
+  // for the far road instead of buying more of the runner's own shadow.
+  //
+  // It also drops the runner in frame, which is where the reference framing puts
+  // him (see the header): measured, his feet go from -0.572 to -0.700 in NDC
+  // while his overall size barely moves, 0.2388 of frame height to 0.2330.
+  //
+  // Not larger than 11.0. The aim point is what the mile flourish, the jump arc
+  // and the finish run-in all modulate from, and past about twelve units the
+  // horizon sits high enough that the top-gear FOV widening starts putting sky
+  // where the road ahead should be.
+  const LOOK_AHEAD = 11.0;
 
   // THE SLIDE DOES NOT MOVE THE CAMERA. Not off the centreline, not into a
   // bank, and not much up or in.
@@ -16025,9 +17005,38 @@ MR.Camera = (function () {
     };
   }
 
+  /**
+   * ---- HILLS: TWO TERMS, AND THEY ARE DELIBERATELY NOT THE SAME ONE --------
+   *
+   * The camera samples the road profile TWICE, once under itself and once
+   * under its look point, and the whole pitch behaviour falls out of the fact
+   * that those two points are 12 units apart:
+   *
+   *   on a constant grade   both rise together, so the camera climbs the road
+   *                         with the horizon held where it belongs
+   *   cresting              E(look) < E(cam), so the camera pitches DOWN and
+   *                         the far road falls away
+   *   into a climb          E(look) > E(cam), so it pitches UP and the road
+   *                         fills the frame
+   *
+   * The camera also sits BASE_BACK behind the runner, so at a crest it is
+   * momentarily still on the near flank and the runner rises in frame -- which
+   * is what cresting a hill looks like from behind.
+   *
+   * Nothing else in this file changes. Every effect it owns already keys off
+   * `speed`, and `speed` is grade-inclusive, so the FOV, the pull-in, the
+   * cadence-locked bob and the trail all quicken on a descent for free. The one
+   * signal that must NOT is the top-gear latch: it reads sp01 from the smoothed
+   * speed, and a steep descent would fire the one-shot flourish and the
+   * permanent rumble spuriously. main.js therefore hands `speed` (grade-
+   * inclusive) and `gearSpeed` (flat, from pace.streakSpeed) separately.
+   */
   function create(aspect) {
     const cam = new THREE.PerspectiveCamera(BASE_FOV, aspect, 0.1, 1200);
     const look = new THREE.Vector3();   // hoisted: this runs 60x a second
+    // The course's road profile, handed over by main.js once the course
+    // exists. Flat until then, and flat for anything that never sets it.
+    let elev = MR.Elevation.FLAT;
 
     const s = {
       camera: cam,
@@ -16039,7 +17048,8 @@ MR.Camera = (function () {
       t: 0,            // clock for the wobble functions
       stride: 0,       // stride phase, mirrors the runner's cadence
       primed: false,   // first frame snaps the speed filter
-      sp: SPEED_LO,    // smoothed ground speed
+      sp: SPEED_LO,    // smoothed ground speed, grade included
+      gsp: SPEED_LO,   // smoothed STREAK speed, grade removed -- top gear only
       drive: 0,        // 0..1 pace within the honest band, shaped
       accel: 0,        // smoothed d(speed)/dt -- the surge signal
 
@@ -16079,18 +17089,24 @@ MR.Camera = (function () {
       // deep-race screenshot with a phantom 6 u/s surge that never happens in
       // a real run.
       const first = !s.primed;
-      if (first) { s.primed = true; s.sp = p.speed; }
+      if (first) { s.primed = true; s.sp = p.speed; s.gsp = p.gearSpeed || p.speed; }
       const prev = s.sp;
       s.sp += (p.speed - s.sp) * (1 - Math.pow(0.02, d));
       const rawAccel = d > 0 ? (s.sp - prev) / d : 0;
       s.accel += (rawAccel - s.accel) * (1 - Math.pow(0.05, d));
+      // The STREAK's speed, with the hill taken back out. Only the top-gear
+      // latch reads it -- see the header: finding another gear is something an
+      // unbroken line buys, never something pointing downhill buys.
+      s.gsp += ((p.gearSpeed === undefined ? p.speed : p.gearSpeed) - s.gsp)
+        * (1 - Math.pow(0.02, d));
 
       const sp01 = clamp01((s.sp - SPEED_LO) / (SPEED_HI - SPEED_LO));
+      const gear01 = clamp01((s.gsp - SPEED_LO) / (SPEED_HI - SPEED_LO));
       // Most of a good run is spent in the upper half of the band, so bias the
       // response there: the difference the player should feel is between
       // "quick" and "flat out", not between the start line and mile 3.
       const drive = Math.pow(sp01, 0.85);
-      const gear = smoothstep(0.70, 0.99, sp01);      // the top-gear state
+      const gear = smoothstep(0.70, 0.99, gear01);    // the top-gear state
       // Kept for impact(): pace *is* the streak, so how fast the runner was
       // going when they hit something is an honest measure of how much the
       // hit just cost them. See impact().
@@ -16109,9 +17125,9 @@ MR.Camera = (function () {
       // Top gear: fire once when the pace floor is essentially reached, and
       // re-arm only if a hit drags the run back out of it. This is the moment
       // the 21% is supposed to feel like a different race.
-      if (first) s.gearArmed = sp01 < 0.93;             // no flourish for ?skip=
-      else if (s.gearArmed && sp01 > 0.93) { s.gearArmed = false; s.gearT = 1; }
-      if (!s.gearArmed && sp01 < 0.72) s.gearArmed = true;
+      if (first) s.gearArmed = gear01 < 0.93;           // no flourish for ?skip=
+      else if (s.gearArmed && gear01 > 0.93) { s.gearArmed = false; s.gearT = 1; }
+      if (!s.gearArmed && gear01 < 0.72) s.gearArmed = true;
       s.gearT = Math.max(0, s.gearT - d * 1.15);
 
       // Going to ground. The held slide pose is the hard thing to read from
@@ -16277,7 +17293,9 @@ MR.Camera = (function () {
         + s.mileT * 0.24
         + s.winded * 0.12
         + bobY + shY
-        + finUp;
+        + finUp
+        // The road under the LENS, which is BASE_BACK behind the runner.
+        + elev.at(p.z - back);
 
       // The lateral drift at the tape: a slow swing off the centreline so the
       // finish is seen from three-quarters and the stands on one side crowd
@@ -16298,6 +17316,11 @@ MR.Camera = (function () {
       // the upper third rather than off the top, and it draws IN toward the
       // runner at the tape -- the run-in is a wide shot of a place, the tape is
       // a shot of a person arriving in it.
+      // The aim point's own z, hoisted out so the road under it can be sampled.
+      // The gap between this and (p.z - back) is what makes the camera pitch
+      // with the grade; see the header.
+      const lookZ = p.z + LOOK_AHEAD - duck * 0.90 + (p.y || 0) * 1.1 - drive * 0.5
+        - runE * 1.8 - fin * 5.0;
       look.set(
         // At the tape the aim goes onto the runner himself rather than onto
         // the damped follow point. The lateral drift below moves the CAMERA,
@@ -16305,9 +17328,9 @@ MR.Camera = (function () {
         // whichever frame edge the last lane change had left the follow on.
         s.x * s.fr.lookX * (1 - fin) + (p.x || 0) * fin,
         LOOK_Y + (p.y || 0) * 0.50 - duck * 0.30 - drive * 0.22
-          + runE * 1.1 + fin * 1.3,
-        p.z + LOOK_AHEAD - duck * 0.90 + (p.y || 0) * 1.1 - drive * 0.5
-          - runE * 1.8 - fin * 5.0
+          + runE * 1.1 + fin * 1.3
+          + elev.at(lookZ),
+        lookZ
       );
       cam.lookAt(look);
 
@@ -16385,6 +17408,9 @@ MR.Camera = (function () {
       s.kick = Math.min(1, s.kick + 0.35);
     };
 
+    /** The course's road profile. Handed over by main.js once it exists. */
+    s.setElevation = function (e) { elev = e || MR.Elevation.FLAT; };
+
     s.resize = function (aspect) {
       cam.aspect = aspect;
       s.fr = frameFor(aspect);
@@ -16394,7 +17420,7 @@ MR.Camera = (function () {
     s.reset = function () {
       s.x = 0; s.vx = 0; s.roll = 0; s.fov = BASE_FOV;
       s.t = 0; s.stride = 0; s.primed = false;
-      s.sp = SPEED_LO; s.drive = 0; s.accel = 0;
+      s.sp = SPEED_LO; s.gsp = SPEED_LO; s.drive = 0; s.accel = 0;
       s.shake = 0; s.punch = 0; s.lurch = 0; s.winded = 0;
       s.dip = 0; s.dipV = 0; s.kick = 0;
       s.pDuck = 0;
@@ -16884,29 +17910,145 @@ MR.Player = (function () {
  * Procedural audio. Every sound is synthesised from oscillators and noise at
  * runtime -- no samples, which keeps the single-file promise intact.
  *
- * The mix is built around the streak: the clean-gate blip rises in pitch as
- * the streak grows, so the player hears their pace improving before they read
- * it on the HUD. Breaking the streak drops it back to the bottom of the
- * scale, which is a far faster signal than any number.
+ * ---- THIS FILE IS MEASURED -----------------------------------------------
  *
- * Browsers require a user gesture before audio starts, so everything is
- * routed through a context that stays suspended until `unlock()`.
+ * `tools/audio-probe.js` renders every cue below through this exact graph in
+ * an OfflineAudioContext and prints peak, rms, 50 ms punch, duration,
+ * spectral centroid and band split. Nothing in here is a guess about how loud
+ * something is any more; every level in this file was set against that table
+ * and the table asserts the ones that matter. If you change a gain, run it.
+ *
+ *   node tools/audio-probe.js
+ *
+ * ---- THE MIX, AS A DESIGN ------------------------------------------------
+ *
+ * The mix is built around the streak, and it says so in three places at once
+ * rather than one:
+ *
+ *   as an EVENT   the clean-gate blip rises in pitch every time you clear a
+ *                 gate, so the reward is instant.
+ *   as a STATE    the air moving past you (`rush`), the crowd bed, and the
+ *                 brightness of your own footfalls all open up with the gear
+ *                 you are in, so you can hear you are flying without any
+ *                 event having to fire.
+ *   as a CHANGE   crossing into a new gear plays a two-note lift; losing one
+ *                 plays it upside down. Eight gears across a race.
+ *
+ * The terrain is said the same way -- the grade is a state, the crest is an
+ * edge -- and deliberately says nothing about cost, because the hills do not
+ * charge one. See THE GRADE.
+ *
+ * The gear curve is derived from the pace model, not invented -- see
+ * `gearOf()`. The previous version saturated at streak 90 on a course of 205
+ * gates, so from about mile 11 the sound stopped responding while the game
+ * kept accelerating to the tape. That was measured, not suspected: the probe
+ * reported an identical 1631 Hz centroid for clean(90), clean(140) and
+ * clean(205).
+ *
+ * ---- LOUDNESS, WHICH IS THE WHOLE JOB ------------------------------------
+ *
+ * Relative level is what makes a mix work or not. The shipped mix had, in
+ * 50 ms punch:
+ *
+ *   hit -19.5, mile -24.7, roar(1) -25.0, footstep -32.2, clean -38.6,
+ *   duck -48.8, and the ambient bed at -45.2.
+ *
+ * Three of those are wrong as facts about the game. The crowd breaking the
+ * roof off for a world record was QUIETER than the mile-13 marker beep. The
+ * clean gate -- the reward the entire design turns on -- was 6 dB below the
+ * sound of your own feet. And the duck cue was 3.6 dB below the crowd bed it
+ * had to be heard over, which means it was not a quiet sound, it was an
+ * inaudible one.
+ *
+ * The intended order now, loudest first, is: the finish, the roar, contact,
+ * then miles and the countdown, then your own body, then the gates, then aid,
+ * then the bed. Contact sits 16 dB above a footstep because it costs the
+ * record and a footstep costs nothing.
+ *
+ * ---- SPECTRUM ------------------------------------------------------------
+ *
+ * The other measured fault was that the running mix was 90% below 200 Hz --
+ * footsteps 99%, landings 100%, contact 81%. Small laptop and phone speakers
+ * roll off hard below ~200 Hz, so on the hardware most people will play this
+ * on, the entire body of the game was missing and what survived was a click.
+ * Every impact now carries a mid band as well as a low one; the low is the
+ * weight on real speakers and the mid is the sound itself everywhere else.
+ *
+ * ---- COST ----------------------------------------------------------------
+ *
+ * The graph runs on the browser's audio thread, not the render thread, so the
+ * per-FRAME cost of this file is only the JS that schedules it. Steady state
+ * is 10 live nodes (bed, rush, their filters and gains, the grade tilt, the
+ * event gain, the limiter and the master). Running creates roughly 30 short-lived nodes a
+ * second, each self-freeing on stop. Nothing is polled and nothing runs on
+ * requestAnimationFrame. `setIntensity` is called every frame by main.js and
+ * is gated so that a frame where the value has not meaningfully moved does no
+ * work at all.
+ *
+ * Everything is scheduled with Web Audio's own clock rather than setTimeout.
+ * The previous version built the roar, the fanfare and the crossover out of
+ * setTimeout callbacks, which means those cues arrived with whatever jitter
+ * the main thread had at the time -- and the frame that fires the finish is
+ * the frame that also breaks the tape and launches the confetti, which is the
+ * worst-timed frame in the game.
+ *
+ * ---- FAILING SAFE --------------------------------------------------------
+ *
+ * Browsers refuse to start an AudioContext without a user gesture, so
+ * everything is routed through a context that stays silent until `unlock()`.
+ * And a browser with no Web Audio at all must still play the game: `create()`
+ * returns a stub built from the same method list as the real object, so a
+ * missing cue can never be a TypeError in the game loop. The old stub was
+ * hand-written and had drifted -- it was missing `duck`, `crossover`, `aid`,
+ * `countdown` and `setMuted`, so on any browser without Web Audio the game
+ * threw on the first tick of the 3-2-1 countdown and never started.
  */
 MR.Audio = (function () {
 
+  // Every method the game may call. The silent stub is generated from this,
+  // so adding a cue below can never leave the no-audio path short of one.
+  const API = [
+    'unlock', 'setMuted', 'ambient', 'setIntensity',
+    'footstep', 'jump', 'land', 'duck', 'hit', 'clean', 'crossover', 'aid',
+    'mile', 'roar', 'finish', 'countdown',
+    'aidMissed', 'recordLost', 'tier',
+  ];
+
+  function silent(reason) {
+    const stub = { enabled: false, reason: reason || 'no Web Audio' };
+    for (const k of API) stub[k] = function () {};
+    return stub;
+  }
+
   function create() {
     const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return { unlock() {}, enabled: false, footstep() {}, jump() {}, land() {}, hit() {}, clean() {}, mile() {}, finish() {}, roar() {}, setIntensity() {}, ambient() {} };
+    if (!AC) return silent('no AudioContext');
 
-    const ctx = new AC();
+    let ctx;
+    try {
+      ctx = new AC();
+    } catch (e) {
+      // Some browsers throw on the Nth context, or under strict autoplay
+      // policy. A game that cannot make a sound still has to run.
+      return silent('AudioContext threw: ' + e);
+    }
+
     const master = ctx.createGain();
     master.gain.value = 0.0;
     master.connect(ctx.destination);
 
-    // Gentle limiter so stacked hits never clip.
+    // A limiter, not a leveller. The old settings were threshold -14 with the
+    // DEFAULT 30 dB knee, which means compression began at -29 dBFS -- below
+    // every cue in the game -- so the thing meant to catch stacked hits was
+    // in fact squashing the whole mix and flattening exactly the differences
+    // between a footstep and a crash that the mix is made of. A 6 dB knee at
+    // -6 leaves the cues alone and only engages on the finish pile-up.
     const comp = ctx.createDynamicsCompressor();
-    comp.threshold.value = -14;
-    comp.ratio.value = 7;
+    comp.threshold.value = -6;
+    comp.knee.value = 6;
+    comp.ratio.value = 12;
+    comp.attack.value = 0.003;
+    comp.release.value = 0.25;
     comp.connect(master);
 
     const s = { ctx, enabled: true, muted: false, started: false };
@@ -16920,96 +18062,472 @@ MR.Audio = (function () {
       return b;
     })();
 
-    function noise(dur, freq, q, gain, type) {
+    /**
+     * Filtered noise burst.
+     *
+     * `o` carries the parts that are not always wanted:
+     *   at   start delay in seconds, on the audio clock. This is how every
+     *        multi-part cue in the file is built -- sample-accurate, and free,
+     *        where setTimeout costs a timer and arrives whenever the main
+     *        thread gets round to it.
+     *   atk  attack time. The default 6 ms is a transient. A crowd is not a
+     *        transient, so the roar asks for 150-300 ms and swells.
+     *   to   sweep the filter to this frequency across the burst. This is what
+     *        turns a hiss into a movement past the ear.
+     *   dest override the output node.
+     */
+    function noise(dur, freq, q, gain, type, o) {
+      o = o || {};
+      const t = ctx.currentTime + (o.at || 0);
+      const atk = Math.min(o.atk === undefined ? 0.006 : o.atk, dur * 0.6);
       const src = ctx.createBufferSource();
       src.buffer = noiseBuf;
       src.loop = true;
       const f = ctx.createBiquadFilter();
       f.type = type || 'bandpass';
-      f.frequency.value = freq;
+      f.frequency.setValueAtTime(freq, t);
+      if (o.to) f.frequency.exponentialRampToValueAtTime(o.to, t + dur);
       f.Q.value = q || 1;
       const g = ctx.createGain();
-      const t = ctx.currentTime;
       g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(gain, t + 0.006);
+      g.gain.linearRampToValueAtTime(gain, t + atk);
       g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      src.connect(f); f.connect(g); g.connect(comp);
-      src.start(t); src.stop(t + dur + 0.02);
+      src.connect(f); f.connect(g); g.connect(o.dest || comp);
+      // Offset into the buffer so repeated bursts are not the same noise.
+      src.start(t, Math.random() * 1.0);
+      src.stop(t + dur + 0.02);
       return { f, g, t };
     }
 
-    function tone(freq, dur, gain, type, glideTo) {
-      const o = ctx.createOscillator();
-      o.type = type || 'sine';
+    function tone(freq, dur, gain, type, glideTo, o) {
+      o = o || {};
+      const t = ctx.currentTime + (o.at || 0);
+      const atk = Math.min(o.atk === undefined ? 0.008 : o.atk, dur * 0.6);
+      const oo = ctx.createOscillator();
+      oo.type = type || 'sine';
       const g = ctx.createGain();
-      const t = ctx.currentTime;
-      o.frequency.setValueAtTime(freq, t);
-      if (glideTo) o.frequency.exponentialRampToValueAtTime(glideTo, t + dur);
+      oo.frequency.setValueAtTime(freq, t);
+      if (glideTo) oo.frequency.exponentialRampToValueAtTime(glideTo, t + dur);
       g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(gain, t + 0.008);
+      g.gain.linearRampToValueAtTime(gain, t + atk);
+      if (o.hold) g.gain.setValueAtTime(gain, t + o.hold);
       g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o.connect(g); g.connect(comp);
-      o.start(t); o.stop(t + dur + 0.02);
-      return { o, g, t };
+      oo.connect(g); g.connect(o.dest || comp);
+      oo.start(t); oo.stop(t + dur + 0.02);
+      return { o: oo, g, t };
     }
 
-    // ---- ambience -------------------------------------------------------
+    // ---- the gear ------------------------------------------------------
+    /**
+     * GEAR: the streak, expressed as something a mix can use.
+     *
+     * The obvious mapping -- streak / someNumber, clamped -- is what shipped,
+     * and it saturated at 90 on a course that has 205 gates. The second
+     * mapping you reach for, "how far the pace has travelled from 5:30
+     * towards 4:14", is worse, not better: measured against the real curve it
+     * is 0.87 at streak 90 and 0.96 at 205, so 91% of the audible range is
+     * spent in the first half of the race and the run to the tape is silent
+     * progress again.
+     *
+     * The mapping that works is the LOG of the gap still to close. Halving
+     * the distance to the pace floor is one step up, every time, so the scale
+     * never runs out:
+     *
+     *   streak    0    10    30    60    90   120   150   180   205
+     *   gear   0.00  0.19  0.41  0.55  0.64  0.74  0.83  0.92  1.00
+     *
+     * 36% of the climb happens after streak 90 -- the part of the race that
+     * used to be flat -- and it is close to linear from there to the finish,
+     * so the last hundred gates each buy an audible, equal step. That is the
+     * same shape as the pace model's promise that "the slow term is still
+     * unwinding at the finish", said in pitch.
+     *
+     * It reads the real curve out of MR.Pace/MR.K rather than restating it,
+     * so retuning the ramp retunes the sound. The fallback exists only so
+     * that audio.js can never be the reason a page fails to start.
+     */
+    const GEAR_GATES = 205;      // gates on a full course (course-test: 202-207)
+
+    function remaining(streak) {
+      const K = MR.K, P = MR.Pace;
+      if (K && P && P.targetPace) {
+        return (P.targetPace(streak) - K.FLOOR_PACE) / (K.START_PACE - K.FLOOR_PACE);
+      }
+      return Math.exp(-streak / 38);
+    }
+    // Normaliser, computed from whichever curve is actually in force, so the
+    // fallback and the real model both put a full course at gear 1.0.
+    const GEAR_SPAN = Math.max(0.5, -Math.log2(Math.max(1e-4, remaining(GEAR_GATES))));
+
+    function gearOf(streak) {
+      const r = Math.max(1e-4, remaining(Math.max(0, streak || 0)));
+      return Math.max(0, Math.min(1.15, -Math.log2(r) / GEAR_SPAN));
+    }
+
+    const GEARS = 8;             // gear-change chimes across a race
+    let gear = 0;                // 0..1.15
+    let gearIdx = 0;             // Math.floor(gear * GEARS)
+    let lastStreak = 0;
+
+    /** Set the gear from a streak and fire the change cue if it moved. */
+    function setGear(streak, at) {
+      lastStreak = Math.max(0, streak || 0);
+      gear = gearOf(lastStreak);
+      applyBed();
+      const idx = Math.min(GEARS, Math.floor(gear * GEARS));
+      if (idx !== gearIdx) {
+        const up = idx > gearIdx;
+        gearIdx = idx;
+        gearChange(up, at || 0);
+      }
+    }
+
+    /**
+     * Changing gear. Two notes, up or down, over the top of whatever else is
+     * playing -- deliberately consonant with nothing, because it is a state
+     * readout rather than a musical event, and it has to be legible under the
+     * gate blip that always fires with it.
+     */
+    function gearChange(up, at) {
+      const root = 300 * Math.pow(2, gearIdx / GEARS * 1.4);
+      const a = up ? root : root * 1.5;
+      const b = up ? root * 1.5 : root;
+      tone(a, 0.11, 0.055, 'triangle', null, { at: at });
+      tone(b, 0.24, 0.05, 'triangle', null, { at: at + 0.075 });
+      if (!up) tone(root * 0.5, 0.34, 0.045, 'sine', root * 0.4, { at: at });
+    }
+
+    // ---- the environment: bed + rush ------------------------------------
+    //
+    //   bed  src -> band -> bedG (intensity) -\
+    //                                          evt -> comp
+    //   rush src -> band -> rushG (gear)     -/
+    //
+    // `evt` is a single gain the one-shots borrow: contact ducks it so the
+    // crash carves a hole in the crowd, the roar holds it up. It is separate
+    // from `bedG` because main.js calls setIntensity every frame and would
+    // otherwise wipe any envelope written onto the bed within one frame.
     let amb = null;
+    let evt = null;
+
     function ambient() {
       if (amb) return;
+      evt = ctx.createGain();
+      evt.gain.value = 1;
+      evt.connect(comp);
+
       const src = ctx.createBufferSource();
       src.buffer = noiseBuf; src.loop = true;
       const f = ctx.createBiquadFilter();
       f.type = 'bandpass'; f.frequency.value = 620; f.Q.value = 0.55;
       const g = ctx.createGain(); g.gain.value = 0.035;
-      src.connect(f); f.connect(g); g.connect(comp);
+      // THE GRADE TILT. A peaking filter at 300 Hz, and the only axis in the
+      // mix that nothing else touches -- gear moves level and centre
+      // frequency, so the grade needed somewhere of its own or a climb would
+      // be indistinguishable from a streak. On a climb the road rises into
+      // your field a few metres in front of you and the low-mid comes back at
+      // you; on a descent the ground falls away and it thins out.
+      const gq = ctx.createBiquadFilter();
+      gq.type = 'peaking'; gq.frequency.value = 300; gq.Q.value = 0.8;
+      gq.gain.value = 0;
+      src.connect(f); f.connect(gq); gq.connect(g); g.connect(evt);
       src.start();
-      amb = { src, f, g };
+
+      // THE RUSH. Air moving past you, and the only part of the mix that is
+      // pure state: it says nothing about any event, it is just how fast you
+      // are going, and it is silent at gear 0. Two nodes and a source, set
+      // once and then only re-targeted when the gear actually changes.
+      const rsrc = ctx.createBufferSource();
+      rsrc.buffer = noiseBuf; rsrc.loop = true;
+      const rf = ctx.createBiquadFilter();
+      rf.type = 'bandpass'; rf.frequency.value = 1200; rf.Q.value = 0.6;
+      const rg = ctx.createGain(); rg.gain.value = 0;
+      rsrc.connect(rf); rf.connect(rg); rg.connect(evt);
+      rsrc.start(ctx.currentTime + 0.02);
+
+      amb = { src, f, g, gq, rsrc, rf, rg };
+      applyBed();
     }
 
-    /** Crowd swells with pace and with the streak. */
-    s.setIntensity = function (x) {
+    // ---- THE GRADE ------------------------------------------------------
+    //
+    // The hills are PACE-NEUTRAL BY CONSTRUCTION: net rise is exactly zero on
+    // every date, the grade term integrates to zero over the race, and the
+    // flat-vs-hilly finish delta is under 0.2 s. So the sound must not imply a
+    // cost the model does not charge. Nothing here labours, strains or
+    // breathes harder on a climb -- that would be the mix telling the player
+    // they are losing something the game is not taking.
+    //
+    // What it does instead is treat the hill as ACOUSTIC SPACE, which is a
+    // fact about terrain rather than about effort:
+    //
+    //   climbing   the road rises into your field a few metres ahead. The
+    //              world closes in: low-mid comes back at you (`gq` up), the
+    //              bed darkens, and there is less air moving.
+    //   descending the ground falls away and the city opens out. Thinner,
+    //              brighter, wider, more air.
+    //
+    // The air term is honest rather than decorative: paceNow = pace +
+    // GRADE_SPM * grade, so the runner genuinely is moving about 6% faster on
+    // the steepest descent and 5% slower on the steepest climb. It is the
+    // FINISH that is neutral, not the local speed.
+    //
+    // And one thing was already free before any of this: main.js fires
+    // footsteps off `runner.phase`, whose cadence is `2.55 * (speed /
+    // SPEED_LO)^0.72` with a grade-inclusive speed. Measured against the real
+    // curve, the stride is 4.7-5.3% slower on a 4% climb and 4.6-6.1% faster
+    // on a 4% descent, all of it already in the mix. The layers below are
+    // sized as a complement to that, not as a replacement for it.
+
+    // pace.grade is PERCENT (elevation.js: gradeAt = slope * 100) while
+    // MR.Elevation.MAX_GRADE is the slope FRACTION 0.040. Reading one as the
+    // other is a factor of 100 and would peg this signal at full scale for
+    // the whole race.
+    const GRADE_MAX_PCT = ((MR.Elevation && MR.Elevation.MAX_GRADE) || 0.04) * 100;
+
+    let gradeN = 0;        // -1..1 against the steepest legal grade
+    let bedWroteX = -1;    // last gear written to the graph
+    let bedWroteG = -9;    // last grade written to the graph
+
+    function applyBed() {
       if (!amb) return;
+      const x = Math.min(1.15, gear);
+      // A frame where neither term has meaningfully moved does no work at all.
+      if (Math.abs(x - bedWroteX) < 0.015 && Math.abs(gradeN - bedWroteG) < 0.04) return;
+      bedWroteX = x; bedWroteG = gradeN;
+      const gn = gradeN;
       const t = ctx.currentTime;
-      amb.g.gain.setTargetAtTime(0.028 + 0.055 * x, t, 0.4);
-      amb.f.frequency.setTargetAtTime(560 + 340 * x, t, 0.6);
+      amb.g.gain.setTargetAtTime((0.030 + 0.062 * x) * (1 + 0.16 * gn), t, 0.4);
+      amb.f.frequency.setTargetAtTime((560 + 340 * x) * Math.pow(2, -0.28 * gn), t, 0.6);
+      amb.gq.gain.setTargetAtTime(5.0 * gn, t, 0.5);
+      // The rush only exists above about half a gear; below that it would be
+      // hiss on a runner who is not going anywhere.
+      const r = Math.max(0, x - 0.42) / 0.58;
+      amb.rg.gain.setTargetAtTime(0.070 * r * r * (1 - 0.35 * gn), t, 0.7);
+      amb.rf.frequency.setTargetAtTime((1000 + 1300 * r) * (1 - 0.10 * gn), t, 0.9);
+    }
+
+    /**
+     * Per-frame world state. Called by main.js on every frame of RUN.
+     *
+     * @param x      pace.streak / 70, unclamped.
+     * @param grade  pace.grade, percent, positive uphill. Optional: without it
+     *               the terrain is simply silent, which is what shipped.
+     *
+     * `x` used to arrive as min(1, streak/70) and saturated at streak 70 on a
+     * course of 205 gates -- the same defect clean() had. The clamp is gone at
+     * the call site now, so the value is read straight back as the streak it
+     * is and gear does the rest.
+     */
+    let lastX = -1;
+    s.setIntensity = function (x, grade) {
+      const v = x || 0;
+      if (v !== lastX) { lastX = v; setGear(v * 70, 0); }
+      if (grade !== undefined) setGrade(grade);
     };
 
+    /**
+     * The terrain edges.
+     *
+     * A hill's grade is a smooth sine: it rises through zero at the foot,
+     * peaks, falls back through zero AT THE CREST, troughs, and returns. So
+     * the crest is a zero crossing, not a state, and it is detected as one --
+     * armed by having actually been on a climb, so a flat wobble cannot fire
+     * it. Measured against the real profiles this gives exactly one crest,
+     * one foot and one bottom per hill: 12-15 edges across a race of 4-5
+     * hills, on every date tested.
+     *
+     * A three-state FLAT/UP/DOWN machine was the obvious shape and is wrong.
+     * The grade sits inside any sensible flat deadband for up to 1812 units --
+     * 64 seconds of wall clock -- between hills, so the crest would have come
+     * out as two unrelated edges, and the one at the top would have fired late
+     * by however wide the deadband was.
+     *
+     * None of these touch `evt`. Ducking the whole world is contact's move and
+     * contact's alone: it is the only event in the game that costs anything
+     * and it should stay the only one that takes the room away.
+     */
+    let gPrev = 0;
+    let gPeak = 0;
+    let armedFoot = true, armedBottom = true;
+
+    function setGrade(gPct) {
+      const gn = Math.max(-1, Math.min(1, (gPct || 0) / GRADE_MAX_PCT));
+      if (gn > gPeak) gPeak = gn;
+
+      // The foot: the ground starts rising under you.
+      if (armedFoot && gPrev <= 0.25 && gn > 0.25) {
+        armedFoot = false;
+        noise(0.70, 1400, 0.6, 0.045, 'bandpass', { atk: 0.14, to: 350 });
+      }
+      // THE CREST. The road stops climbing and the view arrives -- wide, soft,
+      // opening upward, and deliberately below a clean gate in level. It is
+      // terrain, not an achievement, and a chime here would be the mix
+      // congratulating the player for arriving somewhere gravity took them.
+      if (gPrev > 0 && gn <= 0 && gPeak > 0.35) {
+        gPeak = 0; armedFoot = true; armedBottom = true;
+        noise(0.95, 300, 0.5, 0.075, 'bandpass', { atk: 0.18, to: 2600 });
+        noise(0.55, 1800, 0.7, 0.030, 'bandpass', { at: 0.15, atk: 0.20, to: 4200 });
+      }
+      // The bottom: the descent runs out and the road levels.
+      if (armedBottom && gPrev <= -0.25 && gn > -0.25) {
+        armedBottom = false;
+        noise(0.45, 700, 0.7, 0.028, 'bandpass', { atk: 0.10, to: 900 });
+      }
+      gPrev = gn;
+
+      if (Math.abs(gn - gradeN) < 0.02) return;
+      gradeN = gn;
+      applyBed();
+    }
+
     // ---- one-shots ------------------------------------------------------
+
+    /**
+     * Footfalls. Measured at 99% of energy below 200 Hz, which is a thump
+     * with no shoe in it and nothing at all on a phone. There are three
+     * layers now: the tarmac scuff that carries on any speaker, the body, and
+     * the sub. The scuff brightens and sharpens with the gear, so the run
+     * itself tells you what gear you are in three times a second without any
+     * event firing -- this is the cheapest state signal in the file, because
+     * the footstep was going to play anyway.
+     */
     let stepFlip = 0;
     s.footstep = function (power) {
       const p = power === undefined ? 1 : power;
       stepFlip ^= 1;
-      noise(0.075, stepFlip ? 240 : 300, 1.5, 0.16 * p, 'bandpass');
-      tone(stepFlip ? 74 : 66, 0.07, 0.10 * p, 'sine');
+      const g = gear;
+      // Scuff: 900 Hz at a standstill, 2.1 kHz in top gear, and shorter.
+      // It also tilts with the grade, and that is geometry rather than effort:
+      // a climb is taken on the forefoot, so the contact is quieter and duller
+      // with no heel in it, and a descent lands heel-first and harder. The
+      // cadence underneath this already changes on its own -- see the note at
+      // THE GRADE -- so between them the road is legible without anything in
+      // the mix having to sound like it is costing the player time.
+      const gn = gradeN;
+      noise(0.045 - 0.016 * g, (900 + 1200 * g) * (1 - 0.22 * gn), 0.9,
+        0.45 * p * (0.75 + 0.4 * g) * (1 - 0.30 * gn),
+        'bandpass', { atk: 0.002, to: 480 + 400 * g });
+      // Body.
+      noise(0.075, stepFlip ? 240 : 300, 1.2, 0.70 * p, 'bandpass');
+      // Sub. Small on purpose: at the gain this carried before, it was 23 dB
+      // over the other two layers and the footstep measured 99% below 200 Hz.
+      tone(stepFlip ? 74 : 66, 0.07, 0.038 * p, 'sine');
+      // Effort. Only in the top half of the range, only on the down beat, so
+      // it reads as a runner working rather than a loop.
+      if (g > 0.55 && stepFlip) {
+        noise(0.19, 380 + 260 * g, 1.6, 0.11 * (g - 0.55) / 0.45, 'bandpass',
+          { atk: 0.05, to: 240 });
+      }
     };
 
     s.jump = function () {
-      noise(0.26, 900, 0.8, 0.10, 'bandpass');
-      tone(300, 0.24, 0.09, 'triangle', 700);
+      noise(0.26, 900, 0.8, 0.16, 'bandpass', { to: 2200, atk: 0.012 });
+      tone(300, 0.24, 0.05, 'triangle', 700);
     };
 
     s.land = function () {
-      noise(0.11, 190, 1.2, 0.20, 'lowpass');
-      tone(96, 0.13, 0.13, 'sine', 62);
+      // Same fault as the footstep: 100% below 200 Hz. The slap is what the
+      // ear actually hears land; the sub is what the room feels.
+      noise(0.055, 1500, 0.9, 0.85, 'bandpass', { atk: 0.002, to: 700 });
+      noise(0.11, 190, 1.2, 0.45, 'lowpass');
+      tone(96, 0.13, 0.05, 'sine', 62);
     };
 
+    /**
+     * Ducking. Shipped at -48.8 dBFS punch, which is 3.6 dB BELOW the crowd
+     * bed -- not a quiet cue, an inaudible one, and the only feedback the
+     * player had that the input registered. It is now a movement past the ear:
+     * a band sweeping down and away, which is what a bar passing over your
+     * head sounds like, at a level that sits just under a jump.
+     */
     s.duck = function () {
-      noise(0.16, 520, 1.1, 0.07, 'bandpass');
+      noise(0.22, 2400, 1.3, 0.24, 'bandpass', { atk: 0.008, to: 320 });
+      tone(210, 0.16, 0.025, 'sine', 130);
     };
 
+    /**
+     * CONTACT. The most important sound in the game, because it is the only
+     * one that costs anything, and it shipped as three lines with 81% of its
+     * energy below 200 Hz -- a sound that mostly did not exist on a laptop.
+     *
+     * Four things happen at once and each is doing a separate job:
+     *
+     *   the crack    3 kHz, 30 ms, the hardest transient in the file. This is
+     *                what makes it read as an IMPACT rather than a swell, and
+     *                it is the part that survives every speaker.
+     *   the body     a mid thump at 520 and the original low weight under it,
+     *                so it lands on a phone and hits in the chest on desk
+     *                speakers.
+     *   the collapse a tone falling away, and its depth is the gear you were
+     *                in. This is the part that makes the same cue mean
+     *                different things at different points in the race: a hit
+     *                at gear 0.1 is a knock, a hit at gear 0.95 is nearly an
+     *                octave and a half of something draining out from under
+     *                you. The game already models this -- contact keeps 40% of
+     *                the streak, so the higher you were the more there is to
+     *                lose -- and the sound now says it.
+     *   the hole     the crowd and the rush duck to a quarter for 200 ms and
+     *                come back. Nothing else in the mix does this, so contact
+     *                is the only event that changes the whole soundscape, and
+     *                it is what makes it land far harder than its level alone
+     *                would explain.
+     */
     s.hit = function () {
-      noise(0.34, 150, 0.7, 0.34, 'lowpass');
-      tone(150, 0.32, 0.20, 'square', 58);
-      tone(96, 0.40, 0.14, 'sawtooth', 44);
+      const g = gear;
+      // Crack.
+      noise(0.035, 3000, 0.8, 1.10, 'bandpass', { atk: 0.001, to: 1400 });
+      // Mid body -- the part that exists on small speakers.
+      noise(0.16, 520, 0.9, 1.90, 'bandpass', { atk: 0.002, to: 260 });
+      // Low weight. A square at 0.22 was the single loudest element in the
+      // whole game and it lived at 150 Hz, which is most of why contact was
+      // 81% sub-200 and vanished on a laptop.
+      noise(0.34, 150, 0.7, 1.20, 'lowpass', { atk: 0.003 });
+      tone(150, 0.30, 0.14, 'square', 58);
+      tone(96, 0.40, 0.10, 'sawtooth', 44);
+      // Collapse. 0.55 octaves down at a standstill, 1.5 in top gear.
+      const top = 420 + 900 * g;
+      tone(top, 0.30 + 0.55 * g, 0.17 + 0.13 * g, 'triangle',
+        top / Math.pow(2, 0.55 + 0.95 * g), { at: 0.045, atk: 0.012 });
+      // The hole.
+      if (evt) {
+        const t = ctx.currentTime;
+        evt.gain.cancelScheduledValues(t);
+        evt.gain.setValueAtTime(evt.gain.value, t);
+        evt.gain.linearRampToValueAtTime(0.25, t + 0.03);
+        evt.gain.setValueAtTime(0.25, t + 0.20);
+        evt.gain.setTargetAtTime(1, t + 0.20, 0.35);
+      }
+      // Contact keeps HIT_STREAK_KEEP of the streak. Read the constant rather
+      // than restate it, and drop the gear to match, which is what fires the
+      // gear-down chime when the run actually loses a gear.
+      const keep = (MR.K && MR.K.HIT_STREAK_KEEP) || 0.4;
+      setGear(Math.floor(lastStreak * keep), 0.10);
     };
 
-    /** Rises across roughly three octaves as the streak builds. */
+    /**
+     * A clean gate. The reward the entire design turns on, and it shipped
+     * 6 dB QUIETER than the sound of your own feet, in a band that saturated
+     * at streak 90.
+     *
+     * It sits at 420 Hz at the gun and climbs 2.4 octaves to 2.2 kHz across a
+     * full course, on the log-gap curve described at `gearOf` -- so it is
+     * still climbing at mile 26. It gets a tick of noise on the front so it
+     * cuts through the bed by transient rather than by level, which is what
+     * lets it stay a small sound that fires every 0.6 seconds without
+     * becoming exhausting.
+     */
     s.clean = function (streak) {
-      const step = Math.min(1, (streak || 0) / 90);
-      const base = 520 * Math.pow(2, step * 1.6);
-      tone(base, 0.075, 0.055, 'triangle');
-      if (streak && streak % 25 === 0) tone(base * 1.5, 0.16, 0.06, 'sine');
+      const st = streak || 0;
+      setGear(st, 0);
+      const base = 420 * Math.pow(2, 2.15 * gear);
+      tone(base, 0.085, 0.155, 'triangle');
+      // The octave partial fades out as the fundamental climbs, or the blip
+      // turns into a whistle by mile 20.
+      tone(base * 2, 0.05, 0.030 * (1 - 0.6 * gear), 'sine');
+      noise(0.022, Math.min(2800, base * 2.2), 1.4, 0.035, 'bandpass', { atk: 0.001 });
+      // Every 25th gate gets its fifth, as a counting mark.
+      if (st && st % 25 === 0) tone(base * 1.5, 0.20, 0.075, 'sine', null, { at: 0.05 });
     };
 
     /**
@@ -17019,41 +18537,50 @@ MR.Audio = (function () {
      * exists for had only a white flash and a label turning over.
      *
      * Rising for a pass, falling for being caught, because the direction is
-     * the entire message and it has to land without reading the HUD.
+     * the entire message and it has to land without reading the HUD. Being
+     * caught is the heavier of the two and now carries a low root under it,
+     * because losing the record line is worth more than taking it back.
      */
     s.crossover = function (ahead) {
       const root = ahead ? 392 : 523;
       const steps = ahead ? [1, 1.26, 1.5, 2] : [1, 0.84, 0.67, 0.5];
       steps.forEach(function (m, i) {
-        setTimeout(function () {
-          tone(root * m, 0.42, 0.085 - i * 0.008, 'triangle');
-          if (i === steps.length - 1) tone(root * m * 2, 0.5, 0.035, 'sine');
-        }, i * 85);
+        const at = i * 0.085;
+        tone(root * m, 0.42, 0.115 - i * 0.010, 'triangle', null, { at: at });
+        if (i === steps.length - 1) {
+          tone(root * m * 2, 0.5, 0.045, 'sine', null, { at: at });
+          if (!ahead) tone(root * m * 0.5, 0.9, 0.075, 'sawtooth', null, { at: at, atk: 0.03 });
+        }
       });
       // A short swell underneath so it feels like the crowd noticed.
-      noise(0.55, ahead ? 900 : 420, 0.7, 0.09, 'bandpass');
+      noise(0.55, ahead ? 900 : 420, 0.7, 0.11, 'bandpass', { atk: 0.05 });
     };
 
     /**
      * Aid taken. Deliberately small and dry -- a bottle is a sip, not a
      * fanfare, and a water table is five of them in a row, so anything with a
-     * tail would smear into a drone.
+     * tail would smear into a drone. Water was measured at -39.5 dBFS punch,
+     * 7 dB under a footstep and therefore masked by the player's own running
+     * for most of its length; it is small, but it is above the run now.
      */
     s.aid = function (big) {
       if (big) {
-        tone(660, 0.16, 0.075, 'triangle', 990);
-        tone(990, 0.22, 0.045, 'sine');
-        noise(0.18, 1400, 1.2, 0.05, 'bandpass');
+        tone(660, 0.16, 0.11, 'triangle', 990);
+        tone(990, 0.26, 0.065, 'sine', null, { at: 0.03 });
+        noise(0.18, 1400, 1.2, 0.075, 'bandpass');
       } else {
-        tone(880, 0.07, 0.05, 'triangle');
-        noise(0.06, 2200, 1.6, 0.035, 'bandpass');
+        tone(880, 0.075, 0.115, 'triangle');
+        noise(0.06, 2200, 1.6, 0.10, 'bandpass');
       }
     };
 
     s.mile = function (mile) {
-      tone(660, 0.5, 0.10, 'sine');
-      tone(990, 0.55, 0.06, 'sine');
-      if (mile >= 26) tone(1320, 0.7, 0.05, 'sine');
+      // A signpost, and there are 26 of them. It shipped 0.3 dB LOUDER than
+      // the crowd roaring a world record home, which is the single clearest
+      // sign that these levels had never been compared to each other.
+      tone(660, 0.5, 0.082, 'sine');
+      tone(990, 0.55, 0.05, 'sine');
+      if (mile >= 26) tone(1320, 0.7, 0.043, 'sine');
     };
 
     /**
@@ -17061,14 +18588,29 @@ MR.Audio = (function () {
      *
      * The ambient bed already swells with the streak, but a bed is a bed: it
      * changes over seconds and the ear stops hearing it. Breaking the tape is
-     * an EVENT and it needs a transient, and the transient a crowd makes is a
-     * fast bright noise burst that decays over about three seconds into
-     * something wider and lower than the bed it came out of.
+     * an EVENT and it needs a front, and the front a crowd makes is a fast
+     * bright noise burst that decays over about three seconds into something
+     * wider and lower than the bed it came out of.
      *
-     * Two bands, because one is a hiss. The upper band around 1.5k is the
-     * whistles and the clap; the lower around 320 is the body of eight
-     * thousand people, and it comes in a beat late, which is what a real crowd
-     * does -- the noise arrives in a ragged front, not all at once.
+     * What shipped measured at -25.0 dBFS punch for a world record -- 0.3 dB
+     * QUIETER than the mile-1 marker beep. That is not a mixing preference,
+     * it is a fact about the game being wrong: eight thousand people watching
+     * a world record fall cannot be the same size as a signpost. It is now the
+     * second loudest thing in the file, and only the fanfare it plays under is
+     * above it.
+     *
+     * The other fault was the envelope. Every burst attacked in 6 ms and
+     * decayed from there, so the crowd was loudest at the instant the tape
+     * broke and got quieter from then on -- backwards. A crowd SWELLS: the
+     * noise arrives in a ragged front over a couple of hundred milliseconds,
+     * blooms, and then takes seconds to come apart. The bands attack in
+     * 120-320 ms now and hold before they fall.
+     *
+     * Three layers, because one is a hiss. The upper band around 1.4k is the
+     * whistles and the clap; the lower around 300 is the body of eight
+     * thousand people and it comes in a beat late, which is what a real crowd
+     * does; and the claps are individual bursts scattered across the first
+     * second, which is the detail that stops the whole thing reading as wind.
      *
      * `power` is the verdict, 0..1, and it is spent on LENGTH as much as on
      * level: a record roars for four seconds, a run that came apart gets a
@@ -17078,59 +18620,163 @@ MR.Audio = (function () {
     s.roar = function (power) {
       const p = Math.max(0, Math.min(1, power === undefined ? 1 : power));
       const dur = 1.9 + 2.4 * p;
-      noise(dur * 0.75, 1500 - 300 * p, 0.55, 0.16 + 0.14 * p, 'bandpass');
-      setTimeout(function () {
-        noise(dur, 320, 0.7, 0.13 + 0.13 * p, 'bandpass');
-      }, 90);
-      // The whistles: a handful of short high squeals scattered across the
-      // first second, which is the detail that stops it reading as wind.
+      // Upper band: the clap and the whistle, swelling.
+      noise(dur * 0.8, 1400 - 250 * p, 0.55, 0.30 + 0.30 * p, 'bandpass',
+        { atk: 0.12 + 0.10 * p, to: 800 });
+      // Body: eight thousand chests, a beat late and slower to arrive.
+      noise(dur, 300, 0.7, 0.30 + 0.33 * p, 'bandpass',
+        { at: 0.09, atk: 0.20 + 0.12 * p, to: 220 });
+      // Presence, so it is not all below the vocal band on a small speaker.
+      noise(dur * 0.55, 2600, 0.5, 0.08 + 0.11 * p, 'bandpass',
+        { at: 0.05, atk: 0.09 });
+      // Claps: individual pairs of hands in the first second, which is what
+      // separates a crowd from weather.
+      const claps = 5 + Math.round(p * 9);
+      for (let i = 0; i < claps; i++) {
+        noise(0.05, 1500 + Math.random() * 2200, 2.2, 0.09 + 0.09 * p, 'bandpass',
+          { at: 0.03 + Math.random() * 0.95, atk: 0.001 });
+      }
+      // Whistles.
       const n = 2 + Math.round(p * 5);
       for (let i = 0; i < n; i++) {
-        setTimeout(function () {
-          noise(0.16, 2600 + Math.random() * 1800, 9, 0.035 + 0.03 * p, 'bandpass');
-        }, 60 + Math.random() * 900);
+        noise(0.16, 2600 + Math.random() * 1800, 9, 0.07 + 0.07 * p, 'bandpass',
+          { at: 0.06 + Math.random() * 0.9 });
       }
-      if (amb) {
-        // Hold the bed up under the burst, then let it fall back.
+      if (amb && evt) {
+        // Hold the whole environment up under the burst, then let it fall
+        // back. On `evt` rather than the bed gain so the per-frame
+        // setIntensity cannot overwrite it a frame later.
         const t = ctx.currentTime;
-        amb.g.gain.cancelScheduledValues(t);
-        amb.g.gain.setTargetAtTime(0.085 + 0.075 * p, t, 0.25);
+        evt.gain.cancelScheduledValues(t);
+        evt.gain.setValueAtTime(evt.gain.value, t);
+        evt.gain.setTargetAtTime(1.9 + 1.2 * p, t, 0.35);
+        evt.gain.setTargetAtTime(1, t + dur, 1.6);
         amb.f.frequency.setTargetAtTime(760 + 420 * p, t, 0.3);
-        amb.g.gain.setTargetAtTime(0.05, t + dur, 1.6);
+        bedWroteX = -1;  // let the next applyBed re-assert the real value
       }
     };
 
+    /**
+     * THE FINISH.
+     *
+     * Four minutes of holding a line arrive here, and it has to be the biggest
+     * thing in the game -- so it is written as one gesture rather than a run
+     * of notes: a rising fanfare, then the chord it was heading for, sustained
+     * long enough to sit under the confetti and the camera pull-back.
+     *
+     * A record gets a major triad opening out over two octaves with a low root
+     * under it and a shimmer on top. A miss gets the same shape falling to a
+     * minor sixth instead -- warm, resolved, and unmistakably not the one.
+     * Both were four notes before, in a different order, at the same level,
+     * and the one moment the whole game is built around sounded like the one
+     * that missed it by two minutes.
+     */
     s.finish = function (beatRecord) {
-      const notes = beatRecord ? [523, 659, 784, 1047] : [523, 587, 523, 392];
-      notes.forEach((n, i) => {
-        setTimeout(() => tone(n, 0.55, 0.11, 'triangle'), i * 130);
+      const notes = beatRecord ? [523.3, 659.3, 784.0, 1046.5] : [523.3, 587.3, 523.3, 392.0];
+      notes.forEach(function (n, i) {
+        tone(n, 0.55, 0.15, 'triangle', null, { at: i * 0.13, atk: 0.01 });
+        tone(n * 0.5, 0.5, 0.06, 'sine', null, { at: i * 0.13 });
       });
-      // A record gets an octave stack on the last note and a low swell under
-      // it. The fanfare above is four notes either way, so without this the
-      // one moment the whole game is built around sounded like a run that
-      // missed it by two minutes with the notes in a different order.
+      const at = 3 * 0.13;
       if (beatRecord) {
-        setTimeout(function () {
-          tone(1047, 1.4, 0.09, 'triangle');
-          tone(1568, 1.5, 0.055, 'sine');
-          tone(2093, 1.6, 0.030, 'sine');
-          tone(130.8, 1.8, 0.10, 'sawtooth');
-        }, 3 * 130);
+        // The chord. Root, fifth, octave, third-above, plus a sub that arrives
+        // first and holds the whole thing off the ground.
+        tone(65.4, 2.6, 0.11, 'sine', null, { at: at, atk: 0.03, hold: 0.9 });
+        tone(130.8, 2.4, 0.11, 'sawtooth', null, { at: at, atk: 0.04, hold: 0.8 });
+        tone(261.6, 2.2, 0.19, 'triangle', null, { at: at + 0.02, atk: 0.05, hold: 0.7 });
+        tone(392.0, 2.1, 0.15, 'triangle', null, { at: at + 0.04, atk: 0.06, hold: 0.6 });
+        tone(523.3, 2.0, 0.19, 'triangle', null, { at: at + 0.06, atk: 0.05, hold: 0.6 });
+        tone(784.0, 1.9, 0.12, 'sine', null, { at: at + 0.09, atk: 0.07 });
+        tone(1046.5, 1.8, 0.15, 'triangle', null, { at: at + 0.11, atk: 0.05 });
+        tone(1568.0, 1.7, 0.090, 'sine', null, { at: at + 0.16, atk: 0.10 });
+        tone(2093.0, 1.6, 0.045, 'sine', null, { at: at + 0.22, atk: 0.14 });
+        noise(1.4, 5200, 0.6, 0.14, 'bandpass', { at: at, atk: 0.02, to: 2600 });
+      } else {
+        // Warm, low, and finished. Not a failure sound -- a marathon is still
+        // a marathon -- just not the one.
+        tone(98.0, 2.0, 0.060, 'sine', null, { at: at, atk: 0.05, hold: 0.6 });
+        tone(196.0, 1.8, 0.13, 'triangle', null, { at: at, atk: 0.06, hold: 0.5 });
+        tone(261.6, 1.6, 0.12, 'triangle', null, { at: at + 0.04, atk: 0.08 });
+        tone(392.0, 1.5, 0.085, 'sine', null, { at: at + 0.07, atk: 0.10 });
       }
     };
 
     s.countdown = function (final) {
-      tone(final ? 880 : 520, final ? 0.5 : 0.16, 0.12, 'square');
+      if (final) {
+        tone(880, 0.5, 0.14, 'square');
+        tone(440, 0.5, 0.08, 'triangle');
+        noise(0.09, 1800, 1.0, 0.10, 'bandpass', { atk: 0.002 });
+      } else {
+        tone(520, 0.16, 0.13, 'square');
+      }
+    };
+
+    // ---- cues written, measured, and waiting for a call site ------------
+    //
+    // These are complete and appear in the probe table. They are not called
+    // from anywhere yet, because the call sites are in src/core and src/main,
+    // which this change does not own. One line each:
+    //
+    //   setIntensity(x, grade) -- WIRED for x, NOT YET for grade. The second
+    //                 argument is optional and the terrain is simply silent
+    //                 without it, which is exactly what ships today. One token
+    //                 at the existing call site in main.js turns it on:
+    //
+    //                   audio.setIntensity(pace.streak / 70, pace.grade);
+    //
+    //                 pace.grade is already exposed, already correct, and
+    //                 already sampled at the runner's own z every frame.
+    //
+    //   aidMissed()   an aid item went past untaken. main.js already walks
+    //                 player.resolveAid(); the miss is the item the walk did
+    //                 not return, which course.js knows.
+    //   recordLost()  pace.recordPossible() went false. main.js has `pace`
+    //                 in hand every frame; this wants an edge, not a poll.
+    //   tier(up)      MR.Tier.of(pace.projected()) changed band.
+
+    /** The bottle you did not take: a dry, downward, unresolved tick. */
+    s.aidMissed = function () {
+      tone(430, 0.10, 0.055, 'triangle', 300);
+      noise(0.07, 900, 1.4, 0.035, 'bandpass', { to: 500 });
+    };
+
+    /**
+     * The record dies. The one irreversible thing that can happen inside a
+     * run, and it should be heard as the floor going out: a long fall, and the
+     * crowd thinning behind it.
+     */
+    s.recordLost = function () {
+      tone(392, 1.5, 0.11, 'sawtooth', 82, { atk: 0.02 });
+      tone(196, 1.7, 0.08, 'sine', 62, { at: 0.06, atk: 0.05 });
+      noise(1.2, 800, 0.8, 0.07, 'bandpass', { atk: 0.03, to: 180 });
+      if (evt) {
+        const t = ctx.currentTime;
+        evt.gain.cancelScheduledValues(t);
+        evt.gain.setValueAtTime(evt.gain.value, t);
+        evt.gain.setTargetAtTime(0.45, t, 0.5);
+        evt.gain.setTargetAtTime(1, t + 2.2, 1.2);
+        bedWroteX = -1;
+      }
+    };
+
+    /** Projected-tier change. Same grammar as the gear chime, one size up. */
+    s.tier = function (up) {
+      const root = up ? 523.3 : 392.0;
+      tone(root, 0.20, 0.085, 'triangle', null, { at: 0 });
+      tone(up ? root * 1.5 : root * 0.75, 0.45, 0.075, 'triangle', null, { at: 0.12 });
+      tone(up ? root * 3 : root * 0.375, 0.5, 0.030, 'sine', null, { at: 0.12 });
     };
 
     // ---- lifecycle ------------------------------------------------------
     s.unlock = function () {
-      if (ctx.state === 'suspended') ctx.resume();
-      if (!s.started) {
-        s.started = true;
-        ambient();
-      }
-      master.gain.setTargetAtTime(s.muted ? 0 : 0.85, ctx.currentTime, 0.2);
+      try {
+        if (ctx.state === 'suspended') ctx.resume();
+        if (!s.started) {
+          s.started = true;
+          ambient();
+        }
+        master.gain.setTargetAtTime(s.muted ? 0 : 0.85, ctx.currentTime, 0.2);
+      } catch (e) { /* never let audio stop the game starting */ }
     };
 
     s.setMuted = function (m) {
@@ -17139,10 +18785,29 @@ MR.Audio = (function () {
     };
 
     s.ambient = ambient;
+
+    // Any cue that throws must not take the frame with it. Every public method
+    // is wrapped once, here, rather than each of them carrying a try block --
+    // a game loop calling audio.hit() should not be able to die because a
+    // browser disagreed about an AudioParam.
+    for (const k of API) {
+      if (typeof s[k] !== 'function') { s[k] = function () {}; continue; }
+      s[k] = (function (name, fn) {
+        return function () {
+          // Swallowed, but not hidden: nothing is logged, because the
+          // screenshot harness fails the build on a console warning and a
+          // browser quirk in one cue must not fail a build. It is recorded
+          // instead, so `MR.audio.lastError` answers "is the mix throwing".
+          try { return fn.apply(s, arguments); } catch (e) { s.lastError = name + ': ' + e; }
+          return undefined;
+        };
+      })(k, s[k]);
+    }
+
     return s;
   }
 
-  return { create };
+  return { create, silent };
 })();
 
 /* ==================== src/ui/hud.js ==================== */
@@ -17352,6 +19017,46 @@ MR.HUD = (function () {
           spend and rebuild. It also costs one large number less on a screen
           the owner asked to declutter.
         -->
+        <!--
+          THE SECOND PASS: THE PLATE IS THE GAUGE AND ONE NUMBER.
+
+          It carried four rows under the tank -- PACE, a required-pace line and
+          a clean count -- and three of them were the same statement written
+          three ways. Measured across a full clean run at one-second
+          resolution (bot=1, 390x844):
+
+            NEED   moves 4:32 -> 4:27 and back to 4:29 over the first 200
+                   seconds. Five seconds of travel across four fifths of a
+                   race: a constant with a decimal point. Then, as the
+                   remaining distance goes to zero, it divides by it: the last
+                   thing the readout says on a RECORD run is NEED 24:44/MI.
+                   The line that is supposed to price the record prints
+                   nonsense at the moment the record is won.
+
+            Its one live question -- "am I fast enough?" -- is already answered
+            twice beside it, at the same instant. The gauge fill passes the
+            white record tick between race-second 90 and 95; NEED minus PACE
+            crosses zero between race-second 90 and 95. Same event. And PACE
+            itself turns green on the same crossing (the 'ahead' class). Three
+            encodings of one bit.
+
+            n CLEAN is the number the gauge is drawn from -- fill is a linear
+                   map of the pace the streak buys -- so it restates the tank
+                   directly. The stylesheet had already dimmed it to 0.62 on
+                   phones, which is what a readout does just before it admits
+                   the row is furniture.
+
+            Once the record is gone the same slot became PB n CLEAN · n TO GO,
+            or LONGEST CLEAN · n, which measured FROZEN for the last 45
+            seconds of a 265-second run (stuck at 24 from race-second 215 to
+            the tape) while the rail and the projection both retargeted live.
+
+          PACE stays, and this is the argument for keeping it rather than for
+          cutting it: it is the only number in the game that answers to every
+          frame of play, it is the one thing that gives the white tick on the
+          tank a name, and it is stated in the same units as the wager. The
+          gauge shows how full; PACE says how fast. Nothing else does.
+        -->
         <div id="engine">
           <div class="lab">FUEL</div>
           <div class="gauge tank" id="paceGauge">
@@ -17360,15 +19065,34 @@ MR.HUD = (function () {
           </div>
           <div class="lab" id="paceLab">PACE</div>
           <div><span class="val num" id="paceVal">5:30</span><span class="unit">/MI</span></div>
-          <div class="sub num" id="needVal">NEED ${Pace.pace(K.RECORD_PACE)}/MI</div>
-          <div class="sub num" id="streakLine"><span id="streakVal">0</span> CLEAN</div>
           <div id="why">EACH CLEAN GATE BUYS SPEED</div>
         </div>
 
+        <!--
+          AID ONLY. The mile split card used to live here too, and every one
+          of its four facts was already on the screen it was drawn over:
+
+            MILE 11    the mile gantry in the world says so, and R3 is about
+                       making that sign legible rather than duplicating it.
+            4:41/MI    a SECOND pace, in the same units, sixty pixels under a
+                       PACE plate reading 4:25/MI. Two different min/mi
+                       numbers stacked, neither labelled to tell them apart.
+            51:45      the cumulative clock, which the rail prints live.
+            +1:36.8    the ghost delta, which the rail prints live -- and
+                       printed here in PINK on a run whose projection two
+                       plates above read RECORD ON in green. That is the exact
+                       contradiction the rail's tone rule and the finish
+                       card's split column were both rebuilt to remove; this
+                       was the last place in the game it survived.
+
+          It was up for two seconds every mile: 26 cards, ~52s of a ~250s run,
+          21% of the race spent covering the left edge with four numbers that
+          were already elsewhere. Aid is not a duplicate -- nothing else says
+          a bottle refilled the tank -- so the card stays for that alone.
+        -->
         <div id="toast">
-          <div class="lab" id="toastLab">MILE 1</div>
-          <div id="toastRow"><span class="big num" id="toastBig">--:--</span><span class="unit">/MI</span></div>
-          <div class="small num"><span id="toastCum"></span> <span id="toastDelta"></span></div>
+          <div class="lab" id="toastLab">FUEL</div>
+          <div class="big num" id="toastBig"></div>
         </div>
       </div>
 
@@ -17472,6 +19196,46 @@ MR.HUD = (function () {
             exact course rather than 1.5s per hit.
           - what the player's best today was, and whether this beat it.
           - tomorrow.
+
+        WHAT THE SECOND PASS TOOK OFF IT, AND WHY.
+
+        The card answers five questions, in this order: what did I run, was
+        that good, why was it not better, what did I do well, what now. Two
+        blocks answered none of them.
+
+        THE FIVE-ROW SUMMARY. Four of its five rows were arithmetic on
+        numbers already printed on the same card:
+          AVG PACE      FINAL TIME / 26.2.
+          FINAL PACE    the last row of the split table beside it (4:17 and
+                        4:17 clean; 5:05 and 5:06 on a 22-contact run).
+          CLEAN GATES   OF 205 GATES minus 22 CONTACTS COST, both printed.
+          CONTACTS      the cost plate's own label says "22 CONTACTS COST".
+        The fifth, AID TAKEN, is the only fact on the card that is nowhere
+        else, so it survives as a note rather than as a table row.
+
+        THE SIX-ROW SPLIT TABLE. Measured over four different days' courses
+        at four skill levels:
+          - on a CLEAN run it prints 4:57 4:30 4:26 4:23 4:16 4:17, and those
+            six numbers are the same to within two seconds on every one of
+            the four days. It is not showing this run; it is showing the
+            pace model's ramp, which is a constant.
+          - on a run that went wrong -- the card most players see -- the
+            whole spread across its six blocks is 14 to 23 seconds, while
+            the contacts cost 462 to 1064. Five-mile blocks average eight
+            miles of clean running over four contacts, so the one thing the
+            table could usefully locate is exactly what it averages away.
+        Constant on a good run, noise on a bad one. The shape of the race is
+        left to the one line that names an actual moment in it: the turn.
+
+        The best-today line no longer says FIRST RUN TODAY. That is the same
+        empty state the start panel's memory plates already refuse to draw:
+        nothing to remember, so nothing rendered.
+
+        And the rung line no longer repeats the headline. On a record run the
+        card read RECORD, then RECORD BEATEN BY 1:37, over -1:37 VS 1:59:30
+        -- one number three times in ninety pixels. There is no rung above
+        RECORD, so there is nothing for that slot to say; the green chip
+        says it.
       -->
       <div class="panel hidden" id="endPanel"><div class="panelInner">
         <div class="endDate" id="endDate"></div>
@@ -17496,11 +19260,6 @@ MR.HUD = (function () {
 
         <div id="endBadges"></div>
         <div id="endMem" class="num"></div>
-
-        <div id="endCols">
-          <div id="resultStats"></div>
-          <div id="splitTable"></div>
-        </div>
 
         <div id="endCost">
           <div class="lab" id="endCostLab">WHAT THE CONTACTS COST</div>
@@ -17533,13 +19292,12 @@ MR.HUD = (function () {
     const n = {
       clock: q('clock'),
       projCell: q('projCell'), projVal: q('projVal'), margin: q('margin'), status: q('status'),
-      engine: q('engine'), streakVal: q('streakVal'), why: q('why'),
-      gaugeFill: q('gaugeFill'), paceVal: q('paceVal'), needVal: q('needVal'),
-      distVal: q('distVal'), toGo: null,
+      engine: q('engine'), why: q('why'),
+      gaugeFill: q('gaugeFill'), paceVal: q('paceVal'),
+      distVal: q('distVal'),
       rail: q('rail'), railFill: q('railFill'), railGap: q('railGap'), railGhost: q('railGhost'),
       gapVal: q('gapVal'), gapTrend: q('gapTrend'), gapLabel: q('gapLabel'),
       toast: q('toast'), toastLab: q('toastLab'), toastBig: q('toastBig'),
-      toastCum: q('toastCum'), toastDelta: q('toastDelta'),
       startPanel: q('startPanel'), startBtn: q('startBtn'), startDate: q('startDate'),
       startRoute: q('startRoute'), startKeys: q('startKeys'), targetSub: q('targetSub'),
       startMemory: q('startMemory'),
@@ -17547,7 +19305,6 @@ MR.HUD = (function () {
       endVs: q('endVs'), endStreak: q('endStreak'), endStreakSub: q('endStreakSub'),
       verdict: q('verdict'), tierNext: q('tierNext'),
       endBadges: q('endBadges'), endMem: q('endMem'),
-      stats: q('resultStats'), splitTable: q('splitTable'),
       endCost: q('endCost'), endCostLab: q('endCostLab'),
       endCostVal: q('endCostVal'), endCostSub: q('endCostSub'),
       endTurn: q('endTurn'), tomorrow: q('tomorrow'), tomorrowRoute: q('tomorrowRoute'),
@@ -17594,9 +19351,7 @@ MR.HUD = (function () {
       root.classList.toggle('panelOpen', open);
     }
 
-    let lastP = null;      // last state seen, so the split card can read splits
     let hintUntil = 0;     // while set, the why-line shows the streak-cut message
-    let mem = null;        // what MR.Store remembers, as of this run's start
     let dateKey = '';
     let course = null;
     let cleanTime = null;  // this course's flawless finish, computed once
@@ -17620,7 +19375,6 @@ MR.HUD = (function () {
       chipOn = null;
       chipAt = 0;
       cache.chip = cache.chipCls = cache.projCls = undefined;
-      cache.need = cache.needCls = undefined;
     };
 
     api.setDate = function (key) {
@@ -17658,7 +19412,6 @@ MR.HUD = (function () {
      * back rather than as an empty frame promising one.
      */
     api.setMemory = function (sum) {
-      mem = sum || null;
       if (!n.startMemory) return;
       if (!sum) { n.startMemory.innerHTML = ''; return; }
 
@@ -17798,8 +19551,6 @@ MR.HUD = (function () {
     }
 
     api.update = function (p, extra) {
-      lastP = p;
-
       set(n.clock, 'clock', Pace.clock(p.raceTime));
       set(n.distVal, 'dist', p.miles.toFixed(2));
 
@@ -17902,35 +19653,16 @@ MR.HUD = (function () {
       cls(n.status, 'chipCls', 'chip ' + state);
       cls(n.projCell, 'projCls', state);
 
-      // ---- the engine: streak -> speed unlocked -> pace ------------------
-      set(n.streakVal, 'streak', String(p.streak));
+      // ---- the engine: the tank, and the speed it bought ------------------
+      // Two marks, one variable. The fill is a linear map of the pace the
+      // streak has unlocked; the number names it in the units of the wager;
+      // and both cross the white record tick at the same instant, which is why
+      // the required-pace line and the clean count that used to sit under here
+      // were removed rather than reworded. See the plate's comment above.
       n.gaugeFill.style.width =
         (clamp01((K.START_PACE - p.pace) / (K.START_PACE - K.FLOOR_PACE)) * 100) + '%';
       set(n.paceVal, 'pace', Pace.pace(p.pace));
       cls(n.paceVal, 'paceCls', 'val num' + (p.pace <= K.RECORD_PACE ? ' ahead' : ''));
-      // The line under the pace. While the record lives it is the race-desk
-      // number: the pace the rest of the course demands. Once the record is
-      // gone that number is a lie -- it asks for a pace below the 4:14 floor
-      // -- so the plate switches to the one target that is still winnable and
-      // still live: the player's own longest clean line. It is monotone, so it
-      // can only ever be approached, never lost; it has 189 points of
-      // resolution; and it is the exact skill the game is teaching.
-      let needText, needCls;
-      if (!gone) {
-        needText = 'NEED ' + Pace.pace(need) + '/MI';
-        needCls = 'sub num';
-      } else if (mem && mem.pbStreak > 0) {
-        const togo = mem.pbStreak - p.bestStreak;
-        needText = togo > 0
-          ? 'PB ' + mem.pbStreak + ' CLEAN · ' + togo + ' TO GO'
-          : 'CLEAN PB · ' + p.bestStreak;
-        needCls = 'sub num' + (togo > 0 ? '' : ' pb');
-      } else {
-        needText = 'LONGEST CLEAN · ' + p.bestStreak;
-        needCls = 'sub num';
-      }
-      set(n.needVal, 'need', needText);
-      cls(n.needVal, 'needCls', needCls);
 
       // Nothing else on screen says why the pace moves, so the line stays up
       // until the player has plainly felt it, and comes back on every break.
@@ -17978,37 +19710,32 @@ MR.HUD = (function () {
       const d = p.deltaVsRecord();
       const ahead = d < 0;
 
-      // ONCE THE RECORD IS GONE, THE GHOST STOPS BEING NEWS.
+      // THE RAIL IS A MAP. IT DOES NOT CARRY A SECOND VERDICT.
       //
-      // It no longer contradicts anything -- that was fixed above -- but on a
-      // dead run it becomes the largest irrelevant number on screen, counting
-      // a gap to a target that has already been conceded while the headline
-      // chases a rung further down the ladder. Measured mid-run at 7 contacts
-      // it read `+6:01.9 UP THE ROAD` and was still growing.
+      // Once the record died this band used to retarget too: CHASING /
+      // SUB-2:06 / 4:30.0 TO FIND. The plate at the top of the same frame was
+      // simultaneously reading SUB-2:12 / 2:50 OFF SUB-2:06 -- the same rung,
+      // the same question, and two different answers 700px apart, because the
+      // plate integrates the rest of the race with projectClean() and the rail
+      // froze the current pace with projected(). Measured on one frame at 20.1
+      // miles: 2:50 against 4:30.0, a disagreement of 1:40 about how far the
+      // player is from the thing the screen is telling them to chase.
       //
-      // So the plate reports the chase that is actually live. The rail keeps
-      // drawing the ghost marker, because where the record physically is on
-      // the road is still true and still worth seeing; it is only the headline
-      // number that retargets.
-      const goneTier = gone ? Tier.of(p.projected()) : null;
-      const goneNext = gone ? Tier.next(p.projected()) : null;
-      if (gone && goneNext) {
-        set(n.gapLabel, 'gapLab', 'CHASING');
-        set(n.gapVal, 'gap', goneNext.name);
-        cls(n.gapVal, 'gapCls', 'num level');
-        cls(n.railGap, 'railGapCls', 'level');
-        const togo = Math.max(0, p.projected() - goneNext.max);
-        set(n.gapTrend, 'trend', togo > 0 ? Pace.delta(togo).replace('+', '') + ' TO FIND' : 'HELD');
-        cls(n.gapTrend, 'trendCls', togo > 0 ? 'level' : 'ahead');
-      } else {
-        const tone = ahead ? 'ahead' : state === 'off' ? 'behind' : 'level';
-        set(n.gapLabel, 'gapLab', 'RECORD GHOST');
-        set(n.gapVal, 'gap', Pace.delta(d));
-        cls(n.gapVal, 'gapCls', 'num ' + tone);
-        cls(n.railGap, 'railGapCls', tone);
-        set(n.gapTrend, 'trend', Math.abs(d) < 1 ? 'LEVEL' : ahead ? 'BEHIND YOU' : 'UP THE ROAD');
-        cls(n.gapTrend, 'trendCls', tone);
-      }
+      // Unifying the two projections would have printed the identical string
+      // twice, which is the definition of the crowding this pass is for. So the
+      // chase is stated once, in the plate that owns verdicts, and the rail
+      // goes back to being the one thing it draws: you, the ghost, and the road
+      // between you. That is geography, and it stays true after the record has
+      // gone -- which is exactly why its tone is already neutral there: `tone`
+      // can only be red when the projection itself is red, and on a dead run
+      // the projection has retargeted onto the ladder and is not.
+      const tone = ahead ? 'ahead' : state === 'off' ? 'behind' : 'level';
+      set(n.gapLabel, 'gapLab', 'RECORD GHOST');
+      set(n.gapVal, 'gap', Pace.delta(d));
+      cls(n.gapVal, 'gapCls', 'num ' + tone);
+      cls(n.railGap, 'railGapCls', tone);
+      set(n.gapTrend, 'trend', Math.abs(d) < 1 ? 'LEVEL' : ahead ? 'BEHIND YOU' : 'UP THE ROAD');
+      cls(n.gapTrend, 'trendCls', tone);
 
       if (extra && extra.fps !== undefined) {
         set(n.perf, 'perf', extra.fps.toFixed(0) + ' FPS · ' + (extra.draws || 0) + ' DRAWS');
@@ -18021,59 +19748,39 @@ MR.HUD = (function () {
       hintUntil = performance.now() + 2200;
     };
 
-    // ---- mile splits ----------------------------------------------------
-    // A runner's mile split is the time that mile took, which the caller does
-    // not pass; it is one subtraction away in splits[], so the card composes
-    // its own line from the state it already sees and falls back to whatever
-    // strings it was handed.
+    // ---- the aid card ----------------------------------------------------
     let toastTimer = null;
 
     /**
-     * Aid taken. Deliberately reuses the split card rather than adding a
-     * fourth floating element -- the frame is already carrying a race clock, a
-     * streak plate and a ghost tag, and the middle stays clear on purpose. A
-     * bottle gets no card at all: the streak number jumping is the feedback,
-     * and five cards in a row through a water table would be noise.
+     * Aid taken. The only thing this card still says, and the only thing it
+     * ever said that was not already on screen: nothing else in the game
+     * reports that a banana put fuel back in the tank. The gauge jumps, but a
+     * jump with no cause named is indistinguishable from a lucky gate.
+     *
+     * A bottle still gets no card at all -- five cards in a row through a
+     * water table would be noise.
+     *
+     * The `/MI` unit that used to sit in this row is gone with the splits, and
+     * that fixes a live defect on the way out: `toastAid` never hid it, so
+     * every aid card in the shipped game read "+3 STREAK /MI".
      */
     api.toastAid = function (lab, sub) {
       n.toastLab.textContent = lab;
       n.toastBig.textContent = sub;
-      if (n.toastCum) n.toastCum.textContent = '';
-      if (n.toastDelta) { n.toastDelta.textContent = ''; n.toastDelta.className = ''; }
       n.toast.classList.add('show');
       clearTimeout(toastTimer);
       toastTimer = setTimeout(function () { n.toast.classList.remove('show'); }, 1200);
     };
 
-    api.toast = function (big, small, ms) {
-      const sp = lastP && lastP.splits.length
-        ? lastP.splits[lastP.splits.length - 1] : null;
-      if (sp) {
-        const i = lastP.splits.length;
-        const prev = i > 1 ? lastP.splits[i - 2].time : 0;
-        const d = sp.time - sp.mile * K.RECORD_PACE;
-        n.toastLab.textContent = 'MILE ' + sp.mile;
-        n.toastBig.textContent = Pace.pace(sp.time - prev);
-        // Only the delta is tinted. The elapsed clock is a plain fact and
-        // colouring it too made the whole line read as a warning.
-        n.toastCum.textContent = Pace.clock(sp.time);
-        n.toastDelta.textContent = Pace.delta(d);
-        n.toastDelta.className = d < 0 ? 'ahead' : 'behind';
-      } else {
-        n.toastLab.textContent = big || '';
-        n.toastBig.textContent = '';
-        n.toastCum.textContent = small || '';
-        n.toastDelta.textContent = '';
-      }
-      // Without split data there is no mile time to headline, so the card
-      // drops that row rather than showing a bare "/MI".
-      n.toast.classList.toggle('noBig', !sp);
-      n.toast.classList.add('show');
-      clearTimeout(toastTimer);
-      // Splits arrive every nine or ten real seconds at record pace, so the
-      // card can sit long enough to be read without ever stacking up.
-      toastTimer = setTimeout(() => n.toast.classList.remove('show'), ms || 2000);
-    };
+    /**
+     * The mile split card, retired. See the markup comment on #toast for the
+     * four facts it carried and where each one already was.
+     *
+     * Kept as a no-op rather than deleted, because main.js calls it once per
+     * mile and that file belongs to another agent. The call site
+     * (main.js, the split handler) can go with it.
+     */
+    api.toast = function () {};
 
     api.showStart = function (show) {
       n.startPanel.classList.toggle('hidden', !show);
@@ -18160,9 +19867,13 @@ MR.HUD = (function () {
       // ---- the grade -----------------------------------------------------
       n.verdict.textContent = rung.name;
       n.verdict.className = 'tier t' + rung.i;
+      // Nothing above RECORD, so nothing to chase and nothing to print. This
+      // slot used to say RECORD BEATEN BY 1:37 directly beneath an endVs
+      // reading -1:37 VS 1:59:30, beside a chip reading RECORD: the same
+      // number three times inside ninety pixels.
       n.tierNext.textContent = up
         ? Pace.clock(Tier.gapTo(t, up)) + ' OFF ' + up.name
-        : 'RECORD BEATEN BY ' + Pace.clock(-vs);
+        : '';
 
       // ---- what the save made of it --------------------------------------
       const badges = [];
@@ -18180,70 +19891,11 @@ MR.HUD = (function () {
             ? 'BEAT YOUR BEST TODAY BY ' + Pace.clock(was.time - t)
             : 'YOUR BEST TODAY ' + Pace.clock(was.time)
               + ' · THIS RUN +' + Pace.clock(t - was.time))
-        : (rec.dateKey ? 'FIRST RUN TODAY' : '');
-
-      // ---- summary -------------------------------------------------------
-      // Label and value are no longer the same type at two opacities: the
-      // label is the HUD's own 9px/800/0.16em and the value is a large
-      // tabular figure, which is the pairing every plate in the live readout
-      // already uses. Casing is uppercase throughout, because the HUD says
-      // /MI and CLEAN GATES and this card used to say /mi and gates.
-      const rows = [
-        ['AVG PACE', Pace.pace(t / K.MARATHON_MILES) + '/MI'],
-        // p.pace at the line is the pace held into the finish, not the best of
-        // the race -- a run that broke late finishes slower than it ever ran.
-        ['FINAL PACE', Pace.pace(p.pace) + '/MI'],
-        ['CLEAN GATES', String(Math.max(0, p.gatesSeen - p.hits))],
-        ['CONTACTS', String(p.hits)],
-        // "AID TAKEN 0" is meaningless to a player who never noticed aid was
-        // on the course. With the denominator it reads as something missed
-        // rather than a stat with no scale -- and on the runs the mechanic
-        // exists for, a broken race, it is very often 0 of 6.
-        ['AID TAKEN', p.aid + ' OF ' + (course && course.aid ? course.aid.length : '?')],
-      ];
-      // Both grids open with exactly one header row and then run on identical
-      // fixed-height rows, which is what puts them back in phase -- they were
-      // two grids on two rhythms about three pixels apart, which is close
-      // enough to look like a mistake and far enough to be one.
-      n.stats.innerHTML = '<div class="k hd">SUMMARY</div><div class="k hd"></div>' + rows
-        .map(function (r) {
-          return '<div class="k">' + r[0] + '</div><div class="v num">' + r[1] + '</div>';
-        }).join('');
-
-      // ---- splits --------------------------------------------------------
-      // PER-BLOCK PACE, NOT VS-RECORD.
-      //
-      // The old third column was the ghost delta, and it graded a WINNING run
-      // pink for its first three rows -- the race is built so the player opens
-      // at 5:30 and reels the record in, so the delta is positive for the
-      // whole first half of even a flawless line. A win that reads as
-      // three-fifths failure is a broken scorecard, and no amount of tinting
-      // fixes a column that is measuring the wrong thing.
-      //
-      // Pace over each five-mile block is the same data without the false
-      // verdict: it shows the shape of the race climbing from 5:30 toward the
-      // floor, and it goes green only where the block was AT or under record
-      // pace. Nothing on this card is tinted for failure any more; the tier
-      // band carries the result, once.
-      let table = '<div class="k hd">MI</div><div class="k hd">TIME</div>'
-                + '<div class="k hd">PACE</div>';
-      const marks = p.splits.filter(function (s) { return s.mile % 5 === 0; });
-      let pm = 0, pt = 0;
-      for (const s of marks) {
-        const blk = (s.time - pt) / (s.mile - pm);
-        table += '<div class="v num">' + s.mile + '</div>'
-              + '<div class="v num">' + Pace.clock(s.time) + '</div>'
-              + '<div class="v num' + (blk <= K.RECORD_PACE ? ' ahead' : '') + '">'
-              + Pace.pace(blk) + '</div>';
-        pm = s.mile; pt = s.time;
-      }
-      const fblk = K.MARATHON_MILES > pm ? (t - pt) / (K.MARATHON_MILES - pm) : NaN;
-      table += '<div class="sep"></div>'
-            + '<div class="v num fin">' + K.MARATHON_LABEL + '</div>'
-            + '<div class="v num fin">' + Pace.clock(t) + '</div>'
-            + '<div class="v num fin' + (fblk <= K.RECORD_PACE ? ' ahead' : '') + '">'
-            + Pace.pace(fblk) + '</div>';
-      n.splitTable.innerHTML = table;
+        // No previous run today means there is no comparison to draw, and
+        // "FIRST RUN TODAY" is that absence typed out. The start panel's
+        // memory plates already refuse to render their own empty state; this
+        // is the same rule on the other side of the run.
+        : '';
 
       // ---- the true cost of contact --------------------------------------
       // This row used to print hits * HIT_TIME_PENALTY. On a twelve-contact
@@ -18271,7 +19923,29 @@ MR.HUD = (function () {
           : 'AGAINST A FLAWLESS LINE';
       }
 
-      n.endTurn.textContent = turnLine(p);
+      // ---- the two notes ---------------------------------------------------
+      // What is left of the summary and the split table. The turn names one
+      // actual moment in the race, which is the job the six-block table could
+      // not do; AID TAKEN is the one number from the summary that was not
+      // arithmetic on something else already printed here -- and on the runs
+      // the mechanic exists for, a broken race, it is very often 0 of 14,
+      // which is the only line on the card that tells a player there was help
+      // on the road they ran past.
+      const notes = [];
+      const turn = turnLine(p);
+      if (turn) notes.push(turn);
+      // Not on a flawless line. cleanFinish() spells out why aid is worth
+      // exactly zero to a run that never broke -- it tops a streak up to a
+      // ceiling that run is already above -- so "AID TAKEN · 0 OF 14" under a
+      // 205-of-205 card reports a miss that was not one. It is printed when
+      // the player took some, or when there were contacts it could have
+      // answered.
+      const aidN = course && course.aid ? course.aid.length : 0;
+      if (aidN && (p.aid > 0 || p.hits > 0)) {
+        notes.push('AID TAKEN · ' + p.aid + ' OF ' + aidN);
+      }
+      n.endTurn.innerHTML = notes
+        .map(function (x) { return '<div>' + x + '</div>'; }).join('');
       const tom = tomorrowLine();
       n.tomorrowRoute.textContent = tom;
       n.tomorrow.classList.toggle('empty', !tom);
@@ -18310,6 +19984,14 @@ MR.HUD = (function () {
  *   ?debug=1          FPS and draw-call readout
  *   ?nocount=1        skip the countdown
  *   ?nosave=1         play without writing to the save
+ *   ?polish=0         run the character animation with the polish terms off
+ *
+ * `?polish` is the animation A/B, and it is a scalar rather than a switch so
+ * the two versions can also be crossfaded to find where a term stops helping.
+ * Every term added by the animation-polish work is scaled by
+ * MR.Runner.POLISH, which means ONE build renders both the old cycle and the
+ * new one. A checked-in "before" screenshot goes stale the first time
+ * something else on the character changes; this cannot.
  */
 (function () {
   const K = MR.K;
@@ -18325,6 +20007,12 @@ MR.HUD = (function () {
   const NOCOUNT = params.get('nocount') === '1' || BOT;
   // Inspecting the game should not be able to overwrite a real player's best.
   const NOSAVE = params.get('nosave') === '1';
+  // Guarded, because this reads a knob on another module: absent the polish
+  // work the parameter is simply inert rather than a boot failure.
+  if (params.has('polish') && MR.Runner && 'POLISH' in MR.Runner) {
+    const v = parseFloat(params.get('polish'));
+    if (isFinite(v)) MR.Runner.POLISH = Math.max(0, Math.min(1, v));
+  }
 
   // ---- renderer ---------------------------------------------------------
   const canvas = document.getElementById('gl');
@@ -18365,8 +20053,16 @@ MR.HUD = (function () {
   hud.setCourse(course);
   hud.showPerf(DEBUG);
 
+  // The road profile is the course's, so the camera and the pace model read
+  // the same ground the generator proved solvable against.
+  const elev = course.elevation || MR.Elevation.FLAT;
+  cam.setElevation(elev);
+  ghost.setElevation(elev);
+  const eProof = elev.validate();
+  if (!eProof.ok) console.error('ELEVATION INVALID', eProof.errors);
+
   const player = MR.Player.create();
-  let pace = Pace.create();
+  let pace = Pace.create(elev);
 
   // Collision thresholds must stay honest against the visuals; shout in the
   // console rather than let a retune silently make the game unfair.
@@ -18382,6 +20078,12 @@ MR.HUD = (function () {
   let countT = 0;
   let lastStep = 0;
   let mileShown = 0;
+  // Edge detectors for the two cues that mark a change of situation rather
+  // than an event. Neither has anything else on screen at the moment it
+  // happens, which is why they are worth a sound: the record going out of
+  // reach is silent today, and so is dropping a rung of the ladder.
+  let recordGone = false;
+  let tierIdx = -1;
 
   function reset() {
     clearTimeout(endTimer);
@@ -18389,13 +20091,15 @@ MR.HUD = (function () {
     // same session has to chase the streak the first one just set.
     hud.setMemory(MR.Store.summary(dateKey));
     hud.reset();
-    pace = Pace.create();
+    pace = Pace.create(elev);
     player.reset();
     world.reset();
     cam.reset();
     controls.clear();
     mileShown = 0;
     lastStep = 0;
+    recordGone = false;
+    tierIdx = -1;
     runner.phase = 0;
     ghost.reset();
     hud.hideEnd();
@@ -18442,15 +20146,47 @@ MR.HUD = (function () {
       // Deliberate miss, for exercising the failure paths.
       const miss = BOT_SKILL < 1 && (bot.seen % Math.max(2, Math.round(1 / (1 - BOT_SKILL))) === 0);
 
-      // Prefer staying put, then the nearest lane; CLEAR beats an action.
+      // Prefer staying put, then the nearest lane; CLEAR beats an action; and
+      // a lane carrying aid beats the same lane without it.
+      //
+      // The aid term is not decoration. Aid is deliberately placed in the
+      // hardest legal lane and half the pool is placed to rescue a broken run,
+      // so it is the mechanic that decides how forgiving this game is -- and
+      // until now no automated run had ever collected a single item. A
+      // 16-contact bot run took 0 of 14, which meant the comeback path was
+      // measured only by tools/simulate.js modelling it, never by the game
+      // playing it. A verification harness that cannot exercise a mechanic is
+      // not verifying that mechanic.
+      //
+      // Aid is taken on lane match alone (player.resolveAid), so wanting an
+      // item means being in its lane when z passes it. The lane commit below
+      // fires at 34 units out, comfortably before any item between here and
+      // the gate.
       const order = [player.lane, player.lane - 1, player.lane + 1, 0, 1, 2]
         .filter((l, i, a) => l >= 0 && l <= 2 && a.indexOf(l) === i);
-      let best = null;
-      for (const l of order) {
-        if (g.lanes[l] === K.BLOCK) continue;
-        if (best === null) best = l;
-        if (g.lanes[l] === K.CLEAR) { best = l; break; }
+      // Items still ahead of the runner and no further than this gate.
+      const wants = [];
+      for (const it of (course.aid || [])) {
+        if (it.z <= pace.units) continue;
+        if (it.z > g.z) break;
+        wants.push(it.lane);
       }
+      let best = null, bestScore = -Infinity;
+      order.forEach(function (l, i) {
+        if (g.lanes[l] === K.BLOCK) return;
+        // Order position is the existing tie-break, kept intact: a lane earlier
+        // in `order` wins whenever nothing else separates two candidates.
+        let score = (g.lanes[l] === K.CLEAR ? 100 : 0) - i;
+        // Aid outranks a clear lane, deliberately. The bot handles JUMP and
+        // DUCK reliably -- the timing below is derived from the arc, not
+        // hand-tuned -- so detouring through an item costs an action it could
+        // have avoided and not a contact. Verified: bot=1 still finishes with
+        // 0 hits. If that ever stops being true, this is the term to lower,
+        // because a bot that breaks its streak fetching a bottle is measuring
+        // the wrong thing.
+        if (wants.indexOf(l) >= 0) score += 150;
+        if (score > bestScore) { bestScore = score; best = l; }
+      });
       if (best === null) best = player.lane;
       if (miss) {
         const bad = [0, 1, 2].find((l) => g.lanes[l] === K.BLOCK);
@@ -18549,11 +20285,22 @@ MR.HUD = (function () {
       }
 
       // Aid taken this step. Streak only -- pace still has one source.
+      //
+      // resolveAid walks the index past every item the runner drew level with
+      // and returns only the ones whose lane matched, so the difference is the
+      // count that went by untaken. That is the one event in the run which is
+      // pure loss and has nothing to mark it: no contact, no flash, the streak
+      // simply fails to go up. Hence a sound and nothing else -- a toast here
+      // would be scolding, and the readout is being cut, not grown.
+      const aidIdxBefore = player.aidIdx;
+      let aidTaken = 0;
       for (const item of player.resolveAid(course, before, after)) {
         pace.onAid(item.gain);
         audio.aid(item.kind === 'banana');
+        aidTaken++;
         if (item.kind === 'banana') hud.toastAid('FUEL', '+' + item.gain + ' STREAK');
       }
+      if (player.aidIdx - aidIdxBefore > aidTaken) audio.aidMissed();
 
       // Player events -> audio.
       for (const e of player.drainEvents()) {
@@ -18582,7 +20329,23 @@ MR.HUD = (function () {
         audio.mile(sp.mile);
       }
 
-      audio.setIntensity(Math.min(1, pace.streak / 70));
+      // Unclamped, deliberately. The old min(1, ...) saturated at streak 70 on
+      // a course of 205 gates, so the mix stopped responding around mile 11 of
+      // 26 -- the same defect the audio probe found in clean(), which had gone
+      // flat at streak 90. audio.setIntensity reads a value above 1.0 as the
+      // raw streak/70 and keeps climbing.
+      // The second argument is the road's grade, and without it the terrain
+      // layer of the mix is silent -- the hills are audible only through
+      // cadence, which falls out of a grade-inclusive speed for free.
+      audio.setIntensity(pace.streak / 70, pace.grade);
+
+      // The record slipping out of reach, and the ladder moving under you.
+      // Both are changes of situation rather than events, both are currently
+      // silent, and both are edges -- fired once at the crossing, never held.
+      if (!recordGone && !pace.recordPossible()) { recordGone = true; audio.recordLost(); }
+      const tNow = MR.Tier.of(pace.projected()).i;
+      if (tierIdx >= 0 && tNow !== tierIdx) audio.tier(tNow < tierIdx);
+      tierIdx = tNow;
 
       if (pace.finished) {
         state = DONE;
@@ -18626,8 +20389,14 @@ MR.HUD = (function () {
       ? pace.speed() * Math.max(0, 1 - (performance.now() - doneAt) / 2200)
       : pace.speed();
 
+    // The grade at the runner, -1..1 against the steepest legal one. It only
+    // pitches the trunk; the stride slows on the climb and quickens on the
+    // descent for free, because cadence already falls out of `speed`.
+    const grade = elev.gradeNorm(pace.units);
+
     runner.update(dt, {
       speed: strideSpeed,
+      grade,
       air01: player.airborne ? Math.sin(Math.min(1, player.airT) * Math.PI) : 0,
       duck01: player.duck01,
       trip: player.tripT,
@@ -18635,11 +20404,20 @@ MR.HUD = (function () {
       lean: player.lean,
       stumble: player.stumble,
     });
-    runner.group.position.set(player.x, player.y, pace.units);
+    // ELEVATION IS ADDED HERE AND NOWHERE UPSTREAM. `player.y` is, and stays,
+    // the height above the LOCAL road surface -- which is what lets
+    // collision.js keep testing y >= 0.84 and duck01 >= 0.90 against a flat
+    // zero, and is the single finding the whole hill feature rests on.
+    runner.group.position.set(player.x, player.y + elev.at(pace.units), pace.units);
 
     cam.update(dt, {
       z: pace.units, x: player.x, y: player.y,
-      speed: pace.speed(), lean: player.lean, duck01: player.duck01,
+      speed: pace.speed(),
+      // The flat speed, for the top-gear latch alone. A descent must not fire
+      // the gear flourish or the permanent rumble: speed you did not earn is
+      // not another gear. See camera.js's header.
+      gearSpeed: pace.streakSpeed(),
+      lean: player.lean, duck01: player.duck01,
     });
 
     // After the camera, never before: the ghost's tag is placed against this

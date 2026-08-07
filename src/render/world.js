@@ -1180,6 +1180,33 @@ MR.World = (function () {
       const h = t.h[0] + rnd() * (t.h[1] - t.h[0]);
       const col = t.colors[Math.floor(rnd() * t.colors.length)];
       const lean = t.lean ? (rnd() - 0.5) * 0.035 : 0;
+      /**
+       * THE BAYS STEP BACK, and this is the only depth device left in section 7
+       * that survives the distance the street wall is actually read at.
+       *
+       * Everything else on this facade -- the awning, the shopfront band, the
+       * window surrounds, the hanging sign, the balcony -- projects toward the
+       * road on a plane that every bay in the row shares. So the row is one
+       * unbroken plane thirty units long, and at any distance past the nearest
+       * house the eye reads it as an extrusion with a pattern on it rather than
+       * as a terrace of separate buildings. It is the same fault the parapet
+       * comment below already names about roofs, one level up.
+       *
+       * A step is FREE -- the bay's side faces already exist and are simply
+       * uncovered -- and it is the one thing here whose read GROWS with the
+       * grazing angle instead of shrinking with distance. Because the row runs
+       * along z and the camera looks along z, the uncovered face points almost
+       * straight at the lens: a 0.45-unit step is a hard vertical value edge
+       * the full height of the house, 9px wide at 30 units, 4.5px at 60 and
+       * still 2px at 120, against a window surround that is 1-2px at 60 and
+       * gone by 120. Nothing else available at this cost is legible that far.
+       *
+       * It only ever steps BACK. The front plane is 12.2 and the awning fascia
+       * already overhangs it to 11.33 against a pavement edge of 11.75, so
+       * pushing a bay toward the road would spend a margin that is doing real
+       * work; receding costs nothing and reads identically.
+       */
+      const step = rnd() < 0.5 ? 0.30 + rnd() * 0.32 : 0;
       const sub = [];
       sub.push(bx(d, h, bw * 0.98, 0, h / 2, 0, col));
       /**
@@ -1362,7 +1389,7 @@ MR.World = (function () {
             (rnd() - 0.5) * d * 0.5, h + 1.4, z + (rnd() - 0.5) * bw * 0.6, t.roofColor));
         }
       }
-      placeAt(parts, sub, 0, 0, z, lean);
+      placeAt(parts, sub, step, 0, z, lean);
     }
   }
 

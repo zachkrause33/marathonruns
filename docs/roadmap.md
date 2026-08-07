@@ -25,20 +25,47 @@ start, or will misread their run, without it*. The fuel gauge shows the engine
 and the projection shows the verdict; a number that only restates one of those
 is furniture.
 
-### R2 · Stacked obstacles hide the road ahead — **OPEN**
+### R2 · Stacked obstacles hide the road ahead — **DIAGNOSED, OPEN**
 
 > *"When there are so many obstacles back to back it makes it a tad tough to
 > see what's ahead of you. What can we do to unclutter that? Is it changing
 > colors? Moving the camera angle up slightly? Or maybe it's more crisp
 > animation."*
 
-Diagnose before choosing a remedy. The candidates are not equally likely: the
-telegraph mats are the largest painted area on the road and two adjacent mats
-already cover most of the carriageway, which is a much bigger surface than the
-hazards themselves. Camera height was raised once before for exactly this
-complaint and is a blunt instrument — it trades the near road for the far one.
+**The first diagnosis in this file was wrong and is kept here as the reason to
+measure.** It said the telegraph mats were the largest painted area and that
+two adjacent mats cover most of the carriageway. They cannot be adjacent:
+`ACTION_WINDOW` puts a floor of 21 units under gate spacing and a mat is 16
+long, so across five real courses **0% of gaps are short enough for two mats to
+overlap.** 53% of the road carries a mat, always exactly one, 28% of the lane
+band. The mats are not the defect.
 
-### R3 · Mile markers unreadable; the road is over-covered — **OPEN**
+Two things are, both measured against the shipped camera and the shipped
+collision envelopes (`tools/` scratch, reproduced in the R2 brief):
+
+**1. A BLOCK is opaque to the horizon.** `BOX[BLOCK].yMax` is 2.80 and the
+camera eye is `BASE_Y` 2.62. The eye sits 0.18 units *below the top of the
+wall*, so there is no distance at which a player sees over one — the road
+behind a BLOCK is hidden all the way out, at every range. JUMP hides 6–20u
+depending on distance; a DUCK bar has daylight under it and loses a band
+further out (44–67u when the bar is at 20u). Only BLOCK is total.
+
+And any hazard at 12 units covers **all three lanes** of the road at 45 units
+in screen width — 0.144 NDC half-width against a 0.114 lane band. Since gates
+are 21–48 units apart, there is always a near gate doing this to the next one
+at exactly the moment its lane has to be chosen.
+
+**2. The future lives in 5% of the frame.** Road from 25u to 150u — everything
+still undecided — occupies 0.108 of NDC height. Road nearer than 25u, all of it
+already committed, gets 1.037, i.e. **half the screen**. The middle of the
+screen is looking at road 18.5 units ahead.
+
+Re-pointing the frame is real but modest: eye 3.10 / look 1.16 / ahead 11.0
+clears the wall (sightline out to 213u) and costs almost nothing in runner size
+(NDC height 0.504 → 0.491), but only buys 1.18× on the far band. The camera
+alone will not fix this. The wall has to stop being a wall above the eye line.
+
+### R3 · Mile markers unreadable; the road is over-covered — **DIAGNOSED, OPEN**
 
 > *"Review the mile markers. Still tough to read at the top. You should be able
 > to clearly see that. Take out some of the wires, poles, and bars. The road
@@ -48,6 +75,14 @@ complaint and is a blunt instrument — it trades the near road for the far one.
 deliberate correction to an earlier instruction of mine — overhead structure
 was added for depth and rhythm and has been overdone. Open sky is a legitimate
 and cheaper look.
+
+**R3 is R2 seen from above, and they should be one pass.** The far road line
+sits at NDC y 0.145; a gantry beam at y 5.4 sits at 0.217 (90u) to 0.317 (25u).
+Overhead structure occupies the band *immediately above* the sliver that
+carries the entire future of the run, and the HUD occupies the band above that.
+The mile marker has to be read in the same few percent of frame height that the
+next three gates are competing for. Clearing the sky is not decoration; it is
+the cheapest way to give R2's 0.108 of NDC height somewhere to breathe.
 
 ### R4 · The finish card carries too much — **IN FLIGHT**
 

@@ -189,24 +189,19 @@ html, body {
   padding: 8px 14px 9px;
   min-width: 152px; max-width: 178px;
 }
-/* The count is a sub-line now, not the headline -- it explains the tank above
-   it rather than competing with the pace below. Accent still, because it is
-   the same quantity the gauge draws. */
-#engine #streakVal { font-weight: 700; color: var(--accent); }
+/* The plate is now the tank and one number. The clean count and the
+   required-pace line that used to sit under here were three encodings of the
+   crossing the fill and the tick already draw; hud.js carries the measurement.
+   PACE turning green IS that crossing, which is why it is the survivor. */
 #engine #paceLab { margin-top: 1px; }
 #engine .val { font-size: 27px; font-weight: 500; line-height: 1.05; }
 #engine .val.ahead { color: var(--ahead); }
 #engine .unit { font-size: 11px; font-weight: 700; opacity: 0.6; margin-left: 3px; }
-#engine .sub { font-size: 9px; font-weight: 700; opacity: 0.68; margin-top: 2px; }
-/* The required pace turning red is the moment the record stops being possible;
- * it must not stay dimmed like an aside. */
-#engine .sub.behind { opacity: 1; }
 
-/* Contact flashes the whole plate, not just the number: the cost is the
- * streak and the speed together, and they live in the same box. */
+/* Contact flashes the whole plate, not just the number: the cost is the fuel
+ * and the speed together, and they live in the same box. */
 #engine.broken { border-left-color: var(--behind); background: rgba(58, 14, 32, 0.86); }
-#engine.broken #streakVal,
-#engine.broken .gaugeFill { color: var(--behind); background: var(--behind); }
+#engine.broken .gaugeFill { background: var(--behind); }
 
 .gauge {
   position: relative;
@@ -241,7 +236,13 @@ html, body {
   margin-top: 6px; color: var(--accent);
   transition: opacity 0.3s;
 }
-#why.off { opacity: 0; }
+/* It gives the space back, not just the ink. This line is up for the first two
+ * and a half miles and for two seconds after each contact; for the rest of the
+ * race it was an invisible 18px row holding the bottom of the plate down, and
+ * the plate sits in the top-left corner where the only part of the road that is
+ * still undecided -- 25 to 150 units out -- is competing for about 5% of the
+ * frame. An empty row there is not free. */
+#why.off { opacity: 0; height: 0; margin-top: 0; overflow: hidden; }
 #why.cut { color: var(--behind); }
 
 /* ---- distance, right ---- */
@@ -256,11 +257,11 @@ html, body {
 #dist .unit { font-size: 12px; font-weight: 700; opacity: 0.6; margin-left: 3px; }
 #dist .sub { font-size: 10px; font-weight: 700; opacity: 0.62; margin-top: 3px; }
 
-/* ---- mile split card ----
- * Docked under the left plate instead of thrown across the middle of the
- * screen: a split is worth reading, but never at the price of the gate the
- * player is about to hit. It shows the mile's own time, which is what a
- * runner means by a split. */
+/* ---- aid card ----
+ * Docked under the left plate, never across the middle of the screen. It used
+ * to carry the mile split as well; every fact in that card was already on the
+ * frame it was drawn over (see hud.js), so what is left is the one event
+ * nothing else reports -- fuel going back into the tank. */
 #toast {
   background: var(--ink);
   border-left: 4px solid #fffdf5;
@@ -270,12 +271,8 @@ html, body {
   transition: opacity 0.22s ease-out, transform 0.22s ease-out;
 }
 #toast.show { opacity: 1; transform: none; }
-#toast.noBig #toastRow { display: none; }
 #toast .lab { opacity: 0.85; color: #fffdf5; }
 #toast .big { font-size: 27px; font-weight: 700; line-height: 1.05; }
-#toast .unit { font-size: 11px; font-weight: 700; opacity: 0.6; margin-left: 3px; }
-#toast .small { font-size: 11px; font-weight: 500; margin-top: 1px; }
-#toast .small #toastCum { opacity: 0.8; }
 
 /* ---- progress rail ----
  * You, the ghost, and the road between you. The honest split lives here
@@ -755,9 +752,7 @@ html, body {
 
   #leftCol { left: 9px; top: 22px; gap: 7px; }
   #engine { min-width: 124px; max-width: 142px; padding: 6px 11px 7px; }
-  #engine #streakLine { opacity: 0.62; }
   #engine .val { font-size: 21px; }
-  #engine .sub { font-size: 8px; }
   #why { font-size: 8px; margin-top: 4px; }
 
   #dist { right: 9px; top: 22px; min-width: 112px; padding: 6px 11px 7px; }
@@ -766,7 +761,6 @@ html, body {
 
   #toast { min-width: 124px; padding: 6px 11px 7px; }
   #toast .big { font-size: 21px; }
-  #toast .small { font-size: 10px; }
 
   #railWrap { width: 92vw; bottom: calc(10px + env(safe-area-inset-bottom, 0px));
               padding: 7px 11px 6px; }
@@ -797,7 +791,7 @@ html, body {
   #engine { min-width: 190px; max-width: 220px; padding: 10px 17px 12px; }
   #engine .val { font-size: 33px; }
   #engine .unit { font-size: 13px; }
-  #engine .sub, #why { font-size: 11px; }
+  #why { font-size: 11px; }
   .gauge { height: 9px; }
 
   #dist { right: 20px; top: 28px; min-width: 172px; padding: 10px 17px 12px; }
@@ -807,8 +801,6 @@ html, body {
 
   #toast { min-width: 190px; padding: 9px 16px 11px; }
   #toast .big { font-size: 33px; }
-  #toast .unit { font-size: 13px; }
-  #toast .small { font-size: 13px; }
 
   #railWrap { width: min(1000px, 62vw); bottom: 20px; }
   #rail { height: 28px; }

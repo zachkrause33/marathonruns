@@ -204,6 +204,46 @@ MR.HUD = (function () {
           spend and rebuild. It also costs one large number less on a screen
           the owner asked to declutter.
         -->
+        <!--
+          THE SECOND PASS: THE PLATE IS THE GAUGE AND ONE NUMBER.
+
+          It carried four rows under the tank -- PACE, a required-pace line and
+          a clean count -- and three of them were the same statement written
+          three ways. Measured across a full clean run at one-second
+          resolution (bot=1, 390x844):
+
+            NEED   moves 4:32 -> 4:27 and back to 4:29 over the first 200
+                   seconds. Five seconds of travel across four fifths of a
+                   race: a constant with a decimal point. Then, as the
+                   remaining distance goes to zero, it divides by it: the last
+                   thing the readout says on a RECORD run is NEED 24:44/MI.
+                   The line that is supposed to price the record prints
+                   nonsense at the moment the record is won.
+
+            Its one live question -- "am I fast enough?" -- is already answered
+            twice beside it, at the same instant. The gauge fill passes the
+            white record tick between race-second 90 and 95; NEED minus PACE
+            crosses zero between race-second 90 and 95. Same event. And PACE
+            itself turns green on the same crossing (the 'ahead' class). Three
+            encodings of one bit.
+
+            n CLEAN is the number the gauge is drawn from -- fill is a linear
+                   map of the pace the streak buys -- so it restates the tank
+                   directly. The stylesheet had already dimmed it to 0.62 on
+                   phones, which is what a readout does just before it admits
+                   the row is furniture.
+
+            Once the record is gone the same slot became PB n CLEAN · n TO GO,
+            or LONGEST CLEAN · n, which measured FROZEN for the last 45
+            seconds of a 265-second run (stuck at 24 from race-second 215 to
+            the tape) while the rail and the projection both retargeted live.
+
+          PACE stays, and this is the argument for keeping it rather than for
+          cutting it: it is the only number in the game that answers to every
+          frame of play, it is the one thing that gives the white tick on the
+          tank a name, and it is stated in the same units as the wager. The
+          gauge shows how full; PACE says how fast. Nothing else does.
+        -->
         <div id="engine">
           <div class="lab">FUEL</div>
           <div class="gauge tank" id="paceGauge">
@@ -212,15 +252,34 @@ MR.HUD = (function () {
           </div>
           <div class="lab" id="paceLab">PACE</div>
           <div><span class="val num" id="paceVal">5:30</span><span class="unit">/MI</span></div>
-          <div class="sub num" id="needVal">NEED ${Pace.pace(K.RECORD_PACE)}/MI</div>
-          <div class="sub num" id="streakLine"><span id="streakVal">0</span> CLEAN</div>
           <div id="why">EACH CLEAN GATE BUYS SPEED</div>
         </div>
 
+        <!--
+          AID ONLY. The mile split card used to live here too, and every one
+          of its four facts was already on the screen it was drawn over:
+
+            MILE 11    the mile gantry in the world says so, and R3 is about
+                       making that sign legible rather than duplicating it.
+            4:41/MI    a SECOND pace, in the same units, sixty pixels under a
+                       PACE plate reading 4:25/MI. Two different min/mi
+                       numbers stacked, neither labelled to tell them apart.
+            51:45      the cumulative clock, which the rail prints live.
+            +1:36.8    the ghost delta, which the rail prints live -- and
+                       printed here in PINK on a run whose projection two
+                       plates above read RECORD ON in green. That is the exact
+                       contradiction the rail's tone rule and the finish
+                       card's split column were both rebuilt to remove; this
+                       was the last place in the game it survived.
+
+          It was up for two seconds every mile: 26 cards, ~52s of a ~250s run,
+          21% of the race spent covering the left edge with four numbers that
+          were already elsewhere. Aid is not a duplicate -- nothing else says
+          a bottle refilled the tank -- so the card stays for that alone.
+        -->
         <div id="toast">
-          <div class="lab" id="toastLab">MILE 1</div>
-          <div id="toastRow"><span class="big num" id="toastBig">--:--</span><span class="unit">/MI</span></div>
-          <div class="small num"><span id="toastCum"></span> <span id="toastDelta"></span></div>
+          <div class="lab" id="toastLab">FUEL</div>
+          <div class="big num" id="toastBig"></div>
         </div>
       </div>
 
@@ -385,13 +444,12 @@ MR.HUD = (function () {
     const n = {
       clock: q('clock'),
       projCell: q('projCell'), projVal: q('projVal'), margin: q('margin'), status: q('status'),
-      engine: q('engine'), streakVal: q('streakVal'), why: q('why'),
-      gaugeFill: q('gaugeFill'), paceVal: q('paceVal'), needVal: q('needVal'),
-      distVal: q('distVal'), toGo: null,
+      engine: q('engine'), why: q('why'),
+      gaugeFill: q('gaugeFill'), paceVal: q('paceVal'),
+      distVal: q('distVal'),
       rail: q('rail'), railFill: q('railFill'), railGap: q('railGap'), railGhost: q('railGhost'),
       gapVal: q('gapVal'), gapTrend: q('gapTrend'), gapLabel: q('gapLabel'),
       toast: q('toast'), toastLab: q('toastLab'), toastBig: q('toastBig'),
-      toastCum: q('toastCum'), toastDelta: q('toastDelta'),
       startPanel: q('startPanel'), startBtn: q('startBtn'), startDate: q('startDate'),
       startRoute: q('startRoute'), startKeys: q('startKeys'), targetSub: q('targetSub'),
       startMemory: q('startMemory'),
@@ -446,9 +504,7 @@ MR.HUD = (function () {
       root.classList.toggle('panelOpen', open);
     }
 
-    let lastP = null;      // last state seen, so the split card can read splits
     let hintUntil = 0;     // while set, the why-line shows the streak-cut message
-    let mem = null;        // what MR.Store remembers, as of this run's start
     let dateKey = '';
     let course = null;
     let cleanTime = null;  // this course's flawless finish, computed once
@@ -472,7 +528,6 @@ MR.HUD = (function () {
       chipOn = null;
       chipAt = 0;
       cache.chip = cache.chipCls = cache.projCls = undefined;
-      cache.need = cache.needCls = undefined;
     };
 
     api.setDate = function (key) {
@@ -510,7 +565,6 @@ MR.HUD = (function () {
      * back rather than as an empty frame promising one.
      */
     api.setMemory = function (sum) {
-      mem = sum || null;
       if (!n.startMemory) return;
       if (!sum) { n.startMemory.innerHTML = ''; return; }
 
@@ -650,8 +704,6 @@ MR.HUD = (function () {
     }
 
     api.update = function (p, extra) {
-      lastP = p;
-
       set(n.clock, 'clock', Pace.clock(p.raceTime));
       set(n.distVal, 'dist', p.miles.toFixed(2));
 
@@ -754,35 +806,16 @@ MR.HUD = (function () {
       cls(n.status, 'chipCls', 'chip ' + state);
       cls(n.projCell, 'projCls', state);
 
-      // ---- the engine: streak -> speed unlocked -> pace ------------------
-      set(n.streakVal, 'streak', String(p.streak));
+      // ---- the engine: the tank, and the speed it bought ------------------
+      // Two marks, one variable. The fill is a linear map of the pace the
+      // streak has unlocked; the number names it in the units of the wager;
+      // and both cross the white record tick at the same instant, which is why
+      // the required-pace line and the clean count that used to sit under here
+      // were removed rather than reworded. See the plate's comment above.
       n.gaugeFill.style.width =
         (clamp01((K.START_PACE - p.pace) / (K.START_PACE - K.FLOOR_PACE)) * 100) + '%';
       set(n.paceVal, 'pace', Pace.pace(p.pace));
       cls(n.paceVal, 'paceCls', 'val num' + (p.pace <= K.RECORD_PACE ? ' ahead' : ''));
-      // The line under the pace. While the record lives it is the race-desk
-      // number: the pace the rest of the course demands. Once the record is
-      // gone that number is a lie -- it asks for a pace below the 4:14 floor
-      // -- so the plate switches to the one target that is still winnable and
-      // still live: the player's own longest clean line. It is monotone, so it
-      // can only ever be approached, never lost; it has 189 points of
-      // resolution; and it is the exact skill the game is teaching.
-      let needText, needCls;
-      if (!gone) {
-        needText = 'NEED ' + Pace.pace(need) + '/MI';
-        needCls = 'sub num';
-      } else if (mem && mem.pbStreak > 0) {
-        const togo = mem.pbStreak - p.bestStreak;
-        needText = togo > 0
-          ? 'PB ' + mem.pbStreak + ' CLEAN · ' + togo + ' TO GO'
-          : 'CLEAN PB · ' + p.bestStreak;
-        needCls = 'sub num' + (togo > 0 ? '' : ' pb');
-      } else {
-        needText = 'LONGEST CLEAN · ' + p.bestStreak;
-        needCls = 'sub num';
-      }
-      set(n.needVal, 'need', needText);
-      cls(n.needVal, 'needCls', needCls);
 
       // Nothing else on screen says why the pace moves, so the line stays up
       // until the player has plainly felt it, and comes back on every break.
@@ -830,37 +863,32 @@ MR.HUD = (function () {
       const d = p.deltaVsRecord();
       const ahead = d < 0;
 
-      // ONCE THE RECORD IS GONE, THE GHOST STOPS BEING NEWS.
+      // THE RAIL IS A MAP. IT DOES NOT CARRY A SECOND VERDICT.
       //
-      // It no longer contradicts anything -- that was fixed above -- but on a
-      // dead run it becomes the largest irrelevant number on screen, counting
-      // a gap to a target that has already been conceded while the headline
-      // chases a rung further down the ladder. Measured mid-run at 7 contacts
-      // it read `+6:01.9 UP THE ROAD` and was still growing.
+      // Once the record died this band used to retarget too: CHASING /
+      // SUB-2:06 / 4:30.0 TO FIND. The plate at the top of the same frame was
+      // simultaneously reading SUB-2:12 / 2:50 OFF SUB-2:06 -- the same rung,
+      // the same question, and two different answers 700px apart, because the
+      // plate integrates the rest of the race with projectClean() and the rail
+      // froze the current pace with projected(). Measured on one frame at 20.1
+      // miles: 2:50 against 4:30.0, a disagreement of 1:40 about how far the
+      // player is from the thing the screen is telling them to chase.
       //
-      // So the plate reports the chase that is actually live. The rail keeps
-      // drawing the ghost marker, because where the record physically is on
-      // the road is still true and still worth seeing; it is only the headline
-      // number that retargets.
-      const goneTier = gone ? Tier.of(p.projected()) : null;
-      const goneNext = gone ? Tier.next(p.projected()) : null;
-      if (gone && goneNext) {
-        set(n.gapLabel, 'gapLab', 'CHASING');
-        set(n.gapVal, 'gap', goneNext.name);
-        cls(n.gapVal, 'gapCls', 'num level');
-        cls(n.railGap, 'railGapCls', 'level');
-        const togo = Math.max(0, p.projected() - goneNext.max);
-        set(n.gapTrend, 'trend', togo > 0 ? Pace.delta(togo).replace('+', '') + ' TO FIND' : 'HELD');
-        cls(n.gapTrend, 'trendCls', togo > 0 ? 'level' : 'ahead');
-      } else {
-        const tone = ahead ? 'ahead' : state === 'off' ? 'behind' : 'level';
-        set(n.gapLabel, 'gapLab', 'RECORD GHOST');
-        set(n.gapVal, 'gap', Pace.delta(d));
-        cls(n.gapVal, 'gapCls', 'num ' + tone);
-        cls(n.railGap, 'railGapCls', tone);
-        set(n.gapTrend, 'trend', Math.abs(d) < 1 ? 'LEVEL' : ahead ? 'BEHIND YOU' : 'UP THE ROAD');
-        cls(n.gapTrend, 'trendCls', tone);
-      }
+      // Unifying the two projections would have printed the identical string
+      // twice, which is the definition of the crowding this pass is for. So the
+      // chase is stated once, in the plate that owns verdicts, and the rail
+      // goes back to being the one thing it draws: you, the ghost, and the road
+      // between you. That is geography, and it stays true after the record has
+      // gone -- which is exactly why its tone is already neutral there: `tone`
+      // can only be red when the projection itself is red, and on a dead run
+      // the projection has retargeted onto the ladder and is not.
+      const tone = ahead ? 'ahead' : state === 'off' ? 'behind' : 'level';
+      set(n.gapLabel, 'gapLab', 'RECORD GHOST');
+      set(n.gapVal, 'gap', Pace.delta(d));
+      cls(n.gapVal, 'gapCls', 'num ' + tone);
+      cls(n.railGap, 'railGapCls', tone);
+      set(n.gapTrend, 'trend', Math.abs(d) < 1 ? 'LEVEL' : ahead ? 'BEHIND YOU' : 'UP THE ROAD');
+      cls(n.gapTrend, 'trendCls', tone);
 
       if (extra && extra.fps !== undefined) {
         set(n.perf, 'perf', extra.fps.toFixed(0) + ' FPS · ' + (extra.draws || 0) + ' DRAWS');
@@ -873,59 +901,39 @@ MR.HUD = (function () {
       hintUntil = performance.now() + 2200;
     };
 
-    // ---- mile splits ----------------------------------------------------
-    // A runner's mile split is the time that mile took, which the caller does
-    // not pass; it is one subtraction away in splits[], so the card composes
-    // its own line from the state it already sees and falls back to whatever
-    // strings it was handed.
+    // ---- the aid card ----------------------------------------------------
     let toastTimer = null;
 
     /**
-     * Aid taken. Deliberately reuses the split card rather than adding a
-     * fourth floating element -- the frame is already carrying a race clock, a
-     * streak plate and a ghost tag, and the middle stays clear on purpose. A
-     * bottle gets no card at all: the streak number jumping is the feedback,
-     * and five cards in a row through a water table would be noise.
+     * Aid taken. The only thing this card still says, and the only thing it
+     * ever said that was not already on screen: nothing else in the game
+     * reports that a banana put fuel back in the tank. The gauge jumps, but a
+     * jump with no cause named is indistinguishable from a lucky gate.
+     *
+     * A bottle still gets no card at all -- five cards in a row through a
+     * water table would be noise.
+     *
+     * The `/MI` unit that used to sit in this row is gone with the splits, and
+     * that fixes a live defect on the way out: `toastAid` never hid it, so
+     * every aid card in the shipped game read "+3 STREAK /MI".
      */
     api.toastAid = function (lab, sub) {
       n.toastLab.textContent = lab;
       n.toastBig.textContent = sub;
-      if (n.toastCum) n.toastCum.textContent = '';
-      if (n.toastDelta) { n.toastDelta.textContent = ''; n.toastDelta.className = ''; }
       n.toast.classList.add('show');
       clearTimeout(toastTimer);
       toastTimer = setTimeout(function () { n.toast.classList.remove('show'); }, 1200);
     };
 
-    api.toast = function (big, small, ms) {
-      const sp = lastP && lastP.splits.length
-        ? lastP.splits[lastP.splits.length - 1] : null;
-      if (sp) {
-        const i = lastP.splits.length;
-        const prev = i > 1 ? lastP.splits[i - 2].time : 0;
-        const d = sp.time - sp.mile * K.RECORD_PACE;
-        n.toastLab.textContent = 'MILE ' + sp.mile;
-        n.toastBig.textContent = Pace.pace(sp.time - prev);
-        // Only the delta is tinted. The elapsed clock is a plain fact and
-        // colouring it too made the whole line read as a warning.
-        n.toastCum.textContent = Pace.clock(sp.time);
-        n.toastDelta.textContent = Pace.delta(d);
-        n.toastDelta.className = d < 0 ? 'ahead' : 'behind';
-      } else {
-        n.toastLab.textContent = big || '';
-        n.toastBig.textContent = '';
-        n.toastCum.textContent = small || '';
-        n.toastDelta.textContent = '';
-      }
-      // Without split data there is no mile time to headline, so the card
-      // drops that row rather than showing a bare "/MI".
-      n.toast.classList.toggle('noBig', !sp);
-      n.toast.classList.add('show');
-      clearTimeout(toastTimer);
-      // Splits arrive every nine or ten real seconds at record pace, so the
-      // card can sit long enough to be read without ever stacking up.
-      toastTimer = setTimeout(() => n.toast.classList.remove('show'), ms || 2000);
-    };
+    /**
+     * The mile split card, retired. See the markup comment on #toast for the
+     * four facts it carried and where each one already was.
+     *
+     * Kept as a no-op rather than deleted, because main.js calls it once per
+     * mile and that file belongs to another agent. The call site
+     * (main.js, the split handler) can go with it.
+     */
+    api.toast = function () {};
 
     api.showStart = function (show) {
       n.startPanel.classList.toggle('hidden', !show);

@@ -3,12 +3,32 @@
 /* The artifact host supplies the document skeleton and its own reset, so this
  * variant ships no doctype/html/head/body of its own. It also renders inside a
  * frame that may not be the full viewport, so the canvas sizes to 100% of its
- * container rather than to the window. */
+ * container rather than to the window.
+ *
+ * dvh, NOT vh, and the difference is the whole bug.
+ *
+ * On a phone, 100vh is the LARGE viewport -- the height the page would have if
+ * the browser's retractable toolbars were hidden. They are not hidden, so the
+ * bottom of a 100vh element sits underneath them. Reported from an iPhone:
+ * the runner's feet cut off at the bottom of the frame and the progress bar's
+ * lower half behind the Safari toolbar, with the game itself framing him
+ * correctly -- measured, the feet clear the rail by 77-109px in every portrait
+ * size the harness photographs.
+ *
+ * 100dvh is the DYNAMIC viewport: what is actually visible right now, tracking
+ * the toolbars as they show and hide. The plain vh line stays as a fallback
+ * for anything that does not know dvh (Safari before 15.4), where the old
+ * behaviour is still better than a collapsed frame.
+ *
+ * This cannot be caught by the screenshot harness. Headless Chromium has no
+ * retractable chrome, so vh and dvh are identical there and every shot passes.
+ * It is a real-device defect and it took a photograph from one to find it. */
 html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #0e1230; }
 #mr-root {
   position: relative;
   width: 100%;
   height: 100vh;
+  height: 100dvh;
   min-height: 520px;
   overflow: hidden;
   background: #0e1230;

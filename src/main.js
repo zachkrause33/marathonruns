@@ -76,11 +76,15 @@
   // ---- state ------------------------------------------------------------
   const IDLE = 0, COUNT = 1, RUN = 2, DONE = 3;
   let state = IDLE;
+  let doneAt = 0;      // wall-clock at the tape, for the run-out ease
+  let endTimer = 0;    // the held end card; cleared on reset so it cannot
+                       // arrive over a run that has already restarted
   let countT = 0;
   let lastStep = 0;
   let mileShown = 0;
 
   function reset() {
+    clearTimeout(endTimer);
     // Re-read the save before every run, not once at boot: a second run in the
     // same session has to chase the streak the first one just set.
     hud.setMemory(MR.Store.summary(dateKey));
@@ -282,6 +286,7 @@
 
       if (pace.finished) {
         state = DONE;
+        doneAt = performance.now();
         // Fold the result into the save FIRST, because the only moment at
         // which "did this beat your best today" can be answered is before the
         // best today becomes this run. Store.record returns that comparison
@@ -292,8 +297,17 @@
           streak: pace.bestStreak,
           tier: MR.Tier.of(pace.finishTime).name,
         });
-        hud.showEnd(pace, saved);
+        // HOLD THE CARD. The tape breaks, the confetti fires, the crowd
+        // roars and the camera pulls up into its hero shot -- and all of that
+        // used to play behind a full-screen results panel that appeared on the
+        // very same frame. The ending was being built and then covered up.
+        //
+        // 2.6s is the length of the flourish the world and camera play out
+        // (tape swing 1.8s, confetti fall, camera settle), so the card arrives
+        // as the celebration lands rather than instead of it.
         audio.finish(pace.finishTime < K.RECORD_SECONDS);
+        clearTimeout(endTimer);
+        endTimer = setTimeout(function () { hud.showEnd(pace, saved); }, 2600);
       }
     }
 
@@ -304,8 +318,16 @@
       renderer.setClearColor(world.fogColor);
     }
 
+    // Past the tape the race clock stops but pace.speed() does not, so the
+    // runner kept sprinting on the spot through the entire celebration. Ease
+    // the cadence out instead of cutting it: a runner who crosses a line
+    // decelerates, and a stride that halts on one frame reads as a freeze.
+    const strideSpeed = state === DONE
+      ? pace.speed() * Math.max(0, 1 - (performance.now() - doneAt) / 2200)
+      : pace.speed();
+
     runner.update(dt, {
-      speed: pace.speed(),
+      speed: strideSpeed,
       air01: player.airborne ? Math.sin(Math.min(1, player.airT) * Math.PI) : 0,
       duck01: player.duck01,
       trip: player.tripT,

@@ -4092,8 +4092,16 @@ MR.World = (function () {
             mv.position.set(d.pivot[0] * LANE_FIT, d.pivot[1], d.pivot[2]);
             vg.add(mv);
             vg.userData.moving = mv;
+            // Where the moving part rests, so an anim that SLIDES it (see the
+            // refuse truck's tailgate) has something to slide from. Reading it
+            // back off the mesh would drift, because the mesh is the thing the
+            // anim is writing to.
+            vg.userData.pivotY = d.pivot[1];
           }
           vg.userData.body = body;
+          // An anim without a `moving` part is legal and is the cheapest thing
+          // in this file: the variant group gets a y shudder and nothing else,
+          // which is what an idling diesel looks like, for no mesh and no draw.
           vg.userData.anim = d.anim || null;
           vg.visible = false;
           g.add(vg);
@@ -4165,10 +4173,51 @@ MR.World = (function () {
       hbx(0.34, 0.80, 0.34, 1.13, 0.40, 0.34, 0xe07f12),
     ]);
 
+    /**
+     * JUMP v3: DOCKLESS KICK SCOOTERS DOWN IN THE LANE.
+     *
+     * The two-wheeler that earns a JUMP rather than a BLOCK, and it earns it by
+     * being the one that is genuinely low. Ridden, a stand-up scooter is a
+     * 2.5-tall column a third of a lane wide -- the exact shape the trike note
+     * rejects a bicycle for. Dumped in the road, which is what these actually
+     * are most of the time they are in anyone's way, it is a 0.45-tall object
+     * lying across the lane, and that is a hurdle.
+     *
+     * Same construction as the cones: the PLINTH is the read and the scooters
+     * are what you see once you are close enough for it to be flavour. One is
+     * down flat with its bar across the lane, the second is propped against the
+     * plinth at 0.79 -- under the 0.80 the collision box records, with the
+     * clearance threshold at 0.84 above that.
+     */
+    const jumpScooterGeo = (function () {
+      const parts = [
+        hbx(2.24, 0.22, 1.00, 0, 0.11, 0, 0xffb020),
+        hbx(2.34, 0.10, 1.02, 0, 0.27, 0, 0xfff2e0),
+        hbx(0.28, 0.32, 1.00, -1.16, 0.16, 0, 0xe07f12),
+        hbx(0.28, 0.32, 1.00, 1.16, 0.16, 0, 0xe07f12),
+      ];
+      // Down flat. Wheels are discs on their SIDE here -- a scooter on the deck
+      // has its wheels lying horizontal, which is the one orientation where the
+      // default cylinder axis is already right.
+      parts.push(bxAt(1.28, 0.11, 0.30, -0.30, 0.38, -0.10, 0xfff2e0));
+      parts.push(bxAt(0.18, 0.13, 0.30, -0.98, 0.39, -0.10, 0x2b2f52));
+      parts.push(cyl(0.12, 0.12, 0.07, 8, -0.72, 0.42, -0.24, 0x1e2140));
+      parts.push(cyl(0.12, 0.12, 0.07, 8, 0.20, 0.42, -0.02, 0x1e2140));
+      parts.push(bxAt(0.78, 0.09, 0.09, 0.58, 0.39, -0.10, 0xff7a1f));
+      parts.push(bxAt(0.14, 0.09, 0.50, 0.92, 0.39, -0.10, 0x2b2f52));
+      // Propped. The only vertical in the object, and it is what stops the
+      // silhouette being a flat slab with a scribble on it.
+      parts.push(bxAt(0.09, 0.60, 0.09, 0.83, 0.50, 0.26, 0xff7a1f, 0, 0, 0.42));
+      parts.push(bxAt(0.40, 0.08, 0.09, 0.68, 0.72, 0.26, 0x2b2f52));
+      parts.push(bxAt(0.75, 0.10, 0.22, 1.13, 0.30, 0.26, 0xfff2e0));
+      return merge(parts);
+    })();
+
     const jumpPool = hazardPool(K.JUMP, 'jump', [
       { geo: jumpGeo, face: [2.2, 0.62, 0.36, -0.531] },
       { geo: jumpConeGeo, face: [2.2, 0.24, 0.16, -0.521] },
       { geo: jumpWorksGeo, face: [2.2, 0.32, 0.57, -0.531] },
+      { geo: jumpScooterGeo, face: [2.2, 0.24, 0.16, -0.521] },
     ]);
 
     /**
@@ -4267,17 +4316,136 @@ MR.World = (function () {
       { geo: duckSignGeo, face: [2.26, 0.34, 1.62, -0.282] },
     ]);
 
-    // BLOCK v0: a barricaded works truck. Trains scale it along z, so every
-    // baked feature is either a horizontal band or sits at the front face,
-    // which the scale leaves in place -- and it is the ONLY variant a train is
-    // ever allowed to use, for exactly that reason.
-    const blockGeo = merge([
-      hbx(2.10, 2.30, 1.30, 0, 1.50, 0, 0xff3b6b),
-      hbx(2.20, 0.44, 1.30, 0, 0.22, 0, 0x2b2f52),
-      hbx(2.24, 0.26, 1.34, 0, 2.24, 0, 0xfff2e0),
-      hbx(2.20, 0.20, 1.34, 0, 2.70, 0, 0xd42a55),
-      bxAt(0.34, 0.34, 0.34, -0.72, 2.92, 0, 0xffe45e),
-      bxAt(0.34, 0.34, 0.34, 0.72, 2.92, 0, 0xffe45e),
+    /**
+     * ================= THE ROAD VEHICLES =================
+     *
+     * The complaint that produced these was "the cars, bikes and other moving
+     * obstacles need to be more realistic", and the screenshot behind it showed
+     * white crates with a striped board on the front. The fix is NOT surface
+     * detail -- this renderer is flat MeshToonMaterial with banded ramps and
+     * extruded ink, so there is no gloss, no reflection and no texture to chase.
+     * What was actually missing was SILHOUETTE AND PROPORTION, and every one of
+     * the things that carries a real vehicle's read is free here:
+     *
+     *   ROOFLINE HEIGHT      a bus is 2.76 to the cap, a taxi 1.60 to the roof.
+     *   WINDOW BAND HEIGHT   the bus's glazing sits at 1.84-2.48, the tram's at
+     *                        1.14-2.00, the taxi's at 1.10-1.50. Three different
+     *                        vehicles at forty units are three different bands.
+     *   GREENHOUSE TAPER     the taxi's glass is 1.22 world wide on a body of
+     *                        1.58. A crate has no taper; a car always does.
+     *   THE GAP UNDER        every road vehicle here shows daylight between its
+     *                        underframe and the tarmac, with wheels in it. The
+     *                        TRAM IS THE ONE THAT DOES NOT -- its skirt reaches
+     *                        the road, which is exactly how you tell a tram from
+     *                        a bus from directly behind, and it costs nothing.
+     *
+     * Measured off reference/tgr-city.png, which has a tram, a bus and a parked
+     * car in this exact idiom; the numbers are appended to MEASUREMENTS.md.
+     *
+     * WHAT DOES NOT CHANGE, and it is the whole of the hazard contract:
+     *
+     *   FOOTPRINT. MR.Collision.BOX gives BLOCK halfZ 0.65, so every main mass
+     *     below lives in z = [-0.63, +0.63] and every rear-face fitting has its
+     *     rear plane at exactly -0.65. Nothing reaches behind the gate line.
+     *   HEIGHT. BLOCK tops out at 2.80 and nothing here exceeds it. The refuse
+     *     truck's beacon lands on it exactly; everything else is under.
+     *   COLOUR. BLOCK pink on the mass that carries the silhouette, always. A
+     *     hazard's kind is known from its hue before its shape resolves, and a
+     *     realistic grey van would be a hazard nobody could name in time.
+     *   NOTHING MOVES IN X OR Z. Behaviour is one rotating or sliding CHILD and
+     *     a y shudder, and no more. A hazard's lane and z are course data that
+     *     course.js has already proved a path through by BFS; a vehicle is a
+     *     costume on a gate and can never be a new rule.
+     *
+     * The caution-striped face every variant carries is now a REAR BUMPER
+     * CHEVRON -- 0.22 to 0.34 tall, low on the tail -- rather than the 1.9-tall
+     * board that covered most of the old truck's back. That board was the
+     * "striped barrier on the front" in the complaint. Real buses, refuse trucks
+     * and works vehicles all carry exactly this marking, so the kind signal
+     * survives and stops being the entire object.
+     */
+
+    /**
+     * GLAZING, and it is a measured number rather than a dark blue.
+     *
+     * Every vehicle here wants a window band, and the first pass used the same
+     * 0x2b2f52 the marshals' torsos use. That made five of them fail the
+     * contrast gate at once, and the reason is worth writing down because it is
+     * counter-intuitive and it is a property of THIS renderer.
+     *
+     * The chase camera sees a hazard's REAR faces, which are the shaded band of
+     * the toon ramp. Measured off the audit's own swatches, a shaded face comes
+     * back at (0.639R, 0.723G, 0.826B) of its authored colour -- so its
+     * luminance is 0.136R + 0.517G + 0.060B, i.e. almost entirely GREEN. That
+     * puts the palette in an order nobody would guess from the hex:
+     *
+     *   0xfff2e0  cream   -> L 173      0xffe45e  amber -> L 157
+     *   0xff3b6b  BLOCK pink -> L  72   0xd42a55 deep pink -> L 55
+     *   0x2b2f52  navy    -> L  35      0x1e2140 tyre  -> L  22
+     *
+     * The centre lane's tarmac measures L 88-93. **BLOCK pink, seen from
+     * behind, is DARKER than the road it stands on.** That is why every hazard
+     * in this game that passes the gate passes it on cream, and why a vehicle
+     * built as "pink body, dark glass, black tyres" measures at 1.15x and fails.
+     *
+     * So glazing is 0x6577b2: L 86, which is a hair under the tarmac and a hair
+     * OVER the pink body. Glass being lighter than the panel it is set into
+     * looks wrong written down and is what the reference actually shows -- the
+     * parked car in tgr-city.png has a body at L 76 and a windscreen lighter
+     * than it, because glass reflects sky and paint does not. It is 51
+     * luminance clear of the navy it replaced, which is most of the lift.
+     *
+     * The rest is livery: the cream band on the bus, the pale destination panel
+     * on the tram, the chequer band on the taxi, the hi-vis sleeves on the
+     * cyclists. Every one of those is a thing the real vehicle wears, which is
+     * the only reason it is honest to have reached for them to pass a measure.
+     */
+    const GLASS = 0x6577b2;
+
+    /**
+     * BLOCK v0: A TRAM, and it is variant 0 because it is the one a TRAIN uses.
+     *
+     * Trains scale this body along z, so every baked feature is a horizontal
+     * band that survives being stretched -- and a tram is the one road vehicle
+     * that is genuinely BETTER for being stretched, because a stretched tram is
+     * a two-car tram and a stretched anything else is a joke. The glazing band
+     * runs the full length under the scale, which is what a modern low-floor
+     * tram actually looks like.
+     *
+     * THE REAR-FACE RULE. A vertex at z = -0.65 maps to -0.65 for ANY span
+     * (body.scale.z = span with body.position.z = (span-1)*0.65), so a fitting
+     * whose rear plane sits exactly there stays exactly there on a six-unit
+     * train. The blind and the lamps are built to that; the main masses are
+     * 1.26-1.28 deep so those fittings stand proud of them by 0.01-0.02 instead
+     * of z-fighting.
+     */
+    const blockTramGeo = merge([
+      // Skirt to the road. No wheel gap, no wheels: this is the tell.
+      hbx(2.20, 0.20, 1.26, 0, 0.10, 0, 0x2b2f52),
+      hbx(2.16, 0.74, 1.26, 0, 0.57, 0, 0xff3b6b),   // lower body 0.20-0.94
+      hbx(2.24, 0.24, 1.30, 0, 1.06, 0, 0xfff2e0),   // waist band 0.94-1.18
+      hbx(2.20, 0.54, 1.32, 0, 1.45, 0, GLASS),      // glazing 1.18-1.72
+      hbx(2.24, 0.38, 1.30, 0, 1.91, 0, 0xfff2e0),   // destination panel 1.72-2.10
+      hbx(2.16, 0.14, 1.26, 0, 2.17, 0, 0xff3b6b),   // header 2.10-2.24
+      hbx(2.24, 0.10, 1.30, 0, 2.29, 0, 0xfff2e0),   // roof rail 2.24-2.34
+      hbx(1.84, 0.10, 1.14, 0, 2.39, 0, 0xd42a55),   // chamfered crown 2.34-2.44
+      hbx(1.06, 0.18, 0.10, 0, 1.93, -0.60, 0x2b2f52),      // destination blind
+      bxAt(0.28, 0.14, 0.10, -0.88, 0.54, -0.60, 0xffe45e),  // tail lamps
+      bxAt(0.28, 0.14, 0.10, 0.88, 0.54, -0.60, 0xffe45e),
+    ]);
+    /**
+     * The pantograph, and it is the `moving` child rather than part of the body
+     * for one reason: the body is what a train scales, and a pantograph stretched
+     * to six units is a ladder. On its own child it stays one pantograph however
+     * long the tram is, and it gets a slow sway for free.
+     *
+     * Top of the shoe lands at 2.79 against the 2.80 the collision box records.
+     */
+    const blockTramPantoGeo = merge([
+      bx(0.66, 0.07, 0.26, 0, 0.02, 0, 0x2b2f52),
+      bx(0.09, 0.42, 0.09, -0.24, 0.20, 0.02, 0x2b2f52, 0.42),
+      bx(0.09, 0.42, 0.09, 0.24, 0.20, 0.02, 0x2b2f52, 0.42),
+      bx(0.96, 0.06, 0.13, 0, 0.36, -0.16, 0xfff2e0),
     ]);
 
     /** BLOCK v1: a ROAD CLOSED hoarding on a solid plinth. */
@@ -4477,18 +4645,281 @@ MR.World = (function () {
       bx(0.54, 0.15, 0.12, 0, 1.58, -0.14, 0xfff2e0),
     ]);
 
-    // The two INHABITED skins carry double weight. A player who ran the whole
-    // race reported never seeing a cyclist or a marshal at all: at even odds
-    // they were about a tenth of the gates, and the course has since got harder
-    // in a way that spawns fewer BLOCKs still (a full-width gate never carries
-    // one). Two thirds living is what makes the road read as a city closed for
-    // a race rather than a corridor of street furniture, and it costs nothing
-    // -- every variant is built and parented once either way.
+    /**
+     * BLOCK v4: A CITY BUS. Tall, slab-sided, and the tallest thing on the road.
+     *
+     * Two numbers do all the work at forty units. The GLAZING SITS HIGH --
+     * 1.84 to 2.48, the top third of the object -- where the tram's is at
+     * 1.14-2.00 and the taxi's at 1.10-1.50, so the three are told apart by
+     * where their dark band is long before any of them resolves. And the
+     * UNDERFRAME STOPS AT 0.42 with wheels in the daylight below it: a crate
+     * sits on the road, a bus stands over it.
+     */
+    const blockBusGeo = merge([
+      bxAt(0.34, 0.46, 0.50, -0.92, 0.23, -0.24, 0x1e2140),
+      bxAt(0.34, 0.46, 0.50, 0.92, 0.23, -0.24, 0x1e2140),
+      bxAt(0.32, 0.42, 0.46, -0.92, 0.21, 0.42, 0x1e2140),
+      bxAt(0.32, 0.42, 0.46, 0.92, 0.21, 0.42, 0x1e2140),
+      hbx(2.10, 0.26, 1.20, 0, 0.55, 0, 0x2b2f52),   // underframe 0.42-0.68
+      hbx(2.20, 0.60, 1.26, 0, 0.98, 0, 0xff3b6b),   // lower body 0.68-1.28
+      hbx(2.24, 0.34, 1.28, 0, 1.45, 0, 0xfff2e0),   // livery band 1.28-1.62
+      hbx(2.20, 0.16, 1.26, 0, 1.70, 0, 0xff3b6b),   // 1.62-1.78
+      hbx(2.24, 0.10, 1.28, 0, 1.83, 0, 0xfff2e0),   // waist rail 1.78-1.88
+      hbx(2.22, 0.62, 1.30, 0, 2.19, 0, GLASS),      // glazing 1.88-2.50
+      hbx(2.20, 0.14, 1.26, 0, 2.57, 0, 0xff3b6b),   // header
+      hbx(2.26, 0.14, 1.28, 0, 2.71, 0, 0xfff2e0),   // roof cap 2.64-2.78
+      hbx(0.66, 0.30, 0.08, 0, 2.19, -0.62, 0xfff2e0),      // route blind
+      bxAt(0.26, 0.28, 0.10, -0.94, 1.08, -0.60, 0xffe45e),
+      bxAt(0.26, 0.28, 0.10, 0.94, 1.08, -0.60, 0xffe45e),
+      hbx(2.24, 0.16, 0.14, 0, 0.80, -0.58, 0xd42a55),      // rear bumper bar
+    ]);
+
+    /**
+     * BLOCK v5: A TAXI, and the only LOW vehicle in the set.
+     *
+     * A car's read is the greenhouse: glass narrower than the body, sat on a
+     * beltline crease, under a roof narrower still. 1.22 world of glass on 1.58
+     * of body, which is the same ratio as the parked car in tgr-city.png.
+     *
+     * IT ALSO HAS TO NOT LOOK JUMPABLE, and a saloon roof at 1.60 against a
+     * 2.05 jump apex plainly does. That is the same objection that made the
+     * cargo trike a trike rather than a bicycle, and it is answered the same
+     * way -- with something real that takes the silhouette past the apex. Here
+     * it is an airport taxi's ROOF RACK: sign at the front of the roof, two
+     * strapped cases behind it, top of the stack at 2.26. The cases are 0.97
+     * and 0.78 world wide against a lane of 1.70, so what stands above the jump
+     * band is mass rather than a spike.
+     */
+    const blockTaxiGeo = merge([
+      bxAt(0.32, 0.38, 0.44, -0.90, 0.19, -0.30, 0x1e2140),
+      bxAt(0.32, 0.38, 0.44, 0.90, 0.19, -0.30, 0x1e2140),
+      bxAt(0.32, 0.38, 0.44, -0.90, 0.19, 0.36, 0x1e2140),
+      bxAt(0.32, 0.38, 0.44, 0.90, 0.19, 0.36, 0x1e2140),
+      hbx(2.06, 0.24, 1.16, 0, 0.42, 0, 0x2b2f52),    // sills 0.30-0.54
+      hbx(2.18, 0.36, 1.26, 0, 0.72, 0, 0xff3b6b),    // body 0.54-0.90
+      hbx(2.22, 0.20, 1.28, 0, 1.00, 0, 0xfff2e0),    // chequer band 0.90-1.10
+      hbx(1.68, 0.40, 1.02, 0, 1.30, 0.02, GLASS),    // greenhouse 1.10-1.50
+      hbx(1.56, 0.10, 0.94, 0, 1.55, 0.02, 0xfff2e0), // roof 1.50-1.60
+      hbx(0.86, 0.28, 0.30, 0, 1.74, 0.34, 0xffe45e), // roof sign
+      hbx(1.34, 0.34, 0.58, 0, 1.79, -0.16, 0xd42a55),// case 1.62-1.96
+      hbx(1.08, 0.30, 0.50, 0, 2.11, -0.16, 0xfff2e0),// case 1.96-2.26
+      bxAt(0.28, 0.14, 0.10, -0.94, 0.86, -0.60, 0xffe45e),
+      bxAt(0.28, 0.14, 0.10, 0.94, 0.86, -0.60, 0xffe45e),
+      hbx(2.22, 0.14, 0.14, 0, 0.62, -0.58, 0xd42a55),
+    ]);
+
+    /**
+     * BLOCK v6: A DELIVERY VAN WITH ITS BACK DOORS OPEN.
+     *
+     * MEASUREMENTS.md names this object by name in the BLOCK vocabulary -- "so
+     * the dark interior reads as depth rather than as a hole you could pass
+     * through" -- and the second half of that sentence is the whole design
+     * problem. A dark rectangle in a lane is what a DUCK void looks like.
+     *
+     * Three things stop it being one. The opening is 1.07 world on a body of
+     * 1.61, so pink frames it on both sides. Its bottom half is filled with
+     * cream parcels, which is a lit solid exactly where a void would show road.
+     * And the two door leaves are swung flat against the flanks, standing 0.06
+     * proud of them, so the object is visibly a box that has been OPENED rather
+     * than a box with a gap in it.
+     *
+     * The rest is the brief's "blank tall box with a low nose": 1.88 of
+     * unbroken pink with one livery stripe, stepping down at z = +0.19 to a
+     * glazed cab 0.90 lower. That step is what separates it from the bus in a
+     * side lane, where you see the flank rather than the tail.
+     */
+    const blockVanGeo = merge([
+      bxAt(0.34, 0.44, 0.50, -0.92, 0.22, -0.22, 0x1e2140),
+      bxAt(0.34, 0.44, 0.50, 0.92, 0.22, -0.22, 0x1e2140),
+      bxAt(0.30, 0.40, 0.44, -0.92, 0.20, 0.44, 0x1e2140),
+      bxAt(0.30, 0.40, 0.44, 0.92, 0.20, 0.44, 0x1e2140),
+      hbx(2.08, 0.24, 1.16, 0, 0.48, 0, 0x2b2f52),      // chassis 0.36-0.60
+      hbx(2.22, 1.88, 0.80, 0, 1.54, -0.21, 0xff3b6b),  // the box 0.60-2.48
+      hbx(2.26, 0.12, 0.84, 0, 2.54, -0.21, 0xfff2e0),  // roof lip
+      hbx(2.26, 0.12, 0.82, 0, 1.16, -0.21, 0xfff2e0),  // livery stripe
+      hbx(2.10, 0.58, 0.44, 0, 0.89, 0.41, 0xd42a55),   // cab 0.60-1.18
+      hbx(2.04, 0.52, 0.44, 0, 1.44, 0.41, GLASS),      // cab glass 1.18-1.70
+      // The load space is LIT, not black. A black rectangle in a lane is what a
+      // DUCK void looks like, and the parcels fill 73% of the opening's height
+      // for the same reason -- what the player must never see through a BLOCK
+      // is road.
+      hbx(1.48, 1.42, 0.06, 0, 1.47, -0.60, 0x3a4270),  // load space 0.76-2.18
+      hbx(1.34, 0.60, 0.08, 0, 1.06, -0.61, 0xfff2e0),  // parcels 0.76-1.36
+      hbx(1.10, 0.44, 0.08, 0, 1.58, -0.61, 0xf0e4d0),  // parcels 1.36-1.80
+      hbx(1.52, 0.28, 0.09, 0, 2.04, -0.62, 0xfff2e0),  // shutter valance 1.90-2.18
+      bxAt(0.08, 1.54, 0.40, -1.14, 1.48, -0.42, 0xfff2e0),  // door leaves, flat
+      bxAt(0.08, 1.54, 0.40, 1.14, 1.48, -0.42, 0xfff2e0),
+      bxAt(0.26, 0.14, 0.10, -0.96, 0.72, -0.60, 0xffe45e),
+      bxAt(0.26, 0.14, 0.10, 0.96, 0.72, -0.60, 0xffe45e),
+    ]);
+
+    /**
+     * BLOCK v7: A REFUSE TRUCK, which is the one vehicle in the set whose most
+     * characteristic feature is the part you see from behind.
+     *
+     * The silhouette is STEPPED, and deliberately in the direction that reads
+     * from a chase camera: the hopper is aft and stops at 2.06, the packer body
+     * is forward and goes to 2.64, so the tail is a low wide block with a taller
+     * block standing behind it. Nothing else on this road has two roof heights.
+     * Grab rails up the corners, a step across the tail and an amber beacon at
+     * 2.80 -- exactly the 2.80 the collision box records -- finish it.
+     */
+    const blockRefuseGeo = merge([
+      bxAt(0.32, 0.44, 0.44, -0.92, 0.22, -0.06, 0x1e2140),
+      bxAt(0.32, 0.44, 0.44, 0.92, 0.22, -0.06, 0x1e2140),
+      bxAt(0.30, 0.40, 0.42, -0.92, 0.20, 0.44, 0x1e2140),
+      bxAt(0.30, 0.40, 0.42, 0.92, 0.20, 0.44, 0x1e2140),
+      hbx(2.06, 0.26, 1.14, 0, 0.47, 0, 0x2b2f52),      // chassis 0.34-0.60
+      hbx(2.16, 1.92, 0.60, 0, 1.56, 0.32, 0xff3b6b),   // packer body 0.60-2.52
+      hbx(2.22, 0.12, 0.64, 0, 2.58, 0.32, 0xfff2e0),   // body cap 2.52-2.64
+      hbx(2.24, 1.32, 0.62, 0, 1.26, -0.30, 0xd42a55),  // hopper 0.60-1.92
+      hbx(2.18, 0.14, 0.64, 0, 1.99, -0.30, 0xfff2e0),  // hopper cap 1.92-2.06
+      hbx(1.42, 0.46, 0.06, 0, 1.30, -0.60, 0x141a33),  // the throat
+      bxAt(0.09, 0.74, 0.09, -0.98, 1.68, -0.60, 0xffe45e),  // grab rails
+      bxAt(0.09, 0.74, 0.09, 0.98, 1.68, -0.60, 0xffe45e),
+      hbx(1.24, 0.12, 0.16, 0, 0.68, -0.57, 0xfff2e0),  // rear step
+      bxAt(0.26, 0.14, 0.10, -0.98, 0.86, -0.60, 0xffe45e),
+      bxAt(0.26, 0.14, 0.10, 0.98, 0.86, -0.60, 0xffe45e),
+      bx(0.18, 0.16, 0.18, 0, 2.72, 0.32, 0xffe45e),    // beacon 2.64-2.80
+    ]);
+    /**
+     * The tailgate, and it SLIDES rather than swings.
+     *
+     * A hinged tailgate is what a real one does and it is not available here: a
+     * top-hinged panel 0.62 deep sweeps its bottom edge 0.6 units back toward
+     * the lens, which is past the gate line, and a side-hinged one sweeps out
+     * of the lane. A vertical slide is the one motion with no footprint at all,
+     * it is what a packer plate actually does inside the hopper, and from
+     * directly behind -- the only angle this game has -- a pink panel rising off
+     * a dark throat is a bigger signal than any rotation would be.
+     */
+    const blockRefuseGateGeo = merge([
+      bx(1.46, 0.62, 0.09, 0, 0, 0, 0xff3b6b),
+      bx(1.52, 0.09, 0.13, 0, 0.33, 0.01, 0xfff2e0),
+      bx(1.52, 0.09, 0.13, 0, -0.33, 0.01, 0xd42a55),
+    ]);
+
+    /**
+     * BLOCK v8: TWO ROAD CYCLISTS ABREAST.
+     *
+     * The file's standing objection to a bicycle is at blockTrikeGeo: one rider
+     * is a third of a lane wide and 1.75 tall against a 2.05 jump apex, so it
+     * reads as something to hurdle. Both halves of that are answered here by
+     * the same thing, and it is the thing that actually blocks a road in real
+     * life: A PAIR RIDING TWO ABREAST. Shoulder to shoulder they span 1.30 of
+     * the 1.70 lane -- 76%, which is what the trike's pennants span -- and the
+     * near rider has an arm STRAIGHT UP, the standard peloton signal for a
+     * hazard ahead, which takes the silhouette to 2.55.
+     *
+     * The arm is not decoration. It is the same reasoning as the marshal's
+     * paddle: on a road made of obstacles, a human intention is worth more
+     * amplitude than realism would give it, and this one costs two boxes.
+     */
+    const blockRoadBikeGeo = (function () {
+      const parts = [];
+      const who = [
+        { s: -1, x: -0.55, skin: 0xffc79a, dy: 0.00 },
+        { s: 1, x: 0.56, skin: 0xb87a4e, dy: -0.06 },
+      ];
+      for (const p of who) {
+        const X = p.x, y = p.dy;
+        parts.push(cyl(0.33, 0.33, 0.10, 8, X * LANE_FIT, 0.33, 0.06, 0x1e2140, 0, 0, Math.PI / 2));
+        parts.push(bxAt(0.08, 0.52, 0.10, X, 0.62, 0.14, 0xd42a55));
+        parts.push(bxAt(0.34, 0.09, 0.18, X, 0.92, 0.06, 0x2b2f52));
+        // The same value ladder the trike's rider and the marshals use: dark
+        // waist, cream hi-vis where the eye lands, dark collar, skin, pink lid.
+        // Everything up here is seen against pale road or paler sky.
+        parts.push(bxAt(0.50, 0.36, 0.32, X, 1.16 + y, 0.10, 0xff3b6b));
+        parts.push(bxAt(0.58, 0.52, 0.38, X, 1.62 + y, 0.16, 0xfff2e0));
+        parts.push(bxAt(0.50, 0.10, 0.34, X, 1.93 + y, 0.18, 0x2b2f52));
+        parts.push(bxAt(0.34, 0.26, 0.32, X, 2.11 + y, 0.20, p.skin));
+        parts.push(bxAt(0.42, 0.18, 0.38, X, 2.31 + y, 0.20, 0xff3b6b));
+        // Long sleeves, in the hi-vis cream rather than the dark the trike's
+        // rider uses. On a figure this narrow the arms are a third of its
+        // measured area, and dark arms were most of why the pair came back at
+        // 1.24x the centre lane -- see the GLAZING note.
+        parts.push(bxAt(0.14, 0.46, 0.14, X + p.s * 0.24, 1.60 + y, 0.34, 0xfff2e0, 0.7));
+        if (p.s > 0) {
+          parts.push(bxAt(0.14, 0.46, 0.14, X - p.s * 0.24, 1.60 + y, 0.34, 0xfff2e0, 0.7));
+        } else {
+          // The signal. Straight up, hand at 2.55, well inside the lane.
+          parts.push(bxAt(0.15, 0.66, 0.15, X - 0.30, 2.06, 0.12, 0xfff2e0));
+          parts.push(bxAt(0.19, 0.19, 0.19, X - 0.30, 2.48, 0.12, p.skin));
+        }
+      }
+      return merge(parts);
+    })();
+    /**
+     * Four knees on one pivot, exactly as the trike does it -- rotation.x keeps
+     * x offsets, so one mesh can carry both riders. The second rider's pair is
+     * set at 3 and 9 o'clock rather than 12 and 6, which puts the two cadences
+     * a quarter turn apart: two riders pedalling in lockstep read as one prop
+     * mirrored, and the whole point of a pair is that it is two people.
+     */
+    const blockRoadBikeCrankGeo = merge([
+      bx(0.26, 0.34, 0.24, -0.40, 0.30, 0, 0x2b2f52),
+      bx(0.28, 0.14, 0.26, -0.40, 0.45, 0.04, 0xfff2e0),
+      bx(0.26, 0.34, 0.24, -0.40, -0.30, 0, 0x2b2f52),
+      bx(0.28, 0.14, 0.26, -0.40, -0.45, 0.04, 0xfff2e0),
+      bx(0.26, 0.24, 0.34, 0.40, 0, 0.30, 0x2b2f52),
+      bx(0.26, 0.24, 0.34, 0.40, 0, -0.30, 0x2b2f52),
+    ]);
+
+    /**
+     * BLOCK v9: A DELIVERY MOPED.
+     *
+     * A two-wheeler is mostly rider, and the rider is the read -- so this one is
+     * built upward: a 1.10-wide insulated food cube behind the seat carrying the
+     * pink mass at 0.86-1.72, a hi-vis back above it, and a helmet at 2.52. The
+     * WIDTH comes from the mirrors, which reach 0.67 either side of the lane
+     * centre. That is 79% of the lane, and mirrors are the one part of a moped
+     * that is genuinely as wide as the vehicle, so nothing is invented for it.
+     */
+    const blockMopedGeo = merge([
+      cyl(0.31, 0.31, 0.13, 8, 0, 0.31, -0.06, 0x1e2140, 0, 0, Math.PI / 2),
+      bx(0.36, 0.28, 0.54, 0, 0.50, 0.06, 0xd42a55),
+      bx(0.74, 0.16, 0.44, 0, 0.76, 0.10, 0x2b2f52),
+      bxAt(1.52, 0.76, 0.56, 0, 1.24, -0.30, 0xff3b6b),   // the food cube
+      bxAt(1.60, 0.10, 0.60, 0, 1.67, -0.30, 0xfff2e0),
+      bx(0.56, 0.42, 0.34, 0, 1.14, 0.24, 0x2b2f52),
+      bx(0.68, 0.56, 0.40, 0, 1.64, 0.26, 0xfff2e0),
+      bx(0.58, 0.10, 0.36, 0, 1.97, 0.26, 0x2b2f52),
+      bx(0.40, 0.22, 0.34, 0, 2.13, 0.28, 0xffc79a),
+      bx(0.50, 0.40, 0.44, 0, 2.32, 0.26, 0xff3b6b),      // helmet 2.12-2.52
+      bx(0.44, 0.08, 0.10, 0, 2.34, 0.02, 0x141a33),
+      bx(0.15, 0.48, 0.15, -0.30, 1.60, 0.42, 0x2b2f52, 0.55),
+      bx(0.15, 0.48, 0.15, 0.30, 1.60, 0.42, 0x2b2f52, 0.55),
+      bx(0.08, 0.26, 0.08, -0.50, 1.62, 0.54, 0x2b2f52),
+      bx(0.08, 0.26, 0.08, 0.50, 1.62, 0.54, 0x2b2f52),
+      bx(0.24, 0.15, 0.07, -0.55, 1.80, 0.54, 0xfff2e0),  // mirror glass
+      bx(0.24, 0.15, 0.07, 0.55, 1.80, 0.54, 0xfff2e0),
+      bx(0.30, 0.18, 0.06, 0, 0.72, -0.36, 0xfff2e0),
+      bxAt(0.34, 0.12, 0.08, 0, 0.90, -0.61, 0xffe45e),
+    ]);
+
+    /**
+     * The fleet, and the weights are a statement about what the road IS.
+     *
+     * Thirteen tickets in sixteen are a vehicle, because the complaint that
+     * started this was that the road did not have traffic on it -- and the two
+     * hazards that are not vehicles are the two the previous review put double
+     * weight on for the same kind of reason, so the marshals keep theirs. The
+     * old barricaded works truck is gone: it was the object in the screenshot.
+     *
+     * Cost of a variant nobody is looking at: one merged geometry, built once
+     * and shared by every object in the pool, plus three invisible meshes per
+     * pooled hazard -- a matrix update each and no draw call. Only the visible
+     * body, its ink shell, its face and its one moving part are ever submitted,
+     * so ten skins cost the same per frame as four did.
+     */
     const blockPool = hazardPool(K.BLOCK, 'block', [
-      { geo: blockGeo, face: [2.06, 1.9, 1.42, -0.661], weight: 1 },
+      {
+        geo: blockTramGeo, face: [2.20, 0.26, 0.30, -0.671], weight: 1,
+        moving: blockTramPantoGeo, pivot: [0, 2.38, 0.06], anim: 'sway',
+      },
       { geo: blockSignGeo, face: [2.06, 1.7, 1.58, -0.541], weight: 1 },
       {
-        geo: blockTrikeGeo, face: [1.98, 0.86, 0.74, -0.591], weight: 2,
+        geo: blockTrikeGeo, face: [1.98, 0.86, 0.74, -0.591], weight: 1,
         // Bottom bracket lifted to the box line and pulled forward of its far
         // face, so the knees break the box's top edge instead of pedalling
         // behind it. See blockTrikeCrankGeo.
@@ -4500,6 +4931,18 @@ MR.World = (function () {
         // collision box records for a BLOCK rather than 0.20 over it.
         moving: blockPaddleGeo, pivot: [0.92, 0.80, 0.30], anim: 'paddle',
       },
+      { geo: blockBusGeo, face: [2.16, 0.24, 0.56, -0.671], weight: 2, anim: 'idle' },
+      { geo: blockTaxiGeo, face: [2.02, 0.22, 0.42, -0.671], weight: 2, anim: 'idle' },
+      { geo: blockVanGeo, face: [2.10, 0.22, 0.48, -0.671], weight: 2 },
+      {
+        geo: blockRefuseGeo, face: [2.10, 0.22, 0.47, -0.671], weight: 1,
+        moving: blockRefuseGateGeo, pivot: [0, 1.30, -0.60], anim: 'lift',
+      },
+      {
+        geo: blockRoadBikeGeo, face: [1.90, 0.24, 0.30, -0.481], weight: 2,
+        moving: blockRoadBikeCrankGeo, pivot: [0, 0.60, 0.14], anim: 'pedal',
+      },
+      { geo: blockMopedGeo, face: [1.66, 0.30, 1.20, -0.621], weight: 2, anim: 'idle' },
     ]);
 
     /**
@@ -4670,7 +5113,7 @@ MR.World = (function () {
      * so a variant's share is something this file states rather than discovers.
      *
      * A train is always variant 0. It is the only BLOCK body authored to be
-     * stretched along z (see blockGeo), and a six-unit cargo trike would be a
+     * stretched along z (see blockTramGeo), and a six-unit cargo trike would be a
      * joke rather than an obstacle.
      */
     function variantIndex(bag, gate, lane) {
@@ -7450,20 +7893,41 @@ MR.World = (function () {
           const a = o.userData.active;
           if (!a || !a.userData.anim) continue;
           const ph = g.gate.z * 0.7 + l;
-          if (a.userData.anim === 'pedal') {
+          const kind = a.userData.anim;
+          const mv = a.userData.moving;
+          if (kind === 'pedal') {
             // A cadence, not a wheel spin: about 1.2 turns a second is what a
             // rider holding up traffic looks like. Slowed from 1.6 now that the
             // knees rise past the box line rather than turning behind it -- at
             // the old rate the pair strobed instead of reading as legs, and a
             // motion you cannot follow is the same as no motion.
-            a.userData.moving.rotation.x = now * 7.6 + ph;
+            mv.rotation.x = now * 7.6 + ph;
             a.position.y = Math.sin(now * 15.2 + ph) * 0.030;
-          } else {
+          } else if (kind === 'paddle') {
             // A wave, and a big one. This is the only thing on the road that
             // signals a human intention rather than an obstacle, so it is worth
             // more amplitude than realism would give it.
-            a.userData.moving.rotation.z = Math.sin(now * 3.4 + ph) * 0.42;
+            mv.rotation.z = Math.sin(now * 3.4 + ph) * 0.42;
             a.position.y = Math.abs(Math.sin(now * 3.0 + ph)) * 0.050;
+          } else if (kind === 'sway') {
+            // The tram's pantograph, riding a wire that is not drawn. Slow and
+            // small on purpose: the head of a pantograph tracks the wire, it
+            // does not flap, and a big motion up there would argue with the
+            // one thing above the roofline that has to read as rigid.
+            mv.rotation.x = Math.sin(now * 0.85 + ph) * 0.045;
+            a.position.y = Math.sin(now * 1.1 + ph) * 0.012;
+          } else if (kind === 'lift') {
+            // The refuse truck's tailgate, working. Slow -- one cycle every
+            // five seconds -- because a runner passes this thing in under a
+            // second and a fast cycle would only ever be caught mid-blur.
+            mv.position.y = a.userData.pivotY + 0.24 + 0.24 * Math.sin(now * 1.25 + ph);
+            a.position.y = Math.sin(now * 17 + ph) * 0.012;
+          } else {
+            // 'idle': a stopped engine shaking its own body, and nothing else.
+            // 2.2 Hz at 0.022 is about a third of a pixel at forty units and
+            // roughly one at fifteen, which is the range where it should start
+            // to be felt rather than seen.
+            a.position.y = Math.sin(now * 13.8 + ph) * 0.022;
           }
         }
       }

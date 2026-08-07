@@ -133,9 +133,16 @@ fs.mkdirSync(DIR, { recursive: true });
     // a rig that does rotate it, which is a measurement saying nothing.
     // A hip socket 0.11 out from the spine is what pelvis rotation actually
     // moves, and it is also what the eye reads.
+    // `parts.head` is a pivot whose local position is (0,0,0) in the run, so
+    // its world position IS the neck joint and tracking it reports the neck.
+    // A marker parented into head space at the skull centre reports the skull.
+    const skull = new THREE.Object3D();
+    skull.position.set(0, 0.36, 0);
+    rig.head.add(skull);
+
     const track = {
       pelvis: rig.hips, hipL: r.parts.legs[0].hip, shoulderL: r.parts.arms[0].shoulder,
-      chest: rig.chest, head: rig.head,
+      chest: rig.chest, head: skull,
       handL: hands[0], handR: hands[1], footL: feet[0], footR: feet[1],
     };
     const box = {};
@@ -193,7 +200,13 @@ fs.mkdirSync(DIR, { recursive: true });
     // divided by the contact duration.
     const zs = skate.map((s) => s.z || 0);
     const period = 1 / (2.55 * Math.pow(speed / ((MR.K.UNITS_PER_MILE * MR.K.TIME_SCALE) / MR.K.START_PACE), 0.72));
-    const contactSec = period * (down.length / skate.length);
+    // Halved, and the halving is the point. `down` is sampled from whichever
+    // foot is lower, so it spans BOTH feet's contacts within one period, while
+    // travel.footL.z is ONE foot's range. Dividing one by the other made the
+    // ceiling twice as pessimistic as the rig really is -- it reported a floor
+    // of 81% skate that stage 1 then beat, at 73.1%, without exaggerating
+    // anything. A bound nobody checked is worse than no bound.
+    const contactSec = period * (down.length / skate.length) / 2;
 
     const travel = {};
     for (const k in box) {
@@ -235,7 +248,16 @@ fs.mkdirSync(DIR, { recursive: true });
   // The page viewport has to be at least as large as the sheet: a screenshot
   // clip outside the viewport comes back cropped, which silently produced a
   // two-tile "twelve-frame" sheet the first time this ran.
+  //
+  // And the resize must be allowed to SETTLE before the first sheet is drawn.
+  // setViewportSize fires a resize event, the game's own handler repaints the
+  // whole canvas, and that repaint lands on top of whichever view is rendered
+  // first -- so the first sheet came out as a single wide panorama of the game
+  // rather than twelve tiles, every time, while the second was correct. It was
+  // committed to reference/ and described as a contact sheet before anyone
+  // opened it.
   await page.setViewportSize({ width: TW * N, height: TH });
+  await page.waitForTimeout(400);
   for (const view of Object.keys(VIEWS)) {
     await page.evaluate(({ view, N, speed, V, TW, TH }) => {
       const g = MR.game, r = g.runner;

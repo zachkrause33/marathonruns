@@ -3983,14 +3983,49 @@ MR.World = (function () {
         // An avenue, planted on the tile so it costs no extra draw. Scattered
         // single trees never made PARKLAND feel like parkland -- a regular
         // line right at the verge does, and it is what a park boulevard is.
+        //
+        // THIS IS THE TREE THE PLAYER SEES MOST, and it was the one MEASUREMENTS
+        // section 6 never reached. The fix to `vTree` warmed every setting's
+        // palette from a true green to the reference's chartreuse and reordered
+        // the lobes so value tracks height -- but the avenue is baked into the
+        // road tile rather than pooled per setting, so it kept a hard-coded
+        // 0x2f9f52 / 0x3fbf63 / 0x59d47a at R = 0.30-0.42 of G against the
+        // reference's 0.75-0.78, on the old cold trunk 0x8a5a3c, and it kept
+        // being a CONIFER. Two conifers a side on every hedge tile is a hundred
+        // of them live at once, all of them nearer the lens than any pooled
+        // tree, and every one contradicting the trees standing next to it.
+        //
+        // So it becomes the same broadleaf: a warm forked stem under a wide
+        // squat crown, in the generic chartreuse ladder (76.9 / 102.5 / 132.0
+        // through shadedL -- 1.00 : 1.33 : 1.72 against the reference's 1.70),
+        // darkest on the low outboard lobes and lightest on the one that tops
+        // the crown. 236 triangles against 72; four to a tile.
+        //
+        // Proportioned off the reference's own measurement rather than off the
+        // cone it replaces. A bare trunk is 23-36% of tree height in
+        // `tgr-boulevard` and `tgr-taxi-street`; the first draft of this tree
+        // put its crown at y 3.6 on a 5.65 tree and came out at 46% -- leggy,
+        // and visibly so at 20 units. The crown now starts at 1.70 of 4.70:
+        // 36%, at the top of the reference's band, and it is wider than it is
+        // tall (4.0 across, 3.15 deep) the way a street tree is.
+        //
+        // The avenue moves out from TRACK_HALF_WIDTH + 3.4 to + 4.2 so the
+        // wider crown reaches exactly as far toward the road as the cone it
+        // replaces: 7.95 - 2.60 = 5.35, unchanged, and 1.6 outside CORRIDOR_HALF.
+        const LEAF = canopy([0x5c8028, 0x7fa838, 0xa4d848]);
         for (let i = 0; i < 2; i++) {
           const tz = -TILE / 2 + 5 + i * 12 + (sx > 0 ? 3 : 0);
-          const k = i ? 1.15 : 0.92;
-          const tx = sx * (K.TRACK_HALF_WIDTH + 3.4);
-          parts.push(cyl(0.20 * k, 0.32 * k, 1.9 * k, 6, tx, 0.95 * k, tz, 0x8a5a3c));
-          parts.push(cone(1.55 * k, 2.1 * k, 8, tx, 2.6 * k, tz, 0x2f9f52));
-          parts.push(cone(1.20 * k, 1.7 * k, 8, tx, 3.6 * k, tz, 0x3fbf63));
-          parts.push(cone(0.82 * k, 1.4 * k, 8, tx, 4.6 * k, tz, 0x59d47a));
+          const k = i ? 1.30 : 1.05;
+          const tx = sx * (K.TRACK_HALF_WIDTH + 4.2);
+          parts.push(cyl(0.20 * k, 0.30 * k, 1.9 * k, 6, tx, 0.95 * k, tz, 0xb0662e));
+          parts.push(cyl(0.12 * k, 0.17 * k, 1.15 * k, 6, tx - sx * 0.22 * k, 2.25 * k,
+            tz + 0.08 * k, 0xb0662e, 0, 0, sx * 0.30));
+          parts.push(cyl(0.11 * k, 0.16 * k, 1.05 * k, 6, tx + sx * 0.22 * k, 2.20 * k,
+            tz - 0.10 * k, 0xb0662e, 0, 0, -sx * 0.34));
+          parts.push(sph(1.35 * k, 7, tx, 3.05 * k, tz, LEAF[1]));
+          parts.push(sph(1.00 * k, 6, tx - sx * 1.00 * k, 2.70 * k, tz + 0.42 * k, LEAF[2]));
+          parts.push(sph(0.95 * k, 6, tx + sx * 1.02 * k, 2.80 * k, tz - 0.40 * k, LEAF[2]));
+          parts.push(sph(0.85 * k, 6, tx + sx * 0.12 * k, 3.85 * k, tz + 0.12 * k, LEAF[0]));
         }
       }
       // Park and riverside overhead: bunting on slim poles and nothing else.
@@ -7393,7 +7428,17 @@ MR.World = (function () {
       parts.push(cyl(1.1, 2.1, 11.0, 8, 0, 6.0, 0, BARK));
       parts.push(bx(0.9, 6.0, 0.9, -2.6, 11.0, 0, BARK, 0, 0, 0.7));
       parts.push(bx(0.8, 5.0, 0.8, 2.4, 11.6, 1.0, BARK, 0, 0, -0.6));
-      const green = [0x2f9f52, 0x35a855, 0x3fbf63, 0x59d47a];
+      // THE SAME TWO FAULTS SECTION 6 MEASURED ON `vTree`, in the biggest tree
+      // in the game. The palette was a true green at R = 0.30-0.42 of G against
+      // the reference's 0.75-0.78, and it was handed out by BLOB INDEX -- so the
+      // lightest of the four landed on the blob at y 12.8, the second lowest in
+      // the canopy, and the crown blob at 16.8 got the third. Value ran at
+      // random against height, which is the exact defect on the pooled trees.
+      //
+      // Now it is a chartreuse ladder assigned by the blob's own height:
+      // shadedL 76.9 / 89.8 / 102.5 / 132.0, darkest under the canopy and
+      // lightest on top of it. Zero triangles.
+      const green = canopy([0x5c8028, 0x6e9430, 0x7fa838, 0xa4d848]);
       // The inner reach is the number that matters. The furthest any blob gets
       // toward the road is centre minus radius = -10.4, and an oak is never
       // placed nearer than 15, so the canopy stops at world x = 4.6 -- outside
@@ -7404,9 +7449,12 @@ MR.World = (function () {
         [4.2, 15.2, -1.4, 4.8], [6.6, 12.8, 1.8, 4.0], [-1.0, 12.6, 3.6, 4.2],
         [1.6, 13.0, -4.2, 4.4],
       ];
-      for (let i = 0; i < blobs.length; i++) {
-        const b = blobs[i];
-        parts.push(sph(b[3], 7, b[0], b[1], b[2], green[i % green.length]));
+      const yLo = Math.min.apply(null, blobs.map((b) => b[1]));
+      const yHi = Math.max.apply(null, blobs.map((b) => b[1]));
+      for (const b of blobs) {
+        const t = (b[1] - yLo) / (yHi - yLo);
+        parts.push(sph(b[3], 7, b[0], b[1], b[2],
+          green[Math.min(green.length - 1, Math.floor((1 - t) * green.length))]));
       }
       return merge(parts);
     })();

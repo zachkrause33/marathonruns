@@ -367,13 +367,47 @@ MR.shading = (function () {
     '      float aa = fwidth(nh) * 0.70 + 0.010;',
     '      float sheen = smoothstep(' + SPEC_SHEEN.toFixed(2) + ' - aa, ' + SPEC_SHEEN.toFixed(2) + ' + aa, nh);',
     '      float core = smoothstep(' + SPEC_CORE.toFixed(2) + ' - aa, ' + SPEC_CORE.toFixed(2) + ' + aa, nh);',
+    // FRESNEL, and it is what makes this usable on a fleet made of flat panels.
+    //
+    // The failure it fixes, measured on the orbit sheet: at the azimuth where a
+    // flank or a window turns to face the lens, that face fills much of the
+    // frame AND sits at one constant normal, so a threshold it crosses switches
+    // the whole panel white at once. The taxi's side glass went to a flat sheet
+    // of near-white the moment the camera reached the flank.
+    //
+    // Real reflectance rises toward grazing angles and is weakest face-on,
+    // which is precisely the opposite weighting -- so applying it suppresses the
+    // case that broke and strengthens the case the reference actually shows,
+    // which is a highlight along a roof and a shoulder seen edge-on. The floor
+    // keeps a face-on surface from going completely matte, because a windscreen
+    // straight ahead is not a hole.
+    '      float ndv = max(dot(sN, sV), 0.0);',
+    '      float fres = mix(0.22, 1.0, pow(1.0 - ndv, 1.6));',
     // The sheen is the wide, weak step that says "this material is not chalk";
     // the core is the small hot one that reads as an actual reflection. Both
     // are scaled by the light's own colour, so the highlight is warm under the
     // key and cool under the bounce rather than being a white sticker.
-    '      spec += directionalLights[si].color * (sheen * 0.07 + core * 0.24);',
+    '      spec += directionalLights[si].color * fres * (sheen * 0.10 + core * 0.34);',
     '    }',
-    '    outgoingLight += spec * vGloss;',
+    // THE HIGHLIGHT IS TINTED BY THE SURFACE, and that is a chroma decision
+    // rather than a physical one. A dielectric's specular really is the light's
+    // own colour -- but a white additive term is, by construction, the fastest
+    // way to the neutral axis there is, and this build gates on the area-mean
+    // saturation of every hazard. Measured: an untinted highlight took the taxi
+    // from S 0.531 to 0.401 and the refuse truck from 0.556 to 0.412, dropping
+    // both off a target they had been clearing -- the same arithmetic that the
+    // fleet's colour note records for cream and that GLASS_FLASH ran into an
+    // hour earlier. Three doors into one room.
+    //
+    // Mixing 70% of the surface hue back in keeps the highlight bright while
+    // leaving it on its own side of neutral. It is also the more honest look
+    // for this renderer: everything here is saturated toy plastic, and coloured
+    // plastic has a coloured sheen. The divide normalises out VALUE and keeps
+    // only hue, so a dark panel gets the same strength of highlight as a light
+    // one rather than a proportionally dimmer one.
+    '    float mx = max(max(diffuseColor.r, diffuseColor.g), max(diffuseColor.b, 0.001));',
+    '    vec3 specTint = mix(vec3(1.0), diffuseColor.rgb / mx, 0.70);',
+    '    outgoingLight += spec * specTint * vGloss;',
     '  }',
     '#endif',
   ].join('\n');

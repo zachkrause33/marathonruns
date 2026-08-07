@@ -6491,55 +6491,43 @@ MR.World = (function () {
     })();
 
     /**
-     * The same stand with its crowd drawn as a BAND instead of as 55 people.
+     * ============ THE FAR STANDS ARE PEOPLE AT EVERY DISTANCE ============
      *
-     * FINAL MILE carries the heaviest crowd mix in the race and twenty stands
-     * are live at once, which measured 28,560 triangles -- 28% of a 100k frame,
-     * on a budget whose working ceiling is 75k. Fifty-five spectators is 1,320
-     * of a stand's 1,428 triangles, and past about a hundred units a spectator
-     * is under a pixel wide: what survives is a warm speckled mass along each
-     * row, which is precisely what one box per row is.
+     * There used to be a second geometry here that redrew a stand beyond 130
+     * units as five extruded BANDS in the mean of the six shirt tints -- 228
+     * triangles against 1,428, eight thousand saved across twenty stands. It
+     * was built to fit a 75,000-triangle ceiling that was measured under
+     * SwiftShader and was never real. The working ceiling is 500,000 and the
+     * heaviest frame in the game is 170k, so the saving bought nothing that
+     * was needed and the band is gone.
      *
-     * The swap distance is what makes it invisible. STAND_LOD is 130 units,
-     * where the fog is already 45% of the way in (near 60, far 215) and rising
-     * steeply, so the two versions differ only in detail that is both sub-pixel
-     * and half dissolved. The band colours are the mean of the six shirt tints
-     * and the mean skin, so the mass keeps its value and its warmth across the
-     * swap; only the speckle goes.
+     * Its stated justification was also wrong, and the number is worth keeping
+     * because the same mistake is easy to make again. "Past about a hundred
+     * units a spectator is under a pixel wide" -- projected through the real
+     * camera at the fov this leg actually runs (70.3, not the base 58), a
+     * spectator's 0.40-unit torso is:
      *
-     * 228 triangles against 1,428. Zero extra draw calls -- one of the pair is
-     * visible at a time, exactly as the road tile's four roadside kinds are.
+     *     d = 24   10.1 px      d = 110   2.2 px
+     *     d = 40    6.1 px      d = 130   1.9 px
+     *     d = 60    4.0 px      d = 210   1.2 px
+     *
+     * -- 1.9 px at the swap distance, not "under a pixel", and still over a
+     * pixel at the spawn edge. It is the same class of error as the 110px
+     * runner this file's older comments assume: a size asserted rather than
+     * projected.
+     *
+     * What IS true, and is the reason the swap was hard to see: the stand runs
+     * nearly parallel to the view, so the 2.15-unit SEAT PITCH foreshortens far
+     * faster than the body does -- 9.0 px at 24 units, 1.5 px at 60, 0.33 px at
+     * 130. Along the row the crowd merges into a bar long before the individual
+     * does. That is an argument for a band somewhere past 200 units, not at
+     * 130, and past 200 the stands are behind three closer stands anyway: the
+     * grandstands are a continuous wall down both shoulders, so beyond about
+     * the fourth one only the strip either side of the vanishing point is ever
+     * visible at all. There is nothing left there worth a second geometry.
      */
-    const standFarGeo = (function () {
-      const parts = [];
-      for (let row = 0; row < 5; row++) {
-        const y = row * 0.74;
-        const x = 0.9 + row * 1.10;
-        parts.push(bx(1.10, 0.74, TILE, x, y + 0.37, 0, row % 2 ? 0x8e99c6 : 0x6f7aa8));
-        // The band waves too, at a third of the amplitude and one phase per
-        // row. A band cannot ripple along its own length -- it is one box --
-        // so what survives the swap is the SWELL, which is the part that is
-        // still legible through 45% of fog. Splitting each row into chunks to
-        // buy back the ripple would cost more triangles than the whole far
-        // variant currently is, for detail that is sub-pixel by construction.
-        parts.push(wv(bx(0.40, 0.48, TILE - 2.2, x - 0.1, y + 0.98, 0, 0xc2b087), row * 1.9, 0.34));
-        parts.push(wv(bx(0.22, 0.22, TILE - 2.2, x - 0.1, y + 1.33, 0, 0xe8bd94), row * 1.9, 0.34));
-      }
-      for (const z of [-TILE / 2 + 1, TILE / 2 - 1]) {
-        parts.push(bx(0.28, 7.2, 0.28, 0.2, 3.6, z, 0x2b2f52));
-        parts.push(bx(0.14, 1.7, 2.3, 0.2, 6.4, z, z < 0 ? 0xff3b6b : 0x37d6ff));
-      }
-      return merge(parts);
-    })();
-    const STAND_LOD = 130;
     const standPool = Pool(function () {
-      const g = new THREE.Group();
-      const near = S.outlined(standGeo, mats.crowd, S.INK.scenery);
-      const far = S.outlined(standFarGeo, mats.crowd, S.INK.scenery);
-      far.visible = false;
-      g.add(near, far);
-      g.userData.lod = [near, far];
-      return g;
+      return S.outlined(standGeo, mats.crowd, S.INK.scenery);
     }, group);
 
     /**
@@ -6557,10 +6545,9 @@ MR.World = (function () {
      * rail, and they are the only crowd in this game that the player ever sees
      * as people rather than as a mass.
      *
-     * So the budget goes to the front. Sixteen standing figures in two rows at
-     * x = 0.6 and 1.5 take 55% of the triangles; the six seated rows behind
-     * them take the rest, and the back three of those are already banded
-     * because at that depth they are behind the front rows anyway. The rear
+     * So the weight goes to the front. Sixteen standing figures in two rows at
+     * x = 0.6 and 1.5 take a third of the triangles; the six seated rows behind
+     * them take the rest, every row of them drawn as people. The rear
      * wall and roof line are what let the street wall be switched off in the
      * chute (see the street pass) -- this becomes the thing the road runs
      * between, which is what a finish arena actually is.
@@ -6573,8 +6560,7 @@ MR.World = (function () {
      * any height.
      */
     const FSTAND_X = K.TRACK_HALF_WIDTH + 0.55;
-    const FSTAND_LOD = 118;
-    function finishStandParts(seed, banded) {
+    function finishStandParts(seed) {
       const parts = [];
       const shirts = [0xff4d5e, 0x37d6ff, 0xffe45e, 0x59d47a, 0xff9ad5, 0xffb020,
                       0xfff2e0, 0x9a7bff];
@@ -6583,12 +6569,12 @@ MR.World = (function () {
       const r = lcg(seed);
 
       // ---- the front rail: the reason this object exists -----------------
-      if (banded) {
-        for (const rx of [0.62, 1.52]) {
-          parts.push(wv(bx(0.46, 0.72, TILE - 1.0, rx, 1.05, 0, 0xc2926f), rx * 3.1, 0.5));
-          parts.push(wv(bx(0.30, 0.30, TILE - 1.0, rx, 1.56, 0, 0xe8bd94), rx * 3.1, 0.5));
-        }
-      } else {
+      // There was a banded twin of this object for stands beyond 118 units,
+      // and a chute is 150 units long, so it swapped in for the far end of the
+      // finish arena. It is gone with the grandstand's -- same false ceiling,
+      // same measurement error, and this one had less excuse: the finish stand
+      // is the object the player is closest to in the whole game.
+      {
         for (let row = 0; row < 2; row++) {
           const rx = 0.62 + row * 0.90;
           const n = 8;
@@ -6625,18 +6611,17 @@ MR.World = (function () {
         const y = 0.55 + row * 0.80;
         const x = 2.65 + row * 1.05;
         parts.push(bx(1.05, 0.80, TILE, x, y - 0.40, 0, row % 2 ? 0x8e99c6 : 0x6f7aa8));
-        if (banded || row >= 3) {
-          parts.push(wv(bx(0.42, 0.50, TILE - 2.0, x - 0.08, y + 0.61, 0, 0xc2b087), row * 1.9, 0.34));
-          parts.push(wv(bx(0.24, 0.24, TILE - 2.0, x - 0.08, y + 0.98, 0, 0xe8bd94), row * 1.9, 0.34));
-        } else {
-          for (let i = 0; i < 9; i++) {
-            const z = -TILE / 2 + 1.4 + i * 2.6 + (r() - 0.5) * 0.6;
-            const ph = z * 0.44 + row * 1.6 + r() * 1.6;
-            parts.push(wv(bx(0.44, 0.52, 0.30, x - 0.08, y + 0.62, z,
-              shirts[Math.floor(r() * shirts.length)]), ph));
-            parts.push(wv(bx(0.24, 0.24, 0.22, x - 0.08, y + 1.00, z,
-              skins[Math.floor(r() * skins.length)]), ph));
-          }
+        // The back three rows used to be drawn as a band on the grounds that
+        // they sit behind the front rows anyway. They do not: the rows step up
+        // 0.80 each and the eye is at 2.4, so from row 3 up every seat is above
+        // the head of the one in front and every one of them is on screen.
+        for (let i = 0; i < 9; i++) {
+          const z = -TILE / 2 + 1.4 + i * 2.6 + (r() - 0.5) * 0.6;
+          const ph = z * 0.44 + row * 1.6 + r() * 1.6;
+          parts.push(wv(bx(0.44, 0.52, 0.30, x - 0.08, y + 0.62, z,
+            shirts[Math.floor(r() * shirts.length)]), ph));
+          parts.push(wv(bx(0.24, 0.24, 0.22, x - 0.08, y + 1.00, z,
+            skins[Math.floor(r() * skins.length)]), ph));
         }
       }
 
@@ -6659,16 +6644,9 @@ MR.World = (function () {
       }
       return parts;
     }
-    const finishStandGeo = merge(finishStandParts(4211, false));
-    const finishStandFarGeo = merge(finishStandParts(4211, true));
+    const finishStandGeo = merge(finishStandParts(4211));
     const finishStandPool = Pool(function () {
-      const g = new THREE.Group();
-      const near = S.outlined(finishStandGeo, mats.crowd, S.INK.scenery);
-      const far = S.outlined(finishStandFarGeo, mats.crowd, S.INK.scenery);
-      far.visible = false;
-      g.add(near, far);
-      g.userData.lod = [near, far];
-      return g;
+      return S.outlined(finishStandGeo, mats.crowd, S.INK.scenery);
     }, group);
 
     /**
@@ -8509,7 +8487,6 @@ MR.World = (function () {
         if (st.kind === 'fstand') {
           obj.position.x = st.side * FSTAND_X;
           obj.rotation.y = st.side < 0 ? Math.PI : 0;
-          obj.userData.lodAt = FSTAND_LOD;
         }
         if (st.kind === 'arch' && obj.userData.mat) {
           if (!st.tex) st.tex = labelTexture(st.label, st.bg, st.fg, 768, 128, st.sub);
@@ -8518,16 +8495,6 @@ MR.World = (function () {
         }
         obj.userData.auditName = 'set piece / ' + st.kind;
         activeStruct.push({ st, obj, pool });
-      }
-      // Detail level, for the one set piece heavy enough to matter. See
-      // standFarGeo: twenty of these are live at mile 25 and the far half of
-      // them are drawing 55 sub-pixel spectators each through 45% of fog.
-      for (const e of activeStruct) {
-        const lod = e.obj.userData.lod;
-        if (!lod) continue;
-        const far = (e.st.z - z) > (e.obj.userData.lodAt || STAND_LOD);
-        lod[0].visible = !far;
-        lod[1].visible = far;
       }
       while (activeStruct.length && activeStruct[0].st.z < back - 60) {
         const e = activeStruct.shift();

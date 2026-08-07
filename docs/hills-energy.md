@@ -506,3 +506,75 @@ fourth HUD number.
 - **The runner's trunk pitch (+6° / −3°).** Pure feel.
 - **`FUEL` is not a guess.** It is `min(gatesSeen, AID_CEILING)` read straight
   out of `pace.onAid`, and it is exact.
+
+---
+
+# 7. Corrections from the build
+
+Hills shipped. Five numbers in this document did not survive contact with the
+code, and they are recorded here rather than quietly fixed, because a brief
+built on a measurement that did not mean what it appeared to has damaged this
+project three times.
+
+The build's own numbers, for reference: `Elevation.validate()` reports a worst
+sightline of 90.0 units on all 90 dates of the sweep; the flawless finish is
+1:57:50 before and after; the worst |flat − hilly| finish delta over 90 dates ×
+5 skill levels is **0.182 s**; peak cost went 178,954 tri / 266 draws →
+179,420 / 270.
+
+**§1.3's sightline bound is OPTIMISTIC, not "conservative by 5–10 %".** The
+derivation places the eye directly over the crest. The real camera is 4.35
+units behind it and therefore lower down the near flank, so the true eye height
+above the crest tangent is less than 2.30. Swept numerically against the real
+offset, a single hill sitting exactly on the analytic cap measures
+
+| L | 130 | 150 | 180 | 200 | 221 | 240 |
+|---|---|---|---|---|---|---|
+| measured ÷ analytic | 1.035 | 1.013 | 0.993 | 0.985 | 0.979 | **0.978** |
+
+— so at the L = 221 crossover the cap overshoots by 2.1 %. Three courses in a
+90-day sweep failed `validate()` at 89.7 units before a `SIGHT_SAFETY` factor
+of 0.95 was added. The table in §1.3 that reports 104 / 92 / 107 units of
+"measured worst sightline" cannot be reproduced.
+
+**§1.1's `L` range of 130–240 is too short, and the reason is a property the
+design did not notice.** Under the sightline cap `h = K·L²`, so the maximum
+grade of a legal hill is `hπ/2L = Kπ·L/2` — **linear in L**. A longer hill is a
+*steeper* one, not a gentler one, up to L = 245 where the 4 % grade rule takes
+over. So 130–240 tops out at 3.9 % and averages about 2.6 %, and 2.6 % was
+measured on screen as a real but modest read: the horizon moves 18 px in a
+1280×800 frame and a player would have to be looking for it. The shipped range
+is **200–300** with `h = cap(L) × 0.82…1.0`, which puts every hill between
+2.7 % and the 4 % ceiling. Coverage goes 28 % → 39 %, and a hill is 15–22 s of
+wall clock instead of 10–18.
+
+**§1.4's `actionWindowAt` formula loses the margin it was meant to protect.**
+`max(20, JUMP_TIME × speed)` evaluates to 19.84 on the flat, which is *below*
+the constant 21 the generator uses today — so as written it would have loosened
+the flat course rather than protecting the descent. Shipped as
+`ACTION_WINDOW + max(0, span(z) − span(flat))`, which holds the same 1.16-unit
+absolute margin at every point. It is also evaluated against the steepest grade
+within one airborne reach *ahead* of the gate, not at the gate line: on the
+shoulder of a hill the gate line is the gentler end of the span the jump covers.
+Measured across 90 dates the window runs 21.00 → 22.69.
+
+**§1.7's cost of "+230 triangles" was right, and was costed under a false
+ceiling.** The ground plane shipped at 226 triangles across 113 rows; the real
+ceiling is 500,000 and the real constraint is draw calls. Nothing was declined
+on budget grounds.
+
+**The bridge is NOT a hill, and §1.1's "the bridge already is one" does not
+work.** `deckLift(z)` is a ramp / hold / ramp with a **corner** at the top of
+each ramp — piecewise linear, so the curvature there is infinite and the
+sightline rule fails outright. Making it a real rise would need `deckLift`
+reshaped into something twice-differentiable *and* the river detached from the
+ground plane, which now follows `E(z)`. The whole bridge span is excluded from
+hill placement instead, and the leg over the water is flat, which is also what
+a real bridge deck is.
+
+**What §1.3 got exactly right, and it is the important one.** A crest is a new
+way to hide a gate, the cap is the thing that stops it, and it has to be
+ray-marched rather than asserted. It fired on real courses twice during the
+build — once on the analytic error above, once on the footbridge, whose soffit
+sits at 9.05 against an `OVERHEAD_Y` of 9.00 and loses those five centimetres
+over its own half-span on a grade. Neither would have been found by reading.

@@ -432,12 +432,33 @@ added for.
 
 - **R2** — the second gate, and the assertion that never tested for it.
 - **R3** — open the sky, make the mile marker readable.
-- **Animation polish**, stage 1 of 3: the base run cycle. Then secondary
-  motion, then speed responsiveness. `?polish=0..1` scales every added term so
-  one build renders both versions; `tools/stride.js` measures and photographs
-  the cycle.
+- **Animation polish**, stage 2 of 3: secondary motion. Then speed
+  responsiveness. `?polish=0..1` scales every added term so one build renders
+  both versions; `tools/stride.js` measures and photographs the cycle.
 
 ## Done since this file was written
+
+- **Animation polish, stage 1 — the base run cycle.** The brief's diagnosis
+  ("pure sinusoids; contact fast, swing slow") was right and secondary. The
+  bigger defect was **phase**, and it was invisible to every measurement taken
+  because they all read amplitudes: plotting the foot's rig-space *loop*
+  showed it travelling **forward at the bottom of its arc and backward at the
+  top** — a bicycle pedalled the wrong way. `bend` peaked half a cycle from
+  where a run puts it, so the leg was straight at mid-swing (hence a sole 0.035
+  under the road with no weight near it) and folded at both swing extremes.
+  Turning the knee's phase by π reverses the loop, and nothing else had to
+  move because `bob` is already lowest at both places the feet now plant.
+
+  Planted foot **+4.894 → −6.739 u/s** (the sign flip is the whole tell),
+  skate 119.5% → 73.1%, sole penetration halved. Pelvis share of foot travel
+  7.7% → 13.5%; shoulder share of hand travel 7.5% → 16.8%. Foot planting was
+  *solved* rather than tuned: all three leg joints turn about one axis, so the
+  sole is flat when `hip + knee + ankle = 0`, and through stance the ankle is
+  solved for that every frame — so depth no longer depends on stride
+  amplitude, and stage 3 can raise it without reopening the question.
+
+  `--polish 0` proven bit-identical across 18 transforms × 48 phases × 8
+  states, against a same-build control to establish the noise floor.
 
 - **Hills** — the last major unbuilt feature, pace-neutral by construction and
   by measurement: worst flat-vs-hilly finish delta **0.182 s** over 90 dates ×
@@ -482,7 +503,18 @@ nobody measured is worse than no number at all.**
 5. **The LOD justification** — "past a hundred units a spectator is under a
    pixel wide". Projected properly: 4.0px at 60 units, 1.9px at the swap
    distance.
-6. **Three consecutive diagnoses of R2**, each confident, the first two false:
+6. **The stride instrument was wrong three ways, all flattering.** Its contact
+   sheets were not contact sheets — `setViewportSize` fires a resize, the game
+   repaints the full canvas, and that repaint lands on whichever view renders
+   first, so every "behind" sheet was a single wide panorama. One was committed
+   to `reference/` and described to the owner as a contact sheet. Its skate
+   floor divided one foot's travel by both feet's contact window and was 2×
+   pessimistic, which was then passed to an agent as "a bound you must not
+   fight". And it tracked the head at the neck pivot, turning a 1.22× gain into
+   a reported 4.2×. **An instrument nobody audits is not a measurement, it is a
+   preference with decimal places.**
+
+7. **Three consecutive diagnoses of R2**, each confident, the first two false:
    the telegraph mats (they cannot overlap), the DUCK as a solid 3.52-unit wall
    (above the bar it is two 0.26 posts, said so in a comment), and overhead
    structure occluding the road (impossible — the camera looks down). All three
@@ -494,7 +526,7 @@ nobody measured is worse than no number at all.**
    a proxy you can compute from constants.** A bounding box is not a
    silhouette, a z-overlap is not a screen overlap, and a category you defined
    can be unreachable by construction without ever saying so.
-7. **The `git add -A` ban was the wrong rule** and cost four sweeps before
+8. **The `git add -A` ban was the wrong rule** and cost four sweeps before
    anyone noticed, plus a fifth after. `git add <file> && git commit` is not
    file-scoped either: `git commit` writes whatever is already staged, so one
    agent's `git add` lands in the next agent's commit. The rule is pathspecs on

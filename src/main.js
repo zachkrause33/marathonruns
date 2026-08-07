@@ -158,15 +158,47 @@
       // Deliberate miss, for exercising the failure paths.
       const miss = BOT_SKILL < 1 && (bot.seen % Math.max(2, Math.round(1 / (1 - BOT_SKILL))) === 0);
 
-      // Prefer staying put, then the nearest lane; CLEAR beats an action.
+      // Prefer staying put, then the nearest lane; CLEAR beats an action; and
+      // a lane carrying aid beats the same lane without it.
+      //
+      // The aid term is not decoration. Aid is deliberately placed in the
+      // hardest legal lane and half the pool is placed to rescue a broken run,
+      // so it is the mechanic that decides how forgiving this game is -- and
+      // until now no automated run had ever collected a single item. A
+      // 16-contact bot run took 0 of 14, which meant the comeback path was
+      // measured only by tools/simulate.js modelling it, never by the game
+      // playing it. A verification harness that cannot exercise a mechanic is
+      // not verifying that mechanic.
+      //
+      // Aid is taken on lane match alone (player.resolveAid), so wanting an
+      // item means being in its lane when z passes it. The lane commit below
+      // fires at 34 units out, comfortably before any item between here and
+      // the gate.
       const order = [player.lane, player.lane - 1, player.lane + 1, 0, 1, 2]
         .filter((l, i, a) => l >= 0 && l <= 2 && a.indexOf(l) === i);
-      let best = null;
-      for (const l of order) {
-        if (g.lanes[l] === K.BLOCK) continue;
-        if (best === null) best = l;
-        if (g.lanes[l] === K.CLEAR) { best = l; break; }
+      // Items still ahead of the runner and no further than this gate.
+      const wants = [];
+      for (const it of (course.aid || [])) {
+        if (it.z <= pace.units) continue;
+        if (it.z > g.z) break;
+        wants.push(it.lane);
       }
+      let best = null, bestScore = -Infinity;
+      order.forEach(function (l, i) {
+        if (g.lanes[l] === K.BLOCK) return;
+        // Order position is the existing tie-break, kept intact: a lane earlier
+        // in `order` wins whenever nothing else separates two candidates.
+        let score = (g.lanes[l] === K.CLEAR ? 100 : 0) - i;
+        // Aid outranks a clear lane, deliberately. The bot handles JUMP and
+        // DUCK reliably -- the timing below is derived from the arc, not
+        // hand-tuned -- so detouring through an item costs an action it could
+        // have avoided and not a contact. Verified: bot=1 still finishes with
+        // 0 hits. If that ever stops being true, this is the term to lower,
+        // because a bot that breaks its streak fetching a bottle is measuring
+        // the wrong thing.
+        if (wants.indexOf(l) >= 0) score += 150;
+        if (score > bestScore) { bestScore = score; best = l; }
+      });
       if (best === null) best = player.lane;
       if (miss) {
         const bad = [0, 1, 2].find((l) => g.lanes[l] === K.BLOCK);
@@ -314,7 +346,10 @@
       // 26 -- the same defect the audio probe found in clean(), which had gone
       // flat at streak 90. audio.setIntensity reads a value above 1.0 as the
       // raw streak/70 and keeps climbing.
-      audio.setIntensity(pace.streak / 70);
+      // The second argument is the road's grade, and without it the terrain
+      // layer of the mix is silent -- the hills are audible only through
+      // cadence, which falls out of a grade-inclusive speed for free.
+      audio.setIntensity(pace.streak / 70, pace.grade);
 
       // The record slipping out of reach, and the ladder moving under you.
       // Both are changes of situation rather than events, both are currently

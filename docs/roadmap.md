@@ -10,7 +10,7 @@ that refused it).
 
 ## From the 2026-08-07 playtest (five frames)
 
-### R1 · The readout is still too crowded — **IN FLIGHT**
+### R1 · The readout is still too crowded — **DONE**
 
 > *"I'm not sure we need the pace, clean mile, how many obstacles have cleared
 > and how many are left to go. Crowds up the game."*
@@ -20,10 +20,28 @@ Four readouts named: `PACE`, the `MILE n` split toast, `n CLEAN`, and
 middle of the frame given back to the road; this is the second pass, on what
 survived.
 
-The bar to apply is the one the start panel was cut to: *the player cannot
-start, or will misread their run, without it*. The fuel gauge shows the engine
-and the projection shows the verdict; a number that only restates one of those
-is furniture.
+The bar applied was the one the start panel was cut to: *the player cannot
+start, or will misread their run, without it*.
+
+Three of the four are gone, each with the measurement that condemned it.
+`NEED /MI` travelled 4:32 → 4:27 → 4:29 across the first 200 seconds and then
+divided by a distance going to zero, so a RECORD run's last word was
+`NEED 24:44/MI`; its one live question is answered twice beside it at the same
+instant, the gauge crossing its record tick and `need − pace` crossing zero
+both between race-second 90 and 95. `n CLEAN` is the variable the tank is
+drawn from. `PB n CLEAN · n TO GO` measured **frozen at 24 from race-second
+215 to the tape** while the plate above it retargeted live. The `MILE n` toast
+carried four facts already on the frame, including a **second pace in min/mi
+sixty pixels under the PACE plate**, unlabelled — and printed its delta pink
+on a run whose projection read RECORD ON in green. It survives for aid alone.
+
+**`PACE` was kept, against the owner's list**, on the argument that it is the
+only number answering to every frame of play, the only thing that gives the
+tick on the tank a name, and the only one stated in the units of the wager.
+Flagged to the owner rather than decided silently — *their call, still open.*
+
+390×844: plate coverage 20.45% → **17.05%**, left column 263.8px → **204.6px**,
+39 → **29** words, 68 → **60** elements. Landscape left column 70.6% → 53.2%.
 
 ### R2 · Stacked obstacles hide the road ahead — **DIAGNOSED, OPEN**
 
@@ -151,14 +169,33 @@ rather than over it. `shoot.js` counts 13–32 live crossings per frame; 31 in
 02-early and 32 in 04-wall. That is a tunnel, and `shots/04-wall.png` is the
 owner's screenshot reproduced exactly. Separate task, separate pass.
 
-### R4 · The finish card carries too much — **IN FLIGHT**
+### R4 · The finish card carries too much — **DONE**
 
 > *"End scorecard. Review and adjust. Only have what is needed. Similar to the
 > landing page."*
 
-Currently: final time, longest clean, tier chip, best-today, a five-row
-summary, a six-row split table, contacts-cost, fastest mile, tomorrow's route.
-Same test as the start panel, which went 109 words to 74.
+Was: final time, longest clean, tier chip, best-today, a five-row summary, a
+six-row split table, contacts-cost, fastest mile, tomorrow's route.
+
+Four of the five summary rows were arithmetic on numbers already printed —
+`AVG PACE` = time/26.2, `FINAL PACE` 4:17 against a split table already
+reading 4:17, `CLEAN GATES` 183 = 205 − 22, `CONTACTS` 22 beside a label
+reading "22 CONTACTS COST". `AID TAKEN` survives as a note.
+
+The split table was driven over 4 days × 4 skill levels: clean runs print
+`4:57 4:30 4:26 4:23 4:16 4:17` **the same to within 2s on every day** — it
+shows the pace model's ramp, not the run — and broken runs have a total
+six-block spread of 14–23s against contacts costing 462–1064s. Constant on a
+good run, noise on a bad one. Also cut: `RECORD BEATEN BY 1:37` above
+`-1:37 VS 1:59:30` beside a `RECORD` chip, one number three times in 90px.
+
+390×844, 22-contact run: **88 → 53 words, 61 → 25 elements, 598.9 → 406.9px.**
+
+Found while auditing: **the tier chip had no background below t4.** The ladder
+derives eight rungs and the CSS stopped at four, so a 2:14:30 run and a
+2:21:33 run — where every bot at or below 0.5 skill lands — both rendered
+`rgba(0,0,0,0)`, a bare word on exactly the runs the bottom of the ladder was
+added for.
 
 ---
 
@@ -171,10 +208,19 @@ Same test as the start panel, which went 109 words to 74.
 - **Four hazard variants short of the 1.6x/0.30 contrast target** — all clear
   the 1.25x/0.22 gate. Two are the hoarding and the marshals, whose red-and-
   white chevron is their real livery. **OPEN, may be a REFUSED**
-- **Landscape finish card overflows 56px** — traded deliberately for portrait.
-  **OPEN**
-- **The bot never paths toward aid**, so a 16-contact run collects 0 of 14 and
-  the comeback mechanic has never been exercised by an automated run. **OPEN**
+- ~~**Landscape finish card overflows 56px**~~ — **DONE.** Overflow is 0px at
+  390×844, 360×780, 320×568, 1280×800 and 844×390, on the fullest card the
+  game produces (two badges plus best-today), and the race-report line
+  landscape used to hide is back. 320×568 was 62px. 800×360 and 740×360 still
+  scroll ~21px, down from ~119px, left to `.canScroll` rather than bought by
+  dropping a block.
+- ~~**The bot never paths toward aid**~~ — **DONE.** The autopilot's lane
+  choice now scores a lane carrying aid above a clear one, on the grounds that
+  it handles JUMP and DUCK reliably (the action timing is derived from the arc,
+  not hand-tuned) so a detour costs an action rather than a contact. A/B on the
+  same build, aid term neutralised in the built file: **4 of 14 items collected
+  → 13 of 14, with zero contacts either way.** The comeback mechanic is now
+  exercised by an automated run for the first time.
 - **Chapter the session by city** — 3-4 named cities per run already exist;
   giving each a segment clock would add resolution points to a four-minute
   session that currently has exactly one. **OPEN**
@@ -187,8 +233,36 @@ Same test as the start panel, which went 109 words to 74.
 
 ## In flight
 
-- **Hills** — the last major unbuilt feature. Pace-neutral by construction.
-- **Audio** — a full procedural mix that has never once been verified.
+- **R2** — the second gate, and the assertion that never tested for it.
+- **R3** — open the sky, make the mile marker readable.
+- **Animation polish**, stage 1 of 3: the base run cycle. Then secondary
+  motion, then speed responsiveness. `?polish=0..1` scales every added term so
+  one build renders both versions; `tools/stride.js` measures and photographs
+  the cycle.
+
+## Done since this file was written
+
+- **Hills** — the last major unbuilt feature, pace-neutral by construction and
+  by measurement: worst flat-vs-hilly finish delta **0.182 s** over 90 dates ×
+  5 skill levels, net rise exactly 0 on every date. Five things in its own
+  design did not survive contact and are written up in `docs/hills-energy.md`
+  §7, including that §1.3's sightline bound was optimistic rather than
+  conservative and that the bridge cannot be a hill (piecewise-linear deck
+  lift has a corner, so curvature there is infinite).
+- **Audio** — verified for the first time, and it was not fine. `clean()` had
+  stopped responding at streak 90 of a 205-gate course. `hit` had **81% of its
+  energy below 200 Hz**, which is inaudible on a phone. The crowd roar at a
+  world record measured **0.3 dB quieter than a mile signpost**. The limiter's
+  default 30 dB knee meant compression began at −29 dBFS, below every cue in
+  the game, so the thing meant to catch stacked hits was flattening the whole
+  mix. The no-Web-Audio stub was missing five methods `main.js` calls, so any
+  browser without Web Audio threw on the first tick of the countdown and never
+  started.
+- **Grade audio** — terrain as acoustic space rather than effort, because the
+  model charges nothing for a hill: 1846 Hz climbing against 2903 Hz
+  descending. The crest turned out to be **a zero crossing, not a state** — a
+  three-state machine produced no UP→DOWN transition at all, because the grade
+  sits inside any sensible deadband for up to 1812 units between hills.
 
 ---
 
@@ -228,3 +302,12 @@ nobody measured is worse than no number at all.**
    file-scoped either: `git commit` writes whatever is already staged, so one
    agent's `git add` lands in the next agent's commit. The rule is pathspecs on
    the commit — `git commit -m "..." -- <files>`.
+
+   **And that rule is still not enough.** A pathspec scopes by FILE, not by
+   hunk. `43b8e66 "Hand the road's grade to the mix"` is a one-token change to
+   `main.js` — and it also carries the entire autopilot aid-pathing rewrite,
+   because that was sitting uncommitted in the same file. Same class of defect
+   as the four sweeps, committed by the person who wrote the rule, one hour
+   after writing it. The actual discipline is to commit a file when it holds
+   one change, and to check `git diff` before every commit rather than trusting
+   the pathspec to mean what it looks like it means.

@@ -1,5 +1,29 @@
 # Reference measurements
 
+> ## THE TRIANGLE BUDGET IN THIS DOCUMENT IS WRONG
+>
+> Sections written before this note cost their recommendations against a
+> **75,000** or **150,000** triangle ceiling, and several decline detail on
+> that basis. **Both numbers were invented.** Every frame-rate figure in this
+> project came from SwiftShader software rendering, 50-100x slower than a real
+> GPU, and a ceiling was built on top of it and then defended across three
+> passes.
+>
+> Measured properly, the game runs at **108k-192k triangles and 157-294 draw
+> calls**, and the owner has confirmed it runs without issue on their phone.
+> **The working ceiling is 500,000 triangles.** Peak is currently 38% of it.
+>
+> **Draw calls are the real constraint, not geometry** -- each submission
+> carries CPU cost, and that is what bites first in Three.js. Keep the peak
+> under about 400. Merging and instancing are still the right tools; they are
+> tools for draw calls, not for triangles.
+>
+> Where an older section says "this costs too much", read it as "this costs
+> N", and decide again. Three separate agents declined detail they had
+> correctly measured as affordable because a brief told them geometry was
+> scarce.
+
+
 Ten frames supplied by the user, cropped to the game viewport and used as the
 comparison target.
 

@@ -3728,9 +3728,81 @@ MR.World = (function () {
     // the carriageway edge stays one solid bright line. See the Egypt device
     // note in paintGeo for where the numbers come from and why the two are not
     // treated the same.
-    const SEAM_RAIL = 0x8e8aa8;   // L 140 -- was 0xfff6d8, the bead's colour
-    const SEAM_BEAD = 0xfff6d8;   // L 245.7
-    const EDGE_LINE = 0xf2f4ff;   // L 244.4, unchanged
+    /**
+     * ============ THE PAINT LADDER, AS RATIOS TO THE TARMAC ============
+     *
+     * Every tone below used to be an absolute hex tuned by eye against one
+     * frame. They are now stated as MULTIPLES OF THE ROAD THEY LIE ON, and the
+     * reason is that an absolute is only correct for the lighting it was
+     * measured under. The toon ramp and the light rig are being retuned in
+     * shading.js as this is written; a number tuned against today's ramp is
+     * wrong tomorrow, and a number stated as a ratio to its own background is
+     * not, because both sides move together.
+     *
+     * WHAT MAKES THE RATIO HOLD. mats.paint is now the same lit material class
+     * as mats.road (see the note there), and every mark below is a flat-up quad
+     * lying on a flat-up road, so paint and tarmac land in the SAME ramp band
+     * and take the same key, the same sky term and the same fog. An authored
+     * ratio is therefore a rendered ratio, whatever the ramp does next. When
+     * the paint was unlit that was not true: the ratio also carried a factor of
+     * 1/band, i.e. the paint was brighter than its own design by exactly the
+     * amount the lighting dimmed everything else.
+     *
+     * WHY ONE REFERENCE TARMAC IS HONEST. Measured across every road tone the
+     * game can show -- twelve settings plus six biome roads -- shadedL runs
+     * 72.0 to 73.8, a spread of 2.5%. There is effectively one tarmac in this
+     * game wearing eighteen slightly different hues, so a single reference is
+     * a fair thing to divide by, and this is the median of them.
+     *
+     * The ratios below are against the AUTHORED tarmac. On screen the road is
+     * further multiplied by its lane band (0.85-1.00), the camber (0.78-1.00)
+     * and the surface texture, so the rendered ratio against the lane a mark
+     * actually sits beside runs up to about 1.3x higher than the number here --
+     * in the safe direction, and more so toward the outer lanes.
+     */
+    const ROAD_REF = 0x616373;
+    /** `hex` re-valued to `k` times the reference tarmac, keeping its hue. */
+    function overRoad(hex, k) {
+      return tintScale(hex, k * shadedL(ROAD_REF) / shadedL(hex));
+    }
+
+    /**
+     * THE TOP OF THE LADDER IS SET BY THE CHARACTER, NOT BY THE ROAD.
+     *
+     * These were 2.44x / 2.43x / 1.42x. Measured with tools/inkbudget.js, the
+     * paint at those values was the brightest thing in the gameplay band: mean
+     * L 0.55 with near-white peaks, against a player whose lit fill reaches
+     * p95 0.65 and a tarmac at 0.25. The focal point was out-valued by the
+     * surface it runs on, which is not something the art direction ever asked
+     * for -- it was a side effect of one material being lit and the other not.
+     *
+     * So the top of the road's ladder is set to land AT the player's fill p95
+     * rather than half a stop above it: 1.80x here renders at about 0.66
+     * against the player's 0.65. That is the whole of the value fix and it is
+     * one constant.
+     *
+     * IT IS COUPLED, AND SAYING SO IS THE POINT. If the character's ceiling
+     * moves -- and shading.js owns that lever, per the clarity pass's own
+     * boundary note -- this number moves with it, as a ratio, in the same
+     * direction. It is not a value anybody should re-tune by eye.
+     *
+     * DEPARTURE, STATED. R1 verified the solid edge line at ~3.5x the RENDERED
+     * tarmac against Tom Gold Run's measured 3.3-3.9, and this gives up part of
+     * that. The reason to give it up: three of the four reference games put a
+     * near-white extreme on their CHARACTER (p95 0.90 / 0.96 / 0.99) and we do
+     * not (0.65). Matching the reference on the road while not matching it on
+     * the runner is exactly what produced the inversion. The road is the half
+     * this file owns, so the road is the half that moves.
+     *
+     * AND THE BEAD NO LONGER TIES THE EDGE LINE. At 2.43 against 2.44 an
+     * interior lane seam's bead was worth the same as the carriageway
+     * boundary, which inverts the road's own hierarchy: the boundary of the
+     * play surface should out-value a mark inside it, and every real road on
+     * earth agrees. The bead drops a clear step below.
+     */
+    const SEAM_RAIL = overRoad(0x8e8aa8, 1.28);
+    const SEAM_BEAD = overRoad(0xfff6d8, 1.50);
+    const EDGE_LINE = overRoad(0xf2f4ff, 1.80);
 
     // The kerb-notch period, and now the road-bead period too. Declared here
     // because paintGeo beats against it and is built first.
@@ -3866,6 +3938,44 @@ MR.World = (function () {
        * chevrons: a forward-pointing triangle on the tarmac is the JUMP
        * telegraph's own icon, and nothing on the road may compete with the mats.
        */
+      /**
+       * ---- ONLY THE HEAVY JOINT KEEPS ITS LIP, AND HERE IS THE ARITHMETIC --
+       *
+       * Every joint used to be a PAIR of full-carriageway quads: a dark groove
+       * and a lit lip behind it. Twenty pairs per 24-unit tile, unoccluded,
+       * directly under the character. Measured with tools/inkbudget.js, the
+       * merged paint mesh is 39-54% of every near-band edge in the game across
+       * four race points, and 53-60% of its own near edges are horizontal --
+       * which is these, not the longitudinal lines.
+       *
+       * The cut is affordable and that is a measurement rather than a taste.
+       * Ground speed at record pace is (240 * 30) / 273.7 = 26.3 u/s, so:
+       *
+       *   light joint   1.2 u   ~22 Hz     0.44 u per frame at 60 fps, i.e.
+       *                                    37% of its own period per frame
+       *   heavy joint   4.8 u   ~5.5 Hz    the beat the eye actually resolves
+       *
+       * At 22 Hz individual joints are not resolvable as discrete events --
+       * they are within 8 Hz of the frame rate's own Nyquist limit and read as
+       * shimmer. The speed cue a player actually perceives is the 4.8-unit
+       * heavy joint. So the light joints keep the groove, which is what carries
+       * the beat, and give up the lip, which is what carries the brightness.
+       *
+       * THE LIP IS NOT DELETED, and the header's argument for it is why: a
+       * lone dark line reads as a stain, a dark-then-light edge reads as a cut
+       * in a surface with a thickness. That risk is real at the rhythm the eye
+       * resolves, so the lip stays exactly there -- on the heavy joint, at 5.5
+       * Hz, where it can be seen doing its job.
+       *
+       * THE JOINTS ARE NOT DELETED EITHER. They are the transverse speed cue
+       * and the near band is the only place a speed cue can live. The lane
+       * dashes cannot stand in: they are LONGITUDINAL, so they supply lane
+       * identity and convergence, not the transverse beat that reads as ground
+       * speed. All twenty grooves survive; fifteen of twenty lips do not.
+       *
+       * Cost: zero draw calls -- the same merged mesh -- and 30 fewer triangles
+       * per tile.
+       */
       const nJ = Math.round(TILE / ROAD_SLAB);
       for (let i = 0; i < nJ; i++) {
         // -TILE/2 + i*ROAD_SLAB, with TILE an exact multiple of ROAD_SLAB, so
@@ -3873,9 +3983,16 @@ MR.World = (function () {
         const jz = -TILE / 2 + i * ROAD_SLAB;
         const heavy = (i % 4) === 0;
         parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, heavy ? 0.24 : 0.15),
-          heavy ? 0x272636 : 0x313040, 0, 0.004, jz, flat));
-        parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, heavy ? 0.11 : 0.08),
-          heavy ? 0x7b7a81 : 0x73727b, 0, 0.004, jz + (heavy ? 0.18 : 0.12), flat));
+          overRoad(heavy ? 0x272636 : 0x313040, heavy ? 0.40 : 0.50), 0, 0.004, jz, flat));
+        // And the surviving lip comes down toward the tarmac. It was 1.23x the
+        // road, which on twenty full-width bars a tile made it the brightest
+        // large thing in the near band after the edge lines. At 1.05x it is
+        // still a lit edge above a dark groove -- the pairing is what sells the
+        // cut -- but it no longer competes with the marking or the runner.
+        if (heavy) {
+          parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, 0.11),
+            overRoad(0x7b7a81, 1.05), 0, 0.004, jz + 0.18, flat));
+        }
       }
       /**
        * ============ THE EGYPT DEVICE: A RAIL THAT CARRIES BEADS ============
@@ -3971,7 +4088,13 @@ MR.World = (function () {
        */
       for (const lx of [-LANE / 2, LANE / 2]) {
         for (const s of [-1, 1]) {
-          parts.push(part(new THREE.PlaneGeometry(0.11, TILE), 0x77728f, lx + s * 0.12, 0.005, 0, flat));
+          // 0.80x the tarmac. It was 1.19x -- brighter than the road it was
+          // named the shadow of, so it read as a second grey line beside the
+          // rail rather than as a shadow under it. Below the road is where a
+          // shadow goes, and putting it there buys a value step for nothing.
+          // Not near-black: the first pass tried that at 0.24 wide and turned
+          // the carriageway into three strips separated by chasms.
+          parts.push(part(new THREE.PlaneGeometry(0.11, TILE), overRoad(0x77728f, 0.80), lx + s * 0.12, 0.005, 0, flat));
         }
         parts.push(part(new THREE.PlaneGeometry(0.15, TILE), SEAM_RAIL, lx, 0.007, 0, flat));
         beads(lx, SEAM_BEAD, 0.009);
@@ -4071,13 +4194,39 @@ MR.World = (function () {
     const POLE_Z = [-6, 6];
 
     /**
-     * A wire run down the verge. Three lines at POLE_X converging on the
-     * vanishing point -- the hard perspective line above the road that the
-     * cross-spans were originally bought for, kept, and moved out of the sky
-     * over the carriageway where it never belonged.
+     * A wire run down the verge, converging on the vanishing point -- the hard
+     * perspective line above the road that the cross-spans were originally
+     * bought for, kept, and moved out of the sky over the carriageway where it
+     * never belonged.
+     *
+     * TWO WIRES, NOT THREE, AND EACH ONE HEAVIER. Measured by ablation with
+     * tools/inkbudget.js at skip 25: taking the wires out of the tile's merged
+     * edge mesh drops that mesh from 40.61% of all frame edges to 36.58%. That
+     * is 4.03 points of the frame bought by 792 triangles -- 6% of the mesh
+     * buying 10% of its edges, and the best edges-per-triangle bargain in the
+     * game, which is precisely the problem. For comparison, in the same
+     * ablation the 3,696 triangles of pavement joints and kerb notches buy
+     * 1.43 points and the 3,168 triangles of crowd-barrier posts buy 1.47.
+     * Those two are large and quiet; this one is small and loud.
+     *
+     * A wire is the thinnest highest-contrast line it is possible to draw, and
+     * three of them per side at 0.07 across is three sub-pixel lines competing
+     * at the exact distance the mile marker is read at. Two at 0.085 keep the
+     * perspective convergence -- which is the whole reason the wires exist,
+     * and it needs two lines, not three, to be a convergence at all -- while
+     * each surviving line is likelier to land on a whole pixel instead of
+     * shimmering between two.
+     *
+     * NOT THE POLES. The poles are the vertical rhythm that replaced the
+     * overhead spans in R3 and they are what makes the verge read as a street.
+     * This is a trim of the thinnest element, not a removal of the device.
+     *
+     * NO FAIRNESS COST: everything here is above OVERHEAD_Y at |x| = POLE_X,
+     * outside CORRIDOR_HALF, and the camera looks down, so none of it can come
+     * between the lens and a hazard. tools/shoot.js re-derives that every run.
      */
     function vergeWires(parts, sx, ys, tint) {
-      for (const y of ys) parts.push(bx(0.07, 0.07, TILE, sx * POLE_X, y, 0, tint));
+      for (const y of ys) parts.push(bx(0.085, 0.085, TILE, sx * POLE_X, y, 0, tint));
     }
 
     /**
@@ -4172,7 +4321,11 @@ MR.World = (function () {
         // Lamp on the near half one side, far half the other.
         lampArc(parts, sx, POLE_Z[sx > 0 ? 0 : 1], post, head);
         utilityPole(parts, sx, POLE_Z[sx > 0 ? 1 : 0], post);
-        if (wire) vergeWires(parts, sx, [8.35, 7.75, 7.45], wire);
+        // Was [8.35, 7.75, 7.45]. The middle line is the one that goes: it sat
+        // 0.30 under its neighbour, which is under a pixel apart by the time
+        // the run has any convergence to show. The surviving pair keeps the
+        // full 0.90-unit spread, so the fan is wider than it was.
+        if (wire) vergeWires(parts, sx, [8.35, 7.45], wire);
       }
     }
 
@@ -4896,6 +5049,15 @@ MR.World = (function () {
             // anim is writing to.
             vg.userData.pivotY = d.pivot[1];
           }
+          // The footprint the contact shadow is cut to -- the variant's own
+          // merged bounding box in xz, not a guess and not the collision box.
+          // A tram is long and a kerb is wide and the shadow has to be both.
+          d.geo.computeBoundingBox();
+          const bb = d.geo.boundingBox;
+          vg.userData.foot = [
+            Math.max(0.35, (bb.max.x - bb.min.x) * 0.5),
+            Math.max(0.30, (bb.max.z - bb.min.z) * 0.5),
+          ];
           vg.userData.body = body;
           // An anim without a `moving` part is legal and is the cheapest thing
           // in this file: the variant group gets a y shudder and nothing else,
@@ -4906,6 +5068,46 @@ MR.World = (function () {
           variants.push(vg);
         }
         variants[0].visible = true;
+        /**
+         * ================== THE CONTACT SHADOW ==================
+         *
+         * The owner's lighting note asked for objects to separate from one
+         * another and for contact shadows, and this is the half of it that a
+         * value change cannot do: a shadow says an object is STANDING ON the
+         * road, which is a different claim from it being a different colour
+         * than the road.
+         *
+         * A REAL SHADOW MAP IS REFUSED, WITH THE MEASUREMENT. A
+         * DirectionalLightShadow costs +105 to +201 draw calls here and puts
+         * two of the eight shots over the 400 ceiling -- 04-wall 265 to 438,
+         * 08-level 264 to 465. Draw calls are the binding constraint in this
+         * game; triangles are not. One quad per hazard is +1 draw each against
+         * 15 to 26 live hazards a frame, which is the affordable shape of the
+         * same idea.
+         *
+         * ONLY WHAT ACTUALLY RESTS ON THE ROAD. A DUCK is a bar hanging at
+         * y 1.41 on two 0.26 standards; it does not sit on the tarmac and
+         * giving it a full-footprint blob would draw a shadow for an object
+         * that is mostly air, and cover a telegraph mat to do it. So JUMP and
+         * BLOCK get one, DUCK does not, and the test is the collision box's
+         * own yMin rather than a list of kinds that could drift out of date.
+         *
+         * IT CANNOT DAMAGE THE TELEGRAPH. The mats are renderOrder 5 and this
+         * is 2, so the mat is always composited OVER the shadow, never under
+         * it. The mats are the device a race is lost by misreading and they
+         * are on the do-not-touch list; sorting is what keeps that promise
+         * structurally rather than by choosing a gentle opacity.
+         *
+         * Opacity is well below the runner's 0.72: the runner is the focal
+         * point and is meant to be planted hard, while a hazard's shadow only
+         * has to stop it floating -- and it is landing on the play surface,
+         * beside marks the player is reading.
+         */
+        if (kind !== K.DUCK) {
+          const sh = S.contactShadow(1, { opacity: 0.34 });
+          g.add(sh);
+          g.userData.shadow = sh;
+        }
         g.add(telegraph(kind));
         // A hazard is the thing the audit protects, not a thing it polices: it
         // is meant to be in the corridor, and one gate hiding another is the
@@ -8963,12 +9165,25 @@ MR.World = (function () {
           for (let k = 0; k < vs.length; k++) vs[k].visible = (k === vi);
           o.userData.active = vs[vi];
           o.userData.body = vs[vi].userData.body;
+          let span = 1;
           if (kind === K.BLOCK) {
             // Stretch a train backwards along z rather than repeating blocks;
             // the front face and the telegraph stay put on the gate line.
-            const span = gate.train ? 1 + gate.train * 0.9 : 1;
+            span = gate.train ? 1 + gate.train * 0.9 : 1;
             o.userData.body.scale.z = span;
             o.userData.body.position.z = (span - 1) * 0.65;
+          }
+          // Cut the contact shadow to whatever is actually standing here. The
+          // shadow geometry is built at radius 1, so scale IS the world
+          // half-extent, and a train that was stretched along z drags its
+          // shadow with it instead of standing on a puddle the length of one
+          // carriage. Written on every claim, like the variant visibility
+          // above and for the same reason: a pooled object must never inherit
+          // the previous tenant's anything.
+          if (o.userData.shadow) {
+            const foot = vs[vi].userData.foot;
+            o.userData.shadow.scale.set(foot[0] * 1.12, 1, foot[1] * span * 1.12);
+            o.userData.shadow.position.z = (span - 1) * 0.65;
           }
           objs.push(o);
         }

@@ -7,14 +7,15 @@
  * Nothing here animates except the numbers themselves.
  *
  * Colour carries meaning and nothing else, so it stays a closed set:
- *   accent  the speed engine -- streak, gauge, rail fill. What you are buying.
+ *   accent  the speed engine -- the fuel gauge, the rail fill, tomorrow's
+ *           road. What you are buying, and what you would come back for.
  *   ahead   beating the record.
  *   behind  losing the record.
- *   ink     plain fact -- clock, distance.
+ *   ink     plain fact -- clock, distance, position on the road.
  * A number is never tinted for emphasis alone.
  *
  * Layout rule: the middle of the frame belongs to the road and the next gate.
- * Everything here lives on the edges, and the split card comes in at the side
+ * Everything here lives on the edges, and the aid card comes in at the side
  * rather than across the runner.
  */
 

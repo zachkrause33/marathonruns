@@ -259,13 +259,133 @@ MR.shading = (function () {
     shader.fragmentShader = shader.fragmentShader.replace(GRAD_INCLUDE, GRAD_RGB);
   }
 
-  /** Standard toon material. `steps` 2 for props, 3 for characters. */
-  function toon(color, steps, floor) {
+  /**
+   * ================== THE SPECULAR BAND ==================
+   *
+   * MeshToonMaterial HAS NO SPECULAR TERM AT ALL. Its whole lighting model is
+   * a banded diffuse ramp, so there is not, and never has been, a highlight
+   * anywhere on anything in this game. That is the mechanical answer to the
+   * owner's "cars should feel like actual 3D objects rather than flat coloured
+   * shapes", and to reflections and highlights being the first two items on
+   * their list: the material could not produce one.
+   *
+   * WHAT THIS ADDS is a cel specular -- two hard steps on the half-vector, not
+   * a Blinn falloff -- because a smooth highlight under a banded diffuse reads
+   * as a smudge. It is added to outgoingLight BEFORE tone mapping and the
+   * colour-space conversion, and therefore before the fog mix, so a highlight
+   * fades into the haze at exactly the rate the surface under it does. A spec
+   * that stayed crisp at 150 units would undo the aerial perspective the whole
+   * depth read rests on.
+   *
+   * IT IS PER-VERTEX OPT-IN, VIA aGloss, and that is the part that makes it
+   * safe. Every hazard variant is ONE merged geometry under ONE shared
+   * material, so without a per-part control the choice would be "every surface
+   * on the vehicle is glossy" or "none is" -- and a glossy tyre is worse than
+   * no highlight at all. merge() bakes a per-part scalar exactly as it already
+   * bakes aWave for the crowd, so glass and chrome can be wet, paint
+   * semi-gloss and rubber, cloth and skin flat, at no cost in draws, meshes or
+   * materials. A geometry that never asks for the attribute reads 0 through
+   * WebGL's disabled-array default and is bit-identical to before.
+   *
+   * WHERE THE BAND LANDS, worked out rather than dialled in, because the two
+   * thresholds decide whether this is free or whether it moves the contrast
+   * gate. In view space the key light sits at roughly (-0.44, 0.57, -0.69) and
+   * the eye at (0, 0, 1), so the half-vector is about (-0.56, 0.72, 0.39). For
+   * the axis-aligned faces this fleet is built from:
+   *
+   *   roof, normal +y                 N.H = 0.72
+   *   the +x flank                    N.H = 0.56
+   *   the rear face, at the camera    N.H = 0.39
+   *   a roof-to-flank chamfer         N.H = 0.91
+   *   a roof-to-rear chamfer          N.H = 0.79
+   *   a tyre, normals sweeping y-z    N.H peaks at 0.82
+   *
+   * SHEEN at 0.62 and CORE at 0.78 therefore light the roof, both chamfers and
+   * the top of every cylinder, and leave the flanks and THE WHOLE REAR FACE
+   * dark. That last one is the important one: the contrast audit photographs
+   * every variant down the game's own sightline, where the rear face is most
+   * of what it can see, so this cannot inflate the number the build gates on.
+   * The roof is in that shot only as a grazing sliver. Measured, not assumed --
+   * the per-variant before/after is in the report.
+   *
+   * It is also why the chamfers this pass adds to the fleet and this band are
+   * one change and not two: a box has no surface at 45 degrees, so before the
+   * chamfers existed the only thing a shoulder highlight could have landed on
+   * was the roof. The reference's cars carry their brightest line exactly on
+   * that turn, and now so do ours.
+   *
+   * COST: no draw calls, no meshes, no materials, four extra floats a vertex
+   * on the geometries that opt in, and about a dozen fragment instructions on
+   * one material. The loop is over NUM_DIR_LIGHTS rather than reading
+   * directionalLights[0] -- the key light is index 0 only because of scene
+   * insertion order, and an assumption like that is exactly the kind this
+   * project keeps a corrections list for.
+   */
+  const SPEC_SHEEN = 0.62;
+  const SPEC_CORE = 0.78;
+
+  const SPEC_VS_DECL = [
+    'attribute float aGloss;',
+    'varying float vGloss;',
+  ].join('\n');
+
+  const SPEC_FS_DECL = 'varying float vGloss;';
+
+  // No backticks anywhere in the GLSL comments below -- see CLAUDE.md rule 5.
+  const SPEC_FS_BODY = [
+    '#if NUM_DIR_LIGHTS > 0',
+    '  if (vGloss > 0.0) {',
+    '    vec3 sN = normalize(normal);',
+    '    vec3 sV = normalize(vViewPosition);',
+    '    vec3 spec = vec3(0.0);',
+    '    for (int si = 0; si < NUM_DIR_LIGHTS; si++) {',
+    '      vec3 sH = normalize(directionalLights[si].direction + sV);',
+    '      float nh = max(dot(sN, sH), 0.0);',
+    // fwidth is zero across a flat face, so the band is hard there and only
+    // antialiases where the surface actually curves -- which is what a cel
+    // highlight wants. The small constant keeps a flat face from aliasing
+    // against its own neighbour at a grazing angle.
+    '      float aa = fwidth(nh) * 0.70 + 0.010;',
+    '      float sheen = smoothstep(' + SPEC_SHEEN.toFixed(2) + ' - aa, ' + SPEC_SHEEN.toFixed(2) + ' + aa, nh);',
+    '      float core = smoothstep(' + SPEC_CORE.toFixed(2) + ' - aa, ' + SPEC_CORE.toFixed(2) + ' + aa, nh);',
+    // The sheen is the wide, weak step that says "this material is not chalk";
+    // the core is the small hot one that reads as an actual reflection. Both
+    // are scaled by the light's own colour, so the highlight is warm under the
+    // key and cool under the bounce rather than being a white sticker.
+    '      spec += directionalLights[si].color * (sheen * 0.16 + core * 0.42);',
+    '    }',
+    '    outgoingLight += spec * vGloss;',
+    '  }',
+    '#endif',
+  ].join('\n');
+
+  function patchToonSpec(shader) {
+    patchToonRamp(shader);
+    shader.vertexShader = SPEC_VS_DECL + '\n' + shader.vertexShader.replace(
+      '#include <begin_vertex>',
+      '#include <begin_vertex>\n\tvGloss = aGloss;'
+    );
+    shader.fragmentShader = SPEC_FS_DECL + '\n' + shader.fragmentShader.replace(
+      '#include <opaque_fragment>',
+      SPEC_FS_BODY + '\n\t#include <opaque_fragment>'
+    );
+  }
+
+  /**
+   * Standard toon material. `steps` 2 for props, 3 for characters.
+   *
+   * `spec` opts the material into the cel specular above. It is a distinct
+   * shared function object rather than a closure per material, so every specular
+   * toon material still hashes to ONE program: three's default
+   * customProgramCacheKey is onBeforeCompile.toString(), and a fresh closure per
+   * material would compile a fresh shader per material.
+   */
+  function toon(color, steps, floor, spec) {
     const m = new THREE.MeshToonMaterial({
       color,
       gradientMap: ramp(steps || 3, floor),
     });
-    m.onBeforeCompile = patchToonRamp;
+    m.onBeforeCompile = spec ? patchToonSpec : patchToonRamp;
     return m;
   }
 
@@ -895,6 +1015,30 @@ MR.shading = (function () {
       opacity: o.opacity === undefined ? 0.72 : o.opacity,
       depthWrite: false,
       side: THREE.DoubleSide,
+      // EVERY CONTACT SHADOW IN THIS GAME WAS COSTING TWO DRAW CALLS, and the
+      // reason is three's, not ours. WebGLRenderer.renderObject reads:
+      //
+      //   transparent && side === DoubleSide && !forceSinglePass
+      //     -> render BackSide, then render FrontSide
+      //
+      // so a transparent double-sided material is submitted TWICE, with a
+      // needsUpdate flag set between the two halves. Measured on the live page
+      // at 08-level, which is the peak-draw shot: 18 hazard blobs, 16 of them
+      // in frustum, and hiding them took the frame from 297 draws to 265 --
+      // exactly 2 per blob, not 1. Draw calls are the binding constraint in
+      // this game (297 against a working ceiling near 400) and this was 11% of
+      // the peak frame spent rendering the same flat quad twice.
+      //
+      // The split exists so that a transparent SOLID sorts its own back faces
+      // before its front ones. This is a single flat quad: its two faces are
+      // coplanar, so the second pass draws the same pixels at the same depth
+      // and can never change the image. forceSinglePass keeps DoubleSide's
+      // culling behaviour -- the blob is still visible from underneath, which
+      // matters on the bridge deck -- and submits it once.
+      //
+      // Verified as an A/B on the running page rather than reasoned about:
+      // pixels identical, draws 297 -> 265.
+      forceSinglePass: true,
     });
     const mesh = new THREE.Mesh(shadowGeo(r), mat);
     mesh.position.y = 0.015;

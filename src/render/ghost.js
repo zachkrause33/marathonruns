@@ -301,6 +301,13 @@ MR.Ghost = (function () {
   function create() {
     const group = new THREE.Group();
 
+    // The road profile, handed over by main.js. The ghost's own arithmetic is
+    // untouched by hills -- ghostMiles() is raceTime / RECORD_PACE and race
+    // time is grade-neutral by construction -- so this is only ever used to
+    // DRAW the record holder on the same road the player is running.
+    let elev = MR.Elevation.FLAT;
+    const elevAt = function (zz) { return elev.at(zz); };
+
     // One material for the whole body, so a per-frame opacity or colour change
     // is a single write rather than fourteen.
     const mat = S.toon(COOL, 3);
@@ -466,7 +473,11 @@ MR.Ghost = (function () {
         // is why it cannot use the shared, opaque, cached ink material.
         rim.uniforms.rimAlpha.value = Math.min(1, alpha * 1.45 + 0.10);
         body.update(dt, { speed: SPEED });
-        body.group.position.set(s.x, 0, gz);
+        // The ghost runs the same road. Its own maths is untouched -- ghostMiles
+        // is raceTime / RECORD_PACE and race time is grade-neutral by
+        // construction -- so this is the record holder being DRAWN on the
+        // profile, nothing more.
+        body.group.position.set(s.x, elevAt(gz), gz);
       }
 
       // ---- tag -----------------------------------------------------------
@@ -501,7 +512,7 @@ MR.Ghost = (function () {
         // cannot act on has no business sitting on top of them.
         const lift = 0.5 + 1.15 * smoothstep(55, HAZE, gap);
         tagWorld.scale.set(TAG_SIZE * TAG_ASPECT * pulse, TAG_SIZE * pulse, 1);
-        tagWorld.position.set(s.x, HEAD_Y + depth * TAG_SIZE * pulse * lift, tz);
+        tagWorld.position.set(s.x, elevAt(tz) + HEAD_Y + depth * TAG_SIZE * pulse * lift, tz);
       }
 
       tagRear.material.opacity = rear * 0.96;
@@ -549,6 +560,8 @@ MR.Ghost = (function () {
 
     /** Signed gap in world units, for tooling that wants to assert on it. */
     s.gapUnits = function () { return s.gap; };
+
+    s.setElevation = function (e) { elev = e || MR.Elevation.FLAT; };
 
     return s;
   }

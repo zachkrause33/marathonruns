@@ -36,6 +36,11 @@ MR.K = (function () {
   const FAST_SHARE = 0.685;
   const K_FAST = 10, K_SLOW = 100;
 
+  // The chase camera's resting eye, seeded here rather than in camera.js. See
+  // CAM_BASE_Y in the returned object for why.
+  const CAM_BASE_Y = 2.62;
+  const CAM_BASE_BACK = 4.35;
+
   function targetPaceAt(streak) {
     const gap = START - FLOOR_PACE;
     return FLOOR_PACE
@@ -294,15 +299,28 @@ MR.K = (function () {
     // so a clamp that binds is a bug and not a safety net.
     GRADE_CLAMP: 20.0,
 
-    // The eye the sightline cap on hill shape is derived against. camera.js
-    // sits at BASE_Y 2.62 above the local road and drops 0.20 at race pace, so
-    // the honest figure is 2.42; 2.30 is taken instead to absorb the stride bob
-    // and the landing dip. It lives here rather than in camera.js because
-    // elevation.js runs headless in tools/ where no camera exists, and because
-    // cap(L) tightens as the square of it -- if BASE_Y is ever lowered, this
-    // must follow and Elevation.validate() will fail the build if it does not.
-    HILL_EYE_Y: 2.30,
-    HILL_EYE_BACK: 4.35,            // camera.js BASE_BACK
+    // THE CHASE CAMERA'S RESTING EYE, AND WHY IT LIVES HERE.
+    //
+    // camera.js owns the framing and always will, but two of its numbers are
+    // now load-bearing outside it: elevation.js derives the sightline cap on
+    // hill shape from the eye height, and it runs headless in tools/ where no
+    // camera exists. Worse, the dependency is silent and quadratic -- the
+    // steepest legal crest goes as the eye height, so a camera drop that nobody
+    // connected to the terrain would make every hill on every course
+    // fractionally too steep to see over.
+    //
+    // So the seed lives here and camera.js reads it. IF YOU ARE RETUNING THE
+    // CAMERA, change CAM_BASE_Y and the hill cap follows automatically -- that
+    // is the point, not a coincidence. Elevation.validate() ray-marches the
+    // result at generation either way and fails the course if it is wrong, so
+    // the coupling is belt and braces rather than a single point of failure.
+    CAM_BASE_Y,
+    CAM_BASE_BACK,
+    // What the sightline is actually derived against. The camera drops 0.20 at
+    // race pace, so the honest resting figure is CAM_BASE_Y - 0.20; 0.32 is
+    // taken instead to absorb the stride bob and the landing dip on top of it.
+    HILL_EYE_Y: CAM_BASE_Y - 0.32,
+    HILL_EYE_BACK: CAM_BASE_BACK,
 
     // Hazard kinds
     CLEAR: 0,

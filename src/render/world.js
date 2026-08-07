@@ -4544,13 +4544,17 @@ MR.World = (function () {
         const w1 = ROUTE_W * (1 - 0.5 * ((i + 1) / ROUTE_SEGS));
         const v0 = z0 * ROUTE_UV, v1 = z1 * ROUTE_UV;
         const p = i * 18, u = i * 12;
+        // The ribbon is PAINT: it has to lie on the road over the whole 124
+        // units it reaches, or it leaves the surface at the first crest and the
+        // one forward read the player has starts floating in the air.
+        const ry0 = 0.010 + eAt(z0), ry1 = 0.010 + eAt(z1);
         // l0, r1, r0 -- then l0, l1, r1.
-        routePos[p] = x0 - w0; routePos[p + 1] = 0.010; routePos[p + 2] = z0;
-        routePos[p + 3] = x1 + w1; routePos[p + 4] = 0.010; routePos[p + 5] = z1;
-        routePos[p + 6] = x0 + w0; routePos[p + 7] = 0.010; routePos[p + 8] = z0;
-        routePos[p + 9] = x0 - w0; routePos[p + 10] = 0.010; routePos[p + 11] = z0;
-        routePos[p + 12] = x1 - w1; routePos[p + 13] = 0.010; routePos[p + 14] = z1;
-        routePos[p + 15] = x1 + w1; routePos[p + 16] = 0.010; routePos[p + 17] = z1;
+        routePos[p] = x0 - w0; routePos[p + 1] = ry0; routePos[p + 2] = z0;
+        routePos[p + 3] = x1 + w1; routePos[p + 4] = ry1; routePos[p + 5] = z1;
+        routePos[p + 6] = x0 + w0; routePos[p + 7] = ry0; routePos[p + 8] = z0;
+        routePos[p + 9] = x0 - w0; routePos[p + 10] = ry0; routePos[p + 11] = z0;
+        routePos[p + 12] = x1 - w1; routePos[p + 13] = ry1; routePos[p + 14] = z1;
+        routePos[p + 15] = x1 + w1; routePos[p + 16] = ry1; routePos[p + 17] = z1;
         routeUvs[u] = 0; routeUvs[u + 1] = v0;
         routeUvs[u + 2] = 1; routeUvs[u + 3] = v1;
         routeUvs[u + 4] = 1; routeUvs[u + 5] = v0;
@@ -4578,7 +4582,7 @@ MR.World = (function () {
         const a = 0.95 * Math.max(0, 1 - Math.pow(Math.min(1, (cz - z) / RING_FADE), 2.2));
         if (a <= 0.01) { for (let v = 0; v < 18; v++) ringPos[p + v] = 0; continue; }
         const cx = routeX(cz);
-        const cy = RING_Y + Math.sin(now * 1.9 + n * 1.1) * 0.045;
+        const cy = RING_Y + eAt(cz) + Math.sin(now * 1.9 + n * 1.1) * 0.045;
         routeQuad(ringPos, p, cx - RING_R, cy - RING_R, cx + RING_R, cy + RING_R, cz);
         for (let v = 0; v < 6; v++) ringCol[c + v * 4 + 3] = a;
       }
@@ -5940,12 +5944,16 @@ MR.World = (function () {
           // LANE_W, never a difference of LANE_X.
           const hx = LANE * 0.5 + SHADOW_SPREAD;
           const p = n * 18;
-          pos[p] = cx - hx; pos[p + 1] = SHADOW_Y; pos[p + 2] = z0;
-          pos[p + 3] = cx - hx; pos[p + 4] = SHADOW_Y; pos[p + 5] = z1;
-          pos[p + 6] = cx + hx; pos[p + 7] = SHADOW_Y; pos[p + 8] = z1;
-          pos[p + 9] = cx - hx; pos[p + 10] = SHADOW_Y; pos[p + 11] = z0;
-          pos[p + 12] = cx + hx; pos[p + 13] = SHADOW_Y; pos[p + 14] = z1;
-          pos[p + 15] = cx + hx; pos[p + 16] = SHADOW_Y; pos[p + 17] = z0;
+          // The quad lies ON the road, so each z-end takes the road's own
+          // height there. One value for the whole quad would sink the far end
+          // of a train's shadow 16 cm into the tarmac on a 4% grade.
+          const sy0 = SHADOW_Y + eAt(z0), sy1 = SHADOW_Y + eAt(z1);
+          pos[p] = cx - hx; pos[p + 1] = sy0; pos[p + 2] = z0;
+          pos[p + 3] = cx - hx; pos[p + 4] = sy1; pos[p + 5] = z1;
+          pos[p + 6] = cx + hx; pos[p + 7] = sy1; pos[p + 8] = z1;
+          pos[p + 9] = cx - hx; pos[p + 10] = sy0; pos[p + 11] = z0;
+          pos[p + 12] = cx + hx; pos[p + 13] = sy1; pos[p + 14] = z1;
+          pos[p + 15] = cx + hx; pos[p + 16] = sy0; pos[p + 17] = z0;
           n++;
         }
       }
@@ -8659,7 +8667,13 @@ MR.World = (function () {
           const kind = gate.lanes[l];
           if (kind === K.CLEAR) { objs.push(null); continue; }
           const o = hazardObject(kind);
-          o.position.set(K.LANE_X[l], 0, gate.z);
+          // Claim site 2: hazards. The hazard's y is the LOCAL road surface --
+          // its geometry is authored from y = 0 and collision.js measures every
+          // clearance from that same zero, so this lift is purely where it is
+          // drawn. It pitches with the road as well, or a 2.8-unit block on a
+          // 4% grade would stand with one edge 10 cm off the tarmac.
+          o.position.set(K.LANE_X[l], eAt(gate.z), gate.z);
+          o.rotation.x = -Math.atan(EL.slope(gate.z));
           // Pick the skin. Pooled, so EVERY variant's visibility is written on
           // every claim -- a hazard inheriting the previous tenant's body is
           // the kind of defect that only shows up in one screenshot in twenty,
@@ -8742,6 +8756,14 @@ MR.World = (function () {
           // 13cm in the air for the rest of the race.
           obj.position.y = 0;
         }
+        // Claim site 3: roadside props. Every branch above has already written
+        // its own y (a building's is half its height, a crowd knot's is zero),
+        // so the lift is added rather than assigned -- one line for all five
+        // kinds instead of five that can drift apart. They do NOT pitch:
+        // buildings and trees stand vertical on a hillside, and the kerb and
+        // barrier that must follow the road are children of the road tile.
+        obj.position.y += eAt(s.z);
+        obj.userData.baseY = obj.position.y;
         obj.userData.auditName = 'prop / ' + s.kind;
         activeScene.push({ s, obj, pool });
       }
@@ -8759,9 +8781,12 @@ MR.World = (function () {
         const it = aidItems[state.aidIdx++];
         const pool = it.kind === 'banana' ? bananaPool : waterPool;
         const obj = pool.claim();
-        obj.position.set(K.LANE_X[it.lane], 0, it.z);
+        // Claim site 4: aid. Same rule as a hazard -- resolveAid matches on
+        // lane alone, so this is drawing only.
+        const aidY = eAt(it.z);
+        obj.position.set(K.LANE_X[it.lane], aidY, it.z);
         obj.scale.setScalar(1);
-        activeAid.push({ it, obj, pool, pop: -1 });
+        activeAid.push({ it, obj, pool, pop: -1, y0: aidY });
       }
       for (let i = activeAid.length - 1; i >= 0; i--) {
         const e = activeAid[i];
@@ -8808,7 +8833,7 @@ MR.World = (function () {
           // swell is kept to 1.35, which is noticed rather than looked at.
           const s = (1 + 0.55 * Math.sin(Math.PI * t)) * (1 - t * t);
           e.obj.scale.setScalar(Math.max(0.001, s));
-          e.obj.position.y = 3.4 * Math.sqrt(t);
+          e.obj.position.y = e.y0 + 3.4 * Math.sqrt(t);
           e.obj.rotation.y += 0.3;
         }
       }
@@ -8837,6 +8862,20 @@ MR.World = (function () {
           obj.userData.mat.map = st.tex;
           obj.userData.mat.needsUpdate = true;
         }
+        // Claim site 5: biome set pieces. Written last, after the per-kind
+        // overrides above, so none of them can quietly drop it.
+        //
+        // AND THEY PITCH, which props do not. The reason is the corridor rule:
+        // a structure spanning z and placed flat against the road height at its
+        // centre loses clearance at its uphill end, and the footbridge's soffit
+        // sits at 9.05 against an OVERHEAD_Y of 9.00 -- five centimetres of
+        // margin that a 4% grade eats over its own 1.8-unit half-span. Pitching
+        // with the local slope holds the clearance to within a millimetre
+        // (the residual is curvature * halfspan^2 / 2) and costs a 2.3-degree
+        // lean on a lamp standard, which is under anything the eye resolves.
+        // Buildings and trees stay plumb because nothing hangs off them.
+        obj.position.y += eAt(st.z);
+        obj.rotation.x = -Math.atan(EL.slope(st.z));
         obj.userData.auditName = 'set piece / ' + st.kind;
         activeStruct.push({ st, obj, pool });
       }
@@ -8859,7 +8898,12 @@ MR.World = (function () {
         }
         const pool = finish ? archPool : bannerPool;
         const obj = pool.claim();
-        obj.position.set(0, 0, b.m.z);
+        // Claim site 6: mile banners and the finish arch. The arch is on flat
+        // ground by construction -- no hill is placed within EDGE_PAD of the
+        // tape -- but it rides the same rule as everything else rather than
+        // depending on that.
+        obj.position.set(0, eAt(b.m.z), b.m.z);
+        obj.rotation.x = -Math.atan(EL.slope(b.m.z));   // see claim site 5
         obj.userData.mat.map = b.tex;
         obj.userData.mat.color.set(0xffffff);
         obj.userData.mat.needsUpdate = true;
@@ -8886,7 +8930,8 @@ MR.World = (function () {
           const b = e.obj.userData;
           const d = Math.min(11, (now - b.t0) * 0.85) * b.dir;
           e.obj.position.x = b.side * Math.max(WALK_IN, Math.abs(b.baseX) + d);
-          e.obj.position.y = Math.abs(Math.sin(now * 3.2 + b.phase)) * 0.075;
+          // baseY carries the claim's elevation lift; the bob is on top of it.
+          e.obj.position.y = (b.baseY || 0) + Math.abs(Math.sin(now * 3.2 + b.phase)) * 0.075;
         }
       }
 
@@ -9052,6 +9097,22 @@ MR.World = (function () {
           const n = idx ? idx.count : pos.count;
           const m = o.matrixWorld;
           let yMin = Infinity, yMax = -Infinity, zMin = Infinity, zMax = -Infinity, hits = 0;
+          // HILLS SPLIT THIS MEASUREMENT IN TWO, and both halves are needed.
+          //
+          // The corridor rule -- "anything reaching back over the carriageway
+          // does so above OVERHEAD_Y" -- has always meant height above the
+          // ROAD, and the road used to be at y = 0 so world y was the same
+          // number. It no longer is: a mile gantry standing correctly at 9.0
+          // over a crest 6.5 units up is at world y = 15.5, and a road tile
+          // itself is 6.5 up when it used to be 0. Testing the corridor rule in
+          // world space would therefore report every road tile on every hill as
+          // a crossing below OVERHEAD_Y and fail the build for it.
+          //
+          // So yMin/yMax stay in WORLD space, because tools/shoot.js projects
+          // them through the real camera and a projection needs world
+          // coordinates; and yMinLocal/yMaxLocal are the same points measured
+          // from the road directly under them, which is what the rule is about.
+          let yLoMin = Infinity, yLoMax = -Infinity;
           for (let i = 0; i + 2 < n; i += 3) {
             const i0 = idx ? idx.getX(i) : i;
             const i1 = idx ? idx.getX(i + 1) : i + 1;
@@ -9064,16 +9125,28 @@ MR.World = (function () {
             // is roadside furniture, not a crossing, so the test is strict.
             const xlo = Math.min(a.x, b.x, c.x), xhi = Math.max(a.x, b.x, c.x);
             if (xhi <= -CH || xlo >= CH) continue;
-            const ty = Math.min(a.y, b.y, c.y);
-            if (Math.max(a.y, b.y, c.y) <= Y_FLOOR) continue;
             const tz0 = Math.min(a.z, b.z, c.z), tz1 = Math.max(a.z, b.z, c.z);
             if (tz1 < z0lim || tz0 > z1lim) continue;
+            // Y_FLOOR IS MEASURED FROM THE ROAD, per vertex. A 24-unit road
+            // tile spans 0.96 of elevation on a 4% grade, which is larger than
+            // most of the clearances this audit protects, so one value for the
+            // triangle is not good enough. Doing it in world space instead
+            // would let every piece of road paint on a hill through the floor
+            // and into the element box, which turns the screen test below into
+            // "the road overlaps everything".
+            const la = a.y - eAt(a.z), lb = b.y - eAt(b.z), lc = c.y - eAt(c.z);
+            const lHi = Math.max(la, lb, lc);
+            if (lHi <= Y_FLOOR) continue;
+            const lLo = Math.min(la, lb, lc);
             hits++;
+            const ty = Math.min(a.y, b.y, c.y);
             if (ty < yMin) yMin = ty;
             const th = Math.max(a.y, b.y, c.y);
             if (th > yMax) yMax = th;
             if (tz0 < zMin) zMin = tz0;
             if (tz1 > zMax) zMax = tz1;
+            if (lLo < yLoMin) yLoMin = lLo;
+            if (lHi > yLoMax) yLoMax = lHi;
           }
           if (hits) {
             let name = 'mesh', p = o;
@@ -9081,7 +9154,8 @@ MR.World = (function () {
               if (p.userData.auditName) { name = p.userData.auditName; break; }
               p = p.parent;
             }
-            out.push({ name, tris: hits, yMin, yMax, z0: zMin, z1: zMax });
+            out.push({ name, tris: hits, yMin, yMax, z0: zMin, z1: zMax,
+                       yMinLocal: yLoMin, yMaxLocal: yLoMax });
           }
         }
         for (let i = 0; i < o.children.length; i++) scan(o.children[i]);
@@ -9438,10 +9512,16 @@ MR.World = (function () {
           const box = B[kind];
           if (!box) continue;
           const span = (kind === K.BLOCK && g.gate.train) ? 1 + g.gate.train * 0.9 : 1;
+          // Collision.BOX is measured from the LOCAL road surface, and the
+          // occlusion check projects these boxes through the real camera -- so
+          // they are lifted onto the profile here, exactly as the art is at the
+          // claim site. Leaving them at zero would move every hazard the audit
+          // is looking for down the frame on a hill and quietly stop it working.
+          const ey = eAt(g.gate.z);
           out.push({
             kind, lane: l, z: g.gate.z,
             x: K.LANE_X[l], halfX: LANE * 0.5,
-            yMin: box.yMin, yMax: box.yMax,
+            yMin: box.yMin + ey, yMax: box.yMax + ey,
             z0: g.gate.z - box.halfZ, z1: g.gate.z + box.halfZ * (2 * span - 1),
           });
         }

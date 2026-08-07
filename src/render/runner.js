@@ -179,6 +179,12 @@ MR.Runner = (function () {
   // hip term), what the road clamp is finally free to allow.
   const SLIDE_RECLINE = 1.34;
 
+  // Trunk pitch on a grade, in radians at the steepest legal one (4%). A
+  // climber leans into the hill and a descender sits back off it; the descent
+  // gets half the angle because it is a controlled fall rather than an effort.
+  const GRADE_PITCH_UP = 6 * Math.PI / 180;
+  const GRADE_PITCH_DOWN = 3 * Math.PI / 180;
+
   // ---- the slide's head --------------------------------------------------
   // The other half of the same problem, and the half three passes got exactly
   // backwards. The reference frame is unambiguous: Temple Run's slider is flat
@@ -2062,6 +2068,11 @@ MR.Runner = (function () {
       // forward pitch) do not collapse into the same animation.
       const trip = st.trip || 0;
       const knock = st.bounce || 0;
+      // The road's grade at the runner, -1..1 against the steepest legal one.
+      // It is the ONLY thing hills hand this file: the stride slows on the
+      // climb and quickens on the descent for nothing, because cadence already
+      // falls out of `speed`, and `speed` is grade-inclusive.
+      const grade = st.grade || 0;
 
       // ghost.js re-materials every mesh under this rig to draw the record
       // runner as one translucent body. That is right for limbs and wrong for
@@ -2304,9 +2315,17 @@ MR.Runner = (function () {
       // the head at the front of the figure, closest to the thing it was
       // trying to get under, and that is exactly what the playtest read as
       // "diving into it".
+      // Hills, one bone. A climber leans into the hill from the ankles and a
+      // descender sits back off it, and the two are not symmetrical -- the
+      // climb is a whole-body effort and the descent is a controlled fall, so
+      // it gets half the angle. +6 degrees at the steepest legal climb, -3 at
+      // the steepest descent, and both fold away in a slide with everything
+      // else. Pure feel; nothing depends on the numbers.
+      const gradePitch = grade > 0 ? grade * GRADE_PITCH_UP : grade * GRADE_PITCH_DOWN;
       const leanFwd = (0.26 + 0.12 * sp01 + stumble * 0.5) * (1 - slid * 0.94)
         - spread * 0.30
-        - slid * SLIDE_RECLINE;
+        - slid * SLIDE_RECLINE
+        + gradePitch * (1 - slid * 0.94) * (1 - spread);
       spine.rotation.x = leanFwd + trip * 0.46;
       // Slide the whole torso BACK along the direction of travel, not just
       // recline it.

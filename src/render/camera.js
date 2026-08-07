@@ -63,8 +63,16 @@ MR.Camera = (function () {
   // units -- the road immediately ahead is visible again -- and drops the
   // runner from 47% down the frame to roughly 65%, which is also where the
   // Subway Surfers and Sonic references put theirs (see reference/).
-  const BASE_Y = 2.62;
-  const BASE_BACK = 4.35;
+  //
+  // THE VALUE ITSELF LIVES IN constants.js, and moving it there was not
+  // tidiness. elevation.js derives the maximum steepness of a crest from the
+  // eye height -- a lower camera sees less of the far side of a rise -- and it
+  // runs headless in tools/ where this file does not exist. The dependency is
+  // silent and it goes as the square. Retune the camera by changing
+  // K.CAM_BASE_Y and the hill cap follows; Elevation.validate() ray-marches
+  // the result at generation and fails the course if it does not.
+  const BASE_Y = K.CAM_BASE_Y;
+  const BASE_BACK = K.CAM_BASE_BACK;
   const LOOK_Y = 1.16;
   const LOOK_AHEAD = 8.0;
 

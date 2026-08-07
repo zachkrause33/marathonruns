@@ -69,6 +69,7 @@
   // the same ground the generator proved solvable against.
   const elev = course.elevation || MR.Elevation.FLAT;
   cam.setElevation(elev);
+  ghost.setElevation(elev);
   const eProof = elev.validate();
   if (!eProof.ok) console.error('ELEVATION INVALID', eProof.errors);
 

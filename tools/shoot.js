@@ -245,7 +245,14 @@ const DEFAULT_SHOTS = [
       //    (top 2.80) projects at or below it, and the screen test below can
       //    then never fire. Breaking the rule is what makes occlusion possible
       //    in the first place.
-      for (const e of els) if (e.yMin < OY) low.push(e);
+      // yMinLocal, not yMin. With hills the road is no longer at y = 0, so the
+      // corridor rule ("nothing reaches back over the carriageway below
+      // OVERHEAD_Y") is a height above the ROAD and world y is not it: a gantry
+      // correctly clearing a 6.5-unit crest sits at world y 15.5 and the road
+      // tile under it sits at 6.5. world.js measures both -- yMin/yMax in world
+      // space because the screen test below has to project them, yMinLocal
+      // against the road directly underneath, which is what the rule says.
+      for (const e of els) if (e.yMinLocal < OY) low.push(e);
 
       // 2. The screen test, as the backstop. Sliced in depth: a single box
       //    around a 24-unit tile spans half the frame and would overlap
@@ -326,7 +333,7 @@ const DEFAULT_SHOTS = [
       // One line per offender, not one per (offender, gate) pair.
       const seen = new Set();
       const uniqLow = low.filter((e) => {
-        const k = e.name + '@' + e.yMin.toFixed(2);
+        const k = e.name + '@' + e.yMinLocal.toFixed(2);
         if (seen.has(k)) return false; seen.add(k); return true;
       });
       const seen2 = new Set();
@@ -336,7 +343,7 @@ const DEFAULT_SHOTS = [
       });
       return {
         elements: els.length, gates: gates.length,
-        low: uniqLow.map((e) => ({ name: e.name, yMin: +e.yMin.toFixed(2), z0: +e.z0.toFixed(1) })),
+        low: uniqLow.map((e) => ({ name: e.name, yMin: +e.yMinLocal.toFixed(2), z0: +e.z0.toFixed(1) })),
         hide: uniqHide,
       };
     }).catch((e) => ({ skipped: 'evaluate failed: ' + e.message }));

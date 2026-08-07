@@ -92,6 +92,120 @@ try {
   process.exit(1);
 }
 
+/**
+ * The stray-backtick lint, and why the syntax check above is not enough.
+ *
+ * A backtick written inside a comment that is itself inside a template literal
+ * does not usually break the parse. It closes the literal early, and what
+ * follows -- prose the author wrote as a comment -- is then read as code. Most
+ * of the time that prose happens to BE valid JavaScript, so `new Function`
+ * passes, the build prints a size, and the page throws at runtime instead.
+ *
+ * This has now cost this project three separate afternoons:
+ *
+ *   1. a backtick in a GLSL comment inside a shader string (caught by the
+ *      parse check above, which is why that check exists),
+ *   2. `CLEAN` quoted in an HTML comment inside hud.js's start panel,
+ *   3. `.val.ahead` quoted in an HTML comment inside hud.js's readout panel,
+ *      which parsed cleanly and died as
+ *      "Cannot read properties of undefined (reading 'ahead')".
+ *
+ * Only the first was visible to the parser. So this scans for the CAUSE rather
+ * than the symptom, and it needs a signature that a legitimate template cannot
+ * produce. "A comment inside a template literal" is not one: every GLSL shader
+ * in shading.js is a template literal full of honest `//` comments, and the
+ * first draft of this lint failed the build on all of them.
+ *
+ * The signature that does hold: **a template literal that closes while an HTML
+ * comment inside it is still open.** An HTML block is written as one literal
+ * and its comments are balanced within it, so `<!--` without its `-->` at the
+ * closing backtick means the literal ended somewhere its author did not
+ * choose -- which is precisely what a stray backtick in the prose does. GLSL
+ * has no `<!--`, so shaders cannot trip it.
+ */
+function strayBackticks(text, rel) {
+  const hits = [];
+  let i = 0, line = 1;
+  // Where the current template literal began, so a report can name it.
+  let tplLine = 0;
+  let html = 0;                   // <!-- --> nesting inside the current template
+  const st = [];                 // template-literal nesting, for ${ } re-entry
+  let mode = 'code';
+  // A '/' opens a regex rather than a division when the last meaningful token
+  // cannot end an expression. Good enough for this codebase, and a wrong guess
+  // here can only mis-scan a regex, never a template.
+  let prev = '';
+  while (i < text.length) {
+    const c = text[i], n = text[i + 1];
+    if (c === '\n') line++;
+    if (mode === 'line') { if (c === '\n') mode = 'code'; i++; continue; }
+    if (mode === 'block') {
+      if (c === '*' && n === '/') { mode = 'code'; i += 2; continue; }
+      i++; continue;
+    }
+    if (mode === 'sq' || mode === 'dq') {
+      if (c === '\\') { i += 2; continue; }
+      if ((mode === 'sq' && c === "'") || (mode === 'dq' && c === '"')) mode = 'code';
+      i++; continue;
+    }
+    if (mode === 'regex') {
+      if (c === '\\') { i += 2; continue; }
+      if (c === '[') { // a '/' inside a character class is literal
+        while (i < text.length && text[i] !== ']') { if (text[i] === '\\') i++; i++; }
+      } else if (c === '/') mode = 'code';
+      i++; continue;
+    }
+    if (mode === 'tpl') {
+      if (c === '\\') { i += 2; continue; }
+      if (c === '$' && n === '{') { st.push('tpl'); mode = 'code'; i += 2; continue; }
+      if (text.startsWith('<!--', i)) { html++; i += 4; continue; }
+      if (text.startsWith('-->', i)) { html--; i += 3; continue; }
+      if (c === '`') {
+        if (html > 0) {
+          // Report the line the comment opened on as well as the backtick: the
+          // backtick is where the parser diverged, the open comment is where a
+          // human will see why.
+          const eol = text.indexOf('\n', i);
+          hits.push({ line, tplLine, text: text.slice(text.lastIndexOf('\n', i) + 1,
+            eol < 0 ? text.length : eol).trim().slice(0, 76) });
+        }
+        html = 0;
+        mode = st.length ? st.pop() : 'code';
+        i++; continue;
+      }
+      i++; continue;
+    }
+    // mode === 'code'
+    if (c === '/' && n === '/') { mode = 'line'; i += 2; continue; }
+    if (c === '/' && n === '*') { mode = 'block'; i += 2; continue; }
+    if (c === "'") { mode = 'sq'; i++; continue; }
+    if (c === '"') { mode = 'dq'; i++; continue; }
+    if (c === '`') { mode = 'tpl'; tplLine = line; html = 0; i++; continue; }
+    if (c === '}' && st.length) { mode = st.pop(); i++; continue; }
+    if (c === '/' && !/[A-Za-z0-9_$)\]]/.test(prev)) { mode = 'regex'; i++; continue; }
+    if (!/\s/.test(c)) prev = c;
+    i++;
+  }
+  return hits.map((h) => Object.assign({ file: rel }, h));
+}
+
+const stray = [];
+for (const m of MODULES) stray.push(...strayBackticks(read(m), m));
+if (stray.length) {
+  console.error('\nBUILD FAILED: a template literal has swallowed a comment');
+  console.error('  Almost always a backtick written inside a comment inside a');
+  console.error('  template literal. It closes the literal early and the prose');
+  console.error('  after it is read as code -- which often parses, and then');
+  console.error('  throws in the browser instead of here.\n');
+  for (const h of stray.slice(0, 8)) {
+    console.error(`  ${h.file}:${h.line}  (inside the template opened on line ${h.tplLine})`);
+    console.error(`    ${h.text}`);
+  }
+  if (stray.length > 8) console.error(`  ... and ${stray.length - 8} more`);
+  console.error('\n  Use plain quotes inside these comments, never backticks.\n');
+  process.exit(1);
+}
+
 fs.writeFileSync(dest, out);
 
 const kb = (Buffer.byteLength(out) / 1024).toFixed(0);

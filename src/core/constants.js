@@ -38,7 +38,7 @@ MR.K = (function () {
 
   // The chase camera's resting eye, seeded here rather than in camera.js. See
   // CAM_BASE_Y in the returned object for why.
-  const CAM_BASE_Y = 2.62;
+  const CAM_BASE_Y = 3.10;
   const CAM_BASE_BACK = 4.35;
 
   function targetPaceAt(streak) {
@@ -314,6 +314,53 @@ MR.K = (function () {
     // is the point, not a coincidence. Elevation.validate() ray-marches the
     // result at generation either way and fails the course if it is wrong, so
     // the coupling is belt and braces rather than a single point of failure.
+    //
+    // 3.10, RAISED FROM 2.62, AND WHAT IT DOES AND DOES NOT BUY.
+    //
+    // The playtest asked "is it moving the camera angle up slightly?" and the
+    // honest answer is: yes for one of the two things hiding the road ahead,
+    // and no for the other. Both were measured before this moved.
+    //
+    // WHAT IT BUYS. Road at distance d sits atan(eye / d) below the horizon, so
+    // for small angles the whole road stretches down the frame IN PROPORTION TO
+    // THE EYE. The band from 25 to 150 units -- everything still undecided --
+    // subtended 4.86 degrees at the live eye of 2.56 and subtends 5.80 at 3.05,
+    // +19%, and its share of frame height goes 0.0495 to 0.0587. Measured over
+    // ten frames across a real race at 620x1344, not derived.
+    //
+    // AND IT DOES NOT DO WHAT THE FIRST DRAFT OF THIS COMMENT CLAIMED. It does
+    // not push the already-committed road off the bottom of the frame: that
+    // band grows too, 0.3005 to 0.3494, because the same atan scaling applies
+    // to it. What actually happens is that the road as a whole takes frame from
+    // the sky and the scenery above the horizon, and the future's share of it
+    // rises. The gain is real and it is 19%, not a reapportionment.
+    //
+    // It also ends DUCK-bar occlusion, which is a third of all gates. The bar
+    // spans 1.41 to 1.83, so the sightline over it comes back down to the road
+    // and the only question is where; raising the eye both narrows that shadow
+    // (its depth goes as 0.42 / (eye - target top)) and pushes it out to ratios
+    // the gate spacing no longer produces.
+    //
+    // WHAT IT DOES NOT BUY, and this is why the camera is not the whole fix. A
+    // BLOCK's collision box tops out at 2.80. Clearing it is not a matter of
+    // getting above 2.80: to see a JUMP at 0.80 past a BLOCK halfway to it
+    // needs an eye at 4.80, because the sightline has to come back DOWN to 0.80
+    // by the far gate. 4.80 is a helicopter. The BLOCK case is answered in
+    // course.js by spacing instead -- see readWindowAt -- and this constant was
+    // swept from 2.62 to 4.82 against real courses first, which is how that was
+    // settled rather than argued.
+    //
+    // The cost is small and was measured, not assumed: the runner goes from
+    // 0.2321 of frame height to 0.2229, a 4% loss, and his feet drop from
+    // -0.554 to -0.671 -- further down the frame, which is where the Subway
+    // Surfers and Sonic references put theirs.
+    //
+    // Together with the spacing floor in course.js, over the same ten frames:
+    // mean share of an upcoming gate the player can actually see goes 75.3% to
+    // 86.2%, gates under half visible 13 to 5, gates fully blank 6 to 2. The
+    // camera on its own accounts for about 5 of those 11 points (swept
+    // separately at a fixed eye offset before either change was written); the
+    // spacing floor accounts for the rest. Neither alone was enough.
     CAM_BASE_Y,
     CAM_BASE_BACK,
     // What the sightline is actually derived against. The camera drops 0.20 at

@@ -67,6 +67,87 @@ MR.Course = (function () {
     return ACTION_WINDOW + (elev ? elev.windowExtra(z) : 0);
   }
 
+  /**
+   * ---- THE SECOND REASON GATE SPACING HAS A FLOOR -------------------------
+   *
+   * ACTION_WINDOW is the floor the ARM needs: two conflicting gates closer than
+   * one airborne span would demand being in the air and on the ground at once.
+   * That rule has been enforced from both ends since the generator was written.
+   *
+   * The EYE needs a floor too, and nobody had written it down. A hazard is a
+   * solid object standing in the lane, so while it is in front of the lens it
+   * hides whatever is behind it in that lane -- and the shipped camera makes
+   * that absolute rather than approximate for one of the three kinds:
+   * Collision.BOX puts a BLOCK's top at 2.80 and the resting eye, K.CAM_BASE_Y,
+   * at 2.62. The sightline over a BLOCK never comes back down to the road, so a
+   * hazard behind one in the same lane is not merely dim, it is at zero, at
+   * every distance and every camera height the framing can afford. (Raising the
+   * eye to clear it takes 4.8 units, which is a helicopter, not a chase camera.
+   * That was measured before this was written.)
+   *
+   * So the only thing that gives the read back is passing the occluder. The
+   * near gate leaves the lens once the eye has travelled its own distance, and
+   * at that instant the far gate is (z_far - z_near) in front of the lens. For
+   * the player to still have a full action window to answer it:
+   *
+   *     z_far - z_near  >=  actionWindow + K.CAM_BASE_BACK
+   *
+   * -- the chase distance is in there because the LENS is what does the seeing
+   * and it sits K.CAM_BASE_BACK behind the runner the window is measured for.
+   *
+   * That is 25.35 units against an action floor of 21, so it binds only on the
+   * tightest spacings the difficulty curve asks for, which is precisely where
+   * the complaint came from: "when there are so many obstacles back to back it
+   * makes it a tad tough to see what's ahead of you." Holding it makes gaps
+   * BETWEEN gates always wider than the read window, so no gate can ever be the
+   * tight occluder of another, and tools/shoot.js's BLANKS assertion passes by
+   * construction rather than by luck -- the same bargain solvable() and
+   * Elevation.validate() already make with their own invariants.
+   *
+   * It costs about 5% of the gates on a course and nothing at all in finish
+   * time; see tools/simulate.js, which is unchanged to the second by it because
+   * pace integrates over distance and not over gates.
+   */
+  function readWindowAt(z, elev) {
+    return actionWindowAt(z, elev) + K.CAM_BASE_BACK;
+  }
+
+  /**
+   * The deepest hazard collision box, as a half-depth.
+   *
+   * This is Collision.BOX[K.BLOCK].halfZ and it is written twice, which is a
+   * thing this file otherwise refuses to do. The reason: collision.js loads
+   * AFTER this one, and course generation also runs headless in tools/
+   * course-test.js and tools/simulate.js, where collision.js is not loaded at
+   * all. Reading MR.Collision from here would work in the browser and crash
+   * both proofs.
+   *
+   * So it is duplicated and then GUARDED: tools/shoot.js compares this against
+   * the real MR.Collision.BOX in the live page and fails the build if they ever
+   * disagree. A number nobody checks is how the last four corrections in this
+   * project started.
+   */
+  const HAZARD_HALF_Z = 0.65;
+
+  /**
+   * How far a gate's geometry reaches FORWARD of its own gate line, in units.
+   *
+   * A hazard is not a plane at z, it is a box, and a BLOCK train is a long one:
+   * world.js builds it with span = 1 + train * 0.9 gate-spans and a rear face at
+   * halfZ * (2 * span - 1), which is 5.33 units at the longest train. That
+   * matters here for one reason only -- the sightline argument in readWindowAt
+   * turns on WHEN THE OCCLUDER LEAVES THE LENS, and a box leaves the lens when
+   * its REAR face passes it, not when its gate line does. Measuring gate line to
+   * gate line credits a train with clearing the shot up to five units early,
+   * which is 21% of the window it is being checked against.
+   *
+   * The first draft of this fix did exactly that, and it made the assertion pass.
+   */
+  function reachOf(train) {
+    const span = train ? 1 + train * 0.9 : 1;
+    return HAZARD_HALF_Z * (2 * span - 1);
+  }
+
   const START_GRACE = 150;   // clean runway so the first seconds read calmly
   // Clean straight into the tape. It was 190 units -- 0.80 of a mile, about
   // seven seconds at race pace -- and combined with the difficulty ramp's
@@ -202,7 +283,7 @@ MR.Course = (function () {
     return Math.min(1, base * 0.86 + wall + home);
   }
 
-  function spacingAt(f, rnd, z, elev) {
+  function spacingAt(f, rnd, z, elev, train) {
     const d = difficulty(f);
     // 44 units early, tightening as difficulty rises. The floor is
     // ACTION_WINDOW itself rather than a number chosen to sit near it: the
@@ -216,7 +297,20 @@ MR.Course = (function () {
     // a descent widens the generator's tightest spacing and the proof's window
     // together. Moving one without the other is how this invariant went stale
     // the first time.
-    return Math.max(actionWindowAt(z, elev), mean * rnd.range(0.84, 1.16));
+    //
+    // ...and it is readWindowAt, not actionWindowAt, because the floor answers
+    // to the eye as well as to the arm and the eye asks for more. See the
+    // derivation on readWindowAt. This is still the solver's own call with a
+    // constant added, so a retune of the jump arc, the pace floor or the terrain
+    // still moves both ends of the constraint together.
+    //
+    // reachOf(train) is the gate BEHIND this gap -- how far its geometry sticks
+    // forward past its own gate line. The eye is clear of it only once its rear
+    // face has gone by, so the gap it owes the next gate is measured from there.
+    // A standing hazard costs 0.65 of this; a four-span BLOCK train costs 5.33,
+    // and pays it rather than being waved through on its gate line.
+    return Math.max(readWindowAt(z, elev) + reachOf(train),
+                    mean * rnd.range(0.84, 1.16));
   }
 
   /** Hazard mix widens as difficulty rises. */
@@ -550,7 +644,9 @@ MR.Course = (function () {
       }
 
       gates.push({ z, lanes, f, train: span });
-      z += spacingAt(f, rnd, z, elevation);
+      // The span goes in because the gap after a gate is owed by the geometry of
+      // THAT gate, and a train's is five units longer than its gate line says.
+      z += spacingAt(f, rnd, z, elevation, span);
     }
 
     const mileMarkers = [];
@@ -627,6 +723,24 @@ MR.Course = (function () {
       if (g[i].lanes.every((l) => l === K.BLOCK)) errors.push(`gate ${i}: all lanes blocked`);
       if (i > 0 && g[i].z <= g[i - 1].z) errors.push(`gate ${i}: not ordered in z`);
       if (i > 0 && g[i].z - g[i - 1].z < 18) errors.push(`gate ${i}: spacing ${(g[i].z - g[i - 1].z).toFixed(1)} too tight`);
+      // THE SIGHTLINE FLOOR, PROVED RATHER THAN TRUSTED.
+      //
+      // spacingAt() enforces this when it lays the gates down; this checks the
+      // finished course, so course-test.js re-proves it on 90 days of real
+      // courses every run rather than leaving it to the seven frames
+      // tools/shoot.js happens to capture. Same bargain as solvable(): the
+      // generator makes it true, validate() refuses to ship a course where it
+      // is not. See readWindowAt for why the number is what it is.
+      //
+      // The epsilon is float slop only -- spacingAt returns this quantity
+      // exactly when the floor binds, which late in a course is most gates.
+      if (i > 0) {
+        const need = readWindowAt(g[i - 1].z, elev) + reachOf(g[i - 1].train);
+        if (g[i].z - g[i - 1].z < need - 1e-9) {
+          errors.push(`gate ${i}: ${(g[i].z - g[i - 1].z).toFixed(2)} behind gate ${i - 1} `
+            + `needs ${need.toFixed(2)} to stay readable past it`);
+        }
+      }
     }
     if (!solvable(g, elev)) errors.push('course has no solvable lane path');
     // The sightline sweep. A profile that hides the road beyond a crest hides
@@ -642,5 +756,10 @@ MR.Course = (function () {
 
   return { generate, generateAid, validate, solvable, biomeAt, difficulty,
            BIOMES, SETTINGS, pickSettings, ACTION_WINDOW, actionWindowAt,
+           // Exported so tools/shoot.js reads the read window from the file
+           // that enforces it instead of recomputing the same sum. The two
+           // cannot drift, which is the whole point of the invariant.
+           READ_NEAR: ACTION_WINDOW + K.CAM_BASE_BACK, readWindowAt,
+           HAZARD_HALF_Z, reachOf,
            elevationPlan };
 })();

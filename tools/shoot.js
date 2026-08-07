@@ -260,8 +260,20 @@ const DEFAULT_SHOTS = [
       // hazard stands 0.8-2.8 units above that road, so anything the proof
       // covers this test can legitimately demand. See the far-end note in the
       // crossing loop for what bounding it gives up and why it must be bounded.
-      const READ_NEAR = MR.Course.ACTION_WINDOW + MR.K.CAM_BASE_BACK;
+      const READ_NEAR = MR.Course.READ_NEAR;
       const READ_FAR = (MR.Elevation && MR.Elevation.SIGHT_MIN) || 90;
+
+      // course.js has to hold its own copy of the deepest hazard half-depth --
+      // collision.js loads after it, and generation also runs headless in
+      // course-test.js and simulate.js where collision.js is not loaded at all.
+      // A duplicated constant nobody checks is how four of the five corrections
+      // in docs/roadmap.md started, so it is checked here, where both files are
+      // live in the same page.
+      const drift = MR.Course.HAZARD_HALF_Z !== MR.Collision.BOX[MR.K.BLOCK].halfZ
+        ? `course.js HAZARD_HALF_Z is ${MR.Course.HAZARD_HALF_Z} but `
+          + `Collision.BOX[BLOCK].halfZ is ${MR.Collision.BOX[MR.K.BLOCK].halfZ} `
+          + '-- the gate spacing floor is being derived from the wrong box'
+        : null;
 
       const v = new THREE.Vector3();
       const EDGES = [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4],
@@ -511,7 +523,14 @@ const DEFAULT_SHOTS = [
               // held against the gate -- condition (1) above, applied per ray
               // rather than per gate, so a mixed pair is judged on the half
               // that actually bites.
-              else if (gt.z - hit.z < READ_NEAR) {
+              //
+              // hit.z1, NOT hit.z. The occluder is a box and it is out of the
+              // shot when its REAR face passes the lens, which for a BLOCK train
+              // is 5.33 units past its own gate line. Measuring from the gate
+              // line credits the longest occluder in the game with clearing the
+              // view 21% of a read window early, and the first draft of this
+              // assertion did exactly that -- and passed.
+              else if (gt.z - hit.z1 < READ_NEAR) {
                 tight++;
                 const k = ['-', 'JUMP', 'DUCK', 'BLOCK'][hit.kind] + ' lane ' + hit.lane
                   + ' at ' + (hit.z - camZ).toFixed(0) + 'u';
@@ -519,14 +538,25 @@ const DEFAULT_SHOTS = [
               }
             }
           }
-          // Everything not blocked by a tight occluder is credited as readable:
-          // the gate has to be short of the bar for a reason that will still be
-          // there when it matters.
+          // TWO NUMBERS, AND REPORTING BOTH IS NOT PADDING.
+          //
+          // `raw` is what the player can see: rays that reached the box. It
+          // answers the owner's question and it is the before/after this task
+          // is judged on.
+          //
+          // `vis` is what the player is FAIRLY OWED: everything not blocked by
+          // a tight occluder is credited, because a gate hidden by something
+          // that will be past in time is not a defect. That is what the build
+          // gate compares against `need`.
+          //
+          // They are different numbers and collapsing them would let a fix that
+          // merely moved occluders further away read as a fix that removed them.
+          const raw = seenN / tot;
           const vis = (tot - tight) / tot;
           const need = READ_NEAR / d;
           const row = {
             d: +d.toFixed(1), lane: gt.lane, kind: gt.kind,
-            vis: +vis.toFixed(2), need: +need.toFixed(2),
+            raw: +raw.toFixed(2), vis: +vis.toFixed(2), need: +need.toFixed(2),
             by: Object.keys(blame).sort((a, b) => blame[b] - blame[a])[0] || '',
           };
           seenBox.push(row);
@@ -551,6 +581,7 @@ const DEFAULT_SHOTS = [
         low: uniqLow.map((e) => ({ name: e.name, yMin: +e.yMinLocal.toFixed(2), z0: +e.z0.toFixed(1) })),
         hide: uniqHide,
         blank, gateVis: seenBox, readNear: +READ_NEAR.toFixed(2), readFar: READ_FAR,
+        drift,
       };
     }).catch((e) => ({ skipped: 'evaluate failed: ' + e.message }));
 
@@ -601,7 +632,8 @@ const DEFAULT_SHOTS = [
     report.push({ shot: sh.name, file, stat, errors, occl, contrast });
 
     if (errors.length) failed = true;
-    if (occl && !occl.skipped && (occl.low.length || occl.hide.length || occl.blank.length)) failed = true;
+    if (occl && !occl.skipped
+      && (occl.low.length || occl.hide.length || occl.blank.length || occl.drift)) failed = true;
     if (contrast && !contrast.skipped && contrast.fail.length) failed = true;
     await ctx.close();
   }
@@ -622,6 +654,7 @@ const DEFAULT_SHOTS = [
     const o = r.occl;
     if (o && !o.skipped) {
       console.log(`  overhead ${o.elements} crossings, ${o.gates} live hazards`);
+      if (o.drift) console.log('  ! DRIFT: ' + o.drift);
       for (const e of o.low.slice(0, 6)) {
         console.log(`  ! LOW: ${e.name} crosses the corridor at y=${e.yMin} (below OVERHEAD_Y)`);
       }
@@ -633,13 +666,15 @@ const DEFAULT_SHOTS = [
       // The whole table, pass or fail. The point of this assertion is the
       // before/after, and a build that only prints its failures cannot show one.
       if (o.gateVis && o.gateVis.length) {
-        console.log(`  gate sightlines, ${o.readNear}u to ${o.readFar}u  (visible% / owed%)`);
+        console.log(`  gate sightlines, ${o.readNear}u to ${o.readFar}u  `
+          + '(seen% / owed%, and [credited%] when they differ)');
         const byD = {};
         for (const r of o.gateVis) (byD[r.d] = byD[r.d] || []).push(r);
         for (const k of Object.keys(byD).sort((a, b) => a - b)) {
           console.log('    ' + byD[k].map((r) =>
             `${String(r.d).padStart(5)}u ${['-', 'JUMP', 'DUCK', 'BLOCK'][r.kind].padEnd(5)} L${r.lane}`
-            + ` ${String(Math.round(r.vis * 100)).padStart(3)}%/${Math.round(r.need * 100)}%`).join('  '));
+            + ` ${String(Math.round(r.raw * 100)).padStart(3)}%/${Math.round(r.need * 100)}%`
+            + (r.vis > r.raw ? `[${Math.round(r.vis * 100)}%]` : '')).join('  '));
         }
       }
       for (const b of o.blank.slice(0, 8)) {

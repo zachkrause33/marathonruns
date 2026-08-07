@@ -59,10 +59,15 @@ MR.Camera = (function () {
   // the lane they were standing in. Playtest verdict, exactly: "it's hard to
   // see what is in front of you."
   //
-  // 2.62 lands ~2.30 at full pace, which brings that sightline in to about 10
-  // units -- the road immediately ahead is visible again -- and drops the
+  // 2.62 landed ~2.30 at full pace, which brought that sightline in to about 10
+  // units -- the road immediately ahead is visible again -- and dropped the
   // runner from 47% down the frame to roughly 65%, which is also where the
   // Subway Surfers and Sonic references put theirs (see reference/).
+  //
+  // That fixed the near road. It did not fix the FAR road, and the same
+  // playtest sentence came back a second time about a different distance:
+  // "when there are so many obstacles back to back it makes it a tad tough to
+  // see what's ahead of you." Hence the raise below.
   //
   // THE VALUE ITSELF LIVES IN constants.js, and moving it there was not
   // tidiness. elevation.js derives the maximum steepness of a crest from the
@@ -71,10 +76,34 @@ MR.Camera = (function () {
   // silent and it goes as the square. Retune the camera by changing
   // K.CAM_BASE_Y and the hill cap follows; Elevation.validate() ray-marches
   // the result at generation and fails the course if it does not.
+  // 2.62 became 3.10 in constants.js, and the derivation for it is there
+  // because elevation.js reads the same number. The short version: road at
+  // distance d sits atan(eye / d) below the horizon, so raising the eye
+  // stretches the whole road down the frame in proportion -- the 25-to-150
+  // band, which is everything the player can still do something about, goes
+  // from 4.99 degrees to 5.88 -- and it pushes the already-committed road
+  // nearer than 25 units toward the bottom edge and off it. That band was
+  // getting 0.108 of NDC height while the committed road got 1.037.
   const BASE_Y = K.CAM_BASE_Y;
   const BASE_BACK = K.CAM_BASE_BACK;
   const LOOK_Y = 1.16;
-  const LOOK_AHEAD = 8.0;
+  // 8.0 -> 11.0, and it is the other half of the same move.
+  //
+  // Raising the eye without moving the aim point pitches the camera DOWN, which
+  // hands the gain straight back: the frame centre was already looking at road
+  // 18.5 units ahead, and a lower aim from a higher eye looks at road nearer
+  // still. Pushing the look point out re-levels it, so the eye height buys frame
+  // for the far road instead of buying more of the runner's own shadow.
+  //
+  // It also drops the runner in frame, which is where the reference framing puts
+  // him (see the header): measured, his feet go from -0.583 to -0.696 of NDC
+  // height while his overall size barely moves, 0.504 to 0.491.
+  //
+  // Not larger than 11.0. The aim point is what the mile flourish, the jump arc
+  // and the finish run-in all modulate from, and past about twelve units the
+  // horizon sits high enough that the top-gear FOV widening starts putting sky
+  // where the road ahead should be.
+  const LOOK_AHEAD = 11.0;
 
   // THE SLIDE DOES NOT MOVE THE CAMERA. Not off the centreline, not into a
   // bank, and not much up or in.

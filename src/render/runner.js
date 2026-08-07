@@ -437,6 +437,52 @@ MR.Runner = (function () {
     return out;
   }
 
+  /**
+   * A box with its twelve edges rounded off to radius `r`.
+   *
+   * three has no rounded box in core, which is most of why this character had
+   * none: under the old triangle ceiling a chamfer was a whole primitive's
+   * worth of geometry spent on something nobody could see at 110px, and the
+   * shoe -- the only part on the figure whose mass is a box -- kept its hard
+   * corners. At the 200px the shipped frame actually gives him, and at every
+   * angle but dead astern, a trainer with four square corners reads as a brick
+   * with a dome glued on each end.
+   *
+   * Built by EXPLODING a sphere rather than by stitching six faces to twelve
+   * edges to eight corners: each vertex is pushed out by (ex, ey, ez) in the
+   * direction of the octant it is in, which drags the sphere's eight octants
+   * apart and stretches the quads between them into the flat faces. Vertices
+   * ON a symmetry plane are left where they are -- hence the epsilon, without
+   * which a value like 6e-17 at theta = 90 degrees takes a sign at random and
+   * slides one whole face sideways.
+   *
+   * Two properties matter and both are exact rather than approximate:
+   *   - the EXTENTS are untouched. The sphere reaches its full radius on all
+   *     three axes (widthSegments a multiple of four, heightSegments even), so
+   *     the result measures w x h x d to the float. A chamfer that quietly
+   *     grew the shoe would move the slide's half-width, which the outsole
+   *     owns by 0.003.
+   *   - the NORMALS are the sphere's own, which is what a rounded box wants:
+   *     constant across each face, turning through 90 degrees along each edge.
+   *     They are not renormalised because nothing here is scaled.
+   * The faces come out very slightly domed -- 0.076r at the middle of a span,
+   * so 0.002 on the shoe -- which is under a pixel at any size this is drawn
+   * and gives the toon ramp something to curve a band across instead of a
+   * dead flat plane.
+   */
+  function roundedBox(w, h, d, r, seg) {
+    const g = new THREE.SphereGeometry(r, seg, Math.max(4, seg >> 1));
+    const p = g.attributes.position;
+    const ex = Math.max(0, w / 2 - r), ey = Math.max(0, h / 2 - r), ez = Math.max(0, d / 2 - r);
+    const E = 1e-6;
+    const sg = (v) => (v > E ? 1 : v < -E ? -1 : 0);
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+      p.setXYZ(i, x + sg(x) * ex, y + sg(y) * ey, z + sg(z) * ez);
+    }
+    return g;
+  }
+
   // There is no single-primitive part() any more. The last two holdouts were
   // the thigh and the upper arm, and the wardrobe pass gave both of them
   // something welded on -- a hamstring and a triceps -- so every part on the
@@ -1322,8 +1368,18 @@ MR.Runner = (function () {
       // object; a rounded toe, heel and outsole keep it a shoe from every
       // angle the cycle puts it in. See SOLE for why the underside is the
       // value it is.
+      //
+      // The MIDFOOT was still a bare box, and it was the last hard corner on
+      // the character. Dead astern that never showed -- the heel dome covers
+      // it -- but the run cycle swings each foot through the full quarter view
+      // twice a stride, and there a 90-degree corner between the instep and
+      // the side wall reads as a brick with a dome glued on each end. Chamfered
+      // at 0.030, which is a quarter of the shoe's own height: enough to catch
+      // its own band off the toon ramp along the edge, not enough to round the
+      // trainer into a pebble. The extents are unchanged to the float, so the
+      // outsole still owns the slide's half-width by the same 0.003 it did.
       const foot = multi([
-        { g: new THREE.BoxGeometry(0.190, 0.110, 0.225), c: P.runnerShoe, y: -0.036, z: 0.036 },
+        { g: roundedBox(0.190, 0.110, 0.225, 0.030, R_NUB), c: P.runnerShoe, y: -0.036, z: 0.036 },
         { g: new THREE.SphereGeometry(0.095, R_LIMB, 16), c: P.runnerShoe, y: -0.036, z: 0.150, sy: 0.82, sz: 0.66 },
         { g: new THREE.SphereGeometry(0.092, R_NUB, 12), c: P.runnerShoe, y: -0.026, z: -0.072, sy: 0.86, sz: 0.74 },
         // Heel counter. The best-value detail on the whole character, because
@@ -1345,7 +1401,14 @@ MR.Runner = (function () {
         //
         // Thin accent stripe, and thin is the point: it is a crisp bright line
         // from behind and almost nothing from below, which is the opposite of
-        // where the accent used to sit.
+        // where the accent used to sit. NOT chamfered, unlike the midfoot above
+        // it, and for two reasons that agree. The whole job of this piece is to
+        // be a hard line; at 0.028 tall even a 0.008 chamfer is a third of it,
+        // and what came back was a second small dome rather than the edge
+        // between the upper and the outsole. And its front corner turns out to
+        // be the widest point of the whole character in a SLIDE -- knocking it
+        // off pulled the slide's half-width from 0.5609 to 0.5551, which is a
+        // silhouette this game distinguishes states by.
         { g: new THREE.BoxGeometry(0.196, 0.028, 0.240), c: TRIM, y: -0.100, z: 0.036 },
         // Outsole as a squashed ellipsoid rather than a slab, so the face it
         // turns to the camera on the recovery swing is a rounded oval that

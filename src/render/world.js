@@ -5566,45 +5566,25 @@ MR.World = (function () {
         }
         variants[0].visible = true;
         /**
-         * ================== THE CONTACT SHADOW ==================
+         * THE CONTACT SHADOW USED TO BE BUILT HERE, AS A SECOND SYSTEM.
          *
-         * The owner's lighting note asked for objects to separate from one
-         * another and for contact shadows, and this is the half of it that a
-         * value change cannot do: a shadow says an object is STANDING ON the
-         * road, which is a different claim from it being a different colour
-         * than the road.
+         * Every JUMP and BLOCK got its own S.contactShadow blob parented to
+         * this group -- one alpha-blended draw call each -- while
+         * updateShadows() was independently writing a multiply-blended quad
+         * for the same hazard into one pooled geometry. Both shipped, so the
+         * tarmac under every JUMP and BLOCK in the game was darkened twice and
+         * the frame paid 15 to 26 draw calls for the privilege.
          *
-         * A REAL SHADOW MAP IS REFUSED, WITH THE MEASUREMENT. A
-         * DirectionalLightShadow costs +105 to +201 draw calls here and puts
-         * two of the eight shots over the 400 ceiling -- 04-wall 265 to 438,
-         * 08-level 264 to 465. Draw calls are the binding constraint in this
-         * game; triangles are not. One quad per hazard is +1 draw each against
-         * 15 to 26 live hazards a frame, which is the affordable shape of the
-         * same idea.
+         * The pooled quad kept the job and inherited the two things this one
+         * knew that it did not: the variant's own footprint, and no shadow
+         * under a DUCK. Both are stated at updateShadows(), which is now the
+         * only place a hazard shadow exists. Do not re-add one here.
          *
-         * ONLY WHAT ACTUALLY RESTS ON THE ROAD. A DUCK is a bar hanging at
-         * y 1.41 on two 0.26 standards; it does not sit on the tarmac and
-         * giving it a full-footprint blob would draw a shadow for an object
-         * that is mostly air, and cover a telegraph mat to do it. So JUMP and
-         * BLOCK get one, DUCK does not, and the test is the collision box's
-         * own yMin rather than a list of kinds that could drift out of date.
-         *
-         * IT CANNOT DAMAGE THE TELEGRAPH. The mats are renderOrder 5 and this
-         * is 2, so the mat is always composited OVER the shadow, never under
-         * it. The mats are the device a race is lost by misreading and they
-         * are on the do-not-touch list; sorting is what keeps that promise
-         * structurally rather than by choosing a gentle opacity.
-         *
-         * Opacity is well below the runner's 0.72: the runner is the focal
-         * point and is meant to be planted hard, while a hazard's shadow only
-         * has to stop it floating -- and it is landing on the play surface,
-         * beside marks the player is reading.
+         * A REAL SHADOW MAP REMAINS REFUSED, WITH THE MEASUREMENT, and that is
+         * the part of the old header worth keeping: a DirectionalLightShadow
+         * costs +105 to +201 draw calls here and puts two of the eight shots
+         * over the 400 ceiling -- 04-wall 265 to 438, 08-level 264 to 465.
          */
-        if (kind !== K.DUCK) {
-          const sh = S.contactShadow(1, { opacity: 0.34 });
-          g.add(sh);
-          g.userData.shadow = sh;
-        }
         g.add(telegraph(kind));
         // A hazard is the thing the audit protects, not a thing it polices: it
         // is meant to be in the corridor, and one gate hiding another is the
@@ -6869,6 +6849,48 @@ MR.World = (function () {
     // cut at the seam, and long enough that the near end reads as the object
     // sitting ON the road rather than as a disc in front of it.
     const SHADOW_SPREAD = 0.95;
+    /**
+     * ===== ONE SHADOW SYSTEM, NOT TWO =====
+     *
+     * There were two live at once, and their comment blocks contradicted each
+     * other outright. Every JUMP and BLOCK carried an alpha-blended
+     * S.contactShadow blob parented to its own group -- one draw call each,
+     * against 15 to 26 live hazards a frame -- AND had a multiply-blended quad
+     * written into this pooled geometry for the same object at the same
+     * instant. The blob's header argued that "one quad per hazard is the
+     * affordable shape of the same idea"; this one's argued that "a blended
+     * material per hazard is a draw call per hazard, so every live hazard's
+     * quad is written into ONE pooled geometry". Both were shipping.
+     *
+     * The pooled quad wins on every axis that was actually measured. It is one
+     * draw for the whole road instead of one per hazard; it is a MULTIPLY,
+     * which is what the reference frames were measured doing (0.57 / 0.747 /
+     * 0.857, the same on all three channels) and which an alpha blob cannot
+     * do; and it takes fog for free, so a distant hazard's shadow dissolves at
+     * the rate the hazard does. Running both also double-darkened the tarmac
+     * under every JUMP and BLOCK in the game, which is not a look either
+     * header asked for.
+     *
+     * So the blob is gone and this keeps the two things the blob was RIGHT
+     * about, because deleting a system should not delete what it knew:
+     *
+     *   THE FOOTPRINT. The blob was cut to the variant's own merged bounding
+     *     box in xz -- a tram is long and a kerb is wide -- while this quad was
+     *     a fixed LANE-WIDE rectangle off the collision box. Every hazard
+     *     therefore cast a lane-width shadow, so a moped and a bus stood on the
+     *     same puddle. It now reads the same userData.foot the blob did.
+     *   NO SHADOW UNDER A DUCK. A DUCK is a bar hanging at 1.41 on two 0.26
+     *     standards; it does not rest on the tarmac, and a full-footprint
+     *     shadow for an object that is mostly air covers a telegraph mat to
+     *     say something untrue. The blob excluded it and this did not. The
+     *     test is the collision box's own yMin rather than a list of kinds
+     *     that could drift out of date -- BOX[DUCK].yMin is 1.41 and both
+     *     others are 0.00, so the rule selects itself.
+     *
+     * Measured: -16 draw calls at the peak shot, no triangle change (the quads
+     * were already allocated), and the road under a hazard goes from two
+     * multiplied darkenings to one.
+     */
     function updateShadows() {
       const pos = shadowGeo.attributes.position.array;
       const B = MR.Collision.BOX;
@@ -6879,14 +6901,21 @@ MR.World = (function () {
           if (kind === K.CLEAR || !g.objs[l]) continue;
           const box = B[kind];
           if (!box) continue;
+          // Only what actually rests on the road. See the header.
+          if (box.yMin > 0) continue;
           // Same span the body is stretched by, so a six-unit train drags its
           // whole length of shadow instead of a disc at the cab.
           const span = (kind === K.BLOCK && g.gate.train) ? 1 + g.gate.train * 0.9 : 1;
-          const z0 = g.gate.z - box.halfZ - SHADOW_SPREAD;
-          const z1 = g.gate.z + box.halfZ * (2 * span - 1) + SHADOW_SPREAD;
+          // The variant standing here, not the kind. Written on every claim,
+          // so this is never the previous tenant's.
+          const act = g.objs[l].userData.active;
+          const foot = (act && act.userData.foot) || [LANE * 0.5, box.halfZ];
+          const fz = foot[1] * 1.12;
+          const z0 = g.gate.z - fz - SHADOW_SPREAD;
+          const z1 = g.gate.z + fz * (2 * span - 1) + SHADOW_SPREAD;
           const cx = K.LANE_X[l];
-          // LANE_W, never a difference of LANE_X.
-          const hx = LANE * 0.5 + SHADOW_SPREAD;
+          // The variant's own half-width, never a difference of LANE_X.
+          const hx = foot[0] * 1.12 + SHADOW_SPREAD;
           const p = n * 18;
           // The quad lies ON the road, so each z-end takes the road's own
           // height there. One value for the whole quad would sink the far end
@@ -9770,18 +9799,11 @@ MR.World = (function () {
             o.userData.body.scale.z = span;
             o.userData.body.position.z = (span - 1) * 0.65;
           }
-          // Cut the contact shadow to whatever is actually standing here. The
-          // shadow geometry is built at radius 1, so scale IS the world
-          // half-extent, and a train that was stretched along z drags its
-          // shadow with it instead of standing on a puddle the length of one
-          // carriage. Written on every claim, like the variant visibility
-          // above and for the same reason: a pooled object must never inherit
-          // the previous tenant's anything.
-          if (o.userData.shadow) {
-            const foot = vs[vi].userData.foot;
-            o.userData.shadow.scale.set(foot[0] * 1.12, 1, foot[1] * span * 1.12);
-            o.userData.shadow.position.z = (span - 1) * 0.65;
-          }
+          // The contact shadow is not written here any more. It is one pooled
+          // quad per live hazard, sized from this same userData.foot and this
+          // same span inside updateShadows() -- which reads userData.active,
+          // set four lines up. See the header there for why there is now one
+          // shadow system rather than two.
           objs.push(o);
         }
         activeGates.push({ gate, objs });

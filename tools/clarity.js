@@ -37,7 +37,13 @@ if (!SHOTS.length) {
   const p = await b.newPage({ viewport: { width: 400, height: 400 } });
   // A file:// origin, so the canvas may read file:// images back.
   await p.goto('file:///home/user/marathonruns/reference/MEASUREMENTS.md');
-  console.log('file                              range  edge%  satur   FAR sat  NEAR sat  far/near');
+  // The far/near split is not optional detail. A whole-frame edge figure is
+  // dominated by composition: Talking Tom's boulevard frame is 40% empty road,
+  // which drags its whole-frame edge density to 8.9% while its SCENERY band
+  // sits at 17.8%. Comparing whole frames across games with different
+  // compositions overstates the difference by more than a factor of two, and
+  // the first version of this tool did exactly that.
+  console.log('file                              range  edge%  satur   FAR edge   sat   NEAR edge   sat  far/near');
   for (const f of SHOTS) {
     const r = await p.evaluate(async (src) => {
       const img = new Image();
@@ -93,8 +99,8 @@ if (!SHOTS.length) {
     const n = path.basename(f).replace('.png', '').replace('.PNG', '');
     console.log(
       `${n.padEnd(30)} ${r.all.range.toFixed(1).padStart(5)}  ${r.all.edge.toFixed(1).padStart(5)}  ` +
-      `${r.sat.toFixed(3)}   ${r.far.sat.toFixed(3)}    ${r.near.sat.toFixed(3)}    ` +
-      `${(r.far.sat / r.near.sat).toFixed(2)}`);
+      `${r.sat.toFixed(3)}  ${r.far.edge.toFixed(1).padStart(5)} ${r.far.sat.toFixed(3)}  ` +
+      `${r.near.edge.toFixed(1).padStart(5)} ${r.near.sat.toFixed(3)}  ${(r.far.sat / r.near.sat).toFixed(2)}`);
   }
   await b.close();
 })();

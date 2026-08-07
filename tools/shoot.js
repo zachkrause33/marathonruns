@@ -39,10 +39,34 @@
  *          MR.Collision.BOX rather than from the art. If the crossing's lowest
  *          screen row is below the hazard's highest, it is in front of a
  *          hazard on screen and the run fails.
+ *   BLANKS every hazard against the hazards IN FRONT OF IT. See the long
+ *          comment on it below; it is the one that was missing, and the thing
+ *          it measures is the commonest occluder in the game.
  *
- * Both are geometric, so a new prop is audited the day it is added rather than
- * the day somebody notices. Hazards, aid and the sky/ground/hills backdrop are
+ * All three are geometric, so a new prop is audited the day it is added rather
+ * than the day somebody notices. Aid and the sky/ground/hills backdrop are
  * exempt and world.js says why at each exemption.
+ *
+ * ---- WHAT THE FIRST TWO MISSED, FOR ELEVEN MONTHS ------------------------
+ *
+ * LOW and HIDES both walk world.crossings(), which returns OVERHEAD SCENERY.
+ * So between them they answered exactly one question -- "is a prop in front of
+ * a hazard" -- and never the question a player actually asks, which is "is a
+ * HAZARD in front of a hazard". Measured by raycast against the live scene,
+ * overhead structure accounts for 0% of the road the player cannot see, and it
+ * always will: the camera looks DOWN at the road, so nothing above eye height
+ * can ever be between the lens and the tarmac. That bucket was unreachable by
+ * construction, and it was the only bucket being counted.
+ *
+ * What is in the other bucket, sampling the road from the commit point out to
+ * SIGHT_MIN across four points in a race: 35% / 58% / 59% / 89% of the road
+ * hidden, of which hazards are 26 / 51 / 48 / 89 points. Hazards ARE the
+ * occluder, and the assertion had never once looked at them.
+ *
+ * The playtest note that opened this ("when there are so many obstacles back to
+ * back it makes it a tad tough to see what's ahead of you") is that number in
+ * words. So BLANKS below is the missing half, and it is deliberately landed
+ * failing.
  *
  * ---- CONTRAST, and why that is a build failure too -----------------------
  *
@@ -114,6 +138,18 @@ const DEFAULT_SHOTS = [
   { name: '04-wall', q: 'bot=1&skip=185', settle: 700 },
   { name: '05-final', q: 'bot=1&skip=225', settle: 700 },
   { name: '06-mobile', q: 'bot=1&skip=90', settle: 700, w: 420, h: 860 },
+  // The owner's complaint frame, in the shape the game is actually played in.
+  //
+  // Not decoration, and not a duplicate of 04-wall. Occlusion between hazards
+  // depends on where the EYE is laterally, and frameFor() ties that to the
+  // aspect: a portrait frame follows the runner at 0.95 of his lane offset
+  // against a desktop's 0.78, and sits 1.18 back against 1.00. So in portrait
+  // the lens sits very nearly IN the player's lane, and a hazard in that lane
+  // occludes everything behind it in that lane for the whole approach -- there
+  // is no parallax left to open the sightline. 04-wall at 1280x800 reads two
+  // gates clean that this frame reads at 20%. The stricter case is also the
+  // real one.
+  { name: '07-wall-tall', q: 'bot=1&skip=185', settle: 700, w: 620, h: 1344 },
 ];
 
 (async () => {
@@ -200,6 +236,32 @@ const DEFAULT_SHOTS = [
       // it costs nothing and catches a set piece straddling the spawn edge.
       const els = g.world.crossings(camZ + 0.5, camZ + 240);
       const gates = g.world.gateBoxes();
+
+      // ---- THE READ WINDOW, DERIVED AT BOTH ENDS ------------------------
+      //
+      // Both assertions below read the same band of road, because both are
+      // asking the same question about it: can the player see the thing they
+      // are about to have to answer?
+      //
+      // NEAR is the commit point, seen from the LENS. The player's last chance
+      // to change lane or start an action is Course.ACTION_WINDOW ahead of the
+      // RUNNER, and the chase camera sits K.CAM_BASE_BACK behind him, so the
+      // commit point is ACTION_WINDOW + CAM_BASE_BACK = 25.35 units in front of
+      // the eye. Nearer than that the gate is already answered, and hiding it
+      // costs the player nothing they could still have used.
+      //
+      // This is not a new number. It is the 26 that was written here as a
+      // literal, now saying where it came from -- and it moves if the jump arc
+      // or the chase distance moves, which the literal did not.
+      //
+      // FAR is MR.Elevation.SIGHT_MIN, the same 90 units the hill-shape cap is
+      // derived from and that Elevation.validate() ray-marches every course
+      // against. The terrain proof says the road stays visible for 90 units; a
+      // hazard stands 0.8-2.8 units above that road, so anything the proof
+      // covers this test can legitimately demand. See the far-end note in the
+      // crossing loop for what bounding it gives up and why it must be bounded.
+      const READ_NEAR = MR.Course.ACTION_WINDOW + MR.K.CAM_BASE_BACK;
+      const READ_FAR = (MR.Elevation && MR.Elevation.SIGHT_MIN) || 90;
 
       const v = new THREE.Vector3();
       const EDGES = [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4],
@@ -308,9 +370,8 @@ const DEFAULT_SHOTS = [
             // The number NOT chosen: 60, which was proposed and is looser than
             // the 90 this codebase has already proved. Do not relax it further
             // without moving SIGHT_MIN, which would move the hill cap with it.
-            const READ_FAR = (window.MR.Elevation && MR.Elevation.SIGHT_MIN) || 90;
             const gd = gt.z - camZ;
-            if (gd < 26 || gd > READ_FAR) continue;
+            if (gd < READ_NEAR || gd > READ_FAR) continue;
             const gb = band(gt.x - gt.halfX, gt.x + gt.halfX, gt.yMin, gt.yMax, gt.z0, gt.z1);
             if (!gb) continue;
             // A genuine interval overlap, both ends. The one-sided form the
@@ -330,6 +391,149 @@ const DEFAULT_SHOTS = [
           }
         }
       }
+      // ---- 3. BLANKS: a hazard hidden by another hazard ------------------
+      //
+      // The dominant occluder in this game, and the one the two assertions
+      // above cannot reach. Measured on real courses, the first gate ahead is
+      // essentially always whole and the SECOND is routinely 0-60% visible,
+      // with the first gate doing it: one hazard at 12 units has a screen
+      // half-width of 0.144 NDC against 0.114 for the entire three-lane band at
+      // 45, so a near hazard covers all three far lanes. Gates are 21-48 apart,
+      // so there is always a near one doing this to the next at the moment its
+      // lane has to be chosen.
+      //
+      // WHY A PERCENTAGE, AND NOT THE INTERVAL OVERLAP USED ABOVE.
+      //
+      // Overhead scenery is a beam: it either crosses a hazard's screen rows or
+      // it does not, and a beam that clips one row off the top of a bus has not
+      // hidden the bus. Between two hazards the geometry is the opposite -- they
+      // stand in the same band and overlap constantly -- so an interval test
+      // would fire on every gate in the game and mean nothing. What matters is
+      // how much is left, so this casts rays and counts.
+      //
+      // Sampling is the hazard's own collision box, from MR.Collision.BOX via
+      // world.gateBoxes(). NOT the art: the art is world.js's business and the
+      // envelope is the contract. A 5x5 grid over the face nearest the lens, so
+      // one sample is 4% and the numbers below are readable as counts.
+      //
+      // ---- THE THRESHOLD, AND WHERE EACH HALF OF IT COMES FROM -----------
+      //
+      // Two conditions, and a gate has to fail both to fail the build.
+      //
+      // (1) THE OCCLUDER MUST NOT SELF-CLEAR. A hazard hidden now may be in
+      //     plain view in a second, because the thing hiding it is nearer than
+      //     it is and will go past first. That is not a defect, it is
+      //     parallax, and a test that fails on it is a test no course can pass.
+      //     The line is exact rather than judged: the occluder leaves the lens
+      //     after the eye has travelled its own distance, and at that instant
+      //     the hidden gate is (z_gate - z_occluder) in front of the lens. The
+      //     player is owed a full action window from there, and the commit
+      //     point measured from the lens is READ_NEAR -- so the pair is fair,
+      //     whatever it looks like right now, when
+      //
+      //         z_gate - z_occluder >= READ_NEAR
+      //
+      //     and only a TIGHTER pair than that can be unfair. Note what this
+      //     picks out: gate spacing floors at ACTION_WINDOW = 21 and READ_NEAR
+      //     is 25.35, so the pairs this admits are consecutive gates at the
+      //     tightest spacings the generator produces. "So many obstacles back
+      //     to back", in the owner's words, is literally the set this selects.
+      //
+      // (2) WHAT IS LEFT MUST STILL BE READABLE, and this is where the one
+      //     judgement in the assertion lives, so it is stated rather than
+      //     buried. Both ENDS are derived:
+      //
+      //       at READ_NEAR the gate is being committed to this instant and
+      //       there is no later read, so the player is owed all of it: 100%.
+      //
+      //       at READ_FAR = SIGHT_MIN the gate has 64.65 units of approach
+      //       still to run before that moment, so it is owed the share of its
+      //       approach already spent: READ_NEAR / READ_FAR = 28%.
+      //
+      //     Between them it interpolates as READ_NEAR / d, which is that same
+      //     sentence at every distance -- "you are owed as much of this gate as
+      //     you have already spent of its approach". The SHAPE is the judgement;
+      //     the two endpoints are not, and margins are printed for every gate
+      //     so the shape can be argued with against numbers.
+      //
+      // WHAT THIS DELIBERATELY DOES NOT ASSERT: that the KIND is legible. It
+      // does not need to. An occluder stands on the road, so it eats a hidden
+      // gate from the BOTTOM UP, and BOX makes the three kinds separable by
+      // their top edge alone -- JUMP tops at 0.80, the DUCK bar at 1.83, BLOCK
+      // at 2.80, no two overlapping. The part that survives bottom-up occlusion
+      // is exactly the part that names the hazard, so the binding requirement
+      // is that enough of it be SEEN, which is what is measured here.
+      const blank = [], seenBox = [];
+      {
+        const N = 5;                       // 25 rays per gate; one sample = 4%
+        const O = [0, 0, 0], D = [0, 0, 0];
+        // Slab test against an axis-aligned box, in world space. Cheaper and
+        // more honest than projecting: occlusion from a point does not depend
+        // on where the camera is AIMED, only on where its eye is, so this needs
+        // no projection matrix and cannot be flipped by a sample behind the
+        // near plane -- the failure mode band() above exists to work around.
+        function blocks(b, tmax) {
+          let t0 = 1e-4, t1 = tmax;
+          const lo = [b.x - b.halfX, b.yMin, b.z0], hi = [b.x + b.halfX, b.yMax, b.z1];
+          for (let a = 0; a < 3; a++) {
+            if (Math.abs(D[a]) < 1e-9) { if (O[a] < lo[a] || O[a] > hi[a]) return false; continue; }
+            let ta = (lo[a] - O[a]) / D[a], tb = (hi[a] - O[a]) / D[a];
+            if (ta > tb) { const s = ta; ta = tb; tb = s; }
+            if (ta > t0) t0 = ta;
+            if (tb < t1) t1 = tb;
+            if (t0 > t1) return false;
+          }
+          return true;
+        }
+        const eye = cam.position;
+        for (const gt of gates) {
+          const d = gt.z - camZ;
+          if (d < READ_NEAR || d > READ_FAR) continue;
+          let seenN = 0, tight = 0, tot = 0;
+          const blame = {};
+          for (let i = 0; i < N; i++) {
+            for (let j = 0; j < N; j++) {
+              const px = gt.x - gt.halfX + 2 * gt.halfX * (i + 0.5) / N;
+              const py = gt.yMin + (gt.yMax - gt.yMin) * (j + 0.5) / N;
+              O[0] = eye.x; O[1] = eye.y; O[2] = eye.z;
+              D[0] = px - eye.x; D[1] = py - eye.y; D[2] = gt.z0 - eye.z;
+              const len = Math.sqrt(D[0] * D[0] + D[1] * D[1] + D[2] * D[2]);
+              D[0] /= len; D[1] /= len; D[2] /= len;
+              let hit = null;
+              for (const o of gates) {
+                // Strictly in front, and never the gate itself.
+                if (o === gt || o.z1 >= gt.z0) continue;
+                if (blocks(o, len - 1e-3)) { hit = o; break; }
+              }
+              tot++;
+              if (!hit) seenN++;
+              // A sample blocked by something that will be past in time is not
+              // held against the gate -- condition (1) above, applied per ray
+              // rather than per gate, so a mixed pair is judged on the half
+              // that actually bites.
+              else if (gt.z - hit.z < READ_NEAR) {
+                tight++;
+                const k = ['-', 'JUMP', 'DUCK', 'BLOCK'][hit.kind] + ' lane ' + hit.lane
+                  + ' at ' + (hit.z - camZ).toFixed(0) + 'u';
+                blame[k] = (blame[k] || 0) + 1;
+              }
+            }
+          }
+          // Everything not blocked by a tight occluder is credited as readable:
+          // the gate has to be short of the bar for a reason that will still be
+          // there when it matters.
+          const vis = (tot - tight) / tot;
+          const need = READ_NEAR / d;
+          const row = {
+            d: +d.toFixed(1), lane: gt.lane, kind: gt.kind,
+            vis: +vis.toFixed(2), need: +need.toFixed(2),
+            by: Object.keys(blame).sort((a, b) => blame[b] - blame[a])[0] || '',
+          };
+          seenBox.push(row);
+          if (tight && vis < need) blank.push(row);
+        }
+      }
+
       // One line per offender, not one per (offender, gate) pair.
       const seen = new Set();
       const uniqLow = low.filter((e) => {
@@ -341,10 +545,12 @@ const DEFAULT_SHOTS = [
         const k = h.el + '@' + h.gateZ;
         if (seen2.has(k)) return false; seen2.add(k); return true;
       });
+      seenBox.sort((a, b) => a.d - b.d);
       return {
         elements: els.length, gates: gates.length,
         low: uniqLow.map((e) => ({ name: e.name, yMin: +e.yMinLocal.toFixed(2), z0: +e.z0.toFixed(1) })),
         hide: uniqHide,
+        blank, gateVis: seenBox, readNear: +READ_NEAR.toFixed(2), readFar: READ_FAR,
       };
     }).catch((e) => ({ skipped: 'evaluate failed: ' + e.message }));
 
@@ -395,7 +601,7 @@ const DEFAULT_SHOTS = [
     report.push({ shot: sh.name, file, stat, errors, occl, contrast });
 
     if (errors.length) failed = true;
-    if (occl && !occl.skipped && (occl.low.length || occl.hide.length)) failed = true;
+    if (occl && !occl.skipped && (occl.low.length || occl.hide.length || occl.blank.length)) failed = true;
     if (contrast && !contrast.skipped && contrast.fail.length) failed = true;
     await ctx.close();
   }
@@ -424,6 +630,24 @@ const DEFAULT_SHOTS = [
           + `${['-', 'JUMP', 'DUCK', 'BLOCK'][h.kind]} in lane ${h.lane} at z=${h.gateZ} (${h.d}u ahead)`
           + ` -- scenery reaches ${h.elBottom} down the frame, hazard tops out at ${h.gateTop}`);
       }
+      // The whole table, pass or fail. The point of this assertion is the
+      // before/after, and a build that only prints its failures cannot show one.
+      if (o.gateVis && o.gateVis.length) {
+        console.log(`  gate sightlines, ${o.readNear}u to ${o.readFar}u  (visible% / owed%)`);
+        const byD = {};
+        for (const r of o.gateVis) (byD[r.d] = byD[r.d] || []).push(r);
+        for (const k of Object.keys(byD).sort((a, b) => a - b)) {
+          console.log('    ' + byD[k].map((r) =>
+            `${String(r.d).padStart(5)}u ${['-', 'JUMP', 'DUCK', 'BLOCK'][r.kind].padEnd(5)} L${r.lane}`
+            + ` ${String(Math.round(r.vis * 100)).padStart(3)}%/${Math.round(r.need * 100)}%`).join('  '));
+        }
+      }
+      for (const b of o.blank.slice(0, 8)) {
+        console.log(`  ! BLANKS: the ${['-', 'JUMP', 'DUCK', 'BLOCK'][b.kind]} in lane ${b.lane} `
+          + `${b.d}u ahead is ${Math.round(b.vis * 100)}% visible and is owed `
+          + `${Math.round(b.need * 100)}% -- hidden by the ${b.by}, which is under `
+          + `${o.readNear}u in front of it, so passing it does not give the read back in time`);
+      }
     } else if (o && o.skipped) {
       console.log('  occlusion audit skipped: ' + o.skipped);
     }
@@ -448,6 +672,6 @@ const DEFAULT_SHOTS = [
     }
   }
 
-  console.log('\n' + (failed ? 'FAIL: page errors, missing state, a hazard the player cannot see, or one they cannot tell from the road' : 'OK: all shots clean'));
+  console.log('\n' + (failed ? 'FAIL: page errors, missing state, a hazard the player cannot see (behind scenery or behind another hazard), or one they cannot tell from the road' : 'OK: all shots clean'));
   process.exit(failed ? 1 : 0);
 })();

@@ -38,7 +38,9 @@ on a run whose projection read RECORD ON in green. It survives for aid alone.
 **`PACE` was kept, against the owner's list**, on the argument that it is the
 only number answering to every frame of play, the only thing that gives the
 tick on the tank a name, and the only one stated in the units of the wager.
-Flagged to the owner rather than decided silently — *their call, still open.*
+Flagged rather than decided silently, and **the owner has now confirmed it
+stays as-is** — three plates in the left column, ~24% of frame height in
+portrait. Closed.
 
 390×844: plate coverage 20.45% → **17.05%**, left column 263.8px → **204.6px**,
 39 → **29** words, 68 → **60** elements. Landscape left column 70.6% → 53.2%.
@@ -503,7 +505,7 @@ nobody measured is worse than no number at all.**
 5. **The LOD justification** — "past a hundred units a spectator is under a
    pixel wide". Projected properly: 4.0px at 60 units, 1.9px at the swap
    distance.
-6. **The stride instrument was wrong three ways, all flattering.** Its contact
+6. **The stride instrument was wrong FIVE ways, every one of them flattering.** Its contact
    sheets were not contact sheets — `setViewportSize` fires a resize, the game
    repaints the full canvas, and that repaint lands on whichever view renders
    first, so every "behind" sheet was a single wide panorama. One was committed
@@ -511,8 +513,23 @@ nobody measured is worse than no number at all.**
    floor divided one foot's travel by both feet's contact window and was 2×
    pessimistic, which was then passed to an agent as "a bound you must not
    fight". And it tracked the head at the neck pivot, turning a 1.22× gain into
-   a reported 4.2×. **An instrument nobody audits is not a measurement, it is a
-   preference with decimal places.**
+   a reported 4.2×.
+
+   Then stage 2 found two more. Its contact sheets posed the rig with
+   `update(0, …)`, and `dt = 0` means the secondary-motion integrator steps by
+   zero — the hood read an identical −0.010023 in all twelve tiles. **No
+   contact sheet this tool ever produced could show secondary motion**, which
+   is the entire subject of the stage the sheets were meant to judge. And
+   `handL` was tracked at the *elbow pivot*, a child of the shoulder that no
+   elbow rotation can move: every hand figure this project has printed was a
+   shoulder figure, including `0.2533 → 0.3010`, quoted to an agent as
+   evidence for the arm work. The mitt's real travel is 0.4031 → 0.4480
+   vertical and 0.5474 → 0.6502 fore/aft.
+
+   Five defects, found by three different agents, none by me, and every single
+   one made the work look better than it was. **An instrument nobody audits is
+   not a measurement, it is a preference with decimal places** — and the
+   corollary is that the reviewer's own tools need a reviewer.
 
 7. **Three consecutive diagnoses of R2**, each confident, the first two false:
    the telegraph mats (they cannot overlap), the DUCK as a solid 3.52-unit wall

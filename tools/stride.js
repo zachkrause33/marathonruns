@@ -110,7 +110,18 @@ fs.mkdirSync(DIR, { recursive: true });
     // point of the shoe mesh -- the ankle is where the joint is, the sole is
     // what touches the road.
     const feet = r.parts.legs.map((L) => L.ankle);
-    const hands = r.parts.arms.map((A) => A.elbow);
+    // The MITT, not the elbow pivot. A pivot is a child of the joint above it,
+    // so the elbow pivot is moved by the shoulder and by nothing the elbow
+    // does -- every "hand" figure this tool printed was a shoulder figure,
+    // including one quoted to the owner as evidence for arm work. Same class
+    // as tracking the head at the neck pivot. -0.258 is the mitt's own centre
+    // in elbow space, read from runner.js.
+    const hands = r.parts.arms.map(function (A) {
+      const m = new THREE.Object3D();
+      m.position.set(0, -0.258, 0);
+      A.elbow.add(m);
+      return m;
+    });
 
     // The sole, not the ankle. The ankle pivot sits ~0.15 above the bottom of
     // the shoe, so reporting the pivot as "lowest sole" overstates the gap to
@@ -271,9 +282,28 @@ fs.mkdirSync(DIR, { recursive: true });
       el.style.height = TH + 'px';
       g.renderer.setScissorTest(true);
       g.renderer.clear();
+      // Advance the rig in REAL TIME to each phase rather than teleporting
+      // `phase` and posing with dt = 0.
+      //
+      // dt = 0 means the secondary-motion integrator steps by zero, so every
+      // spring in the file holds whatever value it happened to carry -- the
+      // hood read an identical -0.010023 in all twelve tiles. Secondary motion
+      // has never once appeared in a contact sheet produced by this tool, and
+      // could not have, which means "look at the sheets" was incapable of
+      // judging the stage of this work that is entirely about springs.
+      //
+      // Settle first so the springs are on their limit cycle rather than
+      // showing their start-up transient in tile 0.
+      const SDT = 1 / 120;
+      for (let k = 0; k < 240; k++) r.update(SDT, { speed });
       for (let i = 0; i < N; i++) {
-        r.phase = i / N;
-        r.update(0, { speed });
+        const target = i / N;
+        // Step until the phase reaches this tile's target, wrapping once.
+        for (let k = 0; k < 4000; k++) {
+          const before = r.phase;
+          r.update(SDT, { speed });
+          if (r.phase >= target && (before < target || r.phase < before)) break;
+        }
         const cam = new THREE.PerspectiveCamera(34, TW / TH, 0.1, 60);
         const o = r.group.position;
         cam.position.set(o.x + V[view].pos[0], o.y + V[view].pos[1], o.z + V[view].pos[2]);

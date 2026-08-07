@@ -352,7 +352,7 @@ MR.World = (function () {
       terrace: {
         colors: [0xe8dcc8, 0xd8c8b0, 0xc8b8a4, 0xefe4d4, 0xb8a894],
         trim: 0xfff6e8, win: 0x33405e, roof: 'parapet', roofColor: 0x4a4458,
-        h: [8.5, 11.0], bay: 4.4, depth: 7.0, rows: 4, stoop: 1, chimney: 3,
+        h: [8.5, 11.0], bay: 4.4, depth: 7.0, rows: 4, stoop: 1, chimney: 3, balcony: 1,
       },
       tower: { colors: [0x7a8ab0, 0x9aa4c0, 0xc8ccd8], glass: 1, crown: 'flat' },
       tree: { kind: 'round', colors: [0x5f7f30, 0x84a83c, 0xaad84e], h: 1.15, trunk: 0x9a9a86 },
@@ -433,7 +433,7 @@ MR.World = (function () {
       terrace: {
         colors: [0xdcdce4, 0xc8ccd8, 0xe8e4e0, 0xb8bcc8, 0xd0c8c8],
         trim: 0xfffdf5, win: 0x2f3856, roof: 'flat', roofColor: 0x4a4a5e,
-        h: [9.0, 13.0], bay: 3.8, depth: 6.6, rows: 5, neon: 1,
+        h: [9.0, 13.0], bay: 3.8, depth: 6.6, rows: 5, neon: 1, balcony: 2,
       },
       tower: { colors: [0xb8bcd0, 0xd0d4e0, 0x8f96b0], glass: 1, crown: 'antenna' },
       tree: { kind: 'columnar', colors: [0x4e7530, 0x74a03c, 0x9ccc4c], h: 1.0 },
@@ -958,6 +958,27 @@ MR.World = (function () {
     return c.slice().sort(function (x, y) { return shadedL(y) - shadedL(x); });
   }
 
+  /** Blend two authored colours, for deriving a trim from the wall it sits on. */
+  function mixHex(a, b, t) {
+    const r = Math.round(((a >> 16) & 255) + ((((b >> 16) & 255) - ((a >> 16) & 255)) * t));
+    const g = Math.round(((a >> 8) & 255) + ((((b >> 8) & 255) - ((a >> 8) & 255)) * t));
+    const l = Math.round((a & 255) + (((b & 255) - (a & 255)) * t));
+    return (r << 16) | (g << 8) | l;
+  }
+
+  /**
+   * Awning colours. NOT the facade's -- see the facade note in vTerrace. An
+   * awning is a shop's canvas and the reference's are the most saturated thing
+   * on its street, so this is one place the reference should be followed
+   * exactly. Six, drawn per bay off the row's own seeded stream.
+   *
+   * DIVERGENCE, stated: the reference's awnings are STRIPED, and a stripe on a
+   * 93px bay at 60 units aliases to its own mean by 100 units -- the same
+   * failure the JUMP chevron block was measured at. One colour per awning, with
+   * the fascia one step darker, which is the part that survives.
+   */
+  const AWNING = [0xd8503f, 0x2f8090, 0x3f8452, 0x9a4f7f, 0xc07a2a, 0x4f5f9a];
+
   // ======================================================================
   //  PARAMETRIC VOCABULARY
   //
@@ -1161,17 +1182,75 @@ MR.World = (function () {
       const lean = t.lean ? (rnd() - 0.5) * 0.035 : 0;
       const sub = [];
       sub.push(bx(d, h, bw * 0.98, 0, h / 2, 0, col));
-      // Ground floor: a stone base course, which is what stops a terrace
-      // reading as a row of coloured slabs standing on grass.
-      sub.push(bx(d * 1.01, 1.5, bw * 0.99, 0, 0.75, 0, t.trim));
-      sub.push(bx(d * 1.02, 0.22, bw, 0, 1.55, 0, t.trim));
-      // Windows, proud of the facade so they catch a different band of the
-      // toon ramp than the wall does.
+      /**
+       * THE GROUND FLOOR IS A SHOP, not a stone plinth.
+       *
+       * `tgr-shopfronts`, measured: its ground floor is a pale cream band with
+       * FULL-BAY BLUE GLAZING in it, and it is the single largest mass on the
+       * facade. Ours was 1.5 units of solid trim with a door in it. A stall
+       * riser, a 1.42-tall glazing band and the string course over it is the
+       * same three elements the reference has, and it gives the street a light
+       * band at eye level that the crowd barrier reads against.
+       *
+       * The glazing is derived from the setting's own window colour rather than
+       * shared, so Chicago's shopfronts stay cold and Rome's stay warm.
+       */
+      const shop = mixHex(t.win, 0xffffff, 0.62);
+      sub.push(bx(d * 1.01, 0.40, bw * 0.99, 0, 0.20, 0, t.trim));      // stall riser
+      sub.push(bx(d * 1.00, 1.42, bw * 0.96, 0, 1.11, 0, shop));        // shopfront glazing
+      sub.push(bx(d * 1.02, 0.22, bw, 0, 1.93, 0, t.trim));             // string course
+      /**
+       * THE AWNING. Two boxes: a canopy sloping out from the facade at the top
+       * of the ground floor, and a fascia hanging off its front edge.
+       *
+       * It is the strongest single "this is a shop, not a wall" cue the
+       * reference has; it sits at 2 world units, which is exactly the band the
+       * camera looks through; and because it is a horizontal projecting plane it
+       * catches a DIFFERENT toon band from the wall behind it -- so it reads as
+       * depth rather than as paint, which is why it earns its cost in this
+       * renderer and not only in the reference's.
+       */
+      const aw = AWNING[Math.floor(rnd() * AWNING.length)];
+      sub.push(bx(0.92, 0.10, bw * 0.88, fx - 0.40, 2.20, 0, aw, 0, 0, 0.22));
+      sub.push(bx(0.10, 0.34, bw * 0.88, fx - 0.82, 1.94, 0, mixHex(aw, 0, 0.30)));
+      /**
+       * A HANGING SIGN, one bay in three. A bracket and a board hung
+       * PERPENDICULAR to the facade at awning height.
+       *
+       * This is the pizza-slice device in `tgr-shopfronts` and it is the only
+       * item in this section that buys DEPTH rather than detail: because the
+       * board is perpendicular, it crosses in front of the next building along
+       * and gives the street wall a parallax it does not otherwise have.
+       */
+      if (i % 3 === 1) {
+        sub.push(bx(0.62, 0.08, 0.08, fx - 0.31, 3.40, bw * 0.24, 0x3a3550));
+        sub.push(bx(0.66, 0.78, 0.07, fx - 0.58, 3.00, bw * 0.24,
+          AWNING[Math.floor(rnd() * AWNING.length)]));
+      }
+      /**
+       * Windows, proud of the facade so they catch a different band of the toon
+       * ramp than the wall does -- and now in a SURROUND of a different colour,
+       * which is what every window in the reference is: a coloured glass panel
+       * inside a frame that does not match it (blue glass in a pink frame on the
+       * yellow facade, blue in white on the green).
+       *
+       * The surround is the trim where the trim is far enough from the wall in
+       * value to be seen against it, and a lightened wall where it is not --
+       * measured with shadedL rather than assumed, because a trim that reads on
+       * London stucco is invisible on Chicago limestone. It is 0.07 proud on
+       * every side, which at 60 units is 1-2px: exactly the size at which a hard
+       * value edge still separates two masses. At 120 units it stops resolving
+       * and merges into the window's mean, which is the correct failure mode --
+       * the window gets slightly lighter with distance and nothing else happens.
+       */
+      const surround = Math.abs(shadedL(t.trim) - shadedL(col)) > 22
+        ? t.trim : mixHex(col, 0xffffff, 0.38);
       const rows = t.rows || 4;
       for (let r = 0; r < rows; r++) {
         const wy = 2.6 + r * ((h - 3.4) / Math.max(1, rows));
         if (wy > h - 1.0) break;
         for (const sz of [-1, 1]) {
+          sub.push(bx(0.18, 1.29, bw * 0.24 + 0.14, fx - 0.06, wy, sz * bw * 0.21, surround));
           sub.push(bx(0.22, 1.15, bw * 0.24, fx - 0.08, wy, sz * bw * 0.21, t.win));
           sub.push(bx(0.30, 0.16, bw * 0.30, fx - 0.10, wy + 0.68, sz * bw * 0.21, t.trim));
         }
@@ -1184,8 +1263,10 @@ MR.World = (function () {
           sub.push(bx(0.30, 0.08, bw * 0.86, fx - 0.22, wy - 0.18, 0, 0x3a3550));
         }
       }
-      // Door and stoop.
-      sub.push(bx(0.24, 1.6, bw * 0.26, fx - 0.10, 0.8, 0, 0x4a3a56));
+      // Door and stoop. It stands proud of the shopfront glazing, which is what
+      // a shop door does, and it is what keeps the glazing band from reading as
+      // one unbroken ribbon down a thirty-unit row.
+      sub.push(bx(0.24, 1.7, bw * 0.26, fx - 0.12, 0.85, 0, 0x4a3a56));
       if (t.stoop) {
         for (let s = 0; s < 3; s++) {
           sub.push(bx(0.9 - s * 0.22, 0.20, bw * 0.36, fx - 0.5 + s * 0.22, 0.10 + s * 0.20, 0, t.trim));

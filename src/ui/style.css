@@ -610,54 +610,6 @@ html, body {
 }
 #endMem:empty { display: none; }
 
-/* ONE RHYTHM, TWO GRIDS.
- *
- * These were two independent grids with their own row gaps and their own
- * header padding, which put their baselines about three pixels out of phase
- * -- close enough to read as a rendering fault. They now share --endRow and
- * each opens with exactly one header row, so every line of one sits on the
- * same baseline as the matching line of the other at every breakpoint. */
-#endCols {
-  --endRow: 21px;
-  display: flex; flex-wrap: wrap;
-  /* Fluid, so the two columns stay SIDE BY SIDE on a 360px phone instead of
-   * stacking and leaving half the card empty. At fixed 34/18/16 the pair
-   * measured 338px against 332px of content width and wrapped by six pixels. */
-  gap: 14px clamp(16px, 6vw, 34px);
-  justify-content: flex-start; align-items: flex-start;
-  margin-top: 16px;
-}
-#resultStats, #splitTable {
-  display: grid; align-content: start; align-items: center;
-  row-gap: 0; grid-auto-rows: var(--endRow);
-  font-variant-numeric: tabular-nums;
-}
-#resultStats { grid-template-columns: auto auto; column-gap: clamp(11px, 4.5vw, 18px); }
-#splitTable  { grid-template-columns: auto auto auto; column-gap: clamp(10px, 4vw, 16px); }
-
-#endCols .k {
-  font-size: 9px; font-weight: 500; letter-spacing: 0.16em;
-  text-transform: uppercase; opacity: 0.6;
-}
-/* The header row sits on the bottom of its own row, which buys the table a
- * little air without moving any baseline off the shared grid. */
-#endCols .k.hd {
-  align-self: end; padding-bottom: 3px;
-  letter-spacing: 0.18em; opacity: 0.4;
-}
-#endCols .v { font-size: 13px; font-weight: 700; }
-
-#resultStats .k, #resultStats .v { text-align: left; }
-#splitTable .k, #splitTable .v { text-align: right; }
-#splitTable .v { font-weight: 500; }
-#splitTable .v.fin { font-weight: 700; }
-/* A rule spanning the grid, not a border per cell -- per-cell borders break
- * across the column gaps and read as three dashes. */
-#splitTable .sep {
-  grid-column: 1 / -1; height: 1px; align-self: center;
-  background: rgba(255, 253, 245, 0.25);
-}
-
 /* THE CAUSAL LINE.
  *
  * This is where the card used to print TIME LOST +0:18 for twelve contacts
@@ -678,9 +630,16 @@ html, body {
   font-weight: 700; letter-spacing: 0.05em;
 }
 
+/* THE NOTES.
+ *
+ * All that is left of a five-row summary and a six-row split table, both of
+ * which said either nothing new or nothing at all -- see hud.js for the
+ * measurements. The turn names one moment in the race; AID TAKEN is the one
+ * row of the old summary that was not arithmetic on a number printed
+ * elsewhere on the same card. Two 11px lines in place of twenty-two cells. */
 #endTurn {
   font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
-  opacity: 0.7; margin-top: 15px;
+  line-height: 1.5; opacity: 0.7; margin-top: 15px;
 }
 #endTurn:empty { display: none; }
 
@@ -841,9 +800,6 @@ html, body {
   #tierNext { font-size: 14px; }
   .ebadge { font-size: 11px; padding: 4px 9px; }
   #endMem { font-size: 13px; }
-  #endCols { --endRow: 26px; margin-top: 22px; gap: 18px 46px; }
-  #endCols .k { font-size: 11px; }
-  #endCols .v { font-size: 16px; }
   #endTurn { font-size: 13px; }
   #tomorrow { padding: 12px 16px 13px; }
   #tomorrow .tomRoute { font-size: 16px; }
@@ -865,32 +821,40 @@ html, body {
   .panel .keys { margin-top: 10px; }
   .cta { margin-top: 12px; padding: 10px 26px; }
 
-  /* The finish card has the most to say and the least room to say it in, so
-   * it gives up vertical air first and then the one line it can afford to
-   * lose -- the race-report sentence, which is the only block here that is
-   * colour rather than fact. What survives is the grade, the two headlines,
-   * the tables, the true cost of contact and tomorrow.
+  /* THE LANDSCAPE OVERFLOW IS CLOSED.
    *
-   * It still does not all fit at 844x390: the card runs about 40px past the
-   * fold and scrolls, which is what .canScroll's fade is for. Portrait is the
-   * reference experience and this is the deliberate trade. */
-  .panel { padding: 10px 14px; }
+   * This card used to give up its vertical air, then the race-report sentence
+   * as well, and STILL ran 89px past the fold at 844x390 -- carried on the
+   * roadmap as a known defect traded for portrait. With the five-row summary
+   * and the six-row split table gone the block stack measured 408px against
+   * 390, so the last 18 came out of margins rather than out of content: two
+   * pixels off each gap and a little off the two plates' own padding. The
+   * sentence is back, and landscape now shows the SAME card portrait does.
+   *
+   * Measured on the FULLEST card the game can produce -- two badges and a
+   * best-today line, which is the state a returning player sees, not the bare
+   * first-run card the 89px was measured on. At 844x390 it now fits with room.
+   * Shorter landscape phones (800x360, 740x360) still run about 21px past the
+   * fold, down from roughly 119px, and that last 21 is left to .canScroll's
+   * fade rather than bought by hiding a block: everything still on this card
+   * earned its place, and a card that scrolls one line is a smaller defect
+   * than a card that silently drops the player's best-today comparison. */
+  .panel { padding: 8px 14px; }
   #startMemory { margin-top: 10px; gap: 6px; }
   .mplate { padding: 4px 8px 5px; }
   .mplate .mv { font-size: 15px; }
-  .endDate { margin-bottom: 6px; }
+  .endDate { margin-bottom: 4px; }
   .panel .endBig { font-size: clamp(26px, 6vh, 38px); }
   #endHead { gap: 8px 24px; }
   .endSub { margin-top: 2px; }
-  #tierRow { margin-top: 8px; }
-  #endBadges, #endMem { margin-top: 5px; }
-  #endCols { --endRow: 16px; margin-top: 8px; gap: 8px 24px; }
-  #endCost { margin-top: 8px; }
+  #tierRow { margin-top: 6px; }
+  #endBadges, #endMem { margin-top: 4px; }
+  #endCost { margin-top: 6px; padding-top: 3px; padding-bottom: 3px; }
   #endCost .endBig { font-size: 22px; }
-  #endTurn { display: none; }
-  #tomorrow { margin-top: 8px; padding: 6px 9px 7px; }
+  #endTurn { margin-top: 6px; font-size: 10px; line-height: 1.4; }
+  #tomorrow { margin-top: 6px; padding: 5px 9px 5px; }
   #tomorrow .tomRoute { font-size: 11px; margin-top: 2px; }
-  #endPanel .cta { margin-top: 9px; padding: 10px; }
+  #endPanel .cta { margin-top: 7px; padding: 10px; }
 
   #leftCol { top: 20px; gap: 6px; }
   #engine { padding: 5px 10px 6px; }

@@ -383,6 +383,46 @@ MR.HUD = (function () {
             exact course rather than 1.5s per hit.
           - what the player's best today was, and whether this beat it.
           - tomorrow.
+
+        WHAT THE SECOND PASS TOOK OFF IT, AND WHY.
+
+        The card answers five questions, in this order: what did I run, was
+        that good, why was it not better, what did I do well, what now. Two
+        blocks answered none of them.
+
+        THE FIVE-ROW SUMMARY. Four of its five rows were arithmetic on
+        numbers already printed on the same card:
+          AVG PACE      FINAL TIME / 26.2.
+          FINAL PACE    the last row of the split table beside it (4:17 and
+                        4:17 clean; 5:05 and 5:06 on a 22-contact run).
+          CLEAN GATES   OF 205 GATES minus 22 CONTACTS COST, both printed.
+          CONTACTS      the cost plate's own label says "22 CONTACTS COST".
+        The fifth, AID TAKEN, is the only fact on the card that is nowhere
+        else, so it survives as a note rather than as a table row.
+
+        THE SIX-ROW SPLIT TABLE. Measured over four different days' courses
+        at four skill levels:
+          - on a CLEAN run it prints 4:57 4:30 4:26 4:23 4:16 4:17, and those
+            six numbers are the same to within two seconds on every one of
+            the four days. It is not showing this run; it is showing the
+            pace model's ramp, which is a constant.
+          - on a run that went wrong -- the card most players see -- the
+            whole spread across its six blocks is 14 to 23 seconds, while
+            the contacts cost 462 to 1064. Five-mile blocks average eight
+            miles of clean running over four contacts, so the one thing the
+            table could usefully locate is exactly what it averages away.
+        Constant on a good run, noise on a bad one. The shape of the race is
+        left to the one line that names an actual moment in it: the turn.
+
+        The best-today line no longer says FIRST RUN TODAY. That is the same
+        empty state the start panel's memory plates already refuse to draw:
+        nothing to remember, so nothing rendered.
+
+        And the rung line no longer repeats the headline. On a record run the
+        card read RECORD, then RECORD BEATEN BY 1:37, over -1:37 VS 1:59:30
+        -- one number three times in ninety pixels. There is no rung above
+        RECORD, so there is nothing for that slot to say; the green chip
+        says it.
       -->
       <div class="panel hidden" id="endPanel"><div class="panelInner">
         <div class="endDate" id="endDate"></div>
@@ -407,11 +447,6 @@ MR.HUD = (function () {
 
         <div id="endBadges"></div>
         <div id="endMem" class="num"></div>
-
-        <div id="endCols">
-          <div id="resultStats"></div>
-          <div id="splitTable"></div>
-        </div>
 
         <div id="endCost">
           <div class="lab" id="endCostLab">WHAT THE CONTACTS COST</div>
@@ -457,7 +492,6 @@ MR.HUD = (function () {
       endVs: q('endVs'), endStreak: q('endStreak'), endStreakSub: q('endStreakSub'),
       verdict: q('verdict'), tierNext: q('tierNext'),
       endBadges: q('endBadges'), endMem: q('endMem'),
-      stats: q('resultStats'), splitTable: q('splitTable'),
       endCost: q('endCost'), endCostLab: q('endCostLab'),
       endCostVal: q('endCostVal'), endCostSub: q('endCostSub'),
       endTurn: q('endTurn'), tomorrow: q('tomorrow'), tomorrowRoute: q('tomorrowRoute'),
@@ -1020,9 +1054,13 @@ MR.HUD = (function () {
       // ---- the grade -----------------------------------------------------
       n.verdict.textContent = rung.name;
       n.verdict.className = 'tier t' + rung.i;
+      // Nothing above RECORD, so nothing to chase and nothing to print. This
+      // slot used to say RECORD BEATEN BY 1:37 directly beneath an endVs
+      // reading -1:37 VS 1:59:30, beside a chip reading RECORD: the same
+      // number three times inside ninety pixels.
       n.tierNext.textContent = up
         ? Pace.clock(Tier.gapTo(t, up)) + ' OFF ' + up.name
-        : 'RECORD BEATEN BY ' + Pace.clock(-vs);
+        : '';
 
       // ---- what the save made of it --------------------------------------
       const badges = [];
@@ -1040,70 +1078,11 @@ MR.HUD = (function () {
             ? 'BEAT YOUR BEST TODAY BY ' + Pace.clock(was.time - t)
             : 'YOUR BEST TODAY ' + Pace.clock(was.time)
               + ' · THIS RUN +' + Pace.clock(t - was.time))
-        : (rec.dateKey ? 'FIRST RUN TODAY' : '');
-
-      // ---- summary -------------------------------------------------------
-      // Label and value are no longer the same type at two opacities: the
-      // label is the HUD's own 9px/800/0.16em and the value is a large
-      // tabular figure, which is the pairing every plate in the live readout
-      // already uses. Casing is uppercase throughout, because the HUD says
-      // /MI and CLEAN GATES and this card used to say /mi and gates.
-      const rows = [
-        ['AVG PACE', Pace.pace(t / K.MARATHON_MILES) + '/MI'],
-        // p.pace at the line is the pace held into the finish, not the best of
-        // the race -- a run that broke late finishes slower than it ever ran.
-        ['FINAL PACE', Pace.pace(p.pace) + '/MI'],
-        ['CLEAN GATES', String(Math.max(0, p.gatesSeen - p.hits))],
-        ['CONTACTS', String(p.hits)],
-        // "AID TAKEN 0" is meaningless to a player who never noticed aid was
-        // on the course. With the denominator it reads as something missed
-        // rather than a stat with no scale -- and on the runs the mechanic
-        // exists for, a broken race, it is very often 0 of 6.
-        ['AID TAKEN', p.aid + ' OF ' + (course && course.aid ? course.aid.length : '?')],
-      ];
-      // Both grids open with exactly one header row and then run on identical
-      // fixed-height rows, which is what puts them back in phase -- they were
-      // two grids on two rhythms about three pixels apart, which is close
-      // enough to look like a mistake and far enough to be one.
-      n.stats.innerHTML = '<div class="k hd">SUMMARY</div><div class="k hd"></div>' + rows
-        .map(function (r) {
-          return '<div class="k">' + r[0] + '</div><div class="v num">' + r[1] + '</div>';
-        }).join('');
-
-      // ---- splits --------------------------------------------------------
-      // PER-BLOCK PACE, NOT VS-RECORD.
-      //
-      // The old third column was the ghost delta, and it graded a WINNING run
-      // pink for its first three rows -- the race is built so the player opens
-      // at 5:30 and reels the record in, so the delta is positive for the
-      // whole first half of even a flawless line. A win that reads as
-      // three-fifths failure is a broken scorecard, and no amount of tinting
-      // fixes a column that is measuring the wrong thing.
-      //
-      // Pace over each five-mile block is the same data without the false
-      // verdict: it shows the shape of the race climbing from 5:30 toward the
-      // floor, and it goes green only where the block was AT or under record
-      // pace. Nothing on this card is tinted for failure any more; the tier
-      // band carries the result, once.
-      let table = '<div class="k hd">MI</div><div class="k hd">TIME</div>'
-                + '<div class="k hd">PACE</div>';
-      const marks = p.splits.filter(function (s) { return s.mile % 5 === 0; });
-      let pm = 0, pt = 0;
-      for (const s of marks) {
-        const blk = (s.time - pt) / (s.mile - pm);
-        table += '<div class="v num">' + s.mile + '</div>'
-              + '<div class="v num">' + Pace.clock(s.time) + '</div>'
-              + '<div class="v num' + (blk <= K.RECORD_PACE ? ' ahead' : '') + '">'
-              + Pace.pace(blk) + '</div>';
-        pm = s.mile; pt = s.time;
-      }
-      const fblk = K.MARATHON_MILES > pm ? (t - pt) / (K.MARATHON_MILES - pm) : NaN;
-      table += '<div class="sep"></div>'
-            + '<div class="v num fin">' + K.MARATHON_LABEL + '</div>'
-            + '<div class="v num fin">' + Pace.clock(t) + '</div>'
-            + '<div class="v num fin' + (fblk <= K.RECORD_PACE ? ' ahead' : '') + '">'
-            + Pace.pace(fblk) + '</div>';
-      n.splitTable.innerHTML = table;
+        // No previous run today means there is no comparison to draw, and
+        // "FIRST RUN TODAY" is that absence typed out. The start panel's
+        // memory plates already refuse to render their own empty state; this
+        // is the same rule on the other side of the run.
+        : '';
 
       // ---- the true cost of contact --------------------------------------
       // This row used to print hits * HIT_TIME_PENALTY. On a twelve-contact
@@ -1131,7 +1110,29 @@ MR.HUD = (function () {
           : 'AGAINST A FLAWLESS LINE';
       }
 
-      n.endTurn.textContent = turnLine(p);
+      // ---- the two notes ---------------------------------------------------
+      // What is left of the summary and the split table. The turn names one
+      // actual moment in the race, which is the job the six-block table could
+      // not do; AID TAKEN is the one number from the summary that was not
+      // arithmetic on something else already printed here -- and on the runs
+      // the mechanic exists for, a broken race, it is very often 0 of 14,
+      // which is the only line on the card that tells a player there was help
+      // on the road they ran past.
+      const notes = [];
+      const turn = turnLine(p);
+      if (turn) notes.push(turn);
+      // Not on a flawless line. cleanFinish() spells out why aid is worth
+      // exactly zero to a run that never broke -- it tops a streak up to a
+      // ceiling that run is already above -- so "AID TAKEN · 0 OF 14" under a
+      // 205-of-205 card reports a miss that was not one. It is printed when
+      // the player took some, or when there were contacts it could have
+      // answered.
+      const aidN = course && course.aid ? course.aid.length : 0;
+      if (aidN && (p.aid > 0 || p.hits > 0)) {
+        notes.push('AID TAKEN · ' + p.aid + ' OF ' + aidN);
+      }
+      n.endTurn.innerHTML = notes
+        .map(function (x) { return '<div>' + x + '</div>'; }).join('');
       const tom = tomorrowLine();
       n.tomorrowRoute.textContent = tom;
       n.tomorrow.classList.toggle('empty', !tom);

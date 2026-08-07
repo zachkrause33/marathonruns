@@ -440,6 +440,59 @@ added for.
 
 ## Done since this file was written
 
+- **The record plate no longer paints over hazards.** The ghost's
+  `RECORD 1:59:30` marker is a `Sprite` with `depthTest:false` at
+  `renderOrder` 900, outside the world group — so `crossings()` never returned
+  it and none of `LOW`, `HIDES` or `BLANKS` had ever audited it. A new
+  `PAINTS` assertion walks the live scene and tests the *property* rather than
+  the object: any material with `depthTest === false` landing after the opaque
+  pass has its screen rect projected and its **texture alpha read back**, and
+  every ray `BLANKS` already casts at a hazard face is asked whether it lands
+  under one. Its first draft passed for two wrong reasons — it read
+  `Texture.center` to decide the uv transform was identity, and that defaults
+  to `(0,0)` not `(0.5,0.5)`, so the alpha readback never ran; and the default
+  shot set never photographs the ghost level with the player, which is why
+  `08-level` now exists. Fixed by a floor on `lift` derived from
+  `BOX[BLOCK].yMax`, `SIGHT_MIN` and the real camera. Coverage of hazard faces
+  goes to zero across the race, at no cost in draws or triangles.
+
+  **Three corrections to the brief that commissioned it.** `shots/04-wall.png`
+  does not prove the defect — the truck the plate covers there is 14.7u from
+  the lens, inside `READ_NEAR` = 25.35 and already committed to. "Covers
+  hazards forty units further down" understates it: the plate's *top* passes
+  eye height once the ghost is past ~16u, so its sightline never returns to
+  the road and the covered band runs to the horizon. And "raise the floor above
+  2.80 world" was the right instinct in the wrong frame — what binds is the
+  screen row, and the BLOCK that projects highest is the one at `SIGHT_MIN`.
+  It is also only solvable *because* R2 raised the eye to 3.10; at 2.62 no
+  plate height clears the band.
+
+  Costs paid and measured: overlap with mile banners rises 36.5% → 44.1%, and
+  the tag's height stops carrying the gap below ~85 units. Both traded against
+  hazard coverage going 100% → 0%, on the grounds that a banner costs a split
+  and a hazard costs the record.
+
+- **A tree crossed the play corridor at y = 7.74** against an `OVERHEAD_Y` of
+  9.0, at mile 18.3. Trees roll x over [7.5, 26] — clear of `CORRIDOR_HALF`
+  3.75 — and are *then* scaled by up to 1.45, so a large roll at the near end
+  reaches back over the road. Each tree now stands off by its own scaled reach,
+  measured from its merged bounding box, which fixes the class rather than the
+  instance.
+
+  **The finding that matters is about the suite, not the tree.** `shoot.js`
+  could have caught this since the corridor rule was written; it never looked
+  at mile 18.3. Six shots is a thin sample of a 6,293-unit course, and a green
+  suite that has not visited most of the road is a more dangerous object than
+  a red one. Verified by a 155-point sweep every 40 units instead: base build
+  one violation, fixed build none.
+
+- **`build.js --check`** fails when the committed `index.html` is not what the
+  source builds. It had drifted twice in one session, once by 97KB, with every
+  harness green — structural, because every tool either rebuilds first or is
+  pointed at a scratch build, so the one artifact none of them check is the one
+  that ships. And an agent that correctly declines to commit a build artifact
+  leaves it stale by doing the right thing.
+
 - **Animation polish, stage 1 — the base run cycle.** The brief's diagnosis
   ("pure sinusoids; contact fast, swing slow") was right and secondary. The
   bigger defect was **phase**, and it was invisible to every measurement taken

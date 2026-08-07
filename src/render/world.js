@@ -5505,12 +5505,17 @@ MR.World = (function () {
       // This is what replaces the street wall in the chute: a solid rear
       // elevation at 9.3 with a roof fascia and pennant masts on top of it, so
       // the horizon behind the crowd is the stadium rather than a hole.
-      parts.push(bx(0.5, 9.6, TILE, 9.30, 4.80, 0, 0x3a3f6e));
-      parts.push(bx(1.5, 0.9, TILE, 8.70, 9.90, 0, 0x2b2f52));
-      parts.push(bx(1.4, 0.35, TILE, 8.75, 10.45, 0, 0xff3b6b));
+      // Held to 7.9, and lighter than the first pass. At 9.6 in a near-black
+      // navy it stopped being the back of a stand and became a warehouse: two
+      // slabs running the length of the frame, eating the sky the gold light
+      // of this leg is carried in. It only has to reach above the top row of
+      // seats, which is at 6.9.
+      parts.push(bx(0.5, 7.9, TILE, 9.20, 3.95, 0, 0x565c92));
+      parts.push(bx(1.6, 0.75, TILE, 8.60, 8.28, 0, 0x2b2f52));
+      parts.push(bx(1.5, 0.30, TILE, 8.65, 8.80, 0, 0xff3b6b));
       for (const z of [-TILE / 2 + 3, 0, TILE / 2 - 3]) {
-        parts.push(bx(0.20, 3.4, 0.20, 8.75, 12.2, z, 0x2b2f52));
-        parts.push(wv(bx(0.12, 1.5, 1.9, 8.75, 13.3, z,
+        parts.push(bx(0.20, 3.0, 0.20, 8.65, 10.4, z, 0x2b2f52));
+        parts.push(wv(bx(0.12, 1.4, 1.8, 8.65, 11.4, z,
           flags[Math.floor(r() * flags.length)]), z * 0.7, 0.9));
       }
       return parts;
@@ -5559,13 +5564,26 @@ MR.World = (function () {
      *             beside a runner in the last lap of a record attempt.
      */
     const carpetTex = (function () {
+      // Near-black indigo, and the value is the point. The FINAL MILE road is
+      // a light violet, so the carpet has to be a long way DOWN in value to
+      // register at all -- a first pass at 0x2c2352 was invisible against it
+      // in every frame. Down is also the only safe direction: darkening the
+      // surface can only widen a hazard's luminance ratio against it, never
+      // close it, which is the one thing the contrast gate cares about.
       const c = canvas(64, 128);
       const g = c.getContext('2d');
-      g.fillStyle = '#2c2352'; g.fillRect(0, 0, 64, 128);
-      g.fillStyle = 'rgba(255,255,255,0.10)';
-      for (let i = 0; i < 4; i++) g.fillRect(0, i * 32, 64, 3);
-      g.fillStyle = 'rgba(255,255,255,0.06)';
-      g.fillRect(2, 0, 3, 128); g.fillRect(59, 0, 3, 128);
+      g.fillStyle = '#2b2258'; g.fillRect(0, 0, 64, 128);
+      // Chevrons pointing at the tape. v runs along the road, so these are the
+      // only thing in the chute that has a DIRECTION, and at speed they are
+      // what the eye follows to the line.
+      g.strokeStyle = 'rgba(255,255,255,0.34)';
+      g.lineWidth = 5;
+      for (let i = 0; i < 4; i++) {
+        const y = i * 32 + 6;
+        g.beginPath(); g.moveTo(2, y + 13); g.lineTo(32, y); g.lineTo(62, y + 13); g.stroke();
+      }
+      g.fillStyle = 'rgba(255,255,255,0.70)';
+      g.fillRect(0, 0, 5, 128); g.fillRect(59, 0, 5, 128);
       return texture(c, true);
     })();
     const stripTex = (function () {
@@ -5592,19 +5610,22 @@ MR.World = (function () {
         const u = (i / N) * 2 - 1;
         return [u * span, TOP - SAG * (1 - u * u)];
       };
-      for (const sz of [-TILE / 4, TILE / 4]) {
-        for (let i = 0; i < N; i++) {
-          const a = at(i), b = at(i + 1);
-          const dx = b[0] - a[0], dy = b[1] - a[1];
-          parts.push(bx(Math.hypot(dx, dy) + 0.06, 0.08, 0.08,
-            (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, sz, 0x2b2f52, 0, 0, Math.atan2(dy, dx)));
-        }
-        for (let i = 0; i <= 8; i++) {
-          const u = i / 8 * 2 - 1;
-          const y = TOP - SAG * (1 - u * u);
-          parts.push(bx(0.50, 0.62, 0.05, u * span, y - 0.37, sz,
-            BUNT[i % BUNT.length]));
-        }
+      // ONE span per tile, not two. The road tile already carries a bunting
+      // line of its own on every city leg, and a second one at half a tile's
+      // spacing turned the top of a portrait frame into confetti before the
+      // confetti. One line every 24 units, with pennants big enough to read as
+      // pennants, says "finish" where two lines of small ones said "noise".
+      const sz = 0;
+      for (let i = 0; i < N; i++) {
+        const a = at(i), b = at(i + 1);
+        const dx = b[0] - a[0], dy = b[1] - a[1];
+        parts.push(bx(Math.hypot(dx, dy) + 0.06, 0.09, 0.09,
+          (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, sz, 0x2b2f52, 0, 0, Math.atan2(dy, dx)));
+      }
+      for (let i = 0; i <= 9; i++) {
+        const u = i / 9 * 2 - 1;
+        const y = TOP - SAG * (1 - u * u);
+        parts.push(bx(0.62, 0.80, 0.05, u * span, y - 0.46, sz, BUNT[i % BUNT.length]));
       }
       return merge(parts);
     })();
@@ -5628,6 +5649,16 @@ MR.World = (function () {
       }
       return g;
     }, group);
+    // TAGGED sRGB, and it is not optional here. texture() leaves colorSpace
+    // unset, which makes three treat the canvas bytes as LINEAR and then encode
+    // them on output -- everything comes back roughly a stop and a half lighter
+    // than it was authored. That is harmless for the near-white mottles this
+    // file's other canvases carry, and it cost an hour here: the carpet was
+    // authored at #1a1338 and arrived on screen at about #5b4f82, a mid
+    // lavender indistinguishable from the road it was supposed to sit on.
+    // The whole point of the carpet is its VALUE, so it is decoded properly.
+    carpetTex.colorSpace = THREE.SRGBColorSpace;
+    stripTex.colorSpace = THREE.SRGBColorSpace;
     carpetTex.repeat.set(1, TILE / 8);
     // Two units per dash, and TILE/2 is a whole number of them, so the lights
     // run continuously from tile to tile instead of restarting at every seam.
@@ -5669,27 +5700,52 @@ MR.World = (function () {
       g.userData.notScenery = true;
       g.userData.auditName = 'finish tape';
 
-      const postGeo = merge([
-        bx(0.16, TAPE_Y + 0.24, 0.16, TAPE_X, (TAPE_Y + 0.24) / 2, 0, 0x2b2f52),
-        bx(0.16, TAPE_Y + 0.24, 0.16, -TAPE_X, (TAPE_Y + 0.24) / 2, 0, 0x2b2f52),
-        bx(0.44, 0.14, 0.44, TAPE_X, 0.07, 0, 0x1b1633),
-        bx(0.44, 0.14, 0.44, -TAPE_X, 0.07, 0, 0x1b1633),
-      ]);
-      g.add(S.outlined(postGeo, mats.prop, S.INK.banner));
+      // BRIGHT, and bright is not decoration. The posts began as the same
+      // 0x2b2f52 navy the rest of the roadside furniture wears, standing on a
+      // near-black carpet: at forty units they were not there at all, and the
+      // player's first sight of the tape was the frame in which it broke.
+      const postParts = [];
+      for (const sx of [1, -1]) {
+        postParts.push(bx(0.44, 0.14, 0.44, sx * TAPE_X, 0.07, 0, 0x1b1633));
+        // Banded like a course marker, so it reads as a post rather than as a
+        // stick, and separates from both the carpet and the barrier behind it.
+        for (let i = 0; i < 4; i++) {
+          postParts.push(bx(0.18, (TAPE_Y + 0.34) / 4, 0.18, sx * TAPE_X,
+            (TAPE_Y + 0.34) * (i + 0.5) / 4, 0, i % 2 ? 0xfffdf5 : 0xff3b6b));
+        }
+      }
+      // THE LIFTED RAMP, not the scenery one, and for exactly the reason
+      // hazards use it (see mats.propLit). The tape is a vertical surface
+      // turned square at the lens and therefore square AWAY from the key
+      // light, so on the scenery floor of 0.31 it is lit almost entirely by
+      // the blue bounce: authored at 0xfffdf5, it rendered as a dark maroon
+      // bar on a dark carpet and was invisible in every frame taken of it.
+      // This is the same class of object as a hazard -- a thing the player has
+      // to read head-on, at speed, in the last second of the race.
+      g.add(S.outlined(merge(postParts), mats.propLit, S.INK.banner));
 
-      // A half, built running from its own post toward the centre line, so the
-      // group's origin IS the hinge and the swing is one rotation.
+      /**
+       * A half, built running from its own post toward the centre line, so the
+       * group's origin IS the hinge and the swing is one rotation.
+       *
+       * 0.44 tall rather than 0.22. A real breast tape is a banner, not a
+       * ribbon, and the screen maths says the same thing: at the distance the
+       * tape is first read -- forty units, three quarters of the clear run-in
+       * course.js leaves -- 0.22 units is under two pixels of a portrait frame
+       * and half of that is eaten by the haze. Doubling it is the difference
+       * between a thing you see coming and a thing that is suddenly gone.
+       */
       function halfGeo() {
         return merge([
-          bx(TAPE_X, 0.22, 0.035, -TAPE_X / 2, 0, 0, 0xfffdf5),
-          bx(TAPE_X, 0.07, 0.045, -TAPE_X / 2, 0.09, 0, 0xff3b6b),
-          bx(TAPE_X, 0.07, 0.045, -TAPE_X / 2, -0.09, 0, 0xffe45e),
+          bx(TAPE_X, 0.44, 0.035, -TAPE_X / 2, 0, 0, 0xfffdf5),
+          bx(TAPE_X, 0.13, 0.045, -TAPE_X / 2, 0.155, 0, 0xff3b6b),
+          bx(TAPE_X, 0.13, 0.045, -TAPE_X / 2, -0.155, 0, 0xffe45e),
         ]);
       }
       const halves = [];
       for (const sx of [1, -1]) {
         const h = new THREE.Group();
-        const m = S.outlined(halfGeo(), mats.prop, S.INK.banner);
+        const m = S.outlined(halfGeo(), mats.propLit, S.INK.banner);
         if (sx < 0) m.rotation.y = Math.PI;
         h.add(m);
         h.position.set(sx * TAPE_X, TAPE_Y, 0);
@@ -5715,20 +5771,110 @@ MR.World = (function () {
             for (const h of halves) { h.rotation.set(0, 0, 0); h.position.y = TAPE_Y; }
             return;
           }
-          // Swing hard for the first third of a second, then settle. The ease
-          // is cubic out so the snap is at the front, where the eye is.
-          const t = Math.min(1, b / 1.1);
+          // 1.8 seconds, not 1.1. The break is the single most important beat
+          // in the ending and it is over before the camera has finished
+          // arriving: at 1.1s, sampling the real game 400ms apart caught the
+          // tape intact in one frame and flat against the barrier in the next,
+          // with nothing in between. The ease is still cubic out, so the SNAP
+          // is at the front where the eye is and the long tail is the trailing
+          // ribbon settling.
+          const t = Math.min(1, b / 1.8);
           const e = 1 - Math.pow(1 - t, 3);
           for (let i = 0; i < 2; i++) {
             const s = i === 0 ? 1 : -1;
             halves[i].rotation.y = s * 1.85 * e;
             halves[i].rotation.z = -s * 0.55 * e;
             // Whip up on the break, then hang.
-            halves[i].position.y = TAPE_Y + Math.sin(Math.min(1, b / 0.42) * Math.PI) * 0.42
+            halves[i].position.y = TAPE_Y + Math.sin(Math.min(1, b / 0.6) * Math.PI) * 0.55
               - 0.55 * e;
           }
         },
       };
+    })();
+
+    /**
+     * ================== WHAT IS BEHIND THE TAPE ==================
+     *
+     * The road did not stop at the finish and that was quietly the worst thing
+     * about the ending. Standing on the line, the frame showed the tape a third
+     * of the way up and then two hundred more units of identical carriageway
+     * running away into the same bright haze it had been running into for four
+     * minutes. The arch read as one more gantry with a sign on it, because
+     * nothing behind it said the road was over.
+     *
+     * So the road is given an end: a sponsor wall and a media tribune straight
+     * across it, 46 units past the line, with wings angled in to make a funnel
+     * rather than a cul-de-sac. It is tall enough (11.4) to cover the horizon
+     * from every part of the finish camera move, which is the point -- the
+     * vanishing point goes away, and with it the sense that there is more race.
+     *
+     * It stands BEYOND the last coordinate of the course, so like the tape it
+     * is exempt from the corridor height rule and for the same structural
+     * reason: nothing the player can hit exists past z = TOTAL_UNITS, so this
+     * cannot be between the lens and anything. It is not exempt from being
+     * looked at, and it is only ever on screen for the last three seconds.
+     */
+    // Two geometries, two materials, and the split is the same one the tape
+    // makes: everything here faces the lens square-on, so the STRUCTURE takes
+    // the lifted hazard ramp (mats.propLit) or the whole wall goes to mud,
+    // while the PEOPLE take the crowd ramp so they keep waving. Two draws for
+    // the object rather than one, which at one object is not a trade worth
+    // thinking about.
+    const backdropParts = [];
+    const backdropCrowd = [];
+    (function () {
+      const parts = backdropParts;
+      const shirts = [0xff4d5e, 0x37d6ff, 0xffe45e, 0x59d47a, 0xff9ad5, 0xffb020];
+      const r = lcg(6161);
+      // The wall itself, in sponsor-board panels so it is not one slab.
+      // BRIGHT panels, not navy. A dark wall closing the road reads as the
+      // road having been blocked off; a bright one reads as the place you were
+      // running to. It is also the last large surface the light of this leg
+      // (gold, by the FINAL MILE palette pull) has to land on.
+      const PANEL = [0xff3b6b, 0xffe45e, 0xfffdf5, 0x37d6ff];
+      for (let i = -5; i <= 5; i++) {
+        parts.push(bx(3.5, 4.6, 0.5, i * 3.6, 2.3, 0, PANEL[(i + 5) % PANEL.length]));
+        parts.push(bx(3.3, 0.8, 0.6, i * 3.6, 0.6, -0.06, 0x1b1633));
+        parts.push(bx(3.3, 0.5, 0.6, i * 3.6, 4.1, -0.06, 0x1b1633));
+      }
+      parts.push(bx(40, 0.7, 1.1, 0, 4.95, 0, 0x1b1633));
+      // A tribune on top of it: the photographers' gantry, packed.
+      for (let row = 0; row < 3; row++) {
+        const y = 5.3 + row * 0.85;
+        parts.push(bx(40, 0.85, 1.5, 0, y, row * 1.2, 0x565c92));
+        for (let i = -8; i <= 8; i++) {
+          const ph = i * 0.9 + row * 1.7;
+          backdropCrowd.push(wv(bx(0.46, 0.56, 0.32, i * 2.3 + (r() - 0.5), y + 0.70,
+            row * 1.2 - 0.4, shirts[Math.floor(r() * shirts.length)]), ph));
+          backdropCrowd.push(wv(bx(0.26, 0.26, 0.24, i * 2.3, y + 1.10,
+            row * 1.2 - 0.4, 0xffc79a), ph));
+        }
+      }
+      parts.push(bx(41, 0.8, 2.4, 0, 8.35, 1.2, 0x2b2f52));
+      parts.push(bx(41, 0.35, 2.2, 0, 8.95, 1.2, 0xff3b6b));
+      for (let i = -6; i <= 6; i++) {
+        parts.push(bx(0.18, 2.2, 0.18, i * 3.2, 10.2, 1.2, 0x2b2f52));
+        backdropCrowd.push(wv(bx(0.10, 1.3, 1.6, i * 3.2, 11.4, 1.2,
+          shirts[Math.floor(r() * shirts.length)]), i * 1.3, 0.9));
+      }
+      // Wings, angled in. Without them the wall is a garage door; with them the
+      // chute funnels and the eye is carried to the tape rather than stopped
+      // dead behind it.
+      for (const sx of [-1, 1]) {
+        parts.push(bx(26, 5.2, 0.6, sx * 26, 2.6, -12, 0x3a3f6e, 0, sx * 0.55, 0));
+        parts.push(bx(26, 0.8, 0.8, sx * 26, 5.5, -12, 0x2b2f52, 0, sx * 0.55, 0));
+      }
+    })();
+    const backdrop = (function () {
+      const g = new THREE.Group();
+      g.add(S.outlined(merge(backdropParts), mats.propLit, S.INK.scenery));
+      g.add(S.outlined(merge(backdropCrowd), mats.crowd, S.INK.scenery));
+      g.position.z = FINISH_Z + 46;
+      g.userData.notScenery = true;
+      g.userData.auditName = 'finish backdrop';
+      g.visible = false;
+      group.add(g);
+      return g;
     })();
 
     /**
@@ -6811,16 +6957,41 @@ MR.World = (function () {
      */
     const finale = {
       t: 0,          // 0..1 across APPROACH -- the build
+      run: 0,        // 0..1 across the last clear tarmac -- the camera's cue
       hot: 0,        // crowd excitement, smoothed
       gold: 0,       // 0 = warm ovation, 1 = the record went
       chase: 0,      // 0..1 how close the next rung is
       record: false,
       broke: -1,     // performance clock at which the tape went, -1 = intact
+      since: 0,      // seconds since the tape went
       done: false,
       next: 0,       // when to re-read the verdict
       proj: 0,
     };
     let lastNow = -1;
+
+    /**
+     * WHERE THE CAMERA IS ALLOWED TO START LEAVING THE CHASE, in units before
+     * the tape. It has to be far enough back that the whole finish -- an arch
+     * 13.5 units wide, a tape 8.1 wide, and both grandstands -- fits a PORTRAIT
+     * frame, which needs about fourteen units of pull; and it has to be short
+     * enough that it never begins while the player still has a gate to read.
+     *
+     * So it is derived from the course rather than typed in. course.js has just
+     * taken FINISH_GRACE from 190 units to 55 and put the hardest gates of the
+     * race in the closing half-mile, and the number below follows that move on
+     * its own: it is the real gap between the last gate and the tape, less a
+     * ten-unit margin, capped at 46 (about 1.6 seconds, which is as long as a
+     * pull-back can run before it stops reading as one move).
+     *
+     * If the run-in is ever tightened again this shortens itself, and the
+     * camera flourish stays behind the last question the course asks.
+     */
+    const RUNOUT = (function () {
+      const gs = course.gates;
+      const gap = gs && gs.length ? FINISH_Z - gs[gs.length - 1].z : 190;
+      return Math.max(12, Math.min(46, gap - 10));
+    })();
 
     function readVerdict(z) {
       const P = MR.game && MR.game.pace;
@@ -6845,6 +7016,8 @@ MR.World = (function () {
     function updateFinale(z, now, dt) {
       const t = Math.max(0, Math.min(1, (z - (FINISH_Z - APPROACH)) / APPROACH));
       finale.t = t;
+      finale.run = Math.max(0, Math.min(1, (z - (FINISH_Z - RUNOUT)) / RUNOUT));
+      finale.since = finale.broke < 0 ? 0 : now - finale.broke;
       if (t <= 0) {
         // Outside the ending entirely: the crowd still reacts to the runner
         // going past (that is `near` in the shader), it just is not lit up.
@@ -6855,8 +7028,12 @@ MR.World = (function () {
         crowdU.uHot.value = finale.hot;
         tape.update(z, -1);
         confetti.update(dt, z);
+        backdrop.visible = false;
         return;
       }
+      // Only ever in the last stretch: it is 40 units wide and would otherwise
+      // be a wall sitting on the horizon for the whole race.
+      backdrop.visible = z > FINISH_Z - 240;
       if (now >= finale.next) { readVerdict(z); finale.next = now + 0.25; }
 
       const past = z >= FINISH_Z - 0.25;
@@ -7293,7 +7470,7 @@ MR.World = (function () {
       state.structIdx = 0; state.bannerIdx = 0; state.aidIdx = 0;
       finale.t = 0; finale.hot = 0; finale.gold = 0; finale.chase = 0;
       finale.record = false; finale.broke = -1; finale.done = false;
-      finale.next = 0; finale.proj = 0;
+      finale.next = 0; finale.proj = 0; finale.run = 0; finale.since = 0;
       crowdU.uHot.value = 0;
       lastNow = -1;
       confetti.reset();
@@ -7516,6 +7693,32 @@ MR.World = (function () {
         }
         return new THREE.Mesh(merge(parts), mats.road);
       });
+      // THE CARPET IS A ROAD, so it is measured as one.
+      //
+      // course.js now puts the hardest gates of the whole race in the closing
+      // half-mile (FINISH_GRACE is 55 units), which means hazards stand ON the
+      // finish carpet. The carpet is a different surface from the tarmac -- far
+      // darker, by design -- so measuring hazards only against the tarmac would
+      // be measuring them against a road that is not there. It happens to be
+      // the safe direction (every hazard in this game is a bright object, and a
+      // darker backdrop can only widen the ratio), but "it happens to be safe"
+      // is exactly the kind of reasoning this audit exists to replace.
+      //
+      // One entry per lane, at the same pose and through the same lens, so the
+      // gate in tools/shoot.js tests every variant against it without knowing
+      // the carpet exists.
+      _audit.carpets = [0, 1, 2].map(function (l) {
+        const g = new THREE.PlaneGeometry(LANE, 6);
+        const uv = g.attributes.uv;
+        const full = K.TRACK_HALF_WIDTH * 2;
+        for (let i = 0; i < uv.count; i++) {
+          const x = K.LANE_X[l] + (uv.getX(i) - 0.5) * LANE;
+          uv.setX(i, (x + K.TRACK_HALF_WIDTH) / full);
+        }
+        g.rotateX(-Math.PI / 2);
+        g.translate(K.LANE_X[l], 0, 0);
+        return new THREE.Mesh(g, carpetMat);
+      });
     }
 
     const _clr = new THREE.Color();
@@ -7636,6 +7839,13 @@ MR.World = (function () {
           LANE * 0.44, LANE * 0.44);
         return Object.assign({ lane: l }, m);
       });
+      // ...and the finish carpet, which is the surface the last gates of the
+      // race actually stand on. See auditSetup().
+      for (let l = 0; l < 3; l++) {
+        const m = shotMean(renderer, scene, _audit.carpets[l], K.LANE_X[l], 0.02, 0,
+          LANE * 0.44, LANE * 0.44);
+        roads.push(Object.assign({ lane: 'carpet' + l }, m));
+      }
       return { hazards, roads };
     };
 

@@ -14,7 +14,7 @@ MR.Audio = (function () {
 
   function create() {
     const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return { unlock() {}, enabled: false, footstep() {}, jump() {}, land() {}, hit() {}, clean() {}, mile() {}, finish() {}, setIntensity() {}, ambient() {} };
+    if (!AC) return { unlock() {}, enabled: false, footstep() {}, jump() {}, land() {}, hit() {}, clean() {}, mile() {}, finish() {}, roar() {}, setIntensity() {}, ambient() {} };
 
     const ctx = new AC();
     const master = ctx.createGain();
@@ -174,11 +174,67 @@ MR.Audio = (function () {
       if (mile >= 26) tone(1320, 0.7, 0.05, 'sine');
     };
 
+    /**
+     * THE ROAR.
+     *
+     * The ambient bed already swells with the streak, but a bed is a bed: it
+     * changes over seconds and the ear stops hearing it. Breaking the tape is
+     * an EVENT and it needs a transient, and the transient a crowd makes is a
+     * fast bright noise burst that decays over about three seconds into
+     * something wider and lower than the bed it came out of.
+     *
+     * Two bands, because one is a hiss. The upper band around 1.5k is the
+     * whistles and the clap; the lower around 320 is the body of eight
+     * thousand people, and it comes in a beat late, which is what a real crowd
+     * does -- the noise arrives in a ragged front, not all at once.
+     *
+     * `power` is the verdict, 0..1, and it is spent on LENGTH as much as on
+     * level: a record roars for four seconds, a run that came apart gets a
+     * warm two. Called by world.js at the tape rather than from the game loop,
+     * because the tape is a render event and the loop does not know about it.
+     */
+    s.roar = function (power) {
+      const p = Math.max(0, Math.min(1, power === undefined ? 1 : power));
+      const dur = 1.9 + 2.4 * p;
+      noise(dur * 0.75, 1500 - 300 * p, 0.55, 0.16 + 0.14 * p, 'bandpass');
+      setTimeout(function () {
+        noise(dur, 320, 0.7, 0.13 + 0.13 * p, 'bandpass');
+      }, 90);
+      // The whistles: a handful of short high squeals scattered across the
+      // first second, which is the detail that stops it reading as wind.
+      const n = 2 + Math.round(p * 5);
+      for (let i = 0; i < n; i++) {
+        setTimeout(function () {
+          noise(0.16, 2600 + Math.random() * 1800, 9, 0.035 + 0.03 * p, 'bandpass');
+        }, 60 + Math.random() * 900);
+      }
+      if (amb) {
+        // Hold the bed up under the burst, then let it fall back.
+        const t = ctx.currentTime;
+        amb.g.gain.cancelScheduledValues(t);
+        amb.g.gain.setTargetAtTime(0.085 + 0.075 * p, t, 0.25);
+        amb.f.frequency.setTargetAtTime(760 + 420 * p, t, 0.3);
+        amb.g.gain.setTargetAtTime(0.05, t + dur, 1.6);
+      }
+    };
+
     s.finish = function (beatRecord) {
       const notes = beatRecord ? [523, 659, 784, 1047] : [523, 587, 523, 392];
       notes.forEach((n, i) => {
         setTimeout(() => tone(n, 0.55, 0.11, 'triangle'), i * 130);
       });
+      // A record gets an octave stack on the last note and a low swell under
+      // it. The fanfare above is four notes either way, so without this the
+      // one moment the whole game is built around sounded like a run that
+      // missed it by two minutes with the notes in a different order.
+      if (beatRecord) {
+        setTimeout(function () {
+          tone(1047, 1.4, 0.09, 'triangle');
+          tone(1568, 1.5, 0.055, 'sine');
+          tone(2093, 1.6, 0.030, 'sine');
+          tone(130.8, 1.8, 0.10, 'sawtooth');
+        }, 3 * 130);
+      }
     };
 
     s.countdown = function (final) {

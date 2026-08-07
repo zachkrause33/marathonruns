@@ -240,9 +240,63 @@ MR.Camera = (function () {
       }
       s.pDuck = duckNow;
 
-      // Finish: the only place the camera is allowed to abandon the chase.
-      if (p.z >= K.TOTAL_UNITS - 0.25) s.finish = Math.min(1, s.finish + d / 1.5);
+      // ---- the finish ------------------------------------------------------
+      /**
+       * THE ONLY PLACE THE CAMERA IS ALLOWED TO ABANDON THE CHASE, and it now
+       * does it in two movements instead of one.
+       *
+       * The old term fired only once the runner was ON the line, pulled back
+       * 3.4 units, lifted 1.7 and NARROWED the lens by nine degrees. Measured
+       * on the shipped frame, that put the camera 8.5 units behind a finish
+       * arch 13.5 units wide with a portrait horizontal field of about 30
+       * degrees: half-width in frame at the tape was 2.6 units against a tape
+       * that spans 8.1 and posts at 4.05. The arch, the tape, both its posts
+       * and every piece of the celebration were outside the frame at the exact
+       * moment they happened, and narrowing the lens was making it worse. The
+       * comment in this file said the term "fires into a scene with nothing in
+       * it to look at"; the truer version is that it could not have looked at
+       * it.
+       *
+       * So:
+       *   RUN-IN   over the last RUNOUT units of clear tarmac -- a number
+       *            world.js derives from where the course's last gate actually
+       *            is, so this can never begin while a gate is still to be
+       *            read -- the camera falls back and rises to about fourteen
+       *            units, which is what a 4.4-unit half-width needs in
+       *            portrait. It also WIDENS. Both of those only ever show more
+       *            road, which is the rule this file already holds every
+       *            flourish to.
+       *   TAPE     once the line is crossed it keeps going, higher and wider,
+       *            and drifts laterally so the shot is three-quarter rather
+       *            than dead astern -- a symmetrical shot down an empty road
+       *            reads as a pause, and this is the opposite of a pause.
+       *
+       * The verdict rides it too. A record pulls further, rises higher and
+       * leans harder than a run that came apart, because the camera should be
+       * saying the same thing the crowd and the confetti are saying.
+       */
+      const fin0 = MR.game && MR.game.world && MR.game.world.finale;
+      const runIn = fin0 ? fin0.run : 0;
+      const glory = fin0 && fin0.record ? 1 : (fin0 ? fin0.chase * 0.45 : 0);
+      // Squared: nothing happens for the first half of the run-in, then the
+      // camera lets go. A linear fall-back starts drifting while the player is
+      // still running and reads as the game losing interest.
+      const runE = runIn * runIn;
+      if (p.z >= K.TOTAL_UNITS - 0.25) s.finish = Math.min(1, s.finish + d / 1.2);
       const fin = s.finish * s.finish * (3 - 2 * s.finish);
+      // Widen with the pull so the arch (13.5 wide, 14.7 tall) clears the frame
+      // edges rather than being cropped by them.
+      // Tuned by measuring the frame, not by feel. At the tape the camera is
+      // 8.2 units back with a 73-degree lens: half the frame width there is
+      // 3.5 units, so the tape (which spans 8.1) crosses the WHOLE frame at
+      // chest height and its two halves whip out past the edges when it goes,
+      // while the runner still stands 15% of the frame tall. Pulling far
+      // enough to see both posts needs fourteen units and puts the runner at
+      // 8% -- a diagram of a finish rather than a finish. The wide shot is
+      // worth having, so it arrives AFTER the break instead of instead of it.
+      const finFov = runE * 3.0 + fin * 3.0;
+      const finBack = (runE * 4.3 + fin * 3.2 * (1 + 0.25 * glory)) * s.fr.back;
+      const finUp = runE * 1.2 + fin * (2.4 + 1.0 * glory);
 
       // ---- decays ---------------------------------------------------------
       s.shake = Math.max(0, s.shake - d * 2.1);
@@ -311,7 +365,7 @@ MR.Camera = (function () {
         + s.mileT * 0.45
         + s.winded * 0.28
         + bobZ
-        + fin * 3.4;
+        + finBack;
 
       // The pace drop is halved from 0.41. Dropping toward the road is a good
       // speed cue, but it was spending the sightline computed above at exactly
@@ -330,9 +384,13 @@ MR.Camera = (function () {
         + s.mileT * 0.24
         + s.winded * 0.12
         + bobY + shY
-        + fin * 1.7;
+        + finUp;
 
-      cam.position.set(s.x + bobX + shX, hgt, p.z - back);
+      // The lateral drift at the tape: a slow swing off the centreline so the
+      // finish is seen from three-quarters and the stands on one side crowd
+      // the frame. Fixed direction rather than random -- the finish should look
+      // the same in every replay and every screenshot.
+      cam.position.set(s.x + bobX + shX + fin * (1.1 + 0.5 * glory), hgt, p.z - back);
 
       // ---- aim ------------------------------------------------------------
       // The look point follows the jump arc *more* than the camera does, so
@@ -343,10 +401,20 @@ MR.Camera = (function () {
       // -3.2, which between them pitched the camera down hard enough to throw
       // the far road out of frame for the length of the slide. They now do just
       // enough to acknowledge that the body went down.
+      // The aim point rises with the pull so the arch and the bunting are in
+      // the upper third rather than off the top, and it draws IN toward the
+      // runner at the tape -- the run-in is a wide shot of a place, the tape is
+      // a shot of a person arriving in it.
       look.set(
-        s.x * s.fr.lookX,
-        LOOK_Y + (p.y || 0) * 0.50 - duck * 0.30 - drive * 0.22 + fin * 0.55,
+        // At the tape the aim goes onto the runner himself rather than onto
+        // the damped follow point. The lateral drift below moves the CAMERA,
+        // and without this the whole finish -- arch, tape, backdrop -- slid to
+        // whichever frame edge the last lane change had left the follow on.
+        s.x * s.fr.lookX * (1 - fin) + (p.x || 0) * fin,
+        LOOK_Y + (p.y || 0) * 0.50 - duck * 0.30 - drive * 0.22
+          + runE * 1.1 + fin * 1.3,
         p.z + LOOK_AHEAD - duck * 0.90 + (p.y || 0) * 1.1 - drive * 0.5
+          - runE * 1.8 - fin * 5.0
       );
       cam.lookAt(look);
 
@@ -380,7 +448,7 @@ MR.Camera = (function () {
         + s.kick * 6
         - s.winded * 5.0
         - s.mileT * 1.5
-        - fin * 9.0;
+        + finFov;
       // Fast toward a wider frame, slower back: gaining speed should feel
       // immediate, losing it should feel like it is being taken away.
       const fovRate = targetFov > s.fov ? 0.02 : 0.12;

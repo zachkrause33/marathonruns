@@ -90,11 +90,24 @@
  *      why -- one item was not merely invisible but actively read as a hole in
  *      the vest, which is the failure mode worth remembering.
  *   8. Nothing on a rig where every part is bolted to a joint can arrive late,
- *      and everything real does. Two things here are not bolted to a joint:
- *      the hood, on a pair of underdamped springs, and the bib's hem, on a
- *      travelling wave with its own clock. They are the two largest pieces of
- *      cloth the back view sees, which is not a coincidence -- cloth is the
- *      only thing on a runner that is allowed to lag.
+ *      and everything real does. Five things here do not arrive with the
+ *      skeleton: the hood on a pair of underdamped springs, the bib's hem on a
+ *      travelling wave with its own clock, the head on a lag filter at the
+ *      neck, and both elbows on lag filters of their own. The first two are the
+ *      two largest pieces of cloth the back view sees, which is not a
+ *      coincidence -- cloth is the only thing on a runner that is ALLOWED to
+ *      lag freely. The other three are body, and they are held to a much
+ *      shorter lag for exactly that reason: see stage 2 below.
+ *
+ *      What is NOT here, and cannot be without changing the character: the
+ *      vest hem, the short cuffs and the cap peak. The owner's brief named all
+ *      four garments, and three of them are welded into meshes that also carry
+ *      the silhouette -- the hem into the torso, the cuffs into the thighs, the
+ *      peak into the head. Nothing can lag that is a vertex of the part it
+ *      would lag behind, and this is a motion pass, so no geometry was split to
+ *      create something to swing. The peak is a special case twice over: it is
+ *      measured at ZERO pixels from astern (see its own note), so a peak that
+ *      lagged perfectly would still show nothing.
  *
  * ANIMATION POLISH, STAGE 1 -- full-body motion, stride, arms, foot planting
  * and easing. Every term the pass added is scaled by MR.Runner.POLISH, a
@@ -107,8 +120,31 @@
  * cycle and was invisible to every measurement taken before the foot's rig-space
  * LOOP was plotted rather than its amplitudes.
  *
- * Stage 2 (secondary motion) and stage 3 (speed responsiveness) are NOT here.
- * The cadence curve and the spring integrator are untouched on purpose.
+ * ANIMATION POLISH, STAGE 2 -- secondary motion. Four things, all scaled by the
+ * same POLISH knob, and the finding that shaped all four is that the defect was
+ * PHASE and not amplitude. Stage 1 gave the trunk real motion; every part
+ * hanging off it still arrived on the same frame it did. Measured before this
+ * pass, the skull's lateral sweep correlates 0.996 with the trunk at lag
+ * 0.000, and so does the hood's -- the largest piece of cloth on the character
+ * was welded on every axis this camera can see, because both of its springs
+ * were driven by inputs that carry no lateral stride content at all.
+ *
+ *   - The head, on a lag filter at the neck. 13.1 degrees late.
+ *   - Both elbows, on lag filters. The mitt arrives 6.8 degrees late.
+ *   - The hood's lateral spring, given a stride drive so it does something
+ *     while the runner is going straight, which is all but the whole race.
+ *   - The hood's pitch spring, fed the collar's REAL vertical (the bob plus
+ *     stage 1's trunk compression) instead of the bob alone.
+ *
+ * The split those four run on is worth stating once: BODY gets lag filters --
+ * chase the posed value, add the error, which is zero at any held pose, so no
+ * silhouette and no held pose moves at all. CLOTH gets driven soft springs,
+ * which is what lets the hood arrive 140 degrees behind its own drive without
+ * that reading as rubber. Applying the cloth treatment to a limb is exactly the
+ * floppy failure the brief forbids, and it is one constant away in each case.
+ *
+ * Stage 3 (speed responsiveness) is NOT here. The cadence curve and sp01 are
+ * untouched on purpose.
  *
  * Pivot layout (all rotations are local X unless noted):
  *   root -> body -> hips -> thigh -> shin -> foot
@@ -1240,6 +1276,16 @@ MR.Runner = (function () {
     // clock for the bib; see the block at the end of update() for why they are
     // integrated rather than driven straight off the stride phase.
     let hoodA = 0, hoodV = 0, hoodZ = 0, hoodZV = 0, lastBob = 0, bibT = 0;
+    // STAGE 2. Three more filters: one per elbow, and one for the head.
+    //
+    // Seeded lazily rather than at zero. A filter that starts at 0 against an
+    // elbow resting at -1.32 spends its first 90 ms hauling itself out of a
+    // pose the character never holds, and that transient is not merely ugly on
+    // frame one -- tools/stride.js starts its sweep from whatever state it
+    // finds, so the transient lands inside the min/max box and shows up as
+    // travel the cycle does not have. `null` means "not yet running"; the first
+    // frame plants each filter on its own drive.
+    let elbF = [null, null], elbV = [0, 0], headRF = null, headRV = 0;
 
     // ---- head -----------------------------------------------------------
     // The neck pivot sits at the top of the trunk so head tilt rotates from
@@ -2179,6 +2225,11 @@ MR.Runner = (function () {
       // residual 8% is only there to keep the pose from looking frozen.
       const cycD = cycA * (1 - slid * 0.92);
 
+      // The integrator step for every spring in this file, hoisted here because
+      // stage 2 puts springs in the arm loop as well as in the secondary block
+      // at the bottom. See that block for why it is clamped and not raw dt.
+      const hdt = Math.min(dt, 1 / 50);
+
       // ---- legs: contralateral swing with a knee tuck on the recovery leg
       //
       // THE KNEE RUNS ON ITS OWN PHASE, AND THAT IS THE LARGEST SINGLE THING IN
@@ -2520,8 +2571,45 @@ MR.Runner = (function () {
         // and opens as it goes away. 0.46 -> 0.64 is on the axis the ceiling
         // does not apply to, because the hand is climbing in FRONT of the chest
         // where nothing on this character can hide it.
-        A.elbow.rotation.x =
+        const elbowPosed =
           (-1.32 - fwd * (0.46 + POLISH * 0.18) - back * 0.18) * (1 - spread * 0.95) * (1 - slid * 0.86) - slid * 0.10;
+        // ...and the mitt arrives after the elbow does. STAGE 2.
+        //
+        // This is a LAG FILTER, not a driven spring, and the difference is the
+        // whole of why it does not read as a noodle. The spring chases the
+        // posed angle, and what is added is the ERROR -- so at any held pose,
+        // airborne or sliding or standing, the error is zero and the arm is
+        // exactly where the pose says. Nothing static moves; only the arrival
+        // does. That is also why the jump's spread silhouette comes through it
+        // unchanged to four places rather than approximately.
+        //
+        // 55 rad/s and zeta 0.60 (k = 3025, c = 2*0.60*55 = 66). The natural
+        // frequency has to sit WELL ABOVE the drive or the term stops being a
+        // lag and becomes a cancellation -- at cadence 2.8 Hz the ratio is
+        // 0.32, which is the whole reason the constant is where it is. Take it
+        // below the drive instead and the filter stops following at all, what
+        // is left is (F - posed) = -posed, and the arm ends up swinging
+        // OPPOSITE its own shoulder. That is the rubber-limb failure the brief
+        // forbids, and it is one constant away in the soft direction.
+        //
+        // Measured on the cycle rather than predicted from the constants: the
+        // elbow angle comes out at 1.010x its old amplitude and 16.4 degrees
+        // late, 16 ms of a 355 ms stride. What that buys on the axis the camera
+        // can see is the MITT arriving 6.8 degrees (6.7 ms) late with 98.7% of
+        // its old vertical range -- late, and no bigger.
+        //
+        // On a TRANSIENT -- a whole jump arc, takeoff through landing -- the
+        // follow-through peaks at 0.0774 rad, 4.4 degrees, so the forearm whips
+        // out behind the upper arm and checks. Well inside the clamp. On the
+        // 7 fps harness the same arc saturates the clamp at 0.22 exactly,
+        // because a frame there is 143 ms and the pose has moved most of its
+        // range before the filter has integrated 20 ms of it. That is what the
+        // clamp is for and it is the reason there is one.
+        if (elbF[i] === null) elbF[i] = elbowPosed;
+        elbV[i] += ((elbowPosed - elbF[i]) * 3025 - elbV[i] * 66) * hdt;
+        elbF[i] += elbV[i] * hdt;
+        A.elbow.rotation.x = elbowPosed
+          + POLISH * Math.max(-0.22, Math.min(0.22, elbF[i] - elbowPosed));
       }
 
       // ---- torso: forward lean, vertical bob, and a lateral bank on turns
@@ -2680,6 +2768,21 @@ MR.Runner = (function () {
       head.position.y = -slid * NECK_SLIDE_RETRACT;
       head.scale.setScalar(1 - slid * NECK_SLIDE_SQUASH);
 
+      // Whole-body bank into a lane change reads as weight, not a slide.
+      // The slide adds its own, tipping onto the hip it is riding on: a body
+      // that goes in yawed but stays perfectly level reads as a swivel chair.
+      //
+      // Moved ABOVE the secondary-motion block by stage 2, and it is a pure
+      // reordering: nothing between here and where it used to sit reads
+      // root.rotation, so no value changes. It has to be set before the head's
+      // filter runs, because this bank is part of the roll the head inherits
+      // and a filter fed last frame's copy of its own input is 143 ms stale on
+      // the 7fps harness.
+      root.rotation.z = -lean * 0.13 - knock * 0.16 - slid * 0.12;
+      // Go in at an angle. See SLIDE_YAW -- this is the term that gives the
+      // back view something lateral to measure.
+      root.rotation.y = slid * SLIDE_YAW;
+
       // ---- secondary motion ------------------------------------------------
       //
       // Everything above this line is welded to a bone, so every part of the
@@ -2703,12 +2806,25 @@ MR.Runner = (function () {
       // constants behave at both, at the cost of the hood settling in real
       // seconds rather than in frames -- which is the right way round, since
       // nothing reads its value.
-      const hdt = Math.min(dt, 1 / 50);
+      // (`hdt` is hoisted to the top of update() now that the arm loop springs
+      // on it too; the reasoning above is why it is clamped.)
+      //
+      // What the hood is bolted to is the COLLAR, and the collar is not the
+      // bob. Stage 1 gave the trunk its own compression -- the whole girdle
+      // drops toward the pelvis as the weight lands and rises through the
+      // drive -- and the hood was still being driven by `bob` alone, i.e. by
+      // the half of the collar's motion that existed before that pass. Feeding
+      // it the sum is stage 2's cheapest item and its most literal reading of
+      // the brief: there is now real motion for things to lag behind, and this
+      // thing was not being shown it. At POLISH 0 `spine.position.y` is
+      // identically zero and the sum is bit-for-bit `bob`, so the A/B is
+      // undisturbed.
+      const collarY = bob + spine.position.y;
       // The divided difference is clamped before it is used: one long frame
       // after an alt-tab hands this a spike no spring should be asked to
       // follow, and the clamp is cheaper than filtering it.
-      const bobV = dt > 1e-4 ? Math.max(-1.6, Math.min(1.6, (bob - lastBob) / dt)) : 0;
-      lastBob = bob;
+      const bobV = dt > 1e-4 ? Math.max(-1.6, Math.min(1.6, (collarY - lastBob) / dt)) : 0;
+      lastBob = collarY;
       // Body drops, hood swings up the back; jump throws it up; slide presses
       // it flat. The positive clamp is tighter than the negative one because
       // up is toward the head: at +0.30 the roll's far edge rises to 0.167 in
@@ -2720,10 +2836,133 @@ MR.Runner = (function () {
       hoodPivot.rotation.x = Math.max(-0.50, Math.min(0.30, hoodA));
       // ...and a second spring across the lane, so a lane change throws the
       // hood sideways and it swings back a beat after the body has settled.
-      const hoodZRest = -lean * 0.30 - knock * 0.30;
+      //
+      // STAGE 2 gives that spring something to do while the runner is going
+      // STRAIGHT, which is where it spends almost the whole race. Measured on
+      // the shipped cycle: the hood's own lateral travel correlates 0.996 with
+      // the trunk it hangs off at exactly zero lag -- the largest piece of
+      // cloth on the character was welded on every axis the back view can see,
+      // because both of its springs were driven by inputs (`bob`, `lean`) that
+      // carry no lateral stride content at all.
+      //
+      // The drive is the stride's own sideways throw. It is not a roll: the
+      // trunk's two roll terms very nearly cancel above the chest (hips +0.085,
+      // chest -0.083). What actually swings the upper body sideways is the
+      // PELVIS YAW acting on a trunk the forward lean has already tipped out
+      // of the yaw axis, which is why the head measures 0.167 of lateral travel
+      // -- the largest figure on the rig -- with nothing rolling it.
+      //
+      // Left as a DRIVEN spring rather than a lag filter, and that is the split
+      // this file now runs on: limbs and the head get lag filters (chase the
+      // pose, add the error, zero at any held pose), cloth gets a driven soft
+      // spring. At 9.8 rad/s against a 2.8 Hz stride the hood cannot follow --
+      // ratio 1.8 -- and it comes back measured at 140 degrees behind its own
+      // drive. On a limb that would be the rubber failure. On a hood it is the
+      // point: it arrives visibly off the beat, and because the pitch spring
+      // runs at TWICE cadence (the bob does two per stride) the two together
+      // trace a small figure-eight instead of a line.
+      //
+      // 0.20 of drive measures 0.081 rad of roll amplitude on the ring, 0.163
+      // peak to peak, moving its ends about 0.015 -- two pixels at gameplay
+      // framing. That is the size this is allowed to be: the hood sits in the
+      // head/shoulder pinch the whole silhouette is built on (header rule 1),
+      // and anything that reads as a swinging object there is reading as a
+      // wider neck.
+      const hoodZRest = -lean * 0.30 - knock * 0.30 - POLISH * 0.20 * sP * cycD;
       hoodZV += ((hoodZRest - hoodZ) * 96 - hoodZV * 8.8) * hdt;
       hoodZ += hoodZV * hdt;
       hoodPivot.rotation.z = Math.max(-0.42, Math.min(0.42, hoodZ));
+
+      // ---- the head settles -------------------------------------------------
+      // STAGE 2, and the item the owner named first.
+      //
+      // The starting measurement contradicts the brief that asked for it, so it
+      // is worth writing down. The head is NOT the least-travelled thing on
+      // this rig: it moves 0.167 laterally across a stride, which is more than
+      // the foot (0.115) and two and a half times the chest (0.066), and it is
+      // the largest lateral figure the rig produces. The 0.033 that made it
+      // look weak is its FORE-AND-AFT travel, and fore and aft is the axis this
+      // camera cannot see. So the head does not need more amplitude. It needs
+      // the amplitude it already has to stop arriving on the same frame as the
+      // shoulders: cross-correlated against the trunk, the skull comes back at
+      // r = 0.996 and lag 0.000. It is welded, and that is the whole defect.
+      //
+      // A LAG FILTER, like the elbows and unlike the hood. The filter chases
+      // the roll the head inherits and the neck is given the ERROR, so the head
+      // ends up wearing the FILTERED trunk instead of the live one. At a held
+      // pose the error is zero, so nothing static moves -- no silhouette, no
+      // crown height, no contract with collision.js.
+      //
+      // 40 rad/s, zeta 0.55 (k = 1600, c = 44). Softer than the elbow on
+      // purpose: a head is heavier relative to what carries it than a forearm
+      // is, so it should arrive later, and the measured 13.1 degrees against
+      // the elbow's 16.4 on its own angle is that difference stated. Measured
+      // on the skull rather than on the joint: the lateral sweep arrives 13.1
+      // degrees (12.9 ms) late at 1.00x its old amplitude, and total lateral
+      // travel goes 0.1673 -> 0.1774.
+      //
+      // ON A LANE CHANGE, and this is the one place the predicted behaviour was
+      // wrong and the measurement corrected it. The filter's step response
+      // overshoots 12.6% on paper. It does not overshoot in the game, because
+      // player.js ramps `lean` through its own first-order filter at tau = 0.14
+      // s, which is SLOWER than this one -- so what a lane change actually
+      // shows is lag and no overshoot at all. Measured at 60 fps against the
+      // same phase sequence with no lean: the head has taken up 30% of the
+      // bank's neck roll on the first frame where the bare pose takes 11%, it
+      // never goes past the settled value, and it is inside 5% of it by 0.37 s.
+      // Overshoot appears only when the input steps faster than the filter can
+      // follow, which on the 7 fps harness saturates the 0.11 clamp and lands
+      // 34.5% past settled for one frame. Both finite; 60 s of sign-flipping
+      // lean, bounce and air at the clamped step stays pinned at the clamps and
+      // never winds up.
+      //
+      // WHY THE VERTICAL AXIS IS NOT DONE, having been tried. The head's bob
+      // runs at TWICE cadence, 5.6 Hz or 35 rad/s, and the integrator's step is
+      // clamped at 1/50 s, which puts a hard ceiling near 100 rad/s on any
+      // spring in this file. A filter that must sit well above 35 to LAG rather
+      // than CANCEL has no room left under that ceiling: every tuning tried
+      // came back with the filtered value near zero, i.e. a head that stops
+      // bobbing. A head that stops bobbing is not secondary motion, it is less
+      // motion, and it is one step from a bobblehead. The roll works precisely
+      // because it runs at ONE per stride and there is an octave of room.
+      //
+      // The stride term is the part that is not inherited. See the hood note:
+      // almost none of the head's sideways swing comes from anything rolling,
+      // so a filter fed only the trunk's roll terms would have had nothing to
+      // chase while the runner was going straight.
+      //
+      // 0.110, and where the line is was found by looking rather than by
+      // measuring, because "floppy" is not a quantity. Three builds, rendered
+      // as head-and-shoulders sheets at about four times the size the game
+      // ships the character at:
+      //
+      //   0.070  neck roll 0.094 rad p2p (5.4 deg), skull 8.4 deg late.
+      //          Reads. Conservative.
+      //   0.110  neck roll 0.147 rad p2p (8.4 deg), skull 13.1 deg late.
+      //          The cap band's tilt is unmistakable frame to frame and the
+      //          neck still reads as carrying the head. TAKEN.
+      //   0.180  neck roll 0.220 rad p2p (12.6 deg), skull 20.6 deg late.
+      //          The skull visibly overhangs the neck column at the extremes.
+      //          This is where it stops being a runner's head rolling with the
+      //          stride and starts being a head rocking ON something. Refused.
+      //
+      // The sign was also found rather than reasoned, and the first one was
+      // wrong: with the term negative the skull's lateral sweep came back 7.7
+      // degrees EARLY, which is a head that anticipates its own shoulders.
+      // Nothing about the arithmetic says which way that goes -- it depends on
+      // the phase the filter lands at against a drive it is chasing -- so it is
+      // measured, and the measurement is the only reason to believe it.
+      const headRoll = hips.rotation.z + spine.rotation.z + chest.rotation.z
+        + root.rotation.z + 0.110 * sP * cycD;
+      if (headRF === null) headRF = headRoll;
+      headRV += ((headRoll - headRF) * 1600 - headRV * 44) * hdt;
+      headRF += headRV * hdt;
+      // Damped out of the slide entirely. The slide's crown is the trunk and
+      // the leading shoe with the head 0.02 under them (see NECK_SLIDE_X), and
+      // 0.04 of roll on a 0.29 headband is enough to put the head back on top
+      // of a pose whose whole argument is that it is not.
+      neck.rotation.z += POLISH * (1 - slid)
+        * Math.max(-0.11, Math.min(0.11, headRF - headRoll));
 
       // The bib's hem. The reference's runner has a printed graphic that is
       // dead still and CLOTH around it that is not, and that contrast is most
@@ -2769,14 +3008,6 @@ MR.Runner = (function () {
         bp[i * 3 + 1] = bibRest[i * 3 + 1] + lift * 0.70;
       }
       bibPos.needsUpdate = true;
-
-      // Whole-body bank into a lane change reads as weight, not a slide.
-      // The slide adds its own, tipping onto the hip it is riding on: a body
-      // that goes in yawed but stays perfectly level reads as a swivel chair.
-      root.rotation.z = -lean * 0.13 - knock * 0.16 - slid * 0.12;
-      // Go in at an angle. See SLIDE_YAW -- this is the term that gives the
-      // back view something lateral to measure.
-      root.rotation.y = slid * SLIDE_YAW;
 
       // Ducking drops the whole body rather than only folding the spine, so
       // the collision capsule and the silhouette agree. The 0.42 matches

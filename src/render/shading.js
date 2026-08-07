@@ -629,9 +629,24 @@ MR.shading = (function () {
       // Cel steps, blended part-way and antialiased with fwidth: a bare
       // floor() aliases into a staircase wherever the band edge is not exactly
       // horizontal.
-      float b = t * 6.0;
+      //
+      // SIX steps became FOUR when t was re-ranged above, and the two changes
+      // have to be read together. The count is over the whole 0..1 range while
+      // the art direction at the top of this file is about how many bands are
+      // IN FRAME: at the old ramp the visible sky spanned t 0.06 to 0.68 and
+      // showed about four of the six, and re-ranging t to reach 1.0 inside the
+      // frame would have shown all six. Four keeps the frame looking the way it
+      // was tuned to look.
+      //
+      // It was ALSO tried as a fix for far-band edge density and is not one:
+      // six steps at the new ramp measured 36.9% on 02-early and four measured
+      // 37.1%, i.e. no effect. The small far-band edge rise this pass does
+      // carry comes from the sky simply having more contrast in it, not from
+      // the number of band edges. Recorded here because the first draft of this
+      // comment claimed the opposite.
+      float b = t * 4.0;
       float aa = fwidth(b) * 0.6 + 0.002;
-      float stepped = (floor(b) + smoothstep(0.5 - aa, 0.5 + aa, fract(b))) / 6.0;
+      float stepped = (floor(b) + smoothstep(0.5 - aa, 0.5 + aa, fract(b))) / 4.0;
       vec3 col = mix(bottom, top, mix(t, stepped, 0.85));
 
       // Sun: broad bloom, two quantised corona steps, hard disc -- a poster

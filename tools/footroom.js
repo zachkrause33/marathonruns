@@ -300,7 +300,7 @@ function pageSetup() {
 
   F.cadence = function () {
     const SPEED_LO = (MR.K.UNITS_PER_MILE * MR.K.TIME_SCALE) / MR.K.START_PACE;
-    return 2.55 * Math.pow(g.pace.speed / SPEED_LO, 0.72);
+    return 2.55 * Math.pow(g.pace.speed() / SPEED_LO, 0.72);
   };
 
   return { counts: F.counts, rect: { top: F.rect.top, height: F.rect.height } };
@@ -340,7 +340,7 @@ function pageSweep(opt) {
     }
     const fv = g.cam.camera.fov;
     if (fv < fovLo) fovLo = fv; if (fv > fovHi) fovHi = fv;
-    const sp = g.pace.speed;
+    const sp = g.pace.speed();
     if (sp < speedLo) speedLo = sp; if (sp > speedHi) speedHi = sp;
   };
 
@@ -440,7 +440,24 @@ function pageSweep(opt) {
       // step after it is a no-op. The sweep then returns the SAME frame for
       // every state, which is exactly what it did: four different states, one
       // byte-identical row.
-      await page.waitForFunction(() => window.__fr && window.__fr.pump, { timeout: 15000 });
+      // POLL ON A TIMER, NOT ON A FRAME.
+      //
+      // `page.waitForFunction` polls via requestAnimationFrame by default, in
+      // the main world -- the same requestAnimationFrame this harness has just
+      // replaced. So the poller's own callback goes into `pump`, is never
+      // called again, and the wait deadlocks until it times out. It looks
+      // exactly like "the game stopped rendering" and it is not.
+      //
+      // (Two smaller traps in the same call: waitForFunction(fn, arg, options)
+      // takes options THIRD, so passing {timeout} second silently restores the
+      // 30s default; and returning the captured callback hands Playwright an
+      // unserialisable function, which is never truthy however long you wait.)
+      let handed = false;
+      for (let i = 0; i < 60 && !handed; i++) {
+        handed = await page.evaluate(() => !!(window.__fr && window.__fr.pump));
+        if (!handed) await page.waitForTimeout(100);
+      }
+      if (!handed) { problems.push(`${vp.name} ${pc.name}: the game loop never handed over a frame`); failed = true; await ctx.close(); continue; }
       const setup = await page.evaluate(pageSetup);
 
       for (const st of STATES) {

@@ -5207,14 +5207,14 @@ MR.World = (function () {
         bodyW: 2.20, d: 1.18, z: 0,
         skirtTop: 0.68, skirtBot: 0.13, spring: 0.17,
         wheelX: 0.88, wheelR: 0.36, wheelW: 0.32,
-        skirt: BUS_CREASE, under: 0x081a16, tyre: TYRE,
+        skirt: BUS_CREASE, under: BUS_DARK, tyre: TYRE,
       });
       vBumper(parts, 2.14, 0.36, 0.86, -0.65, BUS_DARK, 0.62);
       vLamps(parts, 0.96, 0.86, -0.65, 0.16);
       parts.push(
         hbx(2.20, 0.39, 1.26, 0, 1.235, 0, BUS_BODY),      // lower body 1.04-1.43
-        hbx(2.24, 0.07, 1.28, 0, 1.465, 0, BUS_CREASE),    // shoulder crease 1.43-1.50
-        hbx(2.26, 0.10, 1.28, 0, 1.55, 0, CHROME)           // livery band 1.50-1.60
+        hbx(2.24, 0.05, 1.28, 0, 1.455, 0, BUS_CREASE),    // shoulder crease 1.43-1.48
+        hbx(2.26, 0.12, 1.28, 0, 1.54, 0, CHROME)           // livery band 1.48-1.60
       );
       vGlass(parts, 1.96, 0.96, 1.30, 0, 2.08, 0);
       for (const sx of [-1, 1]) parts.push(hbx(0.14, 0.96, 1.26, sx * 1.03, 2.08, 0, BUS_BODY));
@@ -5266,7 +5266,7 @@ MR.World = (function () {
         bodyW: 2.18, d: 1.10, z: -0.02,
         skirtTop: 0.56, skirtBot: 0.10, spring: 0.14,
         wheelX: 0.90, wheelR: 0.30, wheelW: 0.28, archPad: 0.08,
-        skirt: TAXI_CREASE, under: 0x14100a, tyre: TYRE_WARM,
+        skirt: TAXI_CREASE, under: TAXI_DARK, tyre: TYRE_WARM,
       });
       vBumper(parts, 2.12, 0.24, 0.68, -0.65, TAXI_DARK, 0.56);   // 0.56-0.80
       vLamps(parts, 0.96, 0.68, -0.65, 0.145);
@@ -5336,7 +5336,7 @@ MR.World = (function () {
         bodyW: 2.22, d: 1.08, z: -0.06,
         skirtTop: 0.62, skirtBot: 0.14, spring: 0.16,
         wheelX: 0.92, wheelR: 0.33, wheelW: 0.30,
-        skirt: VAN_CREASE, under: 0x1c1204, tyre: TYRE_WARM,
+        skirt: VAN_CREASE, under: VAN_DARK, tyre: TYRE_WARM,
       });
       vBumper(parts, 2.12, 0.32, 0.78, -0.65, VAN_DARK, 0.60);
       vLamps(parts, 0.96, 0.78, -0.65, 0.15);
@@ -5404,7 +5404,7 @@ MR.World = (function () {
         bodyW: 2.24, d: 1.06, z: 0,
         skirtTop: 0.62, skirtBot: 0.16, spring: 0.16,
         wheelX: 0.90, wheelR: 0.33, wheelW: 0.26, archPad: 0.04, dual: true,
-        skirt: BIN_CREASE, under: 0x121a04, tyre: TYRE_WARM,
+        skirt: BIN_CREASE, under: BIN_DARK, tyre: TYRE_WARM,
       });
       vBumper(parts, 2.12, 0.30, 0.77, -0.65, BIN_DARK, 0.58);
       vLamps(parts, 0.96, 0.77, -0.65, 0.15);

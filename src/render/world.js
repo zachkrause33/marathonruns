@@ -5582,8 +5582,10 @@ MR.World = (function () {
         const y = i * 32 + 6;
         g.beginPath(); g.moveTo(2, y + 13); g.lineTo(32, y); g.lineTo(62, y + 13); g.stroke();
       }
+      // Kept narrow so the pace lights, which run just inboard of it, have
+      // dark carpet to sit on rather than a white band to disappear into.
       g.fillStyle = 'rgba(255,255,255,0.70)';
-      g.fillRect(0, 0, 5, 128); g.fillRect(59, 0, 5, 128);
+      g.fillRect(0, 0, 3, 128); g.fillRect(61, 0, 3, 128);
       return texture(c, true);
     })();
     const stripTex = (function () {
@@ -5640,10 +5642,19 @@ MR.World = (function () {
       carpet.renderOrder = 1;      // under the racing line (3) and the mats (5)
       g.add(carpet);
 
+      // OFF THE TARMAC ALTOGETHER, on the pavement between the kerb (3.92) and
+      // the barrier (4.60). A first pass ran them inside the carriageway at
+      // 3.15 and it was wrong twice over: they landed on top of the road's own
+      // yellow edge line and were indistinguishable from it, and course.js has
+      // just filled this stretch with the hardest gates in the race, so a
+      // bright moving line at the edge of the play surface is competing with
+      // the one read the whole game is decided by. Out here it is trackside
+      // lighting -- which is what a Wavelight is -- and it cannot be mistaken
+      // for anything painted on the road.
       for (const sx of [-1, 1]) {
-        const st = new THREE.Mesh(new THREE.PlaneGeometry(0.26, TILE), stripMat);
+        const st = new THREE.Mesh(new THREE.PlaneGeometry(0.34, TILE), stripMat);
         st.rotation.x = -Math.PI / 2;
-        st.position.set(sx * (K.TRACK_HALF_WIDTH - 0.22), 0.020, 0);
+        st.position.set(sx * 4.28, 0.012, 0);
         st.renderOrder = 2;
         g.add(st);
       }
@@ -6432,12 +6443,20 @@ MR.World = (function () {
         // weighted(); a building standing in the middle of the river is the
         // kind of thing nobody notices until a screenshot.
         if (kind && !look.mix[kind]) kind = null;
-        // Nothing roadside inside the chute. The lottery's knots stand at
-        // TRACK_HALF_WIDTH + 1.9 to + 5.3, which is now INSIDE the finish
-        // stand: nine spectators buried in a grandstand, at 1,700 triangles a
-        // knot. The chute's crowd is the stand's, and it is a better crowd.
+        // THE LAST MILE'S CROWD IS THE GRANDSTAND'S, and the lottery's knots
+        // are buried in it. A knot stands at TRACK_HALF_WIDTH + 1.9 to + 5.3,
+        // i.e. x = 5.65 to 9.05; the stands that run this whole leg occupy
+        // 5.40 outward. Every one of those nine-figure knots -- 1,680
+        // triangles each, and FINAL MILE draws them at the highest weight in
+        // the race -- is inside a grandstand where the player cannot see it.
+        // Measured at mile 25: 10,080 triangles of crowd nobody has ever seen.
+        //
+        // Inside the chute nothing roadside spawns at all, for the same reason
+        // taken further: the finish stand is deeper still.
+        //
         // The rng stream is untouched -- the draw is still made and thrown
         // away -- so every other prop in the race lands exactly where it did.
+        if (kind === 'crowd' && z > BI[BI.length - 1].from) kind = null;
         if (z > FINISH_Z - CHUTE) kind = null;
         const set = settingIndexAt(Math.max(0, z), rnd.next());
         if (kind) {
@@ -7044,7 +7063,7 @@ MR.World = (function () {
         // a projection taken a quarter of a second earlier.
         readVerdict(z);
         confetti.fire(finale.record ? 1 : finale.chase,
-          finale.record ? 1 : 0.20 + 0.55 * finale.chase);
+          finale.record ? 1 : 0.32 + 0.50 * finale.chase);
         const A = MR.game && MR.game.audio;
         if (A && A.roar) A.roar(finale.record ? 1 : 0.55 + 0.35 * finale.chase);
       }
@@ -7054,12 +7073,19 @@ MR.World = (function () {
       // calm so the last three seconds have somewhere to go -- a ramp that
       // starts rising immediately arrives at the tape with nothing left.
       const ramp = Math.pow(t, 1.7);
-      const earned = 0.34 + 0.34 * finale.chase + 0.32 * (finale.record ? 1 : 0);
+      // THE FLOOR IS HIGH ON PURPOSE. Most runs are not record runs and most
+      // runs are not one rung away either -- a first pass gave the base case
+      // 0.34 and the last mile of an ordinary race had a crowd that barely
+      // moved, which is the fault this whole feature exists to fix. Finishing
+      // is the accomplishment; the verdict is worth a quarter of the noise
+      // each way, not all of it.
+      const earned = 0.52 + 0.24 * finale.chase + 0.24 * (finale.record ? 1 : 0);
       let target = ramp * earned;
       if (past) {
         // The tape. Everyone gets a roar; the record gets the roof off.
         const since = now - finale.broke;
-        target = (finale.record ? 1.0 : 0.78) * (1 - Math.min(0.35, since * 0.045));
+        target = (finale.record ? 1.0 : 0.72 + 0.2 * finale.chase)
+          * (1 - Math.min(0.35, since * 0.045));
       }
       // Rise fast, fall slow: a crowd finds its voice quicker than it loses it.
       const rate = target > finale.hot ? 2.6 : 0.7;

@@ -111,6 +111,60 @@ MR.Ghost = (function () {
   const HAZE = 190;
   const HEAD_Y = MR.Runner.HEIGHT + 0.16;
 
+  // ---- the one band the tag may not enter ---------------------------------
+  //
+  // The tag is an instrument and stays one: depthTest off, renderOrder 900, no
+  // fog, in front of the scene unconditionally. What it may not do is paint
+  // over a HAZARD. This game is lost by hitting one thing, and a hazard the
+  // player could not see is the game taking a streak for something outside
+  // their control -- so an object that cannot be occluded had better not be
+  // sitting on the objects the player has to read. The label about the record
+  // was the one thing in the game exempt from that rule by construction, and
+  // it was exempt from the assertions too: it is not in the world group, so
+  // crossings() never returned it and neither LOW, HIDES nor BLANKS had ever
+  // looked at it.
+  //
+  // The FAR case was already handled -- see the lift term in update(), which
+  // pushes the plate into the sky as the ghost recedes. The NEAR case was not,
+  // and it is the worse of the two, for a reason worth writing down because it
+  // is the opposite of what it looks like.
+  //
+  // At lift 0.5 the plate's bottom edge sits exactly on the ghost's head, at
+  // HEAD_Y = 1.76 -- 1.04 BELOW the 2.80 top of a BLOCK. A point under the eye,
+  // seen FROM the eye, projects onto road far beyond it: the sightline through
+  // the bottom edge at depth D meets the road at D * eye / (eye - HEAD_Y), i.e.
+  // 2.3 D. And there is no far edge to the band, because the plate's TOP is at
+  // HEAD_Y + D * TAG_SIZE, which passes the eye's 3.10 once D is past about 16
+  // units -- beyond that the upper half of the plate is aimed above the horizon
+  // and its sightline never comes down at all.
+  //
+  // So the plate riding a ghost 16 units off does not cover the road near it.
+  // It covers everything from 37 units to the horizon, which is the entire read
+  // window and nothing the player has already answered. Measured at two-frame
+  // resolution through miles 18-21 that is exactly what it did: whole gate
+  // lines at 44 and 70 units painted out, all three lanes at once, and the same
+  // gate 100% covered at 96 units AND STILL at 45, coming clear only at 17 --
+  // inside the commit point, with the lane already chosen.
+  //
+  // The floor below is derived, not chosen: the plate's BOTTOM EDGE must ride
+  // above the sightline that grazes the top of a BLOCK standing at the far end
+  // of the read window. Every term already exists. Collision.BOX[BLOCK].yMax is
+  // the envelope the game is actually played on -- not the art, which reaches
+  // 3.09 on the hoarding. Elevation.SIGHT_MIN is the distance the terrain proof
+  // keeps the road visible for, and it is the same far end shoot.js measures
+  // against. Nothing nearer can project higher: a hazard top is BELOW eye
+  // height (2.80 against CAM_BASE_Y 3.10, a margin R2 bought when it raised the
+  // camera from 2.62 -- before that this was not solvable at all), so its
+  // screen row climbs toward the horizon with distance and never arrives.
+  //
+  // Two points at different depths share a screen row when their heights above
+  // the eye divide by their depths to the same number: the camera has no roll,
+  // so pitch is a monotone map on that ratio and cancels. That is the whole of
+  // the arithmetic in clearLift(), and it is a design rule rather than a proof
+  // -- shoot.js re-measures the result through the real projection on every
+  // run, which is what makes the number arguable.
+  const SIGHT = MR.Elevation.SIGHT_MIN;
+
   // ---- how it looks -----------------------------------------------------
 
   // Periwinkle: cool, mid-value, and the one hue the game does not already
@@ -385,6 +439,33 @@ MR.Ghost = (function () {
       z: 0,
     };
 
+    /**
+     * The smallest lift that keeps the plate's bottom edge out of the band the
+     * hazards live in. See the note beside SIGHT above for where it comes from.
+     *
+     * collision.js loads AFTER this file, so BOX is read here at call time
+     * rather than at module time. It is read every frame rather than cached
+     * because the contract says the envelope does not change, and a cached copy
+     * of a constant somebody else owns is how four of the corrections in
+     * docs/roadmap.md started.
+     *
+     * @param cam    the live camera
+     * @param tz     world z the plate is being placed at
+     * @param depth  tz - camera z, already floored at 4
+     * @param pulse  the crossover swell, which scales the plate and its offset
+     */
+    function clearLift(cam, tz, depth, pulse) {
+      const eye = cam.position.y;
+      // The top of a BLOCK at the far end of the read window, standing on the
+      // road it would really be standing on rather than at y = 0.
+      const top = elevAt(cam.position.z + SIGHT) + MR.Collision.BOX[K.BLOCK].yMax;
+      // ...brought back along that sightline to the plate's own depth.
+      const need = eye + (top - eye) * depth / SIGHT;
+      // lift is measured from the head in units of the plate's own height, so
+      // bottom edge = HEAD_Y + depth * TAG_SIZE * pulse * (lift - 0.5). Solve.
+      return 0.5 + (need - elevAt(tz) - HEAD_Y) / (depth * TAG_SIZE * pulse);
+    }
+
     const _v = new THREE.Vector3();  // hoisted: this runs 60x a second
     const _r = new THREE.Vector3();
     const _u = new THREE.Vector3();
@@ -510,7 +591,18 @@ MR.Ghost = (function () {
         // speck. Down at the vanishing point every gate in the next hundred
         // units is stacked into fifteen pixels of road, and a label the player
         // cannot act on has no business sitting on top of them.
-        const lift = 0.5 + 1.15 * smoothstep(55, HAZE, gap);
+        //
+        // THAT ARGUMENT WAS RIGHT AND IT WAS ONLY EVER APPLIED TO ONE END OF
+        // THE RANGE. A label the player cannot act on has no business on top of
+        // a gate at ANY distance, and at arm's length "on its head" put the
+        // plate squarely across the road forty units further down -- see the
+        // note beside SIGHT. So the ramp keeps the far behaviour it was written
+        // for and the floor takes over near, where it was missing. Measured on
+        // the built page across the whole race, the two cross at a gap of about
+        // 85 units: at 80.7 the plate moves 0.002 of NDC, at 93.5 it does not
+        // move at all, so past the haze this line is exactly what it was.
+        const lift = Math.max(0.5 + 1.15 * smoothstep(55, HAZE, gap),
+                              clearLift(cam, tz, depth, pulse));
         tagWorld.scale.set(TAG_SIZE * TAG_ASPECT * pulse, TAG_SIZE * pulse, 1);
         tagWorld.position.set(s.x, elevAt(tz) + HEAD_Y + depth * TAG_SIZE * pulse * lift, tz);
       }

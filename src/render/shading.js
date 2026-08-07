@@ -615,9 +615,16 @@ MR.shading = (function () {
       // was the pale bottom stop plus a bit. The pale bottom is correct and
       // stays: world.js pairs it with the biome fog (sky[1] 0xc6e8ff against
       // fog 0xcfe6f2) so the horizon meets the fogged ground. What was wrong is
-      // that the sky never left it. 2.55 reaches t = 1.0 at the top of the
-      // frame and doubles t at every elevation below it.
-      float t = clamp(sy * 2.55 + 0.07, 0.0, 1.0);
+      // that the sky never left it. 3.20 reaches t = 1.0 at 13 degrees, so the
+      // top third of the visible band is the palette's own deep stop and
+      // everything below it climbs twice as fast as before.
+      //
+      // Swept against the six shipped biome sky/fog pairs: 2.55 gives a mean
+      // visible-sky saturation of 0.232 and 4.00 gives 0.260, but 4.00 flattens
+      // the top 40% of the band into one block of the deep stop and loses the
+      // gradient the cel steps are there to show. 3.20 takes 0.251 of that and
+      // keeps the ramp.
+      float t = clamp(sy * 3.20 + 0.07, 0.0, 1.0);
 
       // Cel steps, blended part-way and antialiased with fwidth: a bare
       // floor() aliases into a staircase wherever the band edge is not exactly
@@ -651,8 +658,13 @@ MR.shading = (function () {
       // every fogged surface in the frame converges on this value, so the
       // horizon is now continuous by construction in every biome instead of in
       // none of them.
+      // The weight came down 0.85 -> 0.60 with the change of target. Fading to
+      // WHITE needed to be strong to hide a seam it was itself creating, since
+      // white is not where the ground ends up; fading to the ground's own
+      // colour needs only enough to soften the join, and every 0.05 of it is
+      // chroma spent on a band the reference keeps at S 0.511.
       float hz = smoothstep(0.0, 0.055, sy) * exp(-max(sy, 0.0) * 8.0);
-      col = mix(col, hazeColor, hz * 0.85);
+      col = mix(col, hazeColor, hz * 0.60);
 
       // Clouds ride a virtual plane overhead, so they converge toward the
       // horizon the way real ones do instead of being pasted on the dome.

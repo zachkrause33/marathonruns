@@ -119,6 +119,12 @@ const STATES = ['run', 'jump', 'slide', 'hit'];
 const ONLY = arg('only', null);
 const JSON_OUT = !!arg('json', false);
 const FILE = arg('file', null);
+// `--quick` drops the camera-phase axis from twelve offsets to three. It is for
+// the inside of a fix loop, where the question is "did that move it and which
+// way"; it is NOT a pass. The full sweep is what the gate is read from, and
+// the report prints which one it ran.
+const QUICK = !!arg('quick', false);
+const WINDOWS = parseInt(arg('windows', QUICK ? 3 : 12), 10);
 
 // ---------------------------------------------------------------------------
 // Everything below runs in the page. It drives the REAL game loop -- main.js's
@@ -202,11 +208,23 @@ function pageSetup() {
 
   const v = new THREE.Vector3();
   F.rect = g.renderer.domElement.getBoundingClientRect();
+  F.clipped = 0;
 
   // Screen row of a world point, in CSS pixels. Returns null behind the lens.
+  //
+  // DROP the sample, never poison the result. A point behind the camera has a
+  // negative w, so the perspective divide flips its sign and it reports the top
+  // of the frame as the bottom -- shoot.js's band() hit exactly this and
+  // confidently claimed six hidden hazards on a frame that had none. The first
+  // draft of this file did the opposite and let one bad vertex return Infinity
+  // for a whole group, which read as "no data" on twelve rows.
+  //
+  // For the figure this is dead code: the runner is BASE_BACK = 4.35 units from
+  // a lens whose near plane is 0.1, so nothing on him is ever close to it. The
+  // count is reported anyway, because a silent guard is how the last one hid.
   const rowOf = function (cam, rect) {
     v.applyMatrix4(cam.matrixWorldInverse);
-    if (v.z > -0.11) return null;              // at or behind the lens
+    if (-v.z < 0.5) { F.clipped++; return null; }
     v.applyMatrix4(cam.projectionMatrix);
     return rect.top + (1 - v.y) * 0.5 * rect.height;
   };
@@ -220,8 +238,7 @@ function pageSetup() {
       v.set(i & 1 ? bb.max.x : bb.min.x, i & 2 ? bb.max.y : bb.min.y, i & 4 ? bb.max.z : bb.min.z);
       v.applyMatrix4(o.matrixWorld);
       const y = rowOf(cam, rect);
-      if (y === null) return Infinity;
-      if (y > lo) lo = y;
+      if (y !== null && y > lo) lo = y;
     }
     return lo;
   };
@@ -233,8 +250,7 @@ function pageSetup() {
     for (let i = 0; i < pts.length; i += 3) {
       v.set(pts[i], pts[i + 1], pts[i + 2]).applyMatrix4(m);
       const y = rowOf(cam, rect);
-      if (y === null) return Infinity;
-      if (y > lo) lo = y;
+      if (y !== null && y > lo) lo = y;
     }
     return lo;
   };
@@ -308,7 +324,8 @@ function pageSweep(opt) {
   if (rail === null) return { error: 'railWrap not visible' };
 
   const N = 48;                    // samples per stride window
-  const WINDOWS = 12;              // camera-phase offsets
+  const WINDOWS = opt.windows || 12;   // camera-phase offsets
+  F.clipped = 0;
   const best = { shoe: -Infinity, body: -Infinity, mark: -Infinity };
   const at = {};
   let fovLo = Infinity, fovHi = -Infinity, speedLo = Infinity, speedHi = -Infinity;
@@ -330,6 +347,9 @@ function pageSweep(opt) {
   // Settle the hand-pumped clock before anything is believed: the first few
   // steps carry whatever dt the handover from the real scheduler produced.
   for (let i = 0; i < 20; i++) F.step(1 / 120);
+  // And prove it is turning. A frozen pump returns finite, plausible, IDENTICAL
+  // numbers for every state -- the failure this file already shipped once.
+  const z0 = g.pace.units;
 
   for (let w = 0; w < WINDOWS; w++) {
     const period = 1 / F.cadence();
@@ -365,12 +385,17 @@ function pageSweep(opt) {
     }
   }
 
+  if (!(g.pace.units - z0 > 1)) {
+    return { error: 'the clock did not advance -- ' + (g.pace.units - z0).toFixed(4) + ' units over the whole sweep' };
+  }
+
   return {
     rail: rail,
     shoe: best.shoe, body: best.body, mark: best.mark,
     atShoe: at.shoe, atBody: at.body,
     fov: [fovLo, fovHi], speed: [speedLo, speedHi],
     samples: samples,
+    clipped: F.clipped,
     viewH: F.rect.height,
   };
 }
@@ -407,12 +432,25 @@ function pageSweep(opt) {
       await page.waitForTimeout(900);
 
       await page.evaluate(pageHarness);
-      await page.waitForTimeout(80);            // let the in-flight frame land
+      // WAIT FOR THE HANDOVER, do not sleep on it.
+      //
+      // Under swiftshader this page runs at 2-7 fps, so one frame is 140-500ms.
+      // A fixed 80ms wait -- which looks generous next to 16ms -- expires before
+      // the in-flight rAF has fired even once, `pump` is still null, and every
+      // step after it is a no-op. The sweep then returns the SAME frame for
+      // every state, which is exactly what it did: four different states, one
+      // byte-identical row.
+      await page.waitForFunction(() => window.__fr && window.__fr.pump, { timeout: 15000 });
       const setup = await page.evaluate(pageSetup);
 
       for (const st of STATES) {
-        const res = await page.evaluate(pageSweep, { state: st });
+        const res = await page.evaluate(pageSweep, { state: st, windows: WINDOWS });
         if (res.error) { problems.push(`${vp.name} ${pc.name} ${st}: ${res.error}`); failed = true; continue; }
+        if (res.clipped) problems.push(`${vp.name} ${pc.name} ${st}: ${res.clipped} vertices behind the near plane`);
+        if (!isFinite(res.shoe) || !isFinite(res.body)) {
+          problems.push(`${vp.name} ${pc.name} ${st}: no finite sample -- the clock is not advancing`);
+          failed = true; continue;
+        }
         const clear = res.rail - res.shoe;
         const clearBody = res.rail - res.body;
         rows.push({
@@ -443,6 +481,7 @@ function pageSweep(opt) {
   console.log('FOOTROOM -- lowest row of the figure vs the top of #railWrap, CSS px');
   console.log('positive = clear of the panel, negative = drawn inside it');
   console.log(`pass threshold ${MARGIN}px  (2px border + 6px backdrop blur + 4px raster slack)`);
+  console.log(`${WINDOWS} camera-phase windows x 48 stride phases` + (QUICK ? '   -- QUICK, not a pass' : ''));
   console.log('');
   console.log('  viewport     pace   state   fov          rail   shoe   body    SHOE    BODY   mark');
   console.log('  ' + '-'.repeat(88));

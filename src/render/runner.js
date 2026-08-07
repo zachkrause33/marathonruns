@@ -1407,61 +1407,91 @@ MR.Runner = (function () {
         // does, because the run cycle drives the elbows LATERALLY -- they are
         // the joint the back view was built to watch.
         { g: new THREE.SphereGeometry(0.088, R_NUB, 12), c: P.runnerSkin, y: -0.012, sy: 0.92, sz: 0.96 },
-        { g: new THREE.CylinderGeometry(0.088, 0.088, 0.048, R_LIMB), c: TRIM, y: -0.188 },
+        // The wristband, and it is 0.098 where it used to be 0.088. That is a
+        // repair, not a flourish: the mitt's old wrist ball was r=0.094 and
+        // spanned the band's whole height, so the third of TRIM's three hits on
+        // this figure -- headband, wristbands, midsoles -- was a ring buried
+        // inside the hand it was meant to break away from, showing as a yellow
+        // thread with the ball's ink shell punching black wedges through it.
+        // Rounding the pieces made that worse rather than better, because a
+        // coarse ball is INSCRIBED and its facets were the only thing letting
+        // the band out at all.
+        //
+        // At 0.098 over a 0.078 forearm it is a sweatband standing 0.020 proud,
+        // and it clears the mitt below it by 0.018 -- comfortably over the ink's
+        // own 0.014, which is the number that decides whether two welded
+        // surfaces cross cleanly or grow teeth.
+        { g: new THREE.CylinderGeometry(0.098, 0.098, 0.052, R_LIMB), c: TRIM, y: -0.180 },
         // ---- the hand ------------------------------------------------------
         //
-        // Sized to the frame that ships and not to a close-up. The figure is
-        // 110-200px tall in play, the hand is 0.20 across on a 1.60 figure, so
-        // the hand is 14-25 PIXELS. That number decides everything below:
+        // Sized to the frame that ships and not to a close-up. Measured on the
+        // real 390x844 chase frame the figure is 200-210px, not the 110 an
+        // earlier pass assumed, so the hand is 0.208 across on a 1.60 figure
+        // and lands at about 26 PIXELS. The finish does NOT help: its camera
+        // pulls BACK to show the arch and both posts, and the held shot has him
+        // at 52px. 26px is the largest this hand is ever drawn in play, and it
+        // decides everything below:
         //
-        //   - Three fingers do not exist at 14px. Each was 0.06 across, under
-        //     4px, in the palm's own colour, and the review's verdict on them
-        //     was "unarticulated rounded stump" -- which is what four pale
-        //     lobes of one tone at 4px are. They are replaced by ONE curled
-        //     roll carrying the whole hand's single value break. A knuckle line
-        //     is the only interior detail a 14px hand can hold, so it gets that
-        //     and nothing else.
+        //   - Three fingers do not exist at 26px. Each was 0.06 across, under
+        //     8px, in the palm's own colour, and the review's verdict on them
+        //     was "unarticulated rounded stump". They stay replaced by one
+        //     curled roll carrying the whole hand's single value break.
         //   - A ball reads as a ball at every size, and a box reads as a card.
         //     Both were built and both were looked at: the flat-faced block
         //     shaded into two clean planes close up and, seen from the shallow
         //     angle most of the cycle puts it at, presented its own edge and
         //     read as a paddle held in the hand rather than as the hand. The
-        //     mass is a broad flattened ELLIPSOID -- half again as wide as it
-        //     is deep -- with the wrist ball above it and the finger roll
-        //     under it: three stacked shapes in two tones, which at 14px
-        //     resolves as forearm / band / hand / fingers rather than as one
-        //     pale oval.
+        //     mass is a broad flattened ELLIPSOID with the band above it and
+        //     the knuckle roll under it -- forearm / band / hand / knuckles,
+        //     four stacked shapes in three tones.
+        //   - The wrist ball above the palm is GONE, and the band is what
+        //     replaces it. Two nested ellipsoids 0.010 apart at the wrist were
+        //     never two shapes at any size; they were one lumpy one, and the
+        //     inner one's shell was the thing eating the band. One mass, one
+        //     ring over it, reads as a hand in a wristband from 26px up.
         //   - The thumb rides high and INBOARD, so it breaks the outline
         //     against the vest and the thigh -- the two dark masses the hand
         //     passes in front of -- rather than against the road, where the
         //     mitt's own edge is already doing the work.
         //
-        // Every dimension is inside the ones it replaces. The old hand reached
-        // -0.362 and was 0.197 across; this one reaches -0.361 and is 0.186,
-        // so the airborne span, which MEASUREMENTS.md caps at 0.70 from the
-        // lane centre, is spent DOWN rather than up. The extra mass is bought
-        // in z, which is the axis the back view does not measure at all.
-        { g: new THREE.SphereGeometry(0.094, R_LIMB, 16), c: MITT, y: -0.202, sy: 0.86, sz: 1.00 },
-        { g: new THREE.SphereGeometry(0.104, R_LIMB, 16), c: MITT, y: -0.264, z: 0.018, sy: 0.76, sz: 0.86 },
-        // The curled fingers: one roll lying across the hand at its LOWER REAR
-        // edge, which took three placements to find and is worth writing down
-        // because the rule is not obvious. Where the break sits matters far
-        // more than what it is. Tucked UNDER the hand, where a real curled fist
-        // carries it, the body of the hand hides it completely. Out at the
-        // LEADING edge, which seemed right because the camera looks down about
-        // 17 degrees, it is worse: the forearm is already pitched forward, so
-        // the hand's leading edge is its FAR edge and the hand occludes it. The
-        // only part of a hand a camera dead astern can rely on seeing is the
-        // rear face and the bottom of the outline -- so that is where the one
-        // value break the size allows has to go, and there it reads as fingers
-        // breaking the underside of the mitt.
+        // The mass is still 0.104 off the arm's axis. What it gave up is REACH:
+        // the hand now bottoms out at -0.348 where the old one reached -0.361,
+        // and that 0.013 is exactly what paid for moving the knuckle row aft
+        // (see below) without the airborne silhouette growing. Measured per
+        // vertex across all 24 stride phases, the jump's half-width comes
+        // through this rebuild on 0.8749 -- the same figure to four places.
+        { g: new THREE.SphereGeometry(0.104, R_LIMB, 16), c: MITT, y: -0.258, z: 0.014, sy: 0.78, sz: 0.84 },
+        // The curled fingers: a knuckle row lying across the hand at its LOWER
+        // REAR edge. Where the break sits matters far more than what it is, and
+        // the old note had the rule right while the geometry had it backwards
+        // -- it read "the rear face and the bottom of the outline" and then put
+        // the roll at z = +0.016, which on this rig is the FRONT (the heel
+        // counter is at -0.076 and the nape at -0.058; -z is what the chase
+        // camera sees). Buried under the palm's own belly, it was invisible
+        // from every angle the game draws, which is exactly what the reviews
+        // meant by "the knuckle break does not resolve". At z = -0.032 it
+        // stands 0.017 proud of the mitt's rear surface and hangs 0.008 below
+        // its underside, so it breaks the silhouette on the two edges a camera
+        // dead astern can rely on seeing.
         //
-        // Its cap ends are the outer knuckles -- one primitive doing both jobs,
-        // exactly as the three finger capsules it replaces used theirs, but at
-        // a size that survives the minification instead of aliasing into the
-        // palm it stands on.
-        { g: new THREE.CapsuleGeometry(0.050, 0.092, 5, R_NUB), c: MITT_DK, y: -0.308, z: 0.016, rz: Math.PI / 2 },
-        { g: new THREE.CapsuleGeometry(0.041, 0.052, 4, 12), c: MITT, x: -side * 0.072, y: -0.238, z: 0.062, rx: 0.85, rz: side * 0.62 },
+        // Three overlapping balls rather than one capsule, and this is the
+        // detail bought back with the budget rather than the one restored. A
+        // capsule's cap ends were the outer knuckles and its middle was a
+        // straight tube; three balls put a scallop between each pair. The
+        // scallop is 0.007 deep, which is one pixel on a 30px hand: at the 26px
+        // the game actually draws the row is still ONE dark roll under the
+        // hand, which is the whole of what gameplay scale can hold and the
+        // thing the earlier pass was right to refuse to break up. From about
+        // 60px of hand it separates into knuckles. It costs the gameplay read
+        // nothing and pays at every size above it, which is the only kind of
+        // detail this character should be spending on.
+        //
+        // Uneven on purpose: the middle knuckle is the tallest on a real fist
+        // and three equal lobes read as a gear rather than as a hand.
+        { g: new THREE.SphereGeometry(0.039, R_NUB, 12), c: MITT_DK, x: -0.046, y: -0.3045, z: -0.032 },
+        { g: new THREE.SphereGeometry(0.042, R_NUB, 12), c: MITT_DK, x: 0.000, y: -0.3055, z: -0.032 },
+        { g: new THREE.SphereGeometry(0.038, R_NUB, 12), c: MITT_DK, x: 0.046, y: -0.3035, z: -0.032 },
+        { g: new THREE.CapsuleGeometry(0.041, 0.052, 4, 12), c: MITT, x: -side * 0.072, y: -0.236, z: 0.056, rx: 0.85, rz: side * 0.62 },
       ]);
       elbow.add(fore);
 

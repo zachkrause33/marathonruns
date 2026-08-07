@@ -949,3 +949,686 @@ magnified, and all three are the same lesson the character work produced:
 - **The van's dark load space** is the one thing here that could read as a void,
   and is drawn lit rather than black, with parcels filling 73% of the opening's
   height and a shutter valance across its top.
+
+---
+
+# 5. The vehicle pass, torn down
+
+Five new Tom Gold Run frames, at the range the chase camera actually works at,
+supplied after the vehicle pass shipped and was rejected: *"Vehicles not good
+enough. Review gold run for vehicle description and depth. Also see detail on
+trees and buildings."*
+
+| File | Shows |
+|---|---|
+| `tgr-taxi-street.png` | yellow taxi in-lane, close; a boulevard of lobed trees |
+| `tgr-bus-front.png` | teal bus filling a third of the frame |
+| `tgr-traffic.png` | several vehicles at once, street trees, bunting |
+| `tgr-boulevard.png` | trees, trunks, kerb and bollards |
+| `tgr-shopfronts.png` | shopfront street, awnings, balconies, signage, red car, bus |
+
+All five are 1206 x 2622 full-bleed, the same 0.46 aspect as the earlier three,
+so every fraction below is directly comparable to section 1-3 and to our own
+620 x 1344 portrait shots.
+
+Our side is measured live, not estimated: `api.contrastAudit(renderer, scene,
+{images: true})` returns a rendered rear elevation per hazard variant plus its
+area-weighted mean. Frames at skip 17 / 31.7 / 39.5 / 50.6 / 97.9 / 194.4,
+found by running the pace model headlessly against `Course.generate('2026-08-07')`
+and solving for the race-second at which a BLOCK gate sits ~15 units ahead.
+
+## The finding that answers the complaint
+
+**We do not have a fleet. We have ten silhouettes of one colour.** The audit's
+own area means, all ten BLOCK variants, one frame:
+
+| variant | mean rgb | L | S |
+|---|---|---|---|
+| v0 tram | (144,108,139) | 122.6 | 0.248 |
+| v1 hoarding | (173,128,146) | 143.7 | 0.258 |
+| v2 trike | (178,143,160) | 155.6 | 0.199 |
+| v3 marshals | (141,110,134) | 122.1 | 0.214 |
+| v4 bus | (146,113,140) | 125.9 | 0.221 |
+| v5 taxi | (143,112,138) | 124.1 | 0.222 |
+| v6 van | (154,117,140) | 130.9 | 0.240 |
+| v7 refuse | (155,109,130) | 125.1 | 0.299 |
+| v8 cyclists | (149,110,132) | 124.4 | 0.258 |
+| v9 moped | (158,102,128) | 121.9 | 0.351 |
+
+Ten different vehicles inside a **12-luminance band and a 0.15 saturation band,
+every one of them the same desaturated mauve.** No two of them differ by as
+much as one toon band. Against that, the reference's four vehicles:
+
+| | body rgb | L | S | road L | road S |
+|---|---|---|---|---|---|
+| taxi, `tgr-taxi-street` | (255,221,0) | 212.3 | **1.000** | 72.8 | 0.292 |
+| bus, `tgr-bus-front` | (41,114,94) | 97.3 | **0.638** | 89.7 | 0.255 |
+| car, `tgr-shopfronts` | (204,25,54) | 65.3 | **0.878** | 86.7 | 0.164 |
+| bus, `tgr-shopfronts` (far) | (118,63,70) | 75.8 | 0.461 | 96.2 | 0.232 |
+
+Four vehicles, four hues, S 0.46-1.00. Ours, ten vehicles, one hue, S 0.20-0.35.
+**That is the whole of "not good enough" and it is a colour finding, not a
+geometry one.** The previous brief's "silhouette and proportion" was not wrong;
+it was half the answer, and the half that was missing costs nothing to fix.
+
+## Why our fleet is mauve, mechanically
+
+The swatch pixels, quantised, give the exact composition. Every colour below is
+the authored hex through the shaded band `(0.639R, 0.723G, 0.826B)`:
+
+| authored | shaded rgb | L | S | share of v4 bus | share of v5 taxi | share of v7 refuse |
+|---|---|---|---|---|---|---|
+| `0xfff2e0` cream | (163,175,185) | 173.1 | **0.119** | **32.6%** | **32.5%** | **32.0%** |
+| `0xff3b6b` pink | (163,43,88) | 71.5 | 0.738 | 21.4% | 12.7% | 23.9% |
+| `0x6577b2` glass | (65,86,147) | 85.9 | 0.561 | 18.2% | 15.3% | — |
+| `0xd42a55` deep pink | (135,30,70) | 55.6 | 0.776 | 5.8% | 11.4% | 9.0% |
+| `0x2b2f52` navy | (27,34,68) | 35.0 | 0.594 | — | — | 7.5% |
+| `0x1e2140` tyre | (17,25,55) | 25.0 | 0.738 | 5.9% | 7.1% | 4.9% |
+
+**The largest single area on every vehicle is cream, and cream is the least
+saturated colour in the palette.** It is there because section 4 reached for it
+to pass the luminance gate, and it worked -- but chroma is measured on the AREA
+MEAN, not on the mean of the chromas, so a warm saturated pink averaged against
+a cool near-neutral cream lands on the neutral axis. Modelled:
+
+    taxi, saturated yellow body, no cream      L 134.4 (1.48x)   dS +0.266
+    same taxi with a 15% cream livery band     L 137.8 (1.52x)   dS +0.032
+
+**A 15% cream band buys 0.04x of luminance and destroys 88% of the object's
+chroma.** That single line is why nine of ten variants sit inside 0.15 of each
+other on saturation, and it is the mechanism behind the complaint.
+
+The prediction model used throughout below is the area-weighted mean of the
+shaded hexes, calibrated against the live audit on four variants:
+
+| variant | model L | measured L | offset | model S | measured S |
+|---|---|---|---|---|---|
+| v0 tram | 108.2 | 122.6 | +14.4 | 0.258 | 0.248 |
+| v4 bus | 108.8 | 125.9 | +17.1 | 0.256 | 0.221 |
+| v5 taxi | 108.6 | 124.1 | +15.5 | 0.245 | 0.222 |
+| v7 refuse | 108.2 | 125.1 | +16.9 | 0.295 | 0.299 |
+
+**Offset +16.0 L, S accurate to 0.035.** The offset is the lit top faces the
+audit camera catches and the flat-shaded model does not. Every predicted figure
+below carries it.
+
+## What the reference vehicle actually is, measured
+
+Four elements and nothing else. Verified on the bus at 15 units
+(`tgr-bus-front`, front face x 805-1095, y 600-1105) and on the bus at gameplay
+distance (`tgr-shopfronts`, face x 512-648, y 575-775):
+
+| band | fraction of face height | bus @15u | bus @gameplay | red car |
+|---|---|---|---|---|
+| roof / header | 11% | | | |
+| upper glass band | 18.4% | | | |
+| **windscreen** | **37.6%** | | | |
+| body with lamps and grille | 17.8% | | | |
+| **dark bumper** | **13.9%** | 10% | 15% | |
+| **glass area ÷ elevation bbox** | | **34.8%** (51.9% with the upper band) | **42.6%** | **40.4%** |
+
+Ours, from the audit swatches: **bus 18.2%, taxi 15.3%, tram 19.9%, van 0%,
+refuse truck 0%.** The reference carries **2.3x our glass**, and two of our
+eight vehicles show none at all from behind.
+
+The other three elements:
+
+- **The glass is not one flat colour, it ramps.** Bus windscreen L 82.2 at the
+  top, 66.5 mid, 51.1 at the bottom; taxi 151.6 / 130.7 / 105.9; red car 110.8 /
+  83.9. **Top ÷ bottom = 1.61, 1.43, 1.32 -- mean 1.45, and 1.61 on the largest
+  sample.** The break sits about 55% up the glass.
+- **The bumper is a dark neutral at the very bottom, full width.** Bus (51,34,51)
+  L 38.8 on a road of 63.5 = **0.61x**; taxi (77,86,62) L 82.7 on 72.8 = 1.14x
+  but S 0.27 against a body at S 1.00; red car grille (67,51,56) L 54.9 and
+  bumper (68,57,68) L 60.8 on a road of 86.7 = **0.63x / 0.70x**. It always
+  carries a pale number plate: bus (136,102,119) L 110.5, red car (164,125,170)
+  L 137.0 -- **1.7x to 2.8x the bumper it sits on**, and it is the lowest bright
+  thing on the vehicle.
+- **Lights are small, round and the brightest thing in frame.** Far bus headlamps
+  measure **(255,255,255) L 255.0** on a body of L 75.8 -- **3.4x**, diameter 22px
+  on a 136px face = **16% of the face width**. Bus at 15 units, (94,128,179)
+  L 125.1 on a body of 97.3 = 1.29x, diameter 30px on 290px = 10%.
+- **The wheel breaks the lower outline.** `tgr-shopfronts` red car: the dark mass
+  from y 1005 to 1080 is 32% of the face height and the tyres sit at its outer
+  corners with a hard black contact line under each. `tgr-city`'s teal car has a
+  visible arch cut with the wheel inside it.
+
+## Where we already agree, and what must not be walked back
+
+- **Lamp size and contrast are already right.** `0xffe45e` shaded is L 158.1 on a
+  pink body of 71.5 = **2.2x**, and the lamp boxes are 0.26-0.28 authored on a
+  2.20 body = 12-13% of the width. The reference is 1.3x-3.4x at 10-16%. We are
+  inside the band. What is wrong is that every lamp on every vehicle is the same
+  amber, so a free identity axis is spent on nothing.
+- **Roofline height, window-band height and greenhouse taper** were the last
+  pass's thesis and they hold. The reference's greenhouse is 0.75-0.91 of the
+  body width (bus 264/290, car 190/235, far bus 102/136); our taxi's 1.50/2.18 =
+  0.69 is if anything over-tapered. **Glass width is not the problem. Glass
+  HEIGHT is.**
+- **Inhabited hazards.** Every reference vehicle is empty. Ours have riders and
+  marshals and they are better for it. Unchanged.
+- **The 1.6x / 0.30 rule and the 1.25x / 0.22 gate.** Unchanged, and the spec
+  below is written to them.
+
+## Divergences that are style, not technique -- do not attempt
+
+- **The gloss.** Every reference vehicle has a specular sweep across the roof and
+  a highlight on each headlamp lens. The glass ramp above is the transferable
+  part of it and it is drawn as two constant bands, not as a gradient.
+- **Smooth-shaded body panels.** The reference's shoulder line is a soft
+  gradient over a curved surface. Under `MeshToonMaterial` with a banded ramp
+  the same shoulder must be a step between two authored colours or it is
+  nothing. Specified below as a step.
+- **The novelty vehicles.** `tgr-traffic`'s giant hot dog on a truck and the
+  gift-wrapped buses are a live-ops event skin, not art direction. Copying them
+  would put a second decorative colour system on top of a hazard whose hue is
+  already a gameplay signal.
+- **Reflections and the sky in the glass.** The reference's windscreen is a
+  mirror; ours is a coloured panel. The two-band ramp below is the translation.
+
+## The budget, corrected
+
+An earlier draft of this section trimmed the spec to fit a 75k working ceiling
+and specified a triangle cut for every addition. **That ceiling was not real.**
+Every fps figure in this project was taken under SwiftShader software rendering
+at 1-8 fps, which is evidence of nothing, and the owner reports the game running
+without issue on their phone at the present 75-83k. **Work to 150k.** Cost is
+still stated for everything below, because it should be known, but it is no
+longer a veto and nothing here is sized down to pay for something else.
+
+Where the weight actually is, measured at mile ~16: the whole frame is 74,619
+triangles and **the runner is 14,128 of it while the record ghost is another
+14,128 -- 38% of the frame in two character rigs**, the second of which is a
+full copy of the first drawn translucent and never in focus. If a reduction is
+ever wanted, that is where it is, not in the crowd and not in the fleet. It is
+not needed to fund anything in this document.
+
+## Spec: the fleet
+
+Widths are authored (x is scaled by `LANE_FIT`); y and z are world and none of
+them moves. `MR.Collision.BOX[BLOCK]` stays yMin 0, yMax 2.80, halfZ 0.65, and
+every rear fitting keeps its rear plane at exactly -0.65 so a train still works.
+
+**V1. Per-vehicle liveries, in two families. Zero triangles.**
+
+The audit measures an area mean, so **a vehicle's body and its glass must not
+straddle the neutral axis.** That splits the fleet cleanly and it is why the
+proposal has two rules rather than one:
+
+- **Cool-bodied vehicles pass on saturation.** Teal, cyan, green body with the
+  cool glass. dS lands at 0.43-0.54 -- over the 0.30 target with room.
+- **Warm-bodied vehicles pass on luminance**, because warm high-green hues are
+  the only ones that reach L 145 through `L = 0.136R + 0.517G + 0.060B`. Their
+  glass must be held to ~26% of the elevation rather than 34%, or the blue drags
+  the mean back to neutral.
+- **No cream on a warm body, anywhere.** The pale element on a warm vehicle is
+  the number plate and the lamp cores and nothing else. Cream on a *cool* body
+  costs only 0.12 of dS and buys 8 L, so the bus and tram may keep a band.
+
+| variant | body | dark bottom | trim | predicted L | vs road | S | dS | verdict | today |
+|---|---|---|---|---|---|---|---|---|---|
+| v5 taxi | `0xffd42b` | `0x2e2412` | `0x1a1608` chequer | 134.4 | **1.48x** | 0.369 | +0.266 | gate both axes | 1.37x / +0.119 |
+| v4 bus | `0x2fc79a` | `0x0e2a26` | `0xd8f24a` | 124.8 | 1.37x | 0.571 | **+0.468** | **TARGET** | 1.39x / +0.118 |
+| v0 tram | `0x35c2e8` | `0x0c2436` | `0xd8f24a` | 125.8 | 1.38x | 0.641 | **+0.538** | **TARGET** | 1.35x / +0.145 |
+| v6 van | `0xffb02e` | `0x35220a` | `0xff6f2b` | 131.8 | 1.45x | 0.312 | +0.209 | gate | 1.44x / +0.137 |
+| v7 refuse | `0xd8f24a` | `0x22300a` | `0xff6f2b` | 137.1 | **1.51x** | 0.422 | **+0.319** | **TARGET** | 1.38x / +0.196 |
+| v8 cyclists | `0xff6f2b` kit | `0x2a0c16` | `0xffd42b` | 122.5 | 1.35x | 0.537 | **+0.434** | **TARGET** | 1.37x / +0.155 |
+| v9 moped | `0xff3b6b` | `0x2a0c16` | `0xffd42b` | 112.8 | 1.24x | 0.477 | **+0.374** | **TARGET** | 1.34x / +0.248 |
+
+Five of seven reach the 1.6x/0.30 target for the first time; the other two clear
+the gate on both axes where today they clear it on one. **The moped drops below
+1.25x on luminance and is carried entirely by dS +0.374 -- which is exactly the
+configuration of `tgr-city`'s parked blue car (0.98x luminance, dS +0.38) and is
+allowed by the rule. It is also the first thing that will fail at distance,
+because saturation e-folds three times faster than value (section 3). If only
+one variant is allowed to sit there, it should be the smallest one, and the
+moped is it.**
+
+The dark bottoms are dark versions of each body's own hue rather than a shared
+neutral, for the same area-mean reason: a shared grey bumper on seven vehicles
+would put 13% of neutral back into every one of them.
+
+BLOCK pink as the kind signal is not abandoned. It moves from "the mass that
+carries the silhouette" to **a fixed pink element in a fixed place on every
+BLOCK** -- the rear bumper chevron face each variant already carries, plus the
+roof cap. Kind is also already signalled at full strength by the telegraph mat
+on the road in front, which is the channel the race is actually lost by
+misreading; the body was a redundant second copy of that signal and it was
+costing the entire vehicle-colour axis.
+
+**V2. Glass: 1.7-2.3x the area, in two bands. +24 rendered triangles/vehicle.**
+
+- Glass area **34% of the rear elevation bbox on cool bodies, 26% on warm ones**
+  (from 15-20% today). This is a resize of the existing `hbx`, so the area is
+  free; only the split costs.
+- **Two constant bands, upper ÷ lower luminance = 1.62**, break at 55% of the
+  glass height. `0x8ec0ea` (shaded L 132.5) over `0x4f74bc` (shaded L 81.9)
+  gives 1.618, matching the bus's measured 1.61 to three figures.
+- Hue stays in the 200-225 degree band on every vehicle regardless of body hue.
+  This is the one thing the reference never varies.
+- **The van and the refuse truck must gain a rear window.** Two of eight vehicles
+  showing no glass at all from the only angle the game has is the largest single
+  reason the fleet reads as boxes. The van's open load space keeps its parcels
+  and its valance; the glass goes in the two door leaves.
+
+**V3. A dark bumper at the bottom. Zero triangles.**
+
+The rear bumper bar exists on the bus, taxi and van already. Move it, resize it,
+recolour it:
+
+- **Full body width, 13% of the elevation height, bottom edge at the sill**, not
+  at 29% up the body where the bus's sits today.
+- Value **0.28-0.35x the centre lane** (reference 0.61-0.70x of a road that is
+  itself darker than ours; our shaded darks land at L 24-30 against a road of
+  90.9, which is 0.26-0.33x -- close enough and on the right side).
+- **A number plate on it**, `0xe8ecf4`, shaded L 168.1 -- **6.5x the bumper it
+  sits on.** +12 authored / +24 rendered. This is the reference's lowest bright
+  element and it is what tells the eye where the vehicle's bottom edge is when
+  the contact shadow has washed out.
+
+**V4. Round wheels in real arch openings, with a shadow gap under the sill.
++160 rendered triangles per wheeled vehicle.**
+
+This is the item the imaginary ceiling cut down to a flat dark rectangle. Built
+properly:
+
+- **The tyre is a cylinder, axis along x**, so what the chase camera sees is the
+  curved rear tread and the bottom of the wheel is round.
+  `cyl(0.30, 0.30, 0.34, 10, ±0.96*LANE_FIT, 0.30, -0.06, tyre, 0, 0, PI/2)`.
+  40 authored / 80 rendered each. At 15 units a 0.19-world tyre is ~15px, which
+  resolves roundness; by 30 units it does not, and that is fine -- the arch above
+  it is what carries the read at distance.
+- **The arch is a real opening, not a painted one.** Split the lower body box in
+  three -- left flank, a centre section spanning above both arches, right flank --
+  so the tyre is seen through a genuine gap in the mesh and the body's lower
+  outline is notched. +24 authored / +48 rendered.
+- **An arch lip** over each wheel, one step darker than the body and standing
+  0.02 proud, following the top of the opening. +24 authored / +48 rendered.
+- **Delete the two front wheels.** They sit at z = +0.36 to +0.44, inside a body
+  1.16-1.30 deep whose rear plane is at -0.65: **occluded by their own body from
+  a chase camera at every distance.** -24 authored / -48 rendered. This is a
+  correctness cut, not a budget one, and it stands whatever the ceiling is.
+- **The shadow gap.** The body's underside stops at 0.34 and nothing fills the
+  span between the two wheels, so lit road shows under the sill exactly as it
+  does under every reference vehicle. The pooled contact quad from R4 already
+  multiplies that road to 0.60; the reference measures its own underbody at
+  **0.67x the local road** (red car, L 58.1 on 86.7), so R4's existing number is
+  right and no new geometry is needed for the shadow itself.
+
+**Divergence, stated:** the reference's arch is a smooth curve cut into a
+smooth-shaded panel with the wheel's shadow softening into it. Ours is a
+straight-sided opening with a hard lip. The transferable part is that the tyre
+**breaks the body's lower outline**, which is a silhouette fact rather than a
+shading one and survives banding intact.
+
+**V5. Round two-part lamps. +232 rendered triangles per vehicle.**
+
+A red tail lamp cannot be drawn in red: `0xff2b3c` shaded is L 60.5, **darker
+than the road**. So it is drawn as the reference draws a headlamp -- value in the
+core, hue in the surround -- and now that geometry is affordable, both parts are
+discs facing the lens rather than boxes:
+
+    surround  cyl(0.17, 0.17, 0.10, 8, ±0.94*LANE_FIT, 0.86, -0.60, 0xff2b3c)  L  60.5
+    core      cyl(0.09, 0.09, 0.11, 8, ±0.94*LANE_FIT, 0.86, -0.61, 0xfff6e2)  L 175.3
+
+Core ÷ surround = 2.9x, against the reference's headlamp-to-body 1.3x-3.4x.
+Lamp diameter 0.34 authored on a 2.20 body = 15% of the width, against the
+reference's measured 10-16%. 128 authored / 256 rendered for the four discs,
+less the 24 rendered the two boxes cost today.
+
+Amber stays only on the refuse truck's beacon and the bin-lift arms, where it
+means something. **If the taxi is turned to face the camera (V6) its lamps
+become headlamps and the core goes to `0xfffdf2`, L 179.9 -- the reference's
+far-bus headlamp measures a flat (255,255,255) and is the brightest thing in the
+frame, so this is the one place a near-white is correct on a vehicle.**
+
+**V5b. The body is not a box. +60 authored / +120 rendered per vehicle.**
+
+Three separate devices, all of which the reference has and none of which we do:
+
+- **A shoulder line.** The lower body is 0.06 wider than the upper, with a
+  crease box between them one step darker than either. The reference draws this
+  as a gradient over a curved flank; **under a banded ramp it has to be a step
+  between two authored colours or it is nothing**, so it is one box. +12/+24.
+- **An inset greenhouse.** Our bus's glazing is `hbx(2.22, ...)` on a body of
+  2.20 -- **wider than the vehicle it is set into.** The reference's is 0.75-0.91
+  of the body width with visible pillars either side (bus 264/290, car 190/235,
+  far bus 102/136). Take the bus's glass to 2.00 on 2.24 and recess it 0.02 in z,
+  then add two body-coloured pillar boxes at the glass's outer edges. +24/+48.
+- **A rounded roof.** Two chamfer boxes above the header, each narrower and
+  shallower than the last, so the roofline steps in twice instead of ending in a
+  square corner. The tram already does this with its "chamfered crown" and it is
+  the best-looking thing in the current fleet. +24/+48.
+
+**V6. One vehicle turned to face the camera. Zero triangles. Optional, and the
+argument is not one-sided.**
+
+Every device measured above -- windscreen, round lamps, grille, bumper, number
+plate -- lives on a vehicle's FRONT, and the reference gets all of them because
+its traffic is oncoming. Our chase camera sees rears, which is why the fleet is
+short of vocabulary before it is short of anything else. A vehicle turned in the
+road at a closure is entirely plausible and costs a `rotation.y`.
+
+Against it: a hazard facing the player reads as oncoming, and every hazard in
+this game is static; and the tram cannot do it (train scaling pins fittings to
+z = -0.65), nor the refuse truck (its tailgate is its tell), nor the van (its
+open doors are). **Recommend it for the taxi only, and measure the read before
+extending it.** A taxi turned around at a road closure is the most natural
+instance and the taxi is the variant with the least to lose.
+
+## Cost
+
+Hazards carry `INK.hazard` 0.025 so every hazard triangle is drawn twice.
+Scenery carries `INK.prop`/`INK.scenery` = 0, so scenery triangles count once.
+
+| item | authored | rendered | per |
+|---|---|---|---|
+| V1 liveries | 0 | 0 | — |
+| V2 glass area | 0 | 0 | — |
+| V2 glass split into two bands | +12 | +24 | vehicle |
+| V3 bumper move and recolour | 0 | 0 | — |
+| V3 number plate | +12 | +24 | vehicle |
+| V4 round tyres (2, 10-seg) | +80 | +160 | wheeled vehicle |
+| V4 wheel boxes they replace | -24 | -48 | wheeled vehicle |
+| V4 lower body split for arch openings | +24 | +48 | wheeled vehicle |
+| V4 arch lips | +24 | +48 | wheeled vehicle |
+| V4 front wheels deleted | -24 | -48 | wheeled vehicle |
+| V5 round two-part lamps (4 discs) | +128 | +256 | vehicle |
+| V5 lamp boxes they replace | -24 | -48 | vehicle |
+| V5b shoulder crease | +12 | +24 | vehicle |
+| V5b inset greenhouse pillars | +24 | +48 | vehicle |
+| V5b roof chamfer | +24 | +48 | vehicle |
+| **net** | **+268** | **+536** | **wheeled vehicle** |
+| **net** | **+188** | **+376** | **two-wheeler / cyclists** |
+
+A BLOCK variant is 144-252 authored triangles today (288-504 rendered), so this
+roughly **doubles the fleet's geometry** -- bus 204 -> 472 authored, 408 -> 944
+rendered.
+
+Whole-frame effect. Measured live in portrait 620 x 1344, the heaviest frames run
+**90,977** (skip 17), 87,063 (skip 50), 85,881 (skip 50.6). A heavy frame carries
+roughly eight live BLOCKs, of which six or so are wheeled:
+
+| | added rendered triangles |
+|---|---|
+| fleet, section 5 | **+4,300** |
+| trees, section 6 | **+3,100** |
+| buildings, section 7 | **+3,000** |
+| **total** | **+10,400** |
+
+**91k -> ~101k against a 150k ceiling: 33% of headroom still unused.** Nothing in
+this document needs to be cut to fit and nothing needs to be cut to pay for it.
+
+If a reduction is ever wanted anyway, it is not here. The runner and the record
+ghost are 14,128 triangles each -- **38% of a 74,619-triangle frame in two
+character rigs**, the ghost being a full copy of the runner drawn translucent and
+never in focus. A reduced ghost rig would return more than everything specified
+above costs. The three heaviest scenery geometries in a skip-17 frame are
+8,316-vertex meshes drawn three and four times at 11,088 triangles each; the
+fleet, even doubled, is a rounding error beside either.
+
+---
+
+# 6. Trees
+
+## Measured
+
+`tgr-boulevard.png`, nearest foliage, and `tgr-taxi-street.png` as the control.
+
+| | reference | ours (authored) | ours (on screen, `w50.6`) |
+|---|---|---|---|
+| lit crown | (174,222,54) L 200-209 | `0x62c470` L 169.1 | L 145.1 |
+| mid | (126,174,54) L 155-188 | `0x4faf5f` L 148.9 | L 97.1 |
+| shaded underside | (102,138,42) L 112-123 | `0x3f9a52` L 129.4 | L 73.1 |
+| **lit ÷ shaded** | **1.70** | **1.31** | 1.99 |
+| saturation | **0.67-0.76** | 0.50-0.59 | 0.64-0.77 |
+| **R ÷ G (hue)** | **0.75-0.78** | **0.41-0.50** | 0.23-0.36 |
+| trunk lit | (174,102,54) L 113.8 **S 0.69** | `0x8a5a3c` L 98.0 S 0.565 | |
+| trunk shaded | (114,66,30) L 73.6 **S 0.74** | — | |
+| bare trunk ÷ tree height | 23-36% | 32% | |
+| lobes per crown | 3-5 | 4 | |
+
+**Three of these are already right and one is badly wrong.** The lobe count, the
+lobe size spread and the bare-trunk fraction all sit inside the reference band;
+the brief's "rounded masses on a visible trunk with clustered sizes" is a
+description of what `vTree`'s `'round'` branch already builds.
+
+**The hue is the wrong one.** The reference's foliage is a chartreuse with red
+at 0.75-0.78 of green; ours is a true green at 0.41-0.50. In a renderer whose
+shaded luminance is `0.136R + 0.517G + 0.060B`, lifting red at constant green is
+free luminance and free warmth, and it is the difference between foliage that
+reads as a lit mass and foliage that reads as a dark hole beside a bright road.
+
+**The value ladder is too flat and the lobes are mapped to it backwards.**
+`vTree` gives `c[0]` -- the darkest colour in every palette -- to the biggest,
+highest-volume central sphere at y 4.4, and `c[c.length-1]` -- the lightest -- to
+a *low* side lobe at y 3.9. So on a three-colour palette the darkest mass sits in
+the middle and the lightest sits underneath, which is the opposite of a canopy.
+
+## Spec
+
+**T1. Reverse the lobe-to-value mapping so value tracks height.** Sort the
+palette light-to-dark and assign by the lobe's y: the crown lobe at 5.7 takes the
+lightest, the main mass at 4.4 the middle, the two side lobes at 3.7 and 3.9 the
+darkest. **Zero triangles, zero draws, four lines.**
+
+**T2. Widen the ladder to 1.70 and warm the hue to R = 0.76G.** Per palette,
+three colours whose shaded luminances stand in 1.00 : 1.30 : 1.70 and whose red
+channel is 0.75-0.78 of green. For the generic city green that is roughly
+`0x6f9a34` / `0x93c245` / `0xb4e256` in place of `0x3f9a52` / `0x4faf5f` /
+`0x62c470`. **Zero triangles.**
+
+**T3. Saturate the trunk and warm it.** `0x8a5a3c` S 0.565 becomes about
+`0xb0662e`, S 0.74, matching the reference's (174,102,54). The plane-tree grey
+`0x9a9a86` stays -- a London plane really is grey and it is the one that reads as
+London. **Zero triangles.**
+
+**T4. Six lobes, not four, and a forked trunk. +104 triangles per round tree.**
+
+An earlier draft of this section proposed cutting the crown from seg 8/7 to
+seg 6 to pay for section 5. With a real ceiling that is the wrong direction.
+
+- **Six lobes rather than four**, sizes 2.0 / 1.6 / 1.5 / 1.4 / 1.2 / 0.9 --
+  ratio 2.2:1, against the reference's visibly clustered 3-5 per crown. The two
+  extra lobes go low and outboard where they break the crown's outline against
+  the sky, which is the only place a lobe earns anything. `sph(r, seg)` builds
+  `SphereGeometry(r, seg, seg-2)`, so a seg-7 lobe is 56 triangles: **+112**.
+- **A forked trunk.** Every reference trunk splits into two or three branches
+  before it enters the crown -- clearly visible in both `tgr-taxi-street` and
+  `tgr-boulevard`, and it is what stops the trunk reading as a post. Two leaning
+  6-segment cylinders off the top of the trunk, 24 triangles each: **+48**.
+- **Drop one existing lobe's overlap** so the six do not read as a sphere: net
+  **+104 per tree, 272 -> 376, scenery so counted once.**
+
+At 30 live trees that is +3,100 triangles, 3% of a 91k frame.
+
+**Not copied:** the reference's crowns are smooth-shaded with a soft gradient
+running across each lobe and a translucent edge where the sun comes through.
+Adding lobes does not buy that and is not meant to -- lobes buy **outline**,
+which is the part that survives a banded ramp. **The gradient's transferable
+substitute is the 1.70 value ladder in T2, and the ordering in T1 is what makes
+the ladder read as a canopy rather than as noise. Both are free, and both matter
+more than the extra lobes.**
+
+---
+
+# 7. Buildings
+
+## The brief's premise is wrong and it is worth correcting
+
+`vTerrace` already builds, per bay: a stone base course and a string course, a
+door, an optional stoop, windows standing proud of the facade with a lintel over
+each, balconies with a slab and seven railing bars, fire escapes, a rack of
+hanging signboards, five kinds of roof, chimneys and a rooftop water tank. That
+is not "flat colour blocks with window rectangles" and it is already richer per
+bay than `tgr-shopfronts` is.
+
+At 60 units a 4.6-unit bay is 93px in a 1344-tall portrait and a 1.15-tall window
+is 23px; at 120 units, 46px and 12px. **Window detail resolves. More of it will
+not help.**
+
+## What the reference has that we do not
+
+| | TGR shopfronts | ours |
+|---|---|---|
+| ground floor differs from upper floors | **pale cream + full-bay blue glazing** | stone base course + a door |
+| awning over the shopfront | **striped, projecting, on every bay** | none |
+| balconies | slab + black railing | slab + 7 railing bars |
+| window frames | 2-colour, frame + glass | proud box + lintel |
+| hanging signage over the pavement | shaped 3D signs on brackets | Tokyo only (`t.neon`) |
+| bunting across the street | yes | **yes, already** |
+| facade saturation (dominant mass) | **0.39-0.69** | **0.07-0.24** |
+
+Measured facades, `tgr-shopfronts` right-hand block: (133,105,189) S 0.444,
+(203,175,63) S 0.690, (133,147,217) S 0.387, (77,133,189) S 0.593. Ours, from
+`w31.7`: the dominant building mass is (161,175,189) L 173.0 **S 0.148**, 25% of
+the building area, with (21,21,49) navy windows at 28%.
+
+## Spec
+
+**B1. The awning. +24 triangles per bay, 120 per five-bay terrace.**
+
+Two boxes: a canopy sloping out from the facade at the top of the ground floor,
+and a fascia hanging off its front edge. It is the strongest single "this is a
+shop, not a wall" cue in the reference, it sits at 3-4 world units which is
+exactly the band the camera looks through, and because it is a horizontal
+projecting plane it catches a different toon band from the wall behind it -- so
+it reads as depth rather than as paint, which is the whole reason it earns its
+cost in this renderer rather than only in the reference's.
+
+**Divergence:** the reference's awnings are striped, and stripes on a 93px-wide
+bay at 60 units alias into a flat mean by 100 units -- the same failure the JUMP
+chevron block was measured at in section 2. **One colour per awning, drawn from
+the setting's accent list, with the fascia one step darker than the canopy.**
+
+**B2. The shopfront glazing band. +24 triangles per bay.**
+
+Replace the ground floor's stone base with base + a full-bay glazing band about
+2.0 tall in a cool pale colour + a stall riser under it. This is the reference's
+single largest ground-floor mass and ours is currently solid trim. It also gives
+the street a light band at eye level that the crowd barrier reads against.
+
+**B3. One hanging sign per three bays. +24 triangles per sign, ~40 per terrace.**
+
+A bracket and a board hung perpendicular to the facade at awning height. This is
+the pizza-slice device and it is the only item here that buys *depth* rather than
+detail: because the board is perpendicular, it crosses in front of the next
+building along and gives the street wall a parallax it does not currently have.
+
+**B4. Two-colour windows. +96 triangles per bay, 480 per five-bay terrace.**
+
+Every window in the reference is a coloured glass panel inside a surround in a
+*different* colour -- blue glass in a pink frame on the yellow facade, blue in
+white on the green. Ours is a proud box in `t.win` with a lintel over it, which
+gives the top edge but not the frame.
+
+One surround box per window, 0.06 larger in both directions and 0.04 shallower,
+in `t.trim` on pale facades and one step lighter than the wall on dark ones. At
+eight windows a bay that is +96 triangles per bay -- the largest single line in
+this section, and at 60 units a window is 23px so the frame is 1-2px, which is
+exactly the size at which a hard value edge still separates two masses. **At 120
+units it stops resolving and merges into the window's mean, which is the correct
+failure mode: the window gets slightly lighter with distance and nothing else
+happens.**
+
+**B5. Balconies on more of the fleet of settings.** `t.balcony` exists and is
+switched on for Berlin only. The reference has one on nearly every upper floor,
+and a projecting slab with a railing is the strongest depth cue on a facade
+because it is the only part that casts its own outline against the wall behind.
+Turning it on for the two or three other settings whose architecture supports it
+costs what it already costs -- slab 12 + seven bars 84 + handrail 12 = **108
+triangles per balconied floor** -- and adds nothing new to build.
+
+**B6. Do not raise facade saturation to match.** The reference is a candy town.
+Ours is twelve named cities whose palettes are deliberately real -- London
+stucco, Boston brownstone, Chicago limestone -- and Bo-Kaap already exists in the
+table as the saturated one, with a comment saying exactly why it is the
+exception. Turning London magenta to score 0.5 on a saturation metric would trade
+a genuine asset for a look we do not want and cannot justify. **Facade colour is
+the one place in this whole teardown where the reference should be ignored.**
+
+**B7. Still not worth building, and now on resolution grounds alone.** Glazing
+bars inside a window, per-floor cornice mouldings, balcony planting, door
+furniture, and any per-bay variation smaller than about 0.25 world units. At 60
+units 0.25 world is 5px and at 120 units it is 2px, so all of it converges on the
+facade's mean before it is ever read. **This is the one veto in the document that
+does not move when the ceiling moves** -- it was never a budget argument, and
+under-a-pixel detail costs triangles to produce nothing at any ceiling.
+
+Section total: awning 24 + shopfront 24 + hanging sign ~8 + window surrounds 96 =
+**152 triangles per bay, ~760 per five-bay terrace**, scenery so counted once.
+With three or four terraces in frame that is **+3,000**, 3% of a 91k frame.
+
+---
+
+# Findings, in priority order
+
+Ordered by perceived-quality gain, with cost stated. Cost is a fact here, not a
+tie-breaker: the whole spec is +10,400 rendered triangles on a 91k peak against a
+150k ceiling, so nothing on this list competes with anything else on it and the
+correct plan is to build all of it.
+
+1. **Give each vehicle its own saturated livery and take the cream off the warm
+   ones. Zero triangles.** Ten variants inside a 12-luminance, 0.15-saturation
+   band all measuring the same mauve is the complaint, stated numerically. Five
+   of seven variants reach the 1.6x/0.30 target for the first time in the game's
+   history. **If only one change is made, make this one** -- and it is first on
+   quality, not on thrift: no amount of geometry fixes ten objects that are the
+   same colour, and every item below reads better on a body that is not mauve.
+2. **Glass to 26-34% of the rear elevation, split into a 1.62:1 two-band ramp,
+   and put a rear window on the van and the refuse truck.** +24 rendered per
+   vehicle; the 2.3x area increase itself is free. Two of eight vehicles showing
+   no glass at all from the only angle the game has is the second-largest reason
+   the fleet reads as boxes.
+3. **Round wheels in real arch openings, with lit road showing under the sill.**
+   +160 rendered per wheeled vehicle net. This is the item the false ceiling
+   reduced to a painted rectangle; built properly it is the one change that makes
+   a vehicle stop being a box that ends at the road.
+4. **Dark bumper full-width at the bottom, 13% of the elevation, with a pale
+   number plate on it.** +24 rendered; the bumper move is free. The plate is 6.5x
+   the bumper it sits on and is the lowest bright element on the vehicle.
+5. **Trees: reverse the lobe-to-value mapping, widen the ladder to 1.70, warm the
+   hue to R = 0.76G, saturate the trunk.** Zero triangles, and per unit of effort
+   it is the largest perceptual change in the document after item 1.
+6. **Round two-part lamps -- near-white core inside a red surround.** +232
+   rendered per vehicle. Red alone is darker than the road and cannot be used
+   unsupported.
+7. **The body stops being a box: shoulder crease, inset greenhouse with pillars,
+   two-step roof chamfer.** +120 rendered per vehicle.
+8. **Trees: six lobes and a forked trunk.** +104 per tree, +3,100 in a heavy
+   frame.
+9. **Buildings: awning, shopfront glazing band, two-colour window surrounds,
+   hanging signs, balconies on more settings.** ~760 per five-bay terrace,
+   +3,000 in a heavy frame.
+10. **Turn the taxi to face the camera.** Zero triangles, real read risk, measure
+    before extending it to anything else.
+
+# Deliberately not copied, this pass
+
+- **Gloss, specular sweeps and lens highlights.** Section 3 established this and
+  nothing here contradicts it. The glass ramp is the transferable part and it is
+  two flat bands, not a gradient.
+- **Smooth-shaded curvature.** The reference's shoulder line, wheel arch and roof
+  dome are all gradients over curved panels. All three are specified above as
+  **steps between authored colours**, because a banded ramp renders a gradient as
+  a step anyway and it is better to place the step deliberately.
+- **The novelty vehicles.** Event skins, not art direction, and they would put a
+  second decorative colour system on top of a hazard hue that is a gameplay
+  signal.
+- **Striped awnings.** They alias to their mean by 100 units, which is the same
+  failure the chevron block was measured at.
+- **Saturated facades.** Twelve real city palettes are worth more than a metric.
+- **Sub-pixel building detail** -- glazing bars, cornice mouldings, door
+  furniture. A resolution argument, not a budget one, and the only veto in this
+  document that does not move when the ceiling does.
+
+# What was withdrawn when the ceiling turned out to be imaginary
+
+Recorded so the reasoning is auditable. An earlier draft of sections 5-7 was
+written to a 75k working ceiling and specified three cuts to pay for itself:
+crown spheres from seg 8/7 down to seg 6 (-104 per tree), wheel arches as flat
+painted rectangles instead of real openings, and box lamps instead of discs. All
+three are withdrawn. **Only one cut survives, and on its own merits: the two
+front wheels on every wheeled variant are occluded by their own body from a chase
+camera at every distance, and geometry that can never be seen should not be
+built at any ceiling.**

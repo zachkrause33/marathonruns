@@ -817,16 +817,37 @@ MR.World = (function () {
     return texture(c, true);
   }
 
-  /** Pale banded ripples, laid over the water plane on the bridge. */
+  /**
+   * Pale banded ripples, laid over the water plane on the bridge.
+   *
+   * THE CRESTS RUN ALONG THE ROAD, BECAUSE THE RIVER RUNS ACROSS IT.
+   *
+   * These bars used to be drawn horizontally, which put the wave crests across
+   * the direction of travel and therefore the current ALONG it -- a river
+   * flowing the same way as the bridge that crosses it. Two things were wrong
+   * with that and only one of them is pedantry.
+   *
+   * The one that matters: the player is travelling at 21.8-27.7 units/s and
+   * the ripple crawled at 0.485 units/s (0.014 offset/s over a 34.6-unit
+   * repeat). A drift along the axis the player is already sweeping at fifty
+   * times the speed is invisible by construction -- it is 1.9% of the motion
+   * already in that axis. Turning the current across the road puts it on the
+   * one axis the player's own travel does NOT hide, which is the same reason
+   * the pavement walkers were given lateral drift rather than forward drift.
+   *
+   * Drawn vertically, the crests also converge on the vanishing point instead
+   * of strobing past, which is what makes a flat sheet read as reaching to the
+   * horizon rather than as a scrolling belt.
+   */
   function rippleTexture() {
     const c = canvas(128, 128);
     const g = c.getContext('2d');
     g.clearRect(0, 0, 128, 128);
     g.fillStyle = 'rgba(255,255,255,0.30)';
     for (let i = 0; i < 7; i++) {
-      const y = 8 + i * 17, w = 24 + ((i * 37) % 60);
-      g.fillRect(((i * 53) % 100), y, w, 4);
-      g.fillRect(((i * 29) % 90) + 20, y + 7, w * 0.6, 3);
+      const x = 8 + i * 17, h = 24 + ((i * 37) % 60);
+      g.fillRect(x, ((i * 53) % 100), 4, h);
+      g.fillRect(x + 7, ((i * 29) % 90) + 20, 3, h * 0.6);
     }
     return texture(c, true);
   }
@@ -4133,6 +4154,9 @@ MR.World = (function () {
     // ground is acting as a river, so still terrain never shimmers.
     const rippleTex = rippleTexture();
     rippleTex.repeat.set(26, 26);
+    // 900 units of sheet over 26 repeats is 34.6 units per texture unit, so
+    // this is 1.90 world units of current per second. See the write site.
+    const RIPPLE_DRIFT = 0.055;
     const ripples = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), new THREE.MeshBasicMaterial({
       map: rippleTex, transparent: true, depthWrite: false,
     }));
@@ -9645,8 +9669,24 @@ MR.World = (function () {
         // sheet welded to the ground plane if that exclusion is ever relaxed.
         ripples.position.set(0, ground.position.y + eAt(z) + 0.05, z);
         ripples.material.opacity = 0.9 * lift;
-        // A slow crawl is all a flat plane needs to stop reading as lino.
-        rippleTex.offset.y = (now * 0.014) % 1;
+        // THE CURRENT, ACROSS THE ROAD. See rippleTexture() for why the axis
+        // changed; this is the rate.
+        //
+        // The sheet is 900 units across a repeat of 26, so one texture unit is
+        // 34.6 world units and the offset rate below is 1.90 units/s of water
+        // moving under the deck. That is stated in the units the player can
+        // check -- a 34-unit ship is moored out there to compare it against --
+        // rather than as an offset constant nobody can size.
+        //
+        // Four times the old crawl, and the axis is doing more of the work
+        // than the number: 0.485 units/s along the direction of travel was
+        // 1.9% of the player's own ground speed and could not be seen at any
+        // rate short of a rapid. Across the deck it competes with nothing.
+        rippleTex.offset.x = (now * RIPPLE_DRIFT) % 1;
+        // A second, slower crawl along the road on the far smaller axis, so
+        // the sheet is not one rigid pattern sliding sideways. Same trick the
+        // two cloud sheets use, and for the same reason.
+        rippleTex.offset.y = (now * RIPPLE_DRIFT * 0.21) % 1;
       }
 
       // road

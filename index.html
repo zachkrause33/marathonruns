@@ -17989,10 +17989,12 @@ MR.Ghost = (function () {
  *   - a top-gear band: the last quarter of the pace range gets extra FOV and
  *     a permanent low rumble, so "finding another gear" is a state change and
  *     not just a slightly bigger number.
- *   - surge, from the derivative of pace. Streak-driven acceleration is up to
- *     ~4 u/s^2, which is very legible even though the speed change is not:
- *     the camera trails and widens while you are gaining, and closes in and
- *     narrows while a hit bleeds the pace away.
+ *   - surge, from the derivative of pace. Measured on the smoothed signal this
+ *     file actually uses, streak-driven acceleration reaches +0.70 u/s^2 and a
+ *     hit -1.33 (7,460 samples of real play) -- NOT the ~4 this line used to
+ *     claim, which is where a normaliser 4.5x too large came from. The camera
+ *     trails and widens while you are gaining, and closes in and narrows while
+ *     a hit bleeds the pace away.
  *
  * Every effect is bounded so it can never hide the next gate: shake is a
  * damped oscillation rather than per-frame noise (noise reads as static and
@@ -18241,8 +18243,33 @@ MR.Camera = (function () {
       // going when they hit something is an honest measure of how much the
       // hit just cost them. See impact().
       s.drive = drive;
-      // +/- 1 over the range the pace ease can actually produce.
-      const surge = Math.max(-1, Math.min(1, s.accel / 3.2));
+      // +/- 1 over the range the pace ease can actually produce -- and the
+      // single divisor of 3.2 was not that range.
+      //
+      // Measured on this signal, 7,460 samples of real play at bot=0.85: the
+      // camera's own smoothed accel reaches +0.702 gaining and -1.327 losing.
+      // Against a divisor of 3.2 that capped the ACCELERATION cue at 0.219 of
+      // full while a hit reached 0.415 -- so the effect named "surge" was
+      // barely half the size of its opposite, and the header's claim that
+      // streak-driven acceleration is "up to ~4 u/s^2" is out by 5.7x. That
+      // wrong number is where 3.2 came from.
+      //
+      // The two sides are not symmetric in the game either, so they should not
+      // share a divisor: gaining pace is the streak easing a target, losing it
+      // is a contact dumping the streak at once.
+      //
+      // Only the gaining side is renormalised here, and the restraint is
+      // deliberate rather than timid. Surge on the way up WIDENS the FOV and
+      // trails the camera back -- both reveal more road, so a bigger value
+      // cannot hide a gate. On the way down it narrows and closes in, which
+      // is the one direction that can, it already stacks with `winded` at
+      // -5.0 FOV, and this project fails builds over hazards a player could
+      // not see. Making the punish cue 2.4x stronger is a difficulty change
+      // and wants a playtest, not an arithmetic fix.
+      const SURGE_UP = 0.70;      // measured ceiling, gaining
+      const surge = s.accel >= 0
+        ? Math.min(1, s.accel / SURGE_UP)
+        : Math.max(-1, s.accel / 3.2);
 
       // ---- one-shot beats ------------------------------------------------
       // Mile marker: a short lift and pull-back, so the milestone is a breath

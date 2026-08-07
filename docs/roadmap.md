@@ -43,12 +43,29 @@ band. The mats are not the defect.
 Two things are, both measured against the shipped camera and the shipped
 collision envelopes (`tools/` scratch, reproduced in the R2 brief):
 
-**1. A BLOCK is opaque to the horizon.** `BOX[BLOCK].yMax` is 2.80 and the
-camera eye is `BASE_Y` 2.62. The eye sits 0.18 units *below the top of the
-wall*, so there is no distance at which a player sees over one — the road
-behind a BLOCK is hidden all the way out, at every range. JUMP hides 6–20u
-depending on distance; a DUCK bar has daylight under it and loses a band
-further out (44–67u when the bar is at 20u). Only BLOCK is total.
+**1. Almost every hazard is opaque to the horizon, and the DUCK is the worst
+of them.** The camera eye is `BASE_Y` 2.62. Anything reaching that high hides
+everything behind it at every range, because the sightline over its top edge
+never comes back down to the road. Measured art heights, from
+`world.fleetSheet()` — not from the collision box, which is a ceiling and not a
+description:
+
+| | art top | sightline |
+|---|---|---|
+| JUMP v0–v3 | 0.79–0.80 | clear past 1.44× the hazard's distance |
+| **DUCK v0–v2** | **3.48–3.56** | **opaque to the horizon** |
+| BLOCK v1 hoarding, v2 trike, v4 bus, v7 refuse truck | 2.72–3.09 | **opaque to the horizon** |
+| BLOCK v0 tram, v3 marshals, v5 taxi, v6 van, v8 cyclists, v9 moped | 2.32–2.59 | clear past 8.7×–87× — opaque in practice |
+
+Seven of seventeen variants stand at or above the eye. Only the four JUMPs let
+a player see past them at a useful range.
+
+The DUCK is the finding. `BOX[DUCK]` is a bar from 1.41 to 1.83 — but the art
+carries a superstructure up to **3.52**, nearly twice the height of anything the
+player interacts with, sitting directly in the band the far road projects into.
+An earlier draft of this entry said a DUCK "has daylight under it and only
+loses a band further out". That is true of the *bar* and false of the *object*,
+and DUCKs are a third of all gates.
 
 And any hazard at 12 units covers **all three lanes** of the road at 45 units
 in screen width — 0.144 NDC half-width against a 0.114 lane band. Since gates

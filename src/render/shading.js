@@ -750,7 +750,57 @@ MR.shading = (function () {
    * the curved dark arcs the sky was criticised for. Eye-relative direction
    * plus fwidth-softened steps removes the geometry from the result entirely.
    */
+  /**
+   * THE CLOUD DRIFT, WHICH IS WIND SPEED OVER CLOUD HEIGHT AND NOTHING ELSE.
+   *
+   * p in SKY_FS is d.xz/h, which is exactly a position on a plane one unit
+   * above the eye. A sheet at height H under a crosswind v therefore crosses p
+   * at v/H per second -- so this constant is not a tuning knob in arbitrary
+   * units, it is metres per second divided by metres, and it can be set from
+   * the sky instead of from taste. 10 m/s under low cumulus based at 750 m is
+   * 0.0133, which is what this is.
+   *
+   * The far sheet takes 0.55 of it in the SAME direction, which is the near
+   * sheet sitting at 55% of the far sheet's altitude. See the sample sites.
+   *
+   * ==== THE BRIEF SAID THE CLOUDS WERE TOO SLOW TO PERCEIVE. THEY WERE NOT.
+   *
+   * Measured on the live page at the top 8% of a 420x860 frame, before any
+   * change: 5.47 px/s, i.e. 0.478 deg/s, i.e. 3.1 frame widths of travel
+   * across a four-minute race. The premise that a 182-second texture repeat
+   * means an imperceptible sky is a unit error -- what a viewer sees is an
+   * ANGULAR rate, and the repeat period of the texture does not appear in it.
+   * At 1500 m the shipped sheets were a 27 m/s gale.
+   *
+   * What was actually wrong is a parallax defect, which is squarely on brief:
+   *
+   *   far  (S 0.125)  o = 0.41 - t*0.0022   ->  dp/dt = +0.01760
+   *   near (S 0.300)  o =        t*0.0055   ->  dp/dt = -0.01833
+   *
+   * Opposite signs at 96% of the same magnitude. Two sheets sliding THROUGH
+   * each other is not depth, and the comment at the sample site claimed it as
+   * "the parallax between them gives the sky depth for free". It gave shear.
+   *
+   * So the far sheet is turned around to agree with the near one -- the near
+   * one keeps the direction it shipped with, so the sky still travels the way
+   * it always did -- and the rate comes down from a gale to a breeze. They
+   * still beat against each other at 0.45 of the near rate, which is what
+   * keeps the composite CHANGING SHAPE rather than scrolling as a rigid sheet;
+   * losing that was the one real thing the counter-motion was buying.
+   *
+   * Result, same instrument: 5.47 -> 4.00 px/s, and every frame of it now
+   * going the same way. This is the rare item where the honest fix REDUCES a
+   * number in a task about adding motion, and it is recorded plainly so that
+   * nobody re-raises "the clouds are too slow" from the texture constant.
+   *
+   * NOT time-compressed. TIME_SCALE runs the RACE at 30x and the sky must not
+   * take it: the sun does not move, so clouds at 30x read as time-lapse under
+   * a pinned sun. Authored against the player's wall clock instead.
+   */
+  const CLOUD_DRIFT = 0.0133;
+
   const SKY_FS = `
+    #define CLOUD_DRIFT ${CLOUD_DRIFT.toFixed(5)}
     uniform vec3 top;
     uniform vec3 bottom;
     uniform vec3 sunColor;
@@ -858,7 +908,16 @@ MR.shading = (function () {
       // horizon the way real ones do instead of being pasted on the dome.
       // Two layers at different scales and drift speeds: one sheet repeats
       // obviously across a 47-degree field, two beating against each other do
-      // not, and the parallax between them gives the sky depth for free.
+      // not.
+      //
+      // The two sheets used to drift in OPPOSITE directions at 96% of the same
+      // magnitude, which is a shear rather than the depth this comment claimed.
+      // A feature holds a fixed texture coordinate, so with offset o and scale
+      // S it crosses the cloud plane at dp/dt = -(do/dt)/S; both sample sites
+      // below are now signed so that rate is negative for both, and the far
+      // sheet is held to 0.55 of the near one. The derivation of the rate
+      // itself, and the measurement that refuted the brief that opened it, are
+      // on CLOUD_DRIFT.
       vec2 p = d.xz / max(h, 0.035);
       float r = length(p);
       // Nothing survives out where one texel spans a degree of sky -- without
@@ -904,10 +963,10 @@ MR.shading = (function () {
       // Switching it off outright was measured at +0.085 mean saturation in the
       // top tenth of the frame, the largest single term in the sky; this keeps
       // the parallax it was added for and gives most of that back.
-      vec4 lo = texture2D(cloudMap, p * 0.125 + vec2(0.41 - time * 0.0022, 0.63));
+      vec4 lo = texture2D(cloudMap, p * 0.125 + vec2(0.41 + time * CLOUD_DRIFT * 0.55 * 0.125, 0.63));
       col = mix(col, mix(col, lit, 0.55), smoothstep(0.34, 0.88, lo.a) * reach * 0.38);
 
-      vec4 hi = texture2D(cloudMap, p * 0.300 + vec2(time * 0.0055, 0.0));
+      vec4 hi = texture2D(cloudMap, p * 0.300 + vec2(time * CLOUD_DRIFT * 0.300, 0.0));
       col = mix(col, mix(shd, lit, smoothstep(0.35, 0.65, hi.r)), smoothstep(0.30, 0.82, hi.a) * reach);
 
       gl_FragColor = vec4(lin2srgb(col), 1.0);

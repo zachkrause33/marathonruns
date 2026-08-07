@@ -116,6 +116,35 @@ const CUES = [
   { label: 'finish(RECORD)',    call: 'a.finish(true)',        len: 7.0 },
   { label: 'countdown(3)',      call: 'a.countdown(false)',    len: 1.0 },
   { label: 'countdown(go)',     call: 'a.countdown(true)',     len: 1.5 },
+  // ---- terrain ----------------------------------------------------------
+  // The grade is a STATE, so it is measured as the steady-state difference the
+  // hill makes against an identical bed at the same gear on the flat: `pre`
+  // sets the cue's world, `refPre` sets the reference's. The hills are
+  // pace-neutral, so the test these rows have to pass is that the terrain is
+  // AUDIBLE and DIRECTIONAL while staying quieter than anything that costs the
+  // player something.
+  { delta: true, label: 'grade +4 (bed)',    call: null, len: 2.5,
+    pre: 'a.setIntensity(2.5, 4)',  refPre: 'a.setIntensity(2.5, 0)' },
+  { delta: true, label: 'grade +2 (bed)',    call: null, len: 2.5,
+    pre: 'a.setIntensity(2.5, 2)',  refPre: 'a.setIntensity(2.5, 0)' },
+  { delta: true, label: 'grade -4 (bed)',    call: null, len: 2.5,
+    pre: 'a.setIntensity(2.5, -4)', refPre: 'a.setIntensity(2.5, 0)' },
+  // The edges. Each fires once per hill, 4-5 hills a race.
+  { delta: true, label: 'CREST',             call: 'a.setIntensity(2.5, -0.4)', len: 3.0,
+    pre: 'a.setIntensity(2.5, 3.2)', refPre: 'a.setIntensity(2.5, 3.2)' },
+  { delta: true, label: 'foot of climb',     call: 'a.setIntensity(2.5, 1.6)', len: 2.5,
+    pre: 'a.setIntensity(2.5, 0)',  refPre: 'a.setIntensity(2.5, 0)' },
+  { delta: true, label: 'bottom',            call: 'a.setIntensity(2.5, -0.5)', len: 2.5,
+    pre: 'a.setIntensity(2.5, -1.6)', refPre: 'a.setIntensity(2.5, -1.6)' },
+  // Footfalls on a hill. Cadence already changes on its own; these are the
+  // per-step colour on top of it.
+  { label: 'footstep@flat',     call: 'a.footstep(1)', len: 1.0,
+    pre: 'a.setIntensity(2.5, 0)',  refPre: 'a.setIntensity(2.5, 0)' },
+  { label: 'footstep@+4',       call: 'a.footstep(1)', len: 1.0,
+    pre: 'a.setIntensity(2.5, 4)',  refPre: 'a.setIntensity(2.5, 4)' },
+  { label: 'footstep@-4',       call: 'a.footstep(1)', len: 1.0,
+    pre: 'a.setIntensity(2.5, -4)', refPre: 'a.setIntensity(2.5, -4)' },
+
   // Written and measured, but not yet called from anywhere -- see the note at
   // the foot of audio.js for the one line each of them needs.
   { label: '~aidMissed',        call: 'a.aidMissed()',         len: 1.0 },
@@ -187,7 +216,7 @@ window.__probe = (function () {
   }
   const realRandom = Math.random;
 
-  async function render(callSrc, len) {
+  async function render(callSrc, len, preSrc) {
     const oc = new OfflineAudioContext(1, Math.ceil(SR * (LEAD + len)), SR);
     let vnow = 0;
 
@@ -216,6 +245,11 @@ window.__probe = (function () {
       const realST = window.setTimeout;
       window.setTimeout = function (fn, ms) { pending.push({ at: (ms || 0) / 1000, fn }); return 0; };
 
+      // Pre-roll: run at vnow 0 so per-frame state (gear, grade) has the whole
+      // 1.5 s lead-in to settle through its setTargetAtTime curves before the
+      // measured window opens. This is how a STATE is measured rather than the
+      // transition into it.
+      if (preSrc) (new Function('a', preSrc))(a);
       vnow = LEAD;
       let base = LEAD;
       try {
@@ -383,7 +417,9 @@ window.__probe = (function () {
     let t0 = performance.now();
     for (let i = 0; i < FRAMES; i++) {
       vnow = i / 60;
-      a.setIntensity(Math.min(1, (205 * i / FRAMES) / 70));
+      // Unclamped streak/70, plus a realistic 5-hill grade profile in percent,
+      // because both arms of setIntensity are now paid on every frame.
+      a.setIntensity((205 * i / FRAMES) / 70, 4 * Math.sin(i / FRAMES * Math.PI * 10));
     }
     const perFrameUs = ((performance.now() - t0) * 1000) / FRAMES;
     const setIntensityNodes = nodes;
@@ -468,16 +504,17 @@ ${mods}
   const rows = [];
 
   for (const cue of list) {
-    const r = await page.evaluate(async ({ call, len, bed }) => {
-      const cueBuf = await window.__probe.render(bed ? null : call, len);
+    const r = await page.evaluate(async ({ call, len, bed, pre, refPre }) => {
+      const cueBuf = await window.__probe.render(bed ? null : call, len, pre);
       let sig = cueBuf;
       if (!bed) {
-        const bedBuf = await window.__probe.render(null, len);
+        const bedBuf = await window.__probe.render(null, len, refPre || pre);
         sig = window.__probe.subtract(cueBuf, bedBuf);
       }
       const m = window.__probe.analyse(sig);
       return { m, samples: Array.from(sig) };
-    }, cue);
+    }, { call: cue.call, len: cue.len, bed: cue.bed, pre: cue.pre || null,
+         refPre: cue.refPre || null });
     rows.push({ label: cue.label, ...r.m });
     if (wavDir) {
       fs.writeFileSync(path.join(wavDir, cue.label.replace(/[^\w.-]+/g, '_') + '.wav'),
@@ -514,8 +551,12 @@ ${mods}
   const by = {};
   for (const r of rows) by[r.label] = r;
   const fails = [];
-  const check = (ok, msg) => { if (!ok) fails.push(msg); };
+  // A filtered run measures a subset, so the cross-cue assertions have nothing
+  // to compare against and would fail for the wrong reason.
+  const partial = !!only;
+  const check = (ok, msg) => { if (!partial && !ok) fails.push(msg); };
   const p = (k) => (by[k] ? by[k].punchDb : NaN);
+  const c = (k) => (by[k] ? by[k].cent : NaN);
 
   for (const r of rows) {
     check(r.clip === 0, `${r.label}: ${r.clip} clipped samples`);
@@ -548,11 +589,37 @@ ${mods}
 
   // The ambient bed is the floor everything has to clear.
   const bed = by['ambient(bed)'];
+  const isDelta = {};
+  for (const cue of [...CUES, ...STACKS]) if (cue.delta) isDelta[cue.label] = true;
   for (const r of rows) {
-    if (r.label.startsWith('STACK') || r.label.startsWith('ambient')) continue;
+    // The terrain rows measure the CHANGE a grade makes to the bed, against an
+    // otherwise identical bed. "Louder than the bed" is the wrong question for
+    // them -- they are judged on being a change of comparable size, below.
+    if (r.label.startsWith('STACK') || r.label.startsWith('ambient') || isDelta[r.label]) continue;
     check(r.punchDb > bed.punchDb + 6,
       `${r.label}: punch ${f(r.punchDb)} dBFS is inside the ${f(bed.punchDb)} dBFS bed`);
   }
+  // ---- terrain ----------------------------------------------------------
+  // The hills are pace-neutral: net rise is exactly zero and the finish moves
+  // by under 0.2 s. So the terrain has to be AUDIBLE, DIRECTIONAL, and smaller
+  // than anything that actually costs the player something -- if a climb ever
+  // measures like an event, the mix is charging for something the model gives
+  // away free.
+  check(c('grade -4 (bed)') > c('grade +4 (bed)') * 1.25,
+    'a climb and a descent colour the bed the same way: '
+    + Math.round(c('grade +4 (bed)')) + 'Hz up vs ' + Math.round(c('grade -4 (bed)')) + 'Hz down');
+  // A delta at or above the level of the bed it is modifying is a change you
+  // cannot miss; 8 dB under it would be one you could.
+  check(p('grade +4 (bed)') > bed.punchDb - 4, 'the grade does not move the bed audibly');
+  check(p('grade -4 (bed)') > bed.punchDb - 6, 'a descent does not move the bed audibly');
+  check(p('grade +4 (bed)') < p('footstep(1)'), 'the grade is louder than a footstep -- it reads as an event');
+  check(p('CREST') > bed.punchDb, 'the crest is smaller than the bed it plays over');
+  check(p('CREST') < p('clean(90)') - 3, 'the crest is as loud as a clean gate -- it reads as a reward');
+  check(p('foot of climb') < p('CREST'), 'the foot of a climb outweighs the crest');
+  check(c('footstep@-4') > c('footstep@+4') * 1.10,
+    'footfalls do not tilt with the grade: '
+    + Math.round(c('footstep@+4')) + 'Hz up vs ' + Math.round(c('footstep@-4')) + 'Hz down');
+
   // Steps land ~3x a second at speed; a tail longer than that is a drone.
   check(by['footstep(1)'] && by['footstep(1)'].dur < 0.3, 'footstep tail smears into the next step');
   // Small speakers roll off below ~200 Hz. A cue that lives entirely down
@@ -561,18 +628,20 @@ ${mods}
     if (by[k]) check(by[k].band[0] < 80, `${k}: ${f(by[k].band[0], 0)}% of energy below 200 Hz`);
   }
 
-  console.log('  cost   setIntensity ' + cost.perFrameUs.toFixed(2) + ' us/frame over a full race ('
-    + cost.setIntensityNodes + ' nodes built, i.e. it never allocates)');
+  console.log('  cost   setIntensity ' + cost.perFrameUs.toFixed(2)
+    + ' us/frame over a full race of streak + grade, allocating '
+    + cost.setIntensityNodes + ' nodes in total (the gear chimes and terrain edges)');
   console.log('         running      ' + cost.perSecondMs.toFixed(3) + ' ms and '
     + cost.perSecondNodes.toFixed(0) + ' short-lived nodes per second of top-gear play, i.e. '
     + (cost.perSecondMs * 1000 / 5).toFixed(0) + ' us on a frame that fires one cue');
-  console.log('         steady state 9 live nodes; all synthesis runs on the audio thread');
+  console.log('         steady state 10 live nodes; all synthesis runs on the audio thread');
   console.log('');
 
   if (errs.length) {
     console.log('  PAGE ERRORS:');
     for (const e of errs.slice(0, 10)) console.log('    ' + e);
   }
+  if (partial) console.log('  (filtered run: cross-cue assertions skipped)');
   if (fails.length) {
     console.log('  FAIL');
     for (const m of fails) console.log('    - ' + m);

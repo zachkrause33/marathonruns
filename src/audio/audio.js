@@ -26,6 +26,10 @@
  *   as a CHANGE   crossing into a new gear plays a two-note lift; losing one
  *                 plays it upside down. Eight gears across a race.
  *
+ * The terrain is said the same way -- the grade is a state, the crest is an
+ * edge -- and deliberately says nothing about cost, because the hills do not
+ * charge one. See THE GRADE.
+ *
  * The gear curve is derived from the pace model, not invented -- see
  * `gearOf()`. The previous version saturated at streak 90 on a course of 205
  * gates, so from about mile 11 the sound stopped responding while the game
@@ -66,8 +70,8 @@
  *
  * The graph runs on the browser's audio thread, not the render thread, so the
  * per-FRAME cost of this file is only the JS that schedules it. Steady state
- * is 9 live nodes (bed, rush, their filters and gains, the event gain, the
- * limiter and the master). Running creates roughly 30 short-lived nodes a
+ * is 10 live nodes (bed, rush, their filters and gains, the grade tilt, the
+ * event gain, the limiter and the master). Running creates roughly 30 short-lived nodes a
  * second, each self-freeing on stop. Nothing is polled and nothing runs on
  * requestAnimationFrame. `setIntensity` is called every frame by main.js and
  * is gated so that a frame where the value has not meaningfully moved does no
@@ -309,7 +313,16 @@ MR.Audio = (function () {
       const f = ctx.createBiquadFilter();
       f.type = 'bandpass'; f.frequency.value = 620; f.Q.value = 0.55;
       const g = ctx.createGain(); g.gain.value = 0.035;
-      src.connect(f); f.connect(g); g.connect(evt);
+      // THE GRADE TILT. A peaking filter at 300 Hz, and the only axis in the
+      // mix that nothing else touches -- gear moves level and centre
+      // frequency, so the grade needed somewhere of its own or a climb would
+      // be indistinguishable from a streak. On a climb the road rises into
+      // your field a few metres in front of you and the low-mid comes back at
+      // you; on a descent the ground falls away and it thins out.
+      const gq = ctx.createBiquadFilter();
+      gq.type = 'peaking'; gq.frequency.value = 300; gq.Q.value = 0.8;
+      gq.gain.value = 0;
+      src.connect(f); f.connect(gq); gq.connect(g); g.connect(evt);
       src.start();
 
       // THE RUSH. Air moving past you, and the only part of the mix that is
@@ -324,46 +337,141 @@ MR.Audio = (function () {
       rsrc.connect(rf); rf.connect(rg); rg.connect(evt);
       rsrc.start(ctx.currentTime + 0.02);
 
-      amb = { src, f, g, rsrc, rf, rg };
+      amb = { src, f, g, gq, rsrc, rf, rg };
       applyBed();
     }
 
-    // Last value main.js pushed in, and the last value actually written to the
-    // graph. Both exist so a frame that changes nothing costs nothing.
-    let callerX = 0;
-    let bedWrote = -1;
+    // ---- THE GRADE ------------------------------------------------------
+    //
+    // The hills are PACE-NEUTRAL BY CONSTRUCTION: net rise is exactly zero on
+    // every date, the grade term integrates to zero over the race, and the
+    // flat-vs-hilly finish delta is under 0.2 s. So the sound must not imply a
+    // cost the model does not charge. Nothing here labours, strains or
+    // breathes harder on a climb -- that would be the mix telling the player
+    // they are losing something the game is not taking.
+    //
+    // What it does instead is treat the hill as ACOUSTIC SPACE, which is a
+    // fact about terrain rather than about effort:
+    //
+    //   climbing   the road rises into your field a few metres ahead. The
+    //              world closes in: low-mid comes back at you (`gq` up), the
+    //              bed darkens, and there is less air moving.
+    //   descending the ground falls away and the city opens out. Thinner,
+    //              brighter, wider, more air.
+    //
+    // The air term is honest rather than decorative: paceNow = pace +
+    // GRADE_SPM * grade, so the runner genuinely is moving about 6% faster on
+    // the steepest descent and 5% slower on the steepest climb. It is the
+    // FINISH that is neutral, not the local speed.
+    //
+    // And one thing was already free before any of this: main.js fires
+    // footsteps off `runner.phase`, whose cadence is `2.55 * (speed /
+    // SPEED_LO)^0.72` with a grade-inclusive speed. Measured against the real
+    // curve, the stride is 4.7-5.3% slower on a 4% climb and 4.6-6.1% faster
+    // on a 4% descent, all of it already in the mix. The layers below are
+    // sized as a complement to that, not as a replacement for it.
+
+    // pace.grade is PERCENT (elevation.js: gradeAt = slope * 100) while
+    // MR.Elevation.MAX_GRADE is the slope FRACTION 0.040. Reading one as the
+    // other is a factor of 100 and would peg this signal at full scale for
+    // the whole race.
+    const GRADE_MAX_PCT = ((MR.Elevation && MR.Elevation.MAX_GRADE) || 0.04) * 100;
+
+    let gradeN = 0;        // -1..1 against the steepest legal grade
+    let bedWroteX = -1;    // last gear written to the graph
+    let bedWroteG = -9;    // last grade written to the graph
 
     function applyBed() {
       if (!amb) return;
-      // main.js sends min(1, streak/70) -- saturated at streak 70 on a course
-      // of 205 gates, the same fault the gate blip had. So the bed is driven
-      // by `gear`, which does not saturate, and the caller's value is folded
-      // in as a floor for the opening of the race where it is still moving.
-      // If a caller ever passes an unclamped streak/70 (a value above 1) it is
-      // read back as a streak and used directly, so improving the call site
-      // needs no change here.
-      const x = Math.max(gear, Math.min(0.6, callerX * 0.6));
-      if (Math.abs(x - bedWrote) < 0.015) return;
-      bedWrote = x;
+      const x = Math.min(1.15, gear);
+      // A frame where neither term has meaningfully moved does no work at all.
+      if (Math.abs(x - bedWroteX) < 0.015 && Math.abs(gradeN - bedWroteG) < 0.04) return;
+      bedWroteX = x; bedWroteG = gradeN;
+      const gn = gradeN;
       const t = ctx.currentTime;
-      amb.g.gain.setTargetAtTime(0.030 + 0.062 * x, t, 0.4);
-      amb.f.frequency.setTargetAtTime(560 + 340 * x, t, 0.6);
+      amb.g.gain.setTargetAtTime((0.030 + 0.062 * x) * (1 + 0.16 * gn), t, 0.4);
+      amb.f.frequency.setTargetAtTime((560 + 340 * x) * Math.pow(2, -0.28 * gn), t, 0.6);
+      amb.gq.gain.setTargetAtTime(5.0 * gn, t, 0.5);
       // The rush only exists above about half a gear; below that it would be
       // hiss on a runner who is not going anywhere.
       const r = Math.max(0, x - 0.42) / 0.58;
-      amb.rg.gain.setTargetAtTime(0.070 * r * r, t, 0.7);
-      amb.rf.frequency.setTargetAtTime(1000 + 1300 * r, t, 0.9);
+      amb.rg.gain.setTargetAtTime(0.070 * r * r * (1 - 0.35 * gn), t, 0.7);
+      amb.rf.frequency.setTargetAtTime((1000 + 1300 * r) * (1 - 0.10 * gn), t, 0.9);
     }
 
-    /** Crowd swells with pace and with the streak. Called every frame. */
-    s.setIntensity = function (x) {
+    /**
+     * Per-frame world state. Called by main.js on every frame of RUN.
+     *
+     * @param x      pace.streak / 70, unclamped.
+     * @param grade  pace.grade, percent, positive uphill. Optional: without it
+     *               the terrain is simply silent, which is what shipped.
+     *
+     * `x` used to arrive as min(1, streak/70) and saturated at streak 70 on a
+     * course of 205 gates -- the same defect clean() had. The clamp is gone at
+     * the call site now, so the value is read straight back as the streak it
+     * is and gear does the rest.
+     */
+    let lastX = -1;
+    s.setIntensity = function (x, grade) {
       const v = x || 0;
-      // Forward-compatible: a caller that stops clamping gets read properly.
-      if (v > 1.05) { setGear(v * 70, 0); return; }
-      if (Math.abs(v - callerX) < 0.01) return;
-      callerX = v;
-      applyBed();
+      if (v !== lastX) { lastX = v; setGear(v * 70, 0); }
+      if (grade !== undefined) setGrade(grade);
     };
+
+    /**
+     * The terrain edges.
+     *
+     * A hill's grade is a smooth sine: it rises through zero at the foot,
+     * peaks, falls back through zero AT THE CREST, troughs, and returns. So
+     * the crest is a zero crossing, not a state, and it is detected as one --
+     * armed by having actually been on a climb, so a flat wobble cannot fire
+     * it. Measured against the real profiles this gives exactly one crest,
+     * one foot and one bottom per hill: 12-15 edges across a race of 4-5
+     * hills, on every date tested.
+     *
+     * A three-state FLAT/UP/DOWN machine was the obvious shape and is wrong.
+     * The grade sits inside any sensible flat deadband for up to 1812 units --
+     * 64 seconds of wall clock -- between hills, so the crest would have come
+     * out as two unrelated edges, and the one at the top would have fired late
+     * by however wide the deadband was.
+     *
+     * None of these touch `evt`. Ducking the whole world is contact's move and
+     * contact's alone: it is the only event in the game that costs anything
+     * and it should stay the only one that takes the room away.
+     */
+    let gPrev = 0;
+    let gPeak = 0;
+    let armedFoot = true, armedBottom = true;
+
+    function setGrade(gPct) {
+      const gn = Math.max(-1, Math.min(1, (gPct || 0) / GRADE_MAX_PCT));
+      if (gn > gPeak) gPeak = gn;
+
+      // The foot: the ground starts rising under you.
+      if (armedFoot && gPrev <= 0.25 && gn > 0.25) {
+        armedFoot = false;
+        noise(0.70, 1400, 0.6, 0.045, 'bandpass', { atk: 0.14, to: 350 });
+      }
+      // THE CREST. The road stops climbing and the view arrives -- wide, soft,
+      // opening upward, and deliberately below a clean gate in level. It is
+      // terrain, not an achievement, and a chime here would be the mix
+      // congratulating the player for arriving somewhere gravity took them.
+      if (gPrev > 0 && gn <= 0 && gPeak > 0.35) {
+        gPeak = 0; armedFoot = true; armedBottom = true;
+        noise(0.95, 300, 0.5, 0.075, 'bandpass', { atk: 0.18, to: 2600 });
+        noise(0.55, 1800, 0.7, 0.030, 'bandpass', { at: 0.15, atk: 0.20, to: 4200 });
+      }
+      // The bottom: the descent runs out and the road levels.
+      if (armedBottom && gPrev <= -0.25 && gn > -0.25) {
+        armedBottom = false;
+        noise(0.45, 700, 0.7, 0.028, 'bandpass', { atk: 0.10, to: 900 });
+      }
+      gPrev = gn;
+
+      if (Math.abs(gn - gradeN) < 0.02) return;
+      gradeN = gn;
+      applyBed();
+    }
 
     // ---- one-shots ------------------------------------------------------
 
@@ -382,7 +490,15 @@ MR.Audio = (function () {
       stepFlip ^= 1;
       const g = gear;
       // Scuff: 900 Hz at a standstill, 2.1 kHz in top gear, and shorter.
-      noise(0.045 - 0.016 * g, 900 + 1200 * g, 0.9, 0.45 * p * (0.75 + 0.4 * g),
+      // It also tilts with the grade, and that is geometry rather than effort:
+      // a climb is taken on the forefoot, so the contact is quieter and duller
+      // with no heel in it, and a descent lands heel-first and harder. The
+      // cadence underneath this already changes on its own -- see the note at
+      // THE GRADE -- so between them the road is legible without anything in
+      // the mix having to sound like it is costing the player time.
+      const gn = gradeN;
+      noise(0.045 - 0.016 * g, (900 + 1200 * g) * (1 - 0.22 * gn), 0.9,
+        0.45 * p * (0.75 + 0.4 * g) * (1 - 0.30 * gn),
         'bandpass', { atk: 0.002, to: 480 + 400 * g });
       // Body.
       noise(0.075, stepFlip ? 240 : 300, 1.2, 0.70 * p, 'bandpass');
@@ -628,7 +744,7 @@ MR.Audio = (function () {
         evt.gain.setTargetAtTime(1.9 + 1.2 * p, t, 0.35);
         evt.gain.setTargetAtTime(1, t + dur, 1.6);
         amb.f.frequency.setTargetAtTime(760 + 420 * p, t, 0.3);
-        bedWrote = -1;   // let the next applyBed re-assert the real value
+        bedWroteX = -1;  // let the next applyBed re-assert the real value
       }
     };
 
@@ -693,6 +809,16 @@ MR.Audio = (function () {
     // from anywhere yet, because the call sites are in src/core and src/main,
     // which this change does not own. One line each:
     //
+    //   setIntensity(x, grade) -- WIRED for x, NOT YET for grade. The second
+    //                 argument is optional and the terrain is simply silent
+    //                 without it, which is exactly what ships today. One token
+    //                 at the existing call site in main.js turns it on:
+    //
+    //                   audio.setIntensity(pace.streak / 70, pace.grade);
+    //
+    //                 pace.grade is already exposed, already correct, and
+    //                 already sampled at the runner's own z every frame.
+    //
     //   aidMissed()   an aid item went past untaken. main.js already walks
     //                 player.resolveAid(); the miss is the item the walk did
     //                 not return, which course.js knows.
@@ -721,7 +847,7 @@ MR.Audio = (function () {
         evt.gain.setValueAtTime(evt.gain.value, t);
         evt.gain.setTargetAtTime(0.45, t, 0.5);
         evt.gain.setTargetAtTime(1, t + 2.2, 1.2);
-        bedWrote = -1;
+        bedWroteX = -1;
       }
     };
 

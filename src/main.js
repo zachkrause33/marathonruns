@@ -10,6 +10,14 @@
  *   ?debug=1          FPS and draw-call readout
  *   ?nocount=1        skip the countdown
  *   ?nosave=1         play without writing to the save
+ *   ?polish=0         run the character animation with the polish terms off
+ *
+ * `?polish` is the animation A/B, and it is a scalar rather than a switch so
+ * the two versions can also be crossfaded to find where a term stops helping.
+ * Every term added by the animation-polish work is scaled by
+ * MR.Runner.POLISH, which means ONE build renders both the old cycle and the
+ * new one. A checked-in "before" screenshot goes stale the first time
+ * something else on the character changes; this cannot.
  */
 (function () {
   const K = MR.K;
@@ -25,6 +33,12 @@
   const NOCOUNT = params.get('nocount') === '1' || BOT;
   // Inspecting the game should not be able to overwrite a real player's best.
   const NOSAVE = params.get('nosave') === '1';
+  // Guarded, because this reads a knob on another module: absent the polish
+  // work the parameter is simply inert rather than a boot failure.
+  if (params.has('polish') && MR.Runner && 'POLISH' in MR.Runner) {
+    const v = parseFloat(params.get('polish'));
+    if (isFinite(v)) MR.Runner.POLISH = Math.max(0, Math.min(1, v));
+  }
 
   // ---- renderer ---------------------------------------------------------
   const canvas = document.getElementById('gl');

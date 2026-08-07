@@ -258,6 +258,11 @@ function pageSetup() {
   F.groups = { shoe: shoe, body: body, mark: mark };
   F.counts = { shoe: shoe.length, body: body.length, mark: mark.length };
 
+  F.shown = function (o) {
+    for (let n = o; n; n = n.parent) if (!n.visible) return false;
+    return true;
+  };
+
   /**
    * One sample. Returns, per group, the conservative bound; and refines to the
    * exact row whenever the bound says this sample could beat the worst so far.
@@ -276,7 +281,12 @@ function pageSetup() {
       let bound = -Infinity, exact = -Infinity;
       const hot = [];
       for (let i = 0; i < list.length; i++) {
-        if (!list[i].visible) continue;
+        // ANCESTORS TOO. `mesh.visible` is not whether the mesh is drawn --
+        // three.js culls a whole subtree when a parent's flag is false, and this
+        // rig switches `fxPivot`, `streaks` and `reticle` off at the group. A
+        // mesh under a hidden group still reports visible === true, so testing
+        // the mesh alone measures geometry that is nowhere on screen.
+        if (!F.shown(list[i])) continue;
         const b = meshBound(list[i], cam, rect);
         if (b > bound) bound = b;
         if (b >= (best[key] === undefined ? -Infinity : best[key])) hot.push(list[i]);
@@ -415,6 +425,16 @@ function pageSweep(opt) {
   for (const vp of VIEWPORTS) {
     if (ONLY && vp.name !== ONLY) continue;
     for (const pc of PACES) {
+     // A FRESH PAGE PER STATE, and it is not fastidiousness.
+     //
+     // Each sweep advances the real simulation by ten to fifteen seconds of
+     // wall time. Four of them in a row from `?skip=178` walk the runner over
+     // the finish line, `state` leaves RUN, `pace.update` stops being called,
+     // and the fourth sweep silently measures a frozen frame -- which is how
+     // the `fast hit` row came back as 0.0000 units of travel. Reloading also
+     // stops a landing dip or a winded tail leaking from one state's sweep
+     // into the next one's first window.
+     for (const st of STATES) {
       const ctx = await browser.newContext({
         viewport: { width: vp.w, height: vp.h }, deviceScaleFactor: 1,
       });
@@ -458,16 +478,14 @@ function pageSweep(opt) {
         if (!handed) await page.waitForTimeout(100);
       }
       if (!handed) { problems.push(`${vp.name} ${pc.name}: the game loop never handed over a frame`); failed = true; await ctx.close(); continue; }
-      const setup = await page.evaluate(pageSetup);
+      await page.evaluate(pageSetup);
 
-      for (const st of STATES) {
-        const res = await page.evaluate(pageSweep, { state: st, windows: WINDOWS });
-        if (res.error) { problems.push(`${vp.name} ${pc.name} ${st}: ${res.error}`); failed = true; continue; }
+      const res = await page.evaluate(pageSweep, { state: st, windows: WINDOWS });
+      if (res.error || !isFinite(res.shoe) || !isFinite(res.body)) {
+        problems.push(`${vp.name} ${pc.name} ${st}: ${res.error || 'no finite sample'}`);
+        failed = true;
+      } else {
         if (res.clipped) problems.push(`${vp.name} ${pc.name} ${st}: ${res.clipped} vertices behind the near plane`);
-        if (!isFinite(res.shoe) || !isFinite(res.body)) {
-          problems.push(`${vp.name} ${pc.name} ${st}: no finite sample -- the clock is not advancing`);
-          failed = true; continue;
-        }
         const clear = res.rail - res.shoe;
         const clearBody = res.rail - res.body;
         rows.push({
@@ -482,8 +500,9 @@ function pageSweep(opt) {
         });
         if (Math.min(clear, clearBody) < MARGIN) failed = true;
       }
-      if (errs.length) { problems.push(`${vp.name} ${pc.name}: ` + errs.slice(0, 2).join(' | ')); failed = true; }
+      if (errs.length) { problems.push(`${vp.name} ${pc.name} ${st}: ` + errs.slice(0, 2).join(' | ')); failed = true; }
       await ctx.close();
+     }
     }
   }
 

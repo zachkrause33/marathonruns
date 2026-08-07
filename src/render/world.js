@@ -3491,7 +3491,33 @@ MR.World = (function () {
       // the ramp follows the cross-fade without anything having to drive it.
       road: S.toon(P.road, 2),
       shoulder: S.toon(P.ground, 2),
-      paint: new THREE.MeshBasicMaterial({ vertexColors: true }),
+      // THE ROAD PAINT IS LIT, AND THAT IS THE WHOLE OF THE HIERARCHY FIX.
+      //
+      // It was MeshBasicMaterial, i.e. unlit, i.e. drawn at its authored value
+      // while everything around it went through the toon ramp. Measured with
+      // tools/inkbudget.js: paint mean L 0.55 against tarmac 0.25 and a player
+      // whose lit fill tops out at p95 0.65. The brightest object in the
+      // gameplay band was road marking, by material choice rather than by
+      // intent -- the focal point out-valued by the surface it runs on.
+      //
+      // Same material class as the road now, so the paint takes the same ramp
+      // the road takes. Both are flat-up normals, so both land in the same
+      // band and the paint-to-tarmac RATIO becomes a property of the authored
+      // colours rather than of one of them being exempt from the lighting.
+      // That is the point: an absolute value tuned against today's ramp is
+      // wrong the moment the ramp moves, and a paint that moves with its own
+      // background stays correct through any relighting.
+      //
+      // Cost: zero draw calls, zero triangles. paintGeo is already one merged
+      // mesh per tile and this only changes which shader it is drawn with.
+      //
+      // WHAT IT COSTS, STATED. An unlit white is the only way to reach 3.8x
+      // the tarmac, because through the ramp the brightest authorable colour
+      // is white and white lands where the ramp puts it. So the markings CAN
+      // NOT hold their old ratio on this material at any authored value, and
+      // the ones that are load-bearing are re-authored below against the
+      // tarmac rather than against a remembered number.
+      paint: vtoon(2),
       prop: vtoon(2),
       // The roadside furniture gets its own material so a setting can put a
       // little of its own light on the barriers, hedges and parapets without

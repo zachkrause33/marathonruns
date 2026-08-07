@@ -319,15 +319,32 @@ html, body {
  * never drawn.
  *
  * Also lifted clear of the safe area: at `bottom: 13px` on an 844px phone the
- * mile caps sat under the home indicator. */
+ * mile caps sat under the home indicator.
+ *
+ * ---- AND IT IS AN OPAQUE PANEL THE RUNNER STANDS BEHIND ------------------
+ *
+ * That is the half of this plate nobody costed. It is drawn over the road, it
+ * is on screen 100% of the time, and the runner's feet are the lowest thing in
+ * the frame -- so the two compete for the same rows, and the panel wins because
+ * it is drawn after. A player reported it as "feet slightly caught off at the
+ * bottom"; measured across all 48 stride phases by tools/footroom.js, his shoe
+ * was 20px inside this panel at race-second 240 and 24px at the start line.
+ *
+ * The camera did most of the fixing, because most of the overlap was framing.
+ * What this file owes is the slack that was sitting here unspent: the 13px
+ * standoff was set before env(safe-area-inset-bottom) was added below it and
+ * has been doing that job twice ever since, and the padding was set for a plate
+ * with no neighbour underneath. 13 -> 6 and 9/8 -> 6/5 is 13px of frame handed
+ * back for nothing lost -- not the 41 the defect needed, but free, and it is
+ * the only part of it that costs no sightline at all. */
 #railWrap {
   position: absolute; left: 50%;
-  bottom: calc(13px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(6px + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
   width: min(660px, 88vw);
   background: var(--ink);
   border: 2px solid var(--hair);
-  padding: 9px 14px 8px;
+  padding: 6px 14px 5px;
   backdrop-filter: blur(6px);
 }
 /* Clearance here is not slack: the ghost marker's cap sticks up out of the
@@ -760,8 +777,8 @@ html, body {
   #toast { min-width: 124px; padding: 6px 11px 7px; }
   #toast .big { font-size: 21px; }
 
-  #railWrap { width: 92vw; bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-              padding: 7px 11px 6px; }
+  #railWrap { width: 92vw; bottom: calc(5px + env(safe-area-inset-bottom, 0px));
+              padding: 5px 11px 4px; }
   #rail { height: 17px; }
   #gapLine { margin-bottom: 13px; gap: 7px; }
   #gapVal { font-size: 15px; }
@@ -845,6 +862,38 @@ html, body {
   #endPanel .cta { margin-top: 22px; }
 }
 
+/* ---- SHORT FRAMES ----
+ *
+ * The readout is sized in pixels, deliberately, so it stays crisp. The runner
+ * is not: he sits at a fixed FRACTION of frame height, because the FOV is
+ * vertical and his distance from the lens does not know how many rows the
+ * screen has. So a fixed-pixel plate at the bottom and a fixed-fraction runner
+ * collide harder the shorter the frame gets, and the plate wins because it is
+ * drawn last.
+ *
+ * The numbers, from tools/footroom.js, lowest row of the figure against the top
+ * of this plate before any of this work:
+ *
+ *   620x1344   plate 6.8% of the frame     +16px clear
+ *   390x844    plate 9.7%                  -24px
+ *   320x568    plate 14.4%                 -47px
+ *   844x390    plate 23.8%                -105px
+ *
+ * That is one curve, not four viewports, and it is a curve in HEIGHT -- 320x568
+ * and 390x844 are the same width bucket and the same aspect bucket and they are
+ * 23px apart. Height is what the sheet was not asking about, so it asks now.
+ *
+ * This step drops #railCaps, the static axis label reading 0 / 13.1 / 26.2. It
+ * is the least live thing on the plate: the halfway point it marks is already
+ * drawn on the bar by #railHalf, and the live distance is printed as #distVal
+ * in the line immediately above it. The bar itself is the readout and it stays.
+ */
+@media (max-height: 620px) {
+  #rail { height: 14px; }
+  #railCaps { display: none; }
+  #gapLine { margin-bottom: 11px; }
+}
+
 /* Landscape phones have almost no vertical room, so the readout tightens up
  * and the panels give up their explanatory blocks rather than push the button
  * off the bottom of the screen. */
@@ -902,6 +951,34 @@ html, body {
   #toast { padding: 5px 10px 6px; }
   #toast .big { font-size: 18px; }
   #perf { top: 140px; }
+
+  /* THE RAIL HAD NEVER BEEN TOLD ABOUT LANDSCAPE, AND IT IS THE ONE PLATE
+   * THAT COULD NOT AFFORD TO MISS IT.
+   *
+   * Everything else in this block gave up height when the frame got short.
+   * #railWrap did not, so it kept its full 93px in a 390px frame -- 24% of
+   * the whole picture, against 9.7% of a 390x844 portrait one. It is also the
+   * only plate at the BOTTOM, which is where the runner is, so the frame that
+   * could least afford it was paying the most.
+   *
+   * Measured by tools/footroom.js at 844x390 before this: the lowest row of the
+   * figure was 104px inside the panel while merely running, at every pace. The
+   * camera answered most of that -- it was pulling IN on wide frames, which is
+   * a bug with its own note in camera.js -- but no camera can put a runner
+   * above a panel occupying the bottom quarter of the screen.
+   *
+   * So the rail gives up what the panels above it already gave up. The bar
+   * itself is the readout and it stays, at 12px instead of 22. #railCaps goes:
+   * it is a static axis label reading 0 / 13.1 / 26.2, the halfway point is
+   * already marked by #railHalf on the bar, and the live distance is printed
+   * on #distVal in the line directly above it. 93px -> 48px, and the gapLine
+   * clearance is held at 11 because the ghost marker's cap still needs its 10.
+   */
+  #railWrap { bottom: calc(5px + env(safe-area-inset-bottom, 0px));
+              padding: 4px 10px 4px; }
+  #rail { height: 12px; }
+  #gapLine { margin-bottom: 11px; }
+  #railCaps { display: none; }
 }
 
 </style>
@@ -18292,10 +18369,30 @@ MR.Camera = (function () {
   // The FOV *swing* is the cue, not the absolute value: past about 74 degrees
   // vertical the far road collapses into a band and gates stop being readable
   // early enough to react to, which is a bug however fast it feels. So the
-  // steady range is 58 -> 71 and the clamp exists only to stop stacked
+  // steady range is 61 -> 72 and the clamp exists only to stop stacked
   // transients (gear + duck + landing kick) from ever getting there.
-  const BASE_FOV = 58;
-  const SPEED_FOV = 10.5;        // widening across the honest pace band
+  //
+  // THE FLOOR WENT 58 -> 61, AND THE SWING ONLY PAID A FIFTH FOR IT.
+  //
+  // 58 was the narrowest lens in the game and it sat exactly where the game is
+  // slowest, so the runner was most magnified -- and therefore lowest in the
+  // frame -- in the opening minute, which is the first thing anyone ever sees.
+  // A player on an iPhone reported it as "feet slightly caught off at the
+  // bottom" and they were right: at 390x844 and race-second 240 the lowest row
+  // of his shoe was drawn 20px INSIDE the opaque readout panel, and at the start
+  // line 24px. See tools/footroom.js, which is the assertion that now says so.
+  //
+  // Measured on that sweep, one degree of vertical field is worth 6.0px of
+  // clearance at 844px of frame height. Three degrees of floor is 18 of them.
+  //
+  // The floor is not the cue and the swing is, so the swing is what had to be
+  // protected: 10.5 -> 8.5 keeps 81% of it, and the TOP of the band widens by a
+  // degree (68.5 -> 69.5) rather than narrowing, because wider only ever shows
+  // more road. The alternative priced against this was a floor of 64 with a
+  // swing of 4.5 -- same pixels, 57% of the cue gone -- and it was rejected on
+  // that number rather than on taste.
+  const BASE_FOV = 61;
+  const SPEED_FOV = 8.5;         // widening across the honest pace band
   const GEAR_FOV = 2.5;          // extra, only in the top of the band
   const FOV_MIN = 48, FOV_MAX = 76;
 
@@ -18357,6 +18454,38 @@ MR.Camera = (function () {
   // where the road ahead should be.
   const LOOK_AHEAD = 11.0;
 
+  // ...AND THE AIM POINT NOW SCALES WITH PACE, WHICH IS THE HALF R2 DID NOT DO.
+  //
+  // 11.0 was tuned against a race being run -- the upper half of the pace band,
+  // where R2's twenty-two frames were taken. Held constant, the same 11.0 aims
+  // the start line at road the runner will not reach for half a second longer,
+  // and the whole cost is paid at the bottom of the frame: the lens is level,
+  // the runner hangs low in it, and at the narrow end of the FOV swing his feet
+  // go under the readout.
+  //
+  // The read window in shoot.js already scales with speed for exactly this
+  // reason -- readWindowAt is actionWindowAt + CAM_BASE_BACK, and the action
+  // window is a distance the runner covers in a fixed TIME, not a fixed
+  // distance. The aim point is the same kind of quantity and was the only one
+  // held still. Ground speed runs 21.8 -> 28.3 u/s, a factor of 1.30, and
+  // 11.0 / 1.30 is 8.5; 7.5 is one further step, taken deliberately, because
+  // the start line is also where there is least worth looking at ahead.
+  //
+  // THE TOP OF THE BAND IS BIT-IDENTICAL. At drive = 1 this yields 11.0, and the
+  // pre-existing -drive * 0.5 below then takes it to 10.5, which is exactly what
+  // shipped. So everything R2 measured was measured on framing this does not
+  // move -- and it could not have moved it in any case, because BLANKS casts its
+  // rays from the camera's POSITION, and an aim point cannot move a position.
+  //
+  // Measured rather than argued. The 25-to-150 band -- the whole undecided
+  // future of the run -- subtends 4.712 degrees before this change and 4.721
+  // after at the start line, 5.015 and 4.984 at pace. R2's +18.7% is intact,
+  // because an angle between two rays from one point cannot be changed by
+  // turning the head. What IS spent is the band's share of the FRAME: 0.0745 ->
+  // 0.0706 of frame height at the start, 0.0599 -> 0.0588 at mile 11. Most of
+  // even that is the wider lens above rather than the aim.
+  const LOOK_AHEAD_LO = 7.5;
+
   // THE SLIDE DOES NOT MOVE THE CAMERA. Not off the centreline, not into a
   // bank, and not much up or in.
   //
@@ -18384,9 +18513,30 @@ MR.Camera = (function () {
   // What survives is the pair that serve the pose rather than decorate it: a
   // small lift and a small step back, because the feet-first slide really is
   // nearly a metre longer along the travel axis than a run and would otherwise
-  // crowd the bottom of the frame. Both are held below the jump's own numbers.
-  const SLIDE_UP = 0.34;         // vs the jump's 0.64 peak
-  const SLIDE_BACK = 0.14;       // pull BACK, framing the longer pose
+  // crowd the bottom of the frame.
+  //
+  // THE LIFT WAS THE WRONG SIGN. The sentence above is right about the problem
+  // and picked the remedy that makes it worse.
+  //
+  // Raising the eye while the aim point stays put steepens the depression angle
+  // to the RUNNER faster than it steepens it to the AIM, because he is 5.1 units
+  // away and the aim is 16.1: d(theta_runner - theta_aim)/d(height) is +4.82
+  // degrees per unit, positive, and positive means DOWN the frame. So every
+  // hundredth of lift pushed the figure further into the readout it was added to
+  // keep him out of. Traced on the shipped build at 390x844, through one slide:
+  // the camera climbs 3.07 -> 3.41 and the lowest row of the figure goes 60px
+  // inside the panel, against 20px running.
+  //
+  // What actually answers "the pose is longer and closer to the lens" is
+  // distance, and that is the other half of the pair -- which was sized at 0.14
+  // and left to do the whole job alone. SLIDE_BACK now does it: it shrinks the
+  // figure for the length of the slide without moving the eye height, without
+  // pitching the lens down, and therefore without touching the sightline for the
+  // one second the player is committed and cannot respond. That last clause is
+  // why this is a step back and not a bigger aim term: the file already tried
+  // -1.05 and -3.2 on the aim and they threw the far road out of frame.
+  const SLIDE_UP = 0.0;          // was 0.34, and it was pointing the wrong way
+  const SLIDE_BACK = 0.80;       // pull BACK, framing the longer pose
 
   // The honest band, in world units/sec. Derived rather than typed in, so a
   // pace retune moves the camera response with it.
@@ -18410,13 +18560,64 @@ MR.Camera = (function () {
    * lateral lag that reads as weight on a wide screen throws the runner onto
    * the edge of a portrait frame, so narrow screens follow harder, sit further
    * back, and bank less.
+   *
+   * ---- back USED TO GO THE OTHER WAY, AND IT CUT THE RUNNER IN HALF -------
+   *
+   * It read 1.18 - 0.18 * wide, so a desktop sat 15% CLOSER than a phone. The
+   * three terms around it are all lateral -- follow, lookX and roll answer to
+   * how far the runner swings across a frame -- and back was written as
+   * though it were a fourth lateral term. It is not. The FOV is VERTICAL, so
+   * back is the one term in this function that decides how far down the frame
+   * the figure sits, and pulling in on a wide screen pushes him toward the
+   * bottom edge of a frame that has fewer pixels below him to begin with.
+   *
+   * How far: at 4.35 units the feet sit atan(3.02/4.35) = 34.8 degrees below
+   * horizontal against a half-field of 29, so THEY ARE OUTSIDE THE FRUSTUM. Not
+   * under the HUD -- off the bottom of the picture. Swept over 48 stride phases
+   * at 844x390 the lowest row of the shoe lands at 391 in a 390px frame, and at
+   * 1280x800 at 804 in an 800px frame, at every pace including the fastest.
+   *
+   * This has been visible in six of shoot.js's eight shots since the day the
+   * chase camera was written. shots/03-mid.png is committed to this
+   * repository with the runner cut off mid-thigh by the readout panel, and it
+   * has been through several reviews. It went unseen for the same reason the
+   * mile signs did: every assertion in the suite starts from the WORLD, and
+   * nothing had ever asked where a world object lands relative to the screen
+   * furniture drawn on top of it.
+   *
+   * So the sign is corrected, and the pull-back gets its OWN ramp rather than
+   * borrowing the lateral one.
+   *
+   * `wide` saturates at aspect 1.35, so a 16:10 desktop and a landscape phone
+   * are the same number to it -- and they are not the same problem. Both are
+   * wide; only one is SHORT. At 1280x800 the readout is 11% of the frame and
+   * the feet miss by 25px; at 844x390 it is 24% of the frame and they miss by
+   * 105. A single saturating term either under-serves the phone or shrinks the
+   * desktop runner to a sprite to pay for it, and the first draft of this fix
+   * did the second: it took him to about 110px, which is the very figure the
+   * roadmap records this project having wrongly assumed for a year.
+   *
+   * So `deep` is a second ramp that starts where `wide` has already finished,
+   * and it is the only thing the pull-back reads. 1280x800 gets +0.18 of it,
+   * 844x390 gets +0.53.
+   *
+   * ASPECT IS A PROXY HERE AND THAT IS WORTH SAYING. What actually governs this
+   * is the frame's HEIGHT IN PIXELS against a readout measured in pixels -- the
+   * runner's angular depression is unchanged by aspect, so the collision is
+   * between a constant fraction of frame height and a constant pixel block.
+   * This function is only handed the aspect, and widening its signature means
+   * changing main.js, which this pass does not own. The height-sensitive half
+   * of the fix is therefore in style.css, where the readout can simply stop
+   * being a fixed pixel block on a short frame. The two halves are independent
+   * and neither needs to know about the other.
    */
   function frameFor(aspect) {
     const wide = clamp01((aspect - 0.55) / 0.80);   // 0 = phone portrait, 1 = desktop
+    const deep = clamp01((aspect - 1.30) / 0.90);   // 0 = anything taller than 4:3
     return {
       follow: 0.95 - 0.17 * wide,
       lookX: 0.85 - 0.30 * wide,
-      back: 1.18 - 0.18 * wide,
+      back: 1.18 + 0.55 * deep,
       roll: 0.70 + 0.30 * wide,
     };
   }
@@ -18760,7 +18961,15 @@ MR.Camera = (function () {
       // The aim point's own z, hoisted out so the road under it can be sampled.
       // The gap between this and (p.z - back) is what makes the camera pitch
       // with the grade; see the header.
-      const lookZ = p.z + LOOK_AHEAD - duck * 0.90 + (p.y || 0) * 1.1 - drive * 0.5
+      //
+      // LOOK_AHEAD_LO at the start line, LOOK_AHEAD at the pace floor. Read
+      // off drive, which is the same shaped pace signal the FOV, the pull-in
+      // and the cadence all key off, so the whole frame opens out together as
+      // the run comes up to speed instead of the lens doing it alone. It also
+      // means the ?skip= snap still holds without a new special case: drive
+      // comes from s.sp, and s.sp is snapped on the first frame.
+      const ahead = LOOK_AHEAD_LO + (LOOK_AHEAD - LOOK_AHEAD_LO) * drive;
+      const lookZ = p.z + ahead - duck * 0.90 + (p.y || 0) * 1.1 - drive * 0.5
         - runE * 1.8 - fin * 5.0;
       look.set(
         // At the tape the aim goes onto the runner himself rather than onto

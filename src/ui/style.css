@@ -293,15 +293,32 @@ html, body {
  * never drawn.
  *
  * Also lifted clear of the safe area: at `bottom: 13px` on an 844px phone the
- * mile caps sat under the home indicator. */
+ * mile caps sat under the home indicator.
+ *
+ * ---- AND IT IS AN OPAQUE PANEL THE RUNNER STANDS BEHIND ------------------
+ *
+ * That is the half of this plate nobody costed. It is drawn over the road, it
+ * is on screen 100% of the time, and the runner's feet are the lowest thing in
+ * the frame -- so the two compete for the same rows, and the panel wins because
+ * it is drawn after. A player reported it as "feet slightly caught off at the
+ * bottom"; measured across all 48 stride phases by tools/footroom.js, his shoe
+ * was 20px inside this panel at race-second 240 and 24px at the start line.
+ *
+ * The camera did most of the fixing, because most of the overlap was framing.
+ * What this file owes is the slack that was sitting here unspent: the 13px
+ * standoff was set before env(safe-area-inset-bottom) was added below it and
+ * has been doing that job twice ever since, and the padding was set for a plate
+ * with no neighbour underneath. 13 -> 6 and 9/8 -> 6/5 is 13px of frame handed
+ * back for nothing lost -- not the 41 the defect needed, but free, and it is
+ * the only part of it that costs no sightline at all. */
 #railWrap {
   position: absolute; left: 50%;
-  bottom: calc(13px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(6px + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
   width: min(660px, 88vw);
   background: var(--ink);
   border: 2px solid var(--hair);
-  padding: 9px 14px 8px;
+  padding: 6px 14px 5px;
   backdrop-filter: blur(6px);
 }
 /* Clearance here is not slack: the ghost marker's cap sticks up out of the
@@ -734,8 +751,8 @@ html, body {
   #toast { min-width: 124px; padding: 6px 11px 7px; }
   #toast .big { font-size: 21px; }
 
-  #railWrap { width: 92vw; bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-              padding: 7px 11px 6px; }
+  #railWrap { width: 92vw; bottom: calc(5px + env(safe-area-inset-bottom, 0px));
+              padding: 5px 11px 4px; }
   #rail { height: 17px; }
   #gapLine { margin-bottom: 13px; gap: 7px; }
   #gapVal { font-size: 15px; }
@@ -819,6 +836,38 @@ html, body {
   #endPanel .cta { margin-top: 22px; }
 }
 
+/* ---- SHORT FRAMES ----
+ *
+ * The readout is sized in pixels, deliberately, so it stays crisp. The runner
+ * is not: he sits at a fixed FRACTION of frame height, because the FOV is
+ * vertical and his distance from the lens does not know how many rows the
+ * screen has. So a fixed-pixel plate at the bottom and a fixed-fraction runner
+ * collide harder the shorter the frame gets, and the plate wins because it is
+ * drawn last.
+ *
+ * The numbers, from tools/footroom.js, lowest row of the figure against the top
+ * of this plate before any of this work:
+ *
+ *   620x1344   plate 6.8% of the frame     +16px clear
+ *   390x844    plate 9.7%                  -24px
+ *   320x568    plate 14.4%                 -47px
+ *   844x390    plate 23.8%                -105px
+ *
+ * That is one curve, not four viewports, and it is a curve in HEIGHT -- 320x568
+ * and 390x844 are the same width bucket and the same aspect bucket and they are
+ * 23px apart. Height is what the sheet was not asking about, so it asks now.
+ *
+ * This step drops #railCaps, the static axis label reading 0 / 13.1 / 26.2. It
+ * is the least live thing on the plate: the halfway point it marks is already
+ * drawn on the bar by #railHalf, and the live distance is printed as #distVal
+ * in the line immediately above it. The bar itself is the readout and it stays.
+ */
+@media (max-height: 620px) {
+  #rail { height: 14px; }
+  #railCaps { display: none; }
+  #gapLine { margin-bottom: 11px; }
+}
+
 /* Landscape phones have almost no vertical room, so the readout tightens up
  * and the panels give up their explanatory blocks rather than push the button
  * off the bottom of the screen. */
@@ -876,4 +925,32 @@ html, body {
   #toast { padding: 5px 10px 6px; }
   #toast .big { font-size: 18px; }
   #perf { top: 140px; }
+
+  /* THE RAIL HAD NEVER BEEN TOLD ABOUT LANDSCAPE, AND IT IS THE ONE PLATE
+   * THAT COULD NOT AFFORD TO MISS IT.
+   *
+   * Everything else in this block gave up height when the frame got short.
+   * #railWrap did not, so it kept its full 93px in a 390px frame -- 24% of
+   * the whole picture, against 9.7% of a 390x844 portrait one. It is also the
+   * only plate at the BOTTOM, which is where the runner is, so the frame that
+   * could least afford it was paying the most.
+   *
+   * Measured by tools/footroom.js at 844x390 before this: the lowest row of the
+   * figure was 104px inside the panel while merely running, at every pace. The
+   * camera answered most of that -- it was pulling IN on wide frames, which is
+   * a bug with its own note in camera.js -- but no camera can put a runner
+   * above a panel occupying the bottom quarter of the screen.
+   *
+   * So the rail gives up what the panels above it already gave up. The bar
+   * itself is the readout and it stays, at 12px instead of 22. #railCaps goes:
+   * it is a static axis label reading 0 / 13.1 / 26.2, the halfway point is
+   * already marked by #railHalf on the bar, and the live distance is printed
+   * on #distVal in the line directly above it. 93px -> 48px, and the gapLine
+   * clearance is held at 11 because the ghost marker's cap still needs its 10.
+   */
+  #railWrap { bottom: calc(5px + env(safe-area-inset-bottom, 0px));
+              padding: 4px 10px 4px; }
+  #rail { height: 12px; }
+  #gapLine { margin-bottom: 11px; }
+  #railCaps { display: none; }
 }

@@ -18,10 +18,24 @@
  *     duck, crosses = impassable) so the read survives colour-blindness and
  *     the fog, which is fully opaque by 235 units.
  *
- *  2. DRAW CALLS, not triangles. SwiftShader at 1100x700 dies on draw count.
- *     Props are therefore merged into single vertex-coloured meshes -- a knot
- *     of eight spectators, a bridge tower with its cables, a whole 24-unit run
- *     of crowd barrier -- so richness costs geometry, which is free, instead
+ *  2. DRAW CALLS, NOT TRIANGLES, AND THE TRIANGLE FIGURES IN THIS FILE WERE
+ *     WRONG FOR MONTHS. Every frame rate this project ever measured came out
+ *     of SwiftShader software rendering in the screenshot harness -- 50 to 100
+ *     times slower than the phone the game runs on -- and a 75,000-triangle
+ *     working ceiling was built on top of those numbers, defended across three
+ *     passes, and paid for by cutting real work: the far grandstands became
+ *     flat bands, the last mile's crowd was thinned, tree crowns were nearly
+ *     decimated. None of it was necessary. Measured properly the working
+ *     ceiling is 500,000 triangles and the heaviest frame in the game is
+ *     192,000. Any comment below still quoting 75k or 150k is stale; ignore it
+ *     and correct it if you are editing near it.
+ *
+ *     What DOES bind is submissions. The sweep runs 160 to 283 draw calls
+ *     against a working ceiling of about 400, and that is the number to spend
+ *     carefully. Props are therefore merged into single vertex-coloured
+ *     meshes -- a knot of eight spectators, a bridge tower with its cables, a
+ *     whole 24-unit run of crowd barrier, a grandstand and its two hundred
+ *     spectators -- so richness costs geometry, which is nearly free, instead
  *     of submissions, which are not.
  *
  * Biomes recolour the shared materials rather than swapping meshes, which is
@@ -7748,6 +7762,14 @@ MR.World = (function () {
         //
         // Inside the chute nothing roadside spawns at all, for the same reason
         // taken further: the finish stand is deeper still.
+        //
+        // THIS IS A VISIBILITY RULE, NOT A SAVING, and the distinction matters
+        // because the two were originally made at the same time and only one
+        // of them was right. The people are not gone -- see the rank at the
+        // rail in standGeo, which puts seventeen standing figures a tile on the
+        // strip between the barrier and the first bench. That is the only slot
+        // left on this leg (barrier 4.60, seating from 5.40, street wall 12.2)
+        // and it is where a real finish straight puts its crowd anyway.
         //
         // The rng stream is untouched -- the draw is still made and thrown
         // away -- so every other prop in the race lands exactly where it did.

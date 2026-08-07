@@ -9828,7 +9828,29 @@ MR.World = (function () {
       cam.left = -halfW; cam.right = halfW; cam.top = halfH; cam.bottom = -halfH;
       cam.updateProjectionMatrix();
       const d = 20;
-      cam.position.set(cx, cy + d * Math.sin(_audit.pitch), cz - d * Math.cos(_audit.pitch));
+      // AZIMUTH AND ELEVATION, because CLAUDE.md rule 1 has to be checkable.
+      //
+      // The default is az 0 / el = _audit.pitch, which is the game's own
+      // sightline from directly behind -- so contrastAudit's numbers are
+      // exactly what they always were and nothing that reads them moves. What
+      // this adds is the ability to ask for any other angle, which is what
+      // "every object is modelled on all sides" needs in order to be an
+      // assertion rather than an intention. A rear-only object photographs as
+      // a fully-built one at az 0 and only at az 0; the flank and the front
+      // are where a hollow face shows, and until now nothing in this file
+      // could look at them.
+      //
+      // az 0 is from -z (behind, the chase view); az grows toward +x, so
+      // PI/2 is the flank and PI is head-on. el is measured up from the
+      // horizontal, which is why the default is +pitch: the eye is above.
+      const az = _audit.az || 0;
+      const el = _audit.el === undefined ? _audit.pitch : _audit.el;
+      const ce = Math.cos(el);
+      cam.position.set(
+        cx + d * ce * Math.sin(az),
+        cy + d * Math.sin(el),
+        cz - d * ce * Math.cos(az)
+      );
       cam.lookAt(cx, cy, cz);
 
       const prevRT = renderer.getRenderTarget();
@@ -9889,6 +9911,12 @@ MR.World = (function () {
     api.contrastAudit = function (renderer, scene, opts) {
       auditSetup();
       _audit.images = !!(opts && opts.images);
+      // Always down the game's own sightline, whatever a fleetSheet call left
+      // behind. The contrast gate is a statement about the angle the lane is
+      // chosen from, and it must not silently become a statement about
+      // whatever angle was last photographed.
+      _audit.az = 0;
+      _audit.el = undefined;
       const NAME = { [K.JUMP]: 'JUMP', [K.DUCK]: 'DUCK', [K.BLOCK]: 'BLOCK' };
       const hazards = [];
       for (const grp of HAZARD_DEFS) {
@@ -9978,6 +10006,12 @@ MR.World = (function () {
       // Put the road a little below centre so the full 0..2.80 band is in
       // frame with the contact line visible on every variant.
       const cy = (opts && opts.cy !== undefined) ? opts.cy : half - 0.16;
+      // See shotMean: az 0 / el = the game's sightline is the default, so
+      // every existing caller is unaffected. Passing an angle is how CLAUDE.md
+      // rule 1 gets checked -- a flank or a front that was never built shows
+      // here and nowhere else.
+      _audit.az = (opts && opts.az) || 0;
+      _audit.el = (opts && opts.el !== undefined) ? opts.el : undefined;
       const NAME = { [K.JUMP]: 'JUMP', [K.DUCK]: 'DUCK', [K.BLOCK]: 'BLOCK' };
       const out = [];
       for (const grp of HAZARD_DEFS) {
@@ -10007,6 +10041,8 @@ MR.World = (function () {
         });
       }
       _audit.images = prevImages;
+      _audit.az = 0;
+      _audit.el = undefined;
       return out;
     };
 

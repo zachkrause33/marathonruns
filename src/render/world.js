@@ -1029,9 +1029,15 @@ MR.World = (function () {
    */
   const GLOSS = {
     glass: 1.00,   // the only thing that gets the full core
-    chrome: 0.85,  // trim, lamp cores, plates, bright rims
-    paint: 0.55,   // vehicle bodywork -- present, never a mirror
-    trim: 0.30,    // creases, bumpers, dark plastics with a sheen
+    chrome: 0.70,  // trim, lamp cores, plates, bright rims
+    // Bodywork is deliberately the LOW end and not the middle. A vehicle body
+    // is mostly large flat panels, and a flat panel does not get a highlight
+    // sweeping across it -- it switches on whole. Measured on the orbit sheet,
+    // paint at 0.55 took the taxi's flank from L 133 to L 177 and bleached the
+    // hue out of it. What carries the fleet's shine is the chamfers and the
+    // cylinders, where the band is narrow because the surface turns.
+    paint: 0.30,
+    trim: 0.22,    // creases, bumpers, dark plastics with a sheen
     matte: 0.0,    // rubber, cloth, skin, hi-vis, anything painted-on
   };
 
@@ -6244,10 +6250,13 @@ MR.World = (function () {
       // 1.09 -- so 0.14 of the car simply was not there at window height and
       // the greenhouse read as full width with a sliver of paint at its edge.
       // 0.30 at +/-0.94 closes it exactly, and the taper is then visible.
-      for (const sx of [-1, 1]) parts.push(hbx(0.30, 0.46, 0.98, sx * 0.94, 1.59, 0.02, TAXI_BODY));
+      //
+      // It now does that as an A and a C pillar rather than as one slab down
+      // the whole flank, which is what uncovers the side windows. See vPillars.
+      vPillars(parts, 0.30, 0.46, 0.98, 0.94, 1.59, 0.02, TAXI_BODY);
       parts.push(
-        hbx(1.44, 0.07, 0.92, 0, 1.855, 0.02, TAXI_BODY),   // roof 1.82-1.89
-        hbx(1.22, 0.05, 0.78, 0, 1.915, 0.02, TAXI_CREASE), // roof chamfer 1.89-1.94
+        gl(hcbx(1.44, 0.07, 0.92, 0, 1.855, 0.02, TAXI_BODY, 0.03), GLOSS.paint),  // roof
+        gl(hcbx(1.22, 0.05, 0.78, 0, 1.915, 0.02, TAXI_CREASE, 0.02), GLOSS.chrome),
         // ONE roof element, not a pile, and this is the second time this file
         // has had to learn it. A sign plus a base plus a cap, each nearly as
         // wide as the roof under it, reads at gameplay scale as a second storey

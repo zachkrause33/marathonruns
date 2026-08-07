@@ -96,6 +96,20 @@
  *      cloth the back view sees, which is not a coincidence -- cloth is the
  *      only thing on a runner that is allowed to lag.
  *
+ * ANIMATION POLISH, STAGE 1 -- full-body motion, stride, arms, foot planting
+ * and easing. Every term the pass added is scaled by MR.Runner.POLISH, a
+ * module-level 0..1 knob wired to ?polish= in main.js and --polish in
+ * tools/stride.js, so ONE build renders the cycle before and after and the
+ * comparison cannot go stale. At 0 the arithmetic reduces to the pre-pass
+ * expressions exactly -- verified joint by joint, not by eye. See the block
+ * above `let POLISH` for the rules that keeps true, and the block above the leg
+ * loop for the phase error it fixed, which was the largest single defect in the
+ * cycle and was invisible to every measurement taken before the foot's rig-space
+ * LOOP was plotted rather than its amplitudes.
+ *
+ * Stage 2 (secondary motion) and stage 3 (speed responsiveness) are NOT here.
+ * The cadence curve and the spring integrator are untouched on purpose.
+ *
  * Pivot layout (all rotations are local X unless noted):
  *   root -> body -> hips -> thigh -> shin -> foot
  *                -> spine -> chest -> neck -> head
@@ -119,6 +133,58 @@ MR.Runner = (function () {
   // full range of stride and lean instead of quietly clipping it.
   const SPEED_LO = (K.UNITS_PER_MILE * K.TIME_SCALE) / K.START_PACE;
   const SPEED_HI = (K.UNITS_PER_MILE * K.TIME_SCALE) / K.FLOOR_PACE;
+
+  // ---- the animation A/B --------------------------------------------------
+  // 0 renders the run cycle exactly as it was before the polish pass, 1 renders
+  // the polished one, and anything between crossfades. main.js reads ?polish=
+  // and tools/stride.js reads --polish, so ONE build renders both and a
+  // before/after comparison cannot go stale the way a checked-in screenshot or
+  // a side branch does.
+  //
+  // The rule every term below obeys, and it is the whole reason this works:
+  // POLISH scales the DELTA, never the term.  x = old + POLISH * (new - old),
+  // so at 0 the arithmetic reduces to the original expression -- not to
+  // something that merely rounds to it. Where a factor is added to an existing
+  // product the constant stays leftmost inside its own parenthesis
+  // (`s * swing * (0.95 + POLISH * 0.10)`), because float multiply is not
+  // associative and reordering it would move the last bit. tools/stride.js at
+  // --polish 0 is the proof, and it must come back byte-for-byte identical to
+  // the pre-pass baseline.
+  let POLISH = 1;
+
+  // old -> new with the knob in between. mix(a, b, 0) is `a + (b - a) * 0`,
+  // which is exactly `a` for any finite a, so this is safe to wrap a term in
+  // without disturbing it at 0.
+  const mix = (a, b, t) => a + (b - a) * t;
+
+  // ---- cycle shape --------------------------------------------------------
+  // Two shaping functions, and between them they are most of what separates a
+  // procedural cycle from an animated one.
+  //
+  // `sm` is smoothstep on [0,1], used here to round off `Math.max(0, sin)`.
+  // A clipped sine is the standard way to say "only while the limb is forward"
+  // and it has a CORNER at every crossing: the angle's first derivative jumps,
+  // which the eye reads as a tick even at a couple of hundredths of a radian.
+  // sm(max(0,x)) has the same peak and the same support with zero slope at both
+  // ends, so the term arrives and leaves instead of switching on.
+  const sm = (x) => x * x * (3 - 2 * x);
+
+  // `SHARP` is a third harmonic added to the fundamental swing. A real stride
+  // is not a sine: the limb crosses the vertical -- which is where the contact
+  // is -- much faster than a sine does, and dwells longer at the two extremes.
+  // sin(x) + b*sin(3x) is the first step from a sine toward a triangle: it
+  // multiplies the rate at the crossing by (1 + 3b) while the peak drops to
+  // (1 - b), so dividing by (1 - b) restores the REACH exactly and buys the
+  // crossing speed for free. That matters more than it sounds: stride length is
+  // the term the owner asked twice not to exaggerate, and this makes the plant
+  // faster without lengthening it by a millimetre.
+  //
+  // Held below 1/9. At b = 1/9 the peak of sin(x) + b*sin(3x) splits in two and
+  // the extreme develops a dimple; below it the curve still has a single
+  // maximum at x = pi/2 with value exactly (1 - b), which is what the
+  // normaliser assumes.
+  const SHARP = 0.10;
+  const sharpen = (s, s3) => (s + SHARP * s3) / (1 - SHARP);
 
   // ---- the height ladder -------------------------------------------------
   // Every joint hangs off these, in world units above the road with the body
@@ -2114,11 +2180,77 @@ MR.Runner = (function () {
       const cycD = cycA * (1 - slid * 0.92);
 
       // ---- legs: contralateral swing with a knee tuck on the recovery leg
+      //
+      // THE KNEE RUNS ON ITS OWN PHASE, AND THAT IS THE LARGEST SINGLE THING IN
+      // THIS PASS. What follows is measured, not argued -- tools/stride.js and
+      // a joint-by-joint sweep of the pre-pass rig, at 25.08 u/s:
+      //
+      //   phase   ankle y   ankle z (rig)   dz/dt
+      //   0.00     0.143      1469.579      +5.3     <- LOWEST point of the foot
+      //   0.19     0.234      1469.757      +0.2     <- FURTHEST FORWARD
+      //   0.50     0.271      1469.455      -3.5
+      //   0.72     0.453      1469.299      -0.8     <- HIGHEST, furthest back
+      //
+      // Read the loop rather than the rows: the foot travels FORWARD while it
+      // is at the bottom of its arc and BACKWARD while it is at the top. That
+      // is a bicycle pedalled the wrong way, and it is why the planted foot
+      // measured +4.894 u/s -- not "not backward enough", but backward by
+      // construction, with no amount of amplitude able to fix it.
+      //
+      // The cause is one phase. `bend` peaked at ph 0.5 and bottomed at ph 0,
+      // where the hip is also passing through vertical -- so the leg was
+      // STRAIGHT at mid-swing (which is why the sole reached 0.035 BELOW the
+      // road there, with the body's whole weight nowhere near it) and FOLDED at
+      // both ends of the swing. A run is the other way round: the knee folds
+      // hardest just after toe-off, when the heel comes up under the hip and the
+      // thigh is passing forward through vertical, and the leg is at its
+      // straightest under the hip at midstance carrying the load.
+      //
+      // Turning the knee's phase by pi puts midstance at ph 0.5, where the hip
+      // is sweeping backward at its fastest, and the loop reverses. Nothing else
+      // has to move: `bob` is |cos| and so is already lowest at BOTH ph 0 and
+      // ph 0.5, which is where the two feet now plant, and the arms and the
+      // shadow pulse are locked to the same p they always were.
+      //
+      // It is written as a rotation of the phase rather than a swap of the
+      // expression so that the A/B is continuous. At POLISH 0 the offset is
+      // `ph + 0`, which is ph, so `kc` is the old `c` bit for bit.
+      let plantW = 0, pushW = 0;
       for (let i = 0; i < legs.length; i++) {
         const L = legs[i];
         const ph = p + (i === 0 ? 0 : Math.PI);
         const s = Math.sin(ph);
-        const c = Math.cos(ph);
+        const kc = Math.cos(ph + Math.PI * POLISH);
+
+        // The stride's own event windows, and they cost no trig at all: `kc` is
+        // +1 exactly where the corrected knee is straightest, which is
+        // midstance, and 0 a quarter-cycle either side -- so it IS the stance
+        // window already. Deriving these from the knee rather than from p means
+        // they cannot drift out of step with the leg they describe, at any value
+        // of the knob.
+        //
+        // The sign here is worth one line of warning, because getting it
+        // backwards is silent: the poses stay legal, the tool still reports a
+        // plausible cycle, and the only symptom is the ankle dorsiflexing under
+        // the body's weight and driving the HEEL 0.063 into the tarmac at
+        // midstance while the toe points at the sky. That is what the first
+        // draft of this block did.
+        //
+        // Smoothstepped for the reason in `sm` above -- these gate the torso's
+        // landing compression and the ankle's push-off, and a corner in either
+        // of those is a tick on the whole body rather than on one joint.
+        const stance = sm(Math.max(0, kc));    // foot down, peak at midstance
+        const airW = sm(Math.max(0, -kc));     // foot up, peak at mid-recovery
+        const drive = sm(Math.max(0, s));      // thigh swinging forward
+        const trail = sm(Math.max(0, -s));     // thigh swinging back
+        const land = stance * drive;           // strike -> midstance, absorbing
+        const push = stance * trail;           // midstance -> toe-off, driving
+        plantW += land;
+        pushW += push;
+
+        // The swing itself, shaped. See SHARP: same reach, faster through the
+        // vertical, which is the half of the cycle the foot is on the road for.
+        const sS = mix(s, sharpen(s, Math.sin(3 * ph)), POLISH);
 
         // Airborne: tuck both knees under. Deliberately gentler than it was.
         // The arms carry the airborne read now, and a hard double tuck on
@@ -2159,17 +2291,71 @@ MR.Runner = (function () {
         // the duck's 0.42 drop was being spent on one buried foot. At 1.66 the
         // thigh carries the knee a little above the hip, the shin folds behind
         // it instead of through the floor, and the drop reaches the road.
-        L.hip.rotation.x = -s * swing * 0.86 * cyc + tuck * 0.70
-          - slid * (lead ? 1.80 : 1.66);
+        //
+        // The two added terms are the owner's "more extension on the trailing
+        // leg" and "forward knee slightly higher", and they are deliberately
+        // NOT one bigger amplitude on the fundamental. A larger `swing` would
+        // lengthen the stride at both ends and at every phase in between, which
+        // is the exaggeration that was ruled out twice; these are one-sided
+        // lobes that only reach their full value at the two extremes, so the
+        // reach grows 12% and the pass under the hip does not move at all.
+        //
+        // Both are pulled out as locals because the ankle below has to READ
+        // them. Only the cycle's own contribution is wanted there, not the jump
+        // tuck or the slide's figure-four, so the split happens here rather than
+        // off the finished joint angle.
+        const hipRun = -sS * swing * 0.86
+          + POLISH * (0.11 * trail - 0.16 * drive);
         // Knee only bends one way; bias so it flexes hardest on recovery.
-        const bend = Math.max(0, -c * 0.5 + 0.5);
-        L.knee.rotation.x = 0.18 + bend * (1.22 + 0.26 * sp01) * cyc + tuck * 1.25
+        const bend = Math.max(0, -kc * 0.5 + 0.5);
+        // ...and two corrections on top of the fundamental fold. The knee gives
+        // way a little as the weight arrives (`land`) and straightens through
+        // the drive off the toe (`push`), which is the difference between a leg
+        // that meets the road and a leg that is passing through the place the
+        // road happens to be. Both are gated on the stance window above, so
+        // neither can fire while the foot is in the air.
+        const kneeRun = bend * (1.22 + 0.26 * sp01)
+          + POLISH * (0.14 * land - 0.22 * push);
+        L.hip.rotation.x = hipRun * cyc + tuck * 0.70
+          - slid * (lead ? 1.80 : 1.66);
+        L.knee.rotation.x = 0.18 + kneeRun * cyc + tuck * 1.25
           + slid * (lead ? 0.02 : 0.62);
         // Dorsiflex through recovery, plantarflex off the toe -- and hard
         // dorsiflexion in the slide, toes up, which is both what a slider
         // actually does and what turns the biggest pale face on the character
         // away from the road and into the light.
-        L.ankle.rotation.x = -0.16 + s * 0.34 * cyc - tuck * 0.45
+        //
+        // FOOT PLANTING, and the thing that makes it work is that all three leg
+        // joints turn about the SAME axis, so the shoe's pitch against the world
+        // is just hip + knee + ankle. The sole lies flat on the road when that
+        // sum is zero, and the ankle is the only one of the three free to be
+        // solved for -- so through the stance window it is, every frame, whatever
+        // the leg above it happens to be doing.
+        //
+        // That is worth more than any amount of hand-tuning, because the failure
+        // it prevents is one nobody watches for. Raking the thigh back at
+        // toe-off rotates the WHOLE foot with it: at the old amplitudes the shoe
+        // reached 30 degrees nose-down while its ankle was still at road height,
+        // and the toe went 0.06 into the tarmac -- nearly twice the sole
+        // penetration this pass started with, produced by a change that never
+        // touched the ankle at all. Solve it and the depth stops depending on
+        // the stride amplitude, which means stage 3 can raise the amplitude
+        // without reopening this.
+        //
+        // 0.16 and 0.18 are the two constants sitting outside the cycle (the
+        // resting dorsiflexion, and the knee's standing flex); everything else
+        // in the sum is `hipRun + kneeRun`.
+        const ankFlat = 0.16 - (hipRun + kneeRun + 0.18);
+        // ...and then the toe is allowed to leave last. `push` rolls the foot
+        // over onto the ball through the drive, which is the one moment a
+        // planted foot SHOULD be nose-down, and `airW` picks the toe up over the
+        // recovery -- the same 0.34 the old sine gave it, moved to the phase
+        // where the shoe is actually passing the road. It also keeps the pale
+        // outsole turned toward the camera on the swing, which the shoe's own
+        // note says is deliberate.
+        const ankDrive = mix(s * 0.34,
+          stance * ankFlat + push * 0.30 - airW * 0.34, POLISH);
+        L.ankle.rotation.x = -0.16 + ankDrive * cyc - tuck * 0.45
           - slid * (lead ? 0.30 : 0.04);
         // A little splay keeps the two legs from overlapping into one shape
         // when they pass each other at midstride, and opens further in the
@@ -2217,12 +2403,28 @@ MR.Runner = (function () {
       // legs were invisible and whose only wide pale objects were its hands.
       // Tucked in they read as one trailing tail and leave the flanks to the
       // feet, which is the half of the pose that has to say "feet first".
+      //
+      // What the polish pass adds here is almost entirely about the arm being
+      // PART OF the body rather than bolted to it. Three things, in descending
+      // order of how much the back view gets from them: the shoulder girdle now
+      // slides fore and aft with its own arm (a real shoulder protracts; a
+      // welded one cannot), the chest it hangs off counter-rotates half again as
+      // far as it did, and the abduction band opens on the back swing and closes
+      // on the front so the ELBOW travels sideways -- which rule 3 in the header
+      // says is the only part of an arm cycle this camera can see at all.
       for (let i = 0; i < arms.length; i++) {
         const A = arms[i];
         const ph = p + (i === 0 ? Math.PI : 0);
         const s = Math.sin(ph);   // > 0 with the arm swung back
-        const fwd = Math.max(0, -s);
-        const back = Math.max(0, s);
+        // Smoothed, for the reason in `sm`: these two gate almost every angle
+        // on the arm, and their shared corner at the crossing was a tick on the
+        // whole limb twice a stride.
+        const fwd = mix(Math.max(0, -s), sm(Math.max(0, -s)), POLISH);
+        const back = mix(Math.max(0, s), sm(Math.max(0, s)), POLISH);
+        // The arms run on exactly the shaping the legs do, so the two cannot
+        // drift apart across the cycle -- which is the whole of "counter the
+        // legs naturally".
+        const sS = mix(s, sharpen(s, Math.sin(3 * ph)), POLISH);
 
         // This angle is measured against the RECLINED chest, not the world, and
         // the size of it is the fix for the most expensive defect this pose
@@ -2248,7 +2450,7 @@ MR.Runner = (function () {
         // gloves up behind the shoulders by exactly as much as the trunk went
         // down, which is how the pose lost its trailing brace the first time
         // the torso was flattened.
-        A.shoulder.rotation.x = s * swing * 0.95 * cycD - spread * 0.26
+        A.shoulder.rotation.x = sS * swing * (0.95 + POLISH * 0.10) * cycD - spread * 0.26
           + slid * (SLIDE_RECLINE + 1.68);
         // Abduction. The running band is deliberately tighter than it used to
         // be: the mitts got big enough to break the outline on their own, so
@@ -2260,12 +2462,30 @@ MR.Runner = (function () {
         // past horizontal to point up-and-back, so the sign that opens a
         // running arm outboard closes a sliding one inboard. That is the
         // direction wanted here -- see the note above the loop.
-        A.shoulder.rotation.z = A.side * ((0.13 + back * 0.15) * cycD + spread * 1.56 + slid * 0.16);
-        A.shoulder.rotation.y = -A.side * (0.16 + fwd * 0.22) * cycD;
+        //
+        // The added band is one-sided on purpose. Opening the run's abduction
+        // by a flat amount would cost silhouette width for the whole cycle and
+        // eat into the gap the jump has to clear; opening it only on the BACK
+        // swing and closing it a little on the front spends nothing on the
+        // maximum and buys travel, and travel is what the eye tracks. A runner
+        // does this anyway -- the elbow goes out and back together and comes
+        // through close to the ribs.
+        A.shoulder.rotation.z = A.side * ((0.13 + back * (0.15 + POLISH * 0.11)
+          - POLISH * 0.05 * fwd) * cycD + spread * 1.56 + slid * 0.16);
+        A.shoulder.rotation.y = -A.side * (0.16 + fwd * (0.22 + POLISH * 0.10)) * cycD;
         // Ride the whole shoulder outboard in the air as well as rotating it.
         // Worth 0.09 of span for nothing, and it keeps the arm root buried in
         // the deltoid instead of tearing a gap at the seam.
         A.shoulder.position.x = A.side * (0.222 + spread * 0.048);
+        // Protraction: the shoulder GIRDLE travels with the arm instead of the
+        // arm pivoting in a socket welded to the ribs. It is worth calling out
+        // that this axis is invisible from the shipped camera by itself -- it
+        // is pure fore-and-aft -- and it is still the single most valuable term
+        // in this loop, because what the camera reads is not the displacement
+        // but the fact that the deltoid, the vest seam and the sleeve hem all
+        // arrive at the same time as the hand. An arm whose root is nailed down
+        // reads as a hinge no matter what the hand does.
+        A.shoulder.position.z = -POLISH * s * 0.026 * cycD;
         // Flexion, and it is now held at BOTH ends of the swing rather than
         // only at the front. That is a readability fix, not an anatomy one.
         //
@@ -2291,8 +2511,17 @@ MR.Runner = (function () {
         // A slide straightens it instead, so the whole arm becomes one long
         // brace trailing behind the body -- flat and low against the jump's
         // wide, and neither of them the run.
+        //
+        // The polish pass deepens the FORWARD half of that and leaves the back
+        // half exactly where the note above pinned it. The asymmetry is the
+        // point of the item: an elbow that flexes by the same amount at both
+        // ends of the swing is a hinge with a constant angle, and what makes a
+        // real arm read is that the joint closes hard as the hand comes through
+        // and opens as it goes away. 0.46 -> 0.64 is on the axis the ceiling
+        // does not apply to, because the hand is climbing in FRONT of the chest
+        // where nothing on this character can hide it.
         A.elbow.rotation.x =
-          (-1.32 - fwd * 0.46 - back * 0.18) * (1 - spread * 0.95) * (1 - slid * 0.86) - slid * 0.10;
+          (-1.32 - fwd * (0.46 + POLISH * 0.18) - back * 0.18) * (1 - spread * 0.95) * (1 - slid * 0.86) - slid * 0.10;
       }
 
       // ---- torso: forward lean, vertical bob, and a lateral bank on turns
@@ -2326,7 +2555,28 @@ MR.Runner = (function () {
         - spread * 0.30
         - slid * SLIDE_RECLINE
         + gradePitch * (1 - slid * 0.94) * (1 - spread);
-      spine.rotation.x = leanFwd + trip * 0.46;
+      // ...and a cyclic pitch on top of the held lean, which is the first half
+      // of "the torso compresses when the foot lands". `plantW` is the two legs'
+      // landing weights summed, so it peaks twice a stride at whichever foot is
+      // taking the weight, and it is biased by its own mean (0.156, measured off
+      // the curve rather than guessed) so the AVERAGE lean is left exactly where
+      // the owner asked it to stay. Amplitude is +/- 0.017rad, one degree: this
+      // is not a bow, it is the trunk giving with the impact.
+      spine.rotation.x = leanFwd + trip * 0.46
+        + POLISH * 0.045 * (plantW - 0.156) * cycD;
+      // The second half, and the one the back view actually reads. There is one
+      // trunk segment on this rig and no spine chain, so a compression has to be
+      // a translation: the whole shoulder girdle, neck and head drop toward the
+      // pelvis as the weight arrives, and rise off it through the drive.
+      //
+      // Written so the expression can never go POSITIVE. `HEIGHT` is quoted to
+      // MR.Collision.audit() as the crown at the top of the bob, and a trunk
+      // that stretched above its rest length on the push -- which is what a
+      // signed term centred on zero would do -- would make that number quietly
+      // untrue on the up-beat. `land` and `push` are supported on disjoint
+      // quarters of the cycle, so at full push (0.629) plantW is 0 and the
+      // bracket reaches exactly 0; everywhere else it is a compression.
+      spine.position.y = -POLISH * 0.026 * (plantW - pushW * 0.55 + 0.346) * cycD;
       // Slide the whole torso BACK along the direction of travel, not just
       // recline it.
       //
@@ -2346,12 +2596,34 @@ MR.Runner = (function () {
       // most separates a run cycle from a march, and the only thing the back
       // view sees the torso do at all. Damped in the air with the rest of the
       // cycle, so the spread pose stays square to the camera.
-      chest.rotation.y = Math.sin(p) * 0.21 * cycD;
-      chest.rotation.z = -Math.sin(p) * 0.055 * cycD;
-      hips.rotation.y = -Math.sin(p) * 0.14 * cycD;
+      //
+      // All four of these are shaped by the same third harmonic the limbs are,
+      // so the trunk turns over at the same moments the legs do rather than
+      // gliding sinusoidally underneath them. That coupling is most of what the
+      // owner meant by "the whole body doesn't participate enough": the terms
+      // were already here, they were simply too small to see and running on a
+      // curve of their own.
+      //
+      // The measured case for the amplitudes: the pelvis was contributing 7.7%
+      // of the foot's fore/aft travel and the shoulder 7.5% of the hand's -- the
+      // trunk was a post the limbs were hung on. Yaw both harder and the sockets
+      // themselves start carrying the stride. Neither costs a millimetre of
+      // silhouette width: a yaw about the body's own axis pulls a shoulder or a
+      // hip socket INBOARD (0.222 * cos), so the run's half-width can only
+      // shrink, and the gap to the jump's 0.92 can only grow.
+      const sP = mix(Math.sin(p), sharpen(Math.sin(p), Math.sin(3 * p)), POLISH);
+      chest.rotation.y = sP * (0.21 + POLISH * 0.13) * cycD;
+      chest.rotation.z = -sP * (0.055 + POLISH * 0.028) * cycD;
+      // Chest pitch, which did not exist before. The girdle nods forward as the
+      // weight lands and opens through the drive, on the same window the spine
+      // and the knees use. It is the term that puts the NECK PIVOT in motion --
+      // and with it the head, which was travelling 0.0042 fore and aft, a
+      // quarter of one percent of body height, on a character supposedly running.
+      chest.rotation.x = POLISH * 0.055 * (plantW - 0.156) * cycD;
+      hips.rotation.y = -sP * (0.14 + POLISH * 0.12) * cycD;
       // Pelvic drop toward the swinging leg: small, but it stops the hips
       // from reading as a rigid block bolted to the spine.
-      hips.rotation.z = Math.sin(p) * 0.055 * cycD;
+      hips.rotation.z = sP * (0.055 + POLISH * 0.030) * cycD;
 
       // Head. Running and airborne it stays level: cancel most of the spine
       // lean, add a small lag, so the eyeline holds down the road and the dark
@@ -2384,7 +2656,12 @@ MR.Runner = (function () {
       // slide; turned, the camera gets hair and an ear. The term is also what
       // it always was -- a head counter-rotated against shoulders turned by
       // SLIDE_YAW is the clearest possible statement that they are turned.
-      neck.rotation.y = -Math.sin(p) * 0.10 - slid * SLIDE_YAW * 1.15;
+      // Shaped with the trunk it sits on, and NOT enlarged: the head counters
+      // the shoulders by the same angle it always did. The point of leaving this
+      // one alone is that the chest under it now turns 0.34 instead of 0.21, so
+      // the same 0.10 of counter-yaw reads as a head holding its line against a
+      // torso doing more work, which is what it is for.
+      neck.rotation.y = -sP * 0.10 - slid * SLIDE_YAW * 1.15;
       // ...and sink it. Rotation gets the crown down; only translation gets it
       // INSIDE. The neck pivot drops along the spine until the skull is seated
       // between the deltoids, so the welded neck column disappears into the
@@ -2627,5 +2904,19 @@ MR.Runner = (function () {
     return api;
   }
 
-  return { create, HEIGHT };
+  // POLISH is exposed as an accessor rather than a plain field so that the
+  // closure the cycle actually reads is the one the setter writes -- a data
+  // property on this object would be a second copy that `api.update` never
+  // sees. Clamped and validated here rather than at every call site: main.js
+  // hands it a URL parameter and stride.js hands it a command-line argument,
+  // and neither should be able to put a NaN into every joint on the character.
+  return {
+    create,
+    HEIGHT,
+    get POLISH() { return POLISH; },
+    set POLISH(v) {
+      const n = parseFloat(v);
+      if (isFinite(n)) POLISH = Math.max(0, Math.min(1, n));
+    },
+  };
 })();

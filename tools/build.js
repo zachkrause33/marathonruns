@@ -206,6 +206,41 @@ if (stray.length) {
   process.exit(1);
 }
 
+/**
+ * `--check` fails instead of writing, when the file on disk is not what this
+ * build would produce.
+ *
+ * index.html IS the deliverable -- the whole premise of the project is that a
+ * player opens one self-contained file -- and it is also a build artifact, so
+ * it goes stale silently every time work lands in src/ without a rebuild. It
+ * has now drifted twice in one session, once by 97KB, and in that state the
+ * shipped game was missing an entire body of work while every harness stayed
+ * green.
+ *
+ * That is not an accident of discipline, it is structural: every tool here
+ * either rebuilds first or is pointed at a scratch build with --out, so the
+ * one artifact none of them look at is the one that ships. And an agent that
+ * correctly declines to commit a build artifact -- because rebuilding bakes in
+ * whatever another agent has uncommitted -- leaves it stale by doing the right
+ * thing.
+ *
+ * So the check belongs in CI and in any pre-push habit, not in a person's
+ * memory.
+ */
+if (process.argv.includes('--check')) {
+  const current = fs.existsSync(dest) ? fs.readFileSync(dest) : null;
+  if (current && Buffer.compare(current, Buffer.from(out)) === 0) {
+    console.log(`up to date  ${path.relative(ROOT, dest) || dest}`);
+    process.exit(0);
+  }
+  console.error(`\nSTALE: ${path.relative(ROOT, dest) || dest} is not what this source builds.`);
+  console.error(current
+    ? `  on disk ${current.length} bytes, fresh build ${Buffer.byteLength(out)} bytes`
+    : '  the file does not exist');
+  console.error('  Run: node tools/build.js\n');
+  process.exit(1);
+}
+
 fs.writeFileSync(dest, out);
 
 const kb = (Buffer.byteLength(out) / 1024).toFixed(0);

@@ -321,8 +321,27 @@ MR.shading = (function () {
    * insertion order, and an assumption like that is exactly the kind this
    * project keeps a corrections list for.
    */
-  const SPEC_SHEEN = 0.62;
-  const SPEC_CORE = 0.78;
+  /**
+   * TUNED DOWN HARD FROM THE FIRST BUILD, against the orbit sheet rather than
+   * against the derivation. The thresholds above are right about WHERE the band
+   * lands; the first strengths (0.16 sheen, 0.42 core) were wrong about how much
+   * to put there by roughly a factor of three, and the reason is worth keeping.
+   *
+   * A specular term reads as "shiny" on a curved surface because only a thin
+   * strip of it is ever lit. On a FLAT face the whole face is at one normal, so
+   * the band does not sweep across it -- it switches the entire panel on. This
+   * fleet is flat panels, so at the azimuths where a flank aligns with the
+   * half-vector, 0.42 of extra light did not put a highlight on the taxi, it
+   * turned the taxi white: measured on the orbit sheet, flank luminance went
+   * 133.4 to 177.3 and the front 139.6 to 192.4, and the body lost its hue.
+   *
+   * So the sheen is now barely more than a lift, and the core is a real but
+   * small highlight. What still reads clearly is exactly what should: the 45
+   * degree chamfers, which are narrow by construction, and the cylinders --
+   * tyres, lamps, scaffold tubes -- where the band genuinely does sweep.
+   */
+  const SPEC_SHEEN = 0.66;
+  const SPEC_CORE = 0.80;
 
   const SPEC_VS_DECL = [
     'attribute float aGloss;',
@@ -352,7 +371,7 @@ MR.shading = (function () {
     // the core is the small hot one that reads as an actual reflection. Both
     // are scaled by the light's own colour, so the highlight is warm under the
     // key and cool under the bounce rather than being a white sticker.
-    '      spec += directionalLights[si].color * (sheen * 0.16 + core * 0.42);',
+    '      spec += directionalLights[si].color * (sheen * 0.07 + core * 0.24);',
     '    }',
     '    outgoingLight += spec * vGloss;',
     '  }',

@@ -9,6 +9,28 @@ Rules that outlive any one task. Read this before building anything.
 **Every object is modelled on all sides, fully, always.** No LOD-by-angle, no
 detail budget spent on "the face the camera sees", no flat or hollow rear.
 
+**This applies to everything in the game, without exception by category:**
+every obstacle and every vehicle of any kind; buildings, towers, terraces and
+street walls; bridges, gantries, arches and every structure; trees, groves,
+hedges and vegetation; crowds, marshals, walkers and the ghost; signs, banners,
+plinths and every prop; the runner. If it is a thing that occupies space, it is
+built on all sides.
+
+The owner's instruction, verbatim: *"Yes everything in the game. All obstacles
+and vehicles of any kind. In fact all build must take this approach. Let all
+agents know."*
+
+**Every brief written for this project must carry this rule.** It is not
+something an agent should have to find.
+
+The one thing that is not an exception but looks like one: **a marking painted
+on a surface has no back, because it is not an object.** Lane dashes, road
+paint, telegraph mats, the finish carpet, water and its ripples are correctly
+single quads lying on the thing they are painted on. The test is whether the
+player could ever get to the other side of it. They cannot get under the road.
+They can walk past a sign, a hoarding or a banner -- so those are built both
+sides, and the mile gantry and finish arch already do exactly that.
+
 This rule exists because it was broken. A brief for the fleet rebuild argued
 that the chase camera only ever sees the rear of an obstacle, so the detail
 should go on tail lights and rear glass and not on the front or the flank. The

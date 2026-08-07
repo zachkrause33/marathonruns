@@ -84,10 +84,27 @@ MR.Elevation = (function () {
   /** The tallest a hill of half-length L may legally be. */
   function cap(L) { return Math.min(K_GRADE * L, K_CURV * L * L); }
 
-  // Placement. A hill is 2L long: 260-480 units, 10-18 s of wall clock, 1.1-2.0
-  // race miles. Five of them cover roughly 28% of the race.
-  const L_MIN = 130, L_MAX = 240;
-  const N_MIN = 4, N_MAX = 6;
+  // Placement, and the range is LONGER than the design asked for because of a
+  // property that only shows up once the numbers are put in.
+  //
+  // Under the sightline cap h = K_CURV * L^2, so the maximum grade of a legal
+  // hill is h*pi/2L = K_CURV*pi*L/2 -- LINEAR IN L. A longer hill is a STEEPER
+  // one, not a gentler one, right up to L = 245 where the 4% grade rule takes
+  // over. The design's 130-240 band therefore tops out at 3.9% and averages
+  // about 2.6%, and 2.6% was measured on screen as a real but modest read: the
+  // horizon moves, the road tilts, and a player would have to be looking for
+  // it. At 4% the same frames are unmistakable -- the climb crops the skyline
+  // out of the top of the frame and the descent opens the whole city up.
+  //
+  // So: 200-300, which puts every hill between 2.7% and the 4% ceiling and
+  // makes each one 400-600 units -- 15-22 s of wall clock, 1.7-2.5 race miles.
+  // Four or five of them cover 35-45% of the race, which is more grade than the
+  // design costed and is the right way round: the descent is the breath, and a
+  // longer descent is a longer breath.
+  const L_MIN = 200, L_MAX = 300;
+  // Fewer, because they are bigger and because the bridge is excluded. The
+  // placement loop gives up gracefully if a day cannot fit them all.
+  const N_MIN = 3, N_MAX = 5;
   // Clear of the start runway and of the run-in to the tape: the opening should
   // read calmly and the last gates should be run on the flat.
   const EDGE_PAD = 200;
@@ -137,7 +154,10 @@ MR.Elevation = (function () {
       const L = rnd.range(L_MIN, L_MAX);
       const c = rnd.range(EDGE_PAD + L, total - EDGE_PAD - L);
       if (blocked(c, L)) continue;
-      hills.push({ c, L, h: cap(L) * rnd.range(0.55, 1.0), mandated: false });
+      // 0.82 rather than the design's 0.55 floor: at the bottom of that range
+      // a hill's grade halves and it stops reading at all, which is a hill
+      // that costs the same and delivers nothing.
+      hills.push({ c, L, h: cap(L) * rnd.range(0.82, 1.0), mandated: false });
     }
     hills.sort(function (a, b) { return a.c - b.c; });
 

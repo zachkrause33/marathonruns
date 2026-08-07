@@ -17,8 +17,8 @@
  * ---- what is measured, and why each column earns its place ---------------
  *
  *   peak    dBFS. Anything at 0.0 is clipping. The master sits at 0.85 and a
- *           DynamicsCompressor at -14/7:1 is the only thing between the cues
- *           and the DAC, so headroom is real but finite.
+ *           DynamicsCompressor is the only thing between the cues and the
+ *           DAC, so headroom is real but finite.
  *   rms     dBFS over the whole cue. Cheap, and wrong on its own: a 4-second
  *           roar and a 70 ms footstep with the same rms sound nothing alike.
  *   pnch    max rms in a sliding 50 ms window, dBFS. THIS is the number that
@@ -26,7 +26,12 @@
  *           over roughly this window, so `pnch` is what tells you whether a
  *           footstep is louder than a crash. It is the most important column.
  *   dur     seconds from the first sample above -60 dB relative to peak to
- *           the last. A cue that outlasts its event smears.
+ *           the last. A cue that outlasts its event smears. Note that this
+ *           includes any change the cue makes to the ambient bed, because the
+ *           bed-only reference does not contain it -- so `hit` and `roar`,
+ *           which deliberately duck and swell the environment, report the
+ *           length of the whole disturbance rather than of the burst. That is
+ *           the honest number: it is how long the soundscape is altered for.
  *   cent    spectral centroid in Hz, energy-weighted across the cue. If every
  *           cue reports the same centroid the mix is piled in one octave and
  *           nothing will separate in play.
@@ -88,19 +93,34 @@ const CUES = [
   { label: 'clean(90)',         call: 'a.clean(90)',           len: 1.0 },
   { label: 'clean(140)',        call: 'a.clean(140)',          len: 1.0 },
   { label: 'clean(205)',        call: 'a.clean(205)',          len: 1.0 },
+  // Contact at the two ends of the race. The cue reads the gear it is in, so
+  // these must not measure the same -- the whole point is that losing a
+  // 190-gate line is not the same event as losing a 5-gate one.
+  { label: 'hit@gear0',         call: 'a.hit()',               len: 3.0 },
+  { label: 'hit@gear.6',        call: 'a.clean(60); a.hit()',  len: 3.0 },
+  { label: 'hit@gear1',         call: 'a.clean(200); a.hit()', len: 3.0 },
+  { label: 'gearUp',            call: 'a.clean(2); a.clean(9)', len: 1.5 },
   { label: 'crossover(ahead)',  call: 'a.crossover(true)',     len: 3.0 },
   { label: 'crossover(caught)', call: 'a.crossover(false)',    len: 3.0 },
   { label: 'aid(water)',        call: 'a.aid(false)',          len: 1.0 },
   { label: 'aid(banana)',       call: 'a.aid(true)',           len: 1.5 },
   { label: 'mile(1)',           call: 'a.mile(1)',             len: 2.0 },
   { label: 'mile(26)',          call: 'a.mile(26)',            len: 2.5 },
+  // world.js calls roar(1) for a record and 0.55 + 0.35*chase otherwise, so
+  // 0.55 and 0.9 are the values that actually reach a player, not 0.
   { label: 'roar(0)',           call: 'a.roar(0)',             len: 6.0 },
-  { label: 'roar(.5)',          call: 'a.roar(0.5)',           len: 7.0 },
+  { label: 'roar(.55)',         call: 'a.roar(0.55)',          len: 7.0 },
+  { label: 'roar(.9)',          call: 'a.roar(0.9)',           len: 8.0 },
   { label: 'roar(1)',           call: 'a.roar(1)',             len: 9.0 },
   { label: 'finish(miss)',      call: 'a.finish(false)',       len: 4.0 },
   { label: 'finish(RECORD)',    call: 'a.finish(true)',        len: 7.0 },
   { label: 'countdown(3)',      call: 'a.countdown(false)',    len: 1.0 },
   { label: 'countdown(go)',     call: 'a.countdown(true)',     len: 1.5 },
+  // Written and measured, but not yet called from anywhere -- see the note at
+  // the foot of audio.js for the one line each of them needs.
+  { label: '~aidMissed',        call: 'a.aidMissed()',         len: 1.0 },
+  { label: '~recordLost',       call: 'a.recordLost()',        len: 4.0 },
+  { label: '~tier(up)',         call: 'a.tier(true)',          len: 1.5 },
 ];
 
 // Realistic pile-ups. The mix is never one cue at a time, and headroom is only
@@ -121,6 +141,14 @@ const STACKS = [
     label: 'STACK finish',
     call: 'a.roar(1); a.finish(true)',
     len: 9.0,
+  },
+  {
+    label: 'STACK worst',
+    // Not a frame the game produces often, but it is a frame the game CAN
+    // produce: contact on the same step as a landing, on a mile boundary,
+    // with the ghost changing sides. Headroom is only real if it survives it.
+    call: 'a.clean(190); a.footstep(1); a.hit(); a.land(); a.mile(26); a.crossover(false)',
+    len: 3.5,
   },
   {
     label: 'STACK 4s run',
@@ -342,10 +370,16 @@ async function main() {
   const jsonOut = arg('--json');
   if (wavDir) fs.mkdirSync(wavDir, { recursive: true });
 
-  const src = fs.readFileSync(path.join(ROOT, 'src/audio/audio.js'), 'utf8');
+  // audio.js derives its gear curve from the live pace model rather than
+  // restating it, so the probe loads the same modules the game does, in the
+  // same order. Measuring audio.js alone would exercise its fallback curve and
+  // report numbers no player will ever hear.
+  const mods = ['src/core/constants.js', 'src/core/pace.js', 'src/audio/audio.js']
+    .map((m) => `<script>${fs.readFileSync(path.join(ROOT, m), 'utf8')}</script>`)
+    .join('\n');
   const html = `<!doctype html><meta charset="utf-8"><title>audio probe</title>
 <script>var MR = {};</script>
-<script>${src}</script>
+${mods}
 <script>${PAGE}</script>`;
   const tmp = path.join(ROOT, 'tools/tmp');
   fs.mkdirSync(tmp, { recursive: true });
@@ -419,23 +453,45 @@ async function main() {
     check(r.clip === 0, `${r.label}: ${r.clip} clipped samples`);
     check(r.peakDb <= -0.5, `${r.label}: peak ${f(r.peakDb)} dBFS, no headroom`);
   }
-  check(p('hit') > p('footstep(1)') + 8, 'hit is not decisively louder than a footstep');
-  check(p('hit') > p('land') + 3, 'hit does not beat a landing');
-  check(p('hit') > p('clean(90)') + 8, 'hit does not beat a clean gate');
-  check(p('roar(1)') > p('roar(0)') + 2, 'roar power does not change level');
-  check(p('finish(RECORD)') > p('mile(1)') + 2, 'the finish is quieter than a mile marker');
+  // Contact costs the record; a footstep costs nothing. 12 dB is the gap that
+  // makes that true to the ear rather than only on paper.
+  check(p('hit') > p('footstep(1)') + 12, 'hit is not decisively louder than a footstep');
+  check(p('hit') > p('land') + 6, 'hit does not beat a landing');
+  check(p('hit') > p('clean(90)') + 10, 'hit does not beat a clean gate');
+  // Eight thousand people watching a world record fall outrank a signpost.
+  check(p('roar(1)') > p('mile(26)') + 4, 'the roar is not bigger than a mile marker');
+  check(p('roar(1)') > p('roar(.55)') + 2, 'roar power does not change level');
+  check(p('finish(RECORD)') > p('finish(miss)') + 3, 'a record sounds like a miss');
+  check(p('finish(RECORD)') >= p('hit') - 1, 'the finish is smaller than a stumble');
+  // The reward has to be above the sound of the player's own running.
+  check(p('clean(90)') > p('footstep(1)') + 2, 'the clean gate is under the footsteps');
+
   // The streak must stay audible all the way to the gates a real run reaches.
-  const c90 = by['clean(90)'], c205 = by['clean(205)'];
+  const c90 = by['clean(90)'], c205 = by['clean(205)'], c45 = by['clean(45)'];
   if (c90 && c205) {
-    check(Math.abs(c205.cent - c90.cent) > 60,
+    check(c205.cent > c90.cent * 1.2,
       `clean() saturates: centroid ${Math.round(c90.cent)}Hz at streak 90 vs `
       + `${Math.round(c205.cent)}Hz at 205 -- a flawless run reaches 205`);
   }
+  if (c45 && c90) check(c90.cent > c45.cent * 1.1, 'clean() is flat across mid-race');
+  // Contact must mean more at the top of a run than at the bottom.
+  const h0 = by['hit@gear0'], h1 = by['hit@gear1'];
+  if (h0 && h1) check(h1.dur > h0.dur * 1.2, 'contact sounds the same at gear 0 and gear 1');
+
+  // The ambient bed is the floor everything has to clear.
+  const bed = by['ambient(bed)'];
   for (const r of rows) {
     if (r.label.startsWith('STACK') || r.label.startsWith('ambient')) continue;
-    check(r.punchDb > -46, `${r.label}: punch ${f(r.punchDb)} dBFS is inaudible`);
+    check(r.punchDb > bed.punchDb + 6,
+      `${r.label}: punch ${f(r.punchDb)} dBFS is inside the ${f(bed.punchDb)} dBFS bed`);
   }
-  check(by['footstep(1)'] && by['footstep(1)'].dur < 0.35, 'footstep tail smears into the next step');
+  // Steps land ~3x a second at speed; a tail longer than that is a drone.
+  check(by['footstep(1)'] && by['footstep(1)'].dur < 0.3, 'footstep tail smears into the next step');
+  // Small speakers roll off below ~200 Hz. A cue that lives entirely down
+  // there does not exist on the hardware most people will play this on.
+  for (const k of ['footstep(1)', 'land', 'hit']) {
+    if (by[k]) check(by[k].band[0] < 80, `${k}: ${f(by[k].band[0], 0)}% of energy below 200 Hz`);
+  }
 
   if (errs.length) {
     console.log('  PAGE ERRORS:');

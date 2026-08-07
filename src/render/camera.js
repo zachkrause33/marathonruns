@@ -132,9 +132,38 @@ MR.Camera = (function () {
     };
   }
 
+  /**
+   * ---- HILLS: TWO TERMS, AND THEY ARE DELIBERATELY NOT THE SAME ONE --------
+   *
+   * The camera samples the road profile TWICE, once under itself and once
+   * under its look point, and the whole pitch behaviour falls out of the fact
+   * that those two points are 12 units apart:
+   *
+   *   on a constant grade   both rise together, so the camera climbs the road
+   *                         with the horizon held where it belongs
+   *   cresting              E(look) < E(cam), so the camera pitches DOWN and
+   *                         the far road falls away
+   *   into a climb          E(look) > E(cam), so it pitches UP and the road
+   *                         fills the frame
+   *
+   * The camera also sits BASE_BACK behind the runner, so at a crest it is
+   * momentarily still on the near flank and the runner rises in frame -- which
+   * is what cresting a hill looks like from behind.
+   *
+   * Nothing else in this file changes. Every effect it owns already keys off
+   * `speed`, and `speed` is grade-inclusive, so the FOV, the pull-in, the
+   * cadence-locked bob and the trail all quicken on a descent for free. The one
+   * signal that must NOT is the top-gear latch: it reads sp01 from the smoothed
+   * speed, and a steep descent would fire the one-shot flourish and the
+   * permanent rumble spuriously. main.js therefore hands `speed` (grade-
+   * inclusive) and `gearSpeed` (flat, from pace.streakSpeed) separately.
+   */
   function create(aspect) {
     const cam = new THREE.PerspectiveCamera(BASE_FOV, aspect, 0.1, 1200);
     const look = new THREE.Vector3();   // hoisted: this runs 60x a second
+    // The course's road profile, handed over by main.js once the course
+    // exists. Flat until then, and flat for anything that never sets it.
+    let elev = MR.Elevation.FLAT;
 
     const s = {
       camera: cam,
@@ -146,7 +175,8 @@ MR.Camera = (function () {
       t: 0,            // clock for the wobble functions
       stride: 0,       // stride phase, mirrors the runner's cadence
       primed: false,   // first frame snaps the speed filter
-      sp: SPEED_LO,    // smoothed ground speed
+      sp: SPEED_LO,    // smoothed ground speed, grade included
+      gsp: SPEED_LO,   // smoothed STREAK speed, grade removed -- top gear only
       drive: 0,        // 0..1 pace within the honest band, shaped
       accel: 0,        // smoothed d(speed)/dt -- the surge signal
 
@@ -186,18 +216,24 @@ MR.Camera = (function () {
       // deep-race screenshot with a phantom 6 u/s surge that never happens in
       // a real run.
       const first = !s.primed;
-      if (first) { s.primed = true; s.sp = p.speed; }
+      if (first) { s.primed = true; s.sp = p.speed; s.gsp = p.gearSpeed || p.speed; }
       const prev = s.sp;
       s.sp += (p.speed - s.sp) * (1 - Math.pow(0.02, d));
       const rawAccel = d > 0 ? (s.sp - prev) / d : 0;
       s.accel += (rawAccel - s.accel) * (1 - Math.pow(0.05, d));
+      // The STREAK's speed, with the hill taken back out. Only the top-gear
+      // latch reads it -- see the header: finding another gear is something an
+      // unbroken line buys, never something pointing downhill buys.
+      s.gsp += ((p.gearSpeed === undefined ? p.speed : p.gearSpeed) - s.gsp)
+        * (1 - Math.pow(0.02, d));
 
       const sp01 = clamp01((s.sp - SPEED_LO) / (SPEED_HI - SPEED_LO));
+      const gear01 = clamp01((s.gsp - SPEED_LO) / (SPEED_HI - SPEED_LO));
       // Most of a good run is spent in the upper half of the band, so bias the
       // response there: the difference the player should feel is between
       // "quick" and "flat out", not between the start line and mile 3.
       const drive = Math.pow(sp01, 0.85);
-      const gear = smoothstep(0.70, 0.99, sp01);      // the top-gear state
+      const gear = smoothstep(0.70, 0.99, gear01);    // the top-gear state
       // Kept for impact(): pace *is* the streak, so how fast the runner was
       // going when they hit something is an honest measure of how much the
       // hit just cost them. See impact().
@@ -216,9 +252,9 @@ MR.Camera = (function () {
       // Top gear: fire once when the pace floor is essentially reached, and
       // re-arm only if a hit drags the run back out of it. This is the moment
       // the 21% is supposed to feel like a different race.
-      if (first) s.gearArmed = sp01 < 0.93;             // no flourish for ?skip=
-      else if (s.gearArmed && sp01 > 0.93) { s.gearArmed = false; s.gearT = 1; }
-      if (!s.gearArmed && sp01 < 0.72) s.gearArmed = true;
+      if (first) s.gearArmed = gear01 < 0.93;           // no flourish for ?skip=
+      else if (s.gearArmed && gear01 > 0.93) { s.gearArmed = false; s.gearT = 1; }
+      if (!s.gearArmed && gear01 < 0.72) s.gearArmed = true;
       s.gearT = Math.max(0, s.gearT - d * 1.15);
 
       // Going to ground. The held slide pose is the hard thing to read from
@@ -384,7 +420,9 @@ MR.Camera = (function () {
         + s.mileT * 0.24
         + s.winded * 0.12
         + bobY + shY
-        + finUp;
+        + finUp
+        // The road under the LENS, which is BASE_BACK behind the runner.
+        + elev.at(p.z - back);
 
       // The lateral drift at the tape: a slow swing off the centreline so the
       // finish is seen from three-quarters and the stands on one side crowd
@@ -405,6 +443,11 @@ MR.Camera = (function () {
       // the upper third rather than off the top, and it draws IN toward the
       // runner at the tape -- the run-in is a wide shot of a place, the tape is
       // a shot of a person arriving in it.
+      // The aim point's own z, hoisted out so the road under it can be sampled.
+      // The gap between this and (p.z - back) is what makes the camera pitch
+      // with the grade; see the header.
+      const lookZ = p.z + LOOK_AHEAD - duck * 0.90 + (p.y || 0) * 1.1 - drive * 0.5
+        - runE * 1.8 - fin * 5.0;
       look.set(
         // At the tape the aim goes onto the runner himself rather than onto
         // the damped follow point. The lateral drift below moves the CAMERA,
@@ -412,9 +455,9 @@ MR.Camera = (function () {
         // whichever frame edge the last lane change had left the follow on.
         s.x * s.fr.lookX * (1 - fin) + (p.x || 0) * fin,
         LOOK_Y + (p.y || 0) * 0.50 - duck * 0.30 - drive * 0.22
-          + runE * 1.1 + fin * 1.3,
-        p.z + LOOK_AHEAD - duck * 0.90 + (p.y || 0) * 1.1 - drive * 0.5
-          - runE * 1.8 - fin * 5.0
+          + runE * 1.1 + fin * 1.3
+          + elev.at(lookZ),
+        lookZ
       );
       cam.lookAt(look);
 
@@ -492,6 +535,9 @@ MR.Camera = (function () {
       s.kick = Math.min(1, s.kick + 0.35);
     };
 
+    /** The course's road profile. Handed over by main.js once it exists. */
+    s.setElevation = function (e) { elev = e || MR.Elevation.FLAT; };
+
     s.resize = function (aspect) {
       cam.aspect = aspect;
       s.fr = frameFor(aspect);
@@ -501,7 +547,7 @@ MR.Camera = (function () {
     s.reset = function () {
       s.x = 0; s.vx = 0; s.roll = 0; s.fov = BASE_FOV;
       s.t = 0; s.stride = 0; s.primed = false;
-      s.sp = SPEED_LO; s.drive = 0; s.accel = 0;
+      s.sp = SPEED_LO; s.gsp = SPEED_LO; s.drive = 0; s.accel = 0;
       s.shake = 0; s.punch = 0; s.lurch = 0; s.winded = 0;
       s.dip = 0; s.dipV = 0; s.kick = 0;
       s.pDuck = 0;

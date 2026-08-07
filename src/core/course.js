@@ -490,7 +490,11 @@ MR.Course = (function () {
     const PAD = 230;   // the water ramp, plus a little
     return {
       exclude: [[bridge.from * K.TOTAL_UNITS - PAD, after.from * K.TOTAL_UNITS + PAD]],
-      mandate: [{ z: 0.763 * K.TOTAL_UNITS, L: 180 }],
+      // L = 280 is chosen to match the spike rather than to look good: the
+      // Gaussian has sigma 0.055, so the wall band is roughly z 4460-5140 and a
+      // hill of this half-length spans 4521-5081. The climb and the density
+      // peak arrive together and the descent lands exactly as the gates thin.
+      mandate: [{ z: 0.763 * K.TOTAL_UNITS, L: 280 }],
     };
   }
 

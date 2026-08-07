@@ -3274,6 +3274,32 @@ MR.World = (function () {
 
   function create(course) {
     const group = new THREE.Group();
+
+    /**
+     * ============ THE HILL, AND WHERE IT IS ALLOWED TO SHOW UP ============
+     *
+     * `EL` is the course's own elevation profile (core/elevation.js). Two rules
+     * govern every use of it in this file and they are worth stating once here
+     * rather than at thirty call sites:
+     *
+     *   1. IT IS A RENDER-TIME OFFSET AND NOTHING ELSE. The simulation places
+     *      the player, the hazards and the aid at y = 0 relative to the LOCAL
+     *      road surface, and collision.js tests its clearances against that
+     *      flat zero. So elevation is added when a thing is drawn, never when
+     *      it is decided. Every clearance threshold in the game is untouched.
+     *
+     *   2. IT IS APPLIED AT THE CLAIM, NOT AT THE PARTS. A pooled object is
+     *      claimed once and then sits still for two hundred units, so its lift
+     *      is written where its z is written -- at the six activeX.push sites
+     *      below -- rather than at the ~30 individual position.set calls inside
+     *      them. One line each, and a missed site is then impossible.
+     *
+     * `eAt` is hot: five or six calls a frame from the update loop plus one per
+     * ground row. It is a loop over at most seven compactly-supported terms
+     * with a single cos, about 200 ns.
+     */
+    const EL = course.elevation || MR.Elevation.FLAT;
+    const eAt = EL.at;
     // v4: the prop lottery gained a 'walkers' entry, which moves every draw
     // after the first and so re-rolls the whole layout. Naming that is cheaper
     // than wondering later why a day's scenery moved. (v3 was the pass that
@@ -3430,15 +3456,73 @@ MR.World = (function () {
     // finite plane can stand in for an infinite one, and it sits below the
     // road surface so the road always wins the depth test. On the bridge it
     // drops away and becomes the river.
+    //
+    // IT IS THE ONE THING HILLS COST GEOMETRY. Left as the single quad it was,
+    // it would slice straight across the descending road at every crest and
+    // hide it -- a flat sheet through a curved surface, with the horizon drawn
+    // on the wrong side of the road the player is about to run down. So it is
+    // cut into strips along z and each strip's row is displaced to E(z) every
+    // frame.
+    //
+    // The pitch is not uniform, because the eye's need for it is not. Four
+    // units through the band the fog lets the player see (fog is opaque at 235,
+    // and nothing spawns past VIEW = 210) puts the worst tangent kink at
+    // c * 4 = 5.7e-4 * 4 = 0.0023 rad = 0.13 degrees, which is beneath
+    // anything; beyond it the rows coarsen hard because a strip out at 500
+    // units is behind an opaque wall of fog. 113 rows, 226 triangles, one draw
+    // -- the same mesh, the same material, the same everything else.
+    const GROUND_ROWS = (function () {
+      const rows = [];
+      for (let z = -700; z < -100; z += 100) rows.push(z);
+      for (let z = -100; z <= 264; z += 4) rows.push(z);
+      for (let z = 300; z <= 700; z += 50) rows.push(z);
+      return rows;
+    })();
     const groundMat = S.toon(P.ground, 2);
     groundMat.map = groundTex;
     mats.shoulder.map = vergeTex;
     mats.road.map = roadTex;
     mats.road.vertexColors = true;
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(1400, 1400), groundMat);
-    ground.rotation.x = -Math.PI / 2;
+    const groundGeo = (function () {
+      const g = new THREE.BufferGeometry();
+      const n = GROUND_ROWS.length;
+      const pos = new Float32Array(n * 2 * 3);
+      const uv = new Float32Array(n * 2 * 2);
+      const idx = [];
+      // Laid flat in XZ with y as height, rather than a PlaneGeometry turned on
+      // its side: a row displacement is then one write to .y instead of a
+      // rotation to reason about. UVs reproduce the old plane's 0..1 across
+      // 1400 units, so groundTex.repeat(48, 48) tiles exactly as before.
+      for (let i = 0; i < n; i++) {
+        const zz = GROUND_ROWS[i];
+        pos[i * 6] = -700; pos[i * 6 + 2] = zz;
+        pos[i * 6 + 3] = 700; pos[i * 6 + 5] = zz;
+        uv[i * 4] = 0; uv[i * 4 + 1] = (zz + 700) / 1400;
+        uv[i * 4 + 2] = 1; uv[i * 4 + 3] = (zz + 700) / 1400;
+        if (i) {
+          const a = (i - 1) * 2, b = a + 1, c = i * 2, d = c + 1;
+          idx.push(a, c, d, a, d, b);
+        }
+      }
+      g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+      g.setIndex(idx);
+      // Normals are computed ONCE, flat and upward, and are deliberately never
+      // recomputed as the rows move. A 4% grade turns the true normal by 2.3
+      // degrees, which is nothing in a smooth renderer and is not nothing here:
+      // the toon ramp is banded, so a normal that drifts across a band boundary
+      // draws a hard stripe along the hill. The ground's shape is carried by its
+      // silhouette against the sky and by the road running over it, which is
+      // where a flat-shaded game should carry it.
+      g.computeVertexNormals();
+      return g;
+    })();
+    const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.position.y = -0.34;
     ground.renderOrder = -500;
+    // Its vertices are rewritten every frame, so its bounding sphere is stale
+    // by construction. It is also always in frame; there is nothing to cull.
+    ground.frustumCulled = false;
     ground.userData.notScenery = true;
     group.add(ground);
     mats.ground = groundMat;
@@ -8485,13 +8569,34 @@ MR.World = (function () {
       const lift = deckLift(z);
       ground.position.z = z;
       ground.position.y = -0.34 - WATER_DROP * lift;
+      // Displace the ground rows onto the profile. World z of row i is
+      // z + GROUND_ROWS[i], and the mesh's own y is the water drop, so the row
+      // carries E() alone. Course.elevationPlan() excludes the whole bridge
+      // span from hill placement, so on the deck E is zero here and the river
+      // stays a flat sheet rather than arching with a road that is not there.
+      {
+        const gp = groundGeo.attributes.position;
+        const arr = gp.array;
+        for (let i = 0; i < GROUND_ROWS.length; i++) {
+          const y = eAt(z + GROUND_ROWS[i]);
+          arr[i * 6 + 1] = y;
+          arr[i * 6 + 4] = y;
+        }
+        gp.needsUpdate = true;
+      }
+      const eHere = eAt(z);
       sky.position.z = z;
+      sky.position.y = eHere;
       hills.position.z = z;
+      hills.position.y = eHere;
       // On the bridge there is no land to see, only water to the horizon.
       hills.visible = lift < 0.6;
       ripples.visible = lift > 0.02;
       if (ripples.visible) {
-        ripples.position.set(0, ground.position.y + 0.05, z);
+        // Water is level. The bridge is excluded from hill placement, so eAt(z)
+        // is zero wherever the ripples are visible; adding it anyway keeps the
+        // sheet welded to the ground plane if that exclusion is ever relaxed.
+        ripples.position.set(0, ground.position.y + eAt(z) + 0.05, z);
         ripples.material.opacity = 0.9 * lift;
         // A slow crawl is all a flat plane needs to stop reading as lino.
         rippleTex.offset.y = (now * 0.014) % 1;
@@ -8502,6 +8607,22 @@ MR.World = (function () {
         const tz = state.roadFrom * TILE;
         const obj = roadPool.claim();
         obj.position.z = tz;
+        // THE ROAD STAYS RIGID PER TILE, and that is why hills cost it nothing.
+        //
+        // The tile's geometry spans local z of -TILE/2 .. +TILE/2, so setting
+        // its y to the CHORD's midpoint and its pitch to the chord's angle puts
+        // its far end at exactly E(tz + TILE/2) -- which is exactly where the
+        // next tile's near end lands. Adjacent tiles therefore meet EXACTLY in
+        // y and only the tangent kinks. At the tightest legal curvature that
+        // kink is c * TILE = 5.7e-4 * 24 = 0.0137 rad = 0.8 degrees.
+        //
+        // Everything the tile carries -- both shoulders, the paint, the kerb
+        // rail or wall, the lamp arcs -- are its children, so they ride for
+        // free. One position, one rotation, one atan, about 1.1 claims a second
+        // at race pace.
+        const ey0 = eAt(tz - TILE / 2), ey1 = eAt(tz + TILE / 2);
+        obj.position.y = (ey0 + ey1) * 0.5;
+        obj.rotation.x = -Math.atan2(ey1 - ey0, TILE);
         // The lamp alternates on the parity of the tile index, not on the tile's
         // z, so the pattern is a property of the course and identical for every
         // player on the same day -- like everything else the course decides.

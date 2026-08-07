@@ -65,8 +65,15 @@
   hud.setCourse(course);
   hud.showPerf(DEBUG);
 
+  // The road profile is the course's, so the camera and the pace model read
+  // the same ground the generator proved solvable against.
+  const elev = course.elevation || MR.Elevation.FLAT;
+  cam.setElevation(elev);
+  const eProof = elev.validate();
+  if (!eProof.ok) console.error('ELEVATION INVALID', eProof.errors);
+
   const player = MR.Player.create();
-  let pace = Pace.create();
+  let pace = Pace.create(elev);
 
   // Collision thresholds must stay honest against the visuals; shout in the
   // console rather than let a retune silently make the game unfair.
@@ -89,7 +96,7 @@
     // same session has to chase the streak the first one just set.
     hud.setMemory(MR.Store.summary(dateKey));
     hud.reset();
-    pace = Pace.create();
+    pace = Pace.create(elev);
     player.reset();
     world.reset();
     cam.reset();
@@ -326,8 +333,14 @@
       ? pace.speed() * Math.max(0, 1 - (performance.now() - doneAt) / 2200)
       : pace.speed();
 
+    // The grade at the runner, -1..1 against the steepest legal one. It only
+    // pitches the trunk; the stride slows on the climb and quickens on the
+    // descent for free, because cadence already falls out of `speed`.
+    const grade = elev.gradeNorm(pace.units);
+
     runner.update(dt, {
       speed: strideSpeed,
+      grade,
       air01: player.airborne ? Math.sin(Math.min(1, player.airT) * Math.PI) : 0,
       duck01: player.duck01,
       trip: player.tripT,
@@ -335,11 +348,20 @@
       lean: player.lean,
       stumble: player.stumble,
     });
-    runner.group.position.set(player.x, player.y, pace.units);
+    // ELEVATION IS ADDED HERE AND NOWHERE UPSTREAM. `player.y` is, and stays,
+    // the height above the LOCAL road surface -- which is what lets
+    // collision.js keep testing y >= 0.84 and duck01 >= 0.90 against a flat
+    // zero, and is the single finding the whole hill feature rests on.
+    runner.group.position.set(player.x, player.y + elev.at(pace.units), pace.units);
 
     cam.update(dt, {
       z: pace.units, x: player.x, y: player.y,
-      speed: pace.speed(), lean: player.lean, duck01: player.duck01,
+      speed: pace.speed(),
+      // The flat speed, for the top-gear latch alone. A descent must not fire
+      // the gear flourish or the permanent rumble: speed you did not earn is
+      // not another gear. See camera.js's header.
+      gearSpeed: pace.streakSpeed(),
+      lean: player.lean, duck01: player.duck01,
     });
 
     // After the camera, never before: the ghost's tag is placed against this

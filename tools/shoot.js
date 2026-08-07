@@ -263,9 +263,47 @@ const DEFAULT_SHOTS = [
           for (const gt of gates) {
             // Only scenery strictly IN FRONT of a gate can hide it.
             if (gt.z0 <= zb) continue;
-            // A gate closer than 26 units is already committed to; the spec's
-            // read window is 26 units out and beyond.
-            if (gt.z - camZ < 26) continue;
+            // THE READ WINDOW, AND IT NOW HAS BOTH ENDS.
+            //
+            // The near end is unchanged: a gate closer than 26 units is already
+            // committed to, so hiding it costs the player nothing they could
+            // have used.
+            //
+            // The far end is new, and it is a deliberate loosening. Until now
+            // the band ran from 26 units to the spawn distance -- 240 -- and on
+            // flat ground that openness was free, because nothing on a flat
+            // road can project onto a hazard 157 units away. Terrain can.
+            // Standing behind a rise you cannot see the dip beyond it: that is
+            // what a hill IS, and an unbounded far end makes this assertion
+            // UNPASSABLE BY CONSTRUCTION for any course with a crest in it. A
+            // test no correct implementation can pass is not a safety net, and
+            // this project has already had to retract one of those.
+            //
+            // So the band is bounded, and the bound is not a new number. It is
+            // MR.Elevation.SIGHT_MIN, the same 90 units the hill shape cap is
+            // derived from and that Elevation.validate() ray-marches every
+            // course against -- the two assertions become one constraint seen
+            // from both ends, which is the pattern ACTION_WINDOW and
+            // spacingAt() already use in course.js. The terrain proof says the
+            // road surface stays visible for 90 units; a hazard stands 0.8-2.8
+            // units ABOVE that road, so anything the proof covers this test can
+            // legitimately demand. Measuring from camZ rather than from the
+            // runner makes it 4.35 units stricter still.
+            //
+            // What it gives up: a prop that occludes a hazard ONLY beyond 90
+            // units and never inside it. Such a hazard is in clear view for at
+            // least 69 units before the 21-unit action window opens, and its
+            // telegraph mat is 16 units long. No player is harmed by that, and
+            // nothing in the current prop set does it -- the sweep passed with
+            // the unbounded form on flat ground, so nothing measured is being
+            // waved through.
+            //
+            // The number NOT chosen: 60, which was proposed and is looser than
+            // the 90 this codebase has already proved. Do not relax it further
+            // without moving SIGHT_MIN, which would move the hill cap with it.
+            const READ_FAR = (window.MR.Elevation && MR.Elevation.SIGHT_MIN) || 90;
+            const gd = gt.z - camZ;
+            if (gd < 26 || gd > READ_FAR) continue;
             const gb = band(gt.x - gt.halfX, gt.x + gt.halfX, gt.yMin, gt.yMax, gt.z0, gt.z1);
             if (!gb) continue;
             // A genuine interval overlap, both ends. The one-sided form the

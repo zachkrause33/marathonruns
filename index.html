@@ -3533,13 +3533,186 @@ MR.shading = (function () {
     shader.fragmentShader = shader.fragmentShader.replace(GRAD_INCLUDE, GRAD_RGB);
   }
 
-  /** Standard toon material. `steps` 2 for props, 3 for characters. */
-  function toon(color, steps, floor) {
+  /**
+   * ================== THE SPECULAR BAND ==================
+   *
+   * MeshToonMaterial HAS NO SPECULAR TERM AT ALL. Its whole lighting model is
+   * a banded diffuse ramp, so there is not, and never has been, a highlight
+   * anywhere on anything in this game. That is the mechanical answer to the
+   * owner's "cars should feel like actual 3D objects rather than flat coloured
+   * shapes", and to reflections and highlights being the first two items on
+   * their list: the material could not produce one.
+   *
+   * WHAT THIS ADDS is a cel specular -- two hard steps on the half-vector, not
+   * a Blinn falloff -- because a smooth highlight under a banded diffuse reads
+   * as a smudge. It is added to outgoingLight BEFORE tone mapping and the
+   * colour-space conversion, and therefore before the fog mix, so a highlight
+   * fades into the haze at exactly the rate the surface under it does. A spec
+   * that stayed crisp at 150 units would undo the aerial perspective the whole
+   * depth read rests on.
+   *
+   * IT IS PER-VERTEX OPT-IN, VIA aGloss, and that is the part that makes it
+   * safe. Every hazard variant is ONE merged geometry under ONE shared
+   * material, so without a per-part control the choice would be "every surface
+   * on the vehicle is glossy" or "none is" -- and a glossy tyre is worse than
+   * no highlight at all. merge() bakes a per-part scalar exactly as it already
+   * bakes aWave for the crowd, so glass and chrome can be wet, paint
+   * semi-gloss and rubber, cloth and skin flat, at no cost in draws, meshes or
+   * materials. A geometry that never asks for the attribute reads 0 through
+   * WebGL's disabled-array default and is bit-identical to before.
+   *
+   * WHERE THE BAND LANDS, worked out rather than dialled in, because the two
+   * thresholds decide whether this is free or whether it moves the contrast
+   * gate. In view space the key light sits at roughly (-0.44, 0.57, -0.69) and
+   * the eye at (0, 0, 1), so the half-vector is about (-0.56, 0.72, 0.39). For
+   * the axis-aligned faces this fleet is built from:
+   *
+   *   roof, normal +y                 N.H = 0.72
+   *   the +x flank                    N.H = 0.56
+   *   the rear face, at the camera    N.H = 0.39
+   *   a roof-to-flank chamfer         N.H = 0.91
+   *   a roof-to-rear chamfer          N.H = 0.79
+   *   a tyre, normals sweeping y-z    N.H peaks at 0.82
+   *
+   * SHEEN at 0.62 and CORE at 0.78 therefore light the roof, both chamfers and
+   * the top of every cylinder, and leave the flanks and THE WHOLE REAR FACE
+   * dark. That last one is the important one: the contrast audit photographs
+   * every variant down the game's own sightline, where the rear face is most
+   * of what it can see, so this cannot inflate the number the build gates on.
+   * The roof is in that shot only as a grazing sliver. Measured, not assumed --
+   * the per-variant before/after is in the report.
+   *
+   * It is also why the chamfers this pass adds to the fleet and this band are
+   * one change and not two: a box has no surface at 45 degrees, so before the
+   * chamfers existed the only thing a shoulder highlight could have landed on
+   * was the roof. The reference's cars carry their brightest line exactly on
+   * that turn, and now so do ours.
+   *
+   * COST: no draw calls, no meshes, no materials, four extra floats a vertex
+   * on the geometries that opt in, and about a dozen fragment instructions on
+   * one material. The loop is over NUM_DIR_LIGHTS rather than reading
+   * directionalLights[0] -- the key light is index 0 only because of scene
+   * insertion order, and an assumption like that is exactly the kind this
+   * project keeps a corrections list for.
+   */
+  /**
+   * TUNED DOWN HARD FROM THE FIRST BUILD, against the orbit sheet rather than
+   * against the derivation. The thresholds above are right about WHERE the band
+   * lands; the first strengths (0.16 sheen, 0.42 core) were wrong about how much
+   * to put there by roughly a factor of three, and the reason is worth keeping.
+   *
+   * A specular term reads as "shiny" on a curved surface because only a thin
+   * strip of it is ever lit. On a FLAT face the whole face is at one normal, so
+   * the band does not sweep across it -- it switches the entire panel on. This
+   * fleet is flat panels, so at the azimuths where a flank aligns with the
+   * half-vector, 0.42 of extra light did not put a highlight on the taxi, it
+   * turned the taxi white: measured on the orbit sheet, flank luminance went
+   * 133.4 to 177.3 and the front 139.6 to 192.4, and the body lost its hue.
+   *
+   * So the sheen is now barely more than a lift, and the core is a real but
+   * small highlight. What still reads clearly is exactly what should: the 45
+   * degree chamfers, which are narrow by construction, and the cylinders --
+   * tyres, lamps, scaffold tubes -- where the band genuinely does sweep.
+   */
+  const SPEC_SHEEN = 0.66;
+  const SPEC_CORE = 0.80;
+
+  const SPEC_VS_DECL = [
+    'attribute float aGloss;',
+    'varying float vGloss;',
+  ].join('\n');
+
+  const SPEC_FS_DECL = 'varying float vGloss;';
+
+  // No backticks anywhere in the GLSL comments below -- see CLAUDE.md rule 5.
+  const SPEC_FS_BODY = [
+    '#if NUM_DIR_LIGHTS > 0',
+    '  if (vGloss > 0.0) {',
+    '    vec3 sN = normalize(normal);',
+    '    vec3 sV = normalize(vViewPosition);',
+    '    vec3 spec = vec3(0.0);',
+    '    for (int si = 0; si < NUM_DIR_LIGHTS; si++) {',
+    '      vec3 sH = normalize(directionalLights[si].direction + sV);',
+    '      float nh = max(dot(sN, sH), 0.0);',
+    // fwidth is zero across a flat face, so the band is hard there and only
+    // antialiases where the surface actually curves -- which is what a cel
+    // highlight wants. The small constant keeps a flat face from aliasing
+    // against its own neighbour at a grazing angle.
+    '      float aa = fwidth(nh) * 0.70 + 0.010;',
+    '      float sheen = smoothstep(' + SPEC_SHEEN.toFixed(2) + ' - aa, ' + SPEC_SHEEN.toFixed(2) + ' + aa, nh);',
+    '      float core = smoothstep(' + SPEC_CORE.toFixed(2) + ' - aa, ' + SPEC_CORE.toFixed(2) + ' + aa, nh);',
+    // FRESNEL, and it is what makes this usable on a fleet made of flat panels.
+    //
+    // The failure it fixes, measured on the orbit sheet: at the azimuth where a
+    // flank or a window turns to face the lens, that face fills much of the
+    // frame AND sits at one constant normal, so a threshold it crosses switches
+    // the whole panel white at once. The taxi's side glass went to a flat sheet
+    // of near-white the moment the camera reached the flank.
+    //
+    // Real reflectance rises toward grazing angles and is weakest face-on,
+    // which is precisely the opposite weighting -- so applying it suppresses the
+    // case that broke and strengthens the case the reference actually shows,
+    // which is a highlight along a roof and a shoulder seen edge-on. The floor
+    // keeps a face-on surface from going completely matte, because a windscreen
+    // straight ahead is not a hole.
+    '      float ndv = max(dot(sN, sV), 0.0);',
+    '      float fres = mix(0.22, 1.0, pow(1.0 - ndv, 1.6));',
+    // The sheen is the wide, weak step that says "this material is not chalk";
+    // the core is the small hot one that reads as an actual reflection. Both
+    // are scaled by the light's own colour, so the highlight is warm under the
+    // key and cool under the bounce rather than being a white sticker.
+    '      spec += directionalLights[si].color * fres * (sheen * 0.10 + core * 0.34);',
+    '    }',
+    // THE HIGHLIGHT IS TINTED BY THE SURFACE, and that is a chroma decision
+    // rather than a physical one. A dielectric's specular really is the light's
+    // own colour -- but a white additive term is, by construction, the fastest
+    // way to the neutral axis there is, and this build gates on the area-mean
+    // saturation of every hazard. Measured: an untinted highlight took the taxi
+    // from S 0.531 to 0.401 and the refuse truck from 0.556 to 0.412, dropping
+    // both off a target they had been clearing -- the same arithmetic that the
+    // fleet's colour note records for cream and that GLASS_FLASH ran into an
+    // hour earlier. Three doors into one room.
+    //
+    // Mixing 70% of the surface hue back in keeps the highlight bright while
+    // leaving it on its own side of neutral. It is also the more honest look
+    // for this renderer: everything here is saturated toy plastic, and coloured
+    // plastic has a coloured sheen. The divide normalises out VALUE and keeps
+    // only hue, so a dark panel gets the same strength of highlight as a light
+    // one rather than a proportionally dimmer one.
+    '    float mx = max(max(diffuseColor.r, diffuseColor.g), max(diffuseColor.b, 0.001));',
+    '    vec3 specTint = mix(vec3(1.0), diffuseColor.rgb / mx, 0.70);',
+    '    outgoingLight += spec * specTint * vGloss;',
+    '  }',
+    '#endif',
+  ].join('\n');
+
+  function patchToonSpec(shader) {
+    patchToonRamp(shader);
+    shader.vertexShader = SPEC_VS_DECL + '\n' + shader.vertexShader.replace(
+      '#include <begin_vertex>',
+      '#include <begin_vertex>\n\tvGloss = aGloss;'
+    );
+    shader.fragmentShader = SPEC_FS_DECL + '\n' + shader.fragmentShader.replace(
+      '#include <opaque_fragment>',
+      SPEC_FS_BODY + '\n\t#include <opaque_fragment>'
+    );
+  }
+
+  /**
+   * Standard toon material. `steps` 2 for props, 3 for characters.
+   *
+   * `spec` opts the material into the cel specular above. It is a distinct
+   * shared function object rather than a closure per material, so every specular
+   * toon material still hashes to ONE program: three's default
+   * customProgramCacheKey is onBeforeCompile.toString(), and a fresh closure per
+   * material would compile a fresh shader per material.
+   */
+  function toon(color, steps, floor, spec) {
     const m = new THREE.MeshToonMaterial({
       color,
       gradientMap: ramp(steps || 3, floor),
     });
-    m.onBeforeCompile = patchToonRamp;
+    m.onBeforeCompile = spec ? patchToonSpec : patchToonRamp;
     return m;
   }
 
@@ -4169,6 +4342,30 @@ MR.shading = (function () {
       opacity: o.opacity === undefined ? 0.72 : o.opacity,
       depthWrite: false,
       side: THREE.DoubleSide,
+      // EVERY CONTACT SHADOW IN THIS GAME WAS COSTING TWO DRAW CALLS, and the
+      // reason is three's, not ours. WebGLRenderer.renderObject reads:
+      //
+      //   transparent && side === DoubleSide && !forceSinglePass
+      //     -> render BackSide, then render FrontSide
+      //
+      // so a transparent double-sided material is submitted TWICE, with a
+      // needsUpdate flag set between the two halves. Measured on the live page
+      // at 08-level, which is the peak-draw shot: 18 hazard blobs, 16 of them
+      // in frustum, and hiding them took the frame from 297 draws to 265 --
+      // exactly 2 per blob, not 1. Draw calls are the binding constraint in
+      // this game (297 against a working ceiling near 400) and this was 11% of
+      // the peak frame spent rendering the same flat quad twice.
+      //
+      // The split exists so that a transparent SOLID sorts its own back faces
+      // before its front ones. This is a single flat quad: its two faces are
+      // coplanar, so the second pass draws the same pixels at the same depth
+      // and can never change the image. forceSinglePass keeps DoubleSide's
+      // culling behaviour -- the blob is still visible from underneath, which
+      // matters on the bridge deck -- and submits it once.
+      //
+      // Verified as an A/B on the running page rather than reasoned about:
+      // pixels identical, draws 297 -> 265.
+      forceSinglePass: true,
     });
     const mesh = new THREE.Mesh(shadowGeo(r), mat);
     mesh.position.y = 0.015;
@@ -8639,15 +8836,30 @@ MR.World = (function () {
    * pattern. The attribute is only emitted if some part asked for it, so every
    * other merged prop is byte-identical to before.
    */
+  /**
+   * A part may also carry `gloss`, a 0..1 scalar baked into an `aGloss` vertex
+   * attribute for the cel specular in shading.js. Same trick as `wave` and for
+   * the same reason: a hazard variant is ONE merged geometry under ONE shared
+   * material, so without a per-part channel the only choices would be a glossy
+   * whole vehicle or a matte one -- and a glossy tyre is worse than no
+   * highlight at all. Glass and chrome get the wet end, paint the middle,
+   * rubber and cloth and skin zero.
+   *
+   * Emitted only if some part asked for it, so every merged prop that has not
+   * opted in is byte-identical to before and its material is not even the
+   * specular one.
+   */
   function merge(parts) {
     let n = 0;
     let anyWave = false;
+    let anyGloss = false;
     const prepared = [];
     for (const p of parts) {
       const g = p.geo.index ? p.geo.toNonIndexed() : p.geo.clone();
       if (p.matrix) g.applyMatrix4(p.matrix);
-      prepared.push({ g, color: p.color, wave: p.wave });
+      prepared.push({ g, color: p.color, wave: p.wave, gloss: p.gloss });
       if (p.wave) anyWave = true;
+      if (p.gloss) anyGloss = true;
       n += g.attributes.position.count;
     }
     const pos = new Float32Array(n * 3);
@@ -8655,6 +8867,7 @@ MR.World = (function () {
     const col = new Float32Array(n * 3);
     const uv = new Float32Array(n * 2);
     const wav = anyWave ? new Float32Array(n * 2) : null;
+    const gls = anyGloss ? new Float32Array(n) : null;
     let o = 0;
     for (const item of prepared) {
       const g = item.g;
@@ -8674,6 +8887,9 @@ MR.World = (function () {
           wav[(o + i) * 2 + 1] = item.wave[1];
         }
       }
+      if (gls && item.gloss) {
+        for (let i = 0; i < count; i++) gls[o + i] = item.gloss;
+      }
       o += count;
       g.dispose();
     }
@@ -8683,9 +8899,56 @@ MR.World = (function () {
     out.setAttribute('color', new THREE.BufferAttribute(col, 3));
     out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
     if (wav) out.setAttribute('aWave', new THREE.BufferAttribute(wav, 2));
+    if (gls) out.setAttribute('aGloss', new THREE.BufferAttribute(gls, 1));
     out.computeBoundingSphere();
     return out;
   }
+
+  /**
+   * Tag a part with a gloss level for the cel specular. Chainable on any of
+   * the primitive helpers: gl(bx(...), GLOSS.paint).
+   */
+  function gl(p, g) { p.gloss = g; return p; }
+
+  /**
+   * The gloss ladder, one place, so the fleet is consistent about what a
+   * material IS rather than each variant guessing.
+   *
+   * The numbers are ratios of the full band, not physical reflectance: 1.0 is
+   * the wettest thing in the game and the rest are stated against it.
+   */
+  /**
+   * THE LADDER IS WEIGHTED AWAY FROM THE NEUTRAL ELEMENTS, and that is the
+   * third and last correction the chroma budget forced on this pass.
+   *
+   * Isolated by building the fleet with every gloss set to zero and measuring
+   * against the same frame: the new GEOMETRY costs almost nothing in
+   * saturation -- the taxi went 0.374 to 0.367 and the refuse truck 0.399 to
+   * 0.363 -- and the HIGHLIGHT costs all the rest, 0.367 to 0.290 and 0.363 to
+   * 0.296. The reason is not that a highlight is white; it is already tinted.
+   * It is that the glossiest surfaces in the first ladder were the chrome,
+   * the plates, the rims and the glass flash, which are the near-neutral
+   * elements -- so the specular was brightening precisely the parts that pull
+   * an area mean to the axis, and raising their weight in it.
+   *
+   * So chrome and glass come down and paint stays. A vehicle's bodywork is the
+   * saturated part, and a highlight there costs nothing and reads as the same
+   * shine. What is given up is a wet-looking window, which the glass flash band
+   * is already drawing far more legibly than a specular ever did.
+   */
+  const GLOSS = {
+    glass: 0.55,
+    chrome: 0.30,  // trim, lamp cores, plates, bright rims
+    // Bodywork is deliberately the LOW end and not the middle. A vehicle body
+    // is mostly large flat panels, and a flat panel does not get a highlight
+    // sweeping across it -- it switches on whole. Measured on the orbit sheet,
+    // paint at 0.55 took the taxi's flank from L 133 to L 177 and bleached the
+    // hue out of it. What carries the fleet's shine is the chamfers and the
+    // cylinders, where the band is narrow because the surface turns.
+    paint: 0.42,
+    trim: 0.22,    // creases, bumpers, dark plastics with a sheen
+    matte: 0.0,    // rubber, cloth, skin, hi-vis, anything painted-on
+  };
 
   const _euler = new THREE.Euler();
   function part(geo, color, x, y, z, rx, ry, rz) {
@@ -8702,6 +8965,125 @@ MR.World = (function () {
   }
   function cone(r, h, seg, x, y, z, color) {
     return part(new THREE.ConeGeometry(r, h, seg), color, x, y, z);
+  }
+
+  /**
+   * ============ THE CHAMFERED BOX ============
+   *
+   * A box with all twelve edges and all eight corners cut off at 45 degrees.
+   * This is the primitive that answers "they look like boxes", and it answers
+   * it in two ways at once rather than one.
+   *
+   * SILHOUETTE. A cut corner is visibly not a square corner at gameplay
+   * distance -- it is the difference between a slab and a moulded panel, and
+   * it is what the reference's cars have everywhere. There is no hard 90
+   * degree corner anywhere on the silhouette of any car in
+   * reference/sonic-cars-closeup.png.
+   *
+   * SHADING, and this is the half that a stepped chamfer cannot buy. The
+   * existing vRoof steps a box in twice, which the file itself describes as
+   * "a square corner with a nick in it" -- and the deeper problem is that every
+   * face of a stepped chamfer is still axis-aligned, so it carries the same
+   * three normals the box already had and takes exactly the same band of the
+   * toon ramp. A real chamfer introduces normals at 45 degrees, which land in
+   * a DIFFERENT ramp band from both faces they join, so the edge reads as a
+   * lit turn rather than as a join. It is also the only surface on the whole
+   * vehicle that the cel specular in shading.js can put its hot core on -- see
+   * the threshold derivation there. Chamfers and the highlight are one change.
+   *
+   * WINDING IS DERIVED, NOT WRITTEN. Every triangle is emitted in whatever
+   * order is convenient and then flipped if its own normal points into the
+   * solid. The shape is convex and centred on the origin, so "outward" is just
+   * the centroid direction and the test is exact. This file has lost a week to
+   * hand-written winding once already (see the shadow-quad note) and it
+   * presents as geometry that is perfectly correct and draws nothing; deriving
+   * it costs a dozen lines and cannot be got wrong.
+   *
+   * Normals are per-face flat, from computeVertexNormals on non-indexed
+   * geometry -- smooth normals across a 45 degree chamfer would turn the hard
+   * cel band back into the gradient this renderer does not have.
+   *
+   * COST: 44 triangles against a box's 12. At the four or five masses a vehicle
+   * carries its silhouette on, that is about 150 extra triangles a variant --
+   * against a budget with 300,000 spare -- and ZERO extra draw calls, because
+   * it merges into the same single geometry as everything else.
+   */
+  function chamferGeo(w, h, d, c) {
+    const hx = w / 2, hy = h / 2, hz = d / 2;
+    // A chamfer may never eat more than half of the smallest dimension, or the
+    // inner face inverts and the solid turns inside out.
+    const k = Math.max(0.0005, Math.min(c, hx * 0.5, hy * 0.5, hz * 0.5));
+    const ix = hx - k, iy = hy - k, iz = hz - k;
+    const tri = [];
+    function push(a, b, cc) { tri.push([a, b, cc]); }
+    function quad(a, b, cc, dd) { push(a, b, cc); push(a, cc, dd); }
+
+    // The six inset faces.
+    quad([hx, -iy, -iz], [hx, iy, -iz], [hx, iy, iz], [hx, -iy, iz]);
+    quad([-hx, -iy, -iz], [-hx, iy, -iz], [-hx, iy, iz], [-hx, -iy, iz]);
+    quad([-ix, hy, -iz], [ix, hy, -iz], [ix, hy, iz], [-ix, hy, iz]);
+    quad([-ix, -hy, -iz], [ix, -hy, -iz], [ix, -hy, iz], [-ix, -hy, iz]);
+    quad([-ix, -iy, hz], [ix, -iy, hz], [ix, iy, hz], [-ix, iy, hz]);
+    quad([-ix, -iy, -hz], [ix, -iy, -hz], [ix, iy, -hz], [-ix, iy, -hz]);
+
+    // The twelve edge bevels. Four run along each axis.
+    for (const sy of [-1, 1]) {
+      for (const sz of [-1, 1]) {
+        quad([-ix, sy * hy, sz * iz], [ix, sy * hy, sz * iz],
+             [ix, sy * iy, sz * hz], [-ix, sy * iy, sz * hz]);
+      }
+    }
+    for (const sx of [-1, 1]) {
+      for (const sz of [-1, 1]) {
+        quad([sx * hx, -iy, sz * iz], [sx * hx, iy, sz * iz],
+             [sx * ix, iy, sz * hz], [sx * ix, -iy, sz * hz]);
+      }
+    }
+    for (const sx of [-1, 1]) {
+      for (const sy of [-1, 1]) {
+        quad([sx * hx, sy * iy, -iz], [sx * hx, sy * iy, iz],
+             [sx * ix, sy * hy, iz], [sx * ix, sy * hy, -iz]);
+      }
+    }
+
+    // The eight corner triangles.
+    for (const sx of [-1, 1]) {
+      for (const sy of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          push([sx * hx, sy * iy, sz * iz], [sx * ix, sy * hy, sz * iz], [sx * ix, sy * iy, sz * hz]);
+        }
+      }
+    }
+
+    const pos = new Float32Array(tri.length * 9);
+    for (let t = 0; t < tri.length; t++) {
+      let [a, b, c2] = tri[t];
+      // Outward test: the solid is convex about the origin, so a triangle whose
+      // own normal disagrees with its centroid is wound the wrong way round.
+      const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
+      const vx = c2[0] - a[0], vy = c2[1] - a[1], vz = c2[2] - a[2];
+      const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      const cx = (a[0] + b[0] + c2[0]) / 3, cy = (a[1] + b[1] + c2[1]) / 3, cz = (a[2] + b[2] + c2[2]) / 3;
+      // Compare in a normalised frame: the box is not a cube, so a raw dot
+      // against the centroid is dominated by whichever axis is longest.
+      if (nx * cx / (hx * hx) + ny * cy / (hy * hy) + nz * cz / (hz * hz) < 0) {
+        const s = b; b = c2; c2 = s;
+      }
+      const o = t * 9;
+      pos[o] = a[0]; pos[o + 1] = a[1]; pos[o + 2] = a[2];
+      pos[o + 3] = b[0]; pos[o + 4] = b[1]; pos[o + 5] = b[2];
+      pos[o + 6] = c2[0]; pos[o + 7] = c2[1]; pos[o + 8] = c2[2];
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.computeVertexNormals();
+    g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(tri.length * 6), 2));
+    return g;
+  }
+
+  /** Chamfered box as a mergeable part, in world units. */
+  function cbx(w, h, d, x, y, z, color, c, rx, ry, rz) {
+    return part(chamferGeo(w, h, d, c === undefined ? 0.05 : c), color, x, y, z, rx, ry, rz);
   }
   /** Tag a part as crowd flesh: `phase` staggers it, `amp` scales its move. */
   function wv(p, phase, amp) {
@@ -10461,6 +10843,19 @@ MR.World = (function () {
   function hbx(w, h, d, x, y, z, color, rx, ry, rz) {
     return bx(w * LANE_FIT, h, d, (x || 0) * LANE_FIT, y, z, color, rx, ry, rz);
   }
+  /**
+   * hbx() with all twelve edges cut. The default chamfer is 0.05 -- about 3cm
+   * at this game's scale -- which is a panel edge rather than a bevelled toy;
+   * the masses that carry a vehicle's shoulder ask for more.
+   *
+   * It is deliberately a SEPARATE call rather than a flag on hbx, so every use
+   * is a decision: the chamfer moves the silhouette, and a mass whose top or
+   * flank is pinned to a number in MR.Collision.BOX must be chamfered
+   * downward from that number, never outward past it. See the fleet.
+   */
+  function hcbx(w, h, d, x, y, z, color, c, rx, ry, rz) {
+    return cbx(w * LANE_FIT, h, d, (x || 0) * LANE_FIT, y, z, color, c, rx, ry, rz);
+  }
   /** Flat quad sized to the lane, for the striped faces hazards turn forward. */
   function hplane(w, h) {
     return new THREE.PlaneGeometry(w * LANE_FIT, h);
@@ -10538,6 +10933,27 @@ MR.World = (function () {
   const LAMP_CORE = 0xfff6e2;
   const TYRE = 0x1e2140;
   const TYRE_WARM = 0x241a10;
+  // The wheel's bright half. WHEEL_RIM is deliberately a cool near-neutral
+  // rather than each vehicle's own hue: a rim is the one part of a car that is
+  // the same material whatever the body is painted, and the reference's four
+  // vehicles all wear the same one. It is bright enough to be the second
+  // brightest thing on a vehicle after the glass flash, which is what makes a
+  // wheel read at 40 units instead of merging into its own arch.
+  // Bright, and CHROMATIC rather than neutral -- see the note on GLASS_FLASH.
+  // A rim really is the same alloy on every car, and that realism is worth less
+  // here than the area mean is: a shared near-neutral on the brightest new
+  // element in the fleet is the same mistake as the shared grey bumper this
+  // file already refuses. Vehicles may override with `rim` on vUnder, and the
+  // warm bodies do.
+  const WHEEL_RIM = 0x9fb8dc;
+  const WHEEL_HUB = 0xd4e4f8;
+  const WHEEL_RIM_WARM = 0xd8b464;
+  const WHEEL_HUB_WARM = 0xf4dc9c;
+  // Front-lamp pair. Cold against the tail lamps' LAMP_RED, so the two ends of
+  // a vehicle are never confused, plus the amber indicator that is the only
+  // warm note on a front end.
+  const LAMP_COLD = 0xb4d4ec;
+  const LAMP_AMBER = 0xffa32b;
 
   /**
    * Glass, in two constant bands rather than one flat panel.
@@ -10554,10 +10970,238 @@ MR.World = (function () {
    *
    * +12 authored triangles over the single box it replaces.
    */
+  /**
+   * THE THIRD BAND IS A REFLECTION, and it is the single most nameable thing
+   * about glass in reference/sonic-cars-closeup.png. Every window in that image
+   * is dark at the bottom and NEARLY WHITE across its upper third -- the owner's
+   * note calls it out by name -- and that streak, not the tint, is what makes a
+   * window read as glass rather than as a hole cut in the bodywork.
+   *
+   * Two bands could not do it. The 1.61 ratio between GLASS_HI and GLASS_LO is
+   * measured off the reference and is right for the body of the pane, but the
+   * reference's own top-to-bottom range is far wider than 1.61: the streak is a
+   * separate event sitting on top of the gradient, not the top of it.
+   *
+   * IT IS HELD TO 16% OF THE PANE, and that number is a chroma budget rather
+   * than a taste. The fleet's colour note records that a 15% cream band cost 88%
+   * of a vehicle's saturation, because the area mean is what the contrast audit
+   * measures and near-neutral area drags it to the axis. So the flash is NOT
+   * white: it is a pale, still-cool version of its own pair, which keeps it on
+   * the same side of neutral as the glass under it. On a cool body that is
+   * chroma-positive outright; on a warm one it is the smallest bright element
+   * that will still read.
+   *
+   * The whole pane carries GLOSS.glass, so it is also the one surface on the
+   * vehicle that takes the specular core -- the highlight and the painted
+   * reflection are doing the same job from two directions.
+   */
+  // BOTH OF THESE WERE NEAR-WHITE IN THE FIRST BUILD AND IT COST REAL CHROMA.
+  // 0xdff4f8 renders at S 0.10, and adding it -- plus a neutral wheel rim and a
+  // cold headlamp -- took the taxi's area-mean saturation from 0.531 to 0.402
+  // and dropped it onto the short-of-target list it had been clearing. That is
+  // the exact mechanism the fleet's colour note documents for cream, arriving
+  // by a different door: the audit measures an AREA MEAN, so any bright
+  // near-neutral drags it to the axis whatever the element is called.
+  // These are as bright as they were and carry a hue: S 0.29 and 0.24 against
+  // 0.12 and 0.10, which is the same flash for the chroma of a real reflection.
+  const GLASS_FLASH = 0xb4dcff;       // for the deep pair, on cool bodies
+  const GLASS_FLASH_PALE = 0xc0f0fc;  // for the pale pair, on warm bodies
+
   function vGlass(parts, w, h, d, x, y, z, pale) {
-    const lo = h * 0.55;
-    parts.push(hbx(w, lo, d, x, y - (h - lo) / 2, z, pale ? GLASS_PALE_LO : GLASS_LO));
-    parts.push(hbx(w, h - lo, d, x, y + lo / 2, z, pale ? GLASS_PALE_HI : GLASS_HI));
+    const lo = h * 0.52, hi = h * 0.32, fl = h - lo - hi;
+    const base = y - h / 2;
+    parts.push(gl(hbx(w, lo, d, x, base + lo / 2, z,
+      pale ? GLASS_PALE_LO : GLASS_LO), GLOSS.glass));
+    parts.push(gl(hbx(w, hi, d, x, base + lo + hi / 2, z,
+      pale ? GLASS_PALE_HI : GLASS_HI), GLOSS.glass));
+    // Full width and full depth, NOT inset. Insetting it looked better in the
+    // rear elevation and put a hole in the object: these glass boxes are solid,
+    // and their own side faces are what vPillars below turns into the side
+    // windows, so a band 4% narrow leaves a 0.03 slot of nothing down each
+    // flank at exactly the height the eye is drawn to.
+    parts.push(gl(hbx(w, fl, d, x, base + lo + hi + fl / 2, z,
+      pale ? GLASS_FLASH_PALE : GLASS_FLASH), GLOSS.glass));
+  }
+
+  /**
+   * A AND C PILLARS, replacing the full-depth slab of body colour that used to
+   * stand outboard of every greenhouse.
+   *
+   * This is where the fleet's side glass comes from, and it costs almost
+   * nothing because it was already built: the glazing is a solid box banded in
+   * three, so its own +/-x faces are already glass in the right three bands. The
+   * only reason no vehicle had a side window was that a pillar 0.98 to 1.26
+   * deep was parked over the whole of it, flank to flank. Cutting that pillar
+   * back to a real 0.24 at each end of the greenhouse uncovers the glass that
+   * was there the entire time.
+   *
+   * It is also the correct shape: a car has an A pillar and a C pillar with
+   * daylight between them, and the taper from body to greenhouse only reads as
+   * a taper if something shows through the gap.
+   */
+  function vPillars(parts, w, h, d, x, y, z, col, gloss) {
+    const pd = Math.min(0.24, d * 0.32);
+    for (const sx of [-1, 1]) {
+      for (const sz of [-1, 1]) {
+        parts.push(gl(hbx(w, h, pd, sx * x, y, z + sz * (d - pd) / 2, col),
+          gloss === undefined ? GLOSS.paint : gloss));
+      }
+    }
+  }
+
+  /**
+   * SIDE GLASS, because until this pass there was none anywhere in the fleet.
+   *
+   * Photographed rather than assumed: api.fleetSheet now takes an azimuth, and
+   * at az 90 degrees every vehicle in the game was a blank painted slab. Front
+   * and rear glazing existed; the flanks had not one window on any of the ten
+   * variants. Under CLAUDE.md rule 1 that is a half-built object, and the flank
+   * is not a hypothetical view -- a hazard in an adjacent lane passes 1.70 units
+   * from the lens and is the last thing on screen before it leaves the shot.
+   *
+   * The pane is a thin box standing just inboard of the flank so the body's own
+   * edge still draws the window frame, banded exactly like vGlass so a vehicle's
+   * side and rear glazing are visibly the same material.
+   */
+  /**
+   * `bodyW` is the width of the mass this window is cut into, and the pane is
+   * placed so its outer face stands 0.005 PROUD of that flank rather than
+   * inboard of it. The first build inset it by half its own thickness, which
+   * buried it inside the bodywork: on the refuse truck the window was drawn,
+   * merged, shipped and completely invisible, because a 0.07 pane 0.055 inside
+   * a solid body never reaches the surface. It cost nothing and showed nothing,
+   * which is the failure mode that does not announce itself.
+   */
+  function vSideGlass(parts, bodyW, z0, z1, yBot, yTop, pale, proud) {
+    const hw = (bodyW * LANE_FIT) / 2;
+    const t = 0.07;
+    const px = hw + (proud === undefined ? 0.005 : proud) - t / 2;
+    const h = yTop - yBot, zc = (z0 + z1) / 2, d = z1 - z0;
+    const lo = h * 0.52, hi = h * 0.32, fl = h - lo - hi;
+    for (const sx of [-1, 1]) {
+      parts.push(gl(bx(t, lo, d, sx * px, yBot + lo / 2, zc,
+        pale ? GLASS_PALE_LO : GLASS_LO), GLOSS.glass));
+      parts.push(gl(bx(t, hi, d, sx * px, yBot + lo + hi / 2, zc,
+        pale ? GLASS_PALE_HI : GLASS_HI), GLOSS.glass));
+      parts.push(gl(bx(t, fl, d * 0.97, sx * px, yBot + lo + hi + fl / 2, zc,
+        pale ? GLASS_FLASH_PALE : GLASS_FLASH), GLOSS.glass));
+    }
+  }
+
+  /**
+   * THE FRONT END, which did not exist.
+   *
+   * The same orbit sheet that found the blank flanks found something worse at
+   * az 180: every road vehicle in the fleet had a completely featureless front.
+   * No grille, no headlamps, no bumper, no number plate -- a flat rectangle of
+   * body colour where the whole reason the reference's cars read as cars is a
+   * dark grille with two bright lamps in it.
+   *
+   * This is the mirror of vBumper and vLamps, and it is deliberately built from
+   * the same numbers, because a vehicle whose front and rear fittings sit at
+   * different heights reads as two different objects from the two ends.
+   *
+   * `zFront` is the frontmost plane it may reach. Nothing here changes the
+   * hazard's footprint: the collision box already spans +/-0.65 in z and the
+   * front face is the +0.65 side, which is the side the player never reaches --
+   * they hit the rear face first, and course.js has already proved a path.
+   */
+  function vFront(parts, o) {
+    const zf = o.zFront;
+    const w = o.w;
+    // The grille: the darkest thing on the front, and the element that makes a
+    // front a front. Slightly inset in width so body colour frames it.
+    parts.push(gl(hbx(w * 0.82, o.grilleH, 0.10, 0, o.grilleY, zf - 0.05, o.dark), GLOSS.trim));
+    // Slats, as a few thin bright bars rather than a texture -- at 40 units
+    // this is one dark rectangle with a sheen, and at 8 it has structure.
+    const nSlat = o.slats === undefined ? 3 : o.slats;
+    for (let i = 0; i < nSlat; i++) {
+      const fy = o.grilleY - o.grilleH / 2 + o.grilleH * (i + 0.5) / nSlat;
+      parts.push(gl(hbx(w * 0.80, o.grilleH * 0.10, 0.04, 0, fy, zf - 0.005, o.crease), GLOSS.chrome));
+    }
+    // Headlamps. Pale rectangles rather than the round discs the tail lamps
+    // use, so front and rear are told apart instantly at any distance, with a
+    // hot core exactly as vLamps builds its tail lights.
+    for (const sx of [-1, 1]) {
+      const px = sx * o.lampX * LANE_FIT;
+      parts.push(gl(bx(o.lampW, o.lampH, 0.07, px, o.grilleY, zf - 0.02, LAMP_COLD), GLOSS.chrome));
+      parts.push(gl(bx(o.lampW * 0.62, o.lampH * 0.52, 0.10, px, o.grilleY, zf - 0.015, LAMP_CORE), GLOSS.chrome));
+      // The indicator, which is the one warm note on a cold front end.
+      parts.push(gl(bx(o.lampW * 0.30, o.lampH * 0.42, 0.06,
+        px + sx * o.lampW * 0.62, o.grilleY, zf - 0.02, LAMP_AMBER), GLOSS.chrome));
+    }
+    // Front bumper and plate, mirroring vBumper.
+    parts.push(gl(hbx(o.bumpW, o.bumpH, 0.16, 0, o.bumpY, zf - 0.11, o.dark), GLOSS.trim));
+    parts.push(gl(hbx(o.plateW || 0.58, o.bumpH * 0.48, 0.06, 0, o.bumpY, zf - 0.03, PLATE), GLOSS.chrome));
+  }
+
+  /**
+   * A WHEEL THAT CAN BE SEEN, which is the one element of the reference that
+   * reads identically from every angle -- the coordinator's note is right about
+   * that and it is the argument for making it good.
+   *
+   * What was there: a near-black cylinder, sitting inside a near-black wheel
+   * well, standing on a multiply shadow that darkens the road under it to 0.60.
+   * Three darks on top of each other. Measured on the orbit sheet, the tyre was
+   * indistinguishable from the arch it sat in at every azimuth.
+   *
+   * The reference's wheels are one of the HIGHEST-contrast elements on the whole
+   * car: a dark tyre, a bright five-spoke rim inside it, and a brighter hub. So
+   * the rim is what is added here, and it is added as a face rather than as a
+   * modelled spoke set -- from any distance the game can produce, a rim is a
+   * bright disc with dark notches in it, and five modelled spokes would be five
+   * subpixel slivers that alias into a grey ring.
+   *
+   * The rim stands 0.012 proud of the tyre's outer face on BOTH sides, so it is
+   * there from either flank as well as from the three-quarter views.
+   */
+  function vWheel(parts, x, y, z, r, w, tyre, rim, hub) {
+    const rimC = rim === undefined ? WHEEL_RIM : rim;
+    const hubC = hub === undefined ? (rim === undefined ? WHEEL_HUB : WHEEL_HUB_WARM) : hub;
+    parts.push(gl(cyl(r, r, w, 16, x, y, z, tyre, 0, 0, Math.PI / 2), GLOSS.trim));
+    for (const sx of [-1, 1]) {
+      const fx = x + sx * (w / 2 + 0.012);
+      parts.push(gl(cyl(r * 0.58, r * 0.58, 0.03, 12, fx, y, z, rimC, 0, 0, Math.PI / 2), GLOSS.chrome));
+      parts.push(gl(cyl(r * 0.22, r * 0.22, 0.05, 8, fx, y, z, hubC, 0, 0, Math.PI / 2), GLOSS.chrome));
+      // Four spoke gaps, as dark bars across the rim face. Cheaper and far more
+      // legible than modelling the spokes: what survives to distance is the
+      // broken-up ring, and this is the same trick the arch uses for roundness.
+      for (let k = 0; k < 4; k++) {
+        parts.push(gl(bx(0.035, r * 0.92, 0.02, fx, y, z, tyre, 0, 0, k * Math.PI / 4), GLOSS.matte));
+      }
+    }
+  }
+
+  /**
+   * THE ARCH FLARE, and it is the reference's most specific shape note: the
+   * wheel arches are cut into the body as curved arcs, with the wheel standing
+   * proud below the sill. In reference/sonic-cars-closeup.png the flare is a
+   * separate raised lip standing outboard of the flank, catching its own light.
+   *
+   * Built as a ring of small boxes following the arc, exactly as vCrown follows
+   * the bus roof -- the file's established way of getting a curve out of a box
+   * renderer. It stands outboard of the flank, so it reads as a flare from the
+   * flank and as a notch from behind.
+   */
+  function vArchFlare(parts, cx, cy, cz, r, col, segs) {
+    const n = segs || 9;
+    const t = 0.085;
+    // The arc is in the X-Y plane, because that is the plane vUnder actually
+    // cuts its opening in: the skirt is emitted as columns along x whose lower
+    // edge lifts on a circle about (wheelX, spring). Arcing this in Y-Z instead
+    // would have drawn a beautifully turned lip at ninety degrees to the hole
+    // it was supposed to be trimming -- which is the class of mistake this file
+    // keeps a corrections list for, and it was in the first draft of this
+    // function.
+    for (let i = 0; i < n; i++) {
+      // The upper half only: an arch, not a wheel surround.
+      const a = Math.PI * (0.05 + 0.90 * (i + 0.5) / n);
+      const px = cx + Math.cos(a) * r;
+      const py = cy + Math.sin(a) * r;
+      // Tangential, so the ring reads as one turned lip rather than as a row
+      // of blocks: at the crown the long axis is along x, at the ends along y.
+      parts.push(gl(bx((Math.PI * r * 1.10) / n, t, 0.09, px, py, cz, col, 0, 0, a - Math.PI / 2), GLOSS.paint));
+    }
   }
 
   /**
@@ -10697,7 +11341,7 @@ MR.World = (function () {
       for (const sx of [-1, 1]) {
         // 1.02 so neighbouring columns overlap a hair and the ink shell cannot
         // find a seam between them.
-        parts.push(bx(step * 1.02, top - low, o.d, sx * xc, (top + low) / 2, o.z, o.skirt));
+        parts.push(gl(bx(step * 1.02, top - low, o.d, sx * xc, (top + low) / 2, o.z, o.skirt), GLOSS.paint));
       }
     }
     // The recess behind each opening, and the shadow between them. Both sit
@@ -10714,16 +11358,36 @@ MR.World = (function () {
     // quad has already darkened to 0.60 of the road.
     // The tyres, in front of their wells. 16 segments: the arch is what reads
     // at distance, but at 15 units the tyre is ~20px and octagons show.
+    //
+    // ONE AXLE, AND IT IS THE ENVELOPE'S DOING RATHER THAN A CHOICE. A BLOCK is
+    // 1.30 deep by MR.Collision.BOX and these wheels are 0.60 to 0.72 across, so
+    // two axles inside the envelope would leave a gap of 0.04 to 0.10 between
+    // the front and rear tyre -- a tracked vehicle, not a car. The alternative
+    // is wheels small enough to space properly, and the reference is explicit
+    // that large high-contrast wheels are the priority. Neither is available at
+    // once, and reaching forward past +0.65 to buy the room is not this file's
+    // call: the occlusion audit derives what a gate hides from box.halfZ, so art
+    // that outruns the box would hide a gate the audit had cleared. Written up
+    // for the owner with the orbit frame rather than decided here.
     const tz = o.z + (o.wheelZ || 0);
     for (const sx of [-1, 1]) {
       if (o.dual) {
         // Twin rear tyres, which is a refuse truck's own tell and nothing
         // else in the fleet has them.
         for (const k of [-1, 1]) {
-          parts.push(cyl(r, r, tw * 0.86, 16, sx * wx + k * tw * 0.56, r, tz, o.tyre, 0, 0, Math.PI / 2));
+          vWheel(parts, sx * wx + k * tw * 0.56, r, tz, r, tw * 0.86, o.tyre, o.rim, o.hub);
         }
       } else {
-        parts.push(cyl(r, r, tw, 16, sx * wx, r, tz, o.tyre, 0, 0, Math.PI / 2));
+        vWheel(parts, sx * wx, r, tz, r, tw, o.tyre, o.rim, o.hub);
+      }
+      // The flare over the opening, on BOTH faces the opening has -- the skirt
+      // is a full-depth column set, so the notch shows at the rear elevation
+      // and at the front one, and a lip on only the rear would be visible as
+      // missing the moment the camera passed the vehicle.
+      if (o.flare !== false) {
+        const fr = aw + 0.055;
+        vArchFlare(parts, sx * wx, spring, o.z - o.d / 2 + 0.04, fr, o.flareCol || o.skirt);
+        vArchFlare(parts, sx * wx, spring, o.z + o.d / 2 - 0.04, fr, o.flareCol || o.skirt);
       }
     }
   }
@@ -10799,8 +11463,8 @@ MR.World = (function () {
   }
 
   /** Vertex-coloured toon material -- the workhorse for merged props. */
-  function vtoon(steps, floor) {
-    const m = S.toon(0xffffff, steps || 2, floor);
+  function vtoon(steps, floor, spec) {
+    const m = S.toon(0xffffff, steps || 2, floor, spec);
     m.vertexColors = true;
     return m;
   }
@@ -11227,7 +11891,13 @@ MR.World = (function () {
       // shading.js for the derivation. This is the one class of object the
       // race is lost by misreading, so it is the one class that spends its
       // shading budget on chroma rather than on form.
-      propLit: vtoon(3, 0.62),
+      // The `true` is the cel specular in shading.js. It is opted into HERE and
+      // nowhere else, so the highlight exists on hazards and on nothing else in
+      // the frame -- the class the owner asked about, and the class where a
+      // wrong-looking highlight would cost a race rather than a screenshot.
+      // Surfaces still have to ask for it per part through `gloss`; a geometry
+      // that never does reads aGloss 0 and renders exactly as it did.
+      propLit: vtoon(3, 0.62, true),
       // Everything that is made of people. Same toon ramp as `prop`, plus the
       // vertex wave -- see vwave() above.
       crowd: vwave(2),
@@ -12816,11 +13486,19 @@ MR.World = (function () {
     // JUMP v0: a wide amber kerb with a cream cap. The cap is what survives the
     // fog -- a light band on a dark road at 100 units is still a light band.
     // Nothing here rises past 0.80 or reaches past halfZ 0.52.
+    // Chamfered, like everything else in the vocabulary. The owner's "boxy" note
+    // is not about vehicles only -- a kerb built from four raw slabs is the
+    // purest example of it in the game. The cut is inward from the extents, so
+    // the 0.80 ceiling and the halfZ 0.52 reach are untouched to the digit.
     const jumpGeo = merge([
-      hbx(2.24, 0.66, 1.04, 0, 0.33, 0, 0xffb020),
-      hbx(2.34, 0.14, 1.04, 0, 0.73, 0, 0xfff2e0),
-      hbx(0.30, 0.80, 1.04, -1.16, 0.40, 0, 0xe07f12),
-      hbx(0.30, 0.80, 1.04, 1.16, 0.40, 0, 0xe07f12),
+      gl(hcbx(2.24, 0.66, 1.04, 0, 0.33, 0, 0xffb020, 0.07), GLOSS.paint),
+      // The cream cap stays MATTE. It is the least saturated element on the
+      // hazard and a highlight on it would brighten exactly the part that pulls
+      // the area mean toward neutral -- the same trap the fleet's gloss ladder
+      // is weighted against.
+      gl(hcbx(2.34, 0.14, 1.04, 0, 0.73, 0, 0xfff2e0, 0.04), GLOSS.matte),
+      gl(hcbx(0.30, 0.80, 1.04, -1.16, 0.40, 0, 0xe07f12, 0.05), GLOSS.paint),
+      gl(hcbx(0.30, 0.80, 1.04, 1.16, 0.40, 0, 0xe07f12, 0.05), GLOSS.paint),
     ]);
 
     /**
@@ -12857,13 +13535,13 @@ MR.World = (function () {
      * cap keep it in the same family.
      */
     const jumpWorksGeo = merge([
-      hbx(2.24, 0.16, 1.04, 0, 0.08, 0, 0x2b2f52),
-      hbx(2.24, 0.34, 1.04, 0, 0.57, 0, 0xffb020),
-      hbx(2.36, 0.14, 1.08, 0, 0.73, 0, 0xfff2e0),
-      hbx(0.34, 0.80, 0.34, -1.13, 0.40, -0.34, 0xe07f12),
-      hbx(0.34, 0.80, 0.34, 1.13, 0.40, -0.34, 0xe07f12),
-      hbx(0.34, 0.80, 0.34, -1.13, 0.40, 0.34, 0xe07f12),
-      hbx(0.34, 0.80, 0.34, 1.13, 0.40, 0.34, 0xe07f12),
+      gl(hbx(2.24, 0.16, 1.04, 0, 0.08, 0, 0x2b2f52), GLOSS.matte),
+      gl(hcbx(2.24, 0.34, 1.04, 0, 0.57, 0, 0xffb020, 0.05), GLOSS.paint),
+      gl(hcbx(2.36, 0.14, 1.08, 0, 0.73, 0, 0xfff2e0, 0.04), GLOSS.matte),
+      gl(hcbx(0.34, 0.80, 0.34, -1.13, 0.40, -0.34, 0xe07f12, 0.06), GLOSS.paint),
+      gl(hcbx(0.34, 0.80, 0.34, 1.13, 0.40, -0.34, 0xe07f12, 0.06), GLOSS.paint),
+      gl(hcbx(0.34, 0.80, 0.34, -1.13, 0.40, 0.34, 0xe07f12, 0.06), GLOSS.paint),
+      gl(hcbx(0.34, 0.80, 0.34, 1.13, 0.40, 0.34, 0xe07f12, 0.06), GLOSS.paint),
     ]);
 
     /**
@@ -12931,13 +13609,17 @@ MR.World = (function () {
      * sliver of post.
      */
     const duckGeo = merge([
-      hbx(2.30, 0.30, 0.60, 0, 1.56, 0, 0x37d6ff),
-      hbx(2.36, 0.12, 0.62, 0, 1.77, 0, 0xd8f8ff),
+      // The bar and the standards are chamfered too. A DUCK is read as a
+      // silhouette at forty units, and the cut is small enough not to touch
+      // that -- what it changes is the near view, where the bar the camera
+      // flies under was four flat faces meeting at square corners.
+      gl(hcbx(2.30, 0.30, 0.60, 0, 1.56, 0, 0x37d6ff, 0.05), GLOSS.paint),
+      gl(hcbx(2.36, 0.12, 0.62, 0, 1.77, 0, 0xd8f8ff, 0.03), GLOSS.trim),
       // The standards keep their own thickness -- only where they stand moves.
       // Scaling a 0.26 post down with the lane would have left the tall cyan
       // verticals, which are the whole distance read on a DUCK, as hairlines.
-      bxAt(0.26, 3.30, 0.30, -1.20, 1.65, 0, 0x37d6ff),
-      bxAt(0.26, 3.30, 0.30, 1.20, 1.65, 0, 0x37d6ff),
+      gl(bxAt(0.26, 3.30, 0.30, -1.20, 1.65, 0, 0x37d6ff), GLOSS.paint),
+      gl(bxAt(0.26, 3.30, 0.30, 1.20, 1.65, 0, 0x37d6ff), GLOSS.paint),
       bxAt(0.30, 0.26, 0.34, -1.20, 2.35, 0, 0x0d2b36),
       bxAt(0.30, 0.26, 0.34, 1.20, 2.35, 0, 0x0d2b36),
       bxAt(0.30, 0.26, 0.34, -1.20, 2.90, 0, 0x0d2b36),
@@ -13186,21 +13868,35 @@ MR.World = (function () {
       vBumper(parts, 2.22, 0.32, 0.36, -0.65, TRAM_DARK, 0.60);
       vLamps(parts, 0.94, 0.36, -0.65, 0.15);
       parts.push(
-        hbx(2.16, 0.58, 1.26, 0, 0.81, 0, TRAM_BODY),      // lower body 0.52-1.10
-        hbx(2.20, 0.06, 1.28, 0, 1.13, 0, TRAM_CREASE),    // shoulder crease 1.10-1.16
-        hbx(2.24, 0.12, 1.30, 0, 1.22, 0, CHROME)           // livery band 1.16-1.28
+        gl(hcbx(2.16, 0.58, 1.26, 0, 0.81, 0, TRAM_BODY, 0.06), GLOSS.paint),
+        gl(hcbx(2.20, 0.06, 1.28, 0, 1.13, 0, TRAM_CREASE, 0.02), GLOSS.chrome),
+        gl(hcbx(2.24, 0.12, 1.30, 0, 1.22, 0, CHROME, 0.03), GLOSS.chrome)
       );
       // Glazing 1.28-2.10, 28.8% of the elevation bbox against 21.7% before, and
       // 1.92 wide on a 2.20 body: 0.87, inside the reference's 0.75-0.91
       // greenhouse-to-body band, with a real pillar showing either side.
       vGlass(parts, 1.92, 0.82, 1.30, 0, 1.69, 0);
-      for (const sx of [-1, 1]) parts.push(hbx(0.16, 0.82, 1.26, sx * 1.04, 1.69, 0, TRAM_BODY));
+      // A AND C PILLARS, WHICH ON A TRAM ARE ALSO WHAT MAKES A TRAIN READ AS A
+      // TRAIN. The body is what gets scaled along z for a multi-car train, so a
+      // pillar pinned to each end of the greenhouse stretches with it and the
+      // glazing between them becomes one long saloon window -- which is what a
+      // stretched tram should look like, and is a better outcome than the
+      // full-depth slab of body colour that was there, which stretched into a
+      // painted flank six units long.
+      vPillars(parts, 0.16, 0.82, 1.26, 1.04, 1.69, 0, TRAM_BODY);
+      // The cab end. A tram driving away shows its front to anything it passes,
+      // and on a train this is the leading car's face.
+      vFront(parts, {
+        zFront: 0.63, w: 2.16, dark: TRAM_DARK, crease: TRAM_CREASE,
+        grilleY: 0.86, grilleH: 0.24, lampX: 0.82, lampW: 0.30, lampH: 0.20,
+        bumpW: 2.22, bumpH: 0.32, bumpY: 0.36, plateW: 0.60, slats: 2,
+      });
       parts.push(
-        hbx(2.24, 0.16, 1.30, 0, 2.18, 0, CHROME),          // destination panel 2.10-2.26
-        hbx(2.16, 0.08, 1.26, 0, 2.30, 0, TRAM_BODY),      // header 2.26-2.34
-        hbx(2.02, 0.06, 1.16, 0, 2.37, 0, CHROME),          // chamfer 2.34-2.40
-        hbx(1.76, 0.04, 1.00, 0, 2.42, 0, TRAM_BODY),      // chamfer 2.40-2.44
-        hbx(1.06, 0.12, 0.10, 0, 2.18, -0.60, TRAM_DARK)   // destination blind
+        gl(hcbx(2.24, 0.16, 1.30, 0, 2.18, 0, CHROME, 0.03), GLOSS.chrome),
+        gl(hcbx(2.16, 0.08, 1.26, 0, 2.30, 0, TRAM_BODY, 0.03), GLOSS.paint),
+        gl(hcbx(2.02, 0.06, 1.16, 0, 2.37, 0, CHROME, 0.02), GLOSS.chrome),
+        gl(hcbx(1.76, 0.04, 1.00, 0, 2.42, 0, TRAM_BODY, 0.02), GLOSS.paint),
+        gl(hbx(1.06, 0.12, 0.10, 0, 2.18, -0.60, TRAM_DARK), GLOSS.trim)
       );
       return merge(parts);
     })();
@@ -13221,14 +13917,18 @@ MR.World = (function () {
 
     /** BLOCK v1: a ROAD CLOSED hoarding on a solid plinth. */
     const blockSignGeo = merge([
-      hbx(2.20, 0.52, 1.30, 0, 0.26, 0, 0x2b2f52),
-      hbx(2.12, 2.00, 1.06, 0, 1.56, 0, 0xff3b6b),
-      hbx(2.26, 0.16, 1.14, 0, 0.72, 0, 0xfff2e0),
-      hbx(2.26, 0.16, 1.14, 0, 1.60, 0, 0xfff2e0),
-      hbx(2.26, 0.16, 1.14, 0, 2.44, 0, 0xfff2e0),
-      hbx(2.28, 0.24, 1.20, 0, 2.68, 0, 0xd42a55),
-      bxAt(0.34, 0.34, 0.34, -0.74, 2.92, 0, 0xffe45e),
-      bxAt(0.34, 0.34, 0.34, 0.74, 2.92, 0, 0xffe45e),
+      // Chamfered, but the cream bands stay matte -- this is one of the two
+      // variants the colour pass deliberately left in its real red-and-white
+      // livery, and it is already the tightest BLOCK but one on chroma. A
+      // highlight on the white would be spent making it whiter.
+      gl(hcbx(2.20, 0.52, 1.30, 0, 0.26, 0, 0x2b2f52, 0.06), GLOSS.trim),
+      gl(hcbx(2.12, 2.00, 1.06, 0, 1.56, 0, 0xff3b6b, 0.06), GLOSS.paint),
+      gl(hcbx(2.26, 0.16, 1.14, 0, 0.72, 0, 0xfff2e0, 0.04), GLOSS.matte),
+      gl(hcbx(2.26, 0.16, 1.14, 0, 1.60, 0, 0xfff2e0, 0.04), GLOSS.matte),
+      gl(hcbx(2.26, 0.16, 1.14, 0, 2.44, 0, 0xfff2e0, 0.04), GLOSS.matte),
+      gl(hcbx(2.28, 0.24, 1.20, 0, 2.68, 0, 0xd42a55, 0.05), GLOSS.paint),
+      gl(bxAt(0.34, 0.34, 0.34, -0.74, 2.92, 0, 0xffe45e), GLOSS.trim),
+      gl(bxAt(0.34, 0.34, 0.34, 0.74, 2.92, 0, 0xffe45e), GLOSS.trim),
     ]);
 
     /**
@@ -13310,10 +14010,13 @@ MR.World = (function () {
       ];
       // Wheels. Seen from directly behind they are slabs rather than discs, so
       // they are built as discs on an x axis and read as tyres under the box.
+      // They carry rims now, like the rest of the fleet: a trike's wheels are
+      // the only part of it below the cargo box, so if they read as three dark
+      // smudges the whole vehicle is a floating crate.
       for (const wx of [-0.86, 0.86]) {
-        parts.push(cyl(0.34, 0.34, 0.16, 10, wx * LANE_FIT, 0.34, 0.20, 0x2b2f52, 0, 0, Math.PI / 2));
+        vWheel(parts, wx * LANE_FIT, 0.34, 0.20, 0.34, 0.16, 0x2b2f52, WHEEL_RIM, WHEEL_HUB);
       }
-      parts.push(cyl(0.32, 0.32, 0.12, 10, 0, 0.32, 1.32, 0x2b2f52, 0, 0, Math.PI / 2));
+      vWheel(parts, 0, 0.32, 1.32, 0.32, 0.12, 0x2b2f52, WHEEL_RIM, WHEEL_HUB);
       // Safety pennants, one each side.
       for (const sx of [-1, 1]) {
         parts.push(bxAt(0.11, 1.56, 0.11, sx * 0.92, 1.94, 0.02, TRIKE_BODY));
@@ -13431,14 +14134,23 @@ MR.World = (function () {
       });
       vBumper(parts, 2.14, 0.36, 0.86, -0.65, BUS_DARK, 0.62);
       vLamps(parts, 0.96, 0.86, -0.65, 0.16);
+      // A bus front is a destination screen over a deep windscreen over a wide
+      // low grille, and none of it existed. The grille sits low and wide -- a
+      // bus's radiator is at the bottom, not at headlamp height -- which is
+      // itself a way of telling it from the taxi and the van head-on.
+      vFront(parts, {
+        zFront: 0.65, w: 2.20, dark: BUS_DARK, crease: BUS_CREASE,
+        grilleY: 1.20, grilleH: 0.30, lampX: 0.84, lampW: 0.30, lampH: 0.24,
+        bumpW: 2.14, bumpH: 0.36, bumpY: 0.86, plateW: 0.62, slats: 4,
+      });
       parts.push(
-        hbx(2.20, 0.39, 1.26, 0, 1.235, 0, BUS_BODY),      // lower body 1.04-1.43
-        hbx(2.24, 0.05, 1.28, 0, 1.455, 0, BUS_CREASE),    // shoulder crease 1.43-1.48
-        hbx(2.26, 0.12, 1.28, 0, 1.54, 0, CHROME)           // livery band 1.48-1.60
+        gl(hcbx(2.20, 0.39, 1.26, 0, 1.235, 0, BUS_BODY, 0.06), GLOSS.paint),
+        gl(hcbx(2.24, 0.05, 1.28, 0, 1.455, 0, BUS_CREASE, 0.02), GLOSS.chrome),
+        gl(hcbx(2.26, 0.12, 1.28, 0, 1.54, 0, CHROME, 0.03), GLOSS.chrome)
       );
       vGlass(parts, 1.96, 0.96, 1.30, 0, 2.08, 0);
-      for (const sx of [-1, 1]) parts.push(hbx(0.14, 0.96, 1.26, sx * 1.03, 2.08, 0, BUS_BODY));
-      parts.push(hbx(2.20, 0.08, 1.26, 0, 2.60, 0, BUS_BODY));   // header 2.56-2.64
+      vPillars(parts, 0.14, 0.96, 1.26, 1.03, 2.08, 0, BUS_BODY);
+      parts.push(gl(hcbx(2.20, 0.08, 1.26, 0, 2.60, 0, BUS_BODY, 0.03), GLOSS.paint));
       // The fleet's only curved roofline, and the bus's whole read at distance.
       // Crest lands at 2.78, inside the 2.80 the collision box records.
       vCrown(parts, 2.20, 1.26, 2.64, 0, 0.14, 14, BUS_BODY);
@@ -13487,13 +14199,25 @@ MR.World = (function () {
         skirtTop: 0.56, skirtBot: 0.10, spring: 0.14,
         wheelX: 0.90, wheelR: 0.30, wheelW: 0.28, archPad: 0.08,
         skirt: TAXI_CREASE, under: TAXI_DARK, tyre: TYRE_WARM,
+        rim: WHEEL_RIM_WARM, hub: WHEEL_HUB_WARM,
       });
       vBumper(parts, 2.12, 0.24, 0.68, -0.65, TAXI_DARK, 0.56);   // 0.56-0.80
       vLamps(parts, 0.96, 0.68, -0.65, 0.145);
+      // The front end, at the +z plane, which was bare paint until this pass.
+      vFront(parts, {
+        zFront: 0.65, w: 2.18, dark: TAXI_DARK, crease: TAXI_CREASE,
+        grilleY: 1.00, grilleH: 0.26, lampX: 0.80, lampW: 0.34, lampH: 0.20,
+        bumpW: 2.12, bumpH: 0.24, bumpY: 0.68, plateW: 0.56,
+      });
       parts.push(
-        hbx(2.18, 0.44, 1.26, 0, 1.02, 0, TAXI_BODY),      // lower body 0.80-1.24
-        hbx(2.22, 0.06, 1.28, 0, 1.27, 0, TAXI_CREASE),    // shoulder crease 1.24-1.30
-        hbx(2.24, 0.06, 1.28, 0, 1.33, 0, 0x1a1608)        // beltline 1.30-1.36
+        // The body masses are chamfered now. The chamfer cuts inward from the
+        // extents, so the bounding box, the 2.80 ceiling and the lane fit are
+        // all exactly what they were -- what changes is that the shoulder is a
+        // lit turn instead of a corner, and that the cel specular has a surface
+        // at 45 degrees to put its core on.
+        gl(hcbx(2.18, 0.44, 1.26, 0, 1.02, 0, TAXI_BODY, 0.07), GLOSS.paint),
+        gl(hcbx(2.22, 0.06, 1.28, 0, 1.27, 0, TAXI_CREASE, 0.02), GLOSS.chrome),
+        gl(hbx(2.24, 0.06, 1.28, 0, 1.33, 0, 0x1a1608), GLOSS.trim)
       );
       // Pale glass, and it is the reference's own. See the two-pair note at
       // vGlass: `tgr-taxi-street`'s glazing measures (100,151,157), which is
@@ -13505,10 +14229,13 @@ MR.World = (function () {
       // 1.09 -- so 0.14 of the car simply was not there at window height and
       // the greenhouse read as full width with a sliver of paint at its edge.
       // 0.30 at +/-0.94 closes it exactly, and the taper is then visible.
-      for (const sx of [-1, 1]) parts.push(hbx(0.30, 0.46, 0.98, sx * 0.94, 1.59, 0.02, TAXI_BODY));
+      //
+      // It now does that as an A and a C pillar rather than as one slab down
+      // the whole flank, which is what uncovers the side windows. See vPillars.
+      vPillars(parts, 0.30, 0.46, 0.98, 0.94, 1.59, 0.02, TAXI_BODY);
       parts.push(
-        hbx(1.44, 0.07, 0.92, 0, 1.855, 0.02, TAXI_BODY),   // roof 1.82-1.89
-        hbx(1.22, 0.05, 0.78, 0, 1.915, 0.02, TAXI_CREASE), // roof chamfer 1.89-1.94
+        gl(hcbx(1.44, 0.07, 0.92, 0, 1.855, 0.02, TAXI_BODY, 0.03), GLOSS.paint),  // roof
+        gl(hcbx(1.22, 0.05, 0.78, 0, 1.915, 0.02, TAXI_CREASE, 0.02), GLOSS.chrome),
         // ONE roof element, not a pile, and this is the second time this file
         // has had to learn it. A sign plus a base plus a cap, each nearly as
         // wide as the roof under it, reads at gameplay scale as a second storey
@@ -13557,17 +14284,30 @@ MR.World = (function () {
         skirtTop: 0.62, skirtBot: 0.14, spring: 0.16,
         wheelX: 0.92, wheelR: 0.33, wheelW: 0.30,
         skirt: VAN_CREASE, under: VAN_DARK, tyre: TYRE_WARM,
+        rim: WHEEL_RIM_WARM, hub: WHEEL_HUB_WARM,
       });
       vBumper(parts, 2.12, 0.32, 0.78, -0.65, VAN_DARK, 0.60);
       vLamps(parts, 0.96, 0.78, -0.65, 0.15);
+      // The van's cab is at the FRONT, so its front end is the one with the
+      // most to say: a deep windscreen already exists up there for the side
+      // lanes, and under it there was nothing at all.
+      vFront(parts, {
+        zFront: 0.65, w: 2.10, dark: VAN_DARK, crease: VAN_CREASE,
+        grilleY: 1.02, grilleH: 0.26, lampX: 0.78, lampW: 0.32, lampH: 0.22,
+        bumpW: 2.12, bumpH: 0.32, bumpY: 0.78, plateW: 0.60,
+      });
       parts.push(
-        hbx(2.22, 0.16, 0.80, 0, 1.02, -0.21, VAN_BODY),   // lower box 0.94-1.10
-        hbx(2.26, 0.06, 0.82, 0, 1.13, -0.21, VAN_CREASE), // shoulder crease 1.10-1.16
-        hbx(2.24, 1.30, 0.80, 0, 1.81, -0.21, VAN_BODY),   // the box 1.16-2.46
-        hbx(2.28, 0.12, 0.82, 0, 1.34, -0.21, KIT_B),      // livery stripe 1.28-1.40
-        hbx(2.10, 0.58, 0.44, 0, 0.89, 0.41, VAN_CREASE)   // cab 0.60-1.18
+        gl(hcbx(2.22, 0.16, 0.80, 0, 1.02, -0.21, VAN_BODY, 0.04), GLOSS.paint),
+        gl(hcbx(2.26, 0.06, 0.82, 0, 1.13, -0.21, VAN_CREASE, 0.02), GLOSS.chrome),
+        gl(hcbx(2.24, 1.30, 0.80, 0, 1.81, -0.21, VAN_BODY, 0.07), GLOSS.paint),
+        gl(hbx(2.28, 0.12, 0.82, 0, 1.34, -0.21, KIT_B), GLOSS.trim),
+        gl(hcbx(2.10, 0.58, 0.44, 0, 0.89, 0.41, VAN_CREASE, 0.05), GLOSS.paint)
       );
-      vGlass(parts, 2.04, 0.52, 0.44, 0, 1.44, 0.41, true); // cab glass, for the side lanes
+      // Cab glass. This box is 2.04 wide on a cab of 2.10, so its own side faces
+      // ARE the cab's side windows and no separate pane is needed -- adding one
+      // here drew a second sheet of glass in the same place and read as a slab
+      // hanging off the flank.
+      vGlass(parts, 2.04, 0.52, 0.44, 0, 1.44, 0.41, true);
       vRoof(parts, 2.24, 0.80, 2.46, -0.21, KIT_B, VAN_BODY);
       parts.push(
         // The load space is LIT, not black, and warm rather than blue -- a cool
@@ -13625,13 +14365,23 @@ MR.World = (function () {
         skirtTop: 0.62, skirtBot: 0.16, spring: 0.16,
         wheelX: 0.90, wheelR: 0.33, wheelW: 0.26, archPad: 0.04, dual: true,
         skirt: BIN_CREASE, under: BIN_DARK, tyre: TYRE_WARM,
+        rim: WHEEL_RIM_WARM, hub: WHEEL_HUB_WARM,
       });
       vBumper(parts, 2.12, 0.30, 0.77, -0.65, BIN_DARK, 0.58);
       vLamps(parts, 0.96, 0.77, -0.65, 0.15);
+      // The cab end. A refuse truck's cab is forward of the packer body, so the
+      // front is a tall flat screen over a heavy grille -- and the packer body
+      // already reaches z +0.62 up there, which is where the glazing goes.
+      vFront(parts, {
+        zFront: 0.65, w: 2.10, dark: BIN_DARK, crease: BIN_CREASE,
+        grilleY: 1.06, grilleH: 0.30, lampX: 0.80, lampW: 0.30, lampH: 0.22,
+        bumpW: 2.12, bumpH: 0.30, bumpY: 0.77, plateW: 0.58, slats: 4,
+      });
+      vGlass(parts, 1.60, 0.46, 0.08, 0, 2.24, 0.60, false);   // cab screen
       parts.push(
-        hbx(2.24, 0.90, 0.62, 0, 1.37, -0.30, BIN_BODY),   // hopper 0.92-1.82
-        hbx(2.26, 0.05, 0.64, 0, 1.845, -0.30, BIN_CREASE),// hopper crease 1.82-1.87
-        hbx(2.18, 0.08, 0.66, 0, 1.91, -0.30, VAN_BODY),   // hopper cap 1.87-1.95
+        gl(hcbx(2.24, 0.90, 0.62, 0, 1.37, -0.30, BIN_BODY, 0.06), GLOSS.paint),
+        gl(hcbx(2.26, 0.05, 0.64, 0, 1.845, -0.30, BIN_CREASE, 0.02), GLOSS.chrome),
+        gl(hcbx(2.18, 0.08, 0.66, 0, 1.91, -0.30, VAN_BODY, 0.03), GLOSS.trim),
         // THE PACKER IS NARROWER THAN THE HOPPER, not merely taller than it.
         // At 2.14 on a 2.24 hopper the step was 0.05 a side -- invisible at
         // gameplay scale, so the truck read as one slab with a bar across it
@@ -13639,10 +14389,13 @@ MR.World = (function () {
         // shoulder is 0.26 a side and the object is visibly two masses: a low
         // wide tail with a tall narrow body standing behind it, which is what a
         // rear loader is and what nothing else on this road has.
-        hbx(1.72, 0.56, 0.60, 0, 2.23, 0.32, BIN_BODY),    // packer body 1.95-2.51
-        hbx(1.78, 0.08, 0.64, 0, 2.55, 0.32, VAN_BODY),    // body cap 2.51-2.59
-        hbx(1.54, 0.06, 0.54, 0, 2.62, 0.32, BIN_BODY)     // roof chamfer 2.59-2.65
+        gl(hcbx(1.72, 0.56, 0.60, 0, 2.23, 0.32, BIN_BODY, 0.06), GLOSS.paint),  // packer 1.95-2.51
+        gl(hcbx(1.78, 0.08, 0.64, 0, 2.55, 0.32, VAN_BODY, 0.03), GLOSS.trim),   // body cap
+        gl(hcbx(1.54, 0.06, 0.54, 0, 2.62, 0.32, BIN_BODY, 0.02), GLOSS.paint)   // roof chamfer
       );
+      // The packer body's own side windows, at the height its inspection panel
+      // sits: from the flank this vehicle was a solid chartreuse wall 2.6 tall.
+      vSideGlass(parts, 1.72, 0.10, 0.58, 2.06, 2.42, false);
       vGlass(parts, 1.28, 0.34, 0.06, 0, 2.24, -0.05, true); // packer inspection window
       parts.push(
         hbx(1.42, 0.30, 0.06, 0, 1.22, -0.60, 0x141a33),   // the throat 1.07-1.37
@@ -13710,7 +14463,7 @@ MR.World = (function () {
         // the hazard's own contact shadow, and at 22 units a navy disc on a
         // multiplied shadow is nothing at all -- the bikes were invisible under
         // their own riders.
-        parts.push(cyl(0.33, 0.33, 0.10, 8, X * LANE_FIT, 0.33, 0.06, 0x6d76a8, 0, 0, Math.PI / 2));
+        vWheel(parts, X * LANE_FIT, 0.33, 0.06, 0.33, 0.10, 0x6d76a8, WHEEL_RIM, WHEEL_HUB);
         parts.push(bxAt(0.08, 0.52, 0.10, X, 0.62, 0.14, p.frame));
         parts.push(bxAt(0.34, 0.09, 0.18, X, 0.92, 0.06, 0x2a0c16));
         // The rear light, as a disc facing the lens with a bright core, exactly
@@ -13776,13 +14529,12 @@ MR.World = (function () {
      */
     const blockMopedGeo = (function () {
       const parts = [
-        cyl(0.31, 0.31, 0.13, 8, 0, 0.31, -0.06, TYRE, 0, 0, Math.PI / 2),
         bx(0.36, 0.28, 0.54, 0, 0.50, 0.06, 0xd42a55),
         bx(0.74, 0.16, 0.44, 0, 0.76, 0.10, 0x2a0c16),
         // The cube was 0.20 taller and hid the rider it exists to carry: only
         // 0.20 of hi-vis cleared it, so the whole thing read as a box on a wheel.
-        bxAt(1.52, 0.66, 0.56, 0, 1.19, -0.30, PINK),      // the food cube
-        bxAt(1.60, 0.10, 0.60, 0, 1.57, -0.30, KIT_B),
+        gl(cbx(1.52 * LANE_FIT, 0.66, 0.56, 0, 1.19, -0.30, PINK, 0.06), GLOSS.paint),
+        gl(cbx(1.60 * LANE_FIT, 0.10, 0.60, 0, 1.57, -0.30, KIT_B, 0.03), GLOSS.trim),
         bx(0.56, 0.42, 0.34, 0, 1.14, 0.24, 0x2a0c16),
         bx(0.68, 0.56, 0.40, 0, 1.64, 0.26, KIT_B),        // hi-vis back
         bx(0.58, 0.10, 0.36, 0, 1.97, 0.26, 0x2a0c16),
@@ -13799,6 +14551,8 @@ MR.World = (function () {
         // which is the job the reference gives it on every one of its four.
         bx(0.34, 0.14, 0.06, 0, 0.72, -0.62, PLATE),
       ];
+      // The road wheel, with a rim like everything else that rolls.
+      vWheel(parts, 0, 0.31, -0.06, 0.31, 0.13, TYRE, WHEEL_RIM, WHEEL_HUB);
       // One rear lamp, on the centreline, built the way the cars build theirs.
       parts.push(cyl(0.13, 0.13, 0.10, 8, 0, 0.94, -0.58, LAMP_RED, Math.PI / 2));
       parts.push(cyl(0.069, 0.069, 0.13, 8, 0, 0.94, -0.585, LAMP_CORE, Math.PI / 2));
@@ -17521,7 +18275,29 @@ MR.World = (function () {
       cam.left = -halfW; cam.right = halfW; cam.top = halfH; cam.bottom = -halfH;
       cam.updateProjectionMatrix();
       const d = 20;
-      cam.position.set(cx, cy + d * Math.sin(_audit.pitch), cz - d * Math.cos(_audit.pitch));
+      // AZIMUTH AND ELEVATION, because CLAUDE.md rule 1 has to be checkable.
+      //
+      // The default is az 0 / el = _audit.pitch, which is the game's own
+      // sightline from directly behind -- so contrastAudit's numbers are
+      // exactly what they always were and nothing that reads them moves. What
+      // this adds is the ability to ask for any other angle, which is what
+      // "every object is modelled on all sides" needs in order to be an
+      // assertion rather than an intention. A rear-only object photographs as
+      // a fully-built one at az 0 and only at az 0; the flank and the front
+      // are where a hollow face shows, and until now nothing in this file
+      // could look at them.
+      //
+      // az 0 is from -z (behind, the chase view); az grows toward +x, so
+      // PI/2 is the flank and PI is head-on. el is measured up from the
+      // horizontal, which is why the default is +pitch: the eye is above.
+      const az = _audit.az || 0;
+      const el = _audit.el === undefined ? _audit.pitch : _audit.el;
+      const ce = Math.cos(el);
+      cam.position.set(
+        cx + d * ce * Math.sin(az),
+        cy + d * Math.sin(el),
+        cz - d * ce * Math.cos(az)
+      );
       cam.lookAt(cx, cy, cz);
 
       const prevRT = renderer.getRenderTarget();
@@ -17582,6 +18358,12 @@ MR.World = (function () {
     api.contrastAudit = function (renderer, scene, opts) {
       auditSetup();
       _audit.images = !!(opts && opts.images);
+      // Always down the game's own sightline, whatever a fleetSheet call left
+      // behind. The contrast gate is a statement about the angle the lane is
+      // chosen from, and it must not silently become a statement about
+      // whatever angle was last photographed.
+      _audit.az = 0;
+      _audit.el = undefined;
       const NAME = { [K.JUMP]: 'JUMP', [K.DUCK]: 'DUCK', [K.BLOCK]: 'BLOCK' };
       const hazards = [];
       for (const grp of HAZARD_DEFS) {
@@ -17671,6 +18453,12 @@ MR.World = (function () {
       // Put the road a little below centre so the full 0..2.80 band is in
       // frame with the contact line visible on every variant.
       const cy = (opts && opts.cy !== undefined) ? opts.cy : half - 0.16;
+      // See shotMean: az 0 / el = the game's sightline is the default, so
+      // every existing caller is unaffected. Passing an angle is how CLAUDE.md
+      // rule 1 gets checked -- a flank or a front that was never built shows
+      // here and nowhere else.
+      _audit.az = (opts && opts.az) || 0;
+      _audit.el = (opts && opts.el !== undefined) ? opts.el : undefined;
       const NAME = { [K.JUMP]: 'JUMP', [K.DUCK]: 'DUCK', [K.BLOCK]: 'BLOCK' };
       const out = [];
       for (const grp of HAZARD_DEFS) {
@@ -17700,6 +18488,45 @@ MR.World = (function () {
         });
       }
       _audit.images = prevImages;
+      _audit.az = 0;
+      _audit.el = undefined;
+      return out;
+    };
+
+    /**
+     * WHICH SKIN EVERY GATE OF A COURSE WILL WEAR, without playing the course.
+     *
+     * "Enough visual variation that the road does not feel repetitive" is a
+     * measurable claim, and it was being answered by eye. variantIndex is a
+     * pure function of (gate.z, lane) and the kind's draw bag, so the whole
+     * course's casting is knowable up front -- this returns it, and the
+     * question "how often does the same variant appear twice inside one visible
+     * window" becomes arithmetic rather than a screenshot.
+     *
+     * It reports what actually SPAWNS, drawn through the weighted bag, so a
+     * variant holding two tickets appears at the rate it really appears. That
+     * distinction is the point: the fleet's weights are deliberate, and a
+     * repetition figure computed from a uniform draw would be describing a
+     * different game.
+     */
+    api.variantPlan = function (gates) {
+      const bags = {};
+      const probe = {};
+      probe[K.JUMP] = jumpPool; probe[K.DUCK] = duckPool; probe[K.BLOCK] = blockPool;
+      for (const k of Object.keys(probe)) {
+        // The bag lives on the pooled object, so borrow one and give it back.
+        const o = probe[k].claim();
+        bags[k] = o.userData.bag;
+        probe[k].release(o);
+      }
+      const out = [];
+      for (const gate of gates) {
+        for (let l = 0; l < 3; l++) {
+          const kind = gate.lanes[l];
+          if (kind === K.CLEAR || !bags[kind]) continue;
+          out.push({ z: gate.z, lane: l, kind: kind, variant: variantIndex(bags[kind], gate, l) });
+        }
+      }
       return out;
     };
 

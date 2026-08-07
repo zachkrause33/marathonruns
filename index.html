@@ -13438,10 +13438,24 @@ MR.World = (function () {
      * pool re-tinted, because these are different SHAPES: a palm is not a
      * recoloured conifer and no amount of material work would make it one.
      */
+    // The half-width of each setting's tree, so placement can stand it off the
+    // corridor by what its own crown needs. See the claim site: a constant
+    // minimum distance does not hold once the scale roll is applied.
+    //
+    // Taken as the larger of the x and z extents because the tree is turned by
+    // a random yaw at claim time, so the face it presents to the road is not
+    // the one measured here.
+    const treeReach = [];
     const treePools = SETS.map(function (st) {
       const parts = [];
       vTree(parts, st.look.tree, 1);
       const geo = merge(parts);
+      geo.computeBoundingBox();
+      const bb = geo.boundingBox;
+      treeReach.push(Math.max(
+        Math.abs(bb.min.x), Math.abs(bb.max.x),
+        Math.abs(bb.min.z), Math.abs(bb.max.z)
+      ));
       return Pool(function () { return S.outlined(geo, mats.prop, S.INK.prop); }, group);
     });
     const grovePools = SETS.map(function (st) {
@@ -16213,8 +16227,26 @@ MR.World = (function () {
           obj.userData.parapet.position.y = h / 2 + 0.3;
           obj.position.set(s.x + s.side * 13, h / 2, s.z);
         } else if (s.kind === 'tree') {
-          obj.scale.setScalar(0.7 + s.a * 0.75);
-          obj.position.set(s.x, 0, s.z);
+          // The corridor rule, at the one place it was being broken.
+          //
+          // Trees roll x over [7.5, 26], which clears CORRIDOR_HALF easily on
+          // its own -- but the crown is then scaled by up to 1.45, and the
+          // scale is applied AFTER the position is chosen. A large roll at the
+          // near end of that range reaches back over the carriageway: measured
+          // at z 4356, mile 18.3, a crown crossing the corridor at y = 7.74
+          // against an OVERHEAD_Y of 9.0. It reproduces on skips 159-166 and
+          // the default shot set has never sampled that stretch, so shoot.js
+          // has been able to catch this since the corridor rule was written and
+          // simply never looked there.
+          //
+          // Standing it off by its own scaled reach fixes the class rather than
+          // the instance: a new tree, a wider crown, or a changed scale range
+          // cannot reintroduce it.
+          const sc = 0.7 + s.a * 0.75;
+          obj.scale.setScalar(sc);
+          const si = Math.min(SETS.length - 1, s.set || 0);
+          const minX = CORRIDOR_HALF + treeReach[si] * sc + 0.15;
+          obj.position.set(Math.sign(s.x || 1) * Math.max(Math.abs(s.x), minX), 0, s.z);
           obj.rotation.y = s.b * 6.3;
         } else if (s.kind === 'grove') {
           obj.position.set(s.x + s.side * 10, 0, s.z);

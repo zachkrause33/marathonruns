@@ -8890,6 +8890,83 @@ MR.World = (function () {
     };
 
     /**
+     * THE FLEET AT ONE SCALE -- the sheet `contrastAudit` cannot give you, and
+     * the reason a previous pass concluded the fleet had no shape variety at
+     * all when what it was looking at was its own camera.
+     *
+     * `contrastAudit` frames every variant to its OWN height: `halfH` is
+     * `h * 0.62` while `halfW` is a FIXED `LANE * 0.62`. That is correct for
+     * the thing it measures -- an area mean wants the object filling the target
+     * and does not care about aspect -- and it is wrong for anything about
+     * SHAPE, in two compounding ways:
+     *
+     *   Every variant is normalised to exactly 128px tall. A 2.32 taxi and a
+     *     2.79 refuse truck come back the same height. Height is the largest
+     *     single difference between a taxi, a van and a bus, and this deletes
+     *     it.
+     *   Every variant is stretched horizontally, by a DIFFERENT factor each --
+     *     1.36x for the taxi, 1.64x for the refuse truck -- because halfW is
+     *     fixed while halfH is not. So even the surviving proportions are wrong
+     *     by a per-variant amount.
+     *
+     * Width is then near-constant across the fleet for a reason that is not a
+     * defect: every BLOCK must fill the lane it blocks, so all ten are ~1.6
+     * world wide by contract. Normalise the height too and ten different
+     * objects necessarily print as ten identical rectangles. A silhouette sheet
+     * built from those swatches shows the camera, not the fleet.
+     *
+     * reference/our-fleet-silhouettes.png was built exactly that way, and was
+     * read as proof that the geometry was flat.
+     *
+     * This renders every variant of one kind down the same sightline at ONE
+     * scale, square (so pixels are undistorted), with ONE ground line -- so
+     * relative height, relative width and the shape of the lower edge are all
+     * facts about the geometry. It is a build-time audit like its neighbour and
+     * is called from tools only.
+     */
+    api.fleetSheet = function (renderer, scene, kind, opts) {
+      auditSetup();
+      const prevImages = _audit.images;
+      _audit.images = !(opts && opts.images === false);
+      // Square framing: halfW === halfH, so one world unit is one pixel count
+      // in both axes. 1.58 covers the 2.80 a BLOCK may reach plus the road.
+      const half = (opts && opts.half) || 1.58;
+      // Put the road a little below centre so the full 0..2.80 band is in
+      // frame with the contact line visible on every variant.
+      const cy = (opts && opts.cy !== undefined) ? opts.cy : half - 0.16;
+      const NAME = { [K.JUMP]: 'JUMP', [K.DUCK]: 'DUCK', [K.BLOCK]: 'BLOCK' };
+      const out = [];
+      for (const grp of HAZARD_DEFS) {
+        if (kind !== undefined && kind !== null && grp.kind !== kind) continue;
+        grp.defs.forEach(function (d, vi) {
+          // Assembled exactly as contrastAudit assembles it, so the two sheets
+          // describe the same object.
+          const g = new THREE.Group();
+          g.add(S.outlined(d.geo, mats.propLit, S.INK.hazard));
+          const f = new THREE.Mesh(hplane(d.face[0], d.face[1]), faceMat[grp.tint]);
+          f.position.set(0, d.face[2], d.face[3]);
+          f.rotation.y = Math.PI;
+          g.add(f);
+          if (d.moving) {
+            const mv = S.outlined(d.moving, mats.propLit, S.INK.hazard);
+            mv.position.set(d.pivot[0] * LANE_FIT, d.pivot[1], d.pivot[2]);
+            g.add(mv);
+          }
+          d.geo.computeBoundingBox();
+          const bb = d.geo.boundingBox;
+          const m = shotMean(renderer, scene, g, 0, cy, 0, half, half);
+          out.push(Object.assign({
+            kind: grp.kind, variant: vi, name: NAME[grp.kind] + ' v' + vi,
+            top: +Math.max(bb.max.y, d.face[2] + d.face[1] / 2).toFixed(2),
+            wide: +(bb.max.x - bb.min.x).toFixed(2),
+          }, m));
+        });
+      }
+      _audit.images = prevImages;
+      return out;
+    };
+
+    /**
      * The gates as the occlusion check needs to see them: a world-space box per
      * live hazard, taken from MR.Collision.BOX so the audit is measured against
      * the collision contract rather than against the art.

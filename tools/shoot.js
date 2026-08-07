@@ -42,8 +42,13 @@
  *   BLANKS every hazard against the hazards IN FRONT OF IT. See the long
  *          comment on it below; it is the one that was missing, and the thing
  *          it measures is the commonest occluder in the game.
+ *   PAINTS  every hazard against the SCREEN-SPACE OVERLAYS. The three above all
+ *          start from a list of world objects, so an object that turns
+ *          depthTest off -- and is therefore in front of everything by
+ *          construction -- appeared in none of them. This one walks the live
+ *          scene and tests the property instead of the object.
  *
- * All three are geometric, so a new prop is audited the day it is added rather
+ * All four are geometric, so a new prop is audited the day it is added rather
  * than the day somebody notices. Aid and the sky/ground/hills backdrop are
  * exempt and world.js says why at each exemption.
  *
@@ -150,6 +155,17 @@ const DEFAULT_SHOTS = [
   // gates clean that this frame reads at 20%. The stricter case is also the
   // real one.
   { name: '07-wall-tall', q: 'bot=1&skip=185', settle: 700, w: 620, h: 1344 },
+  // The ghost level with the player, which no frame above photographs.
+  //
+  // ghost.js says the marker is on screen for four fifths of a good race and
+  // that the pass is the moment the whole feature exists for -- and the six
+  // frames above caught it at gaps of 0.7, 93, 79, 5, -66 and 93, i.e. never
+  // once running alongside. That is exactly where its tag hangs lowest in the
+  // frame, and PAINTS below has nothing to measure without it. Portrait for the
+  // same reason 07 is: the plate is 0.52 of the frame wide there against 0.15
+  // on the desktop, because size attenuation is off and the horizontal NDC
+  // scale divides by the aspect.
+  { name: '08-level', q: 'bot=1&skip=178', settle: 700, w: 620, h: 1344 },
 ];
 
 (async () => {
@@ -403,6 +419,166 @@ const DEFAULT_SHOTS = [
           }
         }
       }
+      // ---- 3a. PAINTS: the screen-space overlays, which nothing has audited -
+      //
+      // LOW, HIDES and BLANKS all start from world geometry -- crossings() for
+      // the first two, gateBoxes() for the third. An object that switches
+      // depthTest OFF is in neither list and is in front of everything by
+      // construction, so the one class of object that CANNOT be occluded was
+      // also the one class nothing checked. That is the same shape of hole
+      // BLANKS was written to close, one level up: an assertion that walks a
+      // list tells you about the things in the list.
+      //
+      // So this walks the live scene instead of a list, and the test is the
+      // property rather than the object: any material with depthTest === false
+      // paints over whatever is behind it, whatever it is and whoever added it.
+      //
+      // WHAT COUNTS AS PAINTING OVER. Three's renderer draws opaque objects,
+      // then transparent ones, each pass sorted by renderOrder. Hazards are
+      // opaque world meshes at renderOrder 0, so a depthTest:false object lands
+      // in front of them if it is transparent (a later pass) or opaque with a
+      // renderOrder at or above theirs. A depthTest:false object that is opaque
+      // AND sorts below zero draws first and the world paints over it -- the
+      // backdrop's own trick -- so it is exempt and says so here rather than by
+      // not being looked at.
+      //
+      // ALPHA, NOT THE QUAD. A sprite's quad is mostly empty: the RECORD plate
+      // is 148 of 208 texture rows and the rest is a chevron and clear margin.
+      // Failing on the quad would be conservative but would also demand a fix
+      // that moves transparent pixels, so the texture's own alpha channel is
+      // read back and sampled per ray. The line is alpha >= 0.5 -- more than
+      // half the light reaching the eye from that point is the overlay's rather
+      // than the hazard's. That is the one judgement here, and it is not
+      // load-bearing: swept over the whole race at 0.30, 0.50 and 0.85 the
+      // coverage figures are identical on every gate but one, because the plate
+      // is drawn at 0.88 and its border at 0.22 with nothing in between.
+      const overlays = [];
+      {
+        const wp = new THREE.Vector3(), ws = new THREE.Vector3(), mv = new THREE.Vector3();
+        const P = cam.projectionMatrix.elements;
+        const masks = new Map();
+        // The alpha channel, read back once per texture. A texture the page
+        // will not hand back (cross-origin, compressed, not yet decoded) falls
+        // through to the whole quad, which is the conservative direction.
+        function maskOf(tex) {
+          if (!tex || !tex.image || !tex.image.width) return null;
+          if (masks.has(tex.uuid)) return masks.get(tex.uuid);
+          let m = null;
+          try {
+            const im = tex.image;
+            const c = document.createElement('canvas');
+            c.width = im.width; c.height = im.height;
+            const x2 = c.getContext('2d');
+            x2.drawImage(im, 0, 0);
+            const d = x2.getImageData(0, 0, c.width, c.height).data;
+            const a = new Uint8Array(c.width * c.height);
+            for (let i = 0; i < a.length; i++) a[i] = d[i * 4 + 3];
+            // three uploads with flipY by default, so uv v=0 is the LAST image
+            // row. Getting this backwards reads the chevron for the plate.
+            m = { w: c.width, h: c.height, a, flipY: tex.flipY !== false };
+          } catch (err) { m = null; }
+          masks.set(tex.uuid, m);
+          return m;
+        }
+        g.scene.traverseVisible(function (o) {
+          if (!o.material || !(o.isSprite || o.isMesh || o.isLine || o.isPoints)) return;
+          const ms = Array.isArray(o.material) ? o.material : [o.material];
+          const m = ms.find((x) => x && x.depthTest === false);
+          if (!m) return;
+          if (!m.transparent && o.renderOrder < 0) return;   // drawn under the world
+          o.getWorldPosition(wp); o.getWorldScale(ws);
+          mv.copy(wp).applyMatrix4(cam.matrixWorldInverse);
+          if (-mv.z < 0.05) return;                          // behind the lens
+          const op = m.opacity === undefined ? 1 : m.opacity;
+          if (op <= 0.02) return;
+          const rec = { name: (o.name || o.type) + '#' + o.id, op, d: wp.z - camZ, mask: null };
+          if (o.isSprite) {
+            // With sizeAttenuation off three multiplies the sprite's scale by
+            // the view depth, which cancels the perspective divide -- so the
+            // NDC half-extent is scale * P[0] / 2 with no depth in it at all,
+            // which is why the plate is the same size at 3 units and at 190.
+            // With it on, the depth comes back.
+            const k = m.sizeAttenuation ? 1 / (-mv.z) : 1;
+            rec.hw = 0.5 * ws.x * P[0] * k;
+            rec.hh = 0.5 * ws.y * P[5] * k;
+            const rot = m.rotation || 0;
+            // Sprite.center is the anchor the quad hangs from, default (0.5,
+            // 0.5) = centred. Off-centre, the quad's middle is displaced by
+            // (0.5 - center) of its own size, which is what three's
+            // alignedPosition does before the billboard turn.
+            const ax = (0.5 - (o.center ? o.center.x : 0.5)) * 2 * rec.hw;
+            const ay = (0.5 - (o.center ? o.center.y : 0.5)) * 2 * rec.hh;
+            if (rot) {
+              // A rotated plate is bounded by its circumscribed rect and its uv
+              // lookup would need the inverse turn; nothing rotates today, so
+              // this stays conservative rather than growing untested arithmetic.
+              const s = Math.abs(Math.sin(rot)), c2 = Math.abs(Math.cos(rot));
+              const hw = rec.hw * c2 + rec.hh * s, hh = rec.hw * s + rec.hh * c2;
+              rec.hw = hw; rec.hh = hh;
+            } else {
+              // The uv transform has to be the identity for a straight texel
+              // lookup. It is not Texture.center that decides that -- that
+              // defaults to (0,0) and is only consulted when rotation is set --
+              // so the test is on the transform's own terms. Getting this
+              // backwards is how the first draft of this check read no alpha at
+              // all and silently fell back to the whole quad, which passed.
+              const t = m.map;
+              const plain = t && (!t.rotation)
+                && (!t.offset || (t.offset.x === 0 && t.offset.y === 0))
+                && (!t.repeat || (t.repeat.x === 1 && t.repeat.y === 1));
+              if (plain) rec.mask = maskOf(t);
+            }
+            rec.ax = ax; rec.ay = ay;
+          } else {
+            // Anything that is not a sprite is bounded by its projected world
+            // box. No alpha, so the whole box counts -- conservative, and the
+            // day something like that appears is the day to do better.
+            if (!o.geometry) return;
+            if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+            const bb = o.geometry.boundingBox;
+            let lo0 = Infinity, hi0 = -Infinity, lo1 = Infinity, hi1 = -Infinity;
+            for (let i = 0; i < 8; i++) {
+              v.set(i & 1 ? bb.max.x : bb.min.x, i & 2 ? bb.max.y : bb.min.y,
+                    i & 4 ? bb.max.z : bb.min.z).applyMatrix4(o.matrixWorld);
+              v.applyMatrix4(cam.matrixWorldInverse);
+              if (-v.z < 0.05) return;
+              v.applyMatrix4(cam.projectionMatrix);
+              if (v.x < lo0) lo0 = v.x; if (v.x > hi0) hi0 = v.x;
+              if (v.y < lo1) lo1 = v.y; if (v.y > hi1) hi1 = v.y;
+            }
+            rec.cx = (lo0 + hi0) / 2; rec.cy = (lo1 + hi1) / 2;
+            rec.hw = (hi0 - lo0) / 2; rec.hh = (hi1 - lo1) / 2;
+            overlays.push(rec);
+            return;
+          }
+          v.copy(wp).project(cam);
+          rec.cx = v.x + (rec.ax || 0); rec.cy = v.y + (rec.ay || 0);
+          overlays.push(rec);
+        });
+      }
+      const PAINT_ALPHA = 0.5;
+      /** The overlay painting over this world point, or '' if none is. */
+      function paintedAt(x, y, z) {
+        if (!overlays.length) return '';
+        v.set(x, y, z).applyMatrix4(cam.matrixWorldInverse);
+        if (-v.z < 0.05) return '';
+        v.applyMatrix4(cam.projectionMatrix);
+        for (const o of overlays) {
+          const dx = v.x - o.cx, dy = v.y - o.cy;
+          if (Math.abs(dx) > o.hw || Math.abs(dy) > o.hh) continue;
+          let a = 1;
+          if (o.mask) {
+            const u = 0.5 + dx / (2 * o.hw), t = 0.5 + dy / (2 * o.hh);
+            const col = Math.min(o.mask.w - 1, Math.max(0, Math.floor(u * o.mask.w)));
+            const row = Math.min(o.mask.h - 1, Math.max(0,
+              Math.floor((o.mask.flipY ? 1 - t : t) * o.mask.h)));
+            a = o.mask.a[row * o.mask.w + col] / 255;
+          }
+          if (a * o.op >= PAINT_ALPHA) return o.name;
+        }
+        return '';
+      }
+
       // ---- 3. BLANKS: a hazard hidden by another hazard ------------------
       //
       // The dominant occluder in this game, and the one the two assertions
@@ -501,8 +677,8 @@ const DEFAULT_SHOTS = [
         for (const gt of gates) {
           const d = gt.z - camZ;
           if (d < READ_NEAR || d > READ_FAR) continue;
-          let seenN = 0, tight = 0, tot = 0;
-          const blame = {};
+          let seenN = 0, tight = 0, tot = 0, over = 0;
+          const blame = {}, blameOver = {};
           for (let i = 0; i < N; i++) {
             for (let j = 0; j < N; j++) {
               const px = gt.x - gt.halfX + 2 * gt.halfX * (i + 0.5) / N;
@@ -517,8 +693,14 @@ const DEFAULT_SHOTS = [
                 if (o === gt || o.z1 >= gt.z0) continue;
                 if (blocks(o, len - 1e-3)) { hit = o; break; }
               }
+              // The overlay pass. A ray can reach the box and STILL not be
+              // seen, because something with no depth test was drawn on top of
+              // where it lands -- so this is asked of the ray's endpoint on
+              // screen, not of the world between here and there. That is the
+              // whole reason it needs its own test: there is nothing in the way.
+              const paint = paintedAt(px, py, gt.z0);
               tot++;
-              if (!hit) seenN++;
+              if (!hit && !paint) seenN++;
               // A sample blocked by something that will be past in time is not
               // held against the gate -- condition (1) above, applied per ray
               // rather than per gate, so a mixed pair is judged on the half
@@ -530,11 +712,25 @@ const DEFAULT_SHOTS = [
               // line credits the longest occluder in the game with clearing the
               // view 21% of a read window early, and the first draft of this
               // assertion did exactly that -- and passed.
-              else if (gt.z - hit.z1 < READ_NEAR) {
+              if (hit && gt.z - hit.z1 < READ_NEAR) {
                 tight++;
                 const k = ['-', 'JUMP', 'DUCK', 'BLOCK'][hit.kind] + ' lane ' + hit.lane
                   + ' at ' + (hit.z - camZ).toFixed(0) + 'u';
                 blame[k] = (blame[k] || 0) + 1;
+              } else if (paint) {
+                // NO SELF-CLEARING CREDIT, AND THIS IS MEASURED RATHER THAN
+                // ASSUMED. Condition (1) forgives a world occluder because the
+                // eye passes it and the read comes back with an action window
+                // to spare. An overlay pinned to a moving marker does not
+                // behave that way: swept at 2-frame resolution over miles
+                // 18-21, the DUCK at z=4770 was 100% painted over at 96 units
+                // AND STILL 100% at 45 units, and only came clear at 17 -- eight
+                // units INSIDE the commit point, with the lane already chosen.
+                // Its coverage is a band of DISTANCE that slides forward with
+                // the player, so it never leaves the shot the way a box does.
+                over++;
+                tight++;
+                blameOver[paint] = (blameOver[paint] || 0) + 1;
               }
             }
           }
@@ -558,6 +754,8 @@ const DEFAULT_SHOTS = [
             d: +d.toFixed(1), lane: gt.lane, kind: gt.kind,
             raw: +raw.toFixed(2), vis: +vis.toFixed(2), need: +need.toFixed(2),
             by: Object.keys(blame).sort((a, b) => blame[b] - blame[a])[0] || '',
+            over: +(over / tot).toFixed(2),
+            byOver: Object.keys(blameOver).sort((a, b) => blameOver[b] - blameOver[a])[0] || '',
           };
           seenBox.push(row);
           if (tight && vis < need) blank.push(row);
@@ -581,6 +779,15 @@ const DEFAULT_SHOTS = [
         low: uniqLow.map((e) => ({ name: e.name, yMin: +e.yMinLocal.toFixed(2), z0: +e.z0.toFixed(1) })),
         hide: uniqHide,
         blank, gateVis: seenBox, readNear: +READ_NEAR.toFixed(2), readFar: READ_FAR,
+        // Printed on every shot, pass or fail. A census is how a NEW overlay
+        // gets noticed on the day it is added rather than the day it lands on
+        // a hazard, which is the whole complaint against the assertions that
+        // walked a fixed list.
+        overlays: overlays.map((o) => ({
+          name: o.name, d: +o.d.toFixed(1), op: +o.op.toFixed(2), mask: !!o.mask,
+          x: +o.cx.toFixed(2), y: +o.cy.toFixed(2),
+          w: +(o.hw * 2).toFixed(3), h: +(o.hh * 2).toFixed(3),
+        })),
         drift,
       };
     }).catch((e) => ({ skipped: 'evaluate failed: ' + e.message }));
@@ -677,11 +884,25 @@ const DEFAULT_SHOTS = [
             + (r.vis > r.raw ? `[${Math.round(r.vis * 100)}%]` : '')).join('  '));
         }
       }
+      if (o.overlays) {
+        console.log(`  screen-space overlays (depthTest off): ${o.overlays.length}`
+          + (o.overlays.length ? '  ' + o.overlays.map((v) =>
+              `${v.name} at ${v.d}u, ${v.w}x${v.h} NDC centred ${v.x},${v.y}`
+              + `${v.mask ? '' : ' (no alpha -- whole quad counted)'}`).join('; ') : ''));
+      }
       for (const b of o.blank.slice(0, 8)) {
-        console.log(`  ! BLANKS: the ${['-', 'JUMP', 'DUCK', 'BLOCK'][b.kind]} in lane ${b.lane} `
-          + `${b.d}u ahead is ${Math.round(b.vis * 100)}% visible and is owed `
-          + `${Math.round(b.need * 100)}% -- hidden by the ${b.by}, which is under `
-          + `${o.readNear}u in front of it, so passing it does not give the read back in time`);
+        if (b.over > 0) {
+          console.log(`  ! PAINTS: the ${['-', 'JUMP', 'DUCK', 'BLOCK'][b.kind]} in lane ${b.lane} `
+            + `${b.d}u ahead is ${Math.round(b.vis * 100)}% visible and is owed `
+            + `${Math.round(b.need * 100)}% -- ${Math.round(b.over * 100)}% of its face is painted `
+            + `over by ${b.byOver}, which has depthTest off, so nothing in the scene can `
+            + 'get in front of it and passing it never gives the read back');
+        } else {
+          console.log(`  ! BLANKS: the ${['-', 'JUMP', 'DUCK', 'BLOCK'][b.kind]} in lane ${b.lane} `
+            + `${b.d}u ahead is ${Math.round(b.vis * 100)}% visible and is owed `
+            + `${Math.round(b.need * 100)}% -- hidden by the ${b.by}, which is under `
+            + `${o.readNear}u in front of it, so passing it does not give the read back in time`);
+        }
       }
     } else if (o && o.skipped) {
       console.log('  occlusion audit skipped: ' + o.skipped);

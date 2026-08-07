@@ -355,7 +355,7 @@ MR.World = (function () {
         h: [8.5, 11.0], bay: 4.4, depth: 7.0, rows: 4, stoop: 1, chimney: 3,
       },
       tower: { colors: [0x7a8ab0, 0x9aa4c0, 0xc8ccd8], glass: 1, crown: 'flat' },
-      tree: { kind: 'round', colors: [0x3e8f4a, 0x4fa85c, 0x5cbf6a], h: 1.15, trunk: 0x9a9a86 },
+      tree: { kind: 'round', colors: [0x5f7f30, 0x84a83c, 0xaad84e], h: 1.15, trunk: 0x9a9a86 },
       marks: {
         'CITY START': [{ k: 'stPauls', x: 17 }, { k: 'bigBen', x: 14 }],
         'RIVERSIDE': [{ k: 'stPauls', x: 18 }, { k: 'ship', x: 34, y: -0.12 }],
@@ -375,7 +375,7 @@ MR.World = (function () {
         h: [10.0, 13.0], bay: 4.8, depth: 7.4, rows: 5, chimney: 2, balcony: 1,
       },
       tower: { colors: [0x8894b8, 0xa8b0cc, 0xd8dce8], glass: 1, crown: 'flat' },
-      tree: { kind: 'round', colors: [0x4aa055, 0x58b862, 0x6ccf74], h: 1.2 },
+      tree: { kind: 'round', colors: [0x688a2e, 0x8cb43a, 0xb0e04e], h: 1.2 },
       marks: {
         'CITY START': [{ k: 'fernsehturm', x: 22 }, { k: 'brandenburg', over: 1 }],
         'RIVERSIDE': [{ k: 'fernsehturm', x: 24 }, { k: 'ship', x: 34, y: -0.12 }],
@@ -395,7 +395,7 @@ MR.World = (function () {
         h: [9.0, 12.0], bay: 4.6, depth: 7.0, rows: 4, stoop: 1, chimney: 1,
       },
       tower: { colors: [0x2f3550, 0x3a4160, 0x4a5270], glass: 1, crown: 'antenna' },
-      tree: { kind: 'round', colors: [0x3f9a52, 0x4faf5f, 0x62c470], h: 1.0 },
+      tree: { kind: 'round', colors: [0x5c8028, 0x7fa838, 0xa4d848], h: 1.0 },
       marks: {
         'CITY START': [{ k: 'willis', x: 20 }, { k: 'lTrack', over: 1, run: 48, alt: 'lTrackTrain', every: 3 }],
         'RIVERSIDE': [{ k: 'lTrack', over: 1, run: 48, alt: 'lTrackTrain', every: 3 }, { k: 'crane', x: 13 }, { k: 'willis', x: 22 }],
@@ -416,7 +416,7 @@ MR.World = (function () {
         fireEscape: 1, chimney: 1,
       },
       tower: { colors: [0x8a8272, 0xa89c88, 0x6f7488], glass: 0, crown: 'stepped' },
-      tree: { kind: 'round', colors: [0x3f9a52, 0x4faf5f, 0x62c470], h: 1.1 },
+      tree: { kind: 'round', colors: [0x5c8028, 0x7fa838, 0xa4d848], h: 1.1 },
       marks: {
         'CITY START': [{ k: 'empire', x: 21 }, { k: 'clock', x: 15 }],
         'RIVERSIDE': [{ k: 'empire', x: 24 }, { k: 'ship', x: 34, y: -0.12 }],
@@ -436,7 +436,7 @@ MR.World = (function () {
         h: [9.0, 13.0], bay: 3.8, depth: 6.6, rows: 5, neon: 1,
       },
       tower: { colors: [0xb8bcd0, 0xd0d4e0, 0x8f96b0], glass: 1, crown: 'antenna' },
-      tree: { kind: 'columnar', colors: [0x3f9a68, 0x4fb078], h: 1.0 },
+      tree: { kind: 'columnar', colors: [0x4e7530, 0x74a03c, 0x9ccc4c], h: 1.0 },
       marks: {
         'CITY START': [{ k: 'skytree', x: 26 }, { k: 'neon', x: 13.5 }, { k: 'torii', over: 1 }],
         'RIVERSIDE': [{ k: 'skytree', x: 28 }, { k: 'neon', x: 14 }],
@@ -456,7 +456,7 @@ MR.World = (function () {
         h: [7.5, 9.5], bay: 4.4, depth: 7.0, rows: 3, balcony: 1, chimney: 2,
       },
       tower: { colors: [0x8fa8c8, 0xb0c4dc, 0xd8e4ee], glass: 1, crown: 'flat' },
-      tree: { kind: 'palm', colors: [0x3f9a5a, 0x4fb068], h: 1.1 },
+      tree: { kind: 'palm', colors: [0x5f8a30, 0x92c040], h: 1.1 },
       marks: {
         'CITY START': [{ k: 'operaHouse', x: 19 }, { k: 'sydneyTower', x: 20 }],
         'RIVERSIDE': [{ k: 'operaHouse', x: 20 }, { k: 'ship', x: 34, y: -0.12 }],
@@ -476,7 +476,7 @@ MR.World = (function () {
         h: [10.5, 12.5], bay: 4.6, depth: 7.2, rows: 5, balcony: 2, chimney: 4,
       },
       tower: { colors: [0xc8c0ac, 0xd8d0bc, 0xb0a894], glass: 0, crown: 'flat' },
-      tree: { kind: 'pollard', colors: [0x4a9a52, 0x5aae60], h: 1.1, trunk: 0xa8a894 },
+      tree: { kind: 'pollard', colors: [0x62862e, 0x8ab23c, 0xaedc4e], h: 1.1, trunk: 0xa8a894 },
       marks: {
         'CITY START': [{ k: 'eiffel', x: 24 }, { k: 'arcDeTriomphe', over: 1 }],
         'RIVERSIDE': [{ k: 'eiffel', x: 26 }, { k: 'ship', x: 34, y: -0.12 }],
@@ -496,7 +496,7 @@ MR.World = (function () {
         h: [8.0, 10.5], bay: 4.4, depth: 7.0, rows: 4, balcony: 1,
       },
       tower: { colors: [0xf4ecd8, 0xffffff, 0xe4dcc8], glass: 0, crown: 'flat' },
-      tree: { kind: 'palm', colors: [0x4faf62, 0x62c470], h: 1.25 },
+      tree: { kind: 'palm', colors: [0x6b9834, 0xa0d045], h: 1.25 },
       marks: {
         'CITY START': [{ k: 'calatravaRibs', x: 17 }, { k: 'hemisferic', x: 20 }],
         'RIVERSIDE': [{ k: 'hemisferic', x: 20 }, { k: 'calatravaRibs', x: 17 }],
@@ -516,7 +516,7 @@ MR.World = (function () {
         h: [10.0, 13.0], bay: 3.2, depth: 6.4, rows: 5, hoist: 1, lean: 1,
       },
       tower: { colors: [0x8f6a58, 0xa88070, 0xc8a890], glass: 0, crown: 'flat' },
-      tree: { kind: 'round', colors: [0x429a55, 0x52ae62, 0x64c070], h: 1.15 },
+      tree: { kind: 'round', colors: [0x5f8a2e, 0x84b03a, 0xa8dc4c], h: 1.15 },
       marks: {
         'CITY START': [{ k: 'canal', x: 20, run: 40, alt: 'canalBridge', every: 3, side: -1 }, { k: 'westerkerk', x: 15 }],
         'RIVERSIDE': [{ k: 'canal', x: 20, run: 40, alt: 'canalBridge', every: 3, side: -1 }, { k: 'westerkerk', x: 16 }],
@@ -536,7 +536,7 @@ MR.World = (function () {
         h: [9.0, 11.5], bay: 4.6, depth: 7.2, rows: 4, balcony: 1, chimney: 2,
       },
       tower: { colors: [0xe8c48c, 0xd8a868, 0xf0dcb0], glass: 0, crown: 'flat' },
-      tree: { kind: 'umbrella', colors: [0x2f7a44, 0x3a8f50], h: 1.2 },
+      tree: { kind: 'umbrella', colors: [0x466a24, 0x628c30, 0x88bc3c], h: 1.2 },
       marks: {
         'CITY START': [{ k: 'colosseum', x: 21 }, { k: 'aqueduct', over: 1 }],
         'RIVERSIDE': [{ k: 'colosseum', x: 22 }, { k: 'ship', x: 34, y: -0.12 }],
@@ -558,7 +558,7 @@ MR.World = (function () {
         h: [6.5, 8.0], bay: 4.4, depth: 6.6, rows: 2, stoop: 1,
       },
       tower: { colors: [0xdce4ec, 0xc8d4e0, 0xf0f4f8], glass: 1, crown: 'flat' },
-      tree: { kind: 'scrub', colors: [0x6f9a4a, 0x8fae5a, 0x5f8f56], h: 0.9 },
+      tree: { kind: 'scrub', colors: [0x7d8f38, 0x9cb04c, 0x6a8440], h: 0.9 },
       marks: {
         'CITY START': [{ k: 'tableMountain', x: 72, run: 220, side: -1 }, { k: 'clock', x: 15 }],
         'RIVERSIDE': [{ k: 'tableMountain', x: 78, run: 220, side: -1 }, { k: 'ship', x: 34, y: -0.12 }],
@@ -578,7 +578,7 @@ MR.World = (function () {
       water: 0x2f8fc4, edge: 0xffffff,
       terrace: SETTING_LOOK.LONDON.terrace,
       tower: SETTING_LOOK.LONDON.tower,
-      tree: { kind: 'cone', colors: [0x35a855, 0x3fbf63, 0x59d47a], h: 1 },
+      tree: { kind: 'cone', colors: [0x4e8a2c, 0x6fae38, 0x94d448], h: 1 },
       marks: {}, bridge: 'tower',
     };
   }
@@ -934,6 +934,28 @@ MR.World = (function () {
   /** Low-poly blob, for canopies and anything that must not read as a box. */
   function sph(r, seg, x, y, z, color) {
     return part(new THREE.SphereGeometry(r, seg || 7, Math.max(3, (seg || 7) - 2)), color, x, y, z);
+  }
+
+  /**
+   * The luminance an authored colour comes back at through this renderer's
+   * shaded band, and it is NOT the order the hex suggests.
+   *
+   * Measured by rendering flat swatches through the contrast audit's own
+   * camera: the shaded band returns (0.660R, 0.732G, 0.828B) of the authored
+   * value, so Rec.601 on that is 0.197R + 0.430G + 0.094B -- green carries 60%
+   * of it and blue almost none. Checked against the audit on twenty-four
+   * colours; cream 0xfff2e0 predicts 175.4 and measures 175.5, BLOCK pink
+   * 0xff3b6b predicts 85.7 and measures 85.4.
+   *
+   * It exists so a palette can be SORTED rather than trusted, which is what
+   * vTree's canopy needs -- see the lobe mapping there.
+   */
+  function shadedL(hex) {
+    return 0.197 * ((hex >> 16) & 255) + 0.430 * ((hex >> 8) & 255) + 0.094 * (hex & 255);
+  }
+  /** A crown palette, lightest first. */
+  function canopy(c) {
+    return c.slice().sort(function (x, y) { return shadedL(y) - shadedL(x); });
   }
 
   // ======================================================================
@@ -1366,11 +1388,62 @@ MR.World = (function () {
     }
   }
 
-  /** A tree, by profile. One function, seven silhouettes. */
+  /**
+   * A tree, by profile. One function, seven silhouettes.
+   *
+   * ============ THE LOBES WERE MAPPED TO VALUE BACKWARDS ============
+   *
+   * Measured against `tgr-boulevard`'s nearest foliage and `tgr-taxi-street`
+   * as the control:
+   *
+   *                       reference          ours (authored)
+   *   lit crown        (174,222,54) L 200-209   0x62c470 L 169.1
+   *   mid              (126,174,54) L 155-188   0x4faf5f L 148.9
+   *   shaded underside (102,138,42) L 112-123   0x3f9a52 L 129.4
+   *   lit / shaded          1.70                     1.31
+   *   saturation          0.67-0.76                0.50-0.59
+   *   R / G (hue)         0.75-0.78                0.41-0.50
+   *   bare trunk / height   23-36%                    32%
+   *   lobes per crown        3-5                       4
+   *
+   * Three of those were already right -- lobe count, lobe size spread, bare
+   * trunk fraction -- and three were wrong, one of them badly.
+   *
+   *   THE ORDER. This function used to hand `c[0]`, which is the DARKEST
+   *   colour in every palette, to the biggest highest-volume sphere in the
+   *   middle of the crown, and `c[c.length - 1]`, the lightest, to a LOW side
+   *   lobe. So on a three-colour palette the darkest mass sat in the middle
+   *   and the lightest sat underneath it, which is the opposite of a canopy.
+   *   The palettes are now SORTED by rendered luminance and assigned by the
+   *   lobe's height: lightest at the crown, mid through the body, darkest
+   *   under it. Free, and it is the largest of the three.
+   *
+   *   THE LADDER was 1.31 lit-to-shaded against the reference's 1.70. Every
+   *   palette in SETTING_LOOK now stands in roughly 1.00 : 1.31 : 1.71.
+   *
+   *   THE HUE was a true green at R = 0.41-0.50 of G where the reference is a
+   *   chartreuse at 0.75-0.78. In a renderer whose shaded luminance is
+   *   0.197R + 0.430G + 0.094B, lifting red at constant green is free
+   *   luminance and free warmth, and it is the difference between foliage that
+   *   reads as a lit mass and foliage that reads as a dark hole beside a
+   *   bright road.
+   *
+   * NOT COPIED: the reference's crowns are smooth-shaded with a soft gradient
+   * across each lobe and a translucent edge where the sun comes through.
+   * Lobes do not buy that and are not meant to -- lobes buy OUTLINE, which is
+   * the part that survives a banded ramp. The gradient's transferable
+   * substitute is the 1.70 ladder, and the height ordering is what makes the
+   * ladder read as a canopy rather than as noise.
+   */
   function vTree(parts, o, k) {
     const c = o.colors, s = (o.h || 1) * (k || 1);
-    const trunk = o.trunk === undefined ? 0x8a5a3c : o.trunk;
+    const trunk = o.trunk === undefined ? 0xb0662e : o.trunk;
     const kind = o.kind;
+    // Lightest first, so band(0) is the crown and band(2) the underside. A
+    // two-colour palette collapses the bottom two, which is correct: it has one
+    // fewer step to spend and the step it keeps should be at the top.
+    const v = canopy(c);
+    const band = function (i) { return v[Math.min(i, v.length - 1)]; };
     if (kind === 'palm') {
       // A palm is a bare leaning stem and a burst at the top, and the LEAN is
       // what tells it from a lamp post.
@@ -1384,7 +1457,7 @@ MR.World = (function () {
         const a = (f / 7) * Math.PI * 2;
         parts.push(bx(3.4 * s, 0.14 * s, 0.9 * s,
           tx + Math.cos(a) * 1.5 * s, ty - 0.35 * s, Math.sin(a) * 1.5 * s,
-          c[f % c.length], 0, a, -0.30));
+          band(f % 2), 0, a, -0.30));
       }
       parts.push(sph(0.5 * s, 6, tx, ty, 0, 0x6a4a2c));
     } else if (kind === 'umbrella') {
@@ -1395,20 +1468,23 @@ MR.World = (function () {
       for (let i = 0; i < 5; i++) {
         const a = (i / 5) * 6.283;
         parts.push(sph(1.9 * s, 7, Math.cos(a) * 1.9 * s, 7.4 * s, Math.sin(a) * 1.9 * s,
-          c[i % c.length]));
+          band(1 + (i & 1))));
       }
-      parts.push(sph(2.3 * s, 7, 0, 8.0 * s, 0, c[0]));
+      // The parasol's own top is the lit surface; the ring under its rim is not.
+      parts.push(sph(2.3 * s, 7, 0, 8.0 * s, 0, band(0)));
     } else if (kind === 'columnar') {
       parts.push(cyl(0.16 * s, 0.26 * s, 1.2 * s, 6, 0, 0.6 * s, 0, trunk));
       for (let i = 0; i < 4; i++) {
-        parts.push(cone((1.05 - i * 0.16) * s, 2.2 * s, 7, 0, (1.9 + i * 1.35) * s, 0, c[i % c.length]));
+        // A columnar crown is a stack, so value tracks height straight up it.
+        parts.push(cone((1.05 - i * 0.16) * s, 2.2 * s, 7, 0, (1.9 + i * 1.35) * s, 0,
+          band(3 - i)));
       }
     } else if (kind === 'scrub') {
       // Fynbos: low, dense, many-crowned and never a single trunk.
       const r = lcg(31);
       for (let i = 0; i < 6; i++) {
         parts.push(sph((0.7 + r() * 0.7) * s, 6, (r() - 0.5) * 4 * s, (0.5 + r() * 0.5) * s,
-          (r() - 0.5) * 4 * s, c[i % c.length]));
+          (r() - 0.5) * 4 * s, band(i % v.length)));
       }
     } else if (kind === 'pollard') {
       // The Paris plane tree: a pale stubby trunk under a tight clipped ball.
@@ -1416,20 +1492,37 @@ MR.World = (function () {
       for (const a of [-0.6, 0.6]) {
         parts.push(bx(0.24 * s, 1.4 * s, 0.24 * s, 0, 3.4 * s, 0, trunk, 0, 0, a));
       }
-      parts.push(sph(2.0 * s, 8, 0, 5.0 * s, 0, c[0]));
-      parts.push(sph(1.5 * s, 7, -0.9 * s, 4.3 * s, 0.6 * s, c[1 % c.length]));
-      parts.push(sph(1.4 * s, 7, 0.9 * s, 4.4 * s, -0.7 * s, c[c.length - 1]));
+      parts.push(sph(2.0 * s, 8, 0, 5.0 * s, 0, band(0)));
+      parts.push(sph(1.5 * s, 7, -0.9 * s, 4.3 * s, 0.6 * s, band(1)));
+      parts.push(sph(1.4 * s, 7, 0.9 * s, 4.4 * s, -0.7 * s, band(2)));
     } else if (kind === 'round') {
+      // A FORKED TRUNK. Every trunk in `tgr-taxi-street` and `tgr-boulevard`
+      // splits into two or three branches before it enters the crown, and that
+      // is what stops it reading as a post with a ball on it. Two leaning
+      // 6-segment cylinders off the top of the stem, 24 triangles each.
       parts.push(cyl(0.20 * s, 0.34 * s, 2.6 * s, 6, 0, 1.3 * s, 0, trunk));
-      parts.push(sph(2.0 * s, 8, 0, 4.4 * s, 0, c[0]));
-      parts.push(sph(1.5 * s, 7, -1.4 * s, 3.7 * s, 0.6 * s, c[1 % c.length]));
-      parts.push(sph(1.4 * s, 7, 1.3 * s, 3.9 * s, -0.7 * s, c[2 % c.length]));
-      parts.push(sph(1.2 * s, 7, 0.2 * s, 5.7 * s, 0.3 * s, c[(c.length - 1) % c.length]));
+      parts.push(cyl(0.12 * s, 0.19 * s, 1.7 * s, 6, -0.30 * s, 3.30 * s, 0.10 * s, trunk, 0, 0, 0.30));
+      parts.push(cyl(0.11 * s, 0.18 * s, 1.5 * s, 6, 0.30 * s, 3.20 * s, -0.12 * s, trunk, 0, 0, -0.34));
+      // SIX LOBES, not four -- 2.0 / 1.6 / 1.5 / 1.4 / 1.2 / 0.9, a 2.2:1
+      // spread against the reference's visibly clustered 3-5 per crown. The two
+      // extra go LOW AND OUTBOARD, which is the only place a lobe earns
+      // anything: it breaks the crown's outline against the sky.
+      //
+      // The two smallest are 6-segment rather than 7. At 60 units a 0.9-unit
+      // lobe is nine pixels across and the segment count does not resolve; the
+      // pair costs 72 triangles that way instead of 112, which is a real saving
+      // for no read, and the crown is 320 triangles against 248.
+      parts.push(sph(2.0 * s, 8, 0, 4.40 * s, 0, band(1)));
+      parts.push(sph(1.6 * s, 7, -1.45 * s, 4.05 * s, 0.55 * s, band(1)));
+      parts.push(sph(1.5 * s, 7, 1.35 * s, 4.25 * s, -0.65 * s, band(1)));
+      parts.push(sph(1.4 * s, 7, -1.05 * s, 3.15 * s, -0.85 * s, band(2)));
+      parts.push(sph(1.2 * s, 6, 0.20 * s, 5.70 * s, 0.30 * s, band(0)));
+      parts.push(sph(0.9 * s, 6, 1.55 * s, 3.05 * s, 0.75 * s, band(2)));
     } else {
       parts.push(cyl(0.17 * s, 0.26 * s, 1.3 * s, 6, 0, 0.65 * s, 0, trunk));
-      parts.push(cone(1.30 * s, 1.7 * s, 8, 0, 2.0 * s, 0, c[0]));
-      parts.push(cone(1.05 * s, 1.5 * s, 8, 0, 2.9 * s, 0, c[1 % c.length]));
-      parts.push(cone(0.75 * s, 1.2 * s, 8, 0, 3.7 * s, 0, c[2 % c.length]));
+      parts.push(cone(1.30 * s, 1.7 * s, 8, 0, 2.0 * s, 0, band(2)));
+      parts.push(cone(1.05 * s, 1.5 * s, 8, 0, 2.9 * s, 0, band(1)));
+      parts.push(cone(0.75 * s, 1.2 * s, 8, 0, 3.7 * s, 0, band(0)));
     }
   }
 

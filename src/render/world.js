@@ -6460,27 +6460,130 @@ MR.World = (function () {
     }, group);
 
     /**
-     * Grandstand: stepped seating packed with spectators, for FINAL MILE.
-     * Built on +x and rotated a half-turn for the other side rather than
-     * mirrored with a negative scale, which would invert its normals.
+     * ============ GRANDSTAND: FINAL MILE, BOTH SHOULDERS, EVERY TILE ========
+     *
+     * Stepped seating packed with spectators. Built on +x and rotated a
+     * half-turn for the other side rather than mirrored with a negative scale,
+     * which would invert its normals.
+     *
+     * SEAT PITCH IS THE WHOLE ARGUMENT, and it was set four times too loose.
+     * Eleven spectators over a 24-unit tile is a pitch of 2.15 units against a
+     * body 0.40 wide -- five body widths of empty bench between neighbours.
+     * That is not a stand at a marathon finish, it is a stand at a reserve-team
+     * fixture, and it is visible in a still: on the nearest tile the front row
+     * reads as separated blocks with the deck showing through between them.
+     *
+     * The pitch that closes it is a projection, not a taste. The stand lies
+     * almost along the view, so a figure's projected width and the projected
+     * gap between figures shrink at different rates -- the width is dominated
+     * by the 0.40 face turned toward the camera, the gap by the pitch seen at
+     * the grazing angle atan(5.85 / d):
+     *
+     *   d = 15   angle 21.3 deg   figure 0.475 wide   pitch x 0.364
+     *   d = 24         13.7             0.455                0.237
+     *   d = 60          5.6             0.421                0.097
+     *
+     * So a row closes when pitch x sin(angle) < figure width, which at the
+     * nearest tile the player ever sees needs pitch < 1.30 and at 24 units
+     * needs 1.92. Past 40 units every pitch under 2.15 is already overlapping.
+     * 0.97 -- twenty-four to a tile -- closes the front row at the closest
+     * approach with a body-width to spare and overlaps everywhere behind it,
+     * which is what a full stand does.
+     *
+     * THE RANK AT THE RAIL is the FINAL MILE roadside crowd, put where it can
+     * be seen. Commit 5336124 correctly found that the nine-figure crowd knots
+     * from the roadside lottery stand at x 5.65 to 9.05 and the grandstands
+     * that run this entire leg occupy 5.40 outward -- so every knot in the last
+     * mile was inside a grandstand and 10,080 triangles of spectators had never
+     * been visible. Deleting them was right. Leaving the last mile with no
+     * standing crowd at all was not: there is no ground-level slot left on this
+     * leg -- the barrier is at 4.60, the seating starts at 5.40 and the street
+     * wall is at 12.2 -- so the crowd belongs on the strip between the barrier
+     * and the first bench, which is exactly where a real finish straight puts
+     * it. Seventeen standing figures a tile, on their feet, with arms up and
+     * placards: the knot's people, in the only place they read.
+     *
+     * FAIRNESS. Local x runs outward from an object standing at
+     * TRACK_HALF_WIDTH + 1.3 = 5.05. The rail rank sits at local 0.14 +/- 0.10,
+     * so the nearest triangle in the whole object is an arm at 4.76 -- outside
+     * the barrier's road face at 4.65, and a full unit outside CORRIDOR_HALF.
+     * The wave shader can sway a body 0.085 x amplitude x excitement, at most
+     * 0.13 on an arm, which still leaves it outside the barrier and 0.9 clear
+     * of the corridor at the peak of an ovation.
+     * Raised arms go straight up rather than leaning out, so they cannot reach
+     * past the torso; the placards are centred on the body for the same reason.
+     * Nothing here reaches over the carriageway at any height.
      */
     const standGeo = (function () {
       const parts = [];
-      const shirts = [0xff4d5e, 0x37d6ff, 0xffe45e, 0x59d47a, 0xff9ad5, 0xffb020];
-      let s = 7717;
-      const r = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+      const shirts = [0xff4d5e, 0x37d6ff, 0xffe45e, 0x59d47a, 0xff9ad5, 0xffb020,
+                      0xfff2e0, 0x9a7bff];
+      const skins = [0xffc79a, 0xe0a173, 0xb87a4e, 0x8a5a3c];
+      const signs = [0xffe45e, 0xfffdf5, 0x37d6ff, 0xff9ad5, 0xff4d5e];
+      const r = lcg(7717);
+
+      // ---- the rank at the rail ------------------------------------------
+      const RAIL_N = 17;
+      for (let i = 0; i < RAIL_N; i++) {
+        const z = -TILE / 2 + 0.9 + i * ((TILE - 1.8) / (RAIL_N - 1)) + (r() - 0.5) * 0.5;
+        const x = 0.14 + (r() - 0.5) * 0.20;
+        const h = 0.90 + r() * 0.24;
+        const shirt = shirts[Math.floor(r() * shirts.length)];
+        const skin = skins[Math.floor(r() * skins.length)];
+        const ph = z * 0.53 + r() * 2.4;
+        parts.push(wv(bx(0.36, 0.64 * h, 0.26, x, 0.32 * h, z, 0x2b2f52), ph, 0.55));
+        parts.push(wv(bx(0.50, 0.68 * h, 0.32, x, 0.99 * h, z, shirt), ph, 1.1));
+        parts.push(wv(bx(0.30, 0.30, 0.28, x, 1.48 * h, z, skin), ph, 1.1));
+        const k = i % 3;
+        if (k === 0) {
+          // Straight up, not splayed: a leaning arm is the one part of this
+          // object that could reach past the barrier line, and the read is in
+          // the arm being ABOVE the head, not in where its hand is.
+          parts.push(wv(bx(0.13, 0.60, 0.13, x - 0.26, 1.44 * h, z, skin), ph, 1.7));
+          parts.push(wv(bx(0.13, 0.60, 0.13, x + 0.26, 1.44 * h, z, skin), ph, 1.7));
+        } else if (k === 1) {
+          parts.push(wv(bx(0.10, 0.80, 0.10, x, 1.72 * h, z, 0x8a5a3c), ph, 1.9));
+          parts.push(wv(bx(0.50, 0.38, 0.06, x, 2.12 * h, z,
+            signs[Math.floor(r() * signs.length)]), ph, 2.2));
+        } else {
+          parts.push(wv(bx(0.13, 0.48, 0.13, x - 0.28, 1.02 * h, z, shirt), ph, 1.0));
+          parts.push(wv(bx(0.13, 0.48, 0.13, x + 0.28, 1.02 * h, z, shirt), ph, 1.0));
+        }
+      }
+
+      // ---- the seating ----------------------------------------------------
+      const SEAT_N = 20;
       for (let row = 0; row < 5; row++) {
         const y = row * 0.74;
         const x = 0.9 + row * 1.10;
         parts.push(bx(1.10, 0.74, TILE, x, y + 0.37, 0, row % 2 ? 0x8e99c6 : 0x6f7aa8));
-        for (let i = 0; i < 11; i++) {
-          const z = -TILE / 2 + 1.2 + i * 2.15 + r() * 0.5;
+        for (let i = 0; i < SEAT_N; i++) {
+          const z = -TILE / 2 + 0.85 + i * ((TILE - 1.7) / (SEAT_N - 1)) + (r() - 0.5) * 0.44;
           // Phase off the seat, not off a counter: neighbours in a row are a
           // beat apart and the rows are offset from each other, which is what
           // keeps a stand from pumping like one object.
           const ph = z * 0.42 + row * 1.7 + r() * 1.4;
-          parts.push(wv(bx(0.40, 0.48, 0.28, x - 0.1, y + 0.98, z, shirts[Math.floor(r() * shirts.length)]), ph));
-          parts.push(wv(bx(0.22, 0.22, 0.20, x - 0.1, y + 1.33, z, 0xffc79a), ph));
+          const shirt = shirts[Math.floor(r() * shirts.length)];
+          const skin = skins[Math.floor(r() * skins.length)];
+          // The back row is on its feet, and one in six of the rest with it.
+          // A row of seated heads is a straight line, and a straight line of
+          // heads is the thing that makes a stand read as upholstery. What
+          // breaks it is people STANDING among the seated -- an irregular top
+          // edge that survives to any distance the row itself does, because it
+          // is a change in the silhouette rather than in its detail.
+          const up = (i % 5) === 3;
+          const lift = up ? 0.52 : 0;
+          if (up) parts.push(wv(bx(0.30, 0.52, 0.24, x - 0.1, y + 0.98, z, 0x2b2f52), ph, 0.5));
+          parts.push(wv(bx(0.40, 0.48, 0.28, x - 0.1, y + 0.98 + lift, z, shirt), ph));
+          parts.push(wv(bx(0.22, 0.22, 0.20, x - 0.1, y + 1.33 + lift, z, skin), ph));
+          // One in four with both arms over their head. At the nearest tile an
+          // arm is 3.3px wide and 15px tall, at 60 units 1.3 x 6 -- and even
+          // where it stops resolving as an arm it is still a lighter fringe
+          // above the row, which is the part that was doing the work.
+          if ((i % 5) === 1) {
+            parts.push(wv(bx(0.11, 0.46, 0.11, x - 0.1, y + 1.62 + lift, z - 0.16, skin), ph, 1.6));
+            parts.push(wv(bx(0.11, 0.46, 0.11, x - 0.1, y + 1.62 + lift, z + 0.16, skin), ph, 1.6));
+          }
         }
       }
       for (const z of [-TILE / 2 + 1, TILE / 2 - 1]) {

@@ -6026,7 +6026,24 @@ MR.World = (function () {
         // silhouette of a lift, not of a crowd. Individually phased on the
         // GPU it costs nothing and nine people jump at nine different moments.
         const ph = i * 1.31 + r() * 2.2;
-        parts.push(wv(bx(0.32, 0.60 * h, 0.24, x, 0.30 * h, z, 0x2b2f52), ph, 0.55));
+        // TWO LEGS, AND THEY REACH UP INSIDE THE TORSO. Two faults at the
+        // distance a knot is actually passed at -- 13 units, where a figure is
+        // 14px wide and 50px tall, not the speck this file's older comments
+        // assume. One slab of navy is not a pair of legs, and it is the only
+        // part of this figure with no articulation at all when the walkers
+        // twenty lines down already stand mid-stride.
+        //
+        // The second is the tear. The wave shader lifts by amplitude, so a
+        // 0.45 difference between legs and body opens a real gap between them
+        // -- up to 0.41 world units at full ovation, 19px at 13 units, and it
+        // is visible in a still as daylight under a floating torso. The legs
+        // now run to 0.86h, a quarter of the body's height up inside the
+        // shirt, so the differential SLIDES inside the torso instead of
+        // parting from it; and it is 0.80 rather than 0.55, which keeps the
+        // feet near the pavement without stretching the man.
+        for (const lx of [-0.13, 0.13]) {
+          parts.push(wv(bx(0.16, 0.86 * h, 0.24, x + lx, 0.43 * h, z, 0x2b2f52), ph, 0.80));
+        }
         parts.push(wv(bx(0.46, 0.62 * h, 0.32, x, 0.92 * h, z, shirt), ph));
         parts.push(wv(bx(0.28, 0.28, 0.26, x, 1.38 * h, z, skin), ph));
         parts.push(wv(bx(0.30, 0.10, 0.28, x, 1.52 * h, z, 0x3a2b46), ph));
@@ -6607,7 +6624,10 @@ MR.World = (function () {
         const shirt = shirts[Math.floor(r() * shirts.length)];
         const skin = skins[Math.floor(r() * skins.length)];
         const ph = z * 0.53 + r() * 2.4;
-        parts.push(wv(bx(0.36, 0.64 * h, 0.26, x, 0.32 * h, z, 0x2b2f52), ph, 0.55));
+        // Legs to 0.88h so they run up inside the shirt: the wave lifts by
+        // amplitude and anything that differs from the torso's has to slide
+        // within it rather than part from it. See crowdGeo.
+        parts.push(wv(bx(0.36, 0.88 * h, 0.26, x, 0.44 * h, z, 0x2b2f52), ph, 0.85));
         parts.push(wv(bx(0.50, 0.68 * h, 0.32, x, 0.99 * h, z, shirt), ph, 1.1));
         parts.push(wv(bx(0.30, 0.30, 0.28, x, 1.48 * h, z, skin), ph, 1.1));
         const k = i % 3;
@@ -6763,7 +6783,10 @@ MR.World = (function () {
             const shirt = shirts[Math.floor(r() * shirts.length)];
             const skin = skins[Math.floor(r() * skins.length)];
             const ph = z * 0.55 + row * 2.3 + r() * 2.0;
-            parts.push(wv(bx(0.36, 0.66 * h, 0.26, rx, 0.33 * h, z, 0x2b2f52), ph, 0.6));
+            // Legs up inside the shirt and within 0.3 of its amplitude, so the
+            // wave cannot open daylight between a body and its own legs. This
+            // is the crowd the player is closest to in the game. See crowdGeo.
+            parts.push(wv(bx(0.36, 0.92 * h, 0.26, rx, 0.46 * h, z, 0x2b2f52), ph, 0.85));
             parts.push(wv(bx(0.50, 0.70 * h, 0.34, rx, 1.02 * h, z, shirt), ph, 1.15));
             parts.push(wv(bx(0.30, 0.30, 0.28, rx, 1.52 * h, z, skin), ph, 1.15));
             // One in three has both arms over their head, one in three is

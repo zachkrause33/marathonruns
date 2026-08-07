@@ -81,9 +81,10 @@ MR.Camera = (function () {
   // distance d sits atan(eye / d) below the horizon, so raising the eye
   // stretches the whole road down the frame in proportion -- the 25-to-150
   // band, which is everything the player can still do something about, goes
-  // from 4.99 degrees to 5.88 -- and it pushes the already-committed road
-  // nearer than 25 units toward the bottom edge and off it. That band was
-  // getting 0.108 of NDC height while the committed road got 1.037.
+  // from 4.75 degrees to 5.64, +18.7%, measured over twenty-two frames of a
+  // real race. It does NOT push the already-committed road off the bottom of
+  // the frame -- that band grows by the same scaling. The road as a whole takes
+  // frame from the sky, and the future's share of it rises.
   const BASE_Y = K.CAM_BASE_Y;
   const BASE_BACK = K.CAM_BASE_BACK;
   const LOOK_Y = 1.16;
@@ -96,8 +97,8 @@ MR.Camera = (function () {
   // for the far road instead of buying more of the runner's own shadow.
   //
   // It also drops the runner in frame, which is where the reference framing puts
-  // him (see the header): measured, his feet go from -0.583 to -0.696 of NDC
-  // height while his overall size barely moves, 0.504 to 0.491.
+  // him (see the header): measured, his feet go from -0.572 to -0.700 in NDC
+  // while his overall size barely moves, 0.2388 of frame height to 0.2330.
   //
   // Not larger than 11.0. The aim point is what the mile flourish, the jump arc
   // and the finish run-in all modulate from, and past about twelve units the

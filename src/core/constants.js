@@ -324,13 +324,13 @@ MR.K = (function () {
     // WHAT IT BUYS. Road at distance d sits atan(eye / d) below the horizon, so
     // for small angles the whole road stretches down the frame IN PROPORTION TO
     // THE EYE. The band from 25 to 150 units -- everything still undecided --
-    // subtended 4.86 degrees at the live eye of 2.56 and subtends 5.80 at 3.05,
-    // +19%, and its share of frame height goes 0.0495 to 0.0587. Measured over
-    // ten frames across a real race at 620x1344, not derived.
+    // subtended 4.75 degrees at the live eye of 2.50 and subtends 5.64 at 2.97,
+    // +18.7%, and its share of frame height goes 0.0504 to 0.0599. Measured
+    // over twenty-two frames across a real race at 620x1344, not derived.
     //
     // AND IT DOES NOT DO WHAT THE FIRST DRAFT OF THIS COMMENT CLAIMED. It does
     // not push the already-committed road off the bottom of the frame: that
-    // band grows too, 0.3005 to 0.3494, because the same atan scaling applies
+    // band grows too, 0.3051 to 0.3579, because the same atan scaling applies
     // to it. What actually happens is that the road as a whole takes frame from
     // the sky and the scenery above the horizon, and the future's share of it
     // rises. The gain is real and it is 19%, not a reapportionment.
@@ -351,16 +351,23 @@ MR.K = (function () {
     // settled rather than argued.
     //
     // The cost is small and was measured, not assumed: the runner goes from
-    // 0.2321 of frame height to 0.2229, a 4% loss, and his feet drop from
-    // -0.554 to -0.671 -- further down the frame, which is where the Subway
+    // 0.2388 of frame height to 0.2330, a 2.4% loss, and his feet drop from
+    // -0.572 to -0.700 -- further down the frame, which is where the Subway
     // Surfers and Sonic references put theirs.
     //
-    // Together with the spacing floor in course.js, over the same ten frames:
-    // mean share of an upcoming gate the player can actually see goes 75.3% to
-    // 86.2%, gates under half visible 13 to 5, gates fully blank 6 to 2. The
-    // camera on its own accounts for about 5 of those 11 points (swept
-    // separately at a fixed eye offset before either change was written); the
-    // spacing floor accounts for the rest. Neither alone was enough.
+    // WHAT IT AND THE SPACING FLOOR TOGETHER DO TO WHAT THE PLAYER CAN SEE,
+    // over twenty-two frames of a real race, 114 gates before and 110 after:
+    //
+    //   mean share of an upcoming gate visible   76.0%  ->  80.4%
+    //   gates under half visible                 29     ->  24
+    //   gates fully blank                        13     ->   6
+    //
+    // AND THE FIRST VERSION OF THIS COMMENT SAID 86.2%, off ten frames. That
+    // was not a typo, it was too small a sample read as a result: the same
+    // measurement on twenty-two frames is 80.4%, so the ten-frame figure
+    // overstated the gain by more than double. The number that survives is the
+    // one above. Halving the fully-blank gates is the honest headline; the
+    // mean moves 4.4 points, which is real and is not a transformation.
     CAM_BASE_Y,
     CAM_BASE_BACK,
     // What the sightline is actually derived against. The camera drops 0.20 at

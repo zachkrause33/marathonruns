@@ -90,6 +90,12 @@
   let countT = 0;
   let lastStep = 0;
   let mileShown = 0;
+  // Edge detectors for the two cues that mark a change of situation rather
+  // than an event. Neither has anything else on screen at the moment it
+  // happens, which is why they are worth a sound: the record going out of
+  // reach is silent today, and so is dropping a rung of the ladder.
+  let recordGone = false;
+  let tierIdx = -1;
 
   function reset() {
     clearTimeout(endTimer);
@@ -104,6 +110,8 @@
     controls.clear();
     mileShown = 0;
     lastStep = 0;
+    recordGone = false;
+    tierIdx = -1;
     runner.phase = 0;
     ghost.reset();
     hud.hideEnd();
@@ -257,11 +265,22 @@
       }
 
       // Aid taken this step. Streak only -- pace still has one source.
+      //
+      // resolveAid walks the index past every item the runner drew level with
+      // and returns only the ones whose lane matched, so the difference is the
+      // count that went by untaken. That is the one event in the run which is
+      // pure loss and has nothing to mark it: no contact, no flash, the streak
+      // simply fails to go up. Hence a sound and nothing else -- a toast here
+      // would be scolding, and the readout is being cut, not grown.
+      const aidIdxBefore = player.aidIdx;
+      let aidTaken = 0;
       for (const item of player.resolveAid(course, before, after)) {
         pace.onAid(item.gain);
         audio.aid(item.kind === 'banana');
+        aidTaken++;
         if (item.kind === 'banana') hud.toastAid('FUEL', '+' + item.gain + ' STREAK');
       }
+      if (player.aidIdx - aidIdxBefore > aidTaken) audio.aidMissed();
 
       // Player events -> audio.
       for (const e of player.drainEvents()) {
@@ -290,7 +309,20 @@
         audio.mile(sp.mile);
       }
 
-      audio.setIntensity(Math.min(1, pace.streak / 70));
+      // Unclamped, deliberately. The old min(1, ...) saturated at streak 70 on
+      // a course of 205 gates, so the mix stopped responding around mile 11 of
+      // 26 -- the same defect the audio probe found in clean(), which had gone
+      // flat at streak 90. audio.setIntensity reads a value above 1.0 as the
+      // raw streak/70 and keeps climbing.
+      audio.setIntensity(pace.streak / 70);
+
+      // The record slipping out of reach, and the ladder moving under you.
+      // Both are changes of situation rather than events, both are currently
+      // silent, and both are edges -- fired once at the crossing, never held.
+      if (!recordGone && !pace.recordPossible()) { recordGone = true; audio.recordLost(); }
+      const tNow = MR.Tier.of(pace.projected()).i;
+      if (tierIdx >= 0 && tNow !== tierIdx) audio.tier(tNow < tierIdx);
+      tierIdx = tNow;
 
       if (pace.finished) {
         state = DONE;

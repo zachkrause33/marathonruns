@@ -4209,7 +4209,11 @@ MR.World = (function () {
       // silhouette being a flat slab with a scribble on it.
       parts.push(bxAt(0.09, 0.60, 0.09, 0.83, 0.50, 0.26, 0xff7a1f, 0, 0, 0.42));
       parts.push(bxAt(0.40, 0.08, 0.09, 0.68, 0.72, 0.26, 0x2b2f52));
-      parts.push(bxAt(0.75, 0.10, 0.22, 1.13, 0.30, 0.26, 0xfff2e0));
+      // 0.62 wide at 0.80 out, NOT 0.75 at 1.13. The wider version reached
+      // x = 1.19, past the 1.118 HAZARD_HALF this file derives its clearances
+      // from and 0.24 further out than any other JUMP -- two hazards in
+      // adjacent lanes would have interpenetrated.
+      parts.push(bxAt(0.62, 0.10, 0.22, 0.80, 0.30, 0.26, 0xfff2e0));
       return merge(parts);
     })();
 
@@ -4424,7 +4428,10 @@ MR.World = (function () {
       hbx(2.20, 0.20, 1.26, 0, 0.10, 0, 0x2b2f52),
       hbx(2.16, 0.74, 1.26, 0, 0.57, 0, 0xff3b6b),   // lower body 0.20-0.94
       hbx(2.24, 0.24, 1.30, 0, 1.06, 0, 0xfff2e0),   // waist band 0.94-1.18
-      hbx(2.20, 0.54, 1.32, 0, 1.45, 0, GLASS),      // glazing 1.18-1.72
+      // 1.30 deep, so its rear plane is EXACTLY -0.65 and a train leaves it
+      // there. At 1.32 the glass crept 0.046 behind the gate line on a
+      // four-car tram.
+      hbx(2.20, 0.54, 1.30, 0, 1.45, 0, GLASS),      // glazing 1.18-1.72
       hbx(2.24, 0.38, 1.30, 0, 1.91, 0, 0xfff2e0),   // destination panel 1.72-2.10
       hbx(2.16, 0.14, 1.26, 0, 2.17, 0, 0xff3b6b),   // header 2.10-2.24
       hbx(2.24, 0.10, 1.30, 0, 2.29, 0, 0xfff2e0),   // roof rail 2.24-2.34
@@ -4656,10 +4663,10 @@ MR.World = (function () {
      * sits on the road, a bus stands over it.
      */
     const blockBusGeo = merge([
-      bxAt(0.34, 0.46, 0.50, -0.92, 0.23, -0.24, 0x1e2140),
-      bxAt(0.34, 0.46, 0.50, 0.92, 0.23, -0.24, 0x1e2140),
-      bxAt(0.32, 0.42, 0.46, -0.92, 0.21, 0.42, 0x1e2140),
-      bxAt(0.32, 0.42, 0.46, 0.92, 0.21, 0.42, 0x1e2140),
+      bxAt(0.34, 0.46, 0.50, -0.98, 0.23, -0.24, 0x1e2140),
+      bxAt(0.34, 0.46, 0.50, 0.98, 0.23, -0.24, 0x1e2140),
+      bxAt(0.32, 0.42, 0.46, -0.98, 0.21, 0.42, 0x1e2140),
+      bxAt(0.32, 0.42, 0.46, 0.98, 0.21, 0.42, 0x1e2140),
       hbx(2.10, 0.26, 1.20, 0, 0.55, 0, 0x2b2f52),   // underframe 0.42-0.68
       hbx(2.20, 0.60, 1.26, 0, 0.98, 0, 0xff3b6b),   // lower body 0.68-1.28
       hbx(2.24, 0.34, 1.28, 0, 1.45, 0, 0xfff2e0),   // livery band 1.28-1.62
@@ -4691,20 +4698,27 @@ MR.World = (function () {
      * band is mass rather than a spike.
      */
     const blockTaxiGeo = merge([
-      bxAt(0.32, 0.38, 0.44, -0.90, 0.19, -0.30, 0x1e2140),
-      bxAt(0.32, 0.38, 0.44, 0.90, 0.19, -0.30, 0x1e2140),
-      bxAt(0.32, 0.38, 0.44, -0.90, 0.19, 0.36, 0x1e2140),
-      bxAt(0.32, 0.38, 0.44, 0.90, 0.19, 0.36, 0x1e2140),
+      bxAt(0.32, 0.38, 0.44, -0.96, 0.19, -0.30, 0x1e2140),
+      bxAt(0.32, 0.38, 0.44, 0.96, 0.19, -0.30, 0x1e2140),
+      bxAt(0.32, 0.38, 0.44, -0.96, 0.19, 0.36, 0x1e2140),
+      bxAt(0.32, 0.38, 0.44, 0.96, 0.19, 0.36, 0x1e2140),
       hbx(2.06, 0.24, 1.16, 0, 0.42, 0, 0x2b2f52),    // sills 0.30-0.54
-      hbx(2.18, 0.36, 1.26, 0, 0.72, 0, 0xff3b6b),    // body 0.54-0.90
-      hbx(2.22, 0.20, 1.28, 0, 1.00, 0, 0xfff2e0),    // chequer band 0.90-1.10
-      hbx(1.68, 0.40, 1.02, 0, 1.30, 0.02, GLASS),    // greenhouse 1.10-1.50
-      hbx(1.56, 0.10, 0.94, 0, 1.55, 0.02, 0xfff2e0), // roof 1.50-1.60
-      hbx(0.86, 0.28, 0.30, 0, 1.74, 0.34, 0xffe45e), // roof sign
-      hbx(1.34, 0.34, 0.58, 0, 1.79, -0.16, 0xd42a55),// case 1.62-1.96
-      hbx(1.08, 0.30, 0.50, 0, 2.11, -0.16, 0xfff2e0),// case 1.96-2.26
-      bxAt(0.28, 0.14, 0.10, -0.94, 0.86, -0.60, 0xffe45e),
-      bxAt(0.28, 0.14, 0.10, 0.94, 0.86, -0.60, 0xffe45e),
+      hbx(2.18, 0.38, 1.26, 0, 0.73, 0, 0xff3b6b),    // body 0.54-0.92
+      hbx(2.22, 0.18, 1.28, 0, 1.01, 0, 0xfff2e0),    // chequer band 0.92-1.10
+      hbx(1.50, 0.42, 1.00, 0, 1.31, 0.02, GLASS),    // greenhouse 1.10-1.52
+      hbx(1.36, 0.10, 0.90, 0, 1.57, 0.02, 0xfff2e0), // roof 1.52-1.62
+      // ONE roof element, not a pile. The first pass put a sign at the front of
+      // the roof and two strapped cases behind it, and at gameplay scale that
+      // read as a stack of boxes with a car underneath rather than as a taxi --
+      // the sign was also completely hidden behind the cases from the only
+      // angle this game has. A single illuminated rank panel is one shape, it
+      // is narrower than the roof so the taper carries up through it, and it
+      // takes the top to 2.28 against the 2.05 jump apex.
+      hbx(1.14, 0.12, 0.30, 0, 1.68, -0.04, 0xd42a55),
+      hbx(1.24, 0.42, 0.32, 0, 1.95, -0.04, 0xfff2e0),
+      hbx(1.28, 0.12, 0.34, 0, 2.22, -0.04, 0xff3b6b),
+      bxAt(0.28, 0.14, 0.10, -0.96, 0.80, -0.60, 0xffe45e),
+      bxAt(0.28, 0.14, 0.10, 0.96, 0.80, -0.60, 0xffe45e),
       hbx(2.22, 0.14, 0.14, 0, 0.62, -0.58, 0xd42a55),
     ]);
 
@@ -4729,10 +4743,10 @@ MR.World = (function () {
      * side lane, where you see the flank rather than the tail.
      */
     const blockVanGeo = merge([
-      bxAt(0.34, 0.44, 0.50, -0.92, 0.22, -0.22, 0x1e2140),
-      bxAt(0.34, 0.44, 0.50, 0.92, 0.22, -0.22, 0x1e2140),
-      bxAt(0.30, 0.40, 0.44, -0.92, 0.20, 0.44, 0x1e2140),
-      bxAt(0.30, 0.40, 0.44, 0.92, 0.20, 0.44, 0x1e2140),
+      bxAt(0.34, 0.44, 0.50, -0.98, 0.22, -0.22, 0x1e2140),
+      bxAt(0.34, 0.44, 0.50, 0.98, 0.22, -0.22, 0x1e2140),
+      bxAt(0.30, 0.40, 0.44, -0.98, 0.20, 0.42, 0x1e2140),
+      bxAt(0.30, 0.40, 0.44, 0.98, 0.20, 0.42, 0x1e2140),
       hbx(2.08, 0.24, 1.16, 0, 0.48, 0, 0x2b2f52),      // chassis 0.36-0.60
       hbx(2.22, 1.88, 0.80, 0, 1.54, -0.21, 0xff3b6b),  // the box 0.60-2.48
       hbx(2.26, 0.12, 0.84, 0, 2.54, -0.21, 0xfff2e0),  // roof lip
@@ -4746,7 +4760,7 @@ MR.World = (function () {
       hbx(1.48, 1.42, 0.06, 0, 1.47, -0.60, 0x3a4270),  // load space 0.76-2.18
       hbx(1.34, 0.60, 0.08, 0, 1.06, -0.61, 0xfff2e0),  // parcels 0.76-1.36
       hbx(1.10, 0.44, 0.08, 0, 1.58, -0.61, 0xf0e4d0),  // parcels 1.36-1.80
-      hbx(1.52, 0.28, 0.09, 0, 2.04, -0.62, 0xfff2e0),  // shutter valance 1.90-2.18
+      hbx(1.52, 0.28, 0.09, 0, 2.04, -0.605, 0xfff2e0), // shutter valance 1.90-2.18
       bxAt(0.08, 1.54, 0.40, -1.14, 1.48, -0.42, 0xfff2e0),  // door leaves, flat
       bxAt(0.08, 1.54, 0.40, 1.14, 1.48, -0.42, 0xfff2e0),
       bxAt(0.26, 0.14, 0.10, -0.96, 0.72, -0.60, 0xffe45e),
@@ -4765,21 +4779,33 @@ MR.World = (function () {
      * 2.80 -- exactly the 2.80 the collision box records -- finish it.
      */
     const blockRefuseGeo = merge([
-      bxAt(0.32, 0.44, 0.44, -0.92, 0.22, -0.06, 0x1e2140),
-      bxAt(0.32, 0.44, 0.44, 0.92, 0.22, -0.06, 0x1e2140),
-      bxAt(0.30, 0.40, 0.42, -0.92, 0.20, 0.44, 0x1e2140),
-      bxAt(0.30, 0.40, 0.42, 0.92, 0.20, 0.44, 0x1e2140),
+      bxAt(0.32, 0.44, 0.44, -0.98, 0.22, -0.06, 0x1e2140),
+      bxAt(0.32, 0.44, 0.44, 0.98, 0.22, -0.06, 0x1e2140),
+      bxAt(0.30, 0.40, 0.42, -0.98, 0.20, 0.44, 0x1e2140),
+      bxAt(0.30, 0.40, 0.42, 0.98, 0.20, 0.44, 0x1e2140),
       hbx(2.06, 0.26, 1.14, 0, 0.47, 0, 0x2b2f52),      // chassis 0.34-0.60
-      hbx(2.16, 1.92, 0.60, 0, 1.56, 0.32, 0xff3b6b),   // packer body 0.60-2.52
-      hbx(2.22, 0.12, 0.64, 0, 2.58, 0.32, 0xfff2e0),   // body cap 2.52-2.64
-      hbx(2.24, 1.32, 0.62, 0, 1.26, -0.30, 0xd42a55),  // hopper 0.60-1.92
-      hbx(2.18, 0.14, 0.64, 0, 1.99, -0.30, 0xfff2e0),  // hopper cap 1.92-2.06
-      hbx(1.42, 0.46, 0.06, 0, 1.30, -0.60, 0x141a33),  // the throat
-      bxAt(0.09, 0.74, 0.09, -0.98, 1.68, -0.60, 0xffe45e),  // grab rails
-      bxAt(0.09, 0.74, 0.09, 0.98, 1.68, -0.60, 0xffe45e),
-      hbx(1.24, 0.12, 0.16, 0, 0.68, -0.57, 0xfff2e0),  // rear step
-      bxAt(0.26, 0.14, 0.10, -0.98, 0.86, -0.60, 0xffe45e),
-      bxAt(0.26, 0.14, 0.10, 0.98, 0.86, -0.60, 0xffe45e),
+      // THE STEP HAS TO BE A VALUE STEP, not only a height one. The first pass
+      // made both halves pink and the whole truck came back a flat slab with a
+      // bar across it: from directly behind you see the hopper's face and, above
+      // its cap, the packer body's face, and two pink faces in the same lane
+      // read as one wall however far apart their tops are. The body is cream now
+      // and the hopper is pink, so the tail is a pink block with a pale block
+      // standing behind it -- which is the shape, and nothing else on this road
+      // has two roof heights to make it with.
+      hbx(2.14, 0.62, 0.60, 0, 2.19, 0.32, 0xfff2e0),   // packer body 1.88-2.50
+      hbx(2.20, 0.14, 0.64, 0, 2.57, 0.32, 0xd42a55),   // body cap 2.50-2.64
+      hbx(2.24, 1.16, 0.62, 0, 1.18, -0.30, 0xff3b6b),  // hopper 0.60-1.76
+      hbx(2.18, 0.12, 0.66, 0, 1.82, -0.30, 0xd42a55),  // hopper cap 1.76-1.88
+      hbx(1.42, 0.34, 0.06, 0, 1.41, -0.60, 0x141a33),  // the throat 1.24-1.58
+      // The reflective band every refuse truck carries above its throat, and
+      // the last 8 luminance this variant needed: it was the tightest thing in
+      // the whole vocabulary at 1.26x the centre lane.
+      hbx(2.26, 0.18, 0.10, 0, 1.67, -0.60, 0xfff2e0),  // 1.58-1.76
+      // Bin-lift arms, and they are thick because at gameplay scale the 0.09
+      // grab rails they replaced were two amber slivers nobody could name.
+      bxAt(0.15, 1.00, 0.10, -0.95, 1.20, -0.60, 0xffe45e),
+      bxAt(0.15, 1.00, 0.10, 0.95, 1.20, -0.60, 0xffe45e),
+      hbx(1.24, 0.12, 0.16, 0, 0.66, -0.57, 0xfff2e0),  // rear step
       bx(0.18, 0.16, 0.18, 0, 2.72, 0.32, 0xffe45e),    // beacon 2.64-2.80
     ]);
     /**
@@ -4817,20 +4843,31 @@ MR.World = (function () {
      */
     const blockRoadBikeGeo = (function () {
       const parts = [];
+      // Different kit as well as different height and skin. Two identical
+      // figures read as a repeated prop, which is the finding the marshals
+      // were rebuilt on.
       const who = [
-        { s: -1, x: -0.55, skin: 0xffc79a, dy: 0.00 },
-        { s: 1, x: 0.56, skin: 0xb87a4e, dy: -0.06 },
+        { s: -1, x: -0.55, skin: 0xffc79a, dy: 0.00, shorts: 0xff3b6b, band: 0xd42a55 },
+        { s: 1, x: 0.56, skin: 0xb87a4e, dy: -0.06, shorts: 0xfff2e0, band: 0xff3b6b },
       ];
       for (const p of who) {
         const X = p.x, y = p.dy;
-        parts.push(cyl(0.33, 0.33, 0.10, 8, X * LANE_FIT, 0.33, 0.06, 0x1e2140, 0, 0, Math.PI / 2));
+        // The wheel is a mid grey, not the tyre navy the cars use. It sits in
+        // the hazard's own contact shadow, and at 22 units a navy disc on a
+        // multiplied shadow is nothing at all -- the bikes were invisible under
+        // their own riders.
+        parts.push(cyl(0.33, 0.33, 0.10, 8, X * LANE_FIT, 0.33, 0.06, 0x6d76a8, 0, 0, Math.PI / 2));
         parts.push(bxAt(0.08, 0.52, 0.10, X, 0.62, 0.14, 0xd42a55));
         parts.push(bxAt(0.34, 0.09, 0.18, X, 0.92, 0.06, 0x2b2f52));
+        parts.push(bxAt(0.16, 0.11, 0.09, X, 0.80, -0.06, 0xffe45e));   // rear light
         // The same value ladder the trike's rider and the marshals use: dark
         // waist, cream hi-vis where the eye lands, dark collar, skin, pink lid.
         // Everything up here is seen against pale road or paler sky.
-        parts.push(bxAt(0.50, 0.36, 0.32, X, 1.16 + y, 0.10, 0xff3b6b));
+        parts.push(bxAt(0.50, 0.36, 0.32, X, 1.16 + y, 0.10, p.shorts));
         parts.push(bxAt(0.58, 0.52, 0.38, X, 1.62 + y, 0.16, 0xfff2e0));
+        // One band across the jersey. Without it the cream sleeves and the
+        // cream back weld into a single pale blob and the figure loses its arms.
+        parts.push(bxAt(0.60, 0.14, 0.39, X, 1.63 + y, 0.16, p.band));
         parts.push(bxAt(0.50, 0.10, 0.34, X, 1.93 + y, 0.18, 0x2b2f52));
         parts.push(bxAt(0.34, 0.26, 0.32, X, 2.11 + y, 0.20, p.skin));
         parts.push(bxAt(0.42, 0.18, 0.38, X, 2.31 + y, 0.20, 0xff3b6b));
@@ -4879,8 +4916,10 @@ MR.World = (function () {
       cyl(0.31, 0.31, 0.13, 8, 0, 0.31, -0.06, 0x1e2140, 0, 0, Math.PI / 2),
       bx(0.36, 0.28, 0.54, 0, 0.50, 0.06, 0xd42a55),
       bx(0.74, 0.16, 0.44, 0, 0.76, 0.10, 0x2b2f52),
-      bxAt(1.52, 0.76, 0.56, 0, 1.24, -0.30, 0xff3b6b),   // the food cube
-      bxAt(1.60, 0.10, 0.60, 0, 1.67, -0.30, 0xfff2e0),
+      // The cube was 0.20 taller and hid the rider it exists to carry: only
+      // 0.20 of hi-vis cleared it, so the whole thing read as a box on a wheel.
+      bxAt(1.52, 0.66, 0.56, 0, 1.19, -0.30, 0xff3b6b),   // the food cube
+      bxAt(1.60, 0.10, 0.60, 0, 1.57, -0.30, 0xfff2e0),
       bx(0.56, 0.42, 0.34, 0, 1.14, 0.24, 0x2b2f52),
       bx(0.68, 0.56, 0.40, 0, 1.64, 0.26, 0xfff2e0),
       bx(0.58, 0.10, 0.36, 0, 1.97, 0.26, 0x2b2f52),
@@ -4889,10 +4928,10 @@ MR.World = (function () {
       bx(0.44, 0.08, 0.10, 0, 2.34, 0.02, 0x141a33),
       bx(0.15, 0.48, 0.15, -0.30, 1.60, 0.42, 0x2b2f52, 0.55),
       bx(0.15, 0.48, 0.15, 0.30, 1.60, 0.42, 0x2b2f52, 0.55),
-      bx(0.08, 0.26, 0.08, -0.50, 1.62, 0.54, 0x2b2f52),
-      bx(0.08, 0.26, 0.08, 0.50, 1.62, 0.54, 0x2b2f52),
-      bx(0.24, 0.15, 0.07, -0.55, 1.80, 0.54, 0xfff2e0),  // mirror glass
-      bx(0.24, 0.15, 0.07, 0.55, 1.80, 0.54, 0xfff2e0),
+      bx(0.08, 0.26, 0.08, -0.54, 1.62, 0.54, 0x2b2f52),
+      bx(0.08, 0.26, 0.08, 0.54, 1.62, 0.54, 0x2b2f52),
+      bx(0.28, 0.17, 0.07, -0.62, 1.80, 0.54, 0xfff2e0),  // mirror glass
+      bx(0.28, 0.17, 0.07, 0.62, 1.80, 0.54, 0xfff2e0),
       bx(0.30, 0.18, 0.06, 0, 0.72, -0.36, 0xfff2e0),
       bxAt(0.34, 0.12, 0.08, 0, 0.90, -0.61, 0xffe45e),
     ]);
@@ -4914,7 +4953,7 @@ MR.World = (function () {
      */
     const blockPool = hazardPool(K.BLOCK, 'block', [
       {
-        geo: blockTramGeo, face: [2.20, 0.26, 0.30, -0.671], weight: 1,
+        geo: blockTramGeo, face: [2.20, 0.26, 0.30, -0.661], weight: 1,
         moving: blockTramPantoGeo, pivot: [0, 2.38, 0.06], anim: 'sway',
       },
       { geo: blockSignGeo, face: [2.06, 1.7, 1.58, -0.541], weight: 1 },
@@ -4931,18 +4970,22 @@ MR.World = (function () {
         // collision box records for a BLOCK rather than 0.20 over it.
         moving: blockPaddleGeo, pivot: [0.92, 0.80, 0.30], anim: 'paddle',
       },
-      { geo: blockBusGeo, face: [2.16, 0.24, 0.56, -0.671], weight: 2, anim: 'idle' },
-      { geo: blockTaxiGeo, face: [2.02, 0.22, 0.42, -0.671], weight: 2, anim: 'idle' },
-      { geo: blockVanGeo, face: [2.10, 0.22, 0.48, -0.671], weight: 2 },
+      { geo: blockBusGeo, face: [2.16, 0.24, 0.56, -0.661], weight: 2, anim: 'idle' },
+      { geo: blockTaxiGeo, face: [2.02, 0.22, 0.42, -0.661], weight: 2, anim: 'idle' },
+      { geo: blockVanGeo, face: [2.10, 0.22, 0.48, -0.661], weight: 2 },
       {
-        geo: blockRefuseGeo, face: [2.10, 0.22, 0.47, -0.671], weight: 1,
-        moving: blockRefuseGateGeo, pivot: [0, 1.30, -0.60], anim: 'lift',
+        // The chevron board goes ON THE TAILGATE, big, where a real refuse
+        // truck carries it -- this is the one vehicle in the set whose real
+        // rear marking IS a full-width red-and-white chevron panel, so the
+        // kind signal and the vehicle agree instead of arguing.
+        geo: blockRefuseGeo, face: [2.16, 0.36, 0.86, -0.661], weight: 1,
+        moving: blockRefuseGateGeo, pivot: [0, 1.20, -0.60], anim: 'lift',
       },
       {
-        geo: blockRoadBikeGeo, face: [1.90, 0.24, 0.30, -0.481], weight: 2,
+        geo: blockRoadBikeGeo, face: [1.70, 0.20, 0.32, -0.481], weight: 2,
         moving: blockRoadBikeCrankGeo, pivot: [0, 0.60, 0.14], anim: 'pedal',
       },
-      { geo: blockMopedGeo, face: [1.66, 0.30, 1.20, -0.621], weight: 2, anim: 'idle' },
+      { geo: blockMopedGeo, face: [1.30, 0.24, 1.10, -0.621], weight: 2, anim: 'idle' },
     ]);
 
     /**

@@ -825,3 +825,127 @@ technique.
   misreading. The Egypt structure is borrowed; its colour channel is not.
 - **Uninhabited obstacles.** Theirs are empty props. Keep the riders and the
   marshals.
+
+---
+
+# 4. The road vehicles
+
+Added when the owner asked for "the cars, bikes and other moving obstacles" to
+be more realistic and offered to send photographs of real ones. The photographs
+were declined, and the reason is the same one in *Deliberately not copied*:
+this renderer is flat `MeshToonMaterial` with banded gradient maps and
+normal-extruded ink, so a photograph would push the work toward gloss,
+reflection and surface texture, none of which exist here. **What a vehicle's
+read is actually made of, and all of which are free flat-shaded, is roofline
+height, where the window band sits, greenhouse taper, ride height and the gap
+between body and road.** `tgr-city.png` has a tram, a bus and a parked car in
+exactly our idiom and was the only reference used.
+
+## Measured off `tgr-city.png`
+
+| | own L | body L | ratio |
+|---|---|---|---|
+| parked car body (shaded flank) | 76.4 | — | — |
+| parked car glass | 92 | 76.4 | **1.20 — the glass is LIGHTER than the paint** |
+| tram roof | 163.5 | — | 2.10x its road |
+| tram window band | 61 | 163.5 | 0.37 |
+
+The car's glass being lighter than its own body looks wrong written down and is
+what the frame shows: paint is a shaded surface and glass is a mirror pointed at
+the sky. Our glazing is `0x6577b2` because of this line, and it is most of what
+made these vehicles pass the contrast gate.
+
+## The finding that cost the most time: BLOCK pink is DARKER than the road
+
+The chase camera only ever sees a hazard's rear faces, which are the shaded band
+of the toon ramp. Measured off `api.contrastAudit`'s own swatches, a shaded face
+returns at `(0.639R, 0.723G, 0.826B)` of its authored colour, so its luminance is
+
+```
+L = 0.136 R + 0.517 G + 0.060 B          (green is 76% of it)
+```
+
+Checked against the audit: cream `0xfff2e0` predicts 173.2 and measures 173;
+pink `0xff3b6b` predicts 71.6 and measures 70; navy `0x2b2f52` predicts 35.0 and
+measures 32. Which puts the palette in an order nobody would guess from the hex:
+
+| authored | role | shaded L |
+|---|---|---|
+| `0xfff2e0` | cream | **173** |
+| `0xffe45e` | amber | 157 |
+| `0xffc79a` | skin | 147 |
+| `0x6577b2` | glazing | 86 |
+| `0xff3b6b` | **BLOCK pink** | **72** |
+| `0xd42a55` | deep pink | 55 |
+| `0x2b2f52` | navy | 35 |
+| `0x1e2140` | tyre | 22 |
+
+The centre lane's tarmac measures **L 88.4 to 92.6** across the six sweep
+frames. **So the hazard hue this game signals "impassable" with is darker, seen
+from behind, than the road it stands on.** A vehicle built the obvious way --
+pink body, dark glass, black tyres -- measures 1.15x to 1.24x the centre lane
+and fails the 1.25x gate on five variants at once. Every hazard in this game
+that passes, including the ones that predate this work, passes on cream.
+
+Measured, first pass then final, worst lane in each case:
+
+| | first pass | final | what changed |
+|---|---|---|---|
+| tram | 92.9 (1.03x) | 122.6 (1.36x) | pale destination panel, glazing |
+| city bus | 105.5 (1.17x) | 125.9 (1.39x) | cream livery band, glazing |
+| taxi | 110.3 (1.22x) | 124.1 (1.37x) | chequer band, glazing |
+| delivery van | 106.3 (1.18x) | 129.2 (1.43x) | lit load space, shutter valance |
+| refuse truck | 114.6 (1.27x) | 124.0 (1.37x) | cream packer body, reflective band |
+| road bike ×2 | 111.7 (1.24x) | 124.4 (1.38x) | hi-vis sleeves, mixed kit |
+| moped | 127.8 (1.41x) | 121.9 (1.35x) | — |
+
+Every one of those lifts is a piece of livery the real vehicle wears, which is
+the only reason it was honest to reach for them to pass a measurement.
+
+## What separates them at gameplay scale
+
+Checked at 22 units in portrait 390x844, which is about 30 px per world unit --
+a BLOCK is then 50 px wide and 84 px tall, and at the 40 units a lane is
+actually chosen at it is 27 x 46. At that size nothing survives but gross
+proportion, so each vehicle is given exactly one thing no other has:
+
+| vehicle | glazing band | roof | the tell |
+|---|---|---|---|
+| tram | 1.18–1.72 | 2.44 + pantograph to 2.77 | **no wheel gap** — skirt to the road |
+| city bus | **1.84–2.48**, top third | 2.78 | tallest thing on the road |
+| taxi | 1.10–1.52, and **narrower than the body** | 1.62 + rank sign to 2.28 | the only low one |
+| delivery van | none on the tail | 2.60 | open back, lit load, doors flat to the flanks |
+| refuse truck | none | hopper 2.06 **/ body 2.64** | the only two-height roofline |
+| road bike ×2 | — | 2.40, raised signal arm 2.55 | two figures, not one mass |
+| moped | — | helmet 2.52 | mirrors at ±0.67, wider than its own cube |
+
+Three things were rebuilt after looking at them at that size rather than
+magnified, and all three are the same lesson the character work produced:
+
+- **The taxi's roof rack was a stack of boxes.** A sign at the front of the roof
+  plus two strapped cases behind it read as luggage with a car underneath, and
+  the sign was completely hidden behind the cases from the only angle the game
+  has. One illuminated rank panel, narrower than the roof, is one shape.
+- **The refuse truck's step was a height step, not a value step.** Both halves
+  were pink, and two pink faces in the same lane read as one wall however far
+  apart their tops are. The packer body is cream now.
+- **The cyclists' bikes were invisible and their arms had welded to their
+  torsos.** Navy wheels sit inside the hazard's own multiplied contact shadow
+  and disappear; cream sleeves on a cream jersey lose the figure its arms. Mid
+  grey wheels, and one band across each jersey.
+
+## Divergences, stated
+
+- **A flat horizontal top edge in the jump band.** `Spec: the vocabulary` above
+  forbids it for BLOCK, and a saloon roof at 1.60 against a 2.05 jump apex is
+  exactly that. It is answered the way the cargo trike answered the same
+  objection -- with something real above it, here a rank sign to 2.28 -- rather
+  than by not having a low car.
+- **"No bright horizontal band across the middle."** The bus wears a cream
+  livery band and the tram a pale destination panel. The rule exists so nothing
+  inside a BLOCK can be mistaken for a gap under a bar; a *bright* band is not a
+  gap, and the ROAD CLOSED hoarding has shipped with three of them since it was
+  added. What is still enforced is that no part of a BLOCK ever frames road.
+- **The van's dark load space** is the one thing here that could read as a void,
+  and is drawn lit rather than black, with parcels filling 73% of the opening's
+  height and a shutter valance across its top.

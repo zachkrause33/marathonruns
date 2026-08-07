@@ -43,7 +43,7 @@ Flagged to the owner rather than decided silently — *their call, still open.*
 390×844: plate coverage 20.45% → **17.05%**, left column 263.8px → **204.6px**,
 39 → **29** words, 68 → **60** elements. Landscape left column 70.6% → 53.2%.
 
-### R2 · Stacked obstacles hide the road ahead — **DIAGNOSED, OPEN**
+### R2 · Stacked obstacles hide the road ahead — **DONE, with one lever left**
 
 > *"When there are so many obstacles back to back it makes it a tad tough to
 > see what's ahead of you. What can we do to unclutter that? Is it changing
@@ -61,9 +61,72 @@ band. The mats are not the defect.
 Two things are, both measured against the shipped camera and the shipped
 collision envelopes (`tools/` scratch, reproduced in the R2 brief):
 
-**THIRD DIAGNOSIS. The first two are kept below because the pattern is the
-point: both reasoned from bounding boxes and aggregate geometry, and both were
-confidently wrong. The third asked the running scene.**
+**FOURTH DIAGNOSIS, counting the one the fix itself corrected. The earlier
+ones are kept below because the pattern is the point: each reasoned from
+bounding boxes or aggregate geometry, and each was confidently wrong.**
+
+### What shipped
+
+`BLANKS` in `tools/shoot.js` — the assertion first, landed red, before any
+fix. For each gate in the read window it casts 25 rays from the real lens at
+that gate's own `Collision.BOX` face and counts what survives the boxes in
+front of it. It fails only when both hold:
+
+1. **The occluder does not self-clear**: `z_gate − z_occluder < READ_NEAR`.
+   Derived, not chosen — the occluder leaves the lens once the eye has
+   travelled its own distance, and at that instant the hidden gate is
+   `z_gate − z_occluder` ahead with a full action window owed from there.
+   `READ_NEAR = ACTION_WINDOW + CAM_BASE_BACK = 25.35`, which is where the
+   literal `26` in the old read window came from; it now says so, and moves if
+   the jump arc or the chase distance moves. Against a spacing floor of 21
+   this selects exactly consecutive gates at the tightest spacings — "obstacles
+   back to back", literally.
+2. **What survives is under `READ_NEAR / d`** — 100% at the commit point, 28%
+   at `SIGHT_MIN`.
+
+The first draft of that assertion **measured occluder separation from the gate
+line and passed**, which credits a BLOCK train with leaving the shot 5.33
+units early — 21% of the window being checked. Corrected to the rear face,
+which made the test harder and forced the generator to pay for it.
+
+**Fixes:** the gate spacing floor now answers to the eye as well as the arm
+(`readWindowAt = actionWindowAt + CAM_BASE_BACK`), and `CAM_BASE_Y` went
+2.62 → 3.10 with `LOOK_AHEAD` 8.0 → 11.0.
+
+**Result**, 22 frames, 114 gates before / 110 after: mean visible 76.0% →
+80.4%, gates under half 29 → 24, **fully blank 13 → 6**. Far-road band 4.75° →
+5.64°, +18.7%. Gate count 204.4 → 194.8, finish 1:57:50 → 1:57:52, and the
+record still survives exactly one mistake with no aid.
+
+**Rejected:** colour (you cannot recolour past a solid object; the four
+variants short of 1.6×/0.30 all still clear the gate and are untouched).
+Animation (no evidence found either way). Raising the eye enough to actually
+clear a BLOCK — that needs 4.80, and at 4.82 seven of 58 gates were still
+under 50%, so camera-only was never the answer.
+
+**The lever left open:** forcing a CLEAR lane in a BLOCK's shadow. Costed at
+~14% of lane slots, which would nearly double the CLEAR share — a difficulty
+change, not a legibility one, and not one to make unilaterally. Some gates are
+still 0% *seen*; they are now 0% seen *fairly*, because passing the occluder
+restores the read with a full action window. Making the second gate genuinely
+visible rather than merely fair is what this lever buys.
+
+### Three things the diagnosis above got wrong
+
+- **"The first gate ahead is always 100% visible"** holds for the nearest gate
+  and not for the first gate *in the read window*: at skip 225 a JUMP at 43.5u
+  was 20%.
+- **The decisive number is the collision box, not the art.** BLOCK's box tops
+  at 2.80 against an eye of 2.62 — that, not the 3.09 hoarding or the 3.52
+  DUCK standards, is what made occlusion absolute, and it sits inside the
+  envelope that cannot be renegotiated.
+- **The framing figures check out**: 0.1008 NDC measured against 0.108 claimed.
+
+And the fix's own author corrected themselves: a first pass reported 75.3% →
+86.2% from ten frames; twenty-two give 80.4%. The honest headline is that
+fully-blank gates halve, not that the mean transforms.
+
+### The third diagnosis, which was right
 
 ### What the scene says
 

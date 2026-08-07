@@ -434,9 +434,8 @@ added for.
 
 - **R2** — the second gate, and the assertion that never tested for it.
 - **R3** — open the sky, make the mile marker readable.
-- **Animation polish**, stage 2 of 3: secondary motion. Then speed
-  responsiveness. `?polish=0..1` scales every added term so one build renders
-  both versions; `tools/stride.js` measures and photographs the cycle.
+_Nothing. All four playtest directives and the three animation stages are
+done._
 
 ## Done since this file was written
 
@@ -558,7 +557,7 @@ nobody measured is worse than no number at all.**
 5. **The LOD justification** — "past a hundred units a spectator is under a
    pixel wide". Projected properly: 4.0px at 60 units, 1.9px at the swap
    distance.
-6. **The stride instrument was wrong FIVE ways, every one of them flattering.** Its contact
+6. **The stride instrument was wrong SIX ways, every one of them flattering.** Its contact
    sheets were not contact sheets — `setViewportSize` fires a resize, the game
    repaints the full canvas, and that repaint lands on whichever view renders
    first, so every "behind" sheet was a single wide panorama. One was committed
@@ -579,10 +578,30 @@ nobody measured is worse than no number at all.**
    evidence for the arm work. The mitt's real travel is 0.4031 → 0.4480
    vertical and 0.5474 → 0.6502 fore/aft.
 
-   Five defects, found by three different agents, none by me, and every single
+   Then stage 3 found a sixth: the sheet half settles before it renders, the
+   *measurement* half did not. The page runs ~600 ms of real game before the
+   tool re-poses the rig at lo/mid/hi, and any filter driven by the *history*
+   of a value rather than by the posed value reads that jump as a real event.
+   Harmless until a term was driven by the derivative of `speed` — then chest
+   fore/aft came back **3.3× inflated**, 0.0264 against 0.0080.
+
+   Six defects, found by four different agents, none by me, and every single
    one made the work look better than it was. **An instrument nobody audits is
    not a measurement, it is a preference with decimal places** — and the
    corollary is that the reviewer's own tools need a reviewer.
+
+9. **Two shipped constants were derived from numbers nobody had measured.**
+   `camera.js` normalised its acceleration cue by 3.2, on a header claim that
+   streak-driven acceleration reaches "~4 u/s²". Measured on the smoothed
+   signal the file actually uses, 7,460 samples of real play: **+0.702**. So
+   the cue named "surge" was capped at 0.219 of full scale while a contact
+   reached 0.415 — what shipped as an acceleration cue was in practice a hit
+   cue. And `runner.js`'s note on arm abduction read as though abduction set
+   the run's half-width; asked which vertex is actually widest at top pace,
+   the rig answers the chest, then the head. The elbow is inboard of both.
+
+   Both are the same failure as the triangle budget and the 110px runner: a
+   number written into a comment, believed, and then built on.
 
 7. **Three consecutive diagnoses of R2**, each confident, the first two false:
    the telegraph mats (they cannot overlap), the DUCK as a solid 3.52-unit wall

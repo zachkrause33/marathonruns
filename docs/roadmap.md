@@ -204,33 +204,167 @@ costs almost nothing in runner size (NDC height 0.504 → 0.491) and improves
 foot position (−0.583 → −0.696), but buys only 1.18× on the far band. Worth
 doing, not sufficient on its own.
 
-### R3 · Mile markers unreadable; the road is over-covered — **DIAGNOSED, OPEN**
+### R3 · Mile markers unreadable; the road is over-covered — **DONE**
 
 > *"Review the mile markers. Still tough to read at the top. You should be able
 > to clearly see that. Take out some of the wires, poles, and bars. The road
 > does not always need to be covered like Subway Surfers. It can be open."*
 
-`MILE 24` sits behind a gantry lattice in the playtest frame. This is a
-deliberate correction to an earlier instruction of mine — overhead structure
-was added for depth and rhythm and has been overdone. Open sky is a legitimate
-and cheaper look.
-
 **R3 is NOT R2 seen from above, and the claim that it was is retracted.** That
 framing said overhead structure was stealing the pixels the far road needs, and
 that the two should be one pass. The raycast puts overhead structure at **0%**
-of blocked road — and it cannot be anything else: the eye is at 2.62 and looks
-*down* at the tarmac, so nothing above eye height can ever lie between the eye
-and the road. The bucket was unreachable by construction, which is the third
-time on this pair of items that a plausible geometric argument has turned out
-to be measuring nothing.
+of blocked road — and it cannot be anything else: the eye looks *down* at the
+tarmac, so nothing above eye height can ever lie between the eye and the road.
+The bucket was unreachable by construction.
 
-What R3 does affect is everything above the horizon: the mile banners, the
-ghost's `RECORD 1:59:30` marker, the skyline, and whether the frame feels like
-a tunnel. A gantry beam at y 5.4 projects to NDC 0.317 at 25u and 0.217 at 90u,
-against a far-road line at 0.145 — so it sits in the band *just above* the road
-rather than over it. `shoot.js` counts 13–32 live crossings per frame; 31 in
-02-early and 32 in 04-wall. That is a tunnel, and `shots/04-wall.png` is the
-owner's screenshot reproduced exactly. Separate task, separate pass.
+But the correction did not go far enough either. It said what R3 does *not*
+touch and left "the frame feels like a tunnel" as a matter of taste. It is not:
+overhead structure was standing in front of the SIGNAGE, which lives in the
+band just above the road, and that is measurable to three figures.
+
+### The census, before
+
+Per 100 units of road, over thirteen sampled points across the whole course. A
+crossing is a cluster in z of triangles passing over the play corridor above
+hazard height whose own z-extent is under 4 units — a member that sweeps
+top-to-bottom past the lens.
+
+| source | crossings / 100u | what it was |
+|---|---|---|
+| road tile, city (`barrier`) | 12.5 | 2 catenary portals + 1 lamp arc per 24u tile, 3 contact wires over the lanes, 15 bunting pennants |
+| road tile, park (`hedge`) | 12.5 | 2 bunting spans + 1 lamp arc per tile, 22 pennants |
+| road tile, bridge (`rail`) | 8.3 | 2 lighting portals per tile, 2 runners over the lanes |
+| road tile, THE WALL (`wall`) | 8.3 | scaffold birdcage: 2 portals + 3 tubes over the lanes per tile |
+| mile banners | 0.42 | |
+| footbridges | 0.30 | |
+| WALL overpasses | 0.60 (that leg) | |
+| landmark spans | ~0.3 | viaduct, Chicago's L, bridge towers |
+
+**Whole-course mean 14.32 per 100 units — one crossing every 7 units, about
+three a second at race pace.** Every 24-unit tile in the game was identical
+overhead. `shoot.js` counted 13–15 live crossing elements in every default
+shot.
+
+### The measurement that settled it
+
+Not "it feels cluttered". Rays from the real camera to a 13 × 5 grid on the
+MILE sign's own panel, at 420 × 860 portrait, binned by distance — plus the
+rendered frame with the panel drawn and then hidden, so the pixels that change
+are the ones a player can actually see.
+
+| distance | occluded before → after | visible before → after | numeral px before → after |
+|---|---|---|---|
+| 0–25u | 0.41 → **0.00** | 0.68 → 0.97 | 32.4 → **64.1** |
+| 25–50 | 0.54 → **0.02** | 0.55 → 0.95 | 17.2 → **32.2** |
+| 50–75 | 0.70 → **0.03** | 0.42 → 0.95 | 9.8 → **19.4** |
+| 75–100 | 0.82 → **0.05** | 0.44 → 0.92 | 7.0 → **13.3** |
+| 100–125 | 0.89 → **0.03** | 0.36 → 0.87 | 5.3 → **10.7** |
+| 125–150 | 0.89 → **0.05** | 0.42 → 0.85 | 4.9 → **8.7** |
+| 150–175 | 0.95 → **0.03** | 0.34 → 0.79 | 3.8 → **8.1** |
+| 175–200 | 0.92 → **0.15** | 0.37 → 0.77 | 3.7 → **6.9** |
+| 200–225 | 1.00 → **0.06** | 0.30 → 0.82 | 3.6 → **5.8** |
+| **all** | **0.79 → 0.04** | **0.43 → 0.88** | **9.6 → 18.4** |
+
+**Between 57% and 100% of the sign was behind something at every distance it
+could be read at, and the numeral was three to eight pixels tall.** The owner
+was not describing a preference.
+
+Three separate causes, and the first is the one nobody would have found by
+looking at the diff:
+
+1. **The gantry drew its own lattice across its own sign.** Nine X-braces sat
+   at z = 0 rotated about z; the sign panel was a plane at z = 0. The near half
+   of every brace was in front of the text, in the same plane, z-fighting with
+   it. The finish arch had the same defect — its top chord crossed the top 0.6
+   of a 2.4-unit FINISH panel, and its checker band was 0.8 units *behind* the
+   panel and more than half of it was never drawn at all.
+2. **Nothing was behind the panel but more structure.** The WALL birdcage
+   accounted for 59 of 65 blocked rays to MILE 20 at 101 units, 61 at 145, all
+   65 at 96.
+3. **The numeral was 0.95 world units tall on a 9.3 × 2.1 plate** carrying a
+   word and a two-digit number with most of the plate empty.
+
+### What shipped
+
+**The road tile no longer spans the road at all.** It carries a VERGE LINE
+instead: a lamp standard and a telegraph pole per side per tile, staggered so a
+vertical passes the lens every six units, with three wires running *along* the
+verge at `POLE_X` where the contact wires used to run over the lanes. The lamp
+arc kept its 13.3-unit head height and its arm was cut back from x = 1.6 to
+`POLE_REACH`, outside `CORRIDOR_HALF`. Removed outright: both catenary portals,
+both bunting spans, the bridge's lighting portals, and the WALL birdcage. The
+WALL's scaffold now goes *up* — a third lift standing on the hoarding line at
+|x| = 11.35 with site floodlights — instead of across.
+
+This is `reference/sonic-dash-downhill.png`, which the owner sent mid-task.
+Nothing spans the carriageway in that frame; the whole vertical vocabulary is
+poles in the verge carrying longitudinal wires, and the Golden Gate fills the
+upper third in clear sky. Depth from the verge, not from the ceiling.
+
+**Bunting now exists only in the finish chute.** It ran on every city and park
+tile for the whole race, which is why it meant nothing. The first pennants a
+player sees in a marathon are the ones over the tape.
+
+**The mile marker was re-set the way a real mile marker is set.** Plate 2.1 →
+2.9 units, X-braces deleted and replaced by a header above the plate, panel
+moved to z = −0.62 clear of every member of the frame, and the label re-laid as
+a small caption beside a huge numeral. Measured on the rasterised canvas, not
+assumed from a cap-height constant: **numeral 0.952 → 1.921 world units,
+2.02×**, for the same one draw call and the same texture upload. Same fixes
+applied to the START/FINISH arch.
+
+**`MILE_SIGHT_BEFORE` / `MILE_SIGHT_AFTER`, a new rule.** No spanning set piece
+may stand within 95 units before a mile marker or 26 units after it. The old
+rule was symmetric at 32 units and was reasoning about composition; occlusion is
+asymmetric, because the camera is always on the low-z side. The hand-placed
+mile-20 overpass moves from 34 units before the gantry to 95 — which is the
+beat its own comment always described, and was not getting.
+
+### The census, after
+
+**Whole-course mean 1.97 per 100 units, an 86% cut.** The road tile contributes
+exactly **zero** — by construction, and `api.crossings()` re-derives it from the
+built triangles on every `shoot.js` run. Longitudinal members over the corridor:
+2–6 per frame → **0**. `shoot.js`'s own count: 13–15 → **4–6** on every default
+shot. Everything remaining is a mile banner, a footbridge, a WALL overpass, a
+named landmark, or the finish chute.
+
+The only place the census still runs high is inside the Oberbaum's own 66-unit
+arcade (6–9 crossings), and that is left alone deliberately: it is a named
+landmark, it happens once per 235 units of bridge, and a landmark is worth more
+than a lattice.
+
+**Cost: draw calls unchanged** — 175/195/182/265/233/164/261 against
+175/198/182/265/235/164/261, i.e. within ±3 on every shot. Peak triangles
+185,000 → 181,904. THE WALL is 876 triangles *heavier* because the third
+scaffold lift costs more than the birdcage saved.
+
+### What the brief got wrong
+
+**"Removing structure should help both [triangles and draws] — if your change
+doesn't reduce draws you should ask yourself whether you removed anything."**
+It cannot reduce draws, and the reason is written in this file: the overhead
+layer was *baked into the road tile's merged edge mesh* precisely so that a
+mast and fifteen pennants cost triangles instead of submissions. Removing it
+gives back triangles and nothing else. Draw calls were never the currency this
+change was denominated in. Deleting 12.3 crossings per 100 units of road bought
+**zero** draw calls, and that is the correct result rather than evidence the
+work was not done.
+
+### Left open, and not mine to close
+
+- **The ghost's `RECORD 1:59:30` marker is a `Sprite` with `depthTest: false`
+  and `fog: false`, at `renderOrder` 900** — an instrument, deliberately, and
+  it is drawn over everything including hazards. It is not in the world group,
+  so `api.crossings()` and therefore `shoot.js` have never audited it. In
+  portrait it lands in the same band as the mile banner and, at every distance
+  measured, it is more legible than the sign it sits under. That is an R1
+  crowding question, in `ghost.js`, and it was left alone.
+- **Beyond ~150 units the fog washes the plate**: plate-vs-sky falls to 1.11 at
+  200–225u and glyph-vs-plate to 1.02. `fog: false` on the panel would fix it
+  and was rejected — the banner spawns at `VIEW` = 210 and fog is what currently
+  hides the spawn, so a fog-free plate would pop into an empty sky. The honest
+  contract is: **findable from ~180 units, readable from ~110.**
 
 ### R4 · The finish card carries too much — **DONE**
 
@@ -374,3 +508,19 @@ nobody measured is worse than no number at all.**
    after writing it. The actual discipline is to commit a file when it holds
    one change, and to check `git diff` before every commit rather than trusting
    the pathspec to mean what it looks like it means.
+8. **"It obeys the corridor rule, so it is free."** Every piece of overhead
+   structure in the game cleared `OVERHEAD_Y` and was audited for it on every
+   `shoot.js` run, and the audit was *correct*: none of it could ever hide a
+   hazard, because the eye is below it and looking down. So it was allowed to
+   grow to 14.32 crossings per 100 units of road — one every seven units, three
+   a second — while the thing it *was* hiding, the signage that lives in the
+   same band, had no assertion at all. 57% to 100% of every MILE sign's own
+   panel was behind something and nothing in the toolchain said so.
+
+   The gantry was also drawing its own X-braces across its own sign face:
+   braces at z = 0 and a sign plane at z = 0, coplanar, z-fighting, for as long
+   as both have existed. Visible in one 4× crop and invisible in every diff.
+
+   The lesson: **an assertion that passes tells you about the property it
+   tests and nothing else.** A rule that only ever asks "can this hide a
+   hazard" will happily let the frame fill up with everything that cannot.

@@ -51,6 +51,21 @@
  *     can crop the frame edge precisely because they are nowhere near the
  *     road. It is also why the rival runners are gone -- see the note where
  *     they used to be.
+ *
+ *  4. AND THE SKY OVER IT IS NOT DECORATION EITHER. The corridor rule is
+ *     about FAIRNESS -- can the player see the next gate -- and everything
+ *     that obeyed it was assumed to be free. It was not. Overhead structure
+ *     cannot hide a hazard (the eye is below it and looking down), but it can
+ *     and did hide the SIGNAGE, which lives in the same band: two portal
+ *     spans and a lamp arc in every 24-unit tile put 12.6 crossings in every
+ *     100 units of road and left 57% to 100% of every MILE sign's own panel
+ *     behind something. The road tile now carries a VERGE LINE and spans
+ *     nothing; see "the verge line, which replaced the overhead layer". The
+ *     census is 2.0 crossings per 100 units and everything left in it is a
+ *     mile banner, a footbridge, an overpass, a named landmark or the finish.
+ *
+ *     The rule this leaves behind: a thing that crosses the road has to be
+ *     worth crossing it for, and there has to be sky on either side of it.
  */
 MR.World = (function () {
   const K = MR.K;
@@ -641,6 +656,61 @@ MR.World = (function () {
       g.font = `900 ${Math.floor(c.height * 0.60)}px ${fam}`;
       g.fillText(text, c.width / 2, c.height / 2 + c.height * 0.03);
     }
+    return texture(c);
+  }
+
+  /**
+   * THE MILE MARKER'S OWN LABEL, and it is set differently from every other
+   * sign in the game for one measured reason.
+   *
+   * `labelTexture` centres one line at 0.60 em on a 768x128 canvas. On the old
+   * 9.3 x 2.1 plate that put the cap height at 0.90 world units -- four to
+   * eight PIXELS in portrait at the 70-160 units where the sign is first read,
+   * with 9.3 units of plate width carrying a word and a two-digit number and
+   * most of it empty. The plate was the right size; the type on it was not.
+   *
+   * A real marathon mile marker is set the other way round: the NUMBER is the
+   * object and the word is a caption. So the numeral takes 0.875 em of a 240px
+   * canvas -- cap height 1.82 world units on the 2.9-unit plate, 2.01x what it
+   * was -- and MILE is set small beside it. The pair is measured and centred as
+   * a group, so 5 and 26.2 both sit right on a symmetric gantry.
+   *
+   * Same triangles, same one draw call, same texture upload. The only thing
+   * that changed is where the ink went.
+   */
+  const MILE_TEX_W = 768, MILE_TEX_H = 240;   // 3.20, the plate's own aspect
+  function mileTexture(word, num, bg, fg, sub) {
+    const c = canvas(MILE_TEX_W, MILE_TEX_H);
+    const g = c.getContext('2d');
+    const H = c.height, W = c.width;
+    g.fillStyle = bg; g.fillRect(0, 0, W, H);
+    // The keyline is what says "sign" rather than "floating rectangle" at
+    // distance, and at this plate size it can afford to be heavier.
+    g.strokeStyle = fg; g.lineWidth = Math.round(H * 0.05);
+    g.strokeRect(H * 0.06, H * 0.06, W - H * 0.12, H - H * 0.12);
+    const fam = 'ui-sans-serif, system-ui, -apple-system, Arial, sans-serif';
+    const numFont = `900 ${Math.round(H * 0.875)}px ${fam}`;
+    const wordFont = `900 ${Math.round(H * (sub ? 0.20 : 0.26))}px ${fam}`;
+    g.font = numFont;
+    const numW = g.measureText(num).width;
+    g.font = wordFont;
+    const wordW = Math.max(g.measureText(word).width, sub ? g.measureText(sub).width : 0);
+    const GAP = H * 0.11;
+    const x0 = (W - (wordW + GAP + numW)) / 2;
+
+    g.fillStyle = fg;
+    g.textAlign = 'left'; g.textBaseline = 'middle';
+    if (sub) {
+      g.fillText(word, x0, H * 0.41);
+      g.font = `800 ${Math.round(H * 0.155)}px ${fam}`;
+      g.fillText(sub, x0, H * 0.62);
+    } else {
+      g.fillText(word, x0, H * 0.52);
+    }
+    g.font = numFont;
+    // Digits have no descender, so the optical centre of a numeral sits a
+    // little below the box centre. 0.53 puts it on the plate's middle.
+    g.fillText(num, x0 + wordW + GAP, H * 0.53);
     return texture(c);
   }
 
@@ -3911,102 +3981,122 @@ MR.World = (function () {
       }
     }
 
-    // ---- the overhead layer -----------------------------------------------
+    // ---- the verge line, which replaced the overhead layer ----------------
     /**
-     * Wires, spans and bunting crossing the road -- baked into the ROAD TILE
-     * rather than pooled as objects.
+     * THE ROAD TILE NO LONGER SPANS THE ROAD, AND THAT IS THE POINT.
      *
-     * This is the other half of Subway Surfers' depth and the layer we had
-     * least of. Something crosses that game's frame every second or two, at
-     * several depths; we had mile gantries every 240 units and nothing between,
-     * which is one crossing every nine seconds. Overhead earns its place
-     * because it passes CLOSE TO THE LENS and therefore sweeps top-to-bottom
-     * fast -- vertical parallax that no amount of ground detail can imitate,
-     * however dense the ground gets.
+     * What used to be here: two portal spans in every 24-unit tile plus a lamp
+     * arc reaching to x = 1.6, on every biome. One crossing every eight units,
+     * about three a second at race pace, identical in every tile of the race.
+     * Measured on the shipped build with the census in the R3 brief, the whole
+     * course ran 12.6 crossings per 100 units and the frame the owner
+     * complained about ran 32 live at once.
      *
-     * Baking it into the tile is what makes it free. Each tile already draws
-     * one merged edge mesh per biome, so a mast, a span wire and fifteen
-     * bunting pennants cost triangles instead of draw calls. SPAN_Z puts two
-     * crossings in every 24-unit tile -- one every 12 units, or roughly every
-     * half second at race pace -- and offsets them from the tile boundary so
-     * neighbouring tiles never stack two spans in the same place.
+     * It was built deliberately, from Subway Surfers, and it was overdone:
      *
-     * NOTHING HERE MAY OBSCURE THE NEXT GATE, and the geometry is what
-     * guarantees it rather than care. Everything is at or above OVERHEAD_Y.
-     * The chase camera sits near y = 2.7 and a gate is read at 40-90 units,
-     * where the road is at or below the camera axis; a member at 9.4 units is
-     * 9 degrees ABOVE that axis at 40 units and less further out, so it crops
-     * the top of the frame and can never come between the lens and a hazard.
+     *   "Take out some of the wires, poles, and bars. The road does not
+     *    always need to be covered like Subway Surfers. It can be open."
+     *
+     * The measurement that settles it is the mile marker. With the birdcage
+     * and the catenary in place, 57% to 100% of the MILE sign's own panel was
+     * behind something at the distance it is first read, and the numeral was
+     * three to eight pixels tall in portrait. Overhead structure was not
+     * competing with the signage, it was standing in front of it.
+     *
+     * REFERENCE, and it is a different game from the one this layer came from:
+     * reference/sonic-dash-downhill.png. NOTHING spans the carriageway in that
+     * frame. The entire vertical vocabulary is a line of telephone poles and
+     * streetlights standing IN THE VERGE, carrying wires that run ALONG the
+     * road rather than across it, at roughly one pole every 15-20 units per
+     * side. The depth cue survives intact -- a receding line of poles and three
+     * wires converging on the vanishing point is the same perspective read the
+     * cross-spans were bought for -- and the sky over the road stays empty, so
+     * the Golden Gate at the vanishing point is legible at a glance.
+     *
+     * So the road tile now carries a VERGE LINE and nothing overhead at all.
+     * Everything stands at |x| = POLE_X, which is outside CORRIDOR_HALF, and
+     * nothing reaches back in past POLE_REACH, which is also outside it. The
+     * tile contributes exactly ZERO crossings to api.crossings(), by
+     * construction rather than by care, and tools/shoot.js re-derives that from
+     * the built triangles on every run.
+     *
+     * What still crosses the road, and only these:
+     *
+     *   mile banners     every 240 units, and they are the reason for all of
+     *                    this -- they now hang in open sky
+     *   footbridges      every 330 units
+     *   the WALL         one concrete overpass every 168 units on that leg
+     *   landmark spans   a viaduct, Chicago's L, the bridge towers
+     *   the finish       arch, chute bunting and tape
+     *
+     * That is about one crossing every 90 units of ordinary road: rare enough
+     * that each one is an event, which is what a set piece is for.
      */
-    const SPAN_Z = [-6, 6];
+    // The verge line. POLE_X is where anything vertical stands and POLE_REACH
+    // is the furthest in toward the centre line that any arm may come. Both are
+    // derived from the corridor rather than typed, so a track retune cannot
+    // quietly push a lamp head over the carriageway: the assertion in
+    // tools/shoot.js would catch it, but geometry that cannot break the rule is
+    // better than geometry that is checked for breaking it.
+    const POLE_X = Math.max(K.TRACK_HALF_WIDTH + 1.65, CORRIDOR_HALF + 1.55);
+    const POLE_REACH = CORRIDOR_HALF + 0.70;
+    // Two verticals per tile per side, staggered against the other side, so a
+    // pole passes the lens every six units of road with nothing over it.
+    const POLE_Z = [-6, 6];
 
     /**
-     * The pennant string. Race bunting is the one piece of overhead dressing
-     * that is unambiguously about a marathon rather than about a city, so it
-     * runs on every biome that gets a span. The flags face back down the course
-     * because that is the only face the runner ever sees.
+     * A wire run down the verge. Three lines at POLE_X converging on the
+     * vanishing point -- the hard perspective line above the road that the
+     * cross-spans were originally bought for, kept, and moved out of the sky
+     * over the carriageway where it never belonged.
      */
-    const BUNTING = [0xff3b6b, 0xffe45e, 0x37d6ff, 0xfffdf5, 0x59d47a];
-    function bunting(parts, halfSpan, y, z, n) {
-      for (let k = 0; k < n; k++) {
-        const fx = -halfSpan + 0.5 + k * ((halfSpan * 2 - 1.0) / (n - 1));
-        parts.push(bx(0.44, 0.48, 0.05, fx, y, z, BUNTING[k % BUNTING.length]));
-      }
+    function vergeWires(parts, sx, ys, tint) {
+      for (const y of ys) parts.push(bx(0.07, 0.07, TILE, sx * POLE_X, y, 0, tint));
     }
 
     /**
-     * THE CURVED LAMP ARC -- the top-of-frame device, measured off tgr-city.png.
+     * THE LAMP STANDARD -- the top-of-frame device, and it no longer leans over
+     * the road.
      *
-     * Two posts were fitted through a common horizon there: the far one sits at
-     * 1.48x the near one's depth, so the spacing is about 0.48x the near lamp's
-     * distance. The near post runs 548 px from head to base against a
-     * carriageway 310 px wide at the same depth, i.e. THE HEAD STANDS 1.77 ROAD
-     * WIDTHS UP. That is an enormous exaggeration -- no real street lamp is
-     * anything like it -- and the exaggeration is exactly the point: it is what
-     * fills the top of a PORTRAIT frame instead of hugging the kerb, which is
-     * the half of the screen this game had almost nothing in.
-     *
+     * The height came off tgr-city.png and is unchanged. Two posts were fitted
+     * through a common horizon there: the near post runs 548 px from head to
+     * base against a carriageway 310 px wide at the same depth, i.e. THE HEAD
+     * STANDS 1.77 ROAD WIDTHS UP. That is an enormous exaggeration -- no real
+     * street lamp is anything like it -- and the exaggeration is the point: it
+     * is what fills the top of a PORTRAIT frame instead of hugging the kerb.
      * Our tarmac is 2 * TRACK_HALF_WIDTH = 7.50, so 1.77 * 7.50 = 13.3.
      *
-     * THE FAIRNESS GUARANTEE IS GEOMETRIC, not a promise. The post stands at
-     * |x| = 5.4, which is outside CORRIDOR_HALF (3.75) and inside LANDMARK_IN
-     * (11.75) -- roadside furniture, in the same band as the kerb and the aid
-     * tables. The arm is a quarter ellipse from the post top (5.4, 9.6) to the
-     * head (1.6, 13.3), i.e. centre (1.6, 9.6) with semi-axes 3.8 and 3.7. The
-     * FIRST point of it to reach over the corridor is x = 3.75, and there
+     * WHAT CHANGED IS THE REACH. The arm used to be a quarter ellipse from the
+     * post top (5.4, 9.6) all the way in to a head at x = 1.6 -- over the
+     * middle lane, 1.6 units from the centre line. It cleared OVERHEAD_Y by
+     * 3.65 units so it was never a fairness problem, and that is exactly why it
+     * survived: it was audited for the rule it obeyed and never counted against
+     * the rule nobody was measuring. Ten live tiles put ten of those arms
+     * across the sky over the carriageway at once, and they were a third of
+     * every frame's crossing count.
      *
-     *   cos t = (3.75 - 1.6) / 3.8 = 0.566  ->  y = 9.6 + 3.7 * 0.824 = 12.65
+     * The arm now stops at POLE_REACH, outside CORRIDOR_HALF, so the lamp is
+     * roadside furniture in the same band as the kerb and the aid tables and
+     * contributes nothing to api.crossings(). Compare the streetlight on the
+     * right of reference/sonic-dash-downhill.png: a short arm over its own
+     * verge, and clear sky over the road beside it. The head keeps its height,
+     * so the device still crops the top corner of a portrait frame -- which was
+     * the job it was hired for.
      *
-     * so the lowest over-corridor point of the whole lamp is 12.65 against an
-     * OVERHEAD_Y of 9.0: 3.65 units of clearance, against the 2.0 the spec asked
-     * for. Nothing about the arc can intersect a hazard (top 2.80) or the jump
-     * arc, and crossings() re-derives that from the built triangles every time
-     * tools/shoot.js runs, so it stays true if these numbers are ever retuned.
-     *
-     * PERIOD: one lamp per road tile, alternating sides, so an arc crosses the
-     * frame every TILE = 24 units and each side carries one every 48. At the
-     * race pace this build tops out at (~26 u/s) that is an arc a second, and
-     * the reference's ~0.48x-near-distance spacing is in the same family. It
-     * errs sparse, which is the right way to err against a device this large.
-     *
-     * COST: 72 triangles per tile -- post 12, arm 4 x 12, head 12. The spec
-     * budgeted 22 by assuming a ribbon arm; boxes are used instead because this
-     * file has twice lost days to quads that came out wound the wrong way and
-     * drew nothing, and 50 triangles a tile is not worth that risk. At ten live
-     * tiles the difference is 500 triangles on a 35k-99k frame.
+     * COST: 60 triangles -- post 12, arm 3 x 12, head 12. Boxes rather than a
+     * ribbon, because this file has twice lost days to quads that came out
+     * wound the wrong way and drew nothing.
      */
-    const LAMP_POST_X = 5.4;
     const LAMP_POST_Y = 9.6;
-    const LAMP_HEAD_X = 1.6;
     const LAMP_HEAD_Y = 13.3;    // 1.77 x the 7.50-unit tarmac
-    const LAMP_SEGS = 4;
+    const LAMP_SEGS = 3;
     function lampArc(parts, sx, z, post, head) {
-      parts.push(bx(0.26, LAMP_POST_Y, 0.26, sx * LAMP_POST_X, LAMP_POST_Y / 2, z, post));
-      const ax = LAMP_POST_X - LAMP_HEAD_X;      // 3.8
-      const ay = LAMP_HEAD_Y - LAMP_POST_Y;      // 3.7
+      parts.push(bx(0.26, LAMP_POST_Y, 0.26, sx * POLE_X, LAMP_POST_Y / 2, z, post));
+      const ax = POLE_X - POLE_REACH;
+      const ay = LAMP_HEAD_Y - LAMP_POST_Y;
       const at = (i) => {
         const t = (i / LAMP_SEGS) * (Math.PI / 2);
-        return [sx * (LAMP_HEAD_X + ax * Math.cos(t)), LAMP_POST_Y + ay * Math.sin(t)];
+        return [sx * (POLE_REACH + ax * Math.cos(t)), LAMP_POST_Y + ay * Math.sin(t)];
       };
       for (let i = 0; i < LAMP_SEGS; i++) {
         const a = at(i), b = at(i + 1);
@@ -4015,21 +4105,50 @@ MR.World = (function () {
           (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, z, post, 0, 0, Math.atan2(dy, dx)));
       }
       // The luminaire hangs off the end of the arm, so its top meets the head
-      // height rather than straddling it.
-      parts.push(bx(0.92, 0.26, 0.44, sx * LAMP_HEAD_X, LAMP_HEAD_Y - 0.13, z, head));
+      // height rather than straddling it. Its own half-width is inside the
+      // margin POLE_REACH leaves over CORRIDOR_HALF.
+      parts.push(bx(0.62, 0.26, 0.44, sx * (POLE_REACH + 0.12), LAMP_HEAD_Y - 0.13, z, head));
     }
 
-    // Which roadside kinds carry a lamp, and what colour it is. THE BRIDGE is
-    // not here because a post at |x| = 5.4 would stand on open water -- the deck
-    // ends at 4.75 -- and it already carries lighting portals every 12 units.
-    // THE WALL is not here either: it already has a scaffold birdcage over the
-    // carriageway at 9.5-10.2, and a second overhead system above that turns the
-    // top of the frame into a thicket, which is the exact failure the bracing
-    // was removed for.
-    const LAMP_EDGES = {
-      barrier: [0x2b2f52, 0xffe45e],
-      hedge: [0x3a4560, 0xfff2e0],
-    };
+    /**
+     * A TELEGRAPH POLE, and it is what pays for the spans coming out.
+     *
+     * reference/sonic-dash-downhill.png fills its verge with these -- plain
+     * poles with two crossarms, one every fifteen or twenty units per side,
+     * carrying the wires that run along the road. They read as speed for the
+     * same reason a fence does, and they cost nothing overhead because nothing
+     * about them crosses anything. Set one between each pair of lamps and the
+     * verge carries a vertical every six units of road, which is a denser
+     * rhythm than the two spans a tile it replaces, in a place where density
+     * cannot hide a sign.
+     */
+    function utilityPole(parts, sx, z, tint) {
+      const h = 8.9;
+      parts.push(bx(0.20, h, 0.20, sx * POLE_X, h / 2, z, tint));
+      parts.push(bx(0.16, 0.16, 2.30, sx * POLE_X, h - 0.55, z, tint));
+      parts.push(bx(0.16, 0.16, 1.60, sx * POLE_X, h - 1.45, z, tint));
+    }
+
+    /**
+     * The whole verge line for a tile: a lamp and a telegraph pole on each
+     * side, staggered against each other so a vertical passes the lens every
+     * six units, and three wires running the length of the tile between them.
+     *
+     * SYMMETRIC, and that replaced a variant axis. The lamp used to alternate
+     * sides tile by tile, which meant every roadside kind was built twice --
+     * `barrierL` and `barrierR` -- and every pooled tile carried both. Poles on
+     * both sides is what the reference does and it is what a street is, so the
+     * stagger now happens WITHIN the tile and there is one geometry per kind
+     * again. That is six merged tile geometries down to four.
+     */
+    function vergeLine(parts, post, head, wire) {
+      for (const sx of [-1, 1]) {
+        // Lamp on the near half one side, far half the other.
+        lampArc(parts, sx, POLE_Z[sx > 0 ? 0 : 1], post, head);
+        utilityPole(parts, sx, POLE_Z[sx > 0 ? 1 : 0], post);
+        if (wire) vergeWires(parts, sx, [8.35, 7.75, 7.45], wire);
+      }
+    }
 
     /**
      * Crowd-control barrier: the single strongest "this is a road race" cue.
@@ -4057,33 +4176,25 @@ MR.World = (function () {
           parts.push(bx(0.9, 1.1, 0.10, lx, 4.6, lz, sx > 0 ? 0x37d6ff : 0xff9ad5));
         }
       }
-      // City overhead: tram catenary, plus bunting on the second span.
+      // THE TRAM CATENARY IS GONE, and the wires it was bought for are not.
       //
-      // The LONGITUDINAL wires are the part that surprised me. Cross-spans give
-      // the strobe, but three wires running the whole length of the tile
-      // converge on the vanishing point, and that convergence is what actually
-      // reads as depth in the reference frames -- a hard perspective line above
-      // the road, which nothing else in this scene provides.
-      const MX = K.TRACK_HALF_WIDTH + 2.6;   // mast line, just outside the lamps
-      for (const wx of [-LANE, 0, LANE]) {
-        parts.push(bx(0.07, 0.07, TILE, wx, 9.30, 0, 0x2b2f52));
-      }
-      for (let i = 0; i < SPAN_Z.length; i++) {
-        const sz = SPAN_Z[i];
-        const h = i ? 10.1 : 10.9;
-        for (const sx of [-1, 1]) {
-          parts.push(bx(0.26, h, 0.26, sx * MX, h / 2, sz, 0x2b2f52));
-          parts.push(bx(0.95, 0.16, 0.16, sx * (MX - 0.48), h - 0.55, sz, 0x2b2f52));
-        }
-        parts.push(bx(MX * 2, 0.11, 0.11, 0, 9.74, sz, 0x2b2f52));
-        parts.push(bx(MX * 2, 0.07, 0.07, 0, 10.34, sz, 0x3a4570));
-        // Droppers, so the span visibly carries the contact wires rather than
-        // three wires and a beam happening to be at the same place.
-        for (const wx of [-LANE, 0, LANE]) {
-          parts.push(bx(0.06, 0.44, 0.06, wx, 9.52, sz, 0x2b2f52));
-        }
-        if (i) bunting(parts, MX, 9.44, sz + 0.09, 15);
-      }
+      // What was here: two portal spans a tile, each a pair of 10-11 unit masts
+      // at |x| = 6.35 with a beam and a second wire across the road, three
+      // droppers hanging off it, and fifteen bunting pennants on the second
+      // span. Plus three contact wires at y 9.30 running the length of the tile
+      // directly over the lanes.
+      //
+      // The longitudinal wires were the good part -- three lines converging on
+      // the vanishing point are the one hard perspective cue this scene has --
+      // and they are kept, at POLE_X on the verge instead of over the lanes,
+      // strung between the telegraph poles where a wire that is not a tram
+      // contact wire actually belongs. Nothing is lost from the frame except
+      // the part that was standing in front of the mile marker.
+      //
+      // The bunting went with the spans, and is better for it: it now appears
+      // only in the finish chute, so the first time the player sees pennants
+      // overhead in a whole race is the moment they can see the tape.
+      vergeLine(parts, 0x2b2f52, 0xffe45e, 0x2b2f52);
       return parts;
     }
 
@@ -4153,47 +4264,38 @@ MR.World = (function () {
           parts.push(sph(0.85 * k, 6, tx + sx * 0.12 * k, 3.85 * k, tz + 0.12 * k, LEAF[0]));
         }
       }
-      // Park and riverside overhead: bunting on slim poles and nothing else.
-      // These legs are meant to feel open, so they get the crossing rhythm
-      // without the ironwork the city carries. The poles stand INSIDE the
-      // avenue, at the hedge line rather than beyond it, so a mast never grows
-      // out of a tree canopy.
-      const MX = K.TRACK_HALF_WIDTH + 0.9;
-      for (const sz of SPAN_Z) {
-        for (const sx of [-1, 1]) {
-          parts.push(cyl(0.12, 0.17, 10.0, 6, sx * MX, 5.0, sz, 0xfff2e0));
-          parts.push(bx(0.5, 0.14, 0.14, sx * (MX - 0.24), 9.72, sz, 0xfff2e0));
-        }
-        parts.push(bx(MX * 2, 0.09, 0.09, 0, 9.76, sz, 0xfff2e0));
-        bunting(parts, MX, 9.42, sz + 0.08, 11);
-      }
+      // PARKLAND AND RIVERSIDE GET THE OPEN SKY, and they get it outright.
+      //
+      // What was here: two bunting spans a tile on 10-unit poles, a cross wire
+      // and eleven pennants each -- 24 pennants and four masts over every 24
+      // units of a leg whose stated job is to feel open. The comment above it
+      // said these legs "are meant to feel open, so they get the crossing
+      // rhythm without the ironwork the city carries", which is the sentence
+      // that gives the game away: a crossing rhythm IS the covering.
+      //
+      // No telegraph poles here either, and no wires. A park boulevard is
+      // lamps and trees, the avenue already carries the trees, and this is the
+      // sparsest overhead in the race by design -- PARKLAND is where the player
+      // gets the longest look down the road.
+      for (const sx of [-1, 1]) lampArc(parts, sx, POLE_Z[sx > 0 ? 0 : 1], 0x3a4560, 0xfff2e0);
       return parts;
     }
 
     /**
-     * One geometry per (roadside kind, lamp side). The lamp has to be baked into
-     * the tile's own merge or it is a draw call per live tile -- about a dozen,
-     * on a frame that already runs 150-260 -- and the only thing that differs
-     * between the two variants is which side the post stands on, so the pair is
-     * built once at start-up and the tile picks one by the parity of its index.
-     * Both are held on every pooled tile and one is made visible, exactly as the
-     * four kinds already were: a biome change stays a visibility flip.
+     * One merged geometry per roadside kind. The verge line has to be baked
+     * into the tile's own merge or it is a draw call per live tile -- about a
+     * dozen, on a frame that already runs 150-275.
+     *
+     * There used to be a second axis here: the lamp alternated sides tile by
+     * tile, so `barrier` and `hedge` were each built twice and every pooled
+     * tile carried both variants. The verge line is symmetric and staggers
+     * within the tile instead, so the axis is gone and with it two geometries
+     * and two outlined mesh pairs on every pooled tile.
      */
-    const LIT_EDGES = {};
-    for (const kind in LAMP_EDGES) {
-      const build = kind === 'barrier' ? barrierParts : hedgeParts;
-      const col = LAMP_EDGES[kind];
-      for (const sx of [-1, 1]) {
-        const parts = build();
-        lampArc(parts, sx, 0, col[0], col[1]);
-        LIT_EDGES[kind + (sx < 0 ? 'L' : 'R')] = merge(parts);
-      }
-    }
-    /** The tile variant a given tile index wears. Alternates every TILE. */
-    function edgeVariant(kind, tileIdx) {
-      if (!LAMP_EDGES[kind]) return kind;
-      return kind + (((tileIdx % 2) + 2) % 2 ? 'R' : 'L');
-    }
+    const LIT_EDGES = {
+      barrier: merge(barrierParts()),
+      hedge: merge(hedgeParts()),
+    };
 
     /**
      * THE WALL: concrete jersey barrier and a graffitied site hoarding. The leg
@@ -4284,31 +4386,53 @@ MR.World = (function () {
           parts.push(bx(0.22, 0.22, 4.4, wx, 4.55, gz, 0x3d3846));
         }
       }
-      // THE WALL overhead: the scaffold continues over the road. This leg is
-      // the one place a birdcage above the carriageway is not a liberty -- the
-      // whole conceit is that the runner is passing through a works site -- and
-      // it closes the trench at the top as well as at the sides. The boards are
-      // deliberately narrow and staggered: a solid deck would drop the light on
-      // a leg that is already the darkest in the race.
-      const MX = K.TRACK_HALF_WIDTH + 7.6;
+      // THE BIRDCAGE CAME OFF, AND IT WAS MEASURABLY THE WORST OBJECT IN THE
+      // GAME FOR THE THING THE OWNER ASKED ABOUT.
+      //
+      // What was here: a scaffold roof over the carriageway -- three
+      // longitudinal tubes at y 9.78 running the full tile directly over the
+      // lanes, two portal frames a tile at 9.52 and 10.24 spanning 22 units,
+      // and a staggered board at 10.08. The argument for it was the conceit,
+      // that the runner is passing through a works site, and the argument was
+      // good enough that a previous pass removed the diagonal bracing and kept
+      // everything else.
+      //
+      // Then it was measured. THE WALL carries mile 19, 20 and 21 -- mile 20 is
+      // where a marathon breaks people and the course stages it deliberately --
+      // and the birdcage was in front of every one of those signs. Rays from
+      // the real camera to the MILE 20 panel at the distance it is first read:
+      // 59 of 65 blocked at 101 units, 61 of 65 at 145, all 65 at 96. It was
+      // not competing with the mile marker for attention, it was standing in
+      // the way of it, and it was the reason the owner could not read MILE 24.
+      //
+      // The works site is still here and it is still joyless: the hoarding, the
+      // standards, the lift rails and the graffiti all stand, and every one of
+      // them is LATERAL. What this leg has overhead now is one concrete
+      // overpass every 168 units, which is what the hand-placed comment further
+      // down this file always wanted -- you pass under it in shadow and the
+      // mile 20 gantry is waiting on the far side in open sky.
+      // The scaffold now goes UP instead of across. A third lift standing on
+      // the hoarding line, with its own top rail and a raking brace, keeps the
+      // works site reading as a structure that has a top rather than a fence
+      // that stops -- and every tube of it is at |x| = 11.35, further out than
+      // the street lamps on any other leg.
       const TUBE = 0x8f8a9c, TUBE2 = 0x6f6a7c;
-      for (const tx of [-2.6, 0, 2.6]) {
-        parts.push(bx(0.13, 0.13, TILE, tx, 9.78, 0, TUBE));
-      }
-      for (let i = 0; i < SPAN_Z.length; i++) {
-        const sz = SPAN_Z[i];
-        for (const sx of [-1, 1]) {
-          parts.push(bx(0.24, 10.4, 0.24, sx * MX, 5.2, sz, TUBE));
+      for (const sx of [-1, 1]) {
+        const wx = sx * (K.TRACK_HALF_WIDTH + 7.6);
+        parts.push(bx(0.16, 0.16, TILE, wx, 9.60, 0, TUBE));
+        parts.push(bx(0.13, 0.13, TILE, wx - sx * 0.55, 8.30, 0, TUBE2));
+        for (const pz of [-9, -3, 3, 9]) {
+          parts.push(bx(0.24, 3.3, 0.24, wx, 8.05, pz, TUBE));
         }
-        parts.push(bx(MX * 2, 0.16, 0.16, 0, 9.52, sz, TUBE));
-        parts.push(bx(MX * 2, 0.13, 0.13, 0, 10.24, sz, TUBE2));
-        // No diagonal bracing over the carriageway. It was there and it had to
-        // go: from a camera at 2.7 looking down a 6-degree slope, canted tubes
-        // at 9.9 cross the horizontal ones at every angle at once and the whole
-        // top of the frame turned into a thicket of sticks. The verticals,
-        // longitudinals and boards give the same crossing rhythm and stay
-        // legible as a structure.
-        parts.push(bx(3.4, 0.10, 1.6, i ? -3.2 : 3.2, 10.08, sz, 0xc0a878));
+        // Site floodlights on the top lift, turned in toward the works. A short
+        // yoke, and the only light on the grimmest leg in the race.
+        for (const fz of [-6, 6]) {
+          parts.push(bx(0.5, 0.20, 0.20, wx - sx * 0.35, 9.95, fz, TUBE));
+          parts.push(bx(0.55, 0.42, 0.62, wx - sx * 0.72, 9.95, fz, 0xffd88a));
+        }
+        // Staggered boards, kept, but stacked on the lift instead of laid over
+        // the road: the plank rhythm survives with nothing above the tarmac.
+        parts.push(bx(0.10, 1.5, 5.2, wx - sx * 0.40, 7.35, sx > 0 ? -5 : 5, 0xc0a878));
       }
       return merge(parts);
     })();
@@ -4324,31 +4448,42 @@ MR.World = (function () {
         for (let i = 0; i < 12; i++) {
           parts.push(bx(0.09, 1.3, 0.09, x, 0.65, -TILE / 2 + 1 + i * 2, 0xdfe6ff));
         }
-        for (let i = 0; i < 2; i++) {
-          const z = -TILE / 2 + 6 + i * 12;
-          parts.push(bx(0.16, 3.4, 0.16, x, 1.7, z, 0x2b2f52));
-          parts.push(bx(0.5, 0.24, 0.5, x, 3.5, z, 0xffe45e));
-        }
+        // THE DECK STANDARD, and it is now the whole of the bridge's overhead.
+        //
+        // What was here: lighting PORTALS -- a 9.7-unit column each side of the
+        // deck, a beam and a second runner across the road every 12 units, plus
+        // two wires at y 9.98 running the length of the tile over the lanes.
+        // The argument was that the deck is the one leg with no roadside at
+        // all, so a ribbon over open water has no speed without something
+        // crossing it. That was the right problem and the wrong answer: a
+        // suspension bridge already has the best vertical device in the game
+        // standing on it, and reference/sonic-dash-downhill.png is a photograph
+        // of exactly that -- the Golden Gate filling the upper third, deck
+        // lamps down the parapet, and not one thing spanning the carriageway.
+        //
+        // So the portal becomes a standard: a tall tapered column on the
+        // parapet with the lantern on top and no arm at all. Two per side per
+        // tile, staggered against the other side, so a lamp passes the lens
+        // every six units -- a denser beat than the portals gave, and none of
+        // it over the road. The tower ahead does the rest.
+        const z = POLE_Z[sx > 0 ? 0 : 1];
+        parts.push(bx(0.26, 9.2, 0.26, x, 4.60, z, 0x2b2f52));
+        parts.push(bx(0.40, 0.55, 0.40, x, 9.45, z, 0x2b2f52));
+        parts.push(bx(0.56, 0.60, 0.56, x, 10.00, z, 0xffe45e));
+        parts.push(bx(0.30, 0.34, 0.30, x, 10.42, z, 0x2b2f52));
+        // A shorter parapet lamp between them, so the deck carries a vertical
+        // every six units without four full standards a tile.
+        const z2 = POLE_Z[sx > 0 ? 1 : 0];
+        parts.push(bx(0.20, 4.6, 0.20, x, 2.30, z2, 0x2b2f52));
+        parts.push(bx(0.44, 0.46, 0.44, x, 4.80, z2, 0xffe45e));
       }
-      // Bridge overhead: lighting portals. The deck is the one leg with no
-      // roadside at all, so it was also the leg with no crossing rhythm
-      // whatever -- a ribbon over open water, and a ribbon over nothing has no
-      // speed. The portals are the only structure a suspension deck can
-      // honestly carry, and the two runners above them give the same
-      // convergence the city wires do.
-      const MX = K.TRACK_HALF_WIDTH + 0.78;
-      for (const wx of [-LANE * 1.55, LANE * 1.55]) {
-        parts.push(bx(0.07, 0.07, TILE, wx, 9.98, 0, 0x2b2f52));
-      }
-      for (const sz of SPAN_Z) {
-        for (const sx of [-1, 1]) {
-          parts.push(bx(0.22, 9.7, 0.22, sx * MX, 4.85, sz, 0x2b2f52));
-        }
-        parts.push(bx(MX * 2, 0.26, 0.26, 0, 9.62, sz, 0x2b2f52));
-        parts.push(bx(MX * 2, 0.13, 0.13, 0, 10.14, sz, 0x3a4570));
-        for (const lx of [-LANE, LANE]) {
-          parts.push(bx(0.34, 0.30, 0.34, lx, 9.32, sz, 0xffe45e));
-        }
+      // The convergence the two over-road runners used to draw, moved out onto
+      // the parapet line where the standards can honestly carry it. Two wires
+      // at |x| = 4.30, which is 0.55 outside CORRIDOR_HALF.
+      for (const sx of [-1, 1]) {
+        const x = sx * (K.TRACK_HALF_WIDTH + 0.55);
+        parts.push(bx(0.07, 0.07, TILE, x, 8.30, 0, 0x2b2f52));
+        parts.push(bx(0.07, 0.07, TILE, x, 7.80, 0, 0x3a4570));
       }
       return merge(parts);
     })();
@@ -6953,9 +7088,16 @@ MR.World = (function () {
      *             in the ending that passes CLOSE to the lens, so it sweeps
      *             top-to-bottom every 24 units and does more for the sense of
      *             closing speed than anything on the ground can. Its lowest
-     *             point is 9.72, against an OVERHEAD_Y of 9.0 -- the same rule
-     *             the catenary and the mile gantries obey, checked by
-     *             api.crossings() rather than promised here.
+     *             point is 9.72, against an OVERHEAD_Y of 9.0 -- the rule the
+     *             mile gantries obey, checked by api.crossings() rather than
+     *             promised here.
+     *
+     *             THIS IS NOW THE ONLY BUNTING IN THE GAME. It used to run on
+     *             every city and every park tile, fifteen pennants a span and
+     *             two spans every 24 units for the whole race, and it was worth
+     *             nothing there because it never stopped. The first pennants a
+     *             player sees in a whole marathon are the ones over the chute,
+     *             which is the only place the object ever meant anything.
      *   CARPET    the finish chute laid over the tarmac. Every road race in the
      *             world does this and it is instantly legible as an ending.
      *             It sits at y = 0.016, under Y_FLOOR, so it is road paint as
@@ -7749,25 +7891,64 @@ MR.World = (function () {
      * that is the part that marks the moment of passing.
      *
      * It also reads better. A sign gantry at 9.5-11.8 is the same object every
-     * motorway has, it now belongs to the same overhead layer as the catenary
-     * and the footbridges instead of floating in its own band, and it sweeps
-     * top-to-bottom past the lens rather than across the middle of the frame.
+     * motorway has and it sweeps top-to-bottom past the lens rather than across
+     * the middle of the frame.
+     *
+     * ============ AND THEN IT STILL COULD NOT BE READ ============
+     *
+     *   "Review the mile markers. Still tough to read at the top. You should
+     *    be able to clearly see that."
+     *
+     * Three separate defects, all of them measured on the rendered frame at
+     * 420x860 rather than argued about (the R3 brief carries the harness):
+     *
+     * 1. THE GANTRY WAS DRAWING ITS OWN LATTICE ACROSS ITS OWN SIGN. Nine
+     *    X-braces, 0.16 x 2.4 x 0.16, sat at z = 0 rotated about z -- and the
+     *    sign panel was a plane at z = 0 as well. The near half of every brace
+     *    was therefore IN FRONT of the text, in the same plane, z-fighting with
+     *    it. Zoom into the crop in the R3 report and the zigzag is legible
+     *    across MILE 19 while the numeral is not. The braces existed to make
+     *    the truss look like a truss; they made the sign look like a fence.
+     *    They are gone, and a header beam above the panel does that job now.
+     *
+     * 2. NOTHING WAS BEHIND THE PANEL BUT MORE STRUCTURE. Rays from the real
+     *    camera to a 13 x 5 grid on the sign face, at the distance the sign is
+     *    first read: 57% to 100% blocked, right across the race, mostly by the
+     *    WALL birdcage and the tile catenary. That half is fixed at the top of
+     *    this file -- the road tile no longer spans the road at all -- and the
+     *    banner is now the tallest thing for a hundred units in either
+     *    direction.
+     *
+     * 3. THE NUMERAL WAS FOUR TO EIGHT PIXELS TALL. The plate was 9.3 wide by
+     *    2.1 high carrying "MILE 24" as one centred line at 0.60 em, so the cap
+     *    height was 0.90 world units on a plate with 9.3 units of width and
+     *    almost nothing in it. The plate grows to 2.9 and the label is re-set
+     *    the way a real marathon mile marker is set: the word small and out of
+     *    the way, the NUMBER as large as the plate will carry. Cap height goes
+     *    0.90 -> 1.74 world units, 1.93x, for no extra triangles and no extra
+     *    draw call.
+     *
+     * The panel also comes forward to PANEL_Z, clear of every member of the
+     * frame, so no future brace can ever be coplanar with it again.
      */
     const BANNER_CHORD = OVERHEAD_Y + 0.35;      // lowest member over the road
     const TRUSS_LIFT = BANNER_CHORD - 3.50;      // 3.50 was the old chord bottom
+    const PANEL_H = 2.9;                         // was 2.1
+    const PANEL_Y = 5.20 + TRUSS_LIFT;           // centre; bottom 9.60, top 12.50
+    const PANEL_Z = -0.62;                       // in front of every member
     const bannerFrameGeo = (function () {
       const parts = [];
-      const legTop = 5.95 + TRUSS_LIFT + 0.25;
+      const legTop = 6.85 + TRUSS_LIFT + 0.40;
       for (const sx of [-1, 1]) {
         parts.push(bx(0.42, legTop, 0.42, sx * GANTRY, legTop / 2, 0, 0x2b2f52));
         parts.push(bx(0.90, 0.30, 0.90, sx * GANTRY, 0.15, 0, 0x1b1633));
-        parts.push(bx(0.30, 0.30, 1.8, sx * GANTRY, 5.4 + TRUSS_LIFT, 0, 0x2b2f52, 0, 0, 0));
+        parts.push(bx(0.30, 0.30, 1.8, sx * GANTRY, 6.20 + TRUSS_LIFT, 0, 0x2b2f52, 0, 0, 0));
       }
-      parts.push(bx(GANTRY * 2 + 0.4, 0.40, 0.40, 0, 5.95 + TRUSS_LIFT, 0, 0x2b2f52));
+      // Header above the plate and a rail under it. The truss reads as a truss
+      // from its top chord and its depth, not from bracing laid over the sign.
+      parts.push(bx(GANTRY * 2 + 0.4, 0.44, 0.44, 0, 6.85 + TRUSS_LIFT, 0, 0x2b2f52));
+      parts.push(bx(GANTRY * 2 + 0.4, 0.26, 0.26, 0, 6.30 + TRUSS_LIFT, 0, 0x3a4570));
       parts.push(bx(GANTRY * 2 + 0.4, 0.30, 0.30, 0, 3.65 + TRUSS_LIFT, 0, 0x2b2f52));
-      for (let i = -4; i <= 4; i++) {
-        parts.push(bx(0.16, 2.4, 0.16, i * (GANTRY - 0.6) / 4, 4.8 + TRUSS_LIFT, 0, 0x3a4570, 0, 0, i % 2 ? 0.45 : -0.45));
-      }
       parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, 0.7), 0xfffdf5, 0, 0.011, 0, -Math.PI / 2));
       return merge(parts);
     })();
@@ -7776,13 +7957,14 @@ MR.World = (function () {
       const g = new THREE.Group();
       g.add(S.outlined(bannerFrameGeo, mats.prop, S.INK.banner));
       const mat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-      const panel = new THREE.Mesh(new THREE.PlaneGeometry(GANTRY * 2 - 0.6, 2.1), mat);
-      panel.position.y = 4.78 + TRUSS_LIFT; panel.rotation.y = Math.PI;
+      const panel = new THREE.Mesh(new THREE.PlaneGeometry(GANTRY * 2 - 0.6, PANEL_H), mat);
+      panel.position.set(0, PANEL_Y, PANEL_Z); panel.rotation.y = Math.PI;
       g.add(panel);
-      const back = new THREE.Mesh(new THREE.PlaneGeometry(GANTRY * 2 - 0.6, 2.1), mat);
-      back.position.y = 4.78 + TRUSS_LIFT;
+      const back = new THREE.Mesh(new THREE.PlaneGeometry(GANTRY * 2 - 0.6, PANEL_H), mat);
+      back.position.set(0, PANEL_Y, 0.30);
       g.add(back);
       g.userData.panel = panel;
+      g.userData.back = back;
       g.userData.mat = mat;
       return g;
     }, group);
@@ -7794,15 +7976,22 @@ MR.World = (function () {
     // arches crossed the road at 5.95-9.35 with the sign panel at 6.25-8.65.
     // START stands 30 units into the race with gates behind it.
     const ARCH_LIFT = BANNER_CHORD - 5.95;
+    // ARCH_HEAD: the top chord used to sit at 8.7 + L, which put its underside
+    // at 11.45 through a sign panel running 9.65 to 12.05 -- the same defect
+    // the mile gantry's X-braces had, on the one sign in the game that says
+    // FINISH. It lifts to clear the panel outright, the panel comes forward of
+    // the chords, and the checker band drops below the plate instead of being
+    // hidden behind it. See the mile banner's note above for the measurement.
+    const ARCH_HEAD = 9.35;
     const archGeo = (function () {
       const L = ARCH_LIFT;
-      const legTop = 8.7 + L + 0.65;
+      const legTop = ARCH_HEAD + L + 0.70;
       return merge([
         bx(1.5, legTop, 1.5, -ARCH, legTop / 2, 0, 0xff3b6b),
         bx(1.5, legTop, 1.5, ARCH, legTop / 2, 0, 0xff3b6b),
         bx(2.3, 0.6, 2.3, -ARCH, 0.3, 0, 0x1b1633),
         bx(2.3, 0.6, 2.3, ARCH, 0.3, 0, 0x1b1633),
-        bx(ARCH * 2 + 2.4, 1.3, 1.6, 0, 8.7 + L, 0, 0xff3b6b),
+        bx(ARCH * 2 + 2.4, 1.3, 1.6, 0, ARCH_HEAD + L, 0, 0xff3b6b),
         bx(ARCH * 2 + 2.4, 0.5, 1.2, 0, 6.2 + L, 0, 0xd42a55),
         // The finials came down from 4.2 to 2.8 to pay for the lift. A finish
         // arch reaching 17 units would have been half again the height of
@@ -7819,16 +8008,19 @@ MR.World = (function () {
       g.add(S.outlined(archGeo, mats.prop, S.INK.banner));
       const mat = new THREE.MeshBasicMaterial({ color: 0xffffff });
       const panel = new THREE.Mesh(new THREE.PlaneGeometry(ARCH * 2 + 0.6, 2.4), mat);
-      panel.position.y = 7.45 + ARCH_LIFT; panel.rotation.y = Math.PI;
+      // z = -0.90 clears the 1.6-deep top chord and the 1.2-deep lower one, so
+      // the plate is unambiguously in front of the whole frame.
+      panel.position.set(0, 7.45 + ARCH_LIFT, -0.90); panel.rotation.y = Math.PI;
       g.add(panel);
       const back = new THREE.Mesh(new THREE.PlaneGeometry(ARCH * 2 + 0.6, 2.4), mat);
-      back.position.y = 7.45 + ARCH_LIFT;
+      back.position.set(0, 7.45 + ARCH_LIFT, 0.90);
       g.add(back);
-      const band = new THREE.Mesh(new THREE.PlaneGeometry(ARCH * 2 + 0.6, 0.55), new THREE.MeshBasicMaterial({ map: checkTex }));
-      // Nudged clear of the chord it hangs under so its own lower edge stays
-      // above OVERHEAD_Y too -- a 0.55 band centred on the chord would dip
-      // 0.02 under it, which is exactly the sort of thing the audit exists for.
-      band.position.set(0, 6.28 + ARCH_LIFT, 0.1); band.rotation.y = Math.PI;
+      const band = new THREE.Mesh(new THREE.PlaneGeometry(ARCH * 2 + 0.6, 0.50), new THREE.MeshBasicMaterial({ map: checkTex }));
+      // BELOW the plate now, not behind it. At 0.1 in front of the chord it was
+      // 0.8 behind the sign panel and more than half of it was simply never
+      // drawn. Its lower edge lands at 9.13 against an OVERHEAD_Y of 9.0, which
+      // is the clearance the audit exists to keep honest.
+      band.position.set(0, 9.38, -0.95); band.rotation.y = Math.PI;
       g.add(band);
       // Checker laid across the road: the line you actually cross.
       const line = new THREE.Mesh(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, 1.2),
@@ -7903,6 +8095,13 @@ MR.World = (function () {
       scenery.sort((p, q) => p.z - q.z);
     }
 
+    // How much clear road a mile marker is owed in front of and behind it.
+    // Declared here rather than beside nudgeOver() below because the structure
+    // loops read it and `const` does not hoist -- see the note on the function
+    // for what the two numbers are and what they were measured against.
+    const MILE_SIGHT_BEFORE = 95;
+    const MILE_SIGHT_AFTER = 26;
+
     // Set pieces: deterministic, biome-specific, and placed by hand rather
     // than rolled, because a bridge tower in the wrong place is not a bridge.
     const structures = [];
@@ -7957,11 +8156,22 @@ MR.World = (function () {
         for (let z = b.from; z < b.to; z += 58) structures.push({ z, kind: 'river', side: -1, set: 0 });
       }
       if (b.name === 'THE WALL') {
-        for (let z = b.from + 90; z < b.to - 40; z += 168) structures.push({ z, kind: 'overpass', set: 0 });
+        // nudgeOver, and it was missing here. These are the only opaque decks
+        // in the game and nothing kept them off the mile gantries -- the loop
+        // simply stepped 168 units and landed where it landed.
+        for (let z = b.from + 90; z < b.to - 40; z += 168) {
+          structures.push({ z: nudgeOver(z), kind: 'overpass', set: 0 });
+        }
         // One placed by hand: you go under it and the mile 20 gantry is
         // waiting on the far side. Mile 20 is where a marathon breaks people,
         // and the course should stage it rather than merely label it.
-        structures.push({ z: 20 * K.UNITS_PER_MILE - 34, kind: 'overpass', set: 0 });
+        //
+        // It stood 34 units before the gantry, which staged nothing: the deck
+        // covered the sign for the whole approach and then the sign was 34
+        // units away, i.e. already overhead. At MILE_SIGHT_BEFORE the deck is
+        // passed with 3.6 seconds of open road and the marker standing in it,
+        // which is the beat the comment above always described.
+        structures.push({ z: 20 * K.UNITS_PER_MILE - MILE_SIGHT_BEFORE, kind: 'overpass', set: 0 });
       }
       if (b.name === 'FINAL MILE') {
         for (let z = b.from; z < K.TOTAL_UNITS + 30; z += TILE) {
@@ -8022,10 +8232,40 @@ MR.World = (function () {
     // obeying by eye.
     const noBridgeSpans = [];
 
-    /** Keep a spanning piece clear of the mile gantries, which are every 240. */
+    /**
+     * KEEP THE MILE MARKER'S SIGHTLINE CLEAR. This is the placement half of the
+     * legibility fix and it is asymmetric, because occlusion is.
+     *
+     * The old rule was |z - mile| >= 32, symmetric, and it was reasoning about
+     * the wrong thing: it kept two structures from reading as one confused
+     * mass, which is a composition problem. The problem that made MILE 20
+     * unreadable is a SIGHTLINE problem. A spanning piece anywhere between the
+     * camera and a sign hides it, and the camera is always on the low-z side,
+     * so a footbridge 60 units BEFORE a marker sits in front of it for the
+     * entire approach while one 60 units after it is simply not in the way.
+     *
+     * Measured, on the shipped build: the overpass hand-placed 34 units before
+     * the mile 20 gantry blocked 52 to 64 of 65 rays to the sign face at every
+     * distance the sign could be read at, and the footbridge at 5250 blocked 26
+     * of 65 to MILE 22. Both passed the old 32-unit test.
+     *
+     *   BEFORE   95 units, which at race pace is 3.6 seconds of clear approach
+     *            after the piece has been passed -- long enough to read a sign
+     *            and see it coming, and it is the number the mile 20 staging
+     *            wanted all along ("you go under it and the gantry is waiting
+     *            on the far side").
+     *   AFTER    26 units, enough that the two do not read as one mass. A piece
+     *            beyond the sign is never between the lens and it.
+     */
     function nudgeOver(z) {
       const m = Math.round(z / K.UNITS_PER_MILE) * K.UNITS_PER_MILE;
-      return Math.abs(z - m) < 32 ? m + (z < m ? -32 : 32) : z;
+      const d = z - m;
+      if (d >= MILE_SIGHT_AFTER || d <= -MILE_SIGHT_BEFORE) return z;
+      // Push to whichever side of the marker it is already nearer, so a piece
+      // laid on a spacing keeps as close to its intended z as the rule allows.
+      return d > (MILE_SIGHT_AFTER - MILE_SIGHT_BEFORE) / 2
+        ? m + MILE_SIGHT_AFTER
+        : m - MILE_SIGHT_BEFORE;
     }
 
     for (const b of BI) {
@@ -8625,16 +8865,16 @@ MR.World = (function () {
         // kink is c * TILE = 5.7e-4 * 24 = 0.0137 rad = 0.8 degrees.
         //
         // Everything the tile carries -- both shoulders, the paint, the kerb
-        // rail or wall, the lamp arcs -- are its children, so they ride for
+        // rail or wall, the verge line -- are its children, so they ride for
         // free. One position, one rotation, one atan, about 1.1 claims a second
         // at race pace.
         const ey0 = eAt(tz - TILE / 2), ey1 = eAt(tz + TILE / 2);
         obj.position.y = (ey0 + ey1) * 0.5;
         obj.rotation.x = -Math.atan2(ey1 - ey0, TILE);
-        // The lamp alternates on the parity of the tile index, not on the tile's
-        // z, so the pattern is a property of the course and identical for every
-        // player on the same day -- like everything else the course decides.
-        const edge = edgeVariant(lookAtZ(tz).look.edge, state.roadFrom);
+        // One geometry per roadside kind. There used to be a second axis here,
+        // the lamp alternating on the parity of the tile index; the verge line
+        // is symmetric and staggers within the tile instead.
+        const edge = lookAtZ(tz).look.edge;
         for (const k in obj.userData.edges) obj.userData.edges[k].visible = (k === edge);
         // On the deck the shoulders come off and the road becomes a ribbon
         // over water. Tiles are claimed 210 units out, so the swap always
@@ -8893,8 +9133,8 @@ MR.World = (function () {
           b.tex = finish
             ? labelTexture('FINISH', '#ff3b6b', '#fffdf5', 768, 128)
             : wall
-              ? labelTexture('MILE 20', '#7a1030', '#ff9ab0', 768, 128, 'THE WALL')
-              : labelTexture(`MILE ${b.m.mile}`, '#1b1633', '#ffe45e', 768, 128);
+              ? mileTexture('MILE', '20', '#7a1030', '#ff9ab0', 'THE WALL')
+              : mileTexture('MILE', String(b.m.mile), '#1b1633', '#ffe45e');
         }
         const pool = finish ? archPool : bannerPool;
         const obj = pool.claim();

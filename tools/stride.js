@@ -134,6 +134,20 @@ fs.mkdirSync(DIR, { recursive: true });
 
     // Run the cycle forward from a known phase so the sweep is reproducible.
     r.phase = 0;
+    // SETTLE BEFORE MEASURING, for the same reason the contact sheets settle.
+    //
+    // The page runs ~600ms of real game at whatever ?skip= produces before
+    // this tool re-poses the rig at lo/mid/hi. Any filter driven by the
+    // HISTORY of a value -- not by the posed value itself -- then sees that
+    // jump as a real event and reports its transient as the steady state. It
+    // was harmless while every filter was seeded lazily off its own pose;
+    // it stopped being harmless the moment a term was driven by the
+    // derivative of `speed`, which reads the re-pose as an acceleration.
+    //
+    // Measured: chest fore/aft inflated 3.3x cold against settled (0.0264 vs
+    // 0.0080), hand vertical +0.0508 at top pace. Sixth defect found in this
+    // file by an agent rather than by me, and the sixth to flatter the work.
+    for (let k = 0; k < 300; k++) r.update(1 / 120, { speed });
     r.update(0, { speed });
     root.updateWorldMatrix(true, true);
 

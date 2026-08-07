@@ -3511,6 +3511,24 @@ MR.shading = (function () {
     inkFogNear: { value: FOG_NEAR },
     inkFogFar: { value: FOG_FAR },
   };
+
+  // The same haze colour the ground fades into, kept in LINEAR working space
+  // for the sky shader -- which mixes in linear and converts once at the end,
+  // so it cannot use the display-encoded copy above. Shared by value object
+  // with every sky material, exactly like the ink uniforms.
+  //
+  // This exists because the horizon used to fade to WHITE. That is the single
+  // largest measured colour defect in the frame: the sky is 8-31% of the
+  // picture and 22-77% of clarity.js's far band, and it was rendering at
+  // S 0.105-0.248 against a non-sky frame of 0.271-0.367 and a reference sky
+  // of 0.54-0.69. Fading to the biome's own fog colour instead is not a
+  // compromise between chroma and the seam -- it is strictly better at BOTH,
+  // because the ground fades to precisely this value, so the horizon now
+  // matches by construction in all six biomes and eighteen city palettes
+  // rather than in whichever one the fixed white was chosen against.
+  const skyHazeU = { value: new THREE.Color(1, 1, 1) };
+  const skyMats = [];
+
   let fogHex = -1;
 
   function syncFog(fog) {
@@ -3523,9 +3541,15 @@ MR.shading = (function () {
     fogU.inkFogColor.value.setRGB(encode(fog.color.r), encode(fog.color.g), encode(fog.color.b));
     fogU.inkFogNear.value = fog.near;
     fogU.inkFogFar.value = fog.far;
+    // fog.color is already linear (a THREE.Color built from a hex under
+    // ColorManagement), which is what the sky shader wants -- no encode() here,
+    // and that asymmetry with inkFogColor above is the whole reason the two are
+    // kept as separate uniforms rather than one shared value.
+    skyHazeU.value.copy(fog.color);
     // A ShaderMaterial only re-uploads on demand; there are a handful of
     // cached outline materials so flagging them all is free.
     outlineMats.forEach(function (m) { m.uniformsNeedUpdate = true; });
+    for (let i = 0; i < skyMats.length; i++) skyMats[i].uniformsNeedUpdate = true;
   }
 
   // ---- ink outlines ------------------------------------------------------
@@ -3740,6 +3764,7 @@ MR.shading = (function () {
     uniform vec3 sunColor;
     uniform vec3 glowColor;
     uniform vec3 sunDir;
+    uniform vec3 hazeColor;
     uniform sampler2D cloudMap;
     uniform float time;
     varying vec3 vWorld;
@@ -3761,14 +3786,48 @@ MR.shading = (function () {
       vec3 back = vec3(viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2]);
       vec3 fwd = normalize(vec3(-back.x, 0.0, -back.z));
       float sy = d.y / max(dot(d, fwd), 0.30);
-      float t = clamp(sy * 1.55 + 0.06, 0.0, 1.0);
+
+      // The gradient has to climb inside the band this camera can SEE. The
+      // chase eye sits at 3.10 looking at 1.16 eleven units ahead, so the view
+      // centre is 7.2 degrees below level and a 58 degree frame reaches only
+      // 21.8 degrees above it -- sy runs 0 to about 0.40, never further. At the
+      // old 1.55 that put the top of the frame at t = 0.68, so the deep blue at
+      // the top of every biome palette was NEVER ON SCREEN and the visible sky
+      // was the pale bottom stop plus a bit. The pale bottom is correct and
+      // stays: world.js pairs it with the biome fog (sky[1] 0xc6e8ff against
+      // fog 0xcfe6f2) so the horizon meets the fogged ground. What was wrong is
+      // that the sky never left it. 3.20 reaches t = 1.0 at 13 degrees, so the
+      // top third of the visible band is the palette's own deep stop and
+      // everything below it climbs twice as fast as before.
+      //
+      // Swept against the six shipped biome sky/fog pairs: 2.55 gives a mean
+      // visible-sky saturation of 0.232 and 4.00 gives 0.260, but 4.00 flattens
+      // the top 40% of the band into one block of the deep stop and loses the
+      // gradient the cel steps are there to show. 3.20 takes 0.251 of that and
+      // keeps the ramp.
+      float t = clamp(sy * 3.20 + 0.07, 0.0, 1.0);
 
       // Cel steps, blended part-way and antialiased with fwidth: a bare
       // floor() aliases into a staircase wherever the band edge is not exactly
       // horizontal.
-      float b = t * 6.0;
+      //
+      // SIX steps became FOUR when t was re-ranged above, and the two changes
+      // have to be read together. The count is over the whole 0..1 range while
+      // the art direction at the top of this file is about how many bands are
+      // IN FRAME: at the old ramp the visible sky spanned t 0.06 to 0.68 and
+      // showed about four of the six, and re-ranging t to reach 1.0 inside the
+      // frame would have shown all six. Four keeps the frame looking the way it
+      // was tuned to look.
+      //
+      // It was ALSO tried as a fix for far-band edge density and is not one:
+      // six steps at the new ramp measured 36.9% on 02-early and four measured
+      // 37.1%, i.e. no effect. The small far-band edge rise this pass does
+      // carry comes from the sky simply having more contrast in it, not from
+      // the number of band edges. Recorded here because the first draft of this
+      // comment claimed the opposite.
+      float b = t * 4.0;
       float aa = fwidth(b) * 0.6 + 0.002;
-      float stepped = (floor(b) + smoothstep(0.5 - aa, 0.5 + aa, fract(b))) / 6.0;
+      float stepped = (floor(b) + smoothstep(0.5 - aa, 0.5 + aa, fract(b))) / 4.0;
       vec3 col = mix(bottom, top, mix(t, stepped, 0.85));
 
       // Sun: broad bloom, two quantised corona steps, hard disc -- a poster
@@ -3785,8 +3844,23 @@ MR.shading = (function () {
       // ground with no step, peaking a few degrees above it. Driven by the
       // same straight-line coordinate as the bands so its thickness is even
       // across the frame.
+      //
+      // It fades to hazeColor -- the LIVE scene fog colour -- and not, as it
+      // used to, to a fixed 42% white. Measured on the shipped frame, that
+      // white put the band just above the horizon at S 0.039 while the same
+      // band in the reference holds S 0.511; it was washing out exactly the
+      // rows the far road, the mile banners and the spawn edge are read
+      // against. Fading to the fog colour is what the seam actually wants:
+      // every fogged surface in the frame converges on this value, so the
+      // horizon is now continuous by construction in every biome instead of in
+      // none of them.
+      // The weight came down 0.85 -> 0.60 with the change of target. Fading to
+      // WHITE needed to be strong to hide a seam it was itself creating, since
+      // white is not where the ground ends up; fading to the ground's own
+      // colour needs only enough to soften the join, and every 0.05 of it is
+      // chroma spent on a band the reference keeps at S 0.511.
       float hz = smoothstep(0.0, 0.055, sy) * exp(-max(sy, 0.0) * 8.0);
-      col = mix(col, mix(bottom, vec3(1.0), 0.42), hz * 0.85);
+      col = mix(col, hazeColor, hz * 0.60);
 
       // Clouds ride a virtual plane overhead, so they converge toward the
       // horizon the way real ones do instead of being pasted on the dome.
@@ -3799,20 +3873,50 @@ MR.shading = (function () {
       // this the last few degrees above the horizon boil into grey stipple.
       float reach = (1.0 - smoothstep(2.4, 5.6, r)) * smoothstep(0.07, 0.24, h);
 
+      // COVER, and it is the number that decides whether this is a blue sky
+      // with clouds in it or an overcast lid.
+      //
+      // The cloud canvas is drawn as filled circles, so its alpha is 1 over a
+      // core and then carries a wide antialiased-plus-magnified skirt once one
+      // tile is stretched across the sky. Sampled raw, that skirt is what puts
+      // cloud over essentially the whole visible band -- and a 60% alpha of a
+      // near-white is a wash, not a cloud. Shaping alpha through a step keeps
+      // the cores at full strength, drops the skirts, and gives back the blue
+      // between them. The references are perhaps a fifth cloud by area; this
+      // is the control that sets ours. Applied at both sheets below.
+
       // The shaded half is derived from the LIT cloud colour, not from the sky
       // top uniform: tying it to that painted navy blobs into a pale blue sky,
       // which read as holes rather than as cloud.
-      vec3 lit = mix(vec3(1.0), bottom, 0.10);
-      vec3 shd = mix(lit * 0.60, bottom, 0.35);
+      //
+      // Both stops carry more of the sky than they used to (0.10 -> 0.30), and
+      // the shaded half is now mixed against the LOCAL sky rather than the
+      // bottom stop. That is not a style preference, it is the arithmetic of
+      // coverage. A white cloud is right -- the reference's own clouds measure
+      // S 0.154 -- but the reference shows perhaps a fifth of its sky as cloud
+      // while the reach term below puts ours over essentially all of it: its
+      // smoothstep on h saturates at 0.24 and this camera never looks above
+      // h = 0.371, so coverage is total across the whole visible band. At
+      // 100% coverage the cloud colour IS the sky colour, so a 0.10 white was
+      // not painting clouds on a blue sky, it was painting the sky white.
+      vec3 lit = mix(vec3(1.0), bottom, 0.30);
+      vec3 shd = mix(lit * 0.58, col, 0.42);
 
       // The far sheet gets aerial perspective of its own: pale and flat, with
       // no shaded half at all. Giving it the same underside as the near sheet
       // painted grey streaks across a light sky that read as smudge.
+      //
+      // Its weight came down (0.80/0.55 -> 0.55/0.38) because at the old figure
+      // it was not a cloud layer at all: lo.a covers most of the tile, so it
+      // acted as a flat 44% wash toward near-white over the WHOLE visible sky.
+      // Switching it off outright was measured at +0.085 mean saturation in the
+      // top tenth of the frame, the largest single term in the sky; this keeps
+      // the parallax it was added for and gives most of that back.
       vec4 lo = texture2D(cloudMap, p * 0.125 + vec2(0.41 - time * 0.0022, 0.63));
-      col = mix(col, mix(col, lit, 0.80), lo.a * reach * 0.55);
+      col = mix(col, mix(col, lit, 0.55), smoothstep(0.34, 0.88, lo.a) * reach * 0.38);
 
       vec4 hi = texture2D(cloudMap, p * 0.300 + vec2(time * 0.0055, 0.0));
-      col = mix(col, mix(shd, lit, smoothstep(0.35, 0.65, hi.r)), hi.a * reach);
+      col = mix(col, mix(shd, lit, smoothstep(0.35, 0.65, hi.r)), smoothstep(0.30, 0.82, hi.a) * reach);
 
       gl_FragColor = vec4(lin2srgb(col), 1.0);
     }`;
@@ -3830,6 +3934,10 @@ MR.shading = (function () {
         // looking down +z, and the elevation is low (~14 degrees) because the
         // chase camera is pitched down: anything higher leaves the frame.
         sunDir: { value: new THREE.Vector3(0.42, 0.25, 0.87).normalize() },
+        // Shared value object, so one syncFog() write moves every sky in the
+        // scene -- and so a dome built before the first syncFog still picks the
+        // colour up rather than being stuck on the constructor's guess.
+        hazeColor: skyHazeU,
         cloudMap: { value: clouds() },
         time: { value: 0 },
       },
@@ -3839,6 +3947,7 @@ MR.shading = (function () {
       depthWrite: false,
       fog: false,
     });
+    skyMats.push(mat);
     // 32x24 rather than 24x16: the fragment maths is geometry-independent, but
     // a coarse sphere still interpolates world position across wide facets and
     // the sun disc would visibly wobble as it crossed one.

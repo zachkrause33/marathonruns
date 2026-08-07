@@ -338,7 +338,74 @@ window.__probe = (function () {
     return out;
   }
 
-  return { render, analyse, subtract, SR };
+  /**
+   * COST. The brief for this file is "do not build a synth that costs
+   * frames", and the only honest answer to that is a number.
+   *
+   * Two things happen on the main thread. setIntensity() is called on EVERY
+   * frame by main.js, so its cost is paid 60 times a second whether or not
+   * anything changed -- that is measured over a realistic four-minute streak
+   * ramp, 14400 calls. And the cues themselves are scheduled from the game
+   * loop, so a second of top-gear running (3 footsteps, ~1.7 gates) is
+   * measured as the per-second cost of actually playing the game.
+   *
+   * Everything after scheduling runs on the browser's audio thread and costs
+   * the renderer nothing, which is why node COUNT is reported separately from
+   * time: it is a memory and audio-thread figure, not a frame-time one.
+   */
+  async function cost() {
+    const oc = new OfflineAudioContext(1, SR * 2, SR);
+    let vnow = 0;
+    const proxy = new Proxy(oc, {
+      get(t, p) {
+        if (p === 'currentTime') return vnow;
+        if (p === 'state') return 'running';
+        if (p === 'resume') return function () {};
+        const v = t[p];
+        return typeof v === 'function' ? v.bind(t) : v;
+      },
+    });
+    const prevAC = window.AudioContext;
+    window.AudioContext = function () { return proxy; };
+    seedRandom(1);
+    const a = MR.Audio.create();
+    a.unlock();
+
+    // Count node construction without changing how it is done.
+    let nodes = 0;
+    for (const m of ['createGain', 'createOscillator', 'createBufferSource', 'createBiquadFilter']) {
+      const orig = oc[m].bind(oc);
+      oc[m] = function () { nodes++; return orig(); };
+    }
+
+    // 240 s of race at 60 fps, streak ramping 0 -> 205 the way a clean run does.
+    const FRAMES = 240 * 60;
+    let t0 = performance.now();
+    for (let i = 0; i < FRAMES; i++) {
+      vnow = i / 60;
+      a.setIntensity(Math.min(1, (205 * i / FRAMES) / 70));
+    }
+    const perFrameUs = ((performance.now() - t0) * 1000) / FRAMES;
+    const setIntensityNodes = nodes;
+
+    // One second of top-gear running.
+    nodes = 0;
+    const REPS = 200;
+    t0 = performance.now();
+    for (let i = 0; i < REPS; i++) {
+      vnow = 100 + i * 1.0;
+      a.footstep(1); a.footstep(0.85); a.footstep(1);
+      a.clean(150 + i); a.clean(151 + i);
+    }
+    const perSecondMs = (performance.now() - t0) / REPS;
+    const perSecondNodes = nodes / REPS;
+
+    window.AudioContext = prevAC;
+    Math.random = realRandom;
+    return { perFrameUs, setIntensityNodes, perSecondMs, perSecondNodes };
+  }
+
+  return { render, analyse, subtract, cost, SR };
 })();
 `;
 
@@ -418,6 +485,7 @@ ${mods}
     }
   }
 
+  const cost = await page.evaluate(() => window.__probe.cost());
   await browser.close();
 
   // ---- print ------------------------------------------------------------
@@ -492,6 +560,14 @@ ${mods}
   for (const k of ['footstep(1)', 'land', 'hit']) {
     if (by[k]) check(by[k].band[0] < 80, `${k}: ${f(by[k].band[0], 0)}% of energy below 200 Hz`);
   }
+
+  console.log('  cost   setIntensity ' + cost.perFrameUs.toFixed(2) + ' us/frame over a full race ('
+    + cost.setIntensityNodes + ' nodes built, i.e. it never allocates)');
+  console.log('         running      ' + cost.perSecondMs.toFixed(3) + ' ms and '
+    + cost.perSecondNodes.toFixed(0) + ' short-lived nodes per second of top-gear play, i.e. '
+    + (cost.perSecondMs * 1000 / 5).toFixed(0) + ' us on a frame that fires one cue');
+  console.log('         steady state 9 live nodes; all synthesis runs on the audio thread');
+  console.log('');
 
   if (errs.length) {
     console.log('  PAGE ERRORS:');

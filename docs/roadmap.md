@@ -473,15 +473,61 @@ added for.
   bridge days with 15-22 clear. **Every blocker found on both routes is at
   ground level.** A raised railway or flyover crossing above `OVERHEAD_Y` is
   untouched by any of it. **OPEN**
-- **Variant repetition is DUCK and JUMP, not the fleet.** Across 8 dates and
-  3,612 hazards, 64.8% of visible windows contain a repeat -- but per hazard
-  seen, a DUCK produces **3x** the repetition of a BLOCK. BLOCK has ten
-  variants, DUCK three, JUMP four. The premise that vehicles were the
-  repetitive thing is backwards. **OPEN**
+- ~~**Variant repetition is DUCK and JUMP, not the fleet**~~ -- **DONE, and
+  the diagnosis was half of it.** The premise held: DUCK and JUMP, not the
+  fleet. The prescription -- more variants -- was the expensive half, and
+  nobody had looked at the DRAW.
+
+  Measured over 30 dates and 12,886 hazards on the 64.65-unit window
+  (`READ_NEAR` 25.35 to `SIGHT_MIN` 90, stepped 5), windows containing a
+  repeat:
+
+  | | JUMP 4 / DUCK 3 | JUMP 6 / DUCK 5 | JUMP 7 / DUCK 6 |
+  |---|---|---|---|
+  | hash | 57.2% | 46.9% | 43.4% |
+  | shuffled bag | 38.1% | **21.7%** | 17.5% |
+
+  **A dealt bag at the OLD variant count beats an independent hash at three
+  more variants than we have.** Two more skins buy 3.5 points; the draw buys
+  25. Both compose, so both shipped.
+
+  `variantIndex` was a good hash -- it replaced an arithmetic form that gave
+  the ten BLOCK skins 36/25/11/18 -- and a good hash is an INDEPENDENT draw,
+  which is the property that produces runs. It is now `castGates`: every
+  variant is dealt once before any is dealt twice, shuffled inside each deal,
+  the whole course cast up front in gate order so the casting stays a property
+  of the course and not of the playback. Trains still force the tram and are
+  dealt outside the bag.
+
+  Shipped figures, measured off `api.variantPlan` on the built page with no
+  node replica in the loop: **57.2% → 22.1%** of windows, repeated pairs per
+  window **1.131 → 0.270**. JUMP 0.518 → 0.089, DUCK 0.524 → 0.101, BLOCK
+  0.089 → 0.080.
+
+  Four new variants: JUMP v4 linked water-filled barriers, v5 a cable drum on
+  a crossing ramp, DUCK v3 a level-crossing boom (the first asymmetric duck),
+  v4 a services pipe crossing. All four inside `MR.Collision.BOX` on every
+  axis and all four clear the 1.6×/0.30 **target**, not merely the gate.
+
+  A second effect nobody asked for: **a variant's share is now its authored
+  weight to a tenth of a point** -- DUCK 20.0% each, JUMP 16.7% each, BLOCK
+  weight-one skins 4.5-4.7% and weight-two 9.0-9.4%. Under the hash the same
+  one and two tickets gave BLOCK v1 4.9% and v8 10.9%.
+
+  **The tram is untouched and is now the largest single source of BLOCK
+  repetition**, at 29.7% of all repeated pairs on 18% of hazards, because a
+  forced draw cannot be spread by a bag. That is structural: a train must be a
+  tram. 0.080 pairs/window in absolute terms.
+
+  `api.liveCast` is new and is the assertion the refactor needed -- it reads
+  the visible child of every claimed hazard, so the plan can be checked
+  against the road. 433 castings repeatable and stable over four loads, every
+  live hazard agreeing with the plan.
 - **Per-variant hazard depth**, rejected for now rather than refused: right in
-  principle and cheap on the course side (`variantIndex` is a pure hash), but
-  a box shorter than its art makes `BLANKS` under-count and pass a gate the art
-  really hides. Needs box and art changed together. **OPEN**
+  principle and cheap on the course side (the casting is a pure function of
+  the course -- see `castGates`), but a box shorter than its art makes
+  `BLANKS` under-count and pass a gate the art really hides. Needs box and art
+  changed together. **OPEN**
 
 ## Decisions waiting on the owner
 
@@ -515,13 +561,73 @@ Both are now settled.
 
 ## Standing, from measured reviews
 
-- **Accent colour is not a closed set** — `#ffe45e` appears 29 times in
-  `world.js` including spectator shirts, and the runner's cap band is the same
-  hex. The stylesheet claims colour carries meaning and nothing else. Either
-  pull it out of the world or delete the claim. **OPEN**
-- **Four hazard variants short of the 1.6x/0.30 contrast target** — all clear
-  the 1.25x/0.22 gate. Two are the hoarding and the marshals, whose red-and-
-  white chevron is their real livery. **OPEN, may be a REFUSED**
+- ~~**Accent colour is not a closed set**~~ — **REFUSED, with the
+  measurement, and the item counted the wrong thing.** `#ffe45e` appears 43
+  times in `world.js` (29 when the item was written) plus the runner's TRIM
+  through `PALETTE.accent`. Counting source hex is the wrong instrument, the
+  same way the 110px runner was: an authored colour is not a screen colour.
+
+  Counted on shipped frames at 390×844, canvas alone with the UI hidden,
+  pixels equal to the HUD accent: **zero at every gameplay skip** (0 at ±8 for
+  skips 40, 120 and 185). Everything the world paints this with is lit — toon
+  ramp, hemisphere fill, fog — and the nearest yellow it renders is
+  (239,212,87), **16 per channel away**. Masked at ±30 the whole frame holds
+  **78 near-accent pixels and every one is the runner's headband and shoe
+  midsoles**, 0.02% of the frame against the HUD's own 1.3-5.1%. Not one
+  spectator shirt, streetlamp, cable, sign or bunting flag comes that close.
+
+  So the stylesheet's claim survives in the channel that decides it, and
+  repainting 43 props would move a number that is already zero.
+
+  **One real collision, recorded rather than removed:** the finish confetti is
+  unlit, so it paints (255,228,94) exactly — 1,327 pixels, at the tape and
+  nowhere else. Gold confetti at a record *is* what the accent means. The
+  thing to watch is that **anything unlit added to this palette lands on the
+  hex exactly**, which is the rule the note in `shading.js` now carries.
+- ~~**Four hazard variants short of the 1.6x/0.30 contrast target**~~ — **two
+  fixed, two REFUSED with numbers, and the list was five.** On the
+  finish-carpet shot JUMP v3 sat at 1.59× as well, in the shipped build and at
+  baseline; and the item's "the hoarding and the marshals" was stale — the
+  hoarding had already cleared and the fourth was the CYCLISTS.
+
+  **Both JUMPs fixed by the fleet's own finding, applied to the vocabulary
+  that never got it.** Chroma is the AREA MEAN and cream renders at S 0.092;
+  the fleet swapped its cream for LEMON `0xfff23a` and every vehicle moved.
+  The JUMP cap is a bigger share of a JUMP than that band ever was of a
+  vehicle, because a JUMP is 0.80 tall and the cap is the top of it under an
+  elevated camera. Target margin: v0 +0.120→+0.173, **v1 −0.090→+0.298**,
+  **v2 −0.132→+0.226**, v3 +0.018→+0.270, v4 +0.060→+0.524, v5
+  +0.101→+0.340. The two that were short now clear by the widest margins of
+  the six, the light band survives at L 159.9 against a road of 61-90, and
+  pairwise silhouette separation at 40 units is unchanged to within a point.
+  Second half of the same rule: the works-trench mouth and the cone bases were
+  `0x2b2f52`, a near-neutral navy and the largest dark area in the vocabulary.
+  Dark amber instead — a hole is a value step, not a hue — and v2's saturation
+  went 0.034 → 0.170 on that change alone.
+
+  **Marshals — REFUSED.** Every lever measured: as shipped −0.144; lime tabard
+  −0.166; amber −0.196; orange `0xff8c00` −0.217; orange `0xff7a1f` **fails
+  the build gate**; navy to dark-of-hue −0.150 to −0.163. Every change is
+  worse and the most obvious one — give them a real hi-vis tabard, because
+  cream is not a hi-vis colour — **fails the build**. One mechanism: the
+  variant passes on luminance, its largest bright area is the cream tabard,
+  and every real hi-vis colour is darker than cream. The chroma route is
+  closed structurally — its two biggest bright areas are a white barrier band
+  and a white tabard, and you cannot saturate white without it ceasing to be
+  white. The lime result is worth keeping: it is worse than cream because the
+  board is pink and lime is opposite it on the wheel, so the area mean cancels
+  to neutral. That is the fleet header's "must not straddle the neutral axis"
+  rule showing up on an object nobody had applied it to.
+
+  **Cyclists — REFUSED.** Needs L 97.8, renders 91.3: short by 7%, the closest
+  miss in the game. Warming the tyres reaches S 0.51 but costs more luminance
+  than it buys (−0.074 to −0.098), and two of the largest remaining areas are
+  SKIN, which cannot be saturated and stay skin. Their rims and hubs are now
+  the WARM set — they were the last warm two-wheeler wearing the cool one —
+  which buys 0.012 of saturation and changes no verdict.
+
+  Both clear the fairness gate, at +0.07-0.12 and +0.195, which is the number
+  that decides whether a player can see them.
 - ~~**Landscape finish card overflows 56px**~~ — **DONE.** Overflow is 0px at
   390×844, 360×780, 320×568, 1280×800 and 844×390, on the fullest card the
   game produces (two badges plus best-today), and the race-report line
@@ -626,10 +732,28 @@ Both are now settled.
   The correction in three of the four is one correction: **a dimension is not
   a screen footprint.** Occlusion and foreshortening decide whether a small
   part is drawn and neither is computable from the source.
-- **Hedge and grass are true greens** (R/G 0.30-0.36) beside chartreuse trees.
-  Next visible inconsistency in PARKLAND. **OPEN**
-- **Hedge and grass are true greens** (R/G 0.30-0.36) beside chartreuse trees.
-  Next visible inconsistency in PARKLAND. **OPEN**
+- ~~**Hedge and grass are true greens** (R/G 0.30-0.36) beside chartreuse
+  trees~~ — **DONE.** (This item was in the file **twice**, verbatim; the
+  duplicate is removed with it.) The two numbers were exact and they were the
+  hedge: body `0x2f9f52` at R/G **0.296** and cap `0x49c96b` at **0.363**,
+  against trees on the same tile at 0.72-0.76. The "grass" was the pond reeds,
+  half of them the same emerald.
+
+  Both were missed for the reason this file already records for the avenue
+  tree, in its own words: they are **baked into the road tile rather than
+  pooled per setting**, so nothing that walks the tree palettes ever reaches
+  them. The hedge is the largest continuous area of foliage in the game — two
+  rows the full length of every PARKLAND and RIVERSIDE tile, nearer the lens
+  than any pooled tree.
+
+  A clipped hedge is a dense dark mass, so it takes the bottom of the ladder
+  rather than the middle: body a step below the avenue's darkest lobe, cap on
+  the avenue's own mid lobe, which is what a sunlit hedge top is. Judged on a
+  PARKLAND frame at f 0.698 before and after, not on the hexes. Whole-frame
+  saturation across the eight shots moves 0.332 → 0.328, **inside the
+  composition confound this file has already been caught by once** — the new
+  casting changes which variants stand in each shot, so a whole-frame mean
+  cannot be read as a colour change.
 
 ## In flight
 
@@ -916,6 +1040,47 @@ nobody measured is worse than no number at all.**
    The lesson is the one at the top of this list with a new edge on it: **a
    contract with no assertion is a comment, and the file that owns the numbers
    is the last place that will notice.**
+
+15. **Counting source hex is not measuring colour.** The accent item counted
+   `#ffe45e` 43 times in `world.js` and concluded the HUD's semantic accent
+   had leaked into the world. Counted in PIXELS instead, on shipped frames
+   with the UI hidden, the world puts **zero** accent-coloured pixels on
+   screen at every gameplay skip: it is all lit, and lit it renders 16 per
+   channel away. The only near-accent pixels in a whole frame are 78 on the
+   runner's headband and midsoles.
+
+   Same class as the 110px runner and the triangle budget, with a new edge:
+   **the source is not the frame, and a palette is a claim about the frame.**
+   The one place the two genuinely collide was invisible to the hex count and
+   obvious to the pixel count -- the finish confetti, which is unlit and so
+   lands on the hex exactly.
+
+16. **Nobody had looked at the DRAW.** The repetition review measured the
+   right thing (64.8% of windows carrying a repeat), correctly identified the
+   right kinds (DUCK and JUMP, not the fleet), and prescribed the expensive
+   half. `variantIndex` was a good hash and had itself been a correction to a
+   worse one -- and a good hash is an INDEPENDENT draw, which is exactly the
+   property that produces runs. A dealt bag at the OLD variant count (38.1%)
+   beats an independent hash at three more variants than the game has
+   (43.4%). Two more skins bought 3.5 points; changing the draw bought 25.
+
+   **The lesson is not "measure things" -- the measurement was right. It is
+   that a measurement of a SYMPTOM does not name its mechanism, and the
+   mechanism here was one function nobody had questioned because it had
+   already been fixed once.**
+
+17. **`collision.js` says the runner is 1.78 and `MR.Runner.HEIGHT` is 1.60.**
+   Found while checking whether two DUCK variants whose art hangs 0.02 below
+   the box floor could clip a ducking player. On the commented number the head
+   at the duck threshold reaches 1.402 against a bar at 1.41 -- 0.008 of
+   clearance, and the art would have been inside the player. On the real one
+   it reaches **1.222**, so the clearance is 0.188 and the art is fine.
+
+   The suspicion was wrong and the comment is still wrong, in the direction
+   that makes the game look **tighter** than it is -- which is the rare
+   flattering-in-reverse case, and is why it survived. Not fixed here:
+   `collision.js` is not this pass's file. Fourth entry on this list of the
+   form "a number written into a comment, believed, and then built on".
 
 7. **Three consecutive diagnoses of R2**, each confident, the first two false:
    the telegraph mats (they cannot overlap), the DUCK as a solid 3.52-unit wall

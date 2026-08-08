@@ -17715,7 +17715,9 @@ MR.World = (function () {
     }
     const crowdGeos = [crowdGeo(3), crowdGeo(17), crowdGeo(41), crowdGeo(88)];
     const crowdPool = crowdGeos.map((geo) => Pool(function () {
-      return S.outlined(geo, mats.crowd, S.INK.prop);
+      const o = S.outlined(geo, mats.crowd, S.INK.prop);
+      o.userData.people = 'crowd';
+      return o;
     }, group));
 
     /**
@@ -17801,7 +17803,9 @@ MR.World = (function () {
     }
     const walkersGeos = [walkersGeo(11), walkersGeo(23), walkersGeo(59)];
     const walkersPool = walkersGeos.map((geo) => Pool(function () {
-      return S.outlined(geo, mats.prop, S.INK.prop);
+      const o = S.outlined(geo, mats.prop, S.INK.prop);
+      o.userData.people = 'walkers';
+      return o;
     }, group));
 
     // Rival runners used to live here, on the shoulder, drifting forward and
@@ -18392,7 +18396,9 @@ MR.World = (function () {
      * visible at all. There is nothing left there worth a second geometry.
      */
     const standPool = Pool(function () {
-      return S.outlined(standGeo, mats.crowd, S.INK.scenery);
+      const o = S.outlined(standGeo, mats.crowd, S.INK.scenery);
+      o.userData.people = 'grandstand';
+      return o;
     }, group);
 
     /**
@@ -18514,7 +18520,9 @@ MR.World = (function () {
     }
     const finishStandGeo = merge(finishStandParts(4211));
     const finishStandPool = Pool(function () {
-      return S.outlined(finishStandGeo, mats.crowd, S.INK.scenery);
+      const o = S.outlined(finishStandGeo, mats.crowd, S.INK.scenery);
+      o.userData.people = 'finishstand';
+      return o;
     }, group);
 
     /**

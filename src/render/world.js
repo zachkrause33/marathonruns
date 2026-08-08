@@ -582,8 +582,8 @@ MR.World = (function () {
       tower: { colors: [0x2f3550, 0x3a4160, 0x4a5270], glass: 1, crown: 'antenna' },
       tree: { kind: 'round', colors: [0x5c8028, 0x7fa838, 0xa4d848], h: 1.0 },
       marks: {
-        'CITY START': [{ k: 'willis', x: 20 }, { k: 'lTrack', over: 1, run: 48, alt: 'lTrackTrain', every: 3 }],
-        'RIVERSIDE': [{ k: 'lTrack', over: 1, run: 48, alt: 'lTrackTrain', every: 3 }, { k: 'crane', x: 13 }, { k: 'willis', x: 22 }],
+        'CITY START': [{ k: 'willis', x: 20 }, { k: 'lTrack', over: 1, run: 48, train: 'lTrain', every: 5 }],
+        'RIVERSIDE': [{ k: 'lTrack', over: 1, run: 48, train: 'lTrain', every: 5 }, { k: 'crane', x: 13 }, { k: 'willis', x: 22 }],
         'PARKLAND': [{ k: 'oak', x: 15 }, { k: 'pond', x: 27 }],
         'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'willis', x: 19 }],
         'FINAL MILE': [{ k: 'willis', x: 20 }, { k: 'jumbo', x: 13.5 }],
@@ -2477,7 +2477,7 @@ MR.World = (function () {
      * overhead (10.9 at the tallest mast), so the two layers stack instead of
      * fighting, and the columns stand at 11.9, outside LANDMARK_IN.
      */
-    lTrack: function (look, withTrain) {
+    lTrack: function (look) {
       const parts = [];
       const STEEL = 0x4a5268, STEEL2 = 0x39405a, TIE = 0x5f4a38;
       const L = 48, CX = 11.9;
@@ -2501,20 +2501,95 @@ MR.World = (function () {
       for (const rx of [-4.4, -2.6, 2.6, 4.4]) {
         parts.push(bx(0.30, 0.30, L, rx, 13.3, 0, 0xa8b0c4));
       }
-      if (withTrain) {
-        const car = [0xc8ccd8, 0x37a8d8];
-        for (let i = 0; i < 3; i++) {
-          const z = -16 + i * 16;
-          parts.push(bx(6.4, 3.0, 14.4, 0, 15.0, z, car[i % 2]));
-          parts.push(bx(6.5, 0.9, 14.5, 0, 16.1, z, 0x2b3350));
-          parts.push(bx(6.6, 0.4, 14.0, 0, 16.9, z, 0xd8dcf0));
-          parts.push(bx(6.0, 0.3, 13.0, 0, 13.5, z, 0x39405a));
-        }
-      }
       return merge(parts);
     },
 
-    lTrackTrain: function (look) { return MARKS.lTrack(look, true); },
+    /**
+     * THE TRAIN ON THE L, which is the only thing in this game that drives.
+     *
+     * It used to be baked into every third viaduct chunk by an lTrackTrain
+     * variant, which meant the one vehicle in the game was PARKED -- three
+     * cars sitting motionless on an elevated railway, passed at running pace.
+     * It is now its own mesh so it can run, and the case for running it is the
+     * one both road-traffic refusals above ended on: the viaduct is ALREADY
+     * BUILT and already counted in api.crossings(), so motion up here is the
+     * one moving vehicle this course can buy without spending the sky again.
+     *
+     * IT RUNS TOWARD -Z, ALWAYS, AND THAT IS A DRIFT RESULT RATHER THAN A
+     * STYLE CHOICE. A set piece is claimed when its ANCHOR is VIEW ahead and
+     * released when the anchor falls BEHIND+60 back, so it lives for 304 units
+     * of player travel, i.e. about 11.4 s at race pace. A mover keeps its
+     * anchor's release test while its own body has left it:
+     *
+     *   against the player   at release the body is 94 + SPEED*11.4 units
+     *                        BEHIND the runner. Off screen by construction.
+     *   with the player      at SPEED 14 the body is 66 units IN FRONT of the
+     *                        runner when the anchor releases, so it would
+     *                        vanish in open view.
+     *
+     * The second is a pop, and no speed that still reads as a train avoids it,
+     * so the trains you see are the ones on the inbound track -- which is also
+     * what a two-track railway does: each track carries one direction. The
+     * outbound rails are there and empty, as they are for most of any minute.
+     *
+     * It also means the FRONT of the train is what faces the player for the
+     * whole approach, so the cab end carries a windscreen, a destination panel
+     * and headlights, and the tail carries lamps for the departure. Both ends
+     * and both flanks are built; see rule 1. Nothing here is a facade.
+     *
+     * COLOUR IS CONSTRAINED, and the old paint proves why the constraint is
+     * real. The baked train's second car was 0x37a8d8, which is h 197.9 deg at
+     * S 0.67 -- 3.9 degrees off the 194 this game contracts as DUCK cyan, and
+     * inside the 14-degree window tools/motion.js fails movers on. Static, it
+     * was invisible to that rule. The moment it moves it is exactly the thing
+     * the rule exists to stop: a vehicle in hazard paint. Stainless and navy
+     * carry the body instead, with the door stripe in 0xd8443a (h 3.8) which
+     * is 21.8 degrees off BLOCK pink and 37.2 off JUMP amber.
+     */
+    lTrain: function (look) {
+      const parts = [];
+      // Track centre. The deck carries four rails -- two tracks, at -4.4/-2.6
+      // and 2.6/4.4 -- so a train sits on one of them rather than astride both,
+      // which is where the baked one used to sit.
+      const TX = -3.5;
+      const STEEL = 0xc8ccd8, GLASS = 0x2b3350, ROOF = 0x9aa2b4;
+      const UNDER = 0x39405a, TRIM = 0xd8443a;
+      const NOSE = -23.2, TAIL = 23.2;
+      for (let i = 0; i < 3; i++) {
+        const z = -16 + i * 16;
+        parts.push(bx(5.2, 0.35, 13.6, TX, 13.62, z, UNDER));
+        parts.push(bx(5.6, 2.70, 14.4, TX, 15.15, z, STEEL));
+        parts.push(bx(5.7, 0.95, 13.4, TX, 15.55, z, GLASS));
+        parts.push(bx(5.5, 0.35, 14.2, TX, 16.65, z, ROOF));
+        parts.push(bx(5.62, 0.22, 14.4, TX, 14.00, z, TRIM));
+        // Bogies, both ends of every car, both sides of the train.
+        for (const sz of [-1, 1]) {
+          parts.push(bx(2.4, 0.50, 2.6, TX, 13.35, z + sz * 4.6, UNDER));
+        }
+        // Doors on BOTH flanks. A train is seen from the far side as it comes
+        // on and from the near side as it goes, so neither flank is a back.
+        for (const sx of [-1, 1]) {
+          for (const dz of [-3.6, 3.6]) {
+            parts.push(bx(0.12, 2.00, 1.10, TX + sx * 2.85, 14.90, z + dz, ROOF));
+          }
+        }
+        // Gangway to the next car.
+        if (i < 2) parts.push(bx(3.0, 1.8, 1.8, TX, 15.00, z + 8.0, UNDER));
+      }
+      // The cab, at the leading (-z) end: this is the face the player watches
+      // for the whole approach.
+      parts.push(bx(4.60, 1.10, 0.25, TX, 15.70, NOSE + 0.05, GLASS));
+      parts.push(bx(2.60, 0.50, 0.25, TX, 16.45, NOSE + 0.05, 0x1b1633));
+      for (const sx of [-1, 1]) {
+        parts.push(bx(0.60, 0.50, 0.30, TX + sx * 1.7, 14.30, NOSE, 0xfff3c8));
+      }
+      // And the tail, which is what you see once it has gone by.
+      for (const sx of [-1, 1]) {
+        parts.push(bx(0.50, 0.40, 0.30, TX + sx * 1.7, 14.30, TAIL, TRIM));
+      }
+      parts.push(bx(4.60, 1.00, 0.25, TX, 15.70, TAIL - 0.05, GLASS));
+      return merge(parts);
+    },
 
     /**
      * A Chicago river bascule -- seen from the deck of its neighbour.
@@ -9402,6 +9477,10 @@ MR.World = (function () {
     // figure is 35.7 units/s and that reads as a speedboat.
     const SHIP_SPEED = 3.2;
 
+    // One train length every 3.3 seconds, running against the player. Derived,
+    // and argued, at the train loop in api.update.
+    const TRAIN_SPEED = 14.0;
+
     const shipGeo = (function () {
       const parts = [];
       const HULL = 0x1f3f6e, TOP = 0xd8552f, WHITE = 0xf0f4ff;
@@ -10033,6 +10112,17 @@ MR.World = (function () {
             const zc = z + e.run / 2;
             if (e.over) landmarkOver(zc, kind, si);
             else landmark(zc, kind, e.side || -1, e.x || LANDMARK_IN, e.y, e.rz, si);
+            // A MOVER RIDING A RUN, spaced by `every` chunks rather than laid
+            // in every one. It is pushed as its own structure instead of being
+            // merged into the chunk, which is the whole point: a vehicle baked
+            // into the scenery it stands on cannot move relative to it.
+            //
+            // It takes NO markBlock -- the run it rides has already opened the
+            // street wall along the whole leg -- and it is not `over`, so it
+            // adds nothing to the footbridge exclusion either.
+            if (e.train && e.every && (i % e.every) === 0) {
+              structures.push({ z: zc, kind: e.train, set: si, side: 1, x: 0, y: 0, ry: 0, rz: 0 });
+            }
           }
         }
         if (!pts.length) continue;
@@ -10925,6 +11015,7 @@ MR.World = (function () {
         // objects that are already claimed and could not tell a fresh claim
         // from a continuing one.
         if (st.kind === 'ship') obj.userData.sailT0 = undefined;
+        if (st.kind === 'lTrain') obj.userData.railT0 = undefined;
         obj.userData.auditName = 'set piece / ' + st.kind;
         activeStruct.push({ st, obj, pool });
       }
@@ -10991,6 +11082,52 @@ MR.World = (function () {
         // quite the same twice, which is what stops a moving object still
         // reading as a decal.
         e.obj.rotation.z = Math.sin(now * 0.52 + d.sailZ0 * 0.11) * 0.016;
+      }
+
+      /**
+       * ================== TRAINS ON THE L ==================
+       *
+       * SPEED, by the same argument the ships were given, because the same
+       * factor-of-thirty trap is here.
+       *
+       * A Chicago L train runs about 11 m/s. One world unit is 6.71 m, so that
+       * is 1.64 units per RACE second, which TIME_SCALE turns into 49 units per
+       * WALL second. This train is 46.4 units nose to tail, so the compressed
+       * figure covers its own length in 0.95 s; the real thing takes 28. That
+       * is the ship's mistake exactly, and it is refused for the same reason:
+       * the eye judges a vehicle in BODY LENGTHS PER SECOND, not against the
+       * observer.
+       *
+       * 14 units/s is taken instead -- one train length every 3.3 seconds. It
+       * is unmistakably faster than the ships at 3.2 and unmistakably a train
+       * rather than a tram, and against a player doing 26.7 units/s it closes
+       * head-on at 40.7, crossing the 210-unit view in 5.2 s. Trains are laid
+       * every fifth 48-unit chunk, so one passes about every nine seconds:
+       * periodic, which is what the sky over this road can afford, rather than
+       * continuous, which is what R3 took out.
+       *
+       * THE DECK IS NOT FLAT, so y and pitch are recomputed from the LIVE z
+       * rather than inherited from the anchor. Every set piece is dropped onto
+       * eAt(st.z) and pitched to the local slope when it is claimed, which is
+       * correct for something that stays where it was put; a mover that keeps
+       * its anchor's elevation while travelling 140 units sinks through its own
+       * viaduct on the first hill. The ships get away without this because
+       * water is level; a railway is not.
+       */
+      for (const e of activeStruct) {
+        if (e.st.kind !== 'lTrain') continue;
+        const d = e.obj.userData;
+        if (d.railT0 === undefined) {
+          d.railT0 = now;
+          d.railZ0 = e.obj.position.z;
+          // The height the claim added, backed out, so it can be re-added at
+          // whatever z the train has reached.
+          d.railY0 = e.obj.position.y - eAt(e.obj.position.z);
+        }
+        const z = d.railZ0 - (now - d.railT0) * TRAIN_SPEED;
+        e.obj.position.z = z;
+        e.obj.position.y = d.railY0 + eAt(z);
+        e.obj.rotation.x = -Math.atan(EL.slope(z));
       }
 
       // mile banners

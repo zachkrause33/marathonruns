@@ -62,6 +62,17 @@ const arg = (n, d) => {
 };
 
 const VP = String(arg('vp', '390x844')).split('x').map(Number);
+// Which lens the sweep is shot through.
+//
+//   chase  the shipped chase camera, untouched. This is the number that
+//          settles "what does this part cost the frame the player sees".
+//   face   the orbit sheet's own lens -- 1.6 units out, 27.2 degrees, level
+//          with the head, swung round to three-quarter front. The face is
+//          invisible from astern BY DESIGN (see the slide's neck yaw in
+//          runner.js), so a face pass measured only through the chase camera
+//          reports zeros and says nothing about whether the work landed. Both
+//          are run and both are reported, which is the honest pair.
+const CAM = String(arg('cam', 'chase'));
 const SKIP = arg('skip', '90');
 const WINDOWS = parseInt(arg('windows', 3), 10);
 const N = parseInt(arg('n', 16), 10);
@@ -117,6 +128,67 @@ const CANDIDATES = [
     anchor: '      elbow.add(fore);',
     note: 'three separate capsules -- cut as "three 4px lobes that alias into one"',
     code: (c) => `__probe('three fingers', elbow, new THREE.CapsuleGeometry(0.032, 0.046, 2, 10), ${c}, { y: -0.320, z: 0.012, rx: 0.60 });`,
+  },
+  // ---- the face pass, added rather than removed ---------------------------
+  //
+  // Every one of these is expected to measure ZERO through the chase camera,
+  // and that is the point of running them: the claim "the face is not visible
+  // in gameplay" is exactly the kind of claim this repo has a corrections list
+  // for. --cam face re-shoots the identical sweep through the orbit sheet's
+  // own lens, so the same probe answers both "what does it cost the frame that
+  // ships" and "what does it buy the frames that show a face".
+  {
+    name: 'nose',
+    kind: 'added',
+    anchor: '    head.add(headMesh);',
+    note: 'a button, 0.029 proud of the skull',
+    code: (c) => `__probe('nose', head, new THREE.SphereGeometry(0.046, 16, 12), ${c}, { y: HY - 0.078, z: 0.240, sx: 0.80, sy: 0.72, sz: 0.80 });`,
+  },
+  {
+    name: 'jaw',
+    kind: 'added',
+    anchor: '    head.add(headMesh);',
+    note: 'one mass across the lower face, 0.024 proud on the centre line',
+    code: (c) => `__probe('jaw', head, new THREE.SphereGeometry(0.150, 20, 14), ${c}, { y: HY - 0.192, z: 0.108, sx: 1.02, sy: 0.40, sz: 0.70 });`,
+  },
+  {
+    name: 'ear concha',
+    kind: 'removed',
+    anchor: '    head.add(headMesh);',
+    note: 'CUT by this tool: 0 px in 48/48 through BOTH lenses, inside the ear nub',
+    code: (c) => `__probe('ear concha', head, new THREE.SphereGeometry(0.052, 16, 10), ${c}, { x: -0.246, y: HY - 0.026, z: 0.004, sx: 0.42, sy: 0.86, sz: 0.62 });
+      __probe('ear concha', head, new THREE.SphereGeometry(0.052, 16, 10), ${c}, { x: 0.246, y: HY - 0.026, z: 0.004, sx: 0.42, sy: 0.86, sz: 0.62 });`,
+  },
+  {
+    name: 'eye sclera',
+    kind: 'added',
+    anchor: '    head.add(eyes);',
+    note: 'the whole eye opening, both eyes pooled -- the ceiling on the four rings',
+    code: (c) => `__probe('eye sclera', head, new THREE.CircleGeometry(0.062, 24), ${c}, { x: -0.100, y: HY - 0.016, z: 0.2610, sy: 0.82 });
+      __probe('eye sclera', head, new THREE.CircleGeometry(0.062, 24), ${c}, { x: 0.100, y: HY - 0.016, z: 0.2610, sy: 0.82 });`,
+  },
+  {
+    name: 'eye pupil',
+    kind: 'added',
+    anchor: '    head.add(eyes);',
+    note: 'both pupils pooled',
+    code: (c) => `__probe('eye pupil', head, new THREE.CircleGeometry(0.026, 16), ${c}, { x: -0.100, y: HY - 0.018, z: 0.2650 });
+      __probe('eye pupil', head, new THREE.CircleGeometry(0.026, 16), ${c}, { x: 0.100, y: HY - 0.018, z: 0.2650 });`,
+  },
+  {
+    name: 'eye catchlight',
+    kind: 'added',
+    anchor: '    head.add(eyes);',
+    note: 'the smallest mark on the character -- both pooled',
+    code: (c) => `__probe('eye catchlight', head, new THREE.CircleGeometry(0.012, 16), ${c}, { x: -0.084, y: HY + 0.002, z: 0.2670 });
+      __probe('eye catchlight', head, new THREE.CircleGeometry(0.012, 16), ${c}, { x: 0.084, y: HY + 0.002, z: 0.2670 });`,
+  },
+  {
+    name: 'mouth',
+    kind: 'added',
+    anchor: '    mouthPivot.add(mouth);',
+    note: 'the aperture, open',
+    code: (c) => `__probe('mouth', mouthPivot, new THREE.CircleGeometry(0.050, 24), ${c}, { z: 0.036, sx: 1.30, sy: 0.46 });`,
   },
   // ---- positive controls ---------------------------------------------------
   //
@@ -283,18 +355,43 @@ function pageSweep(opt) {
   for (let i = 0; i < 20; i++) F.step(1 / 120);
   const z0 = g.pace.units;
 
+
   // Per probe: pixels in each sample, and the union bounding box.
   const acc = {};
   keys.forEach(function (k) { acc[k.name] = { per: [], w: 0, h: 0 }; });
 
   const el = g.renderer.domElement;
+  // The alternate lens, built once. It tracks the rig rather than the world,
+  // so the sweep still walks a real stride under it.
+  let faceCam = null;
+  if (opt.cam === 'face') {
+    faceCam = new window.THREE.PerspectiveCamera(27.2, el.width / el.height, 0.05, 400);
+  }
+  const _t = new window.THREE.Vector3();
+  const reshoot = function () {
+    if (!faceCam) return;
+    const rig = g.runner.group;
+    rig.updateMatrixWorld(true);
+    rig.getWorldPosition(_t);
+    _t.y += 1.19;
+    const a = (opt.faceAz === undefined ? 200 : opt.faceAz) * Math.PI / 180;
+    faceCam.position.set(_t.x + 1.6 * Math.sin(a), _t.y, _t.z - 1.6 * Math.cos(a));
+    faceCam.lookAt(_t);
+    faceCam.aspect = el.width / el.height;
+    faceCam.updateProjectionMatrix();
+    g.renderer.render(g.scene, faceCam);
+  };
   for (let w = 0; w < (opt.windows || 3); w++) {
     const dt = (1 / cadence()) / opt.n;
     g.cam.stride = (g.cam.stride + 1 / (opt.windows || 3)) % 1;
     for (let i = 0; i < opt.n; i++) {
       F.step(dt);
       // Same task as the render that F.step just drove, so the drawing buffer
-      // is still intact and needs no preserveDrawingBuffer.
+      // is still intact and needs no preserveDrawingBuffer. When an alternate
+      // lens is asked for, the SAME scene is re-rendered over the top of it
+      // before the read -- same geometry, same materials, same depth test, so
+      // occlusion is still the real object's occlusion.
+      reshoot();
       F.ctx.drawImage(el, 0, 0);
       const d = F.ctx.getImageData(0, 0, F.cv.width, F.cv.height).data;
       const cnt = {}, bx = {};
@@ -378,7 +475,7 @@ function pageSweep(opt) {
       await page.waitForTimeout(50);
     }
     const info = await page.evaluate(pageSetup);
-    const res = await page.evaluate(pageSweep, { windows: WINDOWS, n: N });
+    const res = await page.evaluate(pageSweep, { windows: WINDOWS, n: N, cam: CAM });
     await ctx.close();
 
     if (errs.length) { console.error('page errors: ' + errs.slice(0, 3).join(' | ')); process.exit(1); }
@@ -399,7 +496,8 @@ function pageSweep(opt) {
 
   console.log('');
   console.log('RESOLVE -- unoccluded screen footprint, ' + VP[0] + 'x' + VP[1]
-    + ' skip=' + SKIP + ', ' + (WINDOWS * N) + ' samples across the stride');
+    + ' skip=' + SKIP + ', ' + (WINDOWS * N) + ' samples across the stride'
+    + ', lens: ' + CAM);
   console.log('  drawing buffer ' + buf[0] + 'x' + buf[1] + ' (dpr ' + dpr + '), '
     + builds.length + ' batches of at most ' + COLOURS.length);
   console.log('');

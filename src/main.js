@@ -260,9 +260,41 @@
     // costs the streak (player.resolveDeck), so the commitment the mechanic
     // asks of a human is one the bot has to make too -- otherwise the harness
     // would measure a version of the ramp that has no downside.
+    //
+    // ---- AND NEVER SIDEWAYS INTO SOMETHING THAT IS STANDING THERE ---------
+    //
+    // The bot plans off the gate table, which is exactly what solvable()
+    // proves, and until flanks became solid that was the whole of what a lane
+    // meant. It is not any more: a BLOCK train is one gate carrying up to 17.9
+    // units of vehicle, and this bot steers 26 units past a gate line towards
+    // one 34 units ahead -- straight through the flank of the lorry the gate
+    // it has already passed left standing in the lane. Measured over four
+    // races with the flank solid and this line as it was: 137 contacts, and a
+    // finish of 2:08:47 against 1:57:55. Every frame this project photographs
+    // is bot-driven, so a bot that drives into lorries does not merely score
+    // badly, it makes the whole shot library a picture of a broken run.
+    //
+    // The fix is not to give the lane up -- validate() guarantees the room to
+    // wait (see its LANE_TRANSIT clause) -- it is to WAIT. The plan is
+    // unchanged; only the step is held, and only while something is actually
+    // in the lane being stepped into. A rideable train is not something to
+    // wait for, it is the destination. With this, the same four races take 0
+    // contacts and finish at 1:57:55, which is the number before flanks were
+    // solid: reading the road costs nothing.
     if (bot.planned && player.lane !== bot.plannedLane && dist < 34
         && player.laneT >= 0.55 && !player.ramp) {
-      controls.push(player.lane < bot.plannedLane ? 'right' : 'left');
+      const next = player.lane + (player.lane < bot.plannedLane ? 1 : -1);
+      // A point test would be exact -- every span starts at a gate line, and
+      // the bot is always past that line when it steers for the next gate -- so
+      // the extra unit is float slack, and it is the same slack the same
+      // decision uses in tools/mechanics.js so the tool and the game are one
+      // model rather than two.
+      const solid = course.occupiedAt
+        ? (course.occupiedAt(pace.units, next) || course.occupiedAt(pace.units + 1, next))
+        : null;
+      if (!solid || (solid.ride && next === bot.plannedLane)) {
+        controls.push(player.lane < bot.plannedLane ? 'right' : 'left');
+      }
     }
 
     // Action timing, derived from the arc rather than hand-tuned: aim to be

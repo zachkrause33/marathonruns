@@ -1350,3 +1350,57 @@ nobody measured is worse than no number at all.**
    hazards that are people measure 17 to 27 px of head at 8 units -- and 80 px
    at the closest approach the game can produce -- so they get faces, and
    everything else gets silhouette and motion.
+
+25. **Four parts on the runner had never been drawn, and every one of them
+   carried a comment explaining what it was doing.** The character pass -- face,
+   eyes, anatomy, hands, cloth, expression -- spent as much of itself deleting
+   as building, and the deletions were all found the same way: by
+   `tools/resolve.js`, which builds a candidate, gives it a unique flat colour
+   and COUNTS its pixels in a real frame.
+
+   - **The thumb**, four passes old, at z +0.056 -- the FRONT of a hand whose
+     mitt reaches 0.101. Seven pixels at its best, absent in 36 of 48 frames.
+     The brief for this pass said the character had no thumb, and the brief was
+     right for the wrong reason: he had one and it was inside his hand.
+   - **The knuckle row**, defended by thirty lines of comment, at a **median of
+     two pixels**. Its z was right; its y was not. At -0.3055 it sat where the
+     mitt's ellipsoid has already curved away to 81% of its section, so three
+     balls "0.017 proud" were proud of a surface that was no longer under them.
+     *A part is not proud of a shape, it is proud of the shape AT ITS OWN
+     HEIGHT* -- the fourth place in that file where the same arithmetic has
+     gone wrong, after the coin of scalp, the cap peak and the wristband.
+   - **An ear concha**, built during this pass, cut during this pass: 0 pixels
+     in 48 of 48 frames through BOTH lenses. Inset in x on an ellipsoid does
+     not mean behind it, it means inside it.
+   - **A facial muzzle and a three-part jaw**, also built and cut here, for a
+     fault that is not about size at all: at this scale every mass resolves as
+     its own closed OUTLINE, and the eye counts outlines before it reads form.
+     Three masses along the bottom of a round head read as a chin between two
+     jowls; one mass that tapers back into the skull before it can have an edge
+     reads as a jaw.
+
+   That last one is the general finding and it is worth more than the four
+   deletions. **On this character the ink shell is the unit of composition.**
+   Every part is drawn twice -- fill, then the same geometry through the
+   outline shader -- so a part boundary is a hard black line, and the arm read
+   as three capsules for exactly that reason and not because of its shapes. The
+   fix was fewer parts spanning the same distance, not more geometry between
+   them: the deltoid moved onto the arm and a forearm belly swallowed the
+   elbow, and one limb came out with one outline round it.
+
+   **Two instruments were kept this time**, which is the correction to entry 3
+   rather than another instance of it. `tools/envelope.js` measures the
+   silhouette contract per vertex in all eight states; `tools/pose-diff.js`
+   compares every joint the file poses, by name, across two builds at any
+   polish setting. Between them they replace four separate hand-written scripts
+   that were thrown away after producing the numbers this repo has been quoting
+   ever since. Both found a defect in themselves before they found one in the
+   work -- walking the rig rather than the body pivot measured the skid ribbon
+   and reported a lowest point 1.9 units under the road, and a single control
+   at shipped polish cannot tell a change from another draw of the same noise.
+
+   **And the face is not visible in this game.** Not in play (0 px in 48 of 48
+   through the chase camera), not at the start panel, which is a DOM dialog over
+   the same astern view, and not at the finish, whose camera swings 1.6 units
+   off the centreline but stays BEHIND him. It was built anyway, under rule 1,
+   and the honest report of where it reads is in the pass's own commits.

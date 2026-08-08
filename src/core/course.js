@@ -658,28 +658,159 @@ MR.Course = (function () {
 
 
   /**
-   * Aid: water tables and fruit, placed deterministically from the same date
-   * seed as everything else.
+   * ---- THE PLACEMENT RULE, AND IT IS ONE SENTENCE LONG --------------------
    *
-   * Two placement rules matter. They are only ever put in a lane that is
-   * PASSABLE at that point on the course, so aid can never be dangled somewhere
-   * a player is not allowed to go; and they are pushed to the gap BETWEEN
-   * gates, so taking one is never entangled with a jump or a duck the player
-   * is already committed to.
+   * A BOTTLE STANDS BEHIND AN OBSTACLE, IN THAT OBSTACLE'S OWN LANE, AT A GATE
+   * THAT ALSO OFFERS A LANE THROUGH FOR NOTHING.
+   *
+   * Every road item is laid AID_SETBACK past the rear face of a JUMP block or a
+   * DUCK bar, in the same lane as that hazard, and only at a gate that leaves
+   * some other lane CLEAR and leaves the aid lane open at the gate after. So
+   * the only way to the bottle is over or under the thing standing in front of
+   * it; declining is always free, because the empty lane is right there to be
+   * taken instead; and paying once buys the item outright, because the gate
+   * ahead is never allowed to shut the lane you just bought your way into.
+   *
+   * The owner's instruction: "Ensure waters and bananas are strategically
+   * placed so that they have to go around an obstacle to get it."
+   *
+   * ---- WHAT WAS THERE BEFORE, AND WHY IT DID NOT DO THAT ------------------
+   *
+   * The old rule scored the open lanes and took the hardest one. That is a
+   * RELATIVE test, and a relative test buys nothing when every candidate is
+   * equally easy: at a gate whose three lanes are all clear it picks one at
+   * random and the item is free. Half the pool was then scored the other way up
+   * on purpose, into the EASIEST lane, which is free by construction. And the
+   * item sat in the middle of the gap, 30 units of open road from anything, so
+   * even a hard placement could be taken by dipping into the lane and coming
+   * straight back out without clearing a thing.
+   *
+   * Measured on the shipped course by tools/aid.js, over 365 days, three ways:
+   * 56% of items cost NOTHING at all over and above the cheapest line through
+   * the course, and only 1% cost an extra action; four natural-line bots that
+   * cannot see aid at all collected 64% of it between them; and a bot that
+   * simply went and got everything finished in exactly the same time, with
+   * exactly the same zero contacts, as one that ignored the lot. Aid was not a
+   * decision. It was scenery that happened to pay.
+   *
+   * ---- WHY THE SETBACK IS SMALL, WHICH IS THE WHOLE MECHANISM -------------
+   *
+   * player.resolveAid is a LANE MATCH AT A POINT, and player.changeLane moves
+   * `lane` on the same frame the input is served -- so any patch of road can be
+   * reached by a swerve, and no placement can charge for anything if the player
+   * has room to swerve into it. The only ground a hazard genuinely guards is
+   * the ground DIRECTLY BEHIND ITSELF, because reaching that means being in the
+   * lane at the gate line a moment earlier, which is where resolveGates fires.
+   *
+   * So the item is pushed right up against the back of the obstacle: the rear
+   * face plus AID_SETBACK, which is 1.39 units behind a JUMP block and 0.95
+   * behind a DUCK bar. At the fastest the runner ever goes that is 52 and 36
+   * milliseconds -- two or three frames -- against the 0.075 s player.handle
+   * makes a player wait between lane changes. The gap between two gates is
+   * never less than 25.35 units, so the old placement had four hundred times
+   * that much room to cut in over.
+   *
+   * This is measured rather than argued. tools/aid.js drives the real state
+   * machine with a bot that takes the free lane at the gate and then swerves
+   * for the bottle as fast as the input queue will serve it; on the old course
+   * it collected 13 of 14 items for half a contact.
+   *
+   * AID_SETBACK is NOT a taste number and must not be tuned down to zero: the
+   * bottle is 1.41 units tall and the DUCK bar's underside is at 1.41, so an
+   * item laid inside a bar's own depth would interpenetrate the art. It is the
+   * smallest offset that keeps the pickup clear of the geometry it stands
+   * behind, and the frames it costs are the price of that.
+   *
+   * ---- THE RESCUE ARGUMENT, WHICH THIS RULE ANSWERS RATHER THAN DROPS -----
+   *
+   * The pool used to be split half hard and half easy, and the reason was real:
+   * scoring every item for maximum difficulty produced a rescue mechanic only a
+   * player who did not need rescuing could reach. 71% of items demanded an
+   * action at the gate on BOTH sides, so aid was gated behind two consecutive
+   * clean clears plus a lane change, asked of the one player whose defining
+   * problem is that they cannot string two clean clears together.
+   *
+   * The fix for that was never "make half of it free". It was to stop asking
+   * for a CHAIN. This rule charges exactly ONE action, at exactly ONE gate, and
+   * explicitly forbids the gate ahead from asking for another -- so there is a
+   * price and there is no compounding. A run fluffing 30% of the actions it
+   * attempts still collects three quarters of the aid on the course; the table
+   * is in tools/aid.js.
+   *
+   * ---- AND IT DOES NOT FIGHT THE ROOF ------------------------------------
+   *
+   * Roof aid, below, is the same rule one step further out: the price is the
+   * mount rather than a jump, and the free lane is the road either side. It is
+   * generated from its own stream and this loop never touches it.
+   *
+   * Nothing here can affect Course.solvable(). Aid reads the gate table and
+   * writes nothing back, so the clean path of a player who ignores every bottle
+   * on the course is the one the BFS proved, untouched.
    *
    * One item per aid point, never a cluster. An earlier version put out a
    * table of 3-5 bottles, which fired five pickups inside a second and a half
-   * and read as a single smear rather than as a decision -- and the decision
-   * is the whole point, because the aid lane is often not the lane the racing
-   * line wants.
+   * and read as a single smear rather than as a decision.
    *
    * Sparse early and dense late, with fruit getting commoner as the race goes
    * on. A run is rarely broken in the first mile; the back half is where the
    * wall is, where the streak is worth most, and where a rescue is worth
    * having.
    */
+  const AID_SETBACK = 0.35;
+  // How far the placement may hunt forward for a gate of the right shape before
+  // giving the point up. Bounded so aid cannot migrate far from where the
+  // density curve wanted it, and so a stretch with no qualifying gate cannot
+  // silently swallow every item behind it. Eight gates is about 250 units.
+  const AID_WALK = 8;
+
+  /**
+   * The lane an item may stand in behind gate `gi`, or -1 if this gate is the
+   * wrong shape.
+   *
+   * Three conditions, and each one is a clause of the rule above:
+   *
+   *   the gate leaves some lane CLEAR   -- or nothing is being given up, and a
+   *                                        full-width gate demands an action in
+   *                                        every lane anyway, so the aid lane
+   *                                        would cost exactly nothing extra
+   *   the aid lane holds a JUMP or DUCK -- the obstacle the bottle stands behind
+   *   the next gate does not BLOCK it   -- paying once buys it outright, and the
+   *                                        player is never trapped in the lane
+   *                                        they bought
+   *
+   * A BLOCK can never be the obstacle: it is impassable, so an item behind one
+   * is aid dangled somewhere the player is not allowed to go. That is the same
+   * exclusion the old `open` test made, stated as a consequence of the rule
+   * rather than as a separate guard.
+   */
+  function aidLaneAt(gates, gi, rnd) {
+    const g = gates[gi];
+    if (!g.lanes.some(function (l) { return l === K.CLEAR; })) return -1;
+    const next = gi + 1 < gates.length ? gates[gi + 1].lanes : [K.CLEAR, K.CLEAR, K.CLEAR];
+    const cands = [];
+    for (let l = 0; l < 3; l++) {
+      if (g.lanes[l] !== K.JUMP && g.lanes[l] !== K.DUCK) continue;
+      if (next[l] === K.BLOCK) continue;
+      cands.push(l);
+    }
+    if (!cands.length) return -1;
+    // Prefer a lane that is CLEAR on the way out over one that merely is not
+    // BLOCK, so "paying once buys it outright" holds wherever the course can
+    // afford it. Ties break from the seeded stream, so a course still varies.
+    let lane = cands[0], best = -Infinity;
+    for (const l of cands) {
+      const score = (next[l] === K.CLEAR ? 2 : 0) + rnd.next();
+      if (score > best) { best = score; lane = l; }
+    }
+    return lane;
+  }
+
   function generateAid(key, gates, ramps) {
-    const rnd = MR.rng.stream(key, 'aid/v3');
+    // v4: the placement rule changed, so the stream is renamed rather than
+    // silently reused. tools/mechanics.js hashes gates and aid SEPARATELY now
+    // for exactly this reason -- the gate stream is untouched and stays
+    // bit-identical, and only the aid baseline moves.
+    const rnd = MR.rng.stream(key, 'aid/v4');
     const items = [];
     if (!gates.length) return items;
 
@@ -739,137 +870,81 @@ MR.Course = (function () {
     }
 
     let gi = 0;
-    let nudged = 0;   // consecutive gaps a rescue item has declined
+    let lastHg = -1;   // the gate the previous item hung off
     let z = START_GRACE + rnd.range(200, 340);
     const end = K.TOTAL_UNITS - FINISH_GRACE - 60;
     let guard = 0;
 
     while (z < end && guard++ < 4000) {
       while (gi < gates.length - 1 && gates[gi + 1].z < z) gi++;
-      const f = z / K.TOTAL_UNITS;
 
-      // Sit in the gap between this gate and the next, never on a gate line.
-      const a = gates[gi].z;
-      const b = gi + 1 < gates.length ? gates[gi + 1].z : a + 40;
-      if (b - a > 12) {
-        // Only lanes passable at the gates either side of the gap, so aid can
-        // never be dangled somewhere the player is not allowed to go.
-        const open = [];
-        for (let l = 0; l < 3; l++) {
-          const here = gates[gi].lanes[l];
-          const next = gi + 1 < gates.length ? gates[gi + 1].lanes[l] : K.CLEAR;
-          if (here !== K.BLOCK && next !== K.BLOCK) open.push(l);
-        }
-        if (open.length) {
-          // WHICH lane the aid goes in is the whole design of it.
-          //
-          // Dropping it in a random passable lane made it free: if the racing
-          // line already ran through that lane you collected it without
-          // deciding anything. Aid should be a trade -- leave the easy line,
-          // clear something, get paid -- so the lane is chosen to be the
-          // HARDEST one that is still legal, not an arbitrary one.
-          //
-          // Difficulty is scored from the gates either side of the gap,
-          // because those are what the player has to survive to be in this
-          // lane at this moment:
-          //   an action at the gate BEFORE  -- you had to clear something to
-          //                                   get here
-          //   an action at the gate AFTER   -- you have to clear something on
-          //                                   the way out, still in this lane
-          //   off-centre                    -- costs a lane change and gives
-          //                                   up the middle, which is the lane
-          //                                   with an escape on both sides
-          //
-          // The lane is still guaranteed passable at both gates, so this makes
-          // aid demanding without ever making it a trap. Nothing here can
-          // reach a BLOCK: `open` excluded those before scoring.
-          // ...but not EVERY item, and that qualification is the whole fix.
-          //
-          // Scoring every placement for maximum difficulty produced a rescue
-          // mechanic that only a player who did not need rescuing could reach.
-          // Measured over 171 items: 85% sat off the centre lane, 71% demanded
-          // an action at the gate on BOTH sides, and 94% demanded one on at
-          // least one side. Aid tops the streak back up to AID_CEILING, so it
-          // is the designated road back for a broken run -- and it was gated
-          // behind two consecutive clean clears plus a lane change, asked of
-          // the one player whose defining problem is that they cannot string
-          // two clean clears together. The stronger the aid was made, the
-          // further out of reach it moved. A 16-contact run collected none.
-          //
-          // So the pool is mixed rather than uniformly hard. Roughly half the
-          // items are still scored for maximum difficulty -- those are the
-          // trade the design wants, and a strong run will hoover them up on
-          // the way past. The rest are scored INVERTED, landing in the easiest
-          // legal lane, and those are the ones a broken run can actually take.
-          //
-          // Deterministic, so the course stays identical for every player: the
-          // choice comes from the same seeded stream as everything else, never
-          // from the runner's live state.
-          const rescue = rnd.chance(0.5);
-          // -Infinity, not -1. On the rescue path `rank` is a NEGATED score
-          // and is therefore always below zero, so a -1 seed meant no lane
-          // scoring 1 or worse could ever beat the initial value: the loop
-          // silently fell through, left the lane as an arbitrary open[0], and
-          // reported a demand of 1 no matter how hard the placement actually
-          // was. Two rounds of tuning measured no effect for exactly this
-          // reason before the seed was found.
-          let lane = open[0], best = -Infinity;
-          for (const l of open) {
-            const before = gates[gi].lanes[l];
-            const after = gi + 1 < gates.length ? gates[gi + 1].lanes[l] : K.CLEAR;
-            let score = 0;
-            if (before === K.JUMP || before === K.DUCK) score += 3;
-            if (after === K.JUMP || after === K.DUCK) score += 3;
-            if (l !== 1) score += 1;
-            // Break ties from the seeded stream so a course still varies.
-            score += rnd.next() * 0.9;
-            // A rescue item wants the LEAST demanding lane, so the same score
-            // is simply read the other way up rather than duplicated.
-            const rank = rescue ? -score : score;
-            if (rank > best) { best = rank; lane = l; }
-          }
-          // `best` is negated on a rescue item, so recover the real score for
-          // the guarded flag the renderer uses to decide how loudly to
-          // telegraph the pickup.
-          const demand = rescue ? -best : best;
-
-          // Reading the score the other way up is not enough on its own, and
-          // measurement is why this is here. Inverting the lane choice moved
-          // "reachable without clearing anything" only from 6% to 9%, because
-          // the LANE is picked after the POSITION and the course is now dense
-          // enough that most gaps have no easy lane in any of the three.
-          //
-          // So a rescue item is allowed to decline a gap. If the gentlest lane
-          // here still demands an action, skip this gap and look at the next
-          // one; `nudged` bounds that walk so aid can never migrate far from
-          // where the spacing rule wanted it, and so a stretch of course with
-          // no easy gap at all cannot silently swallow every rescue item.
-          if (rescue && demand >= 3 && nudged < 5) {
-            nudged++;
-            // Step to the NEXT GAP, not a fixed distance. The first version of
-            // this advanced 26 units, which is less than the median gate
-            // spacing of 29.6 -- so it usually re-tested the same gap, decided
-            // the same thing, and burned its whole allowance without ever
-            // looking at a new one. The measured effect was nil.
-            const nz = gi + 1 < gates.length ? gates[gi + 1].z + 5 : z + 32;
-            z = Math.max(z + 10, nz);
-            continue;
-          }
-          nudged = 0;
-
-          const f2 = z / K.TOTAL_UNITS;
-          const fruit = rnd.chance(0.12 + 0.46 * f2 * f2);
-          items.push(fruit
-            ? { z, lane, kind: 'banana', gain: K.AID_BANANA, guarded: demand >= 3 }
-            : { z, lane, kind: 'water', gain: K.AID_WATER, guarded: demand >= 3 });
-        }
+      // Hunt forward from here for a gate of the right shape. The density curve
+      // below decides ROUGHLY where an aid point goes; the rule decides exactly
+      // which gate it hangs off, and a point with no qualifying gate within
+      // AID_WALK is given up rather than dropped somewhere free.
+      //
+      // ---- THREE BOUNDS, AND ALL THREE WERE MISSING FIRST TIME ------------
+      //
+      // NEVER BEFORE THE PREVIOUS ITEM'S GATE. The hunt starts at the gate
+      // BEHIND the target z, so the placement can pull an item backwards by up
+      // to one gap. Left alone that can order two items the wrong way round or
+      // stack them on one gate. Starting at lastHg + 1 makes the gate index
+      // strictly increasing, so z is too, and the sort at the end has nothing
+      // left to do.
+      //
+      // NEVER PAST THE END. `end` bounds where an aid POINT may be asked for,
+      // and the hunt can carry the item eight gates -- about 250 units -- past
+      // wherever that was. On the last point of the course that walks straight
+      // through the tape. The exact class of defect the ramp's run-in had, and
+      // the exact reason this file's sweeps run at 365 days.
+      let hg = -1, lane = -1;
+      for (let k = Math.max(gi, lastHg + 1); k < gates.length - 1 && k < gi + AID_WALK; k++) {
+        if (gates[k].z > end) break;
+        const l = aidLaneAt(gates, k, rnd);
+        if (l >= 0) { hg = k; lane = l; break; }
+      }
+      if (hg >= 0) {
+        const g = gates[hg];
+        // Behind the obstacle: its rear face, from the SAME nose-anchored
+        // expression reachOf, buildSpans and world.js's gateBoxes all use, so
+        // the bottle can never end up inside the thing it stands behind.
+        //
+        // ASSIGNED, NOT MAXED. This was Math.max(z, ...) so that an item could
+        // never move backwards, and the cost of that was the whole rule: where
+        // the target z already sat past the gate the item simply stayed there,
+        // 46 units downstream, behind nothing at all. Monotonicity is the
+        // hunt's job now, above, and the placement's only job is to be behind
+        // the obstacle.
+        lastHg = hg;
+        z = g.z + 2 * HAZARD_HALF_Z[g.lanes[lane]] + AID_SETBACK;
+        const f2 = z / K.TOTAL_UNITS;
+        const fruit = rnd.chance(0.12 + 0.46 * f2 * f2);
+        // `gate` IS THE INTERFACE TO THE COLLECTION TEST, and it is carried on
+        // the item for the same reason the roof item carries `y`: the rule has
+        // to travel with the thing it governs, or the renderer and the player
+        // are left to rediscover it. player.resolveAid pays a guarded item out
+        // to a runner who was in `lane` when gate `gate` resolved, cleanly or
+        // not -- see the long note there for why a lane match at a point cannot
+        // do this job.
+        //
+        // Every road item is guarded now: that is the rule, so the flag is a
+        // constant rather than a score. It is kept because the roof items carry
+        // it and the two should describe themselves the same way.
+        items.push(fruit
+          ? { z, lane, gate: hg, kind: 'banana', gain: K.AID_BANANA, guarded: true }
+          : { z, lane, gate: hg, kind: 'water', gain: K.AID_WATER, guarded: true });
       }
 
       // Sparse early, dense late. Aid exists to rescue a broken run, and a run
       // is rarely broken in the first mile, so the opening stays clean and the
       // back half -- where the wall is and where the streak is worth most --
       // carries most of the help.
-      const spacing = 620 - 400 * f;
+      //
+      // Read off z AFTER the placement has moved it, not before: the hunt above
+      // can carry a point forward by up to AID_WALK gates, and pacing the next
+      // one off where this one was WANTED rather than where it LANDED would let
+      // two items stack up behind a single dense stretch.
+      const spacing = 620 - 400 * (z / K.TOTAL_UNITS);
       z += spacing * rnd.range(0.82, 1.18);
     }
     items.sort(function (p, q) { return p.z - q.z; });

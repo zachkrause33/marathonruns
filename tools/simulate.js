@@ -106,11 +106,21 @@ for (const [label, skill] of rows) {
  * ignores it is not measuring this game. It answers the question for a player
  * who runs past every bottle on the course, which no real player does.
  *
- * Aid is collected on lane match alone (see player.resolveAid), so modelling
- * it as "the first `take` fraction of items, by position" is exact for a
- * player whose racing line happens to cover that share -- and aid is
- * deliberately placed in the hardest legal lane, so a high take rate is
- * itself a claim about skill.
+ * `take` is modelled as "the first `take` fraction of items, by position", and
+ * what that fraction COSTS is no longer a matter of luck. Every road item now
+ * stands directly behind a JUMP or a DUCK, in that hazard's lane, at a gate
+ * that also offers a lane through for nothing -- and player.resolveAid pays it
+ * out only to a runner who was in that lane when that gate resolved. So the
+ * "all of it" column is not a player who got lucky with their racing line. It
+ * is a player who chose, fourteen times, to jump a thing they could have run
+ * straight past, and this table charges them nothing for the risk of doing so.
+ *
+ * That makes this column the OPTIMISTIC bound and it should be read as one.
+ * tools/aid.js races the same choice through the real state machine and prices
+ * it: at 6% of actions fluffed, going for every bottle costs a full extra
+ * contact over declining, and it stops being worth it once a player is 25%
+ * likelier to fluff the jump they took for a bottle than the ones they had to
+ * take anyway.
  */
 function runWithNHits(n, take) {
   const times = KEYS.map((key) => {
@@ -154,16 +164,48 @@ for (const n of [0, 1, 2, 3, 5, 10]) {
   });
   console.log(`${String(n).padStart(8)}   ${cells.join(' ')}`);
 }
-// The headline the tuning actually turns on: with aid, how many can you drop?
+/**
+ * The headline the tuning actually turns on: with aid, how many can you drop?
+ *
+ * ---- AND IT REPORTS ITS OWN MARGIN, BECAUSE IT IS AN INTEGER CUT FROM A
+ *      CONTINUOUS NUMBER --------------------------------------------------
+ *
+ * This used to print the integer alone, and an integer alone is exactly the
+ * kind of number rule 3 warns about. The aid placement rule was rewritten and
+ * this line went from "3 taking all of it" to "4", which reads as the game
+ * getting a whole mistake more forgiving. It did not: n = 4 finished 0.6s the
+ * wrong side of the record before and 0.7s the right side after. A 1.3-second
+ * swing on a 7,076-second race, caused by aid items moving tens of units along
+ * the course and so landing their streak top-ups at slightly different places
+ * relative to evenly-spaced mistakes.
+ *
+ * A reader shown only the integer would have gone looking for a difficulty
+ * change that was never made, or -- worse -- retuned the pace model to put it
+ * back. So the margin at the boundary is printed with it: how much room the
+ * last surviving mistake had, and how much the first fatal one missed by.
+ * When either is a second or two, the integer is noise and should be read as
+ * such.
+ */
 const budget = (take) => {
   for (let n = 0; n <= 40; n++) {
-    if (runWithNHits(n, take).finishTime > K.RECORD_SECONDS) return n - 1;
+    if (runWithNHits(n, take).finishTime > K.RECORD_SECONDS) {
+      return { n: n - 1,
+               spare: n > 0 ? K.RECORD_SECONDS - runWithNHits(n - 1, take).finishTime : 0,
+               over: runWithNHits(n, take).finishTime - K.RECORD_SECONDS };
+    }
   }
-  return 40;
+  return { n: 40, spare: 0, over: 0 };
 };
 console.log('');
-console.log(`  mistakes the record survives:  ${budget(0)} with no aid, ` +
-            `${budget(0.5)} taking half, ${budget(1)} taking all of it`);
+const b0 = budget(0), b5 = budget(0.5), b1 = budget(1);
+console.log(`  mistakes the record survives:  ${b0.n} with no aid, ` +
+            `${b5.n} taking half, ${b1.n} taking all of it`);
+console.log('');
+console.log('  ...and how close each of those is to being a different integer:');
+for (const [label, b] of [['no aid', b0], ['half', b5], ['all', b1]]) {
+  console.log(`    ${label.padEnd(7)} ${b.n} survives with ${b.spare.toFixed(1)}s to spare; ` +
+              `${b.n + 1} misses by ${b.over.toFixed(1)}s`);
+}
 
 console.log('');
 console.log(ok ? 'PASS  pace model satisfies its stated contract' : 'FAIL  see above');

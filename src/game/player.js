@@ -72,6 +72,9 @@ MR.Player = (function () {
       aidIdx: 0,
       lastResult: null,  // 'clean' | 'hit'
       lastResultAt: -99,
+      // The last gate resolved: { idx, lane, clean }. The receipt a guarded aid
+      // item is bought with -- see resolveGates and resolveAid.
+      lastGate: null,
       events: [],        // drained by main for audio/HUD reactions
     };
 
@@ -88,7 +91,7 @@ MR.Player = (function () {
       s.duck01 = 0; s.lean = 0; s.stumble = 0; s.bounce = 0; s.tripT = 0;
       s.surface = 0; s.ramp = null; s.falling = 0; s.fallFrom = 0; s.flanked = null;
       s.gateIdx = 0; s.aidIdx = 0;
-      s.lastResult = null; s.events.length = 0;
+      s.lastResult = null; s.lastGate = null; s.events.length = 0;
     };
 
     function changeLane(dir) {
@@ -342,6 +345,19 @@ MR.Player = (function () {
 
         const kind = gate.lanes[s.lane];
         const clean = C.clears(kind, s);
+        // ---- THE RECEIPT FOR THE GATE JUST PASSED --------------------------
+        //
+        // Which gate, in which lane, and whether it was cleared. resolveAid
+        // reads this and nothing else to decide whether a guarded item has been
+        // earned -- see the note there. Written BEFORE the BLOCK bounce below,
+        // because the bounce moves s.lane and the receipt has to say the lane
+        // the runner was actually IN when the gate resolved, not the one they
+        // were thrown into by it.
+        //
+        // Index rather than object identity: course.gates is regenerated from
+        // the date seed in several places (the replay path builds its own), and
+        // an item that remembers a gate by pointer would silently never match.
+        s.lastGate = { idx: s.gateIdx - 1, lane: s.lane, clean };
         if (!clean) {
           // Contact is not one thing. Running into a wall and clipping a kerb
           // used to produce the identical result -- pass straight through,
@@ -410,10 +426,65 @@ MR.Player = (function () {
     /**
      * Collect any aid the player ran through this step.
      *
-     * Lane match only ON THE ROAD -- no action required and no vertical test.
-     * Aid is a reward for choosing a line, not a fourth thing to time, and a
-     * bottle you can miss by being mid-jump would make the aid lane a trap in a
-     * game where the aid lane is supposed to be the merciful option.
+     * NO ACTION IS REQUIRED AND THERE IS NO VERTICAL TEST. Aid is a reward for
+     * choosing a line, not a fourth thing to time, and a bottle you can miss by
+     * being mid-jump would make the aid lane a trap in a game where the aid
+     * lane is supposed to be the merciful option. That has not changed and must
+     * not: a runner who ploughs straight into the block still takes the bottle
+     * behind it, having paid for it with the streak.
+     *
+     * ---- WHAT A GUARDED ITEM IS BOUGHT WITH, AND WHY IT IS NOT THE LANE ----
+     *
+     * Every road item is now laid directly behind a JUMP or a DUCK, in that
+     * hazard's own lane, at a gate that also offers a lane through for nothing
+     * (see the placement rule in course.js). The point of that is that reaching
+     * the bottle should mean answering the obstacle in front of it.
+     *
+     * A LANE MATCH AT A POINT CANNOT ENFORCE THAT, and measurement is why this
+     * is here rather than a paragraph claiming it does. player.changeLane moves
+     * `lane` on the same frame the input is served, so any patch of road can be
+     * reached by a swerve -- and a bot in tools/aid.js that took the free lane
+     * at the gate and then cut in behind it collected 61% of the course's aid
+     * for a third of a contact. Pushing the item closer to the gate only makes
+     * the window smaller; it never closes it, and it makes the answer depend on
+     * the frame rate, which is not a thing fairness may depend on.
+     *
+     * So a guarded item carries the INDEX OF THE GATE IT STANDS BEHIND, and is
+     * bought at that gate rather than on the road: the runner has to have been
+     * in the item's lane when the gate resolved. Cleanly or not -- see above.
+     *
+     * This is not a new kind of rule. It is exactly the shape the roof already
+     * had, one step down: a roof item is collected only by a runner standing on
+     * the ramp that carries it, and a guarded item only by one who came through
+     * the obstacle that guards it. Both say the same thing -- the reward is
+     * paid for by where you chose to be, and the pickup is the receipt.
+     *
+     * The instantaneous lane test is DROPPED for a guarded item, deliberately.
+     * Keeping both would mean a player who paid at the gate and then swerved
+     * inside the two units before the bottle paid and got nothing, which is a
+     * trap measured in frames. The gate receipt is the whole test.
+     *
+     * ---- ONE PLACE STILL DESCRIBES THE OLD RULE, AND IT IS NOT THIS FILE ---
+     *
+     * world.js decides when to POP a pickup -- the little punch-out that says
+     * you got it -- with its own copy of the test, and its copy is the one this
+     * function used to have:
+     *
+     *     e.it.lane === playerLane && e.it.z <= z && z - e.it.z < 6
+     *
+     * That is a lane match at a point, so it and this function now answer
+     * differently in exactly the case the guard exists for: a runner who takes
+     * the free lane at the gate and cuts into the aid lane a unit later gets the
+     * animation and no gain, and one who pays at the gate and immediately
+     * swerves out gets the gain and no animation. Both windows are under two
+     * units -- three frames -- so neither is reachable except on purpose, which
+     * is why this is a note rather than a fix landed here: world.js belongs to
+     * another pass and a renderer edit made blind from this file is how two
+     * copies of a rule become three.
+     *
+     * The hook it needs is already on the state: `s.lastGate` is the receipt,
+     * and popping off THAT rather than off the lane deletes the second copy of
+     * the rule instead of correcting it. Recorded in docs/roadmap.md.
      *
      * ---- A ROOF ITEM IS NOT A ROAD ITEM AT A DIFFERENT HEIGHT --------------
      *
@@ -441,12 +512,20 @@ MR.Player = (function () {
         const item = aid[s.aidIdx];
         if (item.z < unitsBefore - 1e-6) { s.aidIdx++; continue; }
         s.aidIdx++;
-        if (item.lane !== s.lane) continue;
-        // The ramp under the ITEM, not under the runner: they are the same
-        // vehicle whenever this can pay out, and asking about the item is what
-        // makes the test independent of where in the step the z landed.
-        const carrier = item.roof && course.rampAt ? course.rampAt(item.z, item.lane) : null;
-        if (item.roof ? s.ramp !== carrier || carrier === null : s.onDeck) continue;
+        if (item.gate != null) {
+          // Bought at the gate, not on the road. Never from a roof, for the
+          // same reason a road item never was: a runner up there did not come
+          // through anything.
+          const r = s.lastGate;
+          if (s.onDeck || !r || r.idx !== item.gate || r.lane !== item.lane) continue;
+        } else {
+          if (item.lane !== s.lane) continue;
+          // The ramp under the ITEM, not under the runner: they are the same
+          // vehicle whenever this can pay out, and asking about the item is what
+          // makes the test independent of where in the step the z landed.
+          const carrier = item.roof && course.rampAt ? course.rampAt(item.z, item.lane) : null;
+          if (item.roof ? s.ramp !== carrier || carrier === null : s.onDeck) continue;
+        }
         out.push(item);
         s.events.push('aid');
       }

@@ -2418,3 +2418,140 @@ nobody measured is worse than no number at all.**
    in that lane and the placeholder is a second solid over the same footprint.
    Correction 46 is the spec for the real tailgate. Flipping the default is one
    line in `course.js` the day that lands.
+
+50. **Aid was scenery that happened to pay. A bottle now stands behind an
+   obstacle, and the obstacle is what you buy it with.**
+
+   The owner's instruction: *"Ensure waters and bananas are strategically placed
+   so that they have to go around an obstacle to get it."* The generator already
+   believed it did this -- it scored the open lanes and took the hardest -- so
+   the first job was to find out what aid actually cost. `tools/aid.js` is the
+   new instrument and it measured the shipped course three independent ways:
+
+   | | before | after |
+   |---|---|---|
+   | items costing the cheapest line **nothing at all** | **56.5%** | **0.0%** |
+   | items had for a lane change and no action | 42.5% | 0.0% |
+   | items costing **at least one more action** | 1.0% | **100%** |
+   | collected by four natural-line bots that cannot see aid | **64.4%** | **0.0%** |
+   | collected by a bot that cuts in behind the gate | **13.0 of 14** | **0 of 14** |
+   | a perfect bot going for everything, vs ignoring it | same time, same 0 contacts | same time, same 0 contacts |
+
+   Three things made it free, and only the first was the one anybody suspected.
+   The lane test was **relative** -- "the hardest of the open lanes" buys nothing
+   at a gate whose three lanes are all clear, and it picked one at random. Half
+   the pool was then scored *inverted*, into the easiest lane, which is free by
+   construction; that was a real fix for a real problem (see below) and it
+   solved it by giving the mechanic away. And the item sat in the **middle of the
+   gap**, thirty units of open road from anything, so even a hard placement could
+   be taken by dipping into the lane and coming straight back out.
+
+   **THE RULE, WHICH IS ONE SENTENCE.** A bottle stands behind an obstacle, in
+   that obstacle's own lane, at a gate that also offers a lane through for
+   nothing. Every road item is laid 0.35 units past the rear face of a JUMP block
+   or a DUCK bar, in the same lane as that hazard, and only at a gate that leaves
+   some other lane CLEAR and leaves the aid lane open at the gate after. So the
+   only way to the bottle is over or under the thing standing in front of it; the
+   free lane is always right there to be taken instead; and paying once buys the
+   item outright, because the gate ahead is never allowed to shut the lane you
+   just bought your way into. Nothing about `solvable()` changes -- aid reads the
+   gate table and writes nothing back, so the clean path of a player who ignores
+   every bottle is the one the BFS already proved.
+
+   **PLACEMENT ALONE CANNOT ENFORCE IT, AND THAT IS THE FINDING.**
+   `player.resolveAid` was a lane match at a point and `changeLane` moves `lane`
+   on the frame the input is served, so **any patch of road is reachable by a
+   swerve**. Pushing the item up against the obstacle only shrinks the window --
+   it never closes it, and it makes the answer depend on the frame rate, which is
+   not a thing fairness may depend on. A bot that took the free lane at the gate
+   and then cut in collected **13 of 14 items for half a contact** with the item
+   mid-gap, and still **8 of 14** with the item 1.4 units behind the block.
+
+   So a guarded item now carries the **index of the gate it stands behind**, and
+   is bought at that gate rather than on the road: the runner has to have been in
+   the item's lane when the gate resolved. Cleanly or not -- a runner who ploughs
+   into the block still takes the bottle behind it, having paid with the streak,
+   which is the whole point of a rescue. That is not a new kind of rule; it is
+   the shape the **roof already had** one step down, where an item is collected
+   only by a runner standing on the ramp that carries it. The cut-in bot now
+   collects **zero**.
+
+   **THE RESCUE ARGUMENT IS ANSWERED RATHER THAN DROPPED.** Correction 40's
+   finding was real: scoring every item for maximum difficulty produced a rescue
+   mechanic only a player who did not need rescuing could reach -- 71% of items
+   demanded an action at the gate on *both* sides, so aid was gated behind two
+   consecutive clean clears asked of the one player who cannot string two
+   together. The fix for that was never "make half of it free". It was to stop
+   asking for a **chain**. This rule charges exactly one action at exactly one
+   gate and forbids the gate ahead from asking for another. A bot fluffing 30% of
+   the actions it attempts still collects **100%** of the aid on the course.
+
+   **IT IS A DECISION AND NOT A TAX, AND SAYING SO NEEDED A THIRD COLUMN.** Run
+   the two bots side by side and going for the aid wins at every ability level,
+   which read as a tax on declining. It is not, and the reason is that the two
+   bots are not taking the same bet: the one that ignores aid jumps only when it
+   has to, and the one that goes for a bottle jumps because it **wants** to, in a
+   lane it chose against a clear one standing beside it. Holding base ability at
+   6% of actions fluffed and adding an extra chance of missing **only the jumps
+   taken to reach a bottle**:
+
+   | extra fluff on the aid jump | finish | vs running past every bottle |
+   |---|---|---|
+   | 0% | 1:59:52 | **-49s** |
+   | 25% | 2:01:43 | +63s |
+   | 50% | 2:03:52 | +192s |
+
+   **Declining becomes the better call once a player is 25% likelier to fluff the
+   jump they took for the bottle than the ones they had to take anyway.** Below
+   that, going for it pays. Both calls are live, which is the whole ask.
+
+   **THE RECORD CONTRACT MOVED BY 1.3 SECONDS AND THE HEADLINE MOVED BY A WHOLE
+   MISTAKE.** `tools/simulate.js` went from *"1 with no aid, 2 taking half, 3
+   taking all of it"* to *"...4 taking all of it"*. Nothing got easier: n = 4
+   finished **+0.6s** the wrong side of the record before and **-0.7s** the right
+   side after, because aid items moved tens of units along the course and so
+   landed their streak top-ups in slightly different places relative to
+   evenly-spaced mistakes. An integer cut from a continuous number, reported
+   without its margin, is exactly the sort of thing that sends the next reader
+   hunting a difficulty change that was never made -- or retuning the pace model
+   to put it back. **`simulate.js` now prints how close each of those integers is
+   to being a different integer**, and the "all of it" column is labelled as the
+   optimistic bound it is: it charges a player nothing for the risk of choosing,
+   fourteen times, to jump a thing they could have run straight past.
+
+   **FOUR DEFECTS IN THE INSTRUMENT AND THE WORK, ALL FLATTERING.** Rule 3 held
+   again, in both directions. The miss knob in `tools/aid.js` counted fluffs in
+   the per-frame action branch instead of once per gate, so the test flipped on
+   and off inside a single gate and the frame where it was off fired the jump
+   anyway -- **every miss rate reported 0.0 contacts**, which read as "aid is
+   free even for a broken run". The DP offered the "be in the lane at the gate
+   AHEAD" route unconditionally, which says nothing about being in that lane 27
+   units earlier where the bottle is, and so reported items free that no line
+   could collect -- flattering the **old** placement, the one direction that would
+   have made this pass look unnecessary. In the generator, `Math.max(z, ...)`
+   left an item wherever the density curve had wanted it whenever that was
+   already past the gate, so items sat up to **46 units** behind nothing at all.
+   And the hunt for a qualifying gate was unbounded at the end of the course: it
+   could walk eight gates -- 250 units -- past the last legal aid point and lay a
+   bottle **through the tape**. That last one is the ramp's run-in defect again,
+   and again it needs 365 days to see.
+
+   **ONE THING LEFT OPEN.** `world.js` decides when to pop a pickup with its own
+   copy of the collection test, and its copy is the one this pass replaced --
+   `e.it.lane === playerLane`. The two now disagree in exactly the case the guard
+   exists for: cut in behind the gate and you get the animation and no gain; pay
+   at the gate and swerve straight out and you get the gain and no animation.
+   Both windows are under two units, so neither is reachable except on purpose.
+   The hook is already there -- `player.lastGate` is the receipt -- and popping
+   off that **deletes** the second copy of the rule rather than correcting it.
+   Related: `main.js` fires `audio.aidMissed()` for every item walked past
+   uncollected, which used to be a minority of them and is now nearly all of them
+   for a player who declines. Worth a listen before it is called a bug.
+
+   `tools/mechanics.js`'s identity hash covered gates **and** aid in one number,
+   so a deliberate change to where the bottles go read as "course generation has
+   MOVED" -- indistinguishable from a flag leaking into the gate stream, which is
+   the thing the check exists to catch. It is two hashes now. The gate hash is
+   `d24862235d30ff68daf8e6142d7162f1f230b6e1` and has **not** moved; the aid hash
+   was re-taken once, on purpose, and the split was checked to reproduce the old
+   combined `f046dcfc...` exactly rather than being a re-baseline in disguise.

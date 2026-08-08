@@ -128,33 +128,60 @@ function topSpeedAt(elev, z) {
 
 console.log(`\n=== identity: flags off must be the generator that shipped ===\n`);
 /**
- * ONE HASH OVER THE WHOLE CALENDAR, taken before the first line of either
- * mechanic went into course.js.
+ * TWO HASHES OVER THE WHOLE CALENDAR, and it used to be one.
  *
- * This is a golden number and it is SUPPOSED to be brittle. Any deliberate
- * change to course generation will break it, and the correct response is to
- * re-take it and say so in docs/roadmap.md -- never to delete the check. What
- * it is guarding is narrower and worth keeping: that NARROW = 0 and RAMP = 0
- * draw no random numbers, so the seeded stream stays in phase and today's
- * course is today's course whether or not the mechanics exist.
+ * These are golden numbers and they are SUPPOSED to be brittle. Any deliberate
+ * change to course generation breaks one, and the correct response is to re-take
+ * that one and say so in docs/roadmap.md -- never to delete the check. What they
+ * guard is narrower and worth keeping: that NARROW = 0 and RAMP = 0 draw no
+ * random numbers, so the seeded stream stays in phase and today's course is
+ * today's course whether or not the mechanics exist.
+ *
+ * ---- WHY IT IS TWO NOW ------------------------------------------------
+ *
+ * The single hash covered gates AND aid, which meant a change to where the
+ * bottles go read as "course generation has MOVED" -- indistinguishable from a
+ * flag leaking into the gate stream, which is the thing this check exists to
+ * catch. The aid placement rule was rewritten (see the long note in
+ * generateAid) and the gate stream was deliberately not touched, and a single
+ * hash cannot say that. Split, it says it precisely: GATES is the number that
+ * has never moved and must not, and AID moved once, on purpose, and here is
+ * the new one.
  */
-const BASELINE_365 = 'f046dcfc84a59c08a3a7b51c78449853f3bd90f8';
+// Unmoved since before either mechanic existed. The old single hash was
+// f046dcfc84a59c08a3a7b51c78449853f3bd90f8 over gates and aid together, and
+// splitting it reproduces that value exactly from these two -- checked rather
+// than asserted, which is how the split was shown not to be a re-baseline in
+// disguise.
+const BASELINE_GATES = 'd24862235d30ff68daf8e6142d7162f1f230b6e1';
+// Re-taken once, deliberately: the aid placement rule was rewritten so a bottle
+// stands behind an obstacle rather than in open road. It was
+// 7f17eb4893b067571344191ddd6478b4f8da3329. See docs/roadmap.md.
+const BASELINE_AID = 'e81209a3dd064fbebaf5c7253b4d3ac0c634d39b';
 (function identity() {
-  const h = crypto.createHash('sha1');
+  const hg = crypto.createHash('sha1');
+  const ha = crypto.createHash('sha1');
   for (const key of keys(365)) {
     const c = Course.generate(key);
-    h.update(JSON.stringify(c.gates) + '|' + JSON.stringify(c.aid));
+    hg.update(JSON.stringify(c.gates));
+    ha.update(JSON.stringify(c.aid));
   }
-  const got = h.digest('hex');
-  console.log(`  365-day course hash  ${got}`);
-  if (got !== BASELINE_365) {
-    bad(`course generation has MOVED at NARROW=0 RAMP=0 (expected ${BASELINE_365}).`);
+  const gotG = hg.digest('hex'), gotA = ha.digest('hex');
+  console.log(`  365-day gate hash    ${gotG}`);
+  console.log(`  365-day aid hash     ${gotA}`);
+  let ok = true;
+  if (BASELINE_GATES && gotG !== BASELINE_GATES) {
+    ok = false;
+    bad(`GATE generation has MOVED at NARROW=0 RAMP=0 (expected ${BASELINE_GATES}).`);
     console.log('    Either a flag is drawing from the seeded stream when it should not,');
-    console.log('    or course generation was deliberately changed -- in which case re-take');
+    console.log('    or gate generation was deliberately changed -- in which case re-take');
     console.log('    this hash and record why in docs/roadmap.md.');
-  } else {
-    console.log('  flags off is bit-identical to the pre-mechanic generator  OK');
   }
+  if (BASELINE_AID && gotA !== BASELINE_AID) {
+    ok = false;
+    bad(`AID placement has MOVED (expected ${BASELINE_AID}). Re-take and record why.`);
+  }
+  if (ok) console.log('  flags off is bit-identical to the recorded baselines  OK');
 })();
 
 console.log(`\n=== guard: duplicated constants ===\n`);

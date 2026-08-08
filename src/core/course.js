@@ -61,7 +61,7 @@ MR.Course = (function () {
    * at all and is not given one -- see the note above it.
    */
   let NARROW = 0;
-  let RAMP = 0;
+  let RAMP = 1;
 
   // A jump covers this much ground; two conflicting action gates closer than
   // this would demand being airborne and ducking at once.

@@ -158,7 +158,25 @@ const BASELINE_GATES = 'd24862235d30ff68daf8e6142d7162f1f230b6e1';
 // stands behind an obstacle rather than in open road. It was
 // 7f17eb4893b067571344191ddd6478b4f8da3329. See docs/roadmap.md.
 const BASELINE_AID = 'e81209a3dd064fbebaf5c7253b4d3ac0c634d39b';
+/**
+ * ---- THE FLAGS ARE FORCED OFF HERE, AND THAT IS NOT A WEAKENING ----------
+ *
+ * This used to hash `Course.generate` at whatever the DEFAULTS happened to be,
+ * and called the result "flags off" -- true only for as long as both flags
+ * shipped at zero. The day RAMP ships at 1 that sentence quietly becomes false
+ * and the check reports "GATE generation has MOVED", which is indistinguishable
+ * from the thing it exists to catch: a flag leaking into the seeded stream.
+ *
+ * The invariant being protected is not "the defaults are zero". It is "NARROW
+ * and RAMP draw no random numbers when OFF, so today's course is today's course
+ * whether or not the mechanics exist". So the flags are now SET to zero rather
+ * than assumed to be, and the golden numbers keep meaning exactly what they
+ * always meant -- including through a release that turns a mechanic on. Neither
+ * baseline moves, which is the point: if either does, something really did leak.
+ */
 (function identity() {
+  const n0 = Course.NARROW, r0 = Course.RAMP;
+  Course.NARROW = 0; Course.RAMP = 0;
   const hg = crypto.createHash('sha1');
   const ha = crypto.createHash('sha1');
   for (const key of keys(365)) {
@@ -166,7 +184,9 @@ const BASELINE_AID = 'e81209a3dd064fbebaf5c7253b4d3ac0c634d39b';
     hg.update(JSON.stringify(c.gates));
     ha.update(JSON.stringify(c.aid));
   }
+  Course.NARROW = n0; Course.RAMP = r0;
   const gotG = hg.digest('hex'), gotA = ha.digest('hex');
+  console.log(`  shipped defaults     NARROW=${n0} RAMP=${r0}   (hashes below are with both forced OFF)`);
   console.log(`  365-day gate hash    ${gotG}`);
   console.log(`  365-day aid hash     ${gotA}`);
   let ok = true;

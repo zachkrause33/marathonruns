@@ -11181,10 +11181,16 @@ MR.World = (function () {
      * a slowly spinning object is unambiguous at any distance, and it is the
      * genre's universal "pick me up" besides.
      *
-     * Collection is lane-match only, with no vertical test and no action (see
-     * player.js), so nothing here is allowed to imply otherwise: the item never
-     * rises above 1.2, never spans the lane, and the pool of light beneath it
-     * says that being in the lane is the whole requirement.
+     * Collection asks for no vertical accuracy and no action (see player.js),
+     * so nothing here is allowed to imply otherwise: the item never rises above
+     * 1.2, never spans the lane, and the pool of light beneath it says that
+     * touching it is not a thing you have to aim at.
+     *
+     * It is NOT lane-match any more, which this paragraph used to say. A road
+     * item is bought at the gate it stands behind, so the bottle is a RECEIPT
+     * for a lane already chosen rather than a thing collected on the way past
+     * -- which is the honest reading of a drink handed over at a feed station,
+     * and is why the art still must not suggest it has to be steered into.
      */
     const AID_Y = 0.95;   // hip height: not the ground (jump), not overhead (duck)
     const AID_POP_TIME = 0.42;
@@ -11192,6 +11198,56 @@ MR.World = (function () {
     // in the next lane back is only clutter -- and the pop needs the slot.
     const AID_BEHIND = 14;
     const aidItems = course.aid || [];
+
+    /**
+     * ============ THE POP READS THE PLAYER'S RECEIPT ============
+     *
+     * Whether an item has been COLLECTED is `player.resolveAid`'s answer and
+     * nobody else's. This asks it; it does not re-decide it.
+     *
+     * WHAT WAS HERE, AND WHY IT WENT WRONG WITHOUT ANYONE TOUCHING IT. The pop
+     * used to fire on `e.it.lane === playerLane` -- a lane match at a point,
+     * with a comment saying it was "exactly what player.js resolves on, so the
+     * pop can never disagree". That was true when it was written and stopped
+     * being true when the aid pass landed: a road item is now bought AT THE
+     * GATE IT STANDS BEHIND, because `changeLane` moves the lane on the frame
+     * the input is served, so any patch of road was reachable by a late swerve
+     * and fairness ended up depending on the frame rate.
+     *
+     * The two rules then disagreed inside a sub-two-unit window, both ways
+     * round: a runner who took the free lane at the gate and cut in a unit
+     * later got the animation and no gain, and one who paid at the gate and
+     * swerved straight out got the gain and no animation. Three frames either
+     * way -- unreachable except on purpose, and still the worst kind of bug
+     * this game has, because the picture was lying about the rules.
+     *
+     * A comment that says two things cannot disagree is not a mechanism for
+     * stopping them disagreeing. So the second copy is deleted rather than
+     * corrected: everything below is read off state the other file owns --
+     * `item.gate` from the course, `lastGate`, `ramp` and `onDeck` from the
+     * player -- and there is no policy here to drift out of step. If
+     * resolveAid's terms change, this stops popping rather than popping
+     * wrongly, which is the failure direction a renderer should have.
+     */
+    function aidTaken(it) {
+      const P = MR.game && MR.game.player;
+      // Before the game object exists -- world.update(0) runs at boot -- there
+      // is no receipt and nothing has been collected.
+      if (!P) return false;
+      if (it.gate != null) {
+        // Bought at the gate, never from a roof: a runner up there did not come
+        // through anything. This is resolveAid's guarded branch, term for term.
+        const r = P.lastGate;
+        return !P.onDeck && !!r && r.idx === it.gate && r.lane === it.lane;
+      }
+      if (it.lane !== P.lane) return false;
+      // The ramp under the ITEM, not under the runner -- the same reason
+      // resolveAid asks it that way: they are the same vehicle whenever this
+      // can pay out, and asking about the item makes it independent of where in
+      // the step the runner's z landed.
+      const carrier = it.roof && course.rampAt ? course.rampAt(it.z, it.lane) : null;
+      return it.roof ? (P.ramp === carrier && carrier !== null) : !P.onDeck;
+    }
 
     /**
      * The pool of light under an item, as GEOMETRY rather than as a soft
@@ -13840,10 +13896,20 @@ MR.World = (function () {
     // road is reacting to, instead of each computing their own and drifting.
     api.finale = finale;
 
-    // playerLane is still taken and still ignored here. It was the route
-    // ribbon's replan trigger and nothing else ever read it; the parameter
-    // stays in the signature because main.js passes it and this file does not
-    // own main.js. If a later pass finds no other use for it, drop it there.
+    /**
+     * playerLane IS NOW TAKEN AND IGNORED, and that is worth a line because two
+     * separate things stopped needing it in the same pass.
+     *
+     * It drove the route ribbon's replan, and the ribbon is gone. It also drove
+     * the aid pop, and the pop now reads the player's gate receipt instead --
+     * see aidTaken, where an instantaneous lane is exactly the wrong question.
+     * Nothing in this file reads it.
+     *
+     * The parameter stays in the signature because main.js passes it and this
+     * file does not own main.js; dropping it here would be a silent arity
+     * change across a module boundary for no gain. Whoever next owns main.js
+     * can drop it at both ends in one edit.
+     */
     api.update = function (z, playerLane) {
       const ahead = z + VIEW;
       const back = z - BEHIND;
@@ -14189,16 +14255,18 @@ MR.World = (function () {
       }
 
       // ---- aid ----------------------------------------------------------
-      // Spawned on the same windowed cursor as everything else; the pop is
-      // driven from here rather than plumbed in from main.js, because the rule
-      // that decides it is one line and duplicating it is cheaper than a new
-      // callback the renderer would have to be trusted to fire.
+      // Spawned on the same windowed cursor as everything else. The POP -- the
+      // little punch-out that says you got it -- is decided by aidTaken()
+      // above, which reads the player's own receipt rather than re-deciding.
       while (state.aidIdx < aidItems.length && aidItems[state.aidIdx].z < ahead) {
         const it = aidItems[state.aidIdx++];
         const pool = it.kind === 'banana' ? bananaPool : waterPool;
         const obj = pool.claim();
-        // Claim site 4: aid. Same rule as a hazard -- resolveAid matches on
-        // lane alone, so this is drawing only.
+        // Claim site 4: aid. This is drawing only, and it always was -- what
+        // has changed is that the sentence which used to be here, "resolveAid
+        // matches on lane alone", is no longer true of any item on the course.
+        // Nothing about WHERE the bottle is drawn depends on that; see aidTaken
+        // for the part that does.
         const aidY = eAt(it.z);
         obj.position.set(K.LANE_X[it.lane], aidY, it.z);
         obj.scale.setScalar(1);
@@ -14207,12 +14275,9 @@ MR.World = (function () {
       for (let i = activeAid.length - 1; i >= 0; i--) {
         const e = activeAid[i];
         if (e.pop < 0) {
-          // Lane match only -- exactly what player.js resolves on, so the pop
-          // can never disagree with the streak the player was just granted.
           // The 6-unit gate is what stops an item popping long after the fact
           // when a ?skip= jump spawns one that is already behind the runner.
-          if (playerLane !== undefined && e.it.lane === playerLane
-            && e.it.z <= z && z - e.it.z < 6) {
+          if (e.it.z <= z && z - e.it.z < 6 && aidTaken(e.it)) {
             e.pop = now;
           } else if (e.it.z < z - AID_BEHIND) {
             e.pool.release(e.obj);
@@ -15423,6 +15488,32 @@ MR.World = (function () {
         }
       }
       return out;
+    };
+
+    /**
+     * The live aid items and whether each has POPPED, so the picture can be
+     * checked against the rules instead of assumed to match them.
+     *
+     * This exists because the two disagreed. world.js decided the pop from its
+     * own copy of a lane-match test after player.js had replaced that rule with
+     * a gate receipt, and nothing in the build could see it: the animation and
+     * the payout are computed in different files and no instrument had both.
+     * The property a tool can now assert is the one that was quietly false --
+     * every item that pays pops, and every item that pops has paid.
+     *
+     * Read-only and derived, in the same family as crossings(), gateBoxes() and
+     * fleetExtents(): the file that owns the state reports it, and the file
+     * that owns the rule does the failing.
+     */
+    api.aidState = function () {
+      return activeAid.map(function (e) {
+        return {
+          z: e.it.z, lane: e.it.lane,
+          gate: e.it.gate === undefined ? null : e.it.gate,
+          roof: !!e.it.roof,
+          popped: e.pop >= 0,
+        };
+      });
     };
 
     /**

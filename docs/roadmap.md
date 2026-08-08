@@ -1041,6 +1041,34 @@ nobody measured is worse than no number at all.**
    contract with no assertion is a comment, and the file that owns the numbers
    is the last place that will notice.**
 
+18. **A sub-assembly was rotated and its LAYOUT LOOP was not.** `stoneArch`'s
+   downstream viaduct ran four arches through the play corridor -- 51
+   triangles at road level, `LOW` plus two `HIDES`, on every one of the ~72
+   days it drew, in shipped code.
+
+   `vArc` builds its ring in the x-y plane, so a viaduct steps its arches
+   along X, the span axis. This stepped `cz`, the extrusion axis. `placeAt`
+   then rotated the assembly by PI/2, and **every other member had been
+   authored for that rotation and agreed with it** -- the deck is 72 along
+   local x, the piers are pushed unrotated to world x -34 and step along world
+   z. One loop was on the wrong axis, so its arches marched from world x -64
+   to **-0.5** while their own deck and piers stayed at -34.
+
+   Two things worth keeping. **The piers were the proof**: put the centres back
+   on x and the arches land at world z ±30, ±10 leaving 2.8 between extrados,
+   and the piers are 3.0 deep at exactly those gaps. The geometry had always
+   been designed for the correct layout, so the fix was one word and the
+   internal evidence for it was already in the file. And **the number it
+   produced had been quoted as a budget**: a refusal elsewhere in `world.js`
+   cited "stoneArch reaches |x| 67.5" as evidence the bridge flank was full.
+   67.5 was not a design reach, it was this defect measured. Same family as
+   `HAZARD_HALF` -- a wrong number becoming load-bearing somewhere else before
+   anyone checked what produced it.
+
+   It shipped because `shoot.js` photographed one date. The general lesson is
+   the one already at entry 8: **an assertion that passes tells you about the
+   property it tests and nothing else** -- here, about the day it was run on.
+
 15. **Counting source hex is not measuring colour.** The accent item counted
    `#ffe45e` 43 times in `world.js` and concluded the HUD's semantic accent
    had leaked into the world. Counted in PIXELS instead, on shipped frames

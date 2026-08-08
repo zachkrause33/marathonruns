@@ -4945,10 +4945,26 @@ MR.shading = (function () {
  *     "0.017 proud" of a mitt that had already curved away to 81% of its
  *     section under it, and drew a MEDIAN OF TWO PIXELS. Fourth instance in
  *     this file, after the coin of scalp, the cap peak and the wristband.
- *   THIS CHARACTER HAS NO BROW LINE. The cap band's underside sits 0.017 into
- *     the top of each eye, which is what wearing a cap pulled down means. The
- *     aperture is the brow, and that is why expression drives the eye's own
- *     scale rather than a pair of brows drawn inside a hat.
+ *   THIS CHARACTER HAS NO BROW LINE, AND THAT IS A CONSEQUENCE RATHER THAN A
+ *     STYLE. The cap band's underside sits at HY + 0.023 and the eye's sclera
+ *     reaches HY + 0.035, so the band is 0.012 INTO the top of each eye and
+ *     there is no forehead at all. The aperture is therefore the brow, which is
+ *     why expression drives the eye's own scale.
+ *
+ *     This was first written here as "what wearing a cap pulled down means",
+ *     i.e. as a design choice being honoured. It is not. The owner's actual
+ *     quality bar -- reference/ss-character-quality.png, which was a
+ *     mislabelled screenshot of THIS GAME until another agent refiled it --
+ *     gives both its characters heavy dark brows, drawn on bare forehead
+ *     BELOW the cap brim. The reference wears the same hat and still has room,
+ *     because its brim sits higher.
+ *
+ *     The number, so the next pass does not have to derive it: the band's
+ *     underside has to rise 0.042 -- band centre HY + 0.060 to HY + 0.102 --
+ *     to open a brow line with one ink width of clearance above the eye. That
+ *     moves the hat, and the hat is the character's identity, so this pass did
+ *     not do it. It is the owner's call and it is the one item on their list
+ *     that could not be delivered without touching something they ruled out.
  *   THE FACE IS NEVER SEEN IN PLAY. 0 pixels in 48 of 48 frames through the
  *     chase camera, the start panel is a DOM dialog over that same view, and
  *     the finish camera swings 1.6 units off the centreline but stays BEHIND

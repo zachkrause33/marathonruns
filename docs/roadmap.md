@@ -400,19 +400,74 @@ added for.
 
 ## Open, from the visual-polish pass
 
-- **The fleet has not grown into its new envelope.** `BLOCK` depth was
-  renegotiated 1.30 -> 3.90 so vehicles could have car proportions; the art is
-  still the old 1.30-deep build sitting inside it. This is the direct
-  continuation of "match the mocks" and it carries two riders:
-  - **Nose-anchor the collision box.** It is centred on the gate line, so once
-    the art fills 3.90 the player is inside the car's nose for **74 ms, 4.4
-    frames**, before the plane test fires (up from 25 ms). Costed at 2.9 gates
-    and 1 second. Harmless today because the art is short; it arrives with the
-    rebuild.
-  - **`Collision.BOX` has no `halfX`.** Width is decided in `world.js`
-    (`halfX: LANE * 0.5`), which contradicts rule 4 -- art never decides
-    clearance. Safe today (box 1.70 against widest art 1.56) and nothing is
-    watching it. **OPEN**
+- ~~**The fleet has not grown into its new envelope**~~ -- **DONE**, with both
+  riders, and with one of the brief's own numbers refuted.
+
+  **The art.** Nine of the ten BLOCK variants were 1.30 deep. They are now
+  3.82-3.89 for the four full-size road vehicles and the tram, 2.42 for the
+  cargo trike, 2.02 for the moped, 1.64 for the pair of cyclists -- so plan
+  proportion is a fact about the vehicle again instead of a constant. The taxi
+  is 3.87 x 1.58, 2.45:1, against a real saloon's 2.56:1; it was 1.20:1. Two
+  axles carry a 1.90 wheelbase with 1.30 between the tyres where the old
+  envelope left 0.04, the bicycles and the moped have two wheels each for the
+  first time, and the refuse truck's twin tyres are on the rear axle only
+  because there is now more than one axle to choose from.
+
+  The wheel arches moved with the length. The old opening was cut in X-Y and
+  extruded the full depth, which is exactly right at 1.30 (the rear face IS the
+  flank) and at 3.90 is a slot down the whole underbody with lit road showing
+  through it. It is cut in Z-Y about each axle now, in the tyre's x band only,
+  which is where a car's arches are and which is what the 3.90 flank shows to
+  the next lane. Cost: about 50 boxes a vehicle against the old 52.
+
+  **Nose-anchoring landed and cost what it was costed at.** `Collision.BOX`
+  spans `[gate.z, gate.z + 2*halfZ]`; `Course.reachOf` charges `2*halfZ*span`
+  instead of `halfZ*(2*span-1)`. Gate count 190.4 -> **187.7 (-2.7)**, perfect
+  finish 1:57:54 -> **1:57:55 (+1s)**, record still survives exactly one
+  mistake unaided. The art is offset by `halfZ` at ONE place (`hazardPool`), on
+  the variant group rather than the pooled group, so the telegraph mat keeps
+  its own z and now runs up to the bumper instead of 1.30 underneath it.
+
+  **`halfX` exists, and the brief's reason for calling it harmless was wrong.**
+  It said "safe today, box 1.70 against widest art 1.56". Measured on the swept
+  geometry of all seventeen variants: **fourteen of them reach past 0.85**, the
+  widest static art is the DUCK frame's base plate at **1.148**, and the
+  marshals' stop paddle swept to **1.865** -- past the middle of the next lane.
+  `LANE * 0.5` would have been the tightest number in the file and would have
+  under-counted every hazard as an occluder, which is the one direction
+  `BLANKS` cannot survive. `halfX` is **1.12**, which is the number `world.js`
+  has cut every clearance from since `HAZARD_HALF` was written, moved into the
+  contract and now enforced. `shoot.js` fails the build on any variant leaving
+  its box in x or z, and on y for JUMP and BLOCK; y is reported and not failed
+  for DUCK, because that box is deliberately the bar and not the frame.
+
+  **Six things were outside their own box and nothing had ever looked.**
+  The hoarding's beacons at **3.09** against a BLOCK ceiling of 2.80. Every
+  JUMP's striped face at 0.531 against a halfZ of 0.52, and every JUMP plinth
+  authored at exactly 1.04 = the whole box, leaving the face nowhere legal to
+  stand. The DUCK cap at 0.31 against 0.30. `vFront`'s headlamp core standing
+  **0.035 proud of the plane its own comment calls "the frontmost it may
+  reach"**, on every road vehicle in the fleet. The DUCK base plate above. The
+  paddle above. All six fixed by moving the art.
+
+  **And `HAZARD_HALF` itself was stale.** It read `1.20 * LANE_FIT + 0.25` =
+  1.118, described as "the widest point of any hazard -- the DUCK frame's foot,
+  0.50 wide at 1.20 out". The foot is 0.56 wide and reaches 1.148, so the
+  constant that `CORRIDOR_HALF`, `LANDMARK_IN` and every aid clearance is cut
+  from sat 0.03 INSIDE the widest thing it was supposed to contain -- and a
+  JUMP variant carries a comment citing 1.118 as a limit it had already passed.
+  Same class as the triangle budget and the 110px runner.
+
+  **A seventh, in the claim site:** `body.position.z = (span - 1) * 0.65` was
+  the OLD BLOCK half-depth, never updated when the envelope was renegotiated,
+  so every train in the game had been anchored 1.30 units behind its own gate
+  line. It reads `MR.Collision.BOX` now.
+
+  Contrast improved or held on all seventeen (per-variant table in the pass
+  report); the four short of the 1.6x/0.30 target are the same four as before
+  and all still clear the gate. Draws 163-261 against 162-258 before,
+  triangles 132k-183k against 131k-183k: the rebuild is free in the budget
+  that binds.
 - **Elevated traffic is the one route not refused.** Road traffic was refused
   twice with measurements: no continuous gap in the 0-12.2 band, and 0 of 14
   bridge days with 15-22 clear. **Every blocker found on both routes is at
@@ -732,6 +787,25 @@ nobody measured is worse than no number at all.**
 
    Both are the same failure as the triangle budget and the 110px runner: a
    number written into a comment, believed, and then built on.
+
+14. **Nothing had ever compared the art with `MR.Collision.BOX`.** The box is
+   called the contract in rule 4 and in three file headers, and until the fleet
+   rebuild no assertion anywhere measured a variant against it. It had no
+   `halfX` at all -- the ART FILE was writing the audited width, as
+   `LANE * 0.5` -- and the brief that flagged that hole argued it was harmless
+   because "the widest art is 1.56". Measured: fourteen of seventeen variants
+   past 0.85, widest static 1.148, a moving part sweeping to 1.865, a hoarding
+   0.29 over the height ceiling, four JUMP faces and a DUCK cap outside their
+   own half-depths, and a headlamp core 0.035 past the plane its own comment
+   called a limit. Six defects, none of them visible in any frame, all of them
+   in the direction that makes `BLANKS` under-count occlusion.
+
+   And the number the guard was written against was stale too: `HAZARD_HALF`
+   claimed to be "the widest point of any hazard" and was 0.03 inside it.
+
+   The lesson is the one at the top of this list with a new edge on it: **a
+   contract with no assertion is a comment, and the file that owns the numbers
+   is the last place that will notice.**
 
 7. **Three consecutive diagnoses of R2**, each confident, the first two false:
    the telegraph mats (they cannot overlap), the DUCK as a solid 3.52-unit wall

@@ -1517,3 +1517,177 @@ nobody measured is worse than no number at all.**
 
    And the brow is 0 pixels in 48 of 48 frames through the chase camera, like
    every other thing on this face.
+
+28. **The unidentifiable green block was not the aid item, and the brown slabs
+   were not the street wall's doing. Both diagnoses were confident, written
+   down, and wrong.**
+
+   Entry 23 left three failures from the blind identification test. Two of them
+   came with a stated cause, and neither cause survived being measured.
+
+   **THE GREEN BLOCK.** The blind reader flagged, in two of four frames and
+   without being asked about props at all, *"a small pale green object I cannot
+   identify -- it might be a bottle or a flag furled on a pole; it just looks
+   like a green block to me"* and *"a small green block on the road between them
+   I cannot make out."* The brief that commissioned this pass believed it was
+   the aid bottle, whose white body was dissolving into the pale marshals behind
+   it, and asked for that to be audited rather than trusted.
+
+   It is not the bottle. A raycast through the exact pixels -- x 200-207,
+   y 163-175 of the v3 tile -- returns a transparent MeshBasicMaterial at hex
+   0x5ff0a6, 21 units ahead of the runner, at road level. That is the RACING
+   LINE. A control render with the ribbon hidden and everything else untouched
+   removes the block and changes nothing else in the frame. The arithmetic said
+   so before the raycast did and nobody had done it: the object is 13 px tall,
+   and a 0.77-unit bottle at 8 units on a figure scale of 73 px per unit would
+   be 56.
+
+   **What that exposed is worse than the misreading.** Measured in HSV:
+
+   | | hue | sat |
+   |---|---|---|
+   | racing line 0x5ff0a6 | 149.4 | 0.60 |
+   | aid pool 0x86eec0 | 153.5 | 0.44 |
+   | bottle body 0xf6fffb | 153.3 | 0.04 |
+   | bottle label, cap, aid cloth 0x2fd39a | 159.1 | 0.78 |
+   | JUMP / DUCK / BLOCK | 38.7 / 192.3 / 345.3 | |
+
+   The three hazards are 33 degrees from their nearest neighbour. The route hint
+   and the entire aid family sat inside **ten degrees of each other**. This game
+   had one colour meaning "follow this" and "collect this" simultaneously, and
+   the only thing separating them was how much of each you could see. The
+   reader's guess that the fragment "might be a bottle" is that collision
+   showing up in a human read.
+
+   The colour was not chosen carelessly -- it was chosen against the wrong list.
+   The comment that picked it reads *"the one hue no hazard owns; amber, cyan
+   and red are all spoken for, and green reads go."* Every clause is true. It
+   checks the HAZARD palette and never the PICKUP palette. **A palette argument
+   that enumerates one family and stops is not an argument.**
+
+   So the line moved to violet and the pickups kept the green, which is the
+   right way round twice over: the pickup is a world object the player is scored
+   on touching, and the line is an affordance drawn on the road.
+
+   **Two more things the ribbon was carrying, both found by the same tool.** It
+   was FOGGED, while the ring trail drawn on top of it is exempt with a
+   paragraph explaining that its job is to be legible far up the road where fog
+   is taking half the contrast out of everything else. The paragraph applies
+   verbatim to the ribbon and the ribbon never inherited it -- the ring was
+   simply written second. And its far end faded by TAPERING ITS WIDTH, which
+   spends the one dimension that decides whether a strip of paint reads as a
+   strip of paint, on top of a perspective that is already halving it every time
+   the distance doubles. The fade is in alpha now and the width is constant.
+
+   **THE TREES.** Entry 23 recorded the reader's *"a group of tall brown
+   vertical slabs I genuinely cannot identify"* and named the cause: tree trunks
+   *"standing behind the aid station with their canopies occluded by the street
+   wall."*
+
+   `tools/canopy.js` keys every placed tree's trunk and crown to two pure
+   colours and counts them in the real frame with every other object untouched,
+   so the occlusion is the shipped occlusion. Over 51 tree appearances at eleven
+   skips inside the race: **49 trees, 0 thin, 2 posts**. Then each occluder
+   class was hidden in turn, and the class that recovers the crown is not the
+   street wall at x 12.20. It is `road tile / hedge` -- **the game's own avenue**,
+   the four broadleaves baked into every hedge tile at x 7.95, standing in front
+   of everything. The worst tree goes from 55 trunk / 0 crown to 127 / 1700 the
+   moment the avenue is hidden.
+
+   That killed both options that had been offered. The avenue is a continuous
+   line 12 units apart down both verges, so there is no lateral band behind it
+   that is clear: a tree pushed outboard far enough to miss it is off the side
+   of a portrait frame long before it clears, and one pushed inboard is in the
+   corridor. What was left is that **a trunk seen without its crown should not be
+   a bare pole.** Real dense planting has an understorey, and the pixels that
+   survive through a gap in the avenue are the ones nearest the ground. Every
+   scatter tree now has a shrub mass at its foot, so what shows through the gap
+   is foliage. 51 of 51.
+
+   That fixes the class rather than the two instances -- any occluder, any
+   distance, any leg, including the ones no skip in the sweep happened to land
+   on. It costs no draw call, and the corridor standoff is computed from the
+   merged vertices, so the skirt is inside the reach it measures automatically.
+
+29. **`?skip=` saturates, and two shipped tools sweep past the end of the race
+   without noticing.**
+
+   `?skip=` is race SECONDS. Measured on the live page: skip 60 is mile 6.11,
+   skip 150 is mile 16.26, and **skip 240 is mile 26.22 at z 6293 -- the finish.
+   Every skip from 240 upward returns that same frame.**
+
+   `tools/people.js` ships with a default sweep of `150,900,1560,2050`. That is
+   not four legs of the course. It is one leg and the finish photographed three
+   times, and the agreement between the last three rows is the tool agreeing
+   with itself. `tools/shoot.js` does not have the bug -- its eight shots run
+   25 to 225 and every one lands inside the race -- so the two tools disagree
+   about what a skip means and only one of them is right.
+
+   This cost the first run of `tools/routeread.js`, which inherited people.js's
+   defaults and reported that the racing line collapses to a single 12x22 blob
+   in most frames. It does not. That was the finish line, three times. Re-run
+   inside the race, the ribbon is typically 1500-2000 px in 2-8 parts with a
+   biggest component around 19x150 -- a line.
+
+   **The general form, and it is entry 3's shape again: a sweep that returns
+   suspiciously consistent numbers is not converging, it is repeating.**
+
+30. **The saturation gate reads the mean COLOUR, not the mean saturation -- so
+   two vivid parts on opposite sides of the hue wheel measure as grey.**
+
+   `contrastAudit` runs every hazard variant through `shotMean`, which averages
+   the RGB of every covered pixel and then takes `satOf` of that one mean. This
+   is stated nowhere and it governs every art decision on the fleet.
+
+   Found by walking into it. BLOCK v9 needed a courier's cargo cube, and the cube
+   was drafted in a delivery blue at sat 0.83, val 1.00, on the obvious
+   reasoning that a vivid colour cannot cost saturation. It cost all of it: v9
+   went from a gate margin of +0.373 to **-0.108, a build failure**, with dS
+   collapsing 0.302 to 0.040. Blue at hue 222 against that bike's pink at 345 is
+   123 degrees apart, and the mean of the two is a neutral.
+
+   The metric is not wrong -- a confetti object really does read as one grey
+   mass once saturation has e-folded down the road, which is the thing the gate
+   is about. But it means the lever everyone reaches for is the weak one.
+   Sliding the cube's hue from 14 to 4 to 355 moved the gate margin by 0.005 and
+   0.032: nothing. What moved it was **area of saturated bright**: getting the
+   near-neutrals off the new part (a cream reflective bar at sat 0.12 and lemon
+   webbing at sat 0.73 became KIT_B at sat 0.98, +0.041), growing the cube in
+   width rather than height so its bright face is a larger share of the object
+   without touching the head (+0.068), and lifting the dark-of-hue trim from
+   val 0.55 to val 0.82 (+0.050).
+
+   Landed at gate +0.382 and target +0.013, against +0.373 and +0.007 before --
+   both margins wider than they started, which is the only acceptable outcome
+   when the change was made to win an identification test. Rule 4 does not allow
+   one to be bought with the other.
+
+31. **The courier cube failed twice before it worked, and neither failure was
+   about colour.**
+
+   Draft one was sized like a real one: 0.80 x 0.76, centred above the shoulder
+   line and 0.40 behind it. Through `framing.js` at 8 units it **deleted the
+   rider.** The cube is nearer the lens than the head by its whole standoff, and
+   from dead astern -- the only view the chase camera has -- it covered the
+   helmet, the visor, the shoulders and the hi-vis band together. It would have
+   traded away the exact part the blind reader had singled out as the reason
+   this variant read as a person at all: *"unlike every other figure here, the
+   head is an actual helmet with a black visor band across it. That visor is
+   what makes it read as a person on a bike rather than a stack of boxes."*
+
+   Draft two cleared the helmet and became a STACK. The top box is nearer the
+   lens than the rider and owns everything below 1.665; the helmet starts at
+   2.11. That leaves a band 0.45 units tall as the only part of this object the
+   chase camera can see a rider in, and a cube that fills it produces helmet,
+   box, box.
+
+   The fix was to stop competing for the band and declare inside it: the cube is
+   less than half the top box's width so the two can never merge into one mass,
+   and the rear face -- the only face this camera gets -- carries two lemon
+   webbing straps and a reflective bar. Bright webbing on a soft bag is not
+   something a painted panel does.
+
+   **The general rule: on this camera, anything added BEHIND the rider is added
+   IN FRONT of them.** Depth order down the object's own axis is the opposite of
+   depth order to the lens, and every part of a two-wheeler mounted aft of the
+   seat occludes the person it belongs to.

@@ -439,14 +439,22 @@ const KIND = ['-', 'JUMP', 'DUCK', 'BLOCK'];
     if (res.drift) console.log('  ! DRIFT: ' + res.drift);
     for (const e of (res.envelope || [])) console.log('  ! ENVELOPE: ' + e);
     for (const e of (res.low || [])) {
+      // The two layers hand back different amounts. The WALK layer owns the
+      // whole course and knows where on it this is; the RACE layer gets its
+      // rows from the shared audit, which reports what shoot.js reports and
+      // no more. Printing the walk's fields unconditionally put a literal
+      // "mile undefined" in the first red run this tool ever produced -- the
+      // instrument's own defect, found the same way everything else here is.
       console.log(`  ! LOW: ${e.name} crosses the corridor at y=${e.yMin} (below OVERHEAD_Y)`
-        + ` at z=${e.z0}-${e.z1}, mile ${e.mile}, in ${e.setting}`
-        + (e.skip !== undefined ? `  [--skip ${e.skip}]` : ''));
+        + ` at z=${e.z0}${e.z1 === undefined ? '' : '-' + e.z1}`
+        + (e.mile === undefined ? '' : `, mile ${e.mile}`)
+        + `, in ${e.setting}`
+        + (e.skip === undefined ? '' : `  [--date ${r.date} --skip ${e.skip}]`));
     }
     for (const h of (res.hide || [])) {
       console.log(`  ! HIDES: ${h.el} (y>=${h.elY}, z<=${h.elZ}) projects onto the `
         + `${KIND[h.kind]} in lane ${h.lane} at z=${h.gateZ} (${h.d}u ahead), in ${h.setting}`
-        + `  [--skip ${h.skip}]`);
+        + `  [--date ${r.date} --skip ${h.skip}]`);
     }
     for (const b of (res.blank || []).slice(0, 6)) {
       const what = b.over > 0 ? 'PAINTS' : 'BLANKS';

@@ -1641,6 +1641,48 @@ MR.Runner = (function () {
       // one continuous mass with no pinch. Dark / light / saturated reads.
       // Long enough to start inside the vest so no gap opens on a head tilt.
       { g: new THREE.CylinderGeometry(0.104, 0.122, 0.32, R_LIMB), c: P.runnerSkin, y: HY - 0.300 },
+      // The fillet under the jaw, and it is the answer to "the neck is a plain
+      // cylinder the head sits on top of".
+      //
+      // The corner is real and it is geometric: at HY - 0.244 the skull's own
+      // radius is 0.1334 and the neck's is 0.1099, so the head OVERHANGS the
+      // neck by 0.024 and the two surfaces meet in a concave crease. No sphere
+      // can fill a concave corner -- every mass this file has ever added is
+      // convex and would sit inside one -- which is why the junction survived
+      // four passes looking like a ball resting on a tube. A torus can, and
+      // this is the only torus on the character apart from the hood.
+      //
+      // It is an ARC of 200 degrees centred on the FRONT, not a ring, and that
+      // restriction is rule 1 in this file's header being obeyed rather than
+      // worked around: nothing may be added to the back of the head or to the
+      // nape, because the whole silhouette is built on the head pinching away
+      // from the shoulders and on the value ladder dark hair / lit neck / dark
+      // hood running uninterrupted down the back. The crease that reads as a
+      // fault is the one under the JAW, which is the half of the junction the
+      // start panel and the finish see; the half behind is doing a job.
+      //
+      // Sized so its outer surface lands on 0.135 against the skull's own
+      // 0.1334 -- it fills the corner and does not widen the neck by anything
+      // the eye or tools/envelope.js can find.
+      // rz then rx, and the ORDER is why the hood's note two hundred lines up
+      // spells it out: weld() composes an Euler in XYZ, so rz is the innermost
+      // rotation and slides the arc round its own ring, while rx lays the ring
+      // flat afterwards. Doing it the other way yaws a finished ring instead.
+      // The arc's midpoint sits at half its span from +X, so rz carries that
+      // to -Y, which rx = -pi/2 then maps to +Z. Get either wrong and the
+      // fillet ends up round the NAPE, which is the one place it may not be.
+      { g: new THREE.TorusGeometry(0.111, 0.024, 8, 20, Math.PI * 1.11), c: P.runnerSkin,
+        y: HY - 0.244, rx: -Math.PI / 2, rz: Math.PI * 0.945 },
+      // The sternocleidomastoids. Two ridges running from behind the ear down
+      // to the notch, which are the only muscles a neck shows at this size and
+      // the reason a neck is not a dowel. 0.022 proud of the cylinder at their
+      // widest and nowhere near its own outline: they reach x 0.083 on a neck
+      // whose radius there is 0.114, so they are pure interior form and the
+      // ramp is what draws them.
+      { g: new THREE.SphereGeometry(0.052, R_NUB, 10), c: P.runnerSkin,
+        x: -0.052, y: HY - 0.317, z: 0.078, sx: 0.60, sy: 1.70, sz: 0.55, rz: -0.16 },
+      { g: new THREE.SphereGeometry(0.052, R_NUB, 10), c: P.runnerSkin,
+        x: 0.052, y: HY - 0.317, z: 0.078, sx: 0.60, sy: 1.70, sz: 0.55, rz: 0.16 },
       { g: new THREE.SphereGeometry(0.266, R_HEAD, 24), c: P.runnerSkin, y: HY, sy: 1.06, sz: 0.97 },
       // The cap. Geometrically this is the same shell that used to be the hair
       // crown -- the fit was already right and the note below is still the
@@ -2036,8 +2078,44 @@ MR.Runner = (function () {
       // hamstring and the calf -- it gives the ramp something to shade without
       // introducing a value the silhouette has to pay for, and it keeps this
       // part off the list of lone primitives.
+      //
+      // ---- AND WHY THE ARM READ AS THREE PIECES ---------------------------
+      //
+      // The owner's word for this character was "primitive 3D shapes assembled
+      // into a human silhouette", and the arm was the clearest case: shoulder,
+      // upper arm and forearm each resolved as its own rounded object rather
+      // than as one limb. The cause is not the shapes. It is the INK.
+      //
+      // Every part on this figure is drawn twice -- fill, then the same
+      // geometry through the outline shader -- so a part boundary is not a
+      // soft join, it is a HARD BLACK LINE, and the eye counts closed outlines
+      // before it reads form. Three welds down the arm is three outlines, and
+      // three outlines is three objects however well the masses overlap.
+      //
+      // So the fix is not more geometry between the parts, it is fewer parts
+      // spanning the same distance. The deltoid below is welded into the ARM
+      // rather than into the trunk, which puts the shoulder mass and the upper
+      // arm inside ONE outline; and the forearm belly does the same for the
+      // elbow and the forearm. The vest keeps its own red deltoid on the
+      // trunk, because that is a garment and a garment is supposed to have an
+      // edge -- what it stops being is the only thing between the neck and the
+      // elbow with a line round it.
       const upper = multi([
         { g: new THREE.CapsuleGeometry(0.086, 0.095, 6, R_LIMB), c: P.runnerSkin, y: -0.122 },
+        // The deltoid, in skin, on the ARM. It emerges from under the vest's
+        // own red shoulder 0.051 lower down, which is where a singlet's
+        // shoulder seam is and where the muscle would show; and it is 0.022
+        // proud of the upper arm's capsule, which clears the 0.014 ink so the
+        // two weld cleanly rather than growing teeth.
+        //
+        // It rotates with the shoulder, which is the one thing about it that
+        // had to be measured rather than reasoned: the jump abducts this joint
+        // hard and an arm-mounted mass swings outward with it. Reaching x 0.330
+        // at rest against the trunk deltoid's 0.384, it stays inside the vest's
+        // own shoulder through the whole cycle -- see the envelope table in the
+        // report for what it did to the jump's half-width, which is the number
+        // the airborne silhouette is separated by.
+        { g: new THREE.SphereGeometry(0.108, R_LIMB, 14), c: P.runnerSkin, y: -0.058, sy: 0.86, sz: 0.92 },
         { g: new THREE.SphereGeometry(0.088, R_NUB, 12), c: P.runnerSkin, y: -0.108, z: -0.016, sx: 0.90, sy: 1.15 },
       ]);
       shoulder.add(upper);
@@ -2063,6 +2141,19 @@ MR.Runner = (function () {
         // does, because the run cycle drives the elbows LATERALLY -- they are
         // the joint the back view was built to watch.
         { g: new THREE.SphereGeometry(0.088, R_NUB, 12), c: P.runnerSkin, y: -0.012, sy: 0.92, sz: 0.96 },
+        // The forearm's belly, and it is the elbow's other half. A forearm is
+        // thickest just under the elbow and tapers to a wrist half its width;
+        // this one was a constant 0.078 tube with a ball on the end of it, so
+        // the elbow read as a knuckle in the middle of the arm rather than as
+        // the widest part of it. Overlapping the elbow ball deliberately: the
+        // two are one mass and the taper runs from there to the band.
+        //
+        // Fatter in z and barely in x -- 0.020 of relief at the back, 0.006 at
+        // the side -- which is the hamstring's argument, the calf's and the
+        // triceps'. Arm swing is almost entirely along the camera axis from
+        // astern, so relief in z is what the ramp can shade; width in x is
+        // what the jump's silhouette is measured on and it is not spent here.
+        { g: new THREE.SphereGeometry(0.098, R_NUB, 12), c: P.runnerSkin, y: -0.072, sx: 0.86, sy: 1.05 },
         // The wristband, and it is 0.098 where it used to be 0.088. That is a
         // repair, not a flourish: the mitt's old wrist ball was r=0.094 and
         // spanned the band's whole height, so the third of TRIM's three hits on

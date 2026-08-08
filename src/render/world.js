@@ -7007,9 +7007,12 @@ MR.World = (function () {
         // (0.543) and nowhere near the lane centre the camera flies down.
         //
         // BOTH FACES, at -0.20 and +0.20, with the mounting boss between them.
-        for (const rz of [-0.20, 0.20]) {
-          parts.push(cyl(0.20, 0.20, 0.09, 12, px, 2.30, rz, 0xfff2e0, Math.PI / 2));
-        }
+        // The rear disc is the deep cyan and not the cream, because the back
+        // of a sign plate is not a sign: two cream discs on one post read at
+        // 45 degrees as one disc drawn twice, which is a rendering fault the
+        // eye reaches for before it reaches for "double-sided".
+        parts.push(cyl(0.20, 0.20, 0.09, 12, px, 2.30, -0.20, 0xfff2e0, Math.PI / 2));
+        parts.push(gl(cyl(0.20, 0.20, 0.09, 12, px, 2.30, 0.20, 0x1f9fd0, Math.PI / 2), GLOSS.paint));
         parts.push(bx(0.14, 0.14, 0.34, px, 2.30, 0, 0x0d2b36));
         // The clips that hold the board to the post: one above and one below
         // the board, on the rear plane, in the post's own x band.

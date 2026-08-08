@@ -1404,3 +1404,32 @@ nobody measured is worse than no number at all.**
    the same astern view, and not at the finish, whose camera swings 1.6 units
    off the centreline but stays BEHIND him. It was built anyway, under rule 1,
    and the honest report of where it reads is in the pass's own commits.
+
+26. **Three reference images were filed by filename instead of by upload time,
+    and all three were the wrong pictures.** The owner's character-quality brief
+    arrived with three attachments. The uploads directory held two batches that
+    day; sorting its filenames put the EARLIER batch last, so `99d47b8`
+    committed `IMG_8928`, `IMG_8932` and `IMG_8933` as the character
+    references. Every one of them was wrong:
+
+    - `reference/ss-character-quality.png` -- the file whose whole purpose was
+      to be the outside quality bar -- was **a phone screenshot of our own
+      game**, timestamped 5:12, at mile 16.66. The commit message described it
+      as the construction bar. The real Subway Surfers key art was
+      `IMG_8934`, sitting unread in the same directory.
+    - `reference/play-npcs.png` was **byte-identical to
+      `play-flatbed-10u.png`** -- same md5, an obstacle frame from a message
+      three hours earlier. The NPC brief was pointed at a picture of a lorry.
+    - `reference/play-runner-closeup.png` was a full-screen chase frame, not
+      the three-panel zoomed contact sheet the owner actually sent.
+
+    The runner agent found it, opened the file, and used `ss-run-01..03.png`
+    instead, so no work was misdirected -- **but that is luck, not process.**
+    The failure is not the sorting. It is that five image files were copied,
+    renamed and committed with descriptive names **without one of them being
+    opened**, in a repo whose second standing rule is that the artifact is not
+    the evidence. A filename is a claim about a picture's contents; here it was
+    a claim nobody checked, and it was wrong five times out of five. All three
+    are refiled from the correct batch, and the two displaced frames are kept
+    as `play-gates-14mi.png` and `play-gates-17mi.png` -- named for what a
+    reader would see in them.

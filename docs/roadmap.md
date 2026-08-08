@@ -2063,3 +2063,195 @@ nobody measured is worse than no number at all.**
    removed."** The trike is removed. The moped is not, and it should get the
    same treatment or the same fate. The measurement to beat is in one line of
    `node tools/kindread.js`.
+
+41. **A thin object cannot honestly fill a lane, and the fifth attempt at the
+   cyclist is where that stopped being an opinion.**
+
+   The slot has now been rebuilt five times and has failed four times on the
+   same mechanism. Written out, the pattern is the finding:
+
+   | attempt | how it failed |
+   |---|---|
+   | cargo trike | "one rider is a third of a lane wide... reads as something to hurdle" |
+   | two cyclists abreast | a blind reader called them MOTORCYCLISTS; measured nearer the DUCK centroid than its own by -1.5 |
+   | one cyclist + a striped board | the board cut the wheels off at hub height -- *"ours look like it is sitting on something"* |
+   | one cyclist + crates | *"the cyclist appears to be biking on top of the box you created. There are also brown boxes next to him."* |
+
+   The last one is the important one, because the crates were added BY the pass
+   that fixed the board, to do the job the board had been doing. A blind reader
+   who had never seen the owner's complaint arrived at the same place
+   independently: *"I cannot confidently name this as one real-world thing, and
+   that is my answer... the parts are individually legible; the whole is not."*
+
+   **The mechanism, stated so it does not have to be rediscovered a sixth
+   time.** A BLOCK must fill a lane and read as impassable. A bicycle is thin
+   and mostly air -- that is what a bicycle IS, and `vBikeWheel` was
+   deliberately built with the road showing through it. So a bicycle cannot
+   fill a lane on its own, and every version has therefore had a prop propped
+   beside it to do the filling. **The prop then becomes the thing that reads,
+   and the rider becomes something sitting on it.**
+
+   **THE GENERAL FORM: an object that cannot carry its kind alone should not be
+   given a helper. Give the kind to the helper, or give up the slot.**
+
+   Here the helper takes the kind. The crates were already doing all the work,
+   so the rider is deleted and the slot becomes `blockCrateLoadGeo` -- a loaded
+   pallet of delivery crates, which is the object standing on the carriageway
+   in two of the five reference frames and is the owner's own vocabulary
+   ("basic brown boxes"). Measured on `tools/kindread.js`, the profile at the
+   road goes **0.61 to 0.79** and the variant stops being the one the
+   classifier argues about.
+
+   **The roadside crates are a different object in a different place and were
+   NOT taken away by this.** The owner asked for crates and flower beds "on the
+   edge"; it is crates standing in a running lane BESIDE a hazard that was the
+   mistake. See entry 44.
+
+42. **The stripe was never the kind channel, so the owner could have it.**
+
+   *"Jump obstacles should be red and white"* collides head-on with the
+   red-and-white this file gave BLOCK one pass earlier, and two kinds sharing a
+   mark is a player jumping into a wall. It does not collide, and the reason
+   was already measured twice from opposite directions:
+
+   - `tools/kindread.js`: a nearest-centroid classifier on **hue alone misreads
+     8 of 21** variants; on the **silhouette profile alone, 1 of 21**.
+   - A blind reader, unprompted: *"Yellow-and-black chevrons universally mean
+     'physical hazard, mind this' -- but that exact striping is used both on
+     things you duck under and on things you must not hit at all. **The colour
+     tells you the object is dangerous and tells you nothing about which way to
+     go.**"*
+
+   So the stripe is freed to say WHAT THE OBJECT IS: **red-and-white is
+   construction furniture** (the JUMP boards, and the two BLOCK variants that
+   are genuinely furniture rather than traffic), **yellow-and-black is reserved
+   to DUCK**, the thing you go under.
+
+   **What this bought, and it was the costliest confusion in the game.** The
+   blind read found JUMP v1 and DUCK v2 both reducing at 25 units to *"a short
+   horizontal yellow bar floating in the middle of the lane... Those two want
+   opposite answers, so mistaking them is the costliest error available in this
+   set."* JUMP v1's yellow came from two places -- its cone bar and its amber
+   caution face -- and both are now gone. See `shots/jump-v1-cones-after.png`.
+
+43. **The bottom of a DUCK's gap was the most blocked part of it, and the feet
+   were platforms nobody had counted.**
+
+   Every DUCK stood each standard on a 0.50 x 0.22 x 0.50 dark block. Two of
+   those is 1.00 of a 2.24-wide envelope filled in at the road. `kindread`:
+
+   | band | y | before | after |
+   |---|---|---|---|
+   | 0 | 0.00-0.20 | 0.38 | **0.21-0.24** |
+   | 1 | 0.20-0.40 | 0.35 | **0.25-0.28** |
+   | 2-6 | 0.40-1.40 | 0.23-0.26 | 0.25 |
+
+   The gap is now uniformly open from the road to the bar instead of being most
+   blocked at the bottom -- and the bottom is exactly where the one surviving
+   discriminator lives. The blind reader found it and called it near-invisible:
+   *"picture 6 shows road visible underneath the bar and picture 1 does not;
+   that is a subtle few-pixel difference at distance."*
+
+   They are also platforms, and the owner banned those in general terms --
+   *"Needs to be connected to the road with no platform"* -- said about cones
+   and meant about everything. **A standard on a block is the same
+   figure-on-a-pedestal read as a cone on a plate, at a different scale.**
+
+44. **"No platform" applied to the cones meant the cone's own base plate, and
+   the fix is that a cone is ONE surface.**
+
+   The plinth under JUMP v1 had already gone a pass earlier, but each cone
+   still stood on its own 0.40 x 0.40 moulded square weight. Deleting the weight
+   and leaving the body hanging would be worse; the answer is that the weight
+   and the body are the same moulding. `jumpConeGeo` is now a single revolved
+   silhouette sampled at nine heights from a 0.36 skirt lying ON y = 0 to a
+   blunt tip at 0.78, at 16 radial segments -- **there is no join and no plate,
+   because the plate is the bottom of the cone.**
+
+   Five small cones became **three large** ones (1.8x the base radius), which is
+   the owner's "individual large orange", and their skirts meet edge to edge at
+   the road so the row still closes the lane at the bottom -- the one job the
+   deleted plinth and the deleted bar were each hired for, now done by the
+   cones' own size.
+
+   **It carries no caution face at all -- the first `face: null` in the game.**
+   A cone has no board on it, and with the bar gone the only thing on the centre
+   line is a cone 0.20 wide at that height, so a 1.63-wide quad there would be a
+   striped mat hanging in mid-air, which is entry 38's defect exactly. The gate
+   survived it: JUMP v1 is not among the tight variants and `shoot.js` passes at
+   BLOCK v2's +0.141.
+
+45. **The violet on the road is the route ribbon, and the blind-read panels
+   cannot show the thing that would have answered the reader's real complaint.**
+
+   A blind reader flagged, in all six panels: *"The purple-violet smear on the
+   road surface... an elongated blotch of saturated violet lying on the tarmac
+   just in front of, or directly beneath, the main object... I cannot tell what
+   it is."* And closed: *"Nothing painted on the road tells a runner what to do
+   about anything in front of them."*
+
+   Identified before being changed, as instructed, and it is **the racing line**
+   -- `0xa87bff`, hue 265, a 0.17-half-width ribbon from ROUTE_NEAR 5 to
+   ROUTE_FAR 124 at opacity 0.38. Not the telegraph mat: the mats are amber,
+   cyan and pink and carry kind glyphs.
+
+   **The second sentence is an instrument artefact, and this is the part worth
+   keeping.** `api.variantObject` returns `assembleVariant`, which adds the
+   body, the caution face and the one moving part -- **and no telegraph mat.**
+   The mat is added by the POOL builder (`g.add(telegraph(kind))`), which a lone
+   variant never goes through. So any tool that shoots a single variant --
+   `kindread`, `framing`, and the panels this blind read was run on -- renders
+   the hazard **with the game's primary "what to do" affordance absent by
+   construction.**
+
+   So "nothing painted on the road tells a runner what to do" is a true
+   statement about the panels and an unproven one about the game. **A blind read
+   is only as good as what the harness put in the frame**, and this harness
+   omits the one channel the file's own reasoning leans on ("the mat says what
+   to DO; the object says what it IS"). The route ribbon was already dropped to
+   0.38 opacity earlier the same day for this exact complaint; nothing further
+   is changed here, because the panels exaggerate it -- there is no mat in them
+   competing for the same tarmac.
+
+46. **What a runner standing on a rideable roof would actually stand on, and
+   the brief's number was measuring the wrong thing.**
+
+   The brief and entry 35 both state "BLOCK variant roofs sit at 2.34-2.79
+   against a box top of 2.80, so four of the ten would float the runner". Two
+   corrections, both structural:
+
+   - **Only ONE variant can ever be ridden.** `castGates` forces
+     `row[l] = 0` for every BLOCK train -- *"A TRAIN IS ALWAYS VARIANT 0 and is
+     dealt OUTSIDE the bag"* -- and a ramp is a train. So nine of the ten roofs
+     are irrelevant to the mechanic and only **v0, the tram**, matters.
+   - **The float is not the problem; COVERAGE is.** A max-vertex height is the
+     wrong measure, because the question is "what is under the foot at (x, z)"
+     as the runner moves down the roof. Raycast straight down over the
+     footprint on a 9x9 grid:
+
+   | variant | footprint covered | roof min | roof max |
+   |---|---|---|---|
+   | **v0 (tram, the only rideable one)** | **89%** | **2.399** | **2.750** |
+   | v2 | 22% | 0.060 | 2.790 |
+   | v8 | 32% | 0.617 | 2.750 |
+   | v9 | 41% | 0.700 | 2.520 |
+
+   So the tram's roof is **not flat** -- it varies 0.35 across the deck -- and
+   **11% of the footprint has nothing under it at all.** A runner placed at
+   DECK_Y 2.80 floats between 0.05 and 0.40 depending where they are standing,
+   and passes over holes. That is a different defect from "the roof is 0.05 too
+   low" and it is not fixed by raising a slab.
+
+   **THE ART IS NOT BUILT. This entry is the measurement and the contract, so
+   the next agent starts from numbers instead of from a paragraph.** What a
+   rideable body has to provide, all of it derived from the contract rather than
+   chosen: deck **flat at y = 2.80** (`Collision.BOX[BLOCK].yMax` =
+   `Course.DECK_Y`) across **100%** of x within +/-1.12 and the full stretched
+   depth. Tailgate, in the variant's own authoring frame, where the gate line is
+   local z = -1.95 (the pool sets `vg.position.z = +halfZ`): **mouth on the road
+   at local z = -1.95, y = 0**; **top meeting the deck at local z = +4.05, y =
+   2.80** (`RAMP_RUN` 6.0); **one lane wide, x in [-0.85, +0.85]** (LANE 1.70),
+   inset inside the body exactly as the reference draws it; **slope 25.0
+   degrees** (atan(2.80 / 6.0)). It must NOT be part of the scaled body -- the
+   body takes `scale.z = span` -- so it belongs on the un-scaled `moving` child
+   or on a variant built for the job.

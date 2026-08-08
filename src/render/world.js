@@ -7505,7 +7505,39 @@ MR.World = (function () {
       bx(0.96, 0.06, 0.13, 0, 0.36, -0.16, CHROME),
     ]);
 
-    /** BLOCK v1: a ROAD CLOSED hoarding on a solid plinth. */
+    /**
+     * BLOCK v1: a ROAD CLOSED hoarding on a solid plinth.
+     *
+     * ============ JUDGED AS A SIGN, AND STILL SHORT ============
+     *
+     * This is the one of the ten that is not traffic, and the temptation is to
+     * exempt it: a sign IS a flat panel, its caution face is legitimately 1.70
+     * tall where every other variant's is 0.20-0.52, and it is the brightest
+     * thing in the fleet at 1.659x. But the gameplay-framing census at 8 units
+     * says what it says:
+     *
+     *   face 46.6%   trim 18.2%   cream 16.0%   body 12.6%   lamp 1.1%
+     *
+     * -- eight parts, all of them slabs, and 1.1% of the object in the only
+     * category that is a fitting rather than a mass. Every other variant in the
+     * game stands on something; this one is a board on a box.
+     *
+     * The two things it was actually missing are structural and both were
+     * measurable. **It had no frame**: the board's edge was the board, so at
+     * every distance the silhouette is a rectangle with three cream bands
+     * across it. And **it had no legs**: it is a free-standing hoarding, and a
+     * free-standing hoarding that is not braced falls over -- which is why the
+     * real thing has skids running fore and aft with ballast on them, and why
+     * it is the one variant with a genuine reason to spend the depth. It used
+     * 0.65 of an allowed 1.95, the largest unused envelope in the fleet.
+     *
+     * NOTHING HERE IS A WHEEL AND NOTHING PRETENDS TO BE A VEHICLE. The frame
+     * is galvanised, so it is pale, which is what a road-closure frame is and
+     * also what protects the luminance this variant clears its target on: it
+     * carries 1.659x against a 1.6x target with 5.4 of L in hand, so cream and
+     * its own pink do the structure and the only darks added are the skids and
+     * the lamp bases.
+     */
     const blockSignGeo = merge([
       // Chamfered, but the cream bands stay matte -- this is one of the two
       // variants the colour pass deliberately left in its real red-and-white
@@ -7523,9 +7555,67 @@ MR.World = (function () {
       gl(hcbx(2.26, 0.16, 1.14, 0, 1.50, 0, 0xfff2e0, 0.04), GLOSS.matte),
       gl(hcbx(2.26, 0.16, 1.14, 0, 2.34, 0, 0xfff2e0, 0.04), GLOSS.matte),
       gl(hcbx(2.28, 0.24, 1.20, 0, 2.58, 0, 0xd42a55, 0.05), GLOSS.paint),
-      gl(bxAt(0.30, 0.30, 0.30, -0.74, 2.64, 0, 0xffe45e), GLOSS.trim),
-      gl(bxAt(0.30, 0.30, 0.30, 0.74, 2.64, 0, 0xffe45e), GLOSS.trim),
-    ]);
+    ].concat((function () {
+      const p = [];
+      // ---- THE FRAME -----------------------------------------------------
+      // Stiles down both edges and a rail top and bottom, standing proud of the
+      // board on all four sides. The caution face is 1.49 wide at x +/-0.745
+      // and is unlit and drawn in front of everything, so the stiles sit
+      // outboard of it at 0.80 where they are the object's own edge -- which is
+      // also the only place on a sign a frame CAN be.
+      for (const sx of [-1, 1]) {
+        p.push(gl(bxAt(0.10, 2.10, 1.14, sx * 1.105, 1.46, 0, 0xfff2e0), GLOSS.chrome));
+        // Corner gussets, top and bottom, which is where a bolted frame is
+        // stiffened and what stops the stile reading as a painted line.
+        p.push(gl(bxAt(0.16, 0.16, 1.18, sx * 1.105, 2.36, 0, 0xd42a55), GLOSS.trim));
+        p.push(gl(bxAt(0.16, 0.16, 1.18, sx * 1.105, 0.56, 0, 0xd42a55), GLOSS.trim));
+        // ---- THE SKIDS, and the depth this variant finally spends ----------
+        // A free-standing hoarding stands on skids running fore and aft with
+        // ballast on them, and is braced back to the board. Without them it is
+        // a board on a box, which is what the census measured. 1.86 long
+        // against an allowed 1.95 of half-depth either way: this is the one
+        // variant with a real reason for the length.
+        p.push(gl(bxAt(0.36, 0.17, 1.86, sx * 0.76, 0.085, 0, 0x2b2f52), GLOSS.trim));
+        p.push(gl(bxAt(0.42, 0.10, 0.44, sx * 0.76, 0.22, -0.72, 0xfff2e0), GLOSS.matte));
+        p.push(gl(bxAt(0.42, 0.10, 0.44, sx * 0.76, 0.22, 0.72, 0xfff2e0), GLOSS.matte));
+        // Ballast blocks, and the brace back to the board.
+        p.push(gl(cbx(0.30, 0.26, 0.34, sx * 0.55, 0.30, -0.74, 0xd42a55, 0.04), GLOSS.paint));
+        p.push(gl(cbx(0.30, 0.26, 0.34, sx * 0.55, 0.30, 0.74, 0xd42a55, 0.04), GLOSS.paint));
+        p.push(gl(bx(0.09, 0.09, 0.734, sx * 0.55, 0.525, 0.73, 0xfff2e0, 1.09), GLOSS.chrome));
+        /**
+         * ---- THE BEACON, WHICH WAS INSIDE THE CAP ----------------------
+         *
+         * The lamps were two 0.30 cubes at x 0.535, y 2.49-2.79. The coping
+         * they sit under is 2.28 wide -- halfX 0.825 -- and runs to y 2.70. So
+         * for 0.21 of their 0.30 they were BURIED IN IT, and the census caught
+         * it as the number it is: 1.1% of the object, on the only fitting the
+         * variant had. Rebuilding them in place made it worse, 0.3%, which is
+         * how the mechanism was found rather than guessed at.
+         *
+         * They move OUTBOARD to the top corners on brackets, which is where a
+         * real hoarding hangs them and which is the only place on this object
+         * clear of the coping. x 0.92 against a box halfX of 1.12, with the
+         * dome's own 0.17 that is 1.09 -- measured with fleetExtents.
+         */
+        p.push(gl(bx(0.28, 0.09, 0.30, sx * 0.87, 2.40, 0, 0x2b2f52), GLOSS.trim));
+        p.push(gl(bx(0.11, 0.24, 0.11, sx * 0.92, 2.50, 0, 0x2b2f52), GLOSS.trim));
+        p.push(gl(cyl(0.155, 0.170, 0.20, 10, sx * 0.92, 2.68, 0, 0xffe45e), GLOSS.chrome));
+        p.push(gl(cyl(0.075, 0.075, 0.21, 8, sx * 0.92, 2.68, 0, LAMP_CORE), GLOSS.chrome));
+        p.push(gl(cyl(0.105, 0.145, 0.07, 10, sx * 0.92, 2.745, 0, 0x2b2f52), GLOSS.trim));
+      }
+      // The bottom rail and the kickboard on the plinth, which is the one
+      // horizontal a hoarding always has and the only structure that lands
+      // BELOW the caution face's own band.
+      p.push(gl(hcbx(2.30, 0.11, 1.22, 0, 0.455, 0, 0xfff2e0, 0.03), GLOSS.chrome));
+      p.push(gl(hcbx(1.90, 0.16, 1.24, 0, 0.20, 0, 0xd42a55, 0.04), GLOSS.paint));
+      // THE BACK OF A SIGN IS A BRACED FRAME, not a second sign face -- the
+      // correction already recorded for the DUCK roundel. Two stiffeners and a
+      // diagonal, on the plane the pass and the lane change both show.
+      p.push(gl(bx(0.11, 1.84, 0.10, -0.34, 1.46, 0.58, 0xfff2e0), GLOSS.chrome));
+      p.push(gl(bx(0.11, 1.84, 0.10, 0.34, 1.46, 0.58, 0xfff2e0), GLOSS.chrome));
+      p.push(gl(bx(1.10, 0.10, 0.09, 0, 1.46, 0.58, 0xfff2e0, 0, 0, 0.98), GLOSS.chrome));
+      return p;
+    })()));
 
     /**
      * BLOCK v2: A CARGO TRIKE, RIDDEN, IN A LANE. The player asked for cyclists

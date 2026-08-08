@@ -3748,8 +3748,11 @@ MR.World = (function () {
     uZ: { value: 0 },
     uHot: { value: 0 },
   };
-  const WAVE_CHUNK = [
-    '#include <begin_vertex>',
+  // Declarations and body are kept apart because the ink shell needs the same
+  // displacement and does NOT go through the three.js include pipeline, so it
+  // has to supply its own `transformed`. See outlineVS in shading.js.
+  const WAVE_DECL = 'attribute vec2 aWave;\nuniform float uT;\nuniform float uZ;\nuniform float uHot;\n';
+  const WAVE_BODY = [
     'if (aWave.y > 0.0) {',
     '  float wz = (modelMatrix * vec4(transformed, 1.0)).z - uZ;',
     // Ahead of the runner the band reaches further than behind it: a crowd
@@ -3766,6 +3769,7 @@ MR.World = (function () {
     '  transformed.x += aWave.y * exc * 0.085 * sin(uT * 5.7 + aWave.x * 1.73);',
     '}',
   ].join('\n');
+  const WAVE_CHUNK = '#include <begin_vertex>\n' + WAVE_BODY;
 
   function vwave(steps, floor) {
     const m = vtoon(steps, floor);
@@ -3775,8 +3779,12 @@ MR.World = (function () {
       shader.uniforms.uT = crowdU.uT;
       shader.uniforms.uZ = crowdU.uZ;
       shader.uniforms.uHot = crowdU.uHot;
-      shader.vertexShader = 'attribute vec2 aWave;\nuniform float uT;\nuniform float uZ;\nuniform float uHot;\n'
+      shader.vertexShader = WAVE_DECL
         + shader.vertexShader.replace('#include <begin_vertex>', WAVE_CHUNK);
+    };
+    // What the ink shell has to replay so the silhouette moves with the body.
+    m.userData.vertexChunk = {
+      key: 'crowdwave/' + (steps || 2), decl: WAVE_DECL, body: WAVE_BODY, uniforms: crowdU,
     };
     // Pinned, so this compiles once rather than being hashed off the function
     // source -- see the note on the shared ramp patch in shading.js.
@@ -3811,12 +3819,25 @@ MR.World = (function () {
    * road, which is the one axis the player's own travel does not hide. The
    * small z term below is decorrelation, not direction.
    *
-   * A STEADY LEAN, NOT A WOBBLE. The sway term is (0.55 + 0.45*sin), which
+   * A STEADY LEAN, NOT A WOBBLE. The sway term is (0.30 + 0.70*sin), which
    * never changes sign -- so every leaf and every pennant sits displaced
    * downwind and BREATHES about that offset. This is the whole difference
    * between wind and vibration, and it is why the first term is a bias rather
    * than a swing. On top of it `gust` breathes far more slowly (0.23 of the
    * sway rate) so the whole roadside surges and eases together.
+   *
+   * THE SPLIT BETWEEN THOSE TWO TERMS IS NOT TASTE, IT IS THE WHOLE BUDGET.
+   * The bias costs lateral reach -- which is charged to the corridor standoff
+   * below, and to the swept box tools/motion.js has to grow -- and it buys NO
+   * motion at all, because it does not vary. The swing costs the same reach
+   * and is the entire perceptible signal. The first draft ran 0.55/0.45 and
+   * measured, on the live page with the world held still, 0.55% of pixels
+   * changing over a HUNDRED SECONDS of clock at RIVERSIDE, the most heavily
+   * planted leg in the game: about one pixel of travel on a mid-distance
+   * crown. That is precisely the "technically animated, perceptually still"
+   * defect this whole task exists to remove, reintroduced in a commit about
+   * adding motion. Rebalancing to 0.30/0.70 buys 56% more visible movement for
+   * the same peak reach, before any amplitude is spent.
    *
    * THE GUST IS A PLACE, NOT A CLOCK. Phase carries world x and z, so the
    * surge is a travelling front across the scene rather than a global pulse:
@@ -3845,7 +3866,22 @@ MR.World = (function () {
    */
   const WIND_F_LEAF = 2.83;
   const WIND_F_CLOTH = 11.30;
-  const WIND_A_LEAF = 0.22;
+  /**
+   * AMPLITUDE IS SIZED IN PIXELS ON THE SCREEN, NOT IN WORLD UNITS, because
+   * pixels are what "perceptible" is a fact about. A tree stands 7.5 to 26
+   * units off the centre line and is read at 30 to 60 units of depth, where
+   * this camera resolves about 15 px per world unit; a sway authored as a
+   * fraction of a crown lobe therefore lands at one or two pixels and is not
+   * there at all. The figure below was raised from 0.22 to 0.40 against a
+   * measured target of at least four pixels peak-to-peak on a mid-distance
+   * crown -- see the rebalance note above for what the first attempt measured.
+   *
+   * Cloth is smaller because a pennant is smaller and, in this game, closer:
+   * the bunting the player actually sees is strung over the finish chute at
+   * ten to thirty units, where the same world displacement buys two to four
+   * times the pixels.
+   */
+  const WIND_A_LEAF = 0.40;
   const WIND_A_CLOTH = 0.16;
   /**
    * The largest LATERAL displacement any wind material can produce per unit of
@@ -3862,14 +3898,15 @@ MR.World = (function () {
    */
   const WIND_REACH = Math.max(WIND_A_LEAF, WIND_A_CLOTH);
 
-  function windChunk(f, a) {
+  const WIND_DECL = 'attribute vec2 aWave;\nuniform float uT;\n';
+
+  function windBody(f, a) {
     return [
-      '#include <begin_vertex>',
       'if (aWave.y > 0.0) {',
       '  vec3 wp = (modelMatrix * vec4(transformed, 1.0)).xyz;',
       '  float ph = aWave.x + wp.x * 0.13 + wp.z * 0.09;',
       '  float gust = 0.62 + 0.38 * sin(uT * ' + (f * 0.23).toFixed(4) + ' + ph * 0.6);',
-      '  float sway = aWave.y * ' + a.toFixed(4) + ' * gust * (0.55 + 0.45 * sin(uT * ' + f.toFixed(4) + ' + ph));',
+      '  float sway = aWave.y * ' + a.toFixed(4) + ' * gust * (0.30 + 0.70 * sin(uT * ' + f.toFixed(4) + ' + ph));',
       '  transformed.x -= sway;',
       // Leaning is an ARC about the stem, not a slide along the ground, so the
       // tip drops as it goes over. It is a small term and it is the one that
@@ -3889,12 +3926,16 @@ MR.World = (function () {
   function vwind(steps, floor, f, a) {
     const m = vtoon(steps, floor);
     const prev = m.onBeforeCompile;
-    const chunk = windChunk(f, a);
+    const body = windBody(f, a);
     m.onBeforeCompile = function (shader, renderer) {
       if (prev) prev.call(this, shader, renderer);
       shader.uniforms.uT = crowdU.uT;
-      shader.vertexShader = 'attribute vec2 aWave;\nuniform float uT;\n'
-        + shader.vertexShader.replace('#include <begin_vertex>', chunk);
+      shader.vertexShader = WIND_DECL
+        + shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n' + body);
+    };
+    m.userData.vertexChunk = {
+      key: 'wind/' + f.toFixed(2) + '/' + a.toFixed(2),
+      decl: WIND_DECL, body: body, uniforms: { uT: crowdU.uT },
     };
     // Keyed on the terms that actually vary the PROGRAM, so the two wind
     // materials compile once each rather than being hashed off function source.
@@ -10594,6 +10635,22 @@ MR.World = (function () {
      * because the audit does not know which material a given mesh wears and
      * an over-large box can only ever make an assertion stricter.
      */
+    /**
+     * The shared animation clock, exposed so an instrument can advance the
+     * crowd wave and the wind WITHOUT advancing the game.
+     *
+     * This is not a convenience. The first attempt to measure whether the wind
+     * is perceptible pumped the game's own frame callback and pinned the
+     * runner's z, and it reported that 96% of the near band changed -- because
+     * pinning the runner does not pin the world, so what it actually measured
+     * was parallax with the wind somewhere inside the noise. A tool whose
+     * signal is a hundredth of its confound is not an instrument, and this one
+     * failed in the flattering direction, which is the direction that gets
+     * believed. Writing this value and re-rendering changes exactly the
+     * vertices the two wave materials displace and nothing else in the frame,
+     * so the difference IS the animation, with no subtraction to get wrong.
+     */
+    api.waveClock = crowdU.uT;
     api.WAVE_ENVELOPE = {
       // crowd: exc * 0.085 laterally, capped at exc 1.55. wind: WIND_REACH.
       x: Math.max(1.55 * 0.085, WIND_REACH),

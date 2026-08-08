@@ -558,16 +558,44 @@ MR.shading = (function () {
   // width for this camera; the clamp at 3.6 stops a distant crowd capsule --
   // four pixels tall -- from being eaten by its own outline. Beyond that the
   // haze has taken over anyway.
-  const OUTLINE_VS = `
+  /**
+   * THE INK SHELL HAS TO MOVE WITH WHAT IT OUTLINES.
+   *
+   * This used to be a fixed string reading straight from `position`, and the
+   * comment on outlined() below claimed silhouette and fill "can never drift
+   * apart". That is true of anything animated by moving the GROUP and false of
+   * everything animated in the vertex shader -- which, in this game, is every
+   * spectator in every grandstand and now every tree. The shell stayed in the
+   * rest pose while the body it wrapped jumped out of it, so the crowd has
+   * been outlined in a static ghost of itself since the wave shipped, and the
+   * foliage would have been the same the moment the wind was added.
+   *
+   * It is not only a look. The ink is drawn as a back-face shell AT the
+   * silhouette, which is exactly where a displaced fill differs from its rest
+   * pose -- so a static shell sits on top of the moving edge and HIDES the
+   * motion. Measured on RIVERSIDE, the most heavily planted leg in the game,
+   * a full sway moved 0.55% of the frame with the shell rigid.
+   *
+   * So the displacement is injected here as well, from the same source string
+   * the fill material uses -- passed through rather than copied, because two
+   * hand-kept copies of a vertex program is the defect this file already has a
+   * note about elsewhere.
+   */
+  function outlineVS(chunk) {
+    return `
     uniform float thickness;
+    ${chunk ? chunk.decl : ''}
     varying float vDepth;
     void main() {
+      vec3 transformed = vec3(position);
+      ${chunk ? chunk.body : ''}
       vec3 n = normalize(normalMatrix * normal);
-      vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      vec4 mv = modelViewMatrix * vec4(transformed, 1.0);
       vDepth = -mv.z;
       mv.xyz += n * thickness * clamp(0.75 + 0.05 * vDepth, 0.90, 3.6);
       gl_Position = projectionMatrix * mv;
     }`;
+  }
 
   // Ink fades into the haze slightly ahead of the surface it wraps (the 0.82
   // exponent). Distant scenery therefore loses its hard black edge before it
@@ -610,22 +638,34 @@ MR.shading = (function () {
    * @param thickness world units of extrusion (see OUTLINE_VS). 0 or less
    *        returns a shared invisible material -- see above.
    */
-  function outlineMaterial(thickness, color) {
+  /**
+   * @param chunk optional { key, decl, body, uniforms } describing a vertex
+   *        displacement the outlined geometry also carries on its fill. Keyed
+   *        into the shared cache so one shell material is built per (weight,
+   *        colour, displacement) rather than per mesh.
+   */
+  function outlineMaterial(thickness, color, chunk) {
     const t = thickness === undefined ? INK.character : thickness;
     if (!(t > 0)) return hiddenInkMaterial();
     const c = color === undefined ? PALETTE.ink : color;
-    const key = t + '/' + c;
+    const key = t + '/' + c + '/' + (chunk ? chunk.key : '-');
     let m = outlineMats.get(key);
     if (m) return m;
+    const uniforms = {
+      thickness: { value: t },
+      oColor: { value: displayColor(c) },
+      inkFogColor: fogU.inkFogColor,
+      inkFogNear: fogU.inkFogNear,
+      inkFogFar: fogU.inkFogFar,
+    };
+    // The SHARED uniform objects, not copies: the shell and the fill have to
+    // read the same clock or the outline lags its own body by a frame.
+    if (chunk && chunk.uniforms) {
+      for (const k in chunk.uniforms) uniforms[k] = chunk.uniforms[k];
+    }
     m = new THREE.ShaderMaterial({
-      uniforms: {
-        thickness: { value: t },
-        oColor: { value: displayColor(c) },
-        inkFogColor: fogU.inkFogColor,
-        inkFogNear: fogU.inkFogNear,
-        inkFogFar: fogU.inkFogFar,
-      },
-      vertexShader: OUTLINE_VS,
+      uniforms,
+      vertexShader: outlineVS(chunk),
       fragmentShader: OUTLINE_FS,
       side: THREE.BackSide,
     });
@@ -638,6 +678,11 @@ MR.shading = (function () {
    * animating the group moves silhouette and fill together and they can never
    * drift apart.
    *
+   * A fill material that displaces vertices in its own vertex shader announces
+   * that on `userData.vertexChunk`, and the shell is built with the same
+   * displacement -- see outlineVS. Without that the two DO drift apart, in the
+   * one way this sentence did not cover.
+   *
    * At INK weight 0 the shell mesh is still built and still parented, but it
    * is switched off. That is on purpose: callers hold on to
    * `group.userData.line` and scale or reposition it alongside the fill (a
@@ -649,7 +694,8 @@ MR.shading = (function () {
     const t = thickness === undefined ? INK.character : thickness;
     const g = new THREE.Group();
     const fill = new THREE.Mesh(geometry, material);
-    const line = new THREE.Mesh(geometry, outlineMaterial(t));
+    const line = new THREE.Mesh(geometry,
+      outlineMaterial(t, undefined, material && material.userData && material.userData.vertexChunk));
     line.renderOrder = -1;
     line.visible = t > 0;
     g.add(line, fill);

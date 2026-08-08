@@ -8449,9 +8449,56 @@ MR.World = (function () {
         parts.push(bxAt(0.08, 0.52, 0.10, X, 0.62, -0.14, p.frame));
         parts.push(bxAt(0.08, 0.12, 0.86, X, 0.56, 0.28, p.frame, -0.34));
         parts.push(bxAt(0.07, 0.62, 0.09, X, 0.66, 0.72, p.frame, 0.22));
+        /**
+         * ============ THE REAR TRIANGLE ============
+         *
+         * What a bicycle looks like from directly behind is a saddle, a post,
+         * and two pairs of thin tubes converging on a hub with a wheel between
+         * them. This variant had a seat tube, a down tube and a fork -- the
+         * DIAMOND, which is what you read a bike by from the FLANK -- and
+         * nothing at all on the axis the chase camera uses. The gameplay
+         * framing census puts 27.3% of the object in dark structure and 7.0%
+         * in wheel, and none of that structure was on the back of the machine.
+         */
+        parts.push(gl(bxAt(0.30, 0.07, 0.34, X, 1.00, -0.10, 0x2a0c16), GLOSS.trim));
+        parts.push(gl(bxAt(0.07, 0.20, 0.07, X, 0.88, -0.12, p.frame), GLOSS.chrome));
+        for (const tx of [-1, 1]) {
+          parts.push(gl(bxAt(0.06, 0.58, 0.07, X + tx * 0.09, 0.62, -0.16, p.frame, 0.13), GLOSS.chrome));
+          parts.push(gl(bxAt(0.06, 0.07, 0.52, X + tx * 0.09, 0.35, -0.02, p.frame), GLOSS.chrome));
+        }
+        // A saddle bag, the one thing a road bike carries, and the mount the
+        // rear light was previously stuck to the air behind.
+        parts.push(gl(bxAt(0.20, 0.15, 0.22, X, 0.90, -0.24, p.band), GLOSS.matte));
         parts.push(bxAt(0.34, 0.09, 0.18, X, 0.92, -0.20, 0x2a0c16));
-        // Bars, out front where the rider's hands go.
+        // Bars, out front where the rider's hands go, and the brake hoods on
+        // them -- which is where a rider's hands actually are and what makes
+        // the arms end in something.
         parts.push(bxAt(0.44, 0.07, 0.08, X, 1.02, 0.66, 0x2a0c16));
+        for (const hx of [-1, 1]) {
+          parts.push(gl(bxAt(0.09, 0.10, 0.20, X + hx * 0.19, 1.05, 0.72, p.band), GLOSS.trim));
+        }
+        /**
+         * THE RACE NUMBER, pinned to the back: rectangular and hard-edged
+         * against a saturated jersey, and the strongest single cue that these
+         * two are riding rather than standing.
+         *
+         * IT IS LEMON AND NOT WHITE, AND THAT COST A BUILD FAILURE TO LEARN
+         * AGAIN. A real race number is white, so the first build used PLATE for
+         * these and for the four pedal shoes -- 7.2% of the object in a pale
+         * NEAR-NEUTRAL. The area mean went L 91.3 / S 0.472 to L 98.7 / S
+         * 0.387: luminance up, chroma down 0.085, and dS against the middle
+         * lane fell from 0.294 to 0.209 through a gate of 0.22. **shoot.js
+         * failed the build.** That is the fleet header's own cream mechanism
+         * arriving by a third door -- after the cream bands and the glass flash
+         * -- on the one variant with no room for it, and the rule it breaks is
+         * written four hundred lines up: the pale element on a warm body is the
+         * plate and the lamp cores and nothing else.
+         *
+         * 0xfff23a is 91% of cream's luminance at eight times its chroma, which
+         * is the substitution the whole fleet already made.
+         */
+        parts.push(gl(bxAt(0.34, 0.24, 0.05, X, 1.60 + y, -0.05, LEMON), GLOSS.matte));
+        parts.push(gl(bxAt(0.36, 0.04, 0.045, X, 1.72 + y, -0.052, p.jersey), GLOSS.matte));
         // The rear light, as a disc facing the lens with a bright core, exactly
         // as the cars carry it -- red alone renders darker than the road.
         parts.push(cyl(0.09, 0.09, 0.10, 8, X * LANE_FIT, 0.80, -0.40, LAMP_RED, Math.PI / 2));
@@ -8487,13 +8534,23 @@ MR.World = (function () {
      * a quarter turn apart: two riders pedalling in lockstep read as one prop
      * mirrored, and the whole point of a pair is that it is two people.
      */
+    /**
+     * SHOES ON THE PEDALS. A knee with nothing on the end of it is a lobe, and
+     * the pale shoe is what turns the orbit into a leg going round -- it is the
+     * brightest thing on the lower half of either bike and it moves, which at
+     * gameplay framing is worth more than anything static of the same size.
+     */
     const blockRoadBikeCrankGeo = merge([
       bx(0.26, 0.34, 0.24, -0.40, 0.30, 0, 0x2a0c16),
       bx(0.28, 0.14, 0.26, -0.40, 0.45, 0.04, KIT_B),
+      gl(bx(0.21, 0.10, 0.28, -0.40, 0.28, 0.17, LEMON), GLOSS.trim),
       bx(0.26, 0.34, 0.24, -0.40, -0.30, 0, 0x2a0c16),
       bx(0.28, 0.14, 0.26, -0.40, -0.45, 0.04, KIT_B),
+      gl(bx(0.21, 0.10, 0.28, -0.40, -0.28, 0.17, LEMON), GLOSS.trim),
       bx(0.26, 0.24, 0.34, 0.40, 0, 0.30, 0x2a0c16),
+      gl(bx(0.21, 0.28, 0.10, 0.40, 0.17, 0.28, LEMON), GLOSS.trim),
       bx(0.26, 0.24, 0.34, 0.40, 0, -0.30, 0x2a0c16),
+      gl(bx(0.21, 0.28, 0.10, 0.40, 0.17, -0.28, LEMON), GLOSS.trim),
     ]);
 
     /**

@@ -5626,6 +5626,70 @@ MR.Runner = (function () {
     return S.outlined(weld(pieces), mat, OUTLINE);
   }
 
+  /**
+   * Turn the bottom band of an already-welded garment into cloth.
+   *
+   * `part` is what multi() returned, so its fill and its ink shell SHARE one
+   * geometry object -- which is the property that makes this cheap and is also
+   * the property that makes it correct: rewriting the buffer moves the outline
+   * with the hem instead of leaving a black line behind on the body. The bib
+   * learned that the hard way and its note records it.
+   *
+   * Weight ramps from 0 at `yFlat` to 1 at `yEdge` on a smoothstep. Smooth
+   * rather than linear because the ramp's own kink is visible: a linear weight
+   * puts a crease across the garment at yFlat that travels with the flutter,
+   * and at three tones on a toon ramp a moving crease reads as a seam.
+   *
+   * The rest pose is kept and the deformation is written from it every frame.
+   * Absolute, never incremental -- see the bib.
+   */
+  function hemCloth(part, yFlat, yEdge) {
+    const pos = part.userData.fill.geometry.attributes.position;
+    const rest = new Float32Array(pos.array);
+    const w = new Float32Array(pos.count);
+    const th = new Float32Array(pos.count);
+    const r0 = new Float32Array(pos.count);
+    for (let i = 0; i < pos.count; i++) {
+      const x = rest[i * 3], y = rest[i * 3 + 1], z = rest[i * 3 + 2];
+      const t = (yFlat - y) / (yFlat - yEdge);
+      w[i] = t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
+      th[i] = Math.atan2(x, z);
+      r0[i] = Math.sqrt(x * x + z * z);
+    }
+    return { pos, rest, w, th, r0 };
+  }
+
+  /**
+   * Drive one hem. A travelling wave around the garment, one-sided.
+   *
+   * ONE-SIDED is the bib's bug fix applied before it can happen again: a
+   * signed sine drives half of every cycle INWARD, and a hem has a body
+   * behind it. The vest hem sits 0.006 outside the shorts and the short cuff
+   * 0.008 outside the thigh, so an inward swing of any usable amplitude puts
+   * the garment through what it is worn over -- which does not read as cloth,
+   * it reads as a hole. Biased into [0, 1], the hem alternates between lifted
+   * and flat, which is what a hem does.
+   *
+   * Radial, about the garment's own axis, because both of these are bodies of
+   * revolution: scaling x and z lifts the hem away from the body all the way
+   * round, where moving it along one axis would shear the front into the back.
+   * The vertical term is UP only -- cloth lifting off a waist rises, and a hem
+   * that dropped would eat the margin tools/footroom.js asserts.
+   */
+  function hemFlutter(h, amp, t, lobes, up) {
+    const a = h.pos.array;
+    for (let i = 0; i < h.pos.count; i++) {
+      const w = h.w[i];
+      if (w <= 0) continue;
+      const lift = (0.5 + 0.5 * Math.sin(t + h.th[i] * lobes)) * amp * w;
+      const k = h.r0[i] > 1e-5 ? 1 + lift / h.r0[i] : 1;
+      a[i * 3] = h.rest[i * 3] * k;
+      a[i * 3 + 2] = h.rest[i * 3 + 2] * k;
+      a[i * 3 + 1] = h.rest[i * 3 + 1] + lift * up;
+    }
+    h.pos.needsUpdate = true;
+  }
+
   function pivot(parent, x, y, z) {
     const p = new THREE.Object3D();
     p.position.set(x || 0, y || 0, z || 0);
@@ -6214,6 +6278,40 @@ MR.Runner = (function () {
     ]);
     chest.add(trunk);
 
+    // ---- the two hems that were still welded on -----------------------------
+    //
+    // Stage 2 established the rule this file now runs on: BODY PARTS GET LAG
+    // FILTERS, CLOTH GETS SPRINGS. It then gave springs to the two largest
+    // pieces of cloth the back view sees -- the hood and the race bib -- and
+    // stopped, which left the two pieces the eye actually tracks the WAIST on
+    // still nailed to the skeleton: the vest's hem and the short's cuff.
+    //
+    // Those two are worth more than their size suggests, because of where they
+    // are rather than how big they are. The vest hem is the largest value edge
+    // on the upper half of the figure (the waistband was cut for cutting it by
+    // 41%, see the pelvis), and the short cuff is the edge the thighs come out
+    // of. A hem that never moves is the single most reliable tell that a
+    // garment is painted on rather than worn.
+    //
+    // THEY COST NOTHING TO DRAW, and that is why they are done this way rather
+    // than by giving each hem its own mesh on its own pivot. A separate part
+    // is two draw calls -- fill and ink -- and draw calls are the binding
+    // constraint on this project at ~266 against ~400. Instead the welded
+    // geometry's own position buffer is rewritten each frame, exactly as the
+    // bib's is, so a hem that moves costs the same as a hem that does not.
+    //
+    // Absolute, never incremental, for the reason the bib's note gives: an
+    // incremental deformation accumulates float error over a two-hour race and
+    // the garment slowly inflates off the body.
+    //
+    // HE HAS NO SLEEVES. The owner's list asks for follow-through on the vest,
+    // the sleeves and the shorts; the base-layer sleeve was removed two passes
+    // ago for reading as a hole in the vest and has stayed out on a measured
+    // argument, so there is nothing there to move. Said here rather than left
+    // as a silent omission.
+    const vestHem = hemCloth(trunk, -0.120, -0.181);
+    const shortHem = hemCloth(pelvis, -0.085, -0.148);
+
     // ---- the hood, and the only part of this character that is not bolted
     // to a bone --------------------------------------------------------------
     //
@@ -6336,6 +6434,10 @@ MR.Runner = (function () {
     // clock for the bib; see the block at the end of update() for why they are
     // integrated rather than driven straight off the stride phase.
     let hoodA = 0, hoodV = 0, hoodZ = 0, hoodZV = 0, lastBob = 0, bibT = 0;
+    // The two hems' own clocks. Two of them, at different rates, because one
+    // clock driving both would tie the waist and the thigh line together and
+    // the pair would read as one hoop rather than as two garments.
+    let vestT = 0, shortT = 0;
     // STAGE 2. Three more filters: one per elbow, and one for the head.
     //
     // Seeded lazily rather than at zero. A filter that starts at 0 against an
@@ -8533,6 +8635,52 @@ MR.Runner = (function () {
         bp[i * 3 + 1] = bibRest[i * 3 + 1] + lift * 0.70;
       }
       bibPos.needsUpdate = true;
+
+      // ---- the vest hem and the short cuff ---------------------------------
+      //
+      // Same shape as the bib above and for the same reasons, with two
+      // differences that matter.
+      //
+      // BOTH ARE SCALED BY POLISH, where the bib is not. That is deliberate:
+      // the bib's flutter is part of the character as it stood before the
+      // animation work, and these are secondary motion in exactly the sense
+      // stage 2 defined, so putting them inside the A/B is what keeps
+      // ?polish=0 meaning "the cycle before any of this". It also makes the
+      // identity proof trivial and exact rather than approximate -- at POLISH
+      // 0 the amplitude is identically zero, the deformation is identically
+      // the rest pose, and every vertex is bit-for-bit where it was.
+      //
+      // THE IMPACT TERM. `bobV` is the collar's own vertical rate, already
+      // computed and clamped for the hood. Only its DOWNWARD half is used:
+      // cloth flies out when the body drops onto a foot and does nothing
+      // special when it rises, so a symmetric term would put a flick at both
+      // ends of the stride and read as a wobble rather than as a footfall.
+      // This is the whole reason the hems beat with the run rather than
+      // floating free the way the bib does -- the bib is pinned to a back and
+      // sees the body's motion only through the panel, a hem is at the waist
+      // and takes the landing directly.
+      //
+      // THE AMPLITUDES ARE SMALL and they are meant to be. 0.016 to 0.026 is
+      // two to three pixels at the 121-131 px per unit the shipped frame gives
+      // this figure -- but a hem is a hard value edge two hundred pixels long,
+      // and what the eye resolves on an edge that size is not the displacement,
+      // it is the WAVE running along it. Anything past about 0.04 stops being
+      // a hem lifting and becomes a skirt.
+      //
+      // Two lobes on the vest and three on the shorts, so the waves have
+      // different spatial periods as well as different clocks. Directions
+      // differ too: the vest's clock runs forward and the short's backward, so
+      // the two waves cross rather than chase.
+      const drop = Math.max(0, -bobV);
+      vestT += dt * (4.4 + 5.2 * sp01);
+      shortT -= dt * (5.6 + 6.0 * sp01);
+      hemFlutter(vestHem,
+        POLISH * ((0.016 + 0.010 * sp01) * (1 - slid * 0.60) + spread * 0.008 + drop * 0.010),
+        vestT, 2, 0.55);
+      hemFlutter(shortHem,
+        POLISH * ((0.014 + 0.008 * sp01) * (1 - slid * 0.45) + spread * 0.006 + drop * 0.012),
+        shortT, 3, 0.45);
+
 
       // Ducking drops the whole body rather than only folding the spine, so
       // the collision capsule and the silhouette agree. The 0.42 matches

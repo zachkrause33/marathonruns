@@ -2255,3 +2255,166 @@ nobody measured is worse than no number at all.**
    degrees** (atan(2.80 / 6.0)). It must NOT be part of the scaled body -- the
    body takes `scale.z = span` -- so it belongs on the un-scaled `moving` child
    or on a variant built for the job.
+
+47. **A vehicle you can see is a vehicle you can hit. The flank is solid now,
+   the owner decided it, and it changed the difficulty of the game by nothing
+   at all -- which is a measurement and not a hope.**
+
+   The hole was older than the ramp and larger than it looked.
+   `player.resolveGates` was the only contact path in the game and it fired at
+   one plane, `gate.z`, while a BLOCK train is ONE gate carrying up to 17.9
+   units of vehicle. Driving the real `MR.Player` into the flank of every train
+   on the calendar: **4895 of 4895 recorded no contact at all.** You could run
+   the whole length of a tram, and every lane-reasoning thing in this project --
+   `solvable()`, the spacing floor, the telegraph mats, the bot, `tools/shoot.js`
+   -- reasoned at gate lines and none of them noticed.
+
+   The owner was shown that, told plainly that closing it makes the game harder,
+   and chose to close it. The condition was that the record contract be
+   re-measured before it ships. It was, and the answer is the thing worth
+   recording:
+
+   **`tools/simulate.js` IS UNCHANGED TO THE SECOND. 1 mistake with no aid, 2
+   taking half, 3 taking all of it -- the same table, on the same four dates,
+   before and after.** That is not luck and it is not a fudge; it is what the
+   instrument measures. simulate.js prices the COST of a mistake, and solid
+   flanks do not touch the cost of anything: course generation is
+   bit-identical (`--identity` still gives
+   `f046dcfc84a59c08a3a7b51c78449853f3bd90f8`), no gate moved, no aid moved, and
+   a contact costs what a contact always cost. What solid flanks change is the
+   RATE, and **no tool in this project measured a mistake rate.** Reporting
+   simulate.js as evidence that nothing got harder would have been true and
+   useless. So the rate was measured separately, with the bot, on the shipped
+   course with both scalars off:
+
+   - a bot that plans off the GATE TABLE alone -- which is the model the game
+     itself had until this pass -- takes **137 contacts in four races and
+     finishes 2:08:47 against 1:57:55**. That is the size of the forgiveness
+     that was being given away.
+   - a bot that will not step sideways into a lane with something in it takes
+     **0 contacts and finishes 1:57:55**, which is the number before the change.
+
+   **In plain words for the owner: this costs a player who looks at the road
+   nothing whatever. It costs exactly the run that steers into a lorry it can
+   see.** The record is as reachable as it was.
+
+   **THE STRUCTURAL FIX, WHICH IS WHAT MADE IT SAFE.** `MR.Course` now states
+   lane occupancy ONCE -- `course.occupiedAt(z, lane)`, spans built from the
+   same nose-anchored `[gate.z, gate.z + 2 * halfZ * (1 + 0.9 * span)]`
+   expression `reachOf`, `world.js`'s `gateBoxes`, `ramp.js` and `shoot.js`
+   already use. One solid, five files describing it. `deckAt` and `rampAt` are
+   now views on that instead of a private ramp list, so a taxi and a lorry are
+   the same kind of fact and only the rideable ones carry a surface.
+
+   **`solvable()` NEEDED NO CHANGE, AND THE REASON IS STRUCTURAL RATHER THAN
+   LUCKY.** Every span is contained in one gate interval, guaranteed: `spacingAt`
+   owes the next gate `readWindowAt + reachOf`, so a vehicle's far face is at
+   least 25.35 units short of the next gate line. "Lane l is free at gate i" and
+   "lane l is unoccupied from gate i to gate i+1" are the same statement -- which
+   is exactly what the BFS always assumed without being able to say so. What IS
+   new is crossing THROUGH an occupied lane, and the room to do it is that same
+   25.35 against the 6.0 two lane changes cover. `validate()` now proves both on
+   every course, and `tools/mechanics.js --transit` proves them over 28,040
+   spans on the calendar: **0 vehicles reach the next gate line, tightest clear
+   road 25.3u.** It is the assertion that fails first if anyone retunes the
+   sightline floor, the jump arc or the pace floor.
+
+   **TWO CONTACT PATHS OVER ONE SOLID, DIVIDED AT THE NEAR FACE.** `resolveGates`
+   already charged for a BLOCK taken head-on AND decided whether the gate was
+   clean. Left alone, `resolveDeck` would fire on the same step -- bouncing the
+   runner into a free lane BEFORE `resolveGates` looked, turning a wall into one
+   flank contact PLUS a free clean gate. The division is physical, not
+   procedural, so it does not depend on call order: a span's near face IS its
+   gate line, `unitsBefore < span.z0` is a head-on arrival and belongs to the
+   gate. A mount is the one exception and has to be, because `clears(BLOCK)`
+   asks `onDeck` and a mount settled one step late records the runner colliding
+   with the lorry he is visibly running up. The probe that catches this is
+   `HEAD`, and it asserts on **clean gates credited: 0**.
+
+   **THE CONTROL IS THE PROBE THAT MATTERS.** Three scenarios, not one: SIDE
+   (swerve in mid-vehicle -- exactly one contact, never zero, never the
+   per-frame re-fire), HEAD (take it at the gate line -- still exactly one, and
+   no stolen streak), and **PAST (stay in the clear lane -- zero)**. Without
+   PAST, a fix that made EVERY lane solid would have passed the other two.
+
+   **FAIRNESS (rule 4).** Nothing new is invisible: the vehicle was always drawn
+   for its whole length, and what changed is that the game stopped disagreeing
+   with the picture. `shoot.js` is clean -- LOW, HIDES, BLANKS, PAINTS, the
+   envelope guard and the contrast gate all pass, and the eight shots take 0
+   hits. The read is easiest exactly where the mistake is made: at the moment of
+   contact the tram fills the right of the frame
+   (`shots/flank/flank-1-contact.png`). What a player has to read is PRESENCE,
+   not length, and presence is legible from the decision point 30 units out
+   (`shots/flank/flank-0-approach.png`).
+
+   **THE INSTRUMENT WAS WRONG, AGAIN, AND AGAIN IT FLATTERED.** Two defects,
+   both found by turning the flank solid:
+
+   - `occupied()` in `tools/mechanics.js` -- the helper the previous pass called
+     "THIS FUNCTION IS THE FINDING" -- asked `deckAt > 0`, which is the height of
+     a RUNNING SURFACE and is **zero over every vehicle that is not rideable**.
+     The "flank-aware" column was aware of ramps and blind to the other 27,000
+     vehicles on the calendar. It read as correct only because nothing but a
+     ramp could be hit. An instrument that is right because the bug it would
+     expose does not exist yet is not right.
+   - awareness was in the wrong PLACE. Putting it in the plan -- reject any lane
+     with a vehicle between here and the gate -- made the table report **13
+     gates a race with "no way out"**, every one of them a gate `solvable()` had
+     proved passable. A lorry between you and a lane is not a reason to give the
+     lane up, it is a reason to WAIT, and the course guarantees the room. Moving
+     it into the step took the same bot from 35 contacts to 0. `main.js`'s own
+     bot had the identical defect and now holds the step the same way; every
+     frame this project photographs is bot-driven, so a bot that drives into
+     lorries does not merely score badly, it makes the whole shot library a
+     picture of a broken run.
+
+48. **The roof pickup paid out at road level, so the ramp was free -- and the
+   camera on the way up, along and down needed nothing.**
+
+   `resolveAid` took lane match alone, deliberately and correctly for a bottle
+   on the road. With roof items on the course that made the ramp **strictly
+   free**: the item sits in the ramp's lane, so a runner at road level in that
+   lane collected it from inside the lorry without ever mounting. Measured
+   before the fix: **215 of 215 roof items collectable from the road.** After:
+   215 of 215 on the roof, 0 from the road, and 0 road items inside a vehicle
+   (that last was already true -- `generateAid` only ever places road items in
+   lanes passable at both gates, and a rideable train's lane is BLOCK at its
+   gate -- but it is checked now instead of reasoned about).
+
+   The roof item also carries `y: DECK_Y` now. That is the interface to the art
+   and it is on the ITEM rather than recomputed by the renderer, because a roof
+   pickup drawn at road level is drawn INSIDE the lorry and is invisible in a
+   diff -- nothing in course space is wrong. It is height above the LOCAL road,
+   the same quantity `player.surface` and `camera.dk` already are, so `world.js`
+   adds it exactly where it already adds `elevation.at(z)`. Only roof items
+   carry it; a `y: 0` on every road item would change the aid JSON and break the
+   identity hash for nothing.
+
+   **THE CAMERA IS FINE AND HERE ARE THE NUMBERS.** Sampled every frame through
+   a whole ride on the real page: climbing, the eye trails the ground under the
+   runner by at most **1.39u**; falling, it sits at most **1.13u** above it;
+   both terms are added to the eye AND the aim, so the PITCH never moves and the
+   whole shot simply rides with the ground. It reaches the deck to within 0.02u
+   about 28 units into a 35.5-unit ride, so most of the ride is spent settling
+   -- which reads as the ground rising into the shot rather than as a cut, and
+   the frames say so (`shots/flank/ramp-1-mouth.png` through
+   `ramp-6-landed.png`). The landing is legible: mid-fall the next gate, its
+   telegraph mat and its cones are all already in frame. **No camera change was
+   made, because none was earned.**
+
+   One property of the ramp worth knowing before `RAMP` is switched on, and it
+   is not a defect: a bot that INSISTS on every ramp hit the flank on **2 of 13
+   approaches**. Both were a ramp two lanes away across an occupied middle
+   lane -- it waited for the crossing, arrived past the top of the tailgate, and
+   met the flank instead of the mouth. A human abandons the ramp; the bot does
+   not, which is what makes the number visible. It is the one way taking a ramp
+   can cost a contact that going round it would not.
+
+   **`RAMP` STILL DEFAULTS TO 0, AND THAT IS THE ONLY THING LEFT.** Everything
+   structural is done -- occupancy, the flank, the roof reward, the landing
+   proof, the camera. What is not done is the art, and `src/render/ramp.js` is
+   still the deliberately plain orange placeholder: `shots/flank/ramp-1-mouth.png`
+   shows a TRAM drawn inside it, because `world.js` casts its own BLOCK variant
+   in that lane and the placeholder is a second solid over the same footprint.
+   Correction 46 is the spec for the real tailgate. Flipping the default is one
+   line in `course.js` the day that lands.

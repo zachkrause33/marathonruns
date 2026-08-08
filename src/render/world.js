@@ -8190,16 +8190,73 @@ MR.World = (function () {
          *
          * Top of the helmet is 2.72, inside the 2.80 the collision box records.
          */
-        hbx(1.14, 0.24, 0.56, 0, 1.42, 0.34, 0x2b2f52),
-        hbx(1.22, 0.54, 0.58, 0, 1.81, 0.34, VAN_BODY),
-        hbx(1.10, 0.10, 0.54, 0, 2.13, 0.34, 0x2b2f52),
-        hbx(0.60, 0.48, 0.50, 0, 2.44, 0.38, 0xffc79a),
-        hbx(0.70, 0.22, 0.60, 0, 2.61, 0.38, PINK),
-        // Arms down onto the bars, which is what puts a lean in the shape.
-        hbx(0.22, 0.66, 0.20, -0.62, 1.54, 0.66, 0x2b2f52, 0.40),
-        hbx(0.22, 0.66, 0.20, 0.62, 1.54, 0.66, 0x2b2f52, 0.40),
         hbx(0.98, 0.12, 0.12, 0, 1.26, 0.92, 0x2b2f52),
       ];
+      /**
+       * ---- THE RIDER, WHOM A BLIND READER COULD NOT NAME AT ALL ----------
+       *
+       * Shown a 1:1 crop at 8 and 12 units with no idea what the game was, a
+       * reader wrote: "I cannot tell what kind of person it is. What I
+       * actually see is a stack of blocks: a dark navy slab for the body, a
+       * tan cube above it for a head WITH NO FACE, and a flat magenta-pink
+       * plate laid on top of that cube. The pink plate might be a cap or a
+       * hard hat, but it reads more like a lid than headgear... If I had to
+       * guess from the vehicle rather than the figure, I would say the driver
+       * of a course maintenance or utility cart, but THAT IS THE CART TALKING,
+       * NOT THE PERSON."
+       *
+       * That last clause is the brief for this whole pass. The description is
+       * also exact: five stacked boxes, no neck, no shoulders, no elbows, no
+       * hands, and a helmet that was a plate because it had no depth.
+       *
+       * The rider is now vFigure at tier FACE. tools/people.js measures this
+       * head at 21.5 x 24.5 px at 8 units with a 2.75 px eye mark -- the
+       * second largest face in the game after the marshals -- so it carries
+       * eyes, brows, nose, mouth, ears and hair, and the helmet is a shell
+       * with a peak and a strap rather than a lid.
+       *
+       * The pose is a working cyclist's, not a racer's: upright, hands wide on
+       * a cargo bar, elbows out. That is what tells this apart from BLOCK v8
+       * two lanes over, which is the same species of vehicle ridden by people
+       * doing a completely different thing.
+       */
+      {
+        const TS = 1.30;
+        const TH = 1.74 * TS;
+        const lean = 0.30;
+        const y0 = 1.42 - 0.505 * TH;
+        const hipY = 1.42;
+        vFigure(parts, {
+          x: 0, y: y0, z: 0.34, h: TS, build: 1.00, tier: 2, fz: 1, legs: false,
+          skin: 0xffc79a, hair: 0x4a2c18, style: 1,
+          // Dark navy body with one broad hi-vis band where the eye lands --
+          // the rule this variant was rebuilt on and which still holds: the
+          // background CHANGES up the figure, so the torso is the darkest
+          // thing in the scene against a pale box and a pale road.
+          top: 0x2b2f52, shoulder: 0x2b2f52, sleeve: 0x2b2f52,
+          legCol: 0x2b2f52, hipCol: 0x2b2f52,
+          lean: lean,
+          // Hands wide and forward on the cargo bar at z 0.92.
+          arm: [0.92, 0.92], fore: [0.30, 0.30],
+          browTilt: 0.06, jaw: 0.86,
+        });
+        const shY = hipY + TH * 0.085 + Math.cos(lean) * (TH * 0.265) - TH * 0.04;
+        const shZ = 0.34 + Math.sin(lean) * (TH * 0.265);
+        const hy = shY + TH * 0.045 + TH * 0.028 + (0.262 * TS) / 2;
+        // The hi-vis band, across the chest where the eye lands.
+        parts.push(hbx(1.02, 0.20, 0.44, 0, shY - 0.26, shZ, VAN_BODY));
+        // A courier's satchel on the back, which is what a cargo-trike rider
+        // carries and what separates this figure from the machine behind it.
+        parts.push(gl(bx(0.52, 0.40, 0.20, 0, shY - 0.34, shZ - 0.34, VAN_BODY), GLOSS.matte));
+        parts.push(gl(bx(0.56, 0.07, 0.21, 0, shY - 0.16, shZ - 0.345, 0x2b2f52), GLOSS.matte));
+        // Helmet: a shell with a peak and a chin strap, not a plate. Top of
+        // the shell is 2.72, inside the 2.80 the collision box records.
+        parts.push(gl(cbx(0.60, 0.30, 0.58, 0, hy + 0.14, shZ, PINK, 0.06), GLOSS.paint));
+        parts.push(gl(bx(0.54, 0.07, 0.16, 0, hy + 0.06, shZ + 0.28, PINK), GLOSS.paint));
+        for (const sx of [-1, 1]) {
+          parts.push(bx(0.05, 0.26, 0.05, sx * 0.20, hy - 0.06, shZ + 0.14, 0x2b2f52));
+        }
+      }
       /**
        * ============ THE WHEELS OWNED ZERO PIXELS ============
        *
@@ -8411,9 +8468,18 @@ MR.World = (function () {
        * on cream's side of neutral rather than opposite it.
        */
       for (const sx of [-1, 1]) {
-        // Legs and feet, at the board's own depth so they clear its bottom edge.
-        parts.push(gl(hbx(0.19, 0.62, 0.17, sx * 0.62, 0.31, -0.54, 0xff3b6b), GLOSS.matte));
-        parts.push(gl(hbx(0.46, 0.09, 0.62, sx * 0.62, 0.045, -0.54, 0xfff2e0), GLOSS.matte));
+        // THE BARRIER'S OWN TRESTLE, and it is now unmistakably not a person.
+        // These were a 0.19 x 0.62 upright with a 0.46 cream slab under it,
+        // which is the size, the shape and the stance of a leg in a shoe --
+        // so the object carried FOUR legs that were the barrier's and none
+        // that were the marshals', and a blind reader called the whole thing a
+        // flat trailer. An A-frame cannot be mistaken for a person: it splays,
+        // it has a spreader across it, and it stands at the board's own depth
+        // where a marshal does not.
+        parts.push(gl(hbx(0.11, 0.64, 0.12, sx * 0.60, 0.32, -0.54, 0xff3b6b, 0, 0, sx * 0.16), GLOSS.matte));
+        parts.push(gl(hbx(0.11, 0.64, 0.12, sx * 0.64, 0.32, -0.54, 0xff3b6b, 0, 0, -sx * 0.16), GLOSS.matte));
+        parts.push(gl(hbx(0.34, 0.07, 0.10, sx * 0.62, 0.24, -0.54, 0xfff2e0), GLOSS.matte));
+        parts.push(gl(hbx(0.30, 0.06, 0.30, sx * 0.62, 0.03, -0.54, 0xfff2e0), GLOSS.matte));
         // The brace back from the foot to the board, which is what stops a
         // free-standing barrier folding over -- and what the pass sees.
         parts.push(gl(bx(0.09, 0.09, 0.62, sx * 0.45, 0.34, -0.28, 0xfff2e0, 0.72), GLOSS.matte));
@@ -8440,39 +8506,113 @@ MR.World = (function () {
        * silhouette still carries the hazard hue. Different heights, because two
        * identical figures read as a repeated prop.
        */
+      /**
+       * ============ AND A BLIND READER SAW A TRAILER ============
+       *
+       * Shown a 1:1 crop of this variant at 8 and 12 units, with no idea what
+       * the game was, a reader wrote: "Two figures side by side on a flat
+       * trailer with a red-and-white striped board across the front... Each is
+       * built the same way: a crimson slab over a tan box for the head, a
+       * broad pale grey-white band across the chest, navy below, and small
+       * brown cubes out at the sides where hands would be... Stripped of the
+       * props, the two bodies themselves are just banded blocks and I could
+       * equally believe they were spectators on a viewing stand."
+       *
+       * Three things in that, and all three are the figures rather than the
+       * barrier:
+       *
+       *   IT READ AS A VEHICLE. Nothing said the pair were STANDING ON THE
+       *     ROAD, because their legs were four boxes packed behind a board and
+       *     the whole assembly sat as one mass. They now have real legs, feet
+       *     with toes pointing at the runner, and daylight between them.
+       *   THE PROPS WERE CARRYING IT. Cones, board and paddle. Take them away
+       *     and there was no person left -- which is exactly the test the pass
+       *     is judged by, because the props are what the OTHER hazards will
+       *     also have.
+       *   "SMALL BROWN CUBES OUT AT THE SIDES WHERE HANDS WOULD BE" is the
+       *     right description of what was there: two skin cubes floating at
+       *     the rail with a rotated navy box near them. There is now an arm --
+       *     shoulder, upper arm, elbow, forearm, hand -- and the hand is on
+       *     the rail because the forearm put it there.
+       *
+       * The far marshal's outer arm is now RAISED WITH THE PALM OUT, which is
+       * the gesture that means stop. It is the one thing on this variant that
+       * says the pair are DIRECTING TRAFFIC rather than standing behind a
+       * fence, it costs four boxes, and it is a shape no spectator makes.
+       *
+       * THE COLOURS DO NOT MOVE. The lever table above is the record of every
+       * chroma and luminance route being tried and every one making it worse;
+       * this variant clears the fairness gate on luminance alone at 1.43x and
+       * the largest bright area on it is the cream tabard. So the rebuild is
+       * geometry only -- the same cream, the same navy, the same pink, in the
+       * same proportions, arranged as a person.
+       */
       const who = [
-        { x: -0.64, skin: 0xffc79a, z: 0.16, h: 0.00 },
-        { x: 0.60, skin: 0xb87a4e, z: 0.44, h: -0.09 },
+        // MOVED OUT FROM +/-0.62 TO +/-0.85, AND THAT IS THE PADDLE'S FAULT.
+        // The stop paddle's roundel is 0.76 across on a pivot at the inner
+        // hand, and with the pair at 0.62 it covered one marshal's head and
+        // shoulder for the whole approach -- so the object had two people on
+        // it and showed one. At 0.85 they flank the paddle instead of standing
+        // behind it. The outermost triangle is a raised hand at 0.97 against a
+        // box halfX of 1.12; the board they hold is 1.62 wide, so the pair is
+        // still inside their own barrier.
+        { x: -0.85, skin: 0xffc79a, z: 0.16, h: 0.00, hair: 0x241a14, style: 3,
+          stop: false, browTilt: 0.10, jaw: 0.88 },
+        { x: 0.85, skin: 0xb87a4e, z: 0.44, h: -0.09, hair: 0x8a8496, style: 5,
+          stop: true, browTilt: -0.12, jaw: 0.74 },
       ];
       for (const p of who) {
         const px = p.x * LANE_FIT;
         const y = p.h;
-        // TWO LEGS AND BOOTS, not one navy slab 0.50 x 0.86. Only the boots
-        // and the bottom of the shins clear the board from astern; the rest is
-        // built because the pass and the lane change both show it.
-        for (const lx of [-1, 1]) {
-          parts.push(gl(bx(0.21, 0.50, 0.30, px + lx * 0.14, 0.62, p.z, 0x2b2f52), GLOSS.matte));
-          parts.push(gl(bx(0.19, 0.30, 0.27, px + lx * 0.15, 0.22, p.z + 0.02, 0x2b2f52), GLOSS.matte));
-          parts.push(gl(bx(0.23, 0.11, 0.38, px + lx * 0.15, 0.055, p.z - 0.05, 0x141a33), GLOSS.trim));
-        }
-        parts.push(gl(bx(0.52, 0.18, 0.34, px, 0.94, p.z, 0x2b2f52), GLOSS.matte));
-        parts.push(bx(0.80, 0.32, 0.44, px, 1.34 + y, p.z, 0x2b2f52));
-        parts.push(gl(cbx(0.86, 0.40, 0.46, px, 1.70 + y, p.z, 0xfff2e0, 0.04), GLOSS.matte));
+        // 1.30 of scale is a 2.26 figure, which is the same stylised
+        // oversizing the rest of the fleet's people carry -- the trike's rider
+        // tops out at 2.72 on a vehicle 1.28 tall. The head lands at 2.13 and
+        // the cap at 2.45, inside where the old build put them.
+        const MS = 1.34;
+        const MH = 1.74 * MS;
+        vFigure(parts, {
+          x: px, y: y, z: p.z, h: MS, build: 0.96, tier: 2, fz: -1,
+          skin: p.skin, hair: p.hair, style: p.style,
+          // Cream hi-vis over a navy uniform: the tabard is the torso, the
+          // shoulders and sleeves stay dark, which is what a tabard looks like
+          // and is where the object's luminance comes from.
+          top: 0xfff2e0, shoulder: 0x2b2f52, sleeve: 0x2b2f52,
+          legCol: 0x2b2f52, hipCol: 0x2b2f52, shoe: 0x141a33,
+          // Feet apart and planted. A marshal stands square across a lane.
+          leg: [0.10, -0.10], knee: [0.04, 0.04],
+          // Inner arm forward onto the rail. Outer arm either forward as well,
+          // or up with the palm out.
+          // THE STOP GESTURE HAS TO GO UP AND FORWARD, and the sign matters:
+          // a negative angle raises the arm behind the shoulder, where the
+          // body hides it. 2.30 rad puts the elbow at 2.19 and the palm at
+          // 2.57, above the tabard, in front of the face, and under the
+          // paddle roundel's own 2.62 ceiling.
+          arm: p.stop ? [0.92, 2.30] : [0.92, 0.92],
+          fore: p.stop ? [0.46, 0.15] : [0.46, 0.46],
+          browTilt: p.browTilt, jaw: p.jaw, mouth: p.stop ? 0.36 : 0.26,
+          wrap: function (q, role) { return role === 'foot' ? gl(q, GLOSS.trim) : q; },
+        });
+        const shY = y + MH * 0.085 + MH * 0.265 - MH * 0.04 + MH * 0.505;
         // One band across the tabard, in the object's own pink. A hi-vis with
         // no band is a rectangle, and this is the one place on the pair that is
         // ABOVE the board from astern and therefore always in frame.
-        parts.push(gl(bx(0.88, 0.08, 0.47, px, 1.61 + y, p.z, 0xff3b6b), GLOSS.matte));
-        parts.push(bx(0.76, 0.10, 0.42, px, 1.95 + y, p.z, 0x2b2f52));
-        parts.push(bx(0.54, 0.48, 0.46, px, 2.24 + y, p.z, p.skin));
-        parts.push(gl(cbx(0.62, 0.20, 0.52, px, 2.44 + y, p.z, 0xff3b6b, 0.04), GLOSS.matte));
-        // Hands ON the rail, sitting on top of it where they clear the board.
-        for (const hx of [-1, 1]) {
-          parts.push(gl(bx(0.17, 0.14, 0.20, px + hx * 0.44, 1.39, -0.50, p.skin), GLOSS.matte));
-        }
-        // Arms forward onto the barrier, which is what makes them its holders
-        // rather than two figures that happen to be standing behind it.
-        parts.push(bx(0.19, 0.70, 0.19, px - 0.40, 1.28 + y, p.z - 0.34, 0x2b2f52, 0.62));
-        parts.push(bx(0.19, 0.70, 0.19, px + 0.40, 1.28 + y, p.z - 0.34, 0x2b2f52, 0.62));
+        parts.push(gl(bx(0.66, 0.09, 0.29, px, shY - 0.30, p.z, 0xff3b6b), GLOSS.matte));
+        // A second band lower down. Two bands rather than one is what a real
+        // hi-vis tabard carries, and it is what stops the cream reading as a
+        // plain white shirt -- which is what the blind reader called it.
+        parts.push(gl(bx(0.66, 0.07, 0.29, px, shY - 0.46, p.z, 0xff3b6b), GLOSS.matte));
+        // The cap, BLOCK pink, so the top of each silhouette still carries the
+        // hazard hue before any of the shape resolves.
+        const hy = shY + MH * 0.045 + MH * 0.028 + (0.262 * MS) / 2;
+        parts.push(gl(cbx(0.36, 0.13, 0.36, px, hy + 0.145, p.z, 0xff3b6b, 0.04), GLOSS.matte));
+        // The peak, forward over the brow, which is what tells a cap from a
+        // helmet at twenty units and which the runner's own cap already does.
+        parts.push(gl(bx(0.34, 0.055, 0.16, px, hy + 0.095, p.z - 0.24, 0xff3b6b), GLOSS.matte));
+        // A radio on the chest: the small hard rectangle with a stub aerial
+        // that every marshal, steward and works operative in the world wears,
+        // and one of the very few props that reads as OFFICIAL at this size.
+        parts.push(gl(bx(0.11, 0.16, 0.07, px - 0.24, shY - 0.20, p.z - 0.16, 0x2b2f52), GLOSS.trim));
+        parts.push(gl(bx(0.025, 0.16, 0.025, px - 0.24, shY - 0.04, p.z - 0.16, 0x2b2f52), GLOSS.trim));
       }
       return merge(parts);
     })();
@@ -9357,31 +9497,76 @@ MR.World = (function () {
       // A reflector on the rear guard, low and central, where the law puts it.
       parts.push(gl(bx(0.16, 0.09, 0.05, 0, 0.60, -0.79, LAMP_RED), GLOSS.chrome));
 
-      // ---- THE RIDER, who now has legs -----------------------------------
-      // Two hi-vis columns either side of the rear wheel, feet on the runners.
-      // This is the strongest single cue a two-wheeler has from directly behind
-      // and the variant had none of it: the old figure was a waist, a back, a
-      // head and a helmet, ending at the saddle.
-      for (const sx of [-1, 1]) {
-        parts.push(gl(bx(0.21, 0.19, 0.44, sx * 0.27, 0.94, 0.28, 0x2a0c16, 0.34), GLOSS.matte));
-        parts.push(gl(bx(0.20, 0.46, 0.22, sx * 0.30, 0.68, 0.40, KIT_B, -0.10), GLOSS.matte));
-        parts.push(gl(bx(0.21, 0.06, 0.23, sx * 0.30, 0.80, 0.41, 0x2a0c16), GLOSS.matte));
-        parts.push(gl(bx(0.20, 0.11, 0.30, sx * 0.31, 0.50, 0.46, 0x141a33), GLOSS.trim));
-      }
-      parts.push(
-        bx(0.56, 0.42, 0.34, 0, 1.14, 0.24, 0x2a0c16),
-        gl(cbx(0.70, 0.58, 0.42, 0, 1.72, 0.26, KIT_B, 0.05), GLOSS.matte),
+      /**
+       * ---- THE RIDER, AND A BLIND READER CALLED HIM A POLICE OFFICER -----
+       *
+       * Shown a 1:1 crop of this variant at 8 and 12 units with no idea what
+       * the game was, a reader wrote: "I would say a police or official escort
+       * motorcyclist, or a delivery rider, on the strength of the top box and
+       * panniers." That is the owner's own misreading arrived at independently
+       * -- they looked at this game's people and asked for the COPS and the
+       * taxi drivers to be improved, and this is the cop.
+       *
+       * The same reader also said this was "the clearest figure of the four",
+       * and gave the reason: "unlike every other figure here, the head is an
+       * actual helmet: a rounded shell with a black horizontal visor band
+       * across it. That visor is what makes it read as a person on a bike
+       * rather than a stack of boxes." One 0.44 x 0.08 box was doing more
+       * identification work than everything else on the rider combined, which
+       * is the whole thesis of this pass in one sentence.
+       *
+       * So: the rider is vFigure at tier FACE -- head 21 px at 8 units, eye
+       * mark 2.75 -- with a visor over the face and a courier's crossbody
+       * strap over the hi-vis. The strap is the cheapest thing on the object
+       * that a police officer does not wear and a delivery rider always does,
+       * and it is LEMON rather than white for the reason written four hundred
+       * lines up: this variant clears its luminance gate by 0.027x and its
+       * saturation target by 0.006, the narrowest margins in the fleet, and a
+       * pale NEAR-NEUTRAL is what failed the build on the cyclists.
+       */
+      {
+        const RS = 1.16;
+        const RH = 1.74 * RS;
+        const lean = 0.42;
+        const y0 = 0.312;
+        const hipY = y0 + 0.505 * RH;
+        vFigure(parts, {
+          x: 0, y: y0, z: 0.24, h: RS, build: 1.02, tier: 2, fz: 1,
+          skin: 0xffc79a, hair: 0x241a14, style: 3,
+          top: KIT_B, shoulder: 0x2a0c16, sleeve: 0x2a0c16,
+          legCol: 0x2a0c16, hipCol: 0x2a0c16, shoe: 0x141a33,
+          lean: lean,
+          // Sitting: thighs forward onto the floor pan, shins dropped to the
+          // runners. The old rider ended at the saddle and had no legs at all
+          // below it, so from astern the machine carried a torso on air.
+          leg: [0.72, 0.72], knee: [-0.72, -0.72],
+          browTilt: 0.08,
+          wrap: function (q, role) { return role === 'foot' ? gl(q, GLOSS.trim) : q; },
+        });
+        const shY = hipY + RH * 0.085 + Math.cos(lean) * (RH * 0.265) - RH * 0.04;
+        const shZ = 0.24 + Math.sin(lean) * (RH * 0.265);
+        const hy = shY + RH * 0.045 + RH * 0.028 + (0.262 * RS) / 2;
         // One reflective band across the hi-vis, so the back is two values and
         // not one flat rectangle at the exact height the eye lands.
-        gl(bx(0.72, 0.07, 0.43, 0, 1.63, 0.26, 0x2a0c16), GLOSS.matte),
-        bx(0.58, 0.10, 0.36, 0, 2.05, 0.26, 0x2a0c16),
-        bx(0.40, 0.22, 0.34, 0, 2.21, 0.28, 0xffc79a),
-        gl(cbx(0.50, 0.40, 0.44, 0, 2.40, 0.26, PINK, 0.07), GLOSS.paint),
-        bx(0.44, 0.08, 0.10, 0, 2.42, 0.02, 0x141a33),
-        bx(0.15, 0.48, 0.15, -0.30, 1.60, 0.42, 0x2a0c16, 0.55),
-        bx(0.15, 0.48, 0.15, 0.30, 1.60, 0.42, 0x2a0c16, 0.55),
-        bx(0.08, 0.26, 0.08, -0.54, 1.62, 0.54, 0x2a0c16),
-        bx(0.08, 0.26, 0.08, 0.54, 1.62, 0.54, 0x2a0c16),
+        parts.push(gl(bx(0.62, 0.07, 0.30, 0, shY - 0.30, shZ, 0x2a0c16), GLOSS.matte));
+        // THE COURIER STRAP, corner to corner across the back, with the bag
+        // itself low on the hip. Nothing else on this object distinguishes the
+        // two services the reader named, and this is four boxes.
+        parts.push(gl(bx(0.66, 0.09, 0.28, 0, shY - 0.16, shZ - 0.02, LEMON, 0, 0, 0.62), GLOSS.matte));
+        parts.push(gl(cbx(0.34, 0.26, 0.20, 0.26, shY - 0.52, shZ - 0.06, M_MID, 0.04), GLOSS.trim));
+        parts.push(gl(bx(0.24, 0.05, 0.06, 0.26, shY - 0.44, shZ - 0.16, LEMON), GLOSS.matte));
+        // The helmet: a full shell over the hair with a DARK VISOR BAND, which
+        // is the one feature the blind reader named by itself.
+        parts.push(gl(cbx(0.46, 0.40, 0.44, 0, hy + 0.10, shZ, PINK, 0.07), GLOSS.paint));
+        parts.push(bx(0.40, 0.10, 0.12, 0, hy + 0.05, shZ - 0.20, 0x141a33));
+        parts.push(gl(bx(0.30, 0.06, 0.14, 0, hy + 0.28, shZ - 0.17, M_MID), GLOSS.trim));
+        // Arms out to the bars, and hands ON them.
+        for (const sx of [-1, 1]) {
+          parts.push(bx(0.15, 0.48, 0.15, sx * 0.30, shY - 0.30, shZ + 0.20, 0x2a0c16, 0.55));
+          parts.push(bx(0.08, 0.26, 0.08, sx * 0.54, shY - 0.28, shZ + 0.32, 0x2a0c16));
+        }
+      }
+      parts.push(
         bx(0.28, 0.17, 0.07, -0.62, 1.80, 0.54, KIT_B),    // mirror glass
         bx(0.28, 0.17, 0.07, 0.62, 1.80, 0.54, KIT_B)
       );

@@ -8,6 +8,8 @@
  *   node tools/calendar.js --date 2026-09-06   one named day, raced end to end
  *   node tools/calendar.js --deep 12       race more of the sampled days
  *   node tools/calendar.js --json          machine-readable
+ *   node tools/calendar.js --ties --full   characterise the BLANKS boundary
+ *                                          (no browser, no build, one second)
  *
  * Exit code is non-zero if any day fails, or if any page threw or warned.
  *
@@ -80,10 +82,19 @@
  *     90 days   12/12 settings   72/72 pairs
  *
  * 32 is therefore the smallest prefix that stands on every piece of ground the
- * game can generate, and it is where the default sits. The tool prints the
- * pairs and the named-scenery census it actually reached on every run, so the
- * claim is checkable against the run rather than against this comment -- which
- * is the failure mode docs/roadmap.md lists four times.
+ * game can generate, and it is where the default sits. CONFIRMED BY THE RUN,
+ * not just by the plan: the default reaches 12/12 settings, 72/72 pairs and 91
+ * distinct named objects, against the 92 a full 365-day walk finds. The tool
+ * prints all three on every run, pass or fail, so the claim is checkable
+ * against the run rather than against this comment -- which is the failure
+ * mode docs/roadmap.md lists four times.
+ *
+ * WHAT A 32-DAY PREFIX STILL MISSES, and it is one object in 365 days: the
+ * census gains its 92nd name somewhere past day 32. A sample sized on
+ * (setting, biome) pairs is not the same as one sized on every prop the
+ * generator can place, and the honest position is that --full exists, costs 17
+ * minutes, and should be run when world.js changes rather than every time
+ * anything does.
  *
  * ---- TWO LAYERS, AND WHAT EACH ONE GUARANTEES ----------------------------
  *
@@ -96,15 +107,26 @@
  *          OVERHEAD_Y" is a statement in world space about the scenery, with
  *          no lens in it, so it can be asked of the WHOLE COURSE instead of a
  *          frame: stub the draw, stream world.update() forward in 150-unit
- *          steps, walk crossings() at each. About 2.0 s a day, of which 1.8 s
- *          is loading the page.
+ *          steps, walk crossings() at each. MEASURED 2.8 s a day over a full
+ *          365-day run, of which about 1.8 s is loading the page -- 42 samples
+ *          reaching 6,360 units of the 6,293 there are.
  *
- *          THE GUARANTEE IS NEARLY ALL OF IT, and that is not luck. shoot.js's
- *          own header states why LOW is the load-bearing half: the eye is at
- *          2.62 and OVERHEAD_Y is 9.0, so anything obeying LOW projects above
- *          everything a hazard can occupy and HIDES cannot then fire. LOW is
- *          what makes occlusion by scenery POSSIBLE. The crane failed LOW
- *          first and HIDES only in consequence.
+ *          WHAT IT GUARANTEES: that on every day it walked, no piece of
+ *          scenery anywhere on the course reaches back over the play corridor
+ *          below OVERHEAD_Y, in its rest pose.
+ *
+ *          THAT IS NEARLY ALL OF THE OCCLUSION GUARANTEE, and not by luck.
+ *          shoot.js's own header states why LOW is the load-bearing half: the
+ *          eye is at 2.62 and OVERHEAD_Y is 9.0, so anything obeying LOW
+ *          projects above everything a hazard can occupy and HIDES cannot then
+ *          fire. LOW is what makes occlusion by scenery POSSIBLE. Both defects
+ *          this file was written for behaved exactly that way -- the quayside
+ *          crane and ROME's stoneArch each failed LOW first and HIDES only in
+ *          consequence.
+ *
+ *          WHAT IT DOES NOT GUARANTEE: anything about hazard-on-hazard
+ *          occlusion, anything about the overlays, anything about colour, and
+ *          anything that only enters the corridor once an animation runs.
  *
  *   RACE   (a nested sub-sample, the whole race, real camera, no pixels)
  *          all four, plus contrast. The autopilot runs the day from the gun to
@@ -112,15 +134,28 @@
  *          tools/footroom.js's trick -- so every spring, filter and lane
  *          change in camera.js is the one that ships and nothing is drawn.
  *          The audit is the SAME CODE shoot.js runs, out of tools/lib, called
- *          every 2 seconds of simulation: at 26.7 units of road per second
- *          that is a sample every 53 units, comfortably inside the 210-unit
- *          spawn distance, so the race covers the whole course too and does it
- *          with a lens. About 6 s a day.
+ *          every 2 seconds of simulation. MEASURED: 6 races reach the tape,
+ *          6,293 units of 6,293, widest gap between consecutive samples 59.7
+ *          units against the 210-unit spawn distance -- so the race covers the
+ *          whole course too, and does it with a lens. About 6-7 s a day.
+ *
+ *          WHAT IT GUARANTEES: on the days it raced, no hazard is hidden by
+ *          scenery, by another hazard, or by a screen-space overlay at any
+ *          point in the race, and no hazard variant matches the road on both
+ *          luminance and saturation in any palette that race passed through.
  *
  *          BLANKS is why this layer has to exist at all. Hazard-on-hazard
  *          occlusion is a fact about GATE LAYOUT, which is the most per-date
  *          thing in the game, and it cannot be computed without the camera's
- *          real lateral position.
+ *          real lateral position. It is also the assertion currently sitting
+ *          on a floating-point boundary -- see --ties, and read it before
+ *          reacting to a red BLANKS row.
+ *
+ * WHAT THE DEFAULT COSTS, MEASURED, so the next person can decide whether to
+ * run it: 32 days, 26 walked and 6 raced, 101 seconds -- 3.2 s a day. The full
+ * year walked is 1,031 seconds. Neither is near the ten minutes at which a
+ * gate stops being run, and shoot.js itself is untouched and still takes what
+ * it always took.
  *
  * CONTRAST rides on RACE and is charged per (setting, biome) pair rather than
  * per day, because that is what it is a function of: the palette. The first
@@ -141,6 +176,19 @@
  *
  * Neither layer rasterises the frame, so nothing here can see a defect that is
  * only in the pixels. That is shoot.js's job and shoot.js still has it.
+ *
+ * AND ONE HOLE THAT IS NOBODY'S, which is worth writing down because the
+ * defect that prompted this file had three parts and only two of them have an
+ * owner. The quayside crane stood in the corridor (LOW, caught here), it hid a
+ * JUMP (HIDES, caught here) -- and it was painted 0x37d6ff, hue 192.3 degrees,
+ * 1.7 degrees off DUCK cyan. tools/motion.js has the hue rule and scopes it,
+ * deliberately and with its reasoning written down, to MOVERS THAT TRANSLATE:
+ * "hue is about things that can close on you". Static scenery in hazard paint
+ * is therefore checked by nothing, on any date, and a container stack wearing
+ * DUCK cyan beside the road is exactly the case that scoping lets through.
+ * Closing it is a separate assertion with its own argument to have -- the
+ * crowd wears BLOCK pink over 18% of its area by design -- and it is not this
+ * pass's, but it should not go unrecorded either.
  */
 const { chromium } = require('playwright');
 const path = require('path');

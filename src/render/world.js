@@ -3630,6 +3630,68 @@ MR.World = (function () {
   }
 
   /**
+   * ============ A WHEEL YOU CAN SEE THROUGH ============
+   *
+   * vWheel above is a CAR wheel and is right for one: a dark tyre with a rim
+   * disc at 0.58 of the radius and a hub inside it, which from any distance
+   * this game can produce is a bright disc with dark notches. Put that under a
+   * bicycle and you get a motorcycle, and that is not a guess -- a reader shown
+   * a 1:1 crop of BLOCK v8 at 8 units, with no idea what the game is, said
+   * "two people on motorcycles" and then "escort or outrider motorcyclists".
+   * The riders are road cyclists.
+   *
+   * A bicycle wheel is MOSTLY AIR, and that is the whole of the difference. So
+   * this builds the tyre as a ring of segments with the road showing between
+   * them, a thin rim inside it, six spokes and a small hub -- the open wheel
+   * that no motorcycle has. It is also thin: 0.055 against the car's 0.10.
+   *
+   * The segments are the same trick vGuard and vCrown use to get a curve out
+   * of a box renderer, and the cost is 16 boxes a wheel against 11 for vWheel,
+   * on a variant that is not near any budget.
+   */
+  function vBikeWheel(parts, x, y, z, r, tyre, rim, hub) {
+    const W = 0.075;
+    const N = 14;
+    // TWO RINGS, and the bright one is the point. The first build made the
+    // wheel open and dark, and open-and-dark is not a bicycle wheel either --
+    // it is a smudge, and it cost this variant 16% of its pixels for nothing.
+    // A real wheel is a dark tyre with a BRIGHT RIM immediately inside it, and
+    // that bright circle is what carries to thirty-five units; the air is
+    // inside the rim, where it belongs.
+    for (let k = 0; k < N; k++) {
+      const a = (k + 0.5) * Math.PI * 2 / N;
+      const ca = Math.cos(a), sa = Math.sin(a);
+      parts.push(gl(bx(W, r * 0.30, r * 0.50, x, y + ca * r, z + sa * r, tyre, a), GLOSS.trim));
+      parts.push(gl(bx(W * 0.72, r * 0.20, r * 0.48, x, y + ca * r * 0.80, z + sa * r * 0.80,
+        rim, a), GLOSS.chrome));
+    }
+    for (let k = 0; k < 3; k++) {
+      parts.push(gl(bx(0.026, r * 1.50, 0.026, x, y, z, rim, k * Math.PI / 3), GLOSS.chrome));
+    }
+    parts.push(gl(cyl(r * 0.16, r * 0.16, W * 1.8, 8, x, y, z, hub, 0, 0, Math.PI / 2), GLOSS.chrome));
+  }
+
+  /**
+   * DROP HANDLEBARS -- the one object in the world that is only ever found on
+   * a road bicycle, and the second reason v8 read as a motorbike: it had a
+   * straight bar with two blobs on it, which is a scooter.
+   *
+   * The shape is a flat top bar, a hood on each side where the hands go, and a
+   * hook that turns down and back under it. Five boxes a side and the profile
+   * is unmistakable from the flank and from astern.
+   */
+  function vDropBars(parts, x, y, z, halfW, col, grip) {
+    parts.push(gl(bx(halfW * 2, 0.045, 0.05, x, y, z, col), GLOSS.chrome));
+    for (const sx of [-1, 1]) {
+      const bxp = x + sx * halfW;
+      parts.push(gl(bx(0.05, 0.05, 0.20, bxp, y + 0.005, z + 0.10, grip), GLOSS.trim));
+      parts.push(gl(bx(0.05, 0.13, 0.055, bxp, y - 0.07, z + 0.185, col), GLOSS.chrome));
+      parts.push(gl(bx(0.05, 0.05, 0.17, bxp, y - 0.125, z + 0.115, col), GLOSS.chrome));
+      parts.push(gl(bx(0.05, 0.05, 0.05, bxp, y - 0.115, z + 0.035, grip), GLOSS.trim));
+    }
+  }
+
+  /**
    * THE ARCH FLARE, and it is the reference's most specific shape note: the
    * wheel arches are cut into the body as curved arcs, with the wheel standing
    * proud below the sill. In reference/sonic-cars-closeup.png the flare is a
@@ -4252,37 +4314,45 @@ MR.World = (function () {
     // they are a real figure's: the head is a seventh of the height, the hip
     // is at 0.52, the shoulder at 0.82.
     const H = 1.74 * S;
-    const headW = 0.215 * S * (o.headW === undefined ? 1 : o.headW);
-    const headH = 0.235 * S * (o.headH === undefined ? 1 : o.headH);
+    const headW = 0.250 * S * (o.headW === undefined ? 1 : o.headW);
+    const headH = 0.262 * S * (o.headH === undefined ? 1 : o.headH);
+    // Kept as the reference an unleaned shoulder is trimmed back to; see shY.
     const shoulderY = y0 + H * 0.815;
     const hipY = y0 + H * 0.505;
-    const shW = 0.40 * S * bw;
+    const shW = 0.52 * S * bw;
 
     // ---- legs -----------------------------------------------------------
     // Thigh and shin as two segments about a knee, so a figure can stand
     // mid-stride, sit, or drive a pedal. One slab of navy is not a pair of
     // legs and never was.
+    //
+    // o.legs === false draws none, and 'thigh' draws the top segment only.
+    // Both exist for the riders: a cyclist's shins and feet are the MOVING
+    // part on the variant's own pivot, so the static mesh must stop at the
+    // knee or the leg is drawn twice and the pedalling reads as a smear.
     const thighL = H * 0.26, shinL = H * 0.24;
-    for (let s = 0; s < 2; s++) {
+    const legMode = o.legs === undefined ? true : o.legs;
+    for (let s = 0; s < 2 && legMode; s++) {
       const sx = s ? 1 : -1;
-      const lx = x + sx * 0.105 * S * bw;
+      const lx = x + sx * 0.122 * S * bw;
       const a = hip[s] || 0, b = (knee[s] || 0);
       // Thigh, hung from the hip and pitched.
       const tcy = hipY - Math.cos(a) * thighL / 2;
       const tcz = z + Math.sin(a) * thighL / 2 * fz;
-      parts.push(P(bx(0.135 * S * bw, thighL, 0.165 * S, lx, tcy, tcz, leg, a * -fz), 'leg'));
+      parts.push(P(bx(0.158 * S * bw, thighL, 0.190 * S, lx, tcy, tcz, leg, a * -fz), 'leg'));
+      if (legMode === 'thigh') continue;
       // Knee to ankle.
       const kx = lx, ky = hipY - Math.cos(a) * thighL, kz = z + Math.sin(a) * thighL * fz;
       const c = a + b;
       const scy = ky - Math.cos(c) * shinL / 2;
       const scz = kz + Math.sin(c) * shinL / 2 * fz;
-      parts.push(P(bx(0.115 * S * bw, shinL, 0.135 * S, kx, scy, scz, o.shin || leg, c * -fz), 'leg'));
+      parts.push(P(bx(0.132 * S * bw, shinL, 0.158 * S, kx, scy, scz, o.shin || leg, c * -fz), 'leg'));
       // Foot, flat on the ground under the ankle. A leg that ends in a shin is
       // a peg, and the foot is what puts the figure ON the pavement.
       const ay = ky - Math.cos(c) * shinL, az = kz + Math.sin(c) * shinL * fz;
       // The toe points the way the figure faces, which is the only thing that
       // tells a standing person from a person standing backwards.
-      parts.push(P(bx(0.135 * S, 0.075 * S, 0.255 * S, kx, ay + 0.032 * S,
+      parts.push(P(bx(0.152 * S, 0.082 * S, 0.265 * S, kx, ay + 0.035 * S,
         az + fz * 0.055 * S, shoe), 'foot'));
     }
 
@@ -4290,22 +4360,30 @@ MR.World = (function () {
     // The hips are their own block and NARROWER than the chest. That one step
     // is most of what makes a torso read as a body: a single box from shoulder
     // to thigh is a fridge.
-    parts.push(P(bx(shW * 0.78, H * 0.10, 0.20 * S, x, hipY + H * 0.045, z,
+    parts.push(P(bx(shW * 0.80, H * 0.105, 0.235 * S, x, hipY + H * 0.045, z,
       o.hipCol || leg), 'torso'));
     const torsoH = H * 0.265;
     const tcy = hipY + H * 0.085 + Math.cos(lean) * torsoH / 2;
     const tcz = z + Math.sin(lean) * torsoH / 2 * fz;
-    parts.push(P(bx(shW * 0.90, torsoH, 0.215 * S, x, tcy, tcz, top, lean * -fz), 'torso'));
+    parts.push(P(bx(shW * 0.90, torsoH, 0.250 * S, x, tcy, tcz, top, lean * -fz), 'torso'));
     // Shoulders: a wider, shallower block on top of the chest. It is what
     // gives the figure a yoke to hang arms from, and it is the difference
     // between a person and a bottle.
-    const shY = shoulderY - H * 0.02;
+    //
+    // THE SHOULDER RIDES ON THE TORSO'S FAR END, not at a fixed height. The
+    // first version pinned it to the upright shoulder line and let the chest
+    // rotate underneath, which is fine at the 0.34 rad a spectator leans and
+    // absurd at the 1.15 a road cyclist does: the head and both arms hang in
+    // the air above a torso that has gone forward without them. The -0.04H
+    // trim is what keeps an UNLEANED figure's shoulder at the 0.815 of height
+    // a real one sits at, so nothing that was upright moved.
+    const shY = hipY + H * 0.085 + Math.cos(lean) * torsoH - H * 0.04;
     const shZ = z + Math.sin(lean) * torsoH * fz;
-    parts.push(P(bx(shW, H * 0.055, 0.205 * S, x, shY, shZ, o.shoulder || top), 'torso'));
+    parts.push(P(bx(shW, H * 0.062, 0.240 * S, x, shY, shZ, o.shoulder || top), 'torso'));
 
     // ---- neck and head --------------------------------------------------
     const neckY = shY + H * 0.045;
-    parts.push(P(bx(0.10 * S, H * 0.045, 0.10 * S, x, neckY, shZ, skin), 'head'));
+    parts.push(P(bx(0.125 * S, H * 0.045, 0.125 * S, x, neckY, shZ, skin), 'head'));
     const headY = neckY + H * 0.028 + headH / 2;
     vHead(parts, {
       w: headW, h: headH, d: headW * 0.92,
@@ -4323,29 +4401,29 @@ MR.World = (function () {
     const upperL = H * 0.185, foreL = H * 0.165;
     for (let s = 0; s < 2; s++) {
       const sx = s ? 1 : -1;
-      const ax = x + sx * (shW / 2 - 0.035 * S);
+      const ax = x + sx * (shW / 2 - 0.048 * S);
       const a = arm[s] || 0;
       const ay0 = shY + H * 0.012;
       if (tier === 0) {
         const L = upperL + foreL;
-        parts.push(P(bx(0.10 * S * bw, L, 0.11 * S,
+        parts.push(P(bx(0.118 * S * bw, L, 0.128 * S,
           ax, ay0 - Math.cos(a) * L / 2,
           shZ + Math.sin(a) * L / 2 * fz, o.sleeve || top, a * -fz), 'arm'));
         continue;
       }
       const ucy = ay0 - Math.cos(a) * upperL / 2;
       const ucz = shZ + Math.sin(a) * upperL / 2 * fz;
-      parts.push(P(bx(0.098 * S * bw, upperL, 0.108 * S, ax, ucy, ucz,
+      parts.push(P(bx(0.118 * S * bw, upperL, 0.128 * S, ax, ucy, ucz,
         o.sleeve || top, a * -fz), 'arm'));
       const ex = ax, ey = ay0 - Math.cos(a) * upperL, ez = shZ + Math.sin(a) * upperL * fz;
       const c = a + (fore[s] || 0);
       const fcy = ey - Math.cos(c) * foreL / 2, fcz = ez + Math.sin(c) * foreL / 2 * fz;
-      parts.push(P(bx(0.088 * S * bw, foreL, 0.098 * S, ex, fcy, fcz,
+      parts.push(P(bx(0.106 * S * bw, foreL, 0.116 * S, ex, fcy, fcz,
         o.cuff || o.sleeve || top, c * -fz), 'arm'));
       // The hand. Small, and it is the thing that lets an arm END rather than
       // stop -- and the thing a paddle, a bar or a placard is held BY.
       const hy = ey - Math.cos(c) * foreL, hz = ez + Math.sin(c) * foreL * fz;
-      parts.push(P(bx(0.085 * S, 0.105 * S, 0.09 * S, ex, hy - 0.045 * S, hz, skin), 'hand'));
+      parts.push(P(bx(0.100 * S, 0.118 * S, 0.105 * S, ex, hy - 0.050 * S, hz, skin), 'hand'));
     }
   }
 
@@ -8934,31 +9012,92 @@ MR.World = (function () {
      *
      * REFUSED. Gate margin +0.195, the widest of the two variants still short.
      */
+    /**
+     * ===== AND A BLIND READER CALLED THEM MOTORCYCLISTS =====
+     *
+     * Shown a 1:1 crop of this variant at 8 and 12 units through the live
+     * chase camera, with no idea what the game was, a reader wrote: "Two
+     * people on motorcycles, and this one I am fairly confident about... I
+     * would call them escort or outrider motorcyclists running ahead of the
+     * race, or possibly couriers." They are road cyclists on bicycles.
+     *
+     * That is a category error, not a detail complaint, and it is the same
+     * failure the owner made when they looked at this game's people and asked
+     * for the cops and taxi drivers to be improved. Three things caused it and
+     * none of them is the paintwork:
+     *
+     *   THE WHEELS WERE CAR WHEELS. vWheel puts a rim disc at 0.58 of the
+     *     radius inside a 0.10-wide tyre, which is correct for the fleet and
+     *     is a motorcycle wheel under a bicycle. A bicycle wheel is MOSTLY
+     *     AIR. See vBikeWheel: a segmented tyre with the road showing through
+     *     it, six spokes, a small hub, 0.055 wide.
+     *   THE BARS WERE A STRAIGHT TUBE with two blobs on it, which is a
+     *     scooter. See vDropBars -- the one object in the world that is only
+     *     ever found on a road bicycle.
+     *   THE RIDERS SAT UP. A motorcyclist sits upright; a road cyclist is
+     *     folded over the bars with their back near horizontal and their head
+     *     down between their shoulders. At 17 px of head that POSTURE is the
+     *     read, and it costs nothing -- it is the same boxes at other angles.
+     *
+     * The near rider is now crouched on the drops. The far one keeps the
+     * straight arm up, which is the peloton's own signal for a hazard ahead --
+     * so it is both the height the variant needs and a gesture no motorcyclist
+     * makes.
+     *
+     * ===== SHORT OF THE 1.6x / 0.30 TARGET, AND REFUSED WITH NUMBERS =====
+     *
+     * It needs L 97.8 against the dark lane and renders 91.3 -- short by 7%,
+     * the closest miss in the game. Measured on the shipped build:
+     *
+     *   as it ships (cool rims)                        -0.066   S 0.460
+     *   WARM rims and hubs, which is what shipped      -0.066   S 0.472
+     *   tyre 0x8a5a3a warm mid                         -0.074   S 0.515
+     *   tyre 0x4a2a2a warm dark                        -0.092   S 0.511
+     *   tyre 0x3a1a1e warm dark                        -0.098   S 0.512
+     *
+     * The trade is closed in both directions. Chroma is reachable -- the tyres
+     * are 0x6d76a8, a near-neutral grey-blue, and warming them takes S from
+     * 0.46 to 0.51. But this variant passes on LUMINANCE, every warm tyre is
+     * darker than a grey-blue one, and the L it loses is worth more than the S
+     * it gains. dS would have to reach 0.30 against a dark road already at
+     * S 0.315, which means an object at S 0.615 -- and two of the largest
+     * remaining areas are SKIN, which cannot be saturated and stay skin.
+     *
+     * THE OPEN WHEEL IS THE ONE THING THAT MOVED THAT NUMBER, and it moved it
+     * the right way by accident rather than by design: the grey-blue tyre was
+     * the largest near-neutral area on the object and most of it is now air.
+     * The rebuild is verified against the gate in tools/shoot.js and the
+     * before and after are in the report, because this is one of the two
+     * variants with no margin to spend.
+     *
+     * REFUSED. Gate margin +0.195, the widest of the two variants still short.
+     */
     const blockRoadBikeGeo = (function () {
       const parts = [];
+      const TYRE_BIKE = 0x6d76a8;
       const who = [
-        { s: -1, x: -0.55, skin: 0xffc79a, dy: 0.00, jersey: KIT_A, band: KIT_B, shorts: 0x2a0c16, frame: 0xc42a1e },
-        { s: 1, x: 0.56, skin: 0xb87a4e, dy: -0.06, jersey: KIT_B, band: KIT_A, shorts: 0x2a0c16, frame: 0xd89800 },
+        { s: -1, x: -0.55, skin: 0xffc79a, dy: 0.00, jersey: KIT_A, band: KIT_B,
+          shorts: 0x2a0c16, frame: 0xc42a1e, crouch: true, hair: 0x241a14, style: 3 },
+        { s: 1, x: 0.56, skin: 0xb87a4e, dy: -0.06, jersey: KIT_B, band: KIT_A,
+          shorts: 0x2a0c16, frame: 0xd89800, crouch: false, hair: 0x4a2c18, style: 4 },
       ];
       for (const p of who) {
         const X = p.x, y = p.dy;
-        // The wheel is a mid grey, not the tyre navy the cars use. It sits in
-        // the hazard's own contact shadow, and at 22 units a navy disc on a
-        // multiplied shadow is nothing at all -- the bikes were invisible under
-        // their own riders.
         // TWO WHEELS, WHICH IS WHAT A BICYCLE HAS. It had one. At halfZ 0.65
         // there was 1.30 of envelope and the wheels are 0.66 across, so a
         // second wheel would have left 0.64 between the tyres -- a wheelbase
         // shorter than a wheel, which is a unicycle with a spare. At 1.95 the
         // pair sits at -0.28 and +0.90, a 1.18 wheelbase, and the object is a
         // bicycle from every angle instead of only from directly behind.
-        vWheel(parts, X * LANE_FIT, 0.33, -0.22, 0.33, 0.10, 0x6d76a8, WHEEL_RIM_WARM, WHEEL_HUB_WARM);
-        vWheel(parts, X * LANE_FIT, 0.33, 0.74, 0.33, 0.10, 0x6d76a8, WHEEL_RIM_WARM, WHEEL_HUB_WARM);
-        // Seat tube, down tube and the fork, which is the diamond a bike reads
-        // by from the flank -- and the flank is the view that did not exist.
-        parts.push(bxAt(0.08, 0.52, 0.10, X, 0.62, -0.14, p.frame));
-        parts.push(bxAt(0.08, 0.12, 0.86, X, 0.56, 0.28, p.frame, -0.34));
-        parts.push(bxAt(0.07, 0.62, 0.09, X, 0.66, 0.72, p.frame, 0.22));
+        vBikeWheel(parts, X * LANE_FIT, 0.33, -0.22, 0.33, TYRE_BIKE, WHEEL_RIM_WARM, WHEEL_HUB_WARM);
+        vBikeWheel(parts, X * LANE_FIT, 0.33, 0.74, 0.33, TYRE_BIKE, WHEEL_RIM_WARM, WHEEL_HUB_WARM);
+        // Seat tube, down tube, TOP TUBE and the fork -- the diamond a bike
+        // reads by from the flank. The top tube was missing and it is the
+        // horizontal that closes the frame into a triangle.
+        parts.push(bxAt(0.055, 0.52, 0.065, X, 0.62, -0.14, p.frame));
+        parts.push(bxAt(0.055, 0.10, 0.86, X, 0.56, 0.28, p.frame, -0.34));
+        parts.push(bxAt(0.05, 0.055, 0.80, X, 0.94, 0.28, p.frame, 0.06));
+        parts.push(bxAt(0.05, 0.62, 0.06, X, 0.66, 0.72, p.frame, 0.22));
         /**
          * ============ THE REAR TRIANGLE ============
          *
@@ -8966,27 +9105,20 @@ MR.World = (function () {
          * and two pairs of thin tubes converging on a hub with a wheel between
          * them. This variant had a seat tube, a down tube and a fork -- the
          * DIAMOND, which is what you read a bike by from the FLANK -- and
-         * nothing at all on the axis the chase camera uses. The gameplay
-         * framing census puts 27.3% of the object in dark structure and 7.0%
-         * in wheel, and none of that structure was on the back of the machine.
+         * nothing at all on the axis the chase camera uses.
          */
-        parts.push(gl(bxAt(0.30, 0.07, 0.34, X, 1.00, -0.10, 0x2a0c16), GLOSS.trim));
-        parts.push(gl(bxAt(0.07, 0.20, 0.07, X, 0.88, -0.12, p.frame), GLOSS.chrome));
+        parts.push(gl(bxAt(0.26, 0.06, 0.30, X, 1.00, -0.10, 0x2a0c16), GLOSS.trim));
+        parts.push(gl(bxAt(0.055, 0.20, 0.055, X, 0.88, -0.12, p.frame), GLOSS.chrome));
         for (const tx of [-1, 1]) {
-          parts.push(gl(bxAt(0.06, 0.58, 0.07, X + tx * 0.09, 0.62, -0.16, p.frame, 0.13), GLOSS.chrome));
-          parts.push(gl(bxAt(0.06, 0.07, 0.52, X + tx * 0.09, 0.35, -0.02, p.frame), GLOSS.chrome));
+          parts.push(gl(bxAt(0.045, 0.58, 0.05, X + tx * 0.075, 0.62, -0.16, p.frame, 0.13), GLOSS.chrome));
+          parts.push(gl(bxAt(0.045, 0.05, 0.52, X + tx * 0.075, 0.35, -0.02, p.frame), GLOSS.chrome));
         }
         // A saddle bag, the one thing a road bike carries, and the mount the
         // rear light was previously stuck to the air behind.
-        parts.push(gl(bxAt(0.20, 0.15, 0.22, X, 0.90, -0.24, p.band), GLOSS.matte));
-        parts.push(bxAt(0.34, 0.09, 0.18, X, 0.92, -0.20, 0x2a0c16));
-        // Bars, out front where the rider's hands go, and the brake hoods on
-        // them -- which is where a rider's hands actually are and what makes
-        // the arms end in something.
-        parts.push(bxAt(0.44, 0.07, 0.08, X, 1.02, 0.66, 0x2a0c16));
-        for (const hx of [-1, 1]) {
-          parts.push(gl(bxAt(0.09, 0.10, 0.20, X + hx * 0.19, 1.05, 0.72, p.band), GLOSS.trim));
-        }
+        parts.push(gl(bxAt(0.17, 0.13, 0.20, X, 0.90, -0.24, p.band), GLOSS.matte));
+        // DROP BARS. See vDropBars: this used to be a straight tube with two
+        // hoods on it, which is the profile of a scooter.
+        vDropBars(parts, X * LANE_FIT, 1.06, 0.66, 0.21 * LANE_FIT, p.frame, 0x2a0c16);
         /**
          * THE RACE NUMBER, pinned to the back: rectangular and hard-edged
          * against a saturated jersey, and the strongest single cue that these
@@ -8997,43 +9129,79 @@ MR.World = (function () {
          * these and for the four pedal shoes -- 7.2% of the object in a pale
          * NEAR-NEUTRAL. The area mean went L 91.3 / S 0.472 to L 98.7 / S
          * 0.387: luminance up, chroma down 0.085, and dS against the middle
-         * lane fell from 0.294 to 0.209 through a gate of 0.22. **shoot.js
-         * failed the build.** That is the fleet header's own cream mechanism
-         * arriving by a third door -- after the cream bands and the glass flash
-         * -- on the one variant with no room for it, and the rule it breaks is
-         * written four hundred lines up: the pale element on a warm body is the
-         * plate and the lamp cores and nothing else.
-         *
-         * 0xfff23a is 91% of cream's luminance at eight times its chroma, which
-         * is the substitution the whole fleet already made.
+         * lane fell from 0.294 to 0.209 through a gate of 0.22. shoot.js
+         * failed the build. 0xfff23a is 91% of cream's luminance at eight
+         * times its chroma, which is the substitution the whole fleet made.
          */
-        parts.push(gl(bxAt(0.34, 0.24, 0.05, X, 1.60 + y, -0.05, LEMON), GLOSS.matte));
-        parts.push(gl(bxAt(0.36, 0.04, 0.045, X, 1.72 + y, -0.052, p.jersey), GLOSS.matte));
-        // The rear light, as a disc facing the lens with a bright core, exactly
-        // as the cars carry it -- red alone renders darker than the road.
-        parts.push(cyl(0.09, 0.09, 0.10, 8, X * LANE_FIT, 0.80, -0.40, LAMP_RED, Math.PI / 2));
-        parts.push(cyl(0.048, 0.048, 0.13, 8, X * LANE_FIT, 0.80, -0.405, LAMP_CORE, Math.PI / 2));
-        // Dark waist, hi-vis where the eye lands, dark collar, skin, pink lid.
-        // Everything up here is seen against pale road or paler sky.
-        parts.push(bxAt(0.50, 0.36, 0.32, X, 1.16 + y, 0.10, p.shorts));
-        parts.push(bxAt(0.58, 0.52, 0.38, X, 1.62 + y, 0.16, p.jersey));
-        // One band across the jersey. Without it the sleeves and the back weld
-        // into a single blob and the figure loses its arms.
-        parts.push(bxAt(0.60, 0.14, 0.39, X, 1.63 + y, 0.16, p.band));
-        parts.push(bxAt(0.50, 0.10, 0.34, X, 1.93 + y, 0.18, 0x2a0c16));
-        parts.push(bxAt(0.34, 0.26, 0.32, X, 2.11 + y, 0.20, p.skin));
-        parts.push(bxAt(0.42, 0.18, 0.38, X, 2.31 + y, 0.20, PINK));
-        // Long sleeves. On a figure this narrow the arms are a third of its
-        // measured area, so what they are made of is a colour decision and not
-        // a detail one.
-        parts.push(bxAt(0.14, 0.46, 0.14, X + p.s * 0.24, 1.60 + y, 0.34, p.band, 0.7));
-        if (p.s > 0) {
-          parts.push(bxAt(0.14, 0.46, 0.14, X - p.s * 0.24, 1.60 + y, 0.34, p.band, 0.7));
-        } else {
-          // The signal. Straight up, hand at 2.55, well inside the lane.
-          parts.push(bxAt(0.15, 0.66, 0.15, X - 0.30, 2.06, 0.12, p.band));
-          parts.push(bxAt(0.19, 0.19, 0.19, X - 0.30, 2.48, 0.12, p.skin));
+        // The rear light, small and low on the saddlebag. It used to be a
+        // 0.09 disc with a bright core at the height of a headlamp, and the
+        // blind reader called it exactly that -- "a round headlamp each".
+        parts.push(gl(bxAt(0.10, 0.07, 0.05, X, 0.80, -0.34, LAMP_RED), GLOSS.chrome));
+        parts.push(gl(bxAt(0.055, 0.04, 0.05, X, 0.80, -0.352, LAMP_CORE), GLOSS.chrome));
+
+        /**
+         * ============ THE RIDER ============
+         *
+         * vFigure at tier FACE. tools/people.js measures this head at 17.0 x
+         * 14.2 px at 8 units with an eye mark of 2.75 px, so it gets eyes,
+         * brows, nose, mouth, ears and hair -- and it gets them although the
+         * pair ride AWAY from the chase camera, because CLAUDE.md rule 1 asks
+         * where the camera GOES: the pass shows the flank at 1.70 units, the
+         * lane change swings the lens across the front, and the head is a
+         * closed solid from every one of them.
+         *
+         * legs: 'thigh' because the shins, knees and shoes are the variant's
+         * MOVING part on its own pivot at (0, 0.60, 0.16). Drawing them here
+         * as well would put two left legs on one bicycle.
+         */
+        /**
+         * THE RIDER SITS HIGH ON THE MACHINE, and that is this game's
+         * convention rather than a mistake -- the trike's rider tops out at
+         * 2.72 on a vehicle 1.28 tall for the same reason. A BLOCK has to
+         * READ AS IMPASSABLE from forty units, the collision box tops the
+         * variant, and a correctly-scaled cyclist on a correctly-scaled
+         * bicycle is a 1.75 object in a 2.80 envelope that the player reads as
+         * something to hurdle. The far rider's straight arm carries the
+         * silhouette to 2.5, which is where the old build put it.
+         */
+        const RS = 1.10;
+        const HB = 1.74 * RS;
+        const hipY = (p.crouch ? 1.22 : 1.30);
+        const lean = p.crouch ? 1.16 : 0.60;
+        vFigure(parts, {
+          x: X * LANE_FIT, y: hipY + y - 0.505 * HB, z: p.crouch ? -0.06 : -0.02,
+          h: RS, build: 0.96, tier: 2, fz: 1, legs: 'thigh',
+          skin: p.skin, hair: p.hair, style: p.style,
+          top: p.jersey, sleeve: p.band, shoulder: p.band,
+          legCol: p.shorts, hipCol: p.shorts,
+          lean: lean,
+          // Thighs forward and down onto the cranks.
+          leg: [0.62, 0.22], knee: [0, 0],
+          // Crouched: both arms long and low onto the drops. Upright: one arm
+          // to the bars and one STRAIGHT UP, which is the peloton's signal for
+          // a hazard ahead and takes the silhouette to the height the variant
+          // needs.
+          arm: p.crouch ? [0.62, 0.62] : [0.72, -3.05],
+          fore: p.crouch ? [0.42, 0.42] : [0.26, -0.06],
+          browTilt: p.crouch ? 0.16 : 0.05,
+          eyeH: p.crouch ? 0.10 : 0.13,
+          headZ: p.crouch ? 0.04 : 0,
+        });
+        // The helmet, over the hair, in BLOCK pink so the top of the
+        // silhouette still carries the hazard hue. Tapered to a point at the
+        // back, which is an aero road helmet and is not a motorcycle lid.
+        const shY = hipY + y + HB * 0.085 + Math.cos(lean) * (HB * 0.265) - HB * 0.04;
+        const shZ = (p.crouch ? -0.06 : -0.02) + Math.sin(lean) * (HB * 0.265);
+        const hy = shY + HB * 0.045 + HB * 0.028 + (0.262 * RS) / 2 + (p.crouch ? 0.04 : 0);
+        const hz = shZ + (p.crouch ? 0.04 : 0);
+        parts.push(gl(cbx(0.290, 0.130, 0.315, X * LANE_FIT, hy + 0.140, hz + 0.01, PINK, 0.05), GLOSS.trim));
+        parts.push(gl(bx(0.155, 0.085, 0.15, X * LANE_FIT, hy + 0.130, hz - 0.175, PINK), GLOSS.trim));
+        // Two vents, dark, across the shell. A smooth lid is a motorcycle lid.
+        for (const vx of [-0.055, 0.055]) {
+          parts.push(bx(0.040, 0.115, 0.25, X * LANE_FIT + vx, hy + 0.158, hz + 0.01, 0x2a0c16));
         }
+        // The race number, on the back where the chase camera reads it.
+        parts.push(gl(bxAt(0.34, 0.24, 0.045, X, shY - 0.13, shZ - 0.175, LEMON), GLOSS.matte));
       }
       return merge(parts);
     })();
@@ -9050,18 +9218,57 @@ MR.World = (function () {
      * brightest thing on the lower half of either bike and it moves, which at
      * gameplay framing is worth more than anything static of the same size.
      */
-    const blockRoadBikeCrankGeo = merge([
-      bx(0.26, 0.34, 0.24, -0.40, 0.30, 0, 0x2a0c16),
-      bx(0.28, 0.14, 0.26, -0.40, 0.45, 0.04, KIT_B),
-      gl(bx(0.21, 0.10, 0.28, -0.40, 0.28, 0.17, LEMON), GLOSS.trim),
-      bx(0.26, 0.34, 0.24, -0.40, -0.30, 0, 0x2a0c16),
-      bx(0.28, 0.14, 0.26, -0.40, -0.45, 0.04, KIT_B),
-      gl(bx(0.21, 0.10, 0.28, -0.40, -0.28, 0.17, LEMON), GLOSS.trim),
-      bx(0.26, 0.24, 0.34, 0.40, 0, 0.30, 0x2a0c16),
-      gl(bx(0.21, 0.28, 0.10, 0.40, 0.17, 0.28, LEMON), GLOSS.trim),
-      bx(0.26, 0.24, 0.34, 0.40, 0, -0.30, 0x2a0c16),
-      gl(bx(0.21, 0.28, 0.10, 0.40, 0.17, -0.28, LEMON), GLOSS.trim),
-    ]);
+    /**
+     * ============ FOUR LEGS, TWO PER RIDER, EITHER SIDE OF THE WHEEL ======
+     *
+     * The old crank put both of a rider's knees at ONE x -- -0.40 for the near
+     * rider and +0.40 for the far one -- so each bicycle had a single lobe
+     * bobbing in front of it. From directly astern, which is the view this
+     * game spends its life in, a bicycle is almost entirely hidden behind its
+     * own rider: the wheels are behind the legs, the frame is behind the
+     * wheels, and the bars are behind the shoulders. WHAT IS LEFT IS THE
+     * LEGS, and a pair of them rising and falling either side of a thin wheel
+     * is the most bicycle-specific thing the rear elevation has.
+     *
+     * So each rider now gets two, at its own x plus and minus 0.155, half a
+     * turn apart -- one up while the other is down, which is what pedalling
+     * looks like. The two RIDERS stay a quarter turn out of step with each
+     * other, as before: two people pedalling in lockstep read as one prop
+     * mirrored, and the whole point of a pair is that it is two people.
+     *
+     * rotation.x keeps x offsets, so all four still ride one pivot and one
+     * mesh, and the variant still spends exactly one extra draw call.
+     */
+    const blockRoadBikeCrankGeo = (function () {
+      const parts = [];
+      const R = 0.29;
+      // BARE LEGS. The shins were the same near-black as the shorts, so from
+      // astern each rider was one dark column from the waist to the pedal and
+      // the pedalling was a shuffle inside it. A road cyclist's legs are bare
+      // between a short and a sock, which is both the truth and the strongest
+      // thing the rear elevation has left after the wheels: it puts two moving
+      // SKIN-coloured limbs against a dark road, and it costs the variant
+      // nothing it has -- skin is brighter than the shorts it replaces, and
+      // this variant clears the gate on luminance.
+      const riders = [
+        { x: -0.55, skin: 0xffc79a, shoe: LEMON, sock: 0xfff2e0, phase: 0 },
+        { x: 0.56, skin: 0xb87a4e, shoe: LEMON, sock: 0xfff2e0, phase: Math.PI / 2 },
+      ];
+      for (const p of riders) {
+        for (let s = 0; s < 2; s++) {
+          const a = p.phase + s * Math.PI;
+          const lx = p.x * LANE_FIT + (s ? 0.155 : -0.155);
+          const oy = Math.cos(a) * R, oz = Math.sin(a) * R;
+          // Shin, sock and shoe. The pale shoe is the brightest thing on the
+          // lower half of either bike and it MOVES, which at gameplay framing
+          // is worth more than anything static of the same size.
+          parts.push(bx(0.135, 0.34, 0.16, lx, oy, oz, p.skin));
+          parts.push(bx(0.145, 0.10, 0.17, lx, oy - 0.13, oz + 0.01, p.sock));
+          parts.push(gl(bx(0.125, 0.08, 0.24, lx, oy - 0.21, oz + 0.05, p.shoe), GLOSS.trim));
+        }
+      }
+      return merge(parts);
+    })();
 
     /**
      * BLOCK v9: A DELIVERY MOPED.

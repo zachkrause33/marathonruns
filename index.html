@@ -16467,16 +16467,29 @@ MR.World = (function () {
         parts.push(bx(Math.hypot(dx, dy) + 0.06, 0.09, 0.09,
           (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, sz, 0x2b2f52, 0, 0, Math.atan2(dy, dx)));
       }
+      // THE PENNANTS FLY AND THE LINE THEY HANG FROM DOES NOT. The catenary
+      // chords above take no wave at all, so the string stays a string and only
+      // the cloth on it moves -- which is the whole reason the wave is a
+      // per-part attribute rather than a per-object one.
+      //
+      // Phase runs along the span, so the flutter travels the line from one
+      // side to the other instead of every pennant snapping together. It is the
+      // same travelling-front idea the wind uses across the world, at the scale
+      // of a single object.
       for (let i = 0; i <= 9; i++) {
         const u = i / 9 * 2 - 1;
         const y = TOP - SAG * (1 - u * u);
-        parts.push(bx(0.62, 0.80, 0.05, u * span, y - 0.46, sz, BUNT[i % BUNT.length]));
+        parts.push(wv(bx(0.62, 0.80, 0.05, u * span, y - 0.46, sz, BUNT[i % BUNT.length]),
+          u * 2.6, 1));
       }
       return merge(parts);
     })();
     const chutePool = Pool(function () {
       const g = new THREE.Group();
-      g.add(S.outlined(chuteGeo, mats.prop, S.INK.banner));
+      // mats.cloth, not mats.prop: the pennants carry an amplitude and the
+      // posts and chords carry zero, so one material moves exactly the cloth.
+      // No extra draw -- it is the same merged geometry under a different ramp.
+      g.add(S.outlined(chuteGeo, mats.cloth, S.INK.banner));
 
       const carpet = new THREE.Mesh(
         new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, TILE), carpetMat);

@@ -1388,6 +1388,15 @@ MR.HUD = (function () {
       requestAnimationFrame(markScroll);
     };
 
+    /**
+     * The celebration: the live readout's top-left column steps out of the
+     * frame while the camera is round the front of the runner. See the
+     * .celebrating rule in style.css for what stays and why.
+     */
+    api.celebrate = function (on) {
+      root.classList.toggle('celebrating', !!on);
+    };
+
     api.hideEnd = function () {
       n.endPanel.classList.add('hidden');
       syncPanels();

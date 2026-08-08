@@ -344,6 +344,15 @@ MR.Runner = (function () {
   // which is exactly `a` for any finite a, so this is safe to wrap a term in
   // without disturbing it at 0.
   const mix = (a, b, t) => a + (b - a) * t;
+  // The finish pose's two helpers, hoisted for the reason _clampBox is: this
+  // runs 60 times a second and must not allocate a closure per frame.
+  // A smoothstepped 0..1 window on the celebration clock.
+  const celRamp = (t, t0, len) => {
+    const u = (t - t0) / len;
+    return u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u);
+  };
+  // Lerp one Euler axis toward a target by weight w. w = 0 leaves it exactly.
+  const to = (o, ax, tgt, w) => { o.rotation[ax] += (tgt - o.rotation[ax]) * w; };
 
   // ---- cycle shape --------------------------------------------------------
   // Two shaping functions, and between them they are most of what separates a
@@ -3897,6 +3906,224 @@ MR.Runner = (function () {
       // back view something lateral to measure.
       root.rotation.y = slid * SLIDE_YAW;
 
+      // ---- THE FINISH: THE FIRST POSE ON THIS RIG BUILT TO BE SEEN FROM THE
+      // ---- FRONT -----------------------------------------------------------
+      //
+      // Every other pose in this file was designed against a camera dead
+      // astern, and the header says so four separate times. This one is not:
+      // camera.js now walks the lens round to three-quarter front over the
+      // 2.6 seconds after the tape and holds it on his face, so for the first
+      // time the things that decide whether this reads are the chest, the
+      // eyeline, the mouth and where the hands are RELATIVE TO THE HEAD --
+      // none of which any measurement in this file has ever had a reason to
+      // look at.
+      //
+      // ---- IT IS APPLIED AS AN OVERRIDE, AFTER EVERYTHING ELSE HAS POSED ---
+      //
+      // Not threaded through the cycle like `slid` and `spread` are, and the
+      // reason is auditability rather than laziness. `celT` is 0 for the whole
+      // race, so at play the loop below does not execute at all and every one
+      // of the eight silhouettes tools/envelope.js holds this rig to is
+      // untouched by construction -- the same guarantee MR.Runner.POLISH gives,
+      // reached the cheap way. Threading a ninth state through forty posed
+      // joints would have put a term that can only be zero into forty
+      // expressions and asked a reviewer to believe all forty.
+      //
+      // It sits ABOVE the secondary-motion block deliberately, so the hood
+      // springs, the elbow lag filters and the head's own filter all see the
+      // celebration pose and arrive after it, exactly as they do after any
+      // other pose.
+      //
+      // ---- THE TWO ENDS OF IT ---------------------------------------------
+      //
+      // `st.joy` (main.js) blends between them. It is ONE gesture with two
+      // extremes, not two animations, because the thing being said is the same
+      // thing at both ends -- you have just run a marathon -- and only the
+      // amount of it changes:
+      //
+      //   joy 1   the record. The arms come up and out, fists high beside the
+      //           head, elbows open, the chest opens, the head goes BACK. The
+      //           mouth is wide and the brows go UP, which is the one moment in
+      //           this game where an expression is chosen rather than driven by
+      //           effort.
+      //   joy 0   the run came apart. The hands go up onto the crown, elbows
+      //           wide, the head drops, the shoulders come down and the chest
+      //           heaves nearly twice as fast. Eyes squeezed, mouth gasping.
+      //
+      // Both raise the arms and both put the hands ABOVE the eyeline, which is
+      // not a coincidence: the close shot has the head at the top third of a
+      // portrait frame and a hand anywhere near the face would sit on top of
+      // the thing this whole pass exists to show. Both then bring the arms DOWN
+      // for the held shot, and that is the other half of the same constraint --
+      // at the hero framing a 390px-wide frame spans 1.24 world units at the
+      // subject, and a pose 1.2 wide has its hands on the frame edge.
+      //
+      // ---- WHAT WAS NOT BUILT, AND THE MEASUREMENT THAT SETTLED IT ---------
+      //
+      // Open hands. This character has fists, correctly, for an arm swing, and
+      // an open palm is a real pose that does not exist here. It stays not
+      // existing, and the reason is not the two draw calls: the hand is 0.208
+      // across and was DESIGNED at 26 px, which is the largest it is ever drawn
+      // in play. At the hero framing it measures 65 px. Splaying fingers onto a
+      // mitt whose three fingers were deleted for being 8 px is answering the
+      // wrong question -- what that measurement actually says is that the whole
+      // hand, and four removals argued at 26 px, want re-judging at 65. That is
+      // a hand pass, not a camera pass, and it is written up in the roadmap
+      // rather than half-done here. A raised FIST is what a runner crossing a
+      // line actually makes, so nothing is being faked in the meantime.
+      //
+      // NOT SCALED BY POLISH, and that is deliberate rather than an omission.
+      // POLISH is the A/B for the animation-polish passes -- it exists so one
+      // build renders the run cycle before and after that work. A finish pose
+      // is not part of it, and multiplying it by that knob would mean ?polish=0
+      // shows a runner who crosses the line and stands there. The EXPRESSION
+      // terms below stay on POLISH, because those really are the same face
+      // channels the polish work built.
+      const celT = st.celT || 0;
+      if (celT > 0) {
+        const joy = Math.max(0, Math.min(1, st.joy === undefined ? 0 : st.joy));
+        // Three clocks, all smoothstepped, all zero at celT = 0.
+        //   plant   stops running and stands. Fast: the legs have to be under
+        //           him before the camera leaves the chase at 0.80s.
+        //   raise   the gesture, in and back out again.
+        //   settle  into the held shot -- the turn toward the lens and the
+        //           breathing.
+        // The timings are set by WHERE THE CAMERA IS, not by what feels right
+        // in isolation, and the first draft got that backwards. It put the
+        // raise at 0.15-1.45s, which is the astern wide shot and the top of the
+        // arc: the gesture the whole pose exists for played out at 82 to 182
+        // pixels of figure, seen from above, and was over before the lens got
+        // round to his face. camera.js holds astern for 0.80s and arrives at
+        // the front at about 2.0s, so the raise is now up across exactly that
+        // window and comes down into the held shot behind it.
+        const plant = celRamp(celT, 0.10, 0.85);
+        const raise = celRamp(celT, 0.80, 1.15) * (1 - celRamp(celT, 2.50, 1.00));
+        const settle = celRamp(celT, 2.60, 1.10);
+        // Breathing. Nearly twice as fast when the run came apart, which is the
+        // cheapest true thing about a finish line: the winner is breathing, the
+        // person who blew up is HEAVING. It runs on celT rather than on a phase
+        // integrator so it cannot drift with frame rate.
+        const breath = Math.sin(celT * (0.55 + 0.70 * (1 - joy)) * Math.PI * 2);
+        // A pop off the ground as the arms go up, on the win only: a short
+        // bump rather than a hold, so it lands with the gesture and is gone.
+        const pop = Math.max(0, Math.sin(Math.min(1, Math.max(0, (celT - 0.85) / 0.70)) * Math.PI));
+
+        // ---- legs: stand -------------------------------------------------
+        // Rest values lifted from the loop above rather than invented, so a
+        // retune there does not leave a standing pose behind: hip 0, knee 0.18,
+        // ankle -0.16, hip abduction side*0.05. Soft knees and the feet a
+        // little wider than the run, which is what a body that has just stopped
+        // does.
+        for (let i = 0; i < legs.length; i++) {
+          const L = legs[i];
+          to(L.hip, 'x', 0.02, plant);
+          to(L.hip, 'y', 0, plant);
+          to(L.hip, 'z', L.side * 0.075, plant);
+          to(L.knee, 'x', 0.22 + 0.05 * (1 - joy), plant);
+          to(L.ankle, 'x', -0.13, plant);
+        }
+
+        // ---- arms --------------------------------------------------------
+        // rotation.x is negative FORWARD on this rig (see the arm loop: +x is
+        // the back swing), so a raise is a large negative angle. rotation.z is
+        // abduction outboard, scaled by side. The elbow flexes negative.
+        //
+        // ---- AND THE REACH IS 0.50, WHICH DECIDED BOTH GESTURES -----------
+        //
+        // The first draft asked for the two poses everyone pictures at a finish
+        // line -- fists high beside the head for the win, hands on the crown
+        // for the collapse -- and neither is REACHABLE ON THIS RIG. Shoulder to
+        // hand is 0.262 + 0.24 = 0.50, the shoulder sits at (0.222, 0.78) and
+        // the crown is at 1.55: hands on the head wants 0.687 of arm and hands
+        // above the head wants 0.746. This is the toy proportion doing exactly
+        // what the header says it does -- head a third of the figure, limbs
+        // short -- and it is not negotiable from here.
+        //
+        // What it costs is worth being precise about, because the first draft
+        // paid it without noticing: asking for the unreachable pose does not
+        // fail, it just puts the arm somewhere else. Both fists ended up
+        // directly in FRONT OF HIS MOUTH at t=2.05, in the one shot this whole
+        // pass exists to produce.
+        //
+        // So both gestures are built from ABDUCTION, which is the axis that has
+        // the room. rotation.z sweeps the hanging arm out through horizontal
+        // (1.57) and on up; at 2.36 the fist lands at (0.575, 1.134), which is
+        // 0.31 clear of the skull's own 0.266 half-width and level with the
+        // eyeline -- a wide V, nothing crossing the face. The spent version is
+        // the same axis stopped short of horizontal at 1.15, so the arms fall
+        // out and DOWN, which is what a body that has just given everything
+        // does with them.
+        const armX = mix(0.15, -0.25, joy);
+        const armZ = mix(1.15, 2.36, joy);
+        const armE = mix(-0.75, -0.25, joy);
+        for (let i = 0; i < arms.length; i++) {
+          const A = arms[i];
+          // Standing: hanging, slightly bent, held a hair off the ribs.
+          to(A.shoulder, 'x', 0.06, plant);
+          to(A.shoulder, 'y', 0, plant);
+          to(A.shoulder, 'z', A.side * 0.15, plant);
+          to(A.elbow, 'x', -0.42, plant);
+          // ...and the gesture on top of it.
+          to(A.shoulder, 'x', armX, raise);
+          to(A.shoulder, 'z', A.side * armZ, raise);
+          to(A.elbow, 'x', armE, raise);
+          // ...and where they come to REST, which is the pose that is actually
+          // on screen for most of the shot and the one the first draft of this
+          // block did not have. Left at the standing target above, the arms hang
+          // dead straight against the ribs and both mitts disappear into the
+          // hip silhouette -- from the front that reads as a mannequin, which is
+          // the exact word the owner used about this character before the
+          // character pass. Hands to the hips: the elbow opens outboard, the
+          // forearm folds in, and the arm becomes a triangle with daylight
+          // through it. It also keeps the mitts low and inboard, out of the
+          // frame edges and well away from the face.
+          to(A.shoulder, 'x', 0.34, settle);
+          to(A.shoulder, 'y', -A.side * 0.30, settle);
+          to(A.shoulder, 'z', A.side * (0.30 + 0.10 * (1 - joy)), settle);
+          to(A.elbow, 'x', -1.62, settle);
+        }
+
+        // ---- trunk -------------------------------------------------------
+        // The cycle's yaw, roll and lean are damped out first (the run has
+        // stopped), then the gesture opens the chest on the win and folds it on
+        // the spent version, and finally the breath rides on top of the held
+        // shot.
+        to(chest, 'y', 0, plant);
+        to(chest, 'z', 0, plant);
+        to(hips, 'y', 0, plant);
+        to(hips, 'z', 0, plant);
+        to(spine, 'x', mix(0.10, -0.04, joy), plant);
+        to(root, 'z', 0, plant);
+        to(root, 'y', 0, plant);
+        chest.rotation.x += (mix(0.22, -0.20, joy) - chest.rotation.x) * raise;
+        chest.rotation.x -= breath * (0.030 + 0.030 * (1 - joy)) * settle;
+        spine.position.y += breath * (0.008 + 0.008 * (1 - joy)) * settle;
+        body.position.y += pop * 0.045 * joy;
+
+        // ---- head --------------------------------------------------------
+        // The eyeline is the whole point of the shot, so this is the one joint
+        // whose targets were picked against the FRONT camera and not against
+        // the silhouette. Back and open on the win, down and closed when spent,
+        // and then in the held shot the head comes level and turns toward the
+        // lens. NOT a chase, and not a constant either: camera.js mirrors the
+        // whole ending to whichever side of the road has room (celSideFor), so
+        // a fixed +y turn would point his face away from the camera on every
+        // finish from a left-hand lane. main.js hands the same sign down.
+        // Both ends tip the head BACK on the gesture and only the amount
+        // differs -- a bowed head at the gesture is the one thing that can hide
+        // the face outright, and the spent version bows in the HOLD instead,
+        // where the lens is 3.2 away and can still see it.
+        to(neck, 'x', mix(-0.22, -0.34, joy), Math.max(plant * 0.35, raise));
+        to(neck, 'z', 0, plant);
+        to(neck, 'y', 0, plant);
+        to(neck, 'x', mix(0.12, -0.06, joy), settle);
+        to(neck, 'y', 0.22 * (st.celSide || 1), settle);
+        // A slow nod through the held shot on the win, a slower one when spent:
+        // a head that is perfectly still for two and a half seconds is a
+        // waxwork, and this is the cheapest motion that is not the breath.
+        neck.rotation.x += Math.sin(celT * 0.9) * 0.030 * settle;
+      }
+
       // ---- secondary motion ------------------------------------------------
       //
       // Everything above this line is welded to a bone, so every part of the
@@ -4246,8 +4473,44 @@ MR.Runner = (function () {
       // pair measures as the sum of its parts. It is also the truer squint --
       // what closes on a face under effort is the lower lid, and the upper one
       // is being pushed by the brow above it.
-      const browLift = -POLISH * (0.0035 * effort + 0.0030 * wince);
-      const browTilt = POLISH * (0.0045 * effort + 0.0030 * wince);
+      // ---- ...AND AT THE FINISH IT IS CHOSEN, NOT DRIVEN -------------------
+      //
+      // Everything above assembles the face out of effort, which is right for
+      // a race and wrong for the two seconds after it: pace has stopped, grade
+      // is zero and surge is zero, so a finish left on the drive above would
+      // land on `effort` 0.30 -- a mild, neutral face -- at the only moment in
+      // the game where the camera is pointed at it.
+      //
+      // So the finish OVERRIDES the drive rather than adding to it, crossfaded
+      // by the same `settle` clock the head turn runs on. The two ends are the
+      // pose's two ends:
+      //
+      //   joy 1  brows UP, which no other state in this game does. Every
+      //          expression term written before this pass pulls the brow DOWN,
+      //          because effort and a wince are the only two things that had
+      //          ever driven it. Eyes fully open, mouth wide and BROAD -- the
+      //          x scale is what turns an open mouth into a grin, since there
+      //          is no smile channel and a mouth this size cannot have one.
+      //   joy 0  the wince the file already has, held: brows down and in, the
+      //          lower lid up, and the mouth pulled open on the breath so the
+      //          gasp is visibly periodic rather than a held shape.
+      //
+      // The upward brow travel is bounded by the CAP, not by taste. The band's
+      // underside is at HY + 0.065 and the brow rests at HY + 0.049 with its
+      // own half-depth of 0.0038, so there is 0.0122 of forehead above it. 0.009
+      // keeps an ink width clear of the brim.
+      const celF = (st.celT || 0) > 0
+        ? sm(Math.max(0, Math.min(1, ((st.celT || 0) - 0.70) / 1.10)))
+        : 0;
+      const celJoy = Math.max(0, Math.min(1, st.joy === undefined ? 0 : st.joy));
+      // The gasp, on the same clock and the same rate as the chest that drives
+      // it -- one breath, two places, so they cannot disagree.
+      const celBreath = Math.sin((st.celT || 0) * (0.55 + 0.70 * (1 - celJoy)) * Math.PI * 2);
+
+      const browLift = mix(-POLISH * (0.0035 * effort + 0.0030 * wince),
+        POLISH * mix(-0.0055, 0.0090, celJoy), celF);
+      const browTilt = mix(POLISH * (0.0045 * effort + 0.0030 * wince),
+        POLISH * mix(0.0060, -0.0010, celJoy), celF);
       {
         const ba = browGeo.pos.array, br = browGeo.rest, bu = browGeo.u;
         for (let i = 0; i < browGeo.pos.count; i++) {
@@ -4257,7 +4520,8 @@ MR.Runner = (function () {
       }
       // Narrowing only, never widening: a toy character with eyes OPENED past
       // their drawn size reads as startled, and he is running, not surprised.
-      const eyeShut = POLISH * (0.16 * effort + 0.34 * wince);
+      const eyeShut = mix(POLISH * (0.16 * effort + 0.34 * wince),
+        POLISH * mix(0.52, 0.02, celJoy), celF);
       eyePivot.scale.y = 1 - eyeShut;
       // EYE_SEMI is the sclera's own half-height. Translating by half of what
       // the scale takes away holds the TOP edge on the float and spends the
@@ -4270,8 +4534,10 @@ MR.Runner = (function () {
       // to nine pixels at the face lens and a shape change rather than a size
       // change, because the lower lip travels with it and the opening between
       // them is what grows.
-      mouthPivot.scale.y = 1 + POLISH * (0.55 * effort + 0.30 * wince);
-      mouthPivot.scale.x = 1 + POLISH * (0.10 * effort + 0.22 * wince);
+      mouthPivot.scale.y = mix(1 + POLISH * (0.55 * effort + 0.30 * wince),
+        1 + POLISH * mix(0.95 + 0.35 * celBreath, 0.70, celJoy), celF);
+      mouthPivot.scale.x = mix(1 + POLISH * (0.10 * effort + 0.22 * wince),
+        1 + POLISH * mix(0.18, 0.52, celJoy), celF);
 
       // Ducking drops the whole body rather than only folding the spine, so
       // the collision capsule and the silhouette agree. The 0.42 matches

@@ -96,6 +96,28 @@ html, body {
 }
 #bug, #leftCol, #dist, #railWrap { transition: opacity 0.22s, visibility 0.22s; }
 
+/* ---- and while the camera is round the front of him ----
+ *
+ * The finish celebration takes the lens off the chase and puts the runner's
+ * head in the top third of a portrait frame, which is exactly where #leftCol
+ * lives. Measured on the shipped frame at 390x844, the PROJECTED FINISH plate
+ * lands across his cap and the FUEL bar across his brow.
+ *
+ * Hiding it costs nothing, because everything in that column has stopped
+ * meaning anything: the projection is now a result, the fuel gauge is a
+ * gauge of a race that is over, and the pace readout is the pace of a runner
+ * who has stopped. What the player still wants -- the finish time, the gap to
+ * the record, the distance -- is in #railWrap at the bottom, which STAYS, and
+ * is why the results card can be held for 4.9s without stranding anyone
+ * (see main.js). Slower than the panel fade above on purpose: this one is part
+ * of the ending rather than a reaction to a dialog opening.
+ */
+#ui.celebrating #leftCol,
+#ui.celebrating #toast {
+  opacity: 0; visibility: hidden;
+}
+#ui.celebrating #leftCol { transition: opacity 0.55s, visibility 0.55s; }
+
 /* ---- top bug: race clock + the verdict ----
  * The projected finish is the headline because it is the only number that
  * answers "is the record still alive". The race clock keeps its place but

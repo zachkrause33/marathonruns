@@ -35,6 +35,12 @@
  * damped oscillation rather than per-frame noise (noise reads as static and
  * makes obstacles unreadable), the punish state *narrows* FOV, and the mile
  * and gear flourishes only ever show more of the road, never less.
+ *
+ * ...with exactly one exception, and it is at the end of the race where there
+ * is no gate left to hide: after the tape the camera leaves the chase
+ * altogether, arcs round to three-quarter FRONT and holds on the runner's face
+ * with a long lens. See THE CELEBRATION below. It is the only shot in this
+ * game that has ever pointed at the front of anything.
  */
 MR.Camera = (function () {
   const K = MR.K;
@@ -212,10 +218,77 @@ MR.Camera = (function () {
   const SLIDE_UP = 0.0;          // was 0.34, and it was pointing the wrong way
   const SLIDE_BACK = 0.80;       // pull BACK, framing the longer pose
 
+  // ---- THE CELEBRATION: THE ONE SHOT IN THIS GAME THAT HAS A FRONT --------
+  //
+  // Measured before it was designed. The runner's face owns ZERO PIXELS in 48
+  // of 48 frames of play (tools/resolve.js), zero at the start panel -- which
+  // is a DOM dialog over the same astern view -- and zero at the finish, whose
+  // camera drifts 1.6 units off the centreline and stays BEHIND him. A whole
+  // character pass built a face, two eyes with catchlights, brows that furrow
+  // on effort, an open mouth and a jaw, and no player has ever seen any of it.
+  //
+  // So this term takes the camera round to the front. It is the only place in
+  // the game where that is allowed, and the reasons it is allowed here are the
+  // reasons every other flourish in this file is bounded:
+  //
+  //   NOTHING IS LEFT TO READ. RUNOUT (world.js) is derived from where the
+  //     course's last gate actually is, the tape is behind him, and pace.js has
+  //     already frozen the clock. A camera that hides the road cannot cost a
+  //     player anything when there is no road left to run.
+  //   IT CANNOT TOUCH THE RESULT. Everything below reads p.z, the runner's x
+  //     and the world's finale verdict; it writes only to the lens. The pace
+  //     model, the save and tools/simulate.js are untouched by construction.
+  //   IT IS ONE MOVE, NOT A CUT. The path is polar about the runner and every
+  //     term is a continuous blend of the chase camera's OWN position, so at
+  //     weight 0 the shot is bit-for-bit the one that shipped.
+  //
+  // ---- the path, and why it has a pinch in it ----------------------------
+  //
+  // The chute is narrow. The finish grandstands stand at x = +/-4.30
+  // (FSTAND_X), the tape posts at +/-4.05 and the arch legs at +/-6.75, so a
+  // camera that swings round on a constant radius from twelve units astern
+  // passes THROUGH a grandstand at the broadside quarter of the arc. CEL_PINCH
+  // is what stops it: the radius is pulled in hardest exactly where the
+  // azimuth is broadside and released again as the camera comes to the front,
+  // which both keeps the lens inside the barriers and reads as a swoop rather
+  // than as a turntable. Measured on the shipped path, the largest lateral
+  // excursion from the runner is 3.63 units; taken with the mirror below (see
+  // celSide) that puts the worst absolute case at 3.63 on a centre-lane finish
+  // and 1.94 from either outer lane -- inside the track's own half-width of
+  // 3.75, and 0.67 clear of the stands at their tightest.
+  //
+  // The lens goes the other way from every other flourish here: it NARROWS,
+  // past FOV_MIN, to CEL_FOV. That is deliberate and it is the one exemption
+  // in the file. A narrow lens is what a portrait close-up wants -- it holds
+  // the head at a readable size without putting the camera inside the
+  // character, and it compresses the crowd and the arch behind him instead of
+  // bending them round the frame edge. FOV_MIN exists to stop stacked
+  // transients from making the road unreadable; there is no road.
+  const CEL_HOLD = 0.80;    // seconds the astern tape-break plays on its own
+  const CEL_SWING = 1.80;   // seconds of arc, astern -> three-quarter front
+  const CEL_AZ = 2.60;      // radians travelled, 0 = dead astern
+  const CEL_R = 3.15;       // hero radius, and the face size falls out of it
+  const CEL_PINCH = 2.40;   // radius pulled in while broadside -- see above
+  const CEL_Y = 1.02;       // hero eye height: below his chest, looking up
+  const CEL_AIM_Y = 0.74;   // ...and the aim, which sets where he sits in frame
+  const CEL_FOV = 40;       // a long lens, deliberately outside [FOV_MIN, MAX]
+
   // The honest band, in world units/sec. Derived rather than typed in, so a
   // pace retune moves the camera response with it.
   const SPEED_LO = (K.UNITS_PER_MILE * K.TIME_SCALE) / K.START_PACE;
   const SPEED_HI = (K.UNITS_PER_MILE * K.TIME_SCALE) / K.FLOOR_PACE;
+
+  /**
+   * Which side of him the ending happens on: -1 if the camera should sweep to
+   * -x, +1 to +x. See the block over celSide in update().
+   *
+   * Exported because runner.js needs the SAME answer -- the finish pose turns
+   * his head toward the lens, and a head that turns the wrong way in half of
+   * all finishes is worse than one that does not turn at all. Two copies of
+   * this rule would have been one edit away from exactly that, so main.js
+   * reads it from here and hands it to the runner.
+   */
+  function celSideFor(x) { return (x || 0) > 0.05 ? -1 : 1; }
 
   function clamp01(x) { return x < 0 ? 0 : x > 1 ? 1 : x; }
   function smoothstep(a, b, x) { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); }
@@ -383,6 +456,13 @@ MR.Camera = (function () {
       mileT: 0,
       gearT: 0, gearArmed: true,
       finish: 0,
+      // Seconds since the tape, in REAL time, and the celebration's whole
+      // clock. Kept here rather than read off world.finale.since so the move
+      // survives a world built without a game around it (course-test.js) and
+      // so a screenshot harness can drive it by pumping dt like everything
+      // else in this file.
+      cel: 0,
+      celW: 0,         // 0..1 blend into the front shot; exposed for tooling
     };
 
     /**
@@ -529,12 +609,48 @@ MR.Camera = (function () {
       const fin0 = MR.game && MR.game.world && MR.game.world.finale;
       const runIn = fin0 ? fin0.run : 0;
       const glory = fin0 && fin0.record ? 1 : (fin0 ? fin0.chase * 0.45 : 0);
+      // WHICH SIDE THE ENDING HAPPENS ON, AND IT IS NOT A CONSTANT ANY MORE.
+      //
+      // The drift below used to be a flat +1.1 to +1.6 whatever lane the runner
+      // finished in, and the arc that now follows it made that a real problem
+      // rather than an untidiness: the grandstands stand at x = +/-4.30 and the
+      // outer lane centre is +2.50, so a camera pushed a further 3.6 out on the
+      // same side flies through a stand full of spectators. (The old drift
+      // already put the lens at 3.6 -- over the shoulder, outside the track's
+      // own 3.75 half-width -- on a right-lane finish; nothing measured it
+      // because nothing had ever asked where that camera was in absolute x.)
+      //
+      // So the ending goes to the side with room. It is still not random and
+      // still not a chase -- it is a mirror, decided once by the lane he
+      // crossed the line in, so a given run frames identically every replay --
+      // and it holds the lens inside the barriers from every finishing lane:
+      // measured, the largest excursion over all three is 3.63, against a
+      // track half-width of 3.75 and stands at 4.30.
+      const celSide = celSideFor(p.x);
       // Squared: nothing happens for the first half of the run-in, then the
       // camera lets go. A linear fall-back starts drifting while the player is
       // still running and reads as the game losing interest.
       const runE = runIn * runIn;
       if (p.z >= K.TOTAL_UNITS - 0.25) s.finish = Math.min(1, s.finish + d / 1.2);
       const fin = s.finish * s.finish * (3 - 2 * s.finish);
+      // Seconds since the tape, handed over by main.js rather than accumulated
+      // here. It is deliberately NOT integrated from `d`: d is clamped to 1/25
+      // so a long frame cannot detonate the springs above, and a parametric
+      // camera path integrated through that clamp plays at 28% speed on a 7fps
+      // machine while the results card, on a real timer, arrives a third of the
+      // way through the move. One clock, unclamped, shared with the pose in
+      // runner.js -- see the note over celClock in main.js.
+      s.cel = p.celT || 0;
+      // The celebration weight. Zero for the whole race and for the first
+      // CEL_HOLD seconds after the tape, so the break, the confetti and the
+      // wide astern shot all play exactly as they did before this pass.
+      const cel01 = clamp01((s.cel - CEL_HOLD) / CEL_SWING);
+      // Smootherstep, not smoothstep: this one drives an azimuth through 149
+      // degrees and the second derivative is visible at both ends of a move
+      // that large. 6t^5-15t^4+10t^3 leaves the astern shot and arrives at the
+      // hero shot with zero acceleration as well as zero velocity.
+      const cw = cel01 * cel01 * cel01 * (cel01 * (cel01 * 6 - 15) + 10);
+      s.celW = cw;
       // Widen with the pull so the arch (13.5 wide, 14.7 tall) clears the frame
       // edges rather than being cropped by them.
       // Tuned by measuring the frame, not by feel. At the tape the camera is
@@ -653,7 +769,8 @@ MR.Camera = (function () {
       // finish is seen from three-quarters and the stands on one side crowd
       // the frame. Fixed direction rather than random -- the finish should look
       // the same in every replay and every screenshot.
-      cam.position.set(s.x + bobX + shX + fin * (1.1 + 0.5 * glory), hgt, p.z - back);
+      cam.position.set(s.x + bobX + shX + celSide * fin * (1.1 + 0.5 * glory),
+        hgt, p.z - back);
 
       // ---- aim ------------------------------------------------------------
       // The look point follows the jump arc *more* than the camera does, so
@@ -697,6 +814,77 @@ MR.Camera = (function () {
           + s.dk,
         lookZ
       );
+
+      // ---- and round to the front ------------------------------------------
+      //
+      // Everything above produced the chase camera's own position and aim, and
+      // this converts that position into POLAR COORDINATES ABOUT THE RUNNER and
+      // walks it round. Doing it in polar rather than lerping the two cartesian
+      // endpoints is the whole of why it reads as a move: the straight line
+      // from twelve units astern to three units in front passes 2.1 units from
+      // his head, so a cartesian blend is a camera flying through the subject
+      // while the aim whips to keep up. An arc is a camera walking round him.
+      //
+      // It also means the start of the arc is not a number in this file. It is
+      // wherever the chase camera happens to be -- which still carries the
+      // lateral drift, the last of the shake and the tape-break pull -- so
+      // there is no frame at which anything jumps.
+      if (cw > 0) {
+        const px = p.x || 0, pz = p.z;
+        // The ground he is standing on, added to both the eye and the aim for
+        // the reason the hill terms already are: it moves the whole shot, not
+        // the pitch. Flat at the finish today; correct if that ever changes.
+        const gy = elev.at(pz) + s.dk;
+        const dx0 = cam.position.x - px, dz0 = cam.position.z - pz;
+        const r0 = Math.sqrt(dx0 * dx0 + dz0 * dz0);
+        // Azimuth measured from DEAD ASTERN, in the frame celSide mirrors into
+        // -- so it is always "toward the middle of the road" and the sweep has
+        // one unambiguous direction. The chase camera at this point is always
+        // astern (dz0 < 0) and always a little to the celSide side of him (the
+        // tape-break drift is 1.1 to 1.6 and the follow can only move it by
+        // 0.13), so a0 is a small positive angle. Everything below stays in the
+        // mirrored frame and is multiplied back out at the position write,
+        // which is the one place the sign can be got wrong.
+        const a0 = Math.atan2(celSide * dx0, -dz0);
+        // The radius arrives ahead of the azimuth (the 0.30 exponent), so the
+        // camera has already closed most of the distance by the time it is
+        // broadside. That is what keeps the arc inside the barriers, and it is
+        // also the shape of the move: come in, then come round.
+        const rw = Math.pow(cw, 0.30);
+        // The HEIGHT comes down faster still, and that was measured off a frame
+        // rather than reasoned. Eased on rw, the lens is 3.15 up at the
+        // broadside quarter of the arc and looking down on the top of his cap
+        // -- which is where the raised-arms gesture happens, so the one beat
+        // the pose exists for was being photographed from above. 0.20 puts the
+        // same instant at 2.11 and the shot on his chest.
+        const hw = Math.pow(cw, 0.20);
+        const az = a0 + (CEL_AZ - a0) * cw;
+        const rr = (r0 + (CEL_R - r0) * rw) - CEL_PINCH * 4 * cw * (1 - cw);
+        cam.position.set(
+          px + celSide * Math.sin(az) * rr,
+          cam.position.y + ((CEL_Y + gy) - cam.position.y) * hw,
+          pz - Math.cos(az) * rr
+        );
+        // The aim goes onto the runner himself. CEL_AIM_Y is BELOW the eye, so
+        // the lens tips up at him -- and it is low enough to hold his feet
+        // clear of the readout panel, which on a 390x844 phone is a quarter of
+        // the frame. See the measured framing in tools/celebrate.js.
+        // THE AIM ARRIVES ON `rw`, NOT ON `cw`, AND THAT IS A COMPOSITION FIX
+        // RATHER THAN A TASTE ONE. The chase aim at the tape sits at y 3.56 --
+        // LOOK_Y plus the run-in and break lifts, which exist to get the arch
+        // and the bunting into frame. Blended out linearly it is still at 1.39
+        // when the camera has closed to 2.7 units, so the figure hangs below
+        // the frame centre at the exact moment he is largest, and his legs go
+        // 238 px inside the opaque readout panel. Arriving on the same eased
+        // weight the RADIUS uses keeps the aim ahead of the approach, and the
+        // lowest row of the figure stays clear of the panel through the whole
+        // move -- measured, and printed by tools/celebrate.js.
+        look.set(
+          look.x + (px - look.x) * rw,
+          look.y + ((CEL_AIM_Y + gy) - look.y) * rw,
+          look.z + (pz - look.z) * rw
+        );
+      }
       cam.lookAt(look);
 
       // Roll: the lean term is the body, the camera's own lateral velocity is
@@ -737,8 +925,16 @@ MR.Camera = (function () {
       if (first) s.fov = fovGoal;                       // ?skip= starts settled
       else s.fov += (fovGoal - s.fov) * (1 - Math.pow(fovRate, d));
 
-      if (Math.abs(cam.fov - s.fov) > 0.01) {
-        cam.fov = s.fov;
+      // The celebration lens is crossfaded ON TOP of the chase lens rather
+      // than folded into targetFov, and that is not tidiness. s.fov is a
+      // stateful filter whose slow half (0.12, a 0.47s time constant) exists
+      // so that losing speed feels like it is being taken away -- driving a
+      // 34-degree narrowing through it would smear the push-in over half the
+      // shot. cw is already smootherstep-shaped, so this needs no filter of
+      // its own, and at cw = 0 the output is s.fov exactly.
+      const fovOut = s.fov + (CEL_FOV - s.fov) * cw;
+      if (Math.abs(cam.fov - fovOut) > 0.01) {
+        cam.fov = fovOut;
         cam.updateProjectionMatrix();
       }
     };
@@ -790,6 +986,7 @@ MR.Camera = (function () {
       s.dip = 0; s.dipV = 0; s.kick = 0;
       s.pDuck = 0; s.dk = 0;
       s.mile = -1; s.mileT = 0; s.gearT = 0; s.gearArmed = true; s.finish = 0;
+      s.cel = 0; s.celW = 0;
       cam.fov = BASE_FOV;
       cam.updateProjectionMatrix();
     };
@@ -797,5 +994,5 @@ MR.Camera = (function () {
     return s;
   }
 
-  return { create, BASE_FOV };
+  return { create, BASE_FOV, celSideFor };
 })();

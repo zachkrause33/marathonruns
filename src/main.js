@@ -45,6 +45,13 @@
   // clamp themselves; see the accessors at the foot of course.js.
   if (params.has('narrow')) MR.Course.NARROW = params.get('narrow') || 1;
   if (params.has('ramp')) MR.Course.RAMP = params.get('ramp') || 1;
+  // ?joy=0..1 forces the finish verdict the celebration pose blends on. Same
+  // shape and same reason as ?polish: ONE build photographs both ends of the
+  // gesture, and the losing version does not need a deliberately broken run to
+  // be looked at -- which is exactly how a losing-run animation goes unchecked.
+  // Null means "read it off the result", which is every real game.
+  const JOY = params.has('joy') ? parseFloat(params.get('joy')) : null;
+  const JOY_FORCED = JOY !== null && isFinite(JOY);
 
   // ---- renderer ---------------------------------------------------------
   const canvas = document.getElementById('gl');
@@ -112,6 +119,8 @@
   let doneAt = 0;      // wall-clock at the tape, for the run-out ease
   let endTimer = 0;    // the held end card; cleared on reset so it cannot
                        // arrive over a run that has already restarted
+  let showCard = null; // ...and the same card, callable early on any input
+  let celClock = 0;    // seconds since the tape -- see the celebration below
   let countT = 0;
   let lastStep = 0;
   let mileShown = 0;
@@ -121,6 +130,29 @@
   // reach is silent today, and so is dropping a rung of the ladder.
   let recordGone = false;
   let tierIdx = -1;
+  // Whether the "you just ran past a bottle that would have helped" cue has
+  // already spoken this run. See the block that sets it for why it is an edge
+  // and not a per-item reaction.
+  let aidNagged = false;
+  // ---- WHAT HIS BODY SAYS ABOUT THE RUN HE JUST FINISHED ------------------
+  //
+  // One number, 0..1, because the finish pose is one blend between two ends of
+  // the same gesture -- see the celebration block in runner.js. The camera move
+  // is IDENTICAL at every value of it, and that is the design rather than an
+  // economy: most runs are not record runs, and a celebration only the best
+  // players ever see is a celebration most players never see. Finishing a
+  // marathon is the accomplishment; the verdict changes what he DOES, not
+  // whether the game turns round and looks at him.
+  //
+  //   1.00  the record went. Both arms up, head back, a roar.
+  //   0.85  an all-time best.
+  //   0.70  a personal best today.
+  //   else  where the run landed on the ladder, top rung 0.60 down to 0.
+  //
+  // At 0 it is the spent finisher: hands to the head, shoulders down, eyes
+  // squeezed shut and a mouth gasping. Which is also a celebration -- it is
+  // what the last third of a real finish line looks like.
+  let finishJoy = 0;
   // WHERE the contacts happened, not just how many. `pace` counts hits and
   // that is all the readout needs while running, but the finish card asks a
   // question a count cannot answer -- which city did this run go wrong in --
@@ -131,6 +163,7 @@
 
   function reset() {
     clearTimeout(endTimer);
+    showCard = null;
     // Re-read the save before every run, not once at boot: a second run in the
     // same session has to chase the streak the first one just set.
     hud.setMemory(MR.Store.summary(dateKey));
@@ -144,10 +177,14 @@
     lastStep = 0;
     recordGone = false;
     tierIdx = -1;
+    aidNagged = false;
+    finishJoy = 0;
+    celClock = 0;
     hitAt = [];
     runner.phase = 0;
     ghost.reset();
     hud.hideEnd();
+    hud.celebrate(false);
     world.update(0);
   }
 
@@ -161,7 +198,14 @@
 
   hud.onStart(begin);
   hud.onAgain(begin);
-  controls.onAny = () => audio.unlock();
+  // Any input during the celebration ends the hold and brings the card up now.
+  // The alternative to this is a player who has seen the ending once being made
+  // to sit through it on every subsequent run, which is how a celebration
+  // becomes a cutscene -- see the note on the 4.9s hold below.
+  controls.onAny = () => {
+    audio.unlock();
+    if (state === DONE && showCard) showCard();
+  };
 
   // ---- autopilot --------------------------------------------------------
   // Plays the course by reading the same gate data the renderer draws, so it
@@ -392,22 +436,71 @@
       }
 
       // Aid taken this step. Streak only -- pace still has one source.
-      //
-      // resolveAid walks the index past every item the runner drew level with
-      // and returns only the ones whose lane matched, so the difference is the
-      // count that went by untaken. That is the one event in the run which is
-      // pure loss and has nothing to mark it: no contact, no flash, the streak
-      // simply fails to go up. Hence a sound and nothing else -- a toast here
-      // would be scolding, and the readout is being cut, not grown.
       const aidIdxBefore = player.aidIdx;
-      let aidTaken = 0;
-      for (const item of player.resolveAid(course, before, after)) {
+      const aidTook = player.resolveAid(course, before, after);
+      for (const item of aidTook) {
         pace.onAid(item.gain);
         audio.aid(item.kind === 'banana');
-        aidTaken++;
         if (item.kind === 'banana') hud.toastAid('FUEL', '+' + item.gain + ' STREAK');
+        // Taking one proves the player has not simply stopped seeing them, so
+        // the missed cue below is allowed to speak again. See its note.
+        aidNagged = false;
       }
-      if (player.aidIdx - aidIdxBefore > aidTaken) audio.aidMissed();
+
+      // ---- THE DECLINED BOTTLE, AND WHY THIS RULE HAD TO CHANGE -----------
+      //
+      // This line used to read `if (passed > taken) audio.aidMissed()`, under a
+      // comment calling a passed item "the one event in the run which is pure
+      // loss and has nothing to mark it". Both halves of that were true of the
+      // aid placement it was written against, and roadmap 50 has just made both
+      // false.
+      //
+      // A bottle now stands BEHIND an obstacle, in that obstacle's own lane, at
+      // a gate that always leaves some other lane clear. Measured by
+      // tools/aid.js on the shipped course: items costing the cheapest line
+      // nothing went 56.5% -> 0%, and four natural-line bots went from
+      // collecting 64.4% to 0%. So declining is now the ORDINARY outcome and
+      // very often the correct one -- the free lane is right there, and the
+      // only way to the bottle is over or under the thing in front of it. Left
+      // alone, this cue would have fired for very nearly every bottle in the
+      // race, which turns a meaningful sound into a nag and, worse, nags the
+      // player for making the right decision.
+      //
+      // Nor is it "pure loss" any more, and that is the deeper change: a passed
+      // bottle is now a PRICE DECLINED, not an opportunity fumbled.
+      //
+      // WHAT THE CUE MEANS NOW. There is still one case worth a sound, and
+      // pace.js already defines it exactly. onAid grants
+      // min(streak + gain, gatesSeen, AID_CEILING) - streak, so a bottle is
+      // worth EXACTLY ZERO to a flawless runner -- their streak already equals
+      // the gates they have passed. The quantity below is that arithmetic, not
+      // a threshold invented here, which is why it cannot drift away from what
+      // the bottle would actually have paid.
+      //
+      // So the cue fires only when the bottle really would have bought
+      // something back, at half its face value or better -- i.e. on a run that
+      // has already come apart, which is the run the rescue half of the aid
+      // pool exists for. It cannot fire on a clean line at all.
+      //
+      // AND ONCE, NOT EVERY TIME. A broken run passes fourteen of these. The
+      // informative event is the FIRST one -- "there is help on this road and
+      // you are running past it" -- and the fourteenth is scolding. This is the
+      // same edge-not-held shape recordLost and the tier cues above already
+      // use, and it re-arms when the player takes an item, because taking one
+      // is proof they can see them.
+      if (player.aidIdx - aidIdxBefore > aidTook.length && !aidNagged) {
+        let worth = 0, face = 0;
+        for (let i = aidIdxBefore; i < player.aidIdx; i++) {
+          const item = course.aid[i];
+          if (!item || aidTook.indexOf(item) >= 0) continue;
+          // pace.onAid's own bounds, so the two can never disagree about what a
+          // bottle is worth to this run at this moment.
+          const paid = Math.max(0, Math.min(pace.streak + item.gain,
+            pace.gatesSeen, K.AID_CEILING) - pace.streak);
+          if (paid > worth) { worth = paid; face = item.gain; }
+        }
+        if (face > 0 && worth >= face * 0.5) { aidNagged = true; audio.aidMissed(); }
+      }
 
       // Player events -> audio.
       for (const e of player.drainEvents()) {
@@ -467,21 +560,48 @@
           streak: pace.bestStreak,
           tier: MR.Tier.of(pace.finishTime).name,
         });
+        // See finishJoy above. Read here, once, off the result that is now a
+        // fact -- never off the projection, which is still twitching a quarter
+        // of a second before the line.
+        const rung = MR.Tier.of(pace.finishTime);
+        const rungs = MR.Tier.LADDER.length - 1;
+        finishJoy = JOY_FORCED ? Math.max(0, Math.min(1, JOY))
+          : pace.finishTime <= K.RECORD_SECONDS ? 1 : Math.max(
+          saved && saved.allTimeBest && !saved.firstEver ? 0.85 : 0,
+          saved && saved.beatToday && !saved.firstToday ? 0.70 : 0,
+          0.60 * (1 - rung.i / rungs));
+
         // HOLD THE CARD. The tape breaks, the confetti fires, the crowd
         // roars and the camera pulls up into its hero shot -- and all of that
         // used to play behind a full-screen results panel that appeared on the
         // very same frame. The ending was being built and then covered up.
         //
-        // 2.6s is the length of the flourish the world and camera play out
-        // (tape swing 1.8s, confetti fall, camera settle), so the card arrives
-        // as the celebration lands rather than instead of it.
+        // 2.6s WAS the length of that flourish. It is not any more: the camera
+        // now leaves the chase entirely and comes round to the front of him
+        // (see the celebration block in camera.js), which is 0.80s of held
+        // astern break, 1.80s of arc, and a hold on his face. The card is what
+        // covers that up, so the card moves.
+        //
+        // 4.9s is not a free number and it is worth saying what pays for it:
+        // the HUD readout is still on screen through all of it with the race
+        // clock stopped on the finish time, so a player who only wants the
+        // number already has the number. Anyone who wants the card sooner can
+        // touch the screen -- see controls.onAny below, which ends the hold on
+        // any input rather than making them wait out an animation twice.
         audio.finish(pace.finishTime < K.RECORD_SECONDS);
+        // Clear the top-left column out of the shot. See hud.celebrate.
+        hud.celebrate(true);
         clearTimeout(endTimer);
         // hitAt is copied rather than handed over: `reset()` empties this array
         // for the next run, and the card is still on screen when RUN IT AGAIN
         // is pressed.
         const where = hitAt.slice();
-        endTimer = setTimeout(function () { hud.showEnd(pace, saved, where); }, 2600);
+        showCard = function () {
+          clearTimeout(endTimer);
+          showCard = null;
+          hud.showEnd(pace, saved, where);
+        };
+        endTimer = setTimeout(function () { if (showCard) showCard(); }, 4900);
       }
     }
 
@@ -500,6 +620,21 @@
       ? pace.speed() * Math.max(0, 1 - (performance.now() - doneAt) / 2200)
       : pace.speed();
 
+    // Seconds since the tape, which is the celebration's clock in runner.js AND
+    // in camera.js. Real time, not race time: the race clock has stopped, and
+    // this drives an animation rather than a result.
+    //
+    // Accumulated from `raw` rather than read off performance.now(), and both
+    // halves of that matter. RAW, because the celebration is a parametric path
+    // and not a spring -- the 1/25 clamp above exists to stop a long frame
+    // detonating an integrator, and applying it here would make the whole move
+    // play at 28% speed on the 7fps SwiftShader harness while the card, on a
+    // real setTimeout, arrived a third of the way through it. ACCUMULATED,
+    // because a screenshot harness that pumps rAF with a synthetic clock then
+    // owns this clock too, which is what makes the framing measurable.
+    if (state === DONE) celClock += raw;
+    const celT = celClock;
+
     // The grade at the runner, -1..1 against the steepest legal one. It only
     // pitches the trunk; the stride slows on the climb and quickens on the
     // descent for free, because cadence already falls out of `speed`.
@@ -514,6 +649,14 @@
       bounce: player.bounce,
       lean: player.lean,
       stumble: player.stumble,
+      // The finish. Both are zero for the whole race, so every term they drive
+      // is provably inert until the tape -- the same discipline MR.Runner.POLISH
+      // runs on, and tools/envelope.js holds the eight play silhouettes to it.
+      celT: celT,
+      joy: finishJoy,
+      // Which side the camera will be on when it arrives. Read from camera.js
+      // rather than recomputed, so the head cannot turn away from the lens.
+      celSide: MR.Camera.celSideFor(player.x),
     });
     // ELEVATION IS ADDED HERE AND NOWHERE UPSTREAM. `player.y` is, and stays,
     // the height above the LOCAL road surface -- which is what lets
@@ -535,6 +678,10 @@
       // not another gear. See camera.js's header.
       gearSpeed: pace.streakSpeed(),
       lean: player.lean, duck01: player.duck01,
+      // The finish, on the same clock the runner's pose runs on. Zero for the
+      // whole race, so every celebration term in camera.js is inert until the
+      // tape and the shipped chase framing is untouched by construction.
+      celT: celT,
     });
 
     // After the camera, never before: the ghost's tag is placed against this
@@ -577,6 +724,15 @@
     // would put a wrong city on the card with nothing to catch it -- so the
     // harness is given the same array the card is given.
     get hitAt() { return hitAt; },
+    // The celebration clock, and it is SETTABLE. A harness that pumps rAF owns
+    // every other clock in this file, and would own this one too except that a
+    // page opened at ?skip=250 is already several real seconds past the tape
+    // before the harness can take the pump -- so without a rewind, a tool can
+    // only ever photograph whichever instant of a 2.6-second move the boot
+    // happened to land on. That is the exact failure tools/stride.js shipped:
+    // a measurement sweep taken at whatever state the page was left in.
+    get celT() { return celClock; },
+    set celT(v) { celClock = Math.max(0, +v || 0); },
     course, world, runner, ghost, cam, hud, audio, renderer, scene,
     begin,
     fps: () => fps,

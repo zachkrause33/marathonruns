@@ -76,7 +76,12 @@ const FOV = parseFloat(arg('fov', 27.2));
 const TARGET_Y = parseFloat(arg('ty', 0.975));
 const ELEV = parseFloat(arg('elev', 0));
 const SKIP = String(arg('skip', '150'));
-const STEPS = parseInt(arg('steps', 96), 10);
+const STEPS = parseInt(arg('steps', 0), 10);
+// The odometer mark and the stride phase the sheet is shot at. Both sheets of
+// a before/after pair must use the same two, and they are defaults rather than
+// derived so that a later pass can reproduce this exact frame.
+const MARK = parseFloat(arg('mark', 3927.0));
+const PHASE = parseFloat(arg('phase', 0.28));
 const FILE = path.resolve(String(arg('file', path.join(ROOT, 'index.html'))));
 const VERIFY = !!arg('verify', false);
 const BEFORE = path.resolve(String(arg('before', path.join(ROOT, 'reference', 'runner-orbit-before.png'))));
@@ -101,7 +106,35 @@ function pageSheet(o) {
     const cb = F.pump; F.pump = null;
     if (cb) cb(F.now);
   };
-  for (let i = 0; i < o.steps; i++) step(1 / 120);
+  // ---- pin the WORLD POSITION as well as the stride phase ----------------
+  //
+  // Pinning the number of pumped steps is not enough on its own, and the first
+  // pair this tool produced proved it: the page runs a real clock from ready
+  // until the harness takes over, so two sessions arrive at the handover half
+  // a unit of course apart, and half a unit of course is a different stride
+  // pose against a different hedge. A before and an after that differ by the
+  // machine's load are not a comparison of geometry.
+  //
+  // So the clock is run forward to a fixed odometer mark first, then to a
+  // fixed point in the cycle, and only then are the tiles shot. Both loops are
+  // guarded: a pump that has stopped turning would otherwise spin here
+  // forever, and a tool that hangs is at least honest, while a tool that
+  // silently shoots frame zero is not.
+  let guard = 0;
+  while (g.pace.units < o.mark && guard++ < 40000) step(1 / 120);
+  if (guard >= 40000) return { error: 'the clock never reached the mark' };
+  // Then to the phase, at a finer step so the landing is inside 0.4% of a
+  // stride rather than inside a whole frame of one.
+  const rn = g.runner;
+  guard = 0;
+  while (guard++ < 4000) {
+    const before = rn.phase;
+    step(1 / 480);
+    const after = rn.phase;
+    // Crossed the target, allowing for the wrap at 1.
+    if ((before < o.phase && after >= o.phase) || (after < before && o.phase >= before)) break;
+  }
+  for (let i = 0; i < o.steps; i++) step(1 / 480);
 
   const rig = g.runner.group;
   rig.updateMatrixWorld(true);
@@ -226,12 +259,14 @@ function pageRows(o) {
   }
   const res = await page.evaluate(pageSheet, {
     az: AZ, tw: TW, th: TH, dist: DIST, fov: FOV, ty: TARGET_Y, elev: ELEV, steps: STEPS,
+    mark: MARK, phase: PHASE,
   });
 
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   fs.writeFileSync(OUT, Buffer.from(res.png.split(',')[1], 'base64'));
   console.log('wrote ' + OUT + '  ' + (AZ.length * TW) + 'x' + TH
-    + '  az ' + AZ.join('/') + '  dist ' + DIST + '  fov ' + FOV + '  ty ' + TARGET_Y);
+    + '  az ' + AZ.join('/') + '  dist ' + DIST + '  fov ' + FOV + '  ty ' + TARGET_Y
+    + '  mark ' + MARK + '  phase ' + PHASE);
   console.log('  rig at ' + res.at.join(', '));
 
   if (VERIFY) {

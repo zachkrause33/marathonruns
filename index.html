@@ -122,6 +122,28 @@ html, body {
 }
 #bug, #leftCol, #dist, #railWrap { transition: opacity 0.22s, visibility 0.22s; }
 
+/* ---- and while the camera is round the front of him ----
+ *
+ * The finish celebration takes the lens off the chase and puts the runner's
+ * head in the top third of a portrait frame, which is exactly where #leftCol
+ * lives. Measured on the shipped frame at 390x844, the PROJECTED FINISH plate
+ * lands across his cap and the FUEL bar across his brow.
+ *
+ * Hiding it costs nothing, because everything in that column has stopped
+ * meaning anything: the projection is now a result, the fuel gauge is a
+ * gauge of a race that is over, and the pace readout is the pace of a runner
+ * who has stopped. What the player still wants -- the finish time, the gap to
+ * the record, the distance -- is in #railWrap at the bottom, which STAYS, and
+ * is why the results card can be held for 4.9s without stranding anyone
+ * (see main.js). Slower than the panel fade above on purpose: this one is part
+ * of the ending rather than a reaction to a dialog opening.
+ */
+#ui.celebrating #leftCol,
+#ui.celebrating #toast {
+  opacity: 0; visibility: hidden;
+}
+#ui.celebrating #leftCol { transition: opacity 0.55s, visibility 0.55s; }
+
 /* ---- top bug: race clock + the verdict ----
  * The projected finish is the headline because it is the only number that
  * answers "is the record still alive". The race clock keeps its place but
@@ -2257,7 +2279,7 @@ MR.Course = (function () {
    * at all and is not given one -- see the note above it.
    */
   let NARROW = 0;
-  let RAMP = 0;
+  let RAMP = 1;
 
   // A jump covers this much ground; two conflicting action gates closer than
   // this would demand being airborne and ducking at once.
@@ -2854,28 +2876,159 @@ MR.Course = (function () {
 
 
   /**
-   * Aid: water tables and fruit, placed deterministically from the same date
-   * seed as everything else.
+   * ---- THE PLACEMENT RULE, AND IT IS ONE SENTENCE LONG --------------------
    *
-   * Two placement rules matter. They are only ever put in a lane that is
-   * PASSABLE at that point on the course, so aid can never be dangled somewhere
-   * a player is not allowed to go; and they are pushed to the gap BETWEEN
-   * gates, so taking one is never entangled with a jump or a duck the player
-   * is already committed to.
+   * A BOTTLE STANDS BEHIND AN OBSTACLE, IN THAT OBSTACLE'S OWN LANE, AT A GATE
+   * THAT ALSO OFFERS A LANE THROUGH FOR NOTHING.
+   *
+   * Every road item is laid AID_SETBACK past the rear face of a JUMP block or a
+   * DUCK bar, in the same lane as that hazard, and only at a gate that leaves
+   * some other lane CLEAR and leaves the aid lane open at the gate after. So
+   * the only way to the bottle is over or under the thing standing in front of
+   * it; declining is always free, because the empty lane is right there to be
+   * taken instead; and paying once buys the item outright, because the gate
+   * ahead is never allowed to shut the lane you just bought your way into.
+   *
+   * The owner's instruction: "Ensure waters and bananas are strategically
+   * placed so that they have to go around an obstacle to get it."
+   *
+   * ---- WHAT WAS THERE BEFORE, AND WHY IT DID NOT DO THAT ------------------
+   *
+   * The old rule scored the open lanes and took the hardest one. That is a
+   * RELATIVE test, and a relative test buys nothing when every candidate is
+   * equally easy: at a gate whose three lanes are all clear it picks one at
+   * random and the item is free. Half the pool was then scored the other way up
+   * on purpose, into the EASIEST lane, which is free by construction. And the
+   * item sat in the middle of the gap, 30 units of open road from anything, so
+   * even a hard placement could be taken by dipping into the lane and coming
+   * straight back out without clearing a thing.
+   *
+   * Measured on the shipped course by tools/aid.js, over 365 days, three ways:
+   * 56% of items cost NOTHING at all over and above the cheapest line through
+   * the course, and only 1% cost an extra action; four natural-line bots that
+   * cannot see aid at all collected 64% of it between them; and a bot that
+   * simply went and got everything finished in exactly the same time, with
+   * exactly the same zero contacts, as one that ignored the lot. Aid was not a
+   * decision. It was scenery that happened to pay.
+   *
+   * ---- WHY THE SETBACK IS SMALL, WHICH IS THE WHOLE MECHANISM -------------
+   *
+   * player.resolveAid is a LANE MATCH AT A POINT, and player.changeLane moves
+   * `lane` on the same frame the input is served -- so any patch of road can be
+   * reached by a swerve, and no placement can charge for anything if the player
+   * has room to swerve into it. The only ground a hazard genuinely guards is
+   * the ground DIRECTLY BEHIND ITSELF, because reaching that means being in the
+   * lane at the gate line a moment earlier, which is where resolveGates fires.
+   *
+   * So the item is pushed right up against the back of the obstacle: the rear
+   * face plus AID_SETBACK, which is 1.39 units behind a JUMP block and 0.95
+   * behind a DUCK bar. At the fastest the runner ever goes that is 52 and 36
+   * milliseconds -- two or three frames -- against the 0.075 s player.handle
+   * makes a player wait between lane changes. The gap between two gates is
+   * never less than 25.35 units, so the old placement had four hundred times
+   * that much room to cut in over.
+   *
+   * This is measured rather than argued. tools/aid.js drives the real state
+   * machine with a bot that takes the free lane at the gate and then swerves
+   * for the bottle as fast as the input queue will serve it; on the old course
+   * it collected 13 of 14 items for half a contact.
+   *
+   * AID_SETBACK is NOT a taste number and must not be tuned down to zero: the
+   * bottle is 1.41 units tall and the DUCK bar's underside is at 1.41, so an
+   * item laid inside a bar's own depth would interpenetrate the art. It is the
+   * smallest offset that keeps the pickup clear of the geometry it stands
+   * behind, and the frames it costs are the price of that.
+   *
+   * ---- THE RESCUE ARGUMENT, WHICH THIS RULE ANSWERS RATHER THAN DROPS -----
+   *
+   * The pool used to be split half hard and half easy, and the reason was real:
+   * scoring every item for maximum difficulty produced a rescue mechanic only a
+   * player who did not need rescuing could reach. 71% of items demanded an
+   * action at the gate on BOTH sides, so aid was gated behind two consecutive
+   * clean clears plus a lane change, asked of the one player whose defining
+   * problem is that they cannot string two clean clears together.
+   *
+   * The fix for that was never "make half of it free". It was to stop asking
+   * for a CHAIN. This rule charges exactly ONE action, at exactly ONE gate, and
+   * explicitly forbids the gate ahead from asking for another -- so there is a
+   * price and there is no compounding. A run fluffing 30% of the actions it
+   * attempts still collects three quarters of the aid on the course; the table
+   * is in tools/aid.js.
+   *
+   * ---- AND IT DOES NOT FIGHT THE ROOF ------------------------------------
+   *
+   * Roof aid, below, is the same rule one step further out: the price is the
+   * mount rather than a jump, and the free lane is the road either side. It is
+   * generated from its own stream and this loop never touches it.
+   *
+   * Nothing here can affect Course.solvable(). Aid reads the gate table and
+   * writes nothing back, so the clean path of a player who ignores every bottle
+   * on the course is the one the BFS proved, untouched.
    *
    * One item per aid point, never a cluster. An earlier version put out a
    * table of 3-5 bottles, which fired five pickups inside a second and a half
-   * and read as a single smear rather than as a decision -- and the decision
-   * is the whole point, because the aid lane is often not the lane the racing
-   * line wants.
+   * and read as a single smear rather than as a decision.
    *
    * Sparse early and dense late, with fruit getting commoner as the race goes
    * on. A run is rarely broken in the first mile; the back half is where the
    * wall is, where the streak is worth most, and where a rescue is worth
    * having.
    */
+  const AID_SETBACK = 0.35;
+  // How far the placement may hunt forward for a gate of the right shape before
+  // giving the point up. Bounded so aid cannot migrate far from where the
+  // density curve wanted it, and so a stretch with no qualifying gate cannot
+  // silently swallow every item behind it. Eight gates is about 250 units.
+  const AID_WALK = 8;
+
+  /**
+   * The lane an item may stand in behind gate `gi`, or -1 if this gate is the
+   * wrong shape.
+   *
+   * Three conditions, and each one is a clause of the rule above:
+   *
+   *   the gate leaves some lane CLEAR   -- or nothing is being given up, and a
+   *                                        full-width gate demands an action in
+   *                                        every lane anyway, so the aid lane
+   *                                        would cost exactly nothing extra
+   *   the aid lane holds a JUMP or DUCK -- the obstacle the bottle stands behind
+   *   the next gate does not BLOCK it   -- paying once buys it outright, and the
+   *                                        player is never trapped in the lane
+   *                                        they bought
+   *
+   * A BLOCK can never be the obstacle: it is impassable, so an item behind one
+   * is aid dangled somewhere the player is not allowed to go. That is the same
+   * exclusion the old `open` test made, stated as a consequence of the rule
+   * rather than as a separate guard.
+   */
+  function aidLaneAt(gates, gi, rnd) {
+    const g = gates[gi];
+    if (!g.lanes.some(function (l) { return l === K.CLEAR; })) return -1;
+    const next = gi + 1 < gates.length ? gates[gi + 1].lanes : [K.CLEAR, K.CLEAR, K.CLEAR];
+    const cands = [];
+    for (let l = 0; l < 3; l++) {
+      if (g.lanes[l] !== K.JUMP && g.lanes[l] !== K.DUCK) continue;
+      if (next[l] === K.BLOCK) continue;
+      cands.push(l);
+    }
+    if (!cands.length) return -1;
+    // Prefer a lane that is CLEAR on the way out over one that merely is not
+    // BLOCK, so "paying once buys it outright" holds wherever the course can
+    // afford it. Ties break from the seeded stream, so a course still varies.
+    let lane = cands[0], best = -Infinity;
+    for (const l of cands) {
+      const score = (next[l] === K.CLEAR ? 2 : 0) + rnd.next();
+      if (score > best) { best = score; lane = l; }
+    }
+    return lane;
+  }
+
   function generateAid(key, gates, ramps) {
-    const rnd = MR.rng.stream(key, 'aid/v3');
+    // v4: the placement rule changed, so the stream is renamed rather than
+    // silently reused. tools/mechanics.js hashes gates and aid SEPARATELY now
+    // for exactly this reason -- the gate stream is untouched and stays
+    // bit-identical, and only the aid baseline moves.
+    const rnd = MR.rng.stream(key, 'aid/v4');
     const items = [];
     if (!gates.length) return items;
 
@@ -2935,137 +3088,81 @@ MR.Course = (function () {
     }
 
     let gi = 0;
-    let nudged = 0;   // consecutive gaps a rescue item has declined
+    let lastHg = -1;   // the gate the previous item hung off
     let z = START_GRACE + rnd.range(200, 340);
     const end = K.TOTAL_UNITS - FINISH_GRACE - 60;
     let guard = 0;
 
     while (z < end && guard++ < 4000) {
       while (gi < gates.length - 1 && gates[gi + 1].z < z) gi++;
-      const f = z / K.TOTAL_UNITS;
 
-      // Sit in the gap between this gate and the next, never on a gate line.
-      const a = gates[gi].z;
-      const b = gi + 1 < gates.length ? gates[gi + 1].z : a + 40;
-      if (b - a > 12) {
-        // Only lanes passable at the gates either side of the gap, so aid can
-        // never be dangled somewhere the player is not allowed to go.
-        const open = [];
-        for (let l = 0; l < 3; l++) {
-          const here = gates[gi].lanes[l];
-          const next = gi + 1 < gates.length ? gates[gi + 1].lanes[l] : K.CLEAR;
-          if (here !== K.BLOCK && next !== K.BLOCK) open.push(l);
-        }
-        if (open.length) {
-          // WHICH lane the aid goes in is the whole design of it.
-          //
-          // Dropping it in a random passable lane made it free: if the racing
-          // line already ran through that lane you collected it without
-          // deciding anything. Aid should be a trade -- leave the easy line,
-          // clear something, get paid -- so the lane is chosen to be the
-          // HARDEST one that is still legal, not an arbitrary one.
-          //
-          // Difficulty is scored from the gates either side of the gap,
-          // because those are what the player has to survive to be in this
-          // lane at this moment:
-          //   an action at the gate BEFORE  -- you had to clear something to
-          //                                   get here
-          //   an action at the gate AFTER   -- you have to clear something on
-          //                                   the way out, still in this lane
-          //   off-centre                    -- costs a lane change and gives
-          //                                   up the middle, which is the lane
-          //                                   with an escape on both sides
-          //
-          // The lane is still guaranteed passable at both gates, so this makes
-          // aid demanding without ever making it a trap. Nothing here can
-          // reach a BLOCK: `open` excluded those before scoring.
-          // ...but not EVERY item, and that qualification is the whole fix.
-          //
-          // Scoring every placement for maximum difficulty produced a rescue
-          // mechanic that only a player who did not need rescuing could reach.
-          // Measured over 171 items: 85% sat off the centre lane, 71% demanded
-          // an action at the gate on BOTH sides, and 94% demanded one on at
-          // least one side. Aid tops the streak back up to AID_CEILING, so it
-          // is the designated road back for a broken run -- and it was gated
-          // behind two consecutive clean clears plus a lane change, asked of
-          // the one player whose defining problem is that they cannot string
-          // two clean clears together. The stronger the aid was made, the
-          // further out of reach it moved. A 16-contact run collected none.
-          //
-          // So the pool is mixed rather than uniformly hard. Roughly half the
-          // items are still scored for maximum difficulty -- those are the
-          // trade the design wants, and a strong run will hoover them up on
-          // the way past. The rest are scored INVERTED, landing in the easiest
-          // legal lane, and those are the ones a broken run can actually take.
-          //
-          // Deterministic, so the course stays identical for every player: the
-          // choice comes from the same seeded stream as everything else, never
-          // from the runner's live state.
-          const rescue = rnd.chance(0.5);
-          // -Infinity, not -1. On the rescue path `rank` is a NEGATED score
-          // and is therefore always below zero, so a -1 seed meant no lane
-          // scoring 1 or worse could ever beat the initial value: the loop
-          // silently fell through, left the lane as an arbitrary open[0], and
-          // reported a demand of 1 no matter how hard the placement actually
-          // was. Two rounds of tuning measured no effect for exactly this
-          // reason before the seed was found.
-          let lane = open[0], best = -Infinity;
-          for (const l of open) {
-            const before = gates[gi].lanes[l];
-            const after = gi + 1 < gates.length ? gates[gi + 1].lanes[l] : K.CLEAR;
-            let score = 0;
-            if (before === K.JUMP || before === K.DUCK) score += 3;
-            if (after === K.JUMP || after === K.DUCK) score += 3;
-            if (l !== 1) score += 1;
-            // Break ties from the seeded stream so a course still varies.
-            score += rnd.next() * 0.9;
-            // A rescue item wants the LEAST demanding lane, so the same score
-            // is simply read the other way up rather than duplicated.
-            const rank = rescue ? -score : score;
-            if (rank > best) { best = rank; lane = l; }
-          }
-          // `best` is negated on a rescue item, so recover the real score for
-          // the guarded flag the renderer uses to decide how loudly to
-          // telegraph the pickup.
-          const demand = rescue ? -best : best;
-
-          // Reading the score the other way up is not enough on its own, and
-          // measurement is why this is here. Inverting the lane choice moved
-          // "reachable without clearing anything" only from 6% to 9%, because
-          // the LANE is picked after the POSITION and the course is now dense
-          // enough that most gaps have no easy lane in any of the three.
-          //
-          // So a rescue item is allowed to decline a gap. If the gentlest lane
-          // here still demands an action, skip this gap and look at the next
-          // one; `nudged` bounds that walk so aid can never migrate far from
-          // where the spacing rule wanted it, and so a stretch of course with
-          // no easy gap at all cannot silently swallow every rescue item.
-          if (rescue && demand >= 3 && nudged < 5) {
-            nudged++;
-            // Step to the NEXT GAP, not a fixed distance. The first version of
-            // this advanced 26 units, which is less than the median gate
-            // spacing of 29.6 -- so it usually re-tested the same gap, decided
-            // the same thing, and burned its whole allowance without ever
-            // looking at a new one. The measured effect was nil.
-            const nz = gi + 1 < gates.length ? gates[gi + 1].z + 5 : z + 32;
-            z = Math.max(z + 10, nz);
-            continue;
-          }
-          nudged = 0;
-
-          const f2 = z / K.TOTAL_UNITS;
-          const fruit = rnd.chance(0.12 + 0.46 * f2 * f2);
-          items.push(fruit
-            ? { z, lane, kind: 'banana', gain: K.AID_BANANA, guarded: demand >= 3 }
-            : { z, lane, kind: 'water', gain: K.AID_WATER, guarded: demand >= 3 });
-        }
+      // Hunt forward from here for a gate of the right shape. The density curve
+      // below decides ROUGHLY where an aid point goes; the rule decides exactly
+      // which gate it hangs off, and a point with no qualifying gate within
+      // AID_WALK is given up rather than dropped somewhere free.
+      //
+      // ---- THREE BOUNDS, AND ALL THREE WERE MISSING FIRST TIME ------------
+      //
+      // NEVER BEFORE THE PREVIOUS ITEM'S GATE. The hunt starts at the gate
+      // BEHIND the target z, so the placement can pull an item backwards by up
+      // to one gap. Left alone that can order two items the wrong way round or
+      // stack them on one gate. Starting at lastHg + 1 makes the gate index
+      // strictly increasing, so z is too, and the sort at the end has nothing
+      // left to do.
+      //
+      // NEVER PAST THE END. `end` bounds where an aid POINT may be asked for,
+      // and the hunt can carry the item eight gates -- about 250 units -- past
+      // wherever that was. On the last point of the course that walks straight
+      // through the tape. The exact class of defect the ramp's run-in had, and
+      // the exact reason this file's sweeps run at 365 days.
+      let hg = -1, lane = -1;
+      for (let k = Math.max(gi, lastHg + 1); k < gates.length - 1 && k < gi + AID_WALK; k++) {
+        if (gates[k].z > end) break;
+        const l = aidLaneAt(gates, k, rnd);
+        if (l >= 0) { hg = k; lane = l; break; }
+      }
+      if (hg >= 0) {
+        const g = gates[hg];
+        // Behind the obstacle: its rear face, from the SAME nose-anchored
+        // expression reachOf, buildSpans and world.js's gateBoxes all use, so
+        // the bottle can never end up inside the thing it stands behind.
+        //
+        // ASSIGNED, NOT MAXED. This was Math.max(z, ...) so that an item could
+        // never move backwards, and the cost of that was the whole rule: where
+        // the target z already sat past the gate the item simply stayed there,
+        // 46 units downstream, behind nothing at all. Monotonicity is the
+        // hunt's job now, above, and the placement's only job is to be behind
+        // the obstacle.
+        lastHg = hg;
+        z = g.z + 2 * HAZARD_HALF_Z[g.lanes[lane]] + AID_SETBACK;
+        const f2 = z / K.TOTAL_UNITS;
+        const fruit = rnd.chance(0.12 + 0.46 * f2 * f2);
+        // `gate` IS THE INTERFACE TO THE COLLECTION TEST, and it is carried on
+        // the item for the same reason the roof item carries `y`: the rule has
+        // to travel with the thing it governs, or the renderer and the player
+        // are left to rediscover it. player.resolveAid pays a guarded item out
+        // to a runner who was in `lane` when gate `gate` resolved, cleanly or
+        // not -- see the long note there for why a lane match at a point cannot
+        // do this job.
+        //
+        // Every road item is guarded now: that is the rule, so the flag is a
+        // constant rather than a score. It is kept because the roof items carry
+        // it and the two should describe themselves the same way.
+        items.push(fruit
+          ? { z, lane, gate: hg, kind: 'banana', gain: K.AID_BANANA, guarded: true }
+          : { z, lane, gate: hg, kind: 'water', gain: K.AID_WATER, guarded: true });
       }
 
       // Sparse early, dense late. Aid exists to rescue a broken run, and a run
       // is rarely broken in the first mile, so the opening stays clean and the
       // back half -- where the wall is and where the streak is worth most --
       // carries most of the help.
-      const spacing = 620 - 400 * f;
+      //
+      // Read off z AFTER the placement has moved it, not before: the hunt above
+      // can carry a point forward by up to AID_WALK gates, and pacing the next
+      // one off where this one was WANTED rather than where it LANDED would let
+      // two items stack up behind a single dense stretch.
+      const spacing = 620 - 400 * (z / K.TOTAL_UNITS);
       z += spacing * rnd.range(0.82, 1.18);
     }
     items.sort(function (p, q) { return p.z - q.z; });
@@ -5553,6 +5650,15 @@ MR.Runner = (function () {
   // which is exactly `a` for any finite a, so this is safe to wrap a term in
   // without disturbing it at 0.
   const mix = (a, b, t) => a + (b - a) * t;
+  // The finish pose's two helpers, hoisted for the reason _clampBox is: this
+  // runs 60 times a second and must not allocate a closure per frame.
+  // A smoothstepped 0..1 window on the celebration clock.
+  const celRamp = (t, t0, len) => {
+    const u = (t - t0) / len;
+    return u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u);
+  };
+  // Lerp one Euler axis toward a target by weight w. w = 0 leaves it exactly.
+  const to = (o, ax, tgt, w) => { o.rotation[ax] += (tgt - o.rotation[ax]) * w; };
 
   // ---- cycle shape --------------------------------------------------------
   // Two shaping functions, and between them they are most of what separates a
@@ -9106,6 +9212,224 @@ MR.Runner = (function () {
       // back view something lateral to measure.
       root.rotation.y = slid * SLIDE_YAW;
 
+      // ---- THE FINISH: THE FIRST POSE ON THIS RIG BUILT TO BE SEEN FROM THE
+      // ---- FRONT -----------------------------------------------------------
+      //
+      // Every other pose in this file was designed against a camera dead
+      // astern, and the header says so four separate times. This one is not:
+      // camera.js now walks the lens round to three-quarter front over the
+      // 2.6 seconds after the tape and holds it on his face, so for the first
+      // time the things that decide whether this reads are the chest, the
+      // eyeline, the mouth and where the hands are RELATIVE TO THE HEAD --
+      // none of which any measurement in this file has ever had a reason to
+      // look at.
+      //
+      // ---- IT IS APPLIED AS AN OVERRIDE, AFTER EVERYTHING ELSE HAS POSED ---
+      //
+      // Not threaded through the cycle like `slid` and `spread` are, and the
+      // reason is auditability rather than laziness. `celT` is 0 for the whole
+      // race, so at play the loop below does not execute at all and every one
+      // of the eight silhouettes tools/envelope.js holds this rig to is
+      // untouched by construction -- the same guarantee MR.Runner.POLISH gives,
+      // reached the cheap way. Threading a ninth state through forty posed
+      // joints would have put a term that can only be zero into forty
+      // expressions and asked a reviewer to believe all forty.
+      //
+      // It sits ABOVE the secondary-motion block deliberately, so the hood
+      // springs, the elbow lag filters and the head's own filter all see the
+      // celebration pose and arrive after it, exactly as they do after any
+      // other pose.
+      //
+      // ---- THE TWO ENDS OF IT ---------------------------------------------
+      //
+      // `st.joy` (main.js) blends between them. It is ONE gesture with two
+      // extremes, not two animations, because the thing being said is the same
+      // thing at both ends -- you have just run a marathon -- and only the
+      // amount of it changes:
+      //
+      //   joy 1   the record. The arms come up and out, fists high beside the
+      //           head, elbows open, the chest opens, the head goes BACK. The
+      //           mouth is wide and the brows go UP, which is the one moment in
+      //           this game where an expression is chosen rather than driven by
+      //           effort.
+      //   joy 0   the run came apart. The hands go up onto the crown, elbows
+      //           wide, the head drops, the shoulders come down and the chest
+      //           heaves nearly twice as fast. Eyes squeezed, mouth gasping.
+      //
+      // Both raise the arms and both put the hands ABOVE the eyeline, which is
+      // not a coincidence: the close shot has the head at the top third of a
+      // portrait frame and a hand anywhere near the face would sit on top of
+      // the thing this whole pass exists to show. Both then bring the arms DOWN
+      // for the held shot, and that is the other half of the same constraint --
+      // at the hero framing a 390px-wide frame spans 1.24 world units at the
+      // subject, and a pose 1.2 wide has its hands on the frame edge.
+      //
+      // ---- WHAT WAS NOT BUILT, AND THE MEASUREMENT THAT SETTLED IT ---------
+      //
+      // Open hands. This character has fists, correctly, for an arm swing, and
+      // an open palm is a real pose that does not exist here. It stays not
+      // existing, and the reason is not the two draw calls: the hand is 0.208
+      // across and was DESIGNED at 26 px, which is the largest it is ever drawn
+      // in play. At the hero framing it measures 65 px. Splaying fingers onto a
+      // mitt whose three fingers were deleted for being 8 px is answering the
+      // wrong question -- what that measurement actually says is that the whole
+      // hand, and four removals argued at 26 px, want re-judging at 65. That is
+      // a hand pass, not a camera pass, and it is written up in the roadmap
+      // rather than half-done here. A raised FIST is what a runner crossing a
+      // line actually makes, so nothing is being faked in the meantime.
+      //
+      // NOT SCALED BY POLISH, and that is deliberate rather than an omission.
+      // POLISH is the A/B for the animation-polish passes -- it exists so one
+      // build renders the run cycle before and after that work. A finish pose
+      // is not part of it, and multiplying it by that knob would mean ?polish=0
+      // shows a runner who crosses the line and stands there. The EXPRESSION
+      // terms below stay on POLISH, because those really are the same face
+      // channels the polish work built.
+      const celT = st.celT || 0;
+      if (celT > 0) {
+        const joy = Math.max(0, Math.min(1, st.joy === undefined ? 0 : st.joy));
+        // Three clocks, all smoothstepped, all zero at celT = 0.
+        //   plant   stops running and stands. Fast: the legs have to be under
+        //           him before the camera leaves the chase at 0.80s.
+        //   raise   the gesture, in and back out again.
+        //   settle  into the held shot -- the turn toward the lens and the
+        //           breathing.
+        // The timings are set by WHERE THE CAMERA IS, not by what feels right
+        // in isolation, and the first draft got that backwards. It put the
+        // raise at 0.15-1.45s, which is the astern wide shot and the top of the
+        // arc: the gesture the whole pose exists for played out at 82 to 182
+        // pixels of figure, seen from above, and was over before the lens got
+        // round to his face. camera.js holds astern for 0.80s and arrives at
+        // the front at about 2.0s, so the raise is now up across exactly that
+        // window and comes down into the held shot behind it.
+        const plant = celRamp(celT, 0.10, 0.85);
+        const raise = celRamp(celT, 0.80, 1.15) * (1 - celRamp(celT, 2.50, 1.00));
+        const settle = celRamp(celT, 2.60, 1.10);
+        // Breathing. Nearly twice as fast when the run came apart, which is the
+        // cheapest true thing about a finish line: the winner is breathing, the
+        // person who blew up is HEAVING. It runs on celT rather than on a phase
+        // integrator so it cannot drift with frame rate.
+        const breath = Math.sin(celT * (0.55 + 0.70 * (1 - joy)) * Math.PI * 2);
+        // A pop off the ground as the arms go up, on the win only: a short
+        // bump rather than a hold, so it lands with the gesture and is gone.
+        const pop = Math.max(0, Math.sin(Math.min(1, Math.max(0, (celT - 0.85) / 0.70)) * Math.PI));
+
+        // ---- legs: stand -------------------------------------------------
+        // Rest values lifted from the loop above rather than invented, so a
+        // retune there does not leave a standing pose behind: hip 0, knee 0.18,
+        // ankle -0.16, hip abduction side*0.05. Soft knees and the feet a
+        // little wider than the run, which is what a body that has just stopped
+        // does.
+        for (let i = 0; i < legs.length; i++) {
+          const L = legs[i];
+          to(L.hip, 'x', 0.02, plant);
+          to(L.hip, 'y', 0, plant);
+          to(L.hip, 'z', L.side * 0.075, plant);
+          to(L.knee, 'x', 0.22 + 0.05 * (1 - joy), plant);
+          to(L.ankle, 'x', -0.13, plant);
+        }
+
+        // ---- arms --------------------------------------------------------
+        // rotation.x is negative FORWARD on this rig (see the arm loop: +x is
+        // the back swing), so a raise is a large negative angle. rotation.z is
+        // abduction outboard, scaled by side. The elbow flexes negative.
+        //
+        // ---- AND THE REACH IS 0.50, WHICH DECIDED BOTH GESTURES -----------
+        //
+        // The first draft asked for the two poses everyone pictures at a finish
+        // line -- fists high beside the head for the win, hands on the crown
+        // for the collapse -- and neither is REACHABLE ON THIS RIG. Shoulder to
+        // hand is 0.262 + 0.24 = 0.50, the shoulder sits at (0.222, 0.78) and
+        // the crown is at 1.55: hands on the head wants 0.687 of arm and hands
+        // above the head wants 0.746. This is the toy proportion doing exactly
+        // what the header says it does -- head a third of the figure, limbs
+        // short -- and it is not negotiable from here.
+        //
+        // What it costs is worth being precise about, because the first draft
+        // paid it without noticing: asking for the unreachable pose does not
+        // fail, it just puts the arm somewhere else. Both fists ended up
+        // directly in FRONT OF HIS MOUTH at t=2.05, in the one shot this whole
+        // pass exists to produce.
+        //
+        // So both gestures are built from ABDUCTION, which is the axis that has
+        // the room. rotation.z sweeps the hanging arm out through horizontal
+        // (1.57) and on up; at 2.36 the fist lands at (0.575, 1.134), which is
+        // 0.31 clear of the skull's own 0.266 half-width and level with the
+        // eyeline -- a wide V, nothing crossing the face. The spent version is
+        // the same axis stopped short of horizontal at 1.15, so the arms fall
+        // out and DOWN, which is what a body that has just given everything
+        // does with them.
+        const armX = mix(0.15, -0.25, joy);
+        const armZ = mix(1.15, 2.36, joy);
+        const armE = mix(-0.75, -0.25, joy);
+        for (let i = 0; i < arms.length; i++) {
+          const A = arms[i];
+          // Standing: hanging, slightly bent, held a hair off the ribs.
+          to(A.shoulder, 'x', 0.06, plant);
+          to(A.shoulder, 'y', 0, plant);
+          to(A.shoulder, 'z', A.side * 0.15, plant);
+          to(A.elbow, 'x', -0.42, plant);
+          // ...and the gesture on top of it.
+          to(A.shoulder, 'x', armX, raise);
+          to(A.shoulder, 'z', A.side * armZ, raise);
+          to(A.elbow, 'x', armE, raise);
+          // ...and where they come to REST, which is the pose that is actually
+          // on screen for most of the shot and the one the first draft of this
+          // block did not have. Left at the standing target above, the arms hang
+          // dead straight against the ribs and both mitts disappear into the
+          // hip silhouette -- from the front that reads as a mannequin, which is
+          // the exact word the owner used about this character before the
+          // character pass. Hands to the hips: the elbow opens outboard, the
+          // forearm folds in, and the arm becomes a triangle with daylight
+          // through it. It also keeps the mitts low and inboard, out of the
+          // frame edges and well away from the face.
+          to(A.shoulder, 'x', 0.34, settle);
+          to(A.shoulder, 'y', -A.side * 0.30, settle);
+          to(A.shoulder, 'z', A.side * (0.30 + 0.10 * (1 - joy)), settle);
+          to(A.elbow, 'x', -1.62, settle);
+        }
+
+        // ---- trunk -------------------------------------------------------
+        // The cycle's yaw, roll and lean are damped out first (the run has
+        // stopped), then the gesture opens the chest on the win and folds it on
+        // the spent version, and finally the breath rides on top of the held
+        // shot.
+        to(chest, 'y', 0, plant);
+        to(chest, 'z', 0, plant);
+        to(hips, 'y', 0, plant);
+        to(hips, 'z', 0, plant);
+        to(spine, 'x', mix(0.10, -0.04, joy), plant);
+        to(root, 'z', 0, plant);
+        to(root, 'y', 0, plant);
+        chest.rotation.x += (mix(0.22, -0.20, joy) - chest.rotation.x) * raise;
+        chest.rotation.x -= breath * (0.030 + 0.030 * (1 - joy)) * settle;
+        spine.position.y += breath * (0.008 + 0.008 * (1 - joy)) * settle;
+        body.position.y += pop * 0.045 * joy;
+
+        // ---- head --------------------------------------------------------
+        // The eyeline is the whole point of the shot, so this is the one joint
+        // whose targets were picked against the FRONT camera and not against
+        // the silhouette. Back and open on the win, down and closed when spent,
+        // and then in the held shot the head comes level and turns toward the
+        // lens. NOT a chase, and not a constant either: camera.js mirrors the
+        // whole ending to whichever side of the road has room (celSideFor), so
+        // a fixed +y turn would point his face away from the camera on every
+        // finish from a left-hand lane. main.js hands the same sign down.
+        // Both ends tip the head BACK on the gesture and only the amount
+        // differs -- a bowed head at the gesture is the one thing that can hide
+        // the face outright, and the spent version bows in the HOLD instead,
+        // where the lens is 3.2 away and can still see it.
+        to(neck, 'x', mix(-0.22, -0.34, joy), Math.max(plant * 0.35, raise));
+        to(neck, 'z', 0, plant);
+        to(neck, 'y', 0, plant);
+        to(neck, 'x', mix(0.12, -0.06, joy), settle);
+        to(neck, 'y', 0.22 * (st.celSide || 1), settle);
+        // A slow nod through the held shot on the win, a slower one when spent:
+        // a head that is perfectly still for two and a half seconds is a
+        // waxwork, and this is the cheapest motion that is not the breath.
+        neck.rotation.x += Math.sin(celT * 0.9) * 0.030 * settle;
+      }
+
       // ---- secondary motion ------------------------------------------------
       //
       // Everything above this line is welded to a bone, so every part of the
@@ -9455,8 +9779,44 @@ MR.Runner = (function () {
       // pair measures as the sum of its parts. It is also the truer squint --
       // what closes on a face under effort is the lower lid, and the upper one
       // is being pushed by the brow above it.
-      const browLift = -POLISH * (0.0035 * effort + 0.0030 * wince);
-      const browTilt = POLISH * (0.0045 * effort + 0.0030 * wince);
+      // ---- ...AND AT THE FINISH IT IS CHOSEN, NOT DRIVEN -------------------
+      //
+      // Everything above assembles the face out of effort, which is right for
+      // a race and wrong for the two seconds after it: pace has stopped, grade
+      // is zero and surge is zero, so a finish left on the drive above would
+      // land on `effort` 0.30 -- a mild, neutral face -- at the only moment in
+      // the game where the camera is pointed at it.
+      //
+      // So the finish OVERRIDES the drive rather than adding to it, crossfaded
+      // by the same `settle` clock the head turn runs on. The two ends are the
+      // pose's two ends:
+      //
+      //   joy 1  brows UP, which no other state in this game does. Every
+      //          expression term written before this pass pulls the brow DOWN,
+      //          because effort and a wince are the only two things that had
+      //          ever driven it. Eyes fully open, mouth wide and BROAD -- the
+      //          x scale is what turns an open mouth into a grin, since there
+      //          is no smile channel and a mouth this size cannot have one.
+      //   joy 0  the wince the file already has, held: brows down and in, the
+      //          lower lid up, and the mouth pulled open on the breath so the
+      //          gasp is visibly periodic rather than a held shape.
+      //
+      // The upward brow travel is bounded by the CAP, not by taste. The band's
+      // underside is at HY + 0.065 and the brow rests at HY + 0.049 with its
+      // own half-depth of 0.0038, so there is 0.0122 of forehead above it. 0.009
+      // keeps an ink width clear of the brim.
+      const celF = (st.celT || 0) > 0
+        ? sm(Math.max(0, Math.min(1, ((st.celT || 0) - 0.70) / 1.10)))
+        : 0;
+      const celJoy = Math.max(0, Math.min(1, st.joy === undefined ? 0 : st.joy));
+      // The gasp, on the same clock and the same rate as the chest that drives
+      // it -- one breath, two places, so they cannot disagree.
+      const celBreath = Math.sin((st.celT || 0) * (0.55 + 0.70 * (1 - celJoy)) * Math.PI * 2);
+
+      const browLift = mix(-POLISH * (0.0035 * effort + 0.0030 * wince),
+        POLISH * mix(-0.0055, 0.0090, celJoy), celF);
+      const browTilt = mix(POLISH * (0.0045 * effort + 0.0030 * wince),
+        POLISH * mix(0.0060, -0.0010, celJoy), celF);
       {
         const ba = browGeo.pos.array, br = browGeo.rest, bu = browGeo.u;
         for (let i = 0; i < browGeo.pos.count; i++) {
@@ -9466,7 +9826,8 @@ MR.Runner = (function () {
       }
       // Narrowing only, never widening: a toy character with eyes OPENED past
       // their drawn size reads as startled, and he is running, not surprised.
-      const eyeShut = POLISH * (0.16 * effort + 0.34 * wince);
+      const eyeShut = mix(POLISH * (0.16 * effort + 0.34 * wince),
+        POLISH * mix(0.52, 0.02, celJoy), celF);
       eyePivot.scale.y = 1 - eyeShut;
       // EYE_SEMI is the sclera's own half-height. Translating by half of what
       // the scale takes away holds the TOP edge on the float and spends the
@@ -9479,8 +9840,10 @@ MR.Runner = (function () {
       // to nine pixels at the face lens and a shape change rather than a size
       // change, because the lower lip travels with it and the opening between
       // them is what grows.
-      mouthPivot.scale.y = 1 + POLISH * (0.55 * effort + 0.30 * wince);
-      mouthPivot.scale.x = 1 + POLISH * (0.10 * effort + 0.22 * wince);
+      mouthPivot.scale.y = mix(1 + POLISH * (0.55 * effort + 0.30 * wince),
+        1 + POLISH * mix(0.95 + 0.35 * celBreath, 0.70, celJoy), celF);
+      mouthPivot.scale.x = mix(1 + POLISH * (0.10 * effort + 0.22 * wince),
+        1 + POLISH * mix(0.18, 0.52, celJoy), celF);
 
       // Ducking drops the whole body rather than only folding the spine, so
       // the collision capsule and the silhouette agree. The 0.42 matches
@@ -12955,6 +13318,76 @@ MR.World = (function () {
   }
 
   /**
+   * ============ A CLOSED SOLID FROM A (z, y) PROFILE ============
+   *
+   * Extrudes a CONVEX profile in the z-y plane across x, and caps both ends.
+   * Every face is emitted -- the two flanks, both caps and one wall per profile
+   * edge -- so there is no side left out because a chase camera is unlikely to
+   * look at it. That is CLAUDE.md rule 1 as a primitive rather than as a
+   * paragraph an author has to remember: a caller cannot build half of one.
+   *
+   * WINDING IS DERIVED, NOT WRITTEN, and this is the whole reason the helper
+   * exists. src/render/ramp.js records what hand-winding cost: "the first draft
+   * did it by hand and got three of the six faces backwards, including the roof
+   * -- which back-face culling then deleted, so the frame showed the runner
+   * standing on the tram underneath instead of on the ramp." A missing face is
+   * invisible in a diff and nearly invisible in a frame. So each triangle takes
+   * its normal from its own winding and flips itself if that normal points back
+   * at the centroid of the solid. The solid is convex, so "outward is away from
+   * the middle" is exact rather than a heuristic.
+   *
+   * The profile is given in the order the runner meets it and may be wound
+   * either way round; orientation is not the caller's problem.
+   *
+   * @param prof  [[z, y], ...] a convex polygon, at least three points
+   * @param hw    half-width across x
+   */
+  function prismX(prof, hw, color, dx, dy, dz) {
+    const pos = [], nor = [];
+    const n = prof.length;
+    // The centroid of the solid. Only which SIDE of a face it falls on is used,
+    // so the plain mean of the profile is enough and is exact for a convex one.
+    let cz = 0, cy = 0;
+    for (const p of prof) { cz += p[0] / n; cy += p[1] / n; }
+    const cx = 0;
+
+    function tri(a, b, c) {
+      const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
+      const vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+      let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      const len = Math.hypot(nx, ny, nz);
+      if (len < 1e-12) return;              // degenerate, and a zero normal is worse than no face
+      nx /= len; ny /= len; nz /= len;
+      const fx = (a[0] + b[0] + c[0]) / 3 - cx;
+      const fy = (a[1] + b[1] + c[1]) / 3 - cy;
+      const fz = (a[2] + b[2] + c[2]) / 3 - cz;
+      let order = [a, b, c];
+      if (nx * fx + ny * fy + nz * fz < 0) { nx = -nx; ny = -ny; nz = -nz; order = [a, c, b]; }
+      for (const p of order) { pos.push(p[0], p[1], p[2]); nor.push(nx, ny, nz); }
+    }
+
+    for (let i = 0; i < n; i++) {
+      const p = prof[i], q = prof[(i + 1) % n];
+      // The wall on this edge.
+      const a = [-hw, p[1], p[0]], b = [hw, p[1], p[0]];
+      const c = [hw, q[1], q[0]], d = [-hw, q[1], q[0]];
+      tri(a, b, c); tri(a, c, d);
+      // ...and the two caps, as a fan from vertex 0. Convexity is what makes a
+      // fan legal, and it is the same convexity the winding test relies on.
+      if (i > 0 && i < n - 1) {
+        const r = prof[0];
+        tri([-hw, r[1], r[0]], [-hw, p[1], p[0]], [-hw, q[1], q[0]]);
+        tri([hw, r[1], r[0]], [hw, p[1], p[0]], [hw, q[1], q[0]]);
+      }
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    return part(geo, color, dx, dy, dz);
+  }
+
+  /**
    * ============ VEHICLE FITTINGS ============
    *
    * The four things every reference vehicle has and ours did not, measured off
@@ -14526,135 +14959,6 @@ MR.World = (function () {
     };
   }
 
-  /**
-   * The racing line: one concrete lane path that survives the whole course.
-   *
-   * course.js already proves a path EXISTS -- generate() retries a gate until
-   * `solvable()` still says yes. This walks the identical state space, keeps
-   * the cheapest survivor instead of the first, and hands back the lane to be
-   * in at every gate. Identical rules means the line drawn on the road is a
-   * line the player can actually hold, not a suggestion that runs into a train
-   * two gates later.
-   *
-   * Cost is lane changes first and actions second, which is the line a runner
-   * would pick rather than merely a legal one: hold what you have, move only
-   * when the gate makes you, and prefer the lane you can run straight through.
-   *
-   * It is a property of the course, so it is the same for every player on the
-   * same day -- exactly like the course itself.
-   */
-  function racingLine(gates, startLane, startIdx) {
-    if (!gates.length) return null;
-    const AW = MR.Course.ACTION_WINDOW;
-    const from = startIdx || 0;
-    // Same state collapse as Course.solvable: lane, the action still committed
-    // to, and whether that action is recent enough to conflict.
-    //
-    // Seeded from where the player ACTUALLY is, not from a fixed lane 1. A line
-    // planned from lane 1 is always survivable, but it will happily ask a
-    // player sitting in a clear lane to move for no reason, and a hint you
-    // learn to ignore is worse than no hint.
-    let states = [{ lane: startLane === undefined ? 1 : startLane, act: K.CLEAR, z: -1e9, cost: 0, prev: null }];
-
-    for (let i = from; i < gates.length; i++) {
-      const g = gates[i];
-      const next = new Map();
-      for (const s of states) {
-        for (let l = 0; l < 3; l++) {
-          const h = g.lanes[l];
-          if (h === K.BLOCK) continue;
-          if (h !== K.CLEAR && s.act !== K.CLEAR && h !== s.act && g.z - s.z < AW) continue;
-          const act = h === K.CLEAR ? s.act : h;
-          const az = h === K.CLEAR ? s.z : g.z;
-          const tag = l + ':' + act + ':' + (g.z - az < AW ? 1 : 0);
-          // Lane changes dominate; an action is a small tax; and sitting in an
-          // outer lane costs a little every gate, so once a hazard has pushed
-          // the line wide it drifts back to the middle instead of camping out
-          // there. The middle is where a line has an escape on both sides, and
-          // a hint that keeps sending the player to the edge of the road for no
-          // reason is a hint they stop believing.
-          const cost = s.cost + Math.abs(l - s.lane) * 12 + (h === K.CLEAR ? 0 : 1) + (l === 1 ? 0 : 2);
-          const cur = next.get(tag);
-          if (!cur || cost < cur.cost) next.set(tag, { lane: l, act, z: az, cost, prev: s });
-        }
-      }
-      // Unreachable: generate() would have rejected the gate. Fail soft rather
-      // than throw -- a missing line is a missing hint, not a broken race.
-      if (!next.size) return null;
-      states = Array.from(next.values());
-    }
-
-    let best = states[0];
-    for (const s of states) if (s.cost < best.cost) best = s;
-
-    // Backtrack only over the range actually solved. The chain is `from` links
-    // long, not gates.length, so walking to index 0 dereferences null the
-    // moment a replan starts mid-course. Gates already behind the player keep
-    // the start lane, which costs nothing -- the ribbon is only drawn ahead.
-    const lanes = new Array(gates.length);
-    for (let i = gates.length - 1; i >= from; i--) { lanes[i] = best.lane; best = best.prev; }
-    for (let i = 0; i < from; i++) lanes[i] = lanes[from] !== undefined ? lanes[from] : 1;
-    return lanes;
-  }
-
-  /**
-   * The stripe the racing line is painted with: soft-edged, with a pulse
-   * running along it.
-   *
-   * Deliberately paint and not floating pickups. Anything hovering in a lane at
-   * this camera height has to be read and then ruled out as a hazard, and the
-   * entire point of the hint is to reduce what the player has to parse, not to
-   * add a fifth thing on the road that looks like the other four.
-   */
-  let routeTex = null;
-  function routeTexture() {
-    if (routeTex) return routeTex;
-    const c = canvas(32, 128);
-    const g = c.getContext('2d');
-    const img = g.createImageData(32, 128);
-    for (let y = 0; y < 128; y++) {
-      // Two pulses per tile and never fully dark: a line that breaks stops
-      // reading as a path and starts reading as a row of objects.
-      const v = y / 128;
-      const flow = 0.54 + 0.46 * Math.pow(0.5 + 0.5 * Math.sin(v * Math.PI * 4 - 1.6), 2.4);
-      for (let x = 0; x < 32; x++) {
-        // Soft shoulders. A hard-edged stripe aliases into a dotted line at the
-        // far end of the run-up, which is the end that has to carry the read.
-        const u = Math.abs(x - 15.5) / 15.5;
-        const core = Math.max(0, 1 - Math.pow(u, 2.6));
-        const i = (y * 32 + x) * 4;
-        img.data[i] = 255; img.data[i + 1] = 255; img.data[i + 2] = 255;
-        img.data[i + 3] = Math.round(255 * core * flow);
-      }
-    }
-    g.putImageData(img, 0, 0);
-    routeTex = texture(c, true);
-    return routeTex;
-  }
-
-  /**
-   * A ring, for the floating half of the route hint.
-   *
-   * The hard stroke is under a pixel wide by 90 units, so it carries a much
-   * softer halo underneath it -- that is what is actually still visible at the
-   * far end of the trail, where the hint has to do its work.
-   */
-  let ringTex = null;
-  function ringTexture() {
-    if (ringTex) return ringTex;
-    const c = canvas(64, 64);
-    const g = c.getContext('2d');
-    g.strokeStyle = '#ffffff';
-    g.globalAlpha = 0.34;
-    g.lineWidth = 22;
-    g.beginPath(); g.arc(32, 32, 21, 0, Math.PI * 2); g.stroke();
-    g.globalAlpha = 1;
-    g.lineWidth = 9;
-    g.beginPath(); g.arc(32, 32, 21, 0, Math.PI * 2); g.stroke();
-    ringTex = texture(c);
-    return ringTex;
-  }
-
   function create(course) {
     const group = new THREE.Group();
 
@@ -16045,350 +16349,6 @@ MR.World = (function () {
       return t;
     }, group);
 
-    // ---- the racing line ------------------------------------------------
-    /**
-     * A blue line, painted on the road, showing the lane the next few gates
-     * have to be taken in.
-     *
-     * The whole mechanic here is holding one unbroken clean line, and until now
-     * the game gave the player no forward read of where that line was: every
-     * gate was solved on its own, on sight, with no way to see that the lane
-     * you are about to take is the one that runs into a train two gates later.
-     * Both reference runners telegraph the route several gates out with a coin
-     * or ring trail. A marathon already has the perfect version of that idea --
-     * real courses paint the measured shortest route on the tarmac -- so this
-     * is a borrow that costs the game nothing in tone.
-     *
-     * Cost is one draw call, and a second for the rings below. Each is a single
-     * mesh whose vertices are rewritten in place every frame as the route
-     * scrolls past, so neither allocates and neither grows with the length of
-     * the course.
-     *
-     * It hints the LANE and nothing else: which action a gate wants, and when
-     * to commit to it, are still entirely the player's read.
-     */
-    const ROUTE_NEAR = 5;      // starts clear of the runner's own feet
-    const ROUTE_FAR = 124;     // three to five gates -- as far as the fog allows
-    const ROUTE_SEGS = 44;
-    const ROUTE_W = 0.17;      // half-width
-    const ROUTE_UV = 1 / 14;   // one texture tile per 14 units of road
-
-    // Replanned whenever the player changes lane; the solve is ~174 gates x 3
-    // states, far too cheap to be worth caching harder than this.
-    let routeLane = racingLine(course.gates, 1, 0);
-    let routePlannedLane = 1;
-    const routeGeo = new THREE.BufferGeometry();
-    const routePos = new Float32Array(ROUTE_SEGS * 6 * 3);
-    const routeUvs = new Float32Array(ROUTE_SEGS * 6 * 2);
-    // RGB is always 1 and only the alpha moves -- the same four-component
-    // trick the ring trail uses below, and for the same reason: a fade the
-    // geometry owns can be shaped, and the fog's cannot.
-    const routeCol = new Float32Array(ROUTE_SEGS * 6 * 4);
-    for (let i = 0; i < ROUTE_SEGS * 6; i++) {
-      routeCol[i * 4] = 1; routeCol[i * 4 + 1] = 1; routeCol[i * 4 + 2] = 1;
-    }
-    routeGeo.setAttribute('position', new THREE.BufferAttribute(routePos, 3));
-    routeGeo.setAttribute('uv', new THREE.BufferAttribute(routeUvs, 2));
-    routeGeo.setAttribute('color', new THREE.BufferAttribute(routeCol, 4));
-    /**
-     * ============ THE LINE WAS GREEN, AND SO IS EVERY PICKUP ============
-     *
-     * This colour used to be 0x5ff0a6, and the comment that chose it read "the
-     * one hue no hazard owns; amber, cyan and red are all spoken for, and green
-     * reads go". Every clause of that is true and the conclusion is still
-     * wrong, because it was checked against the HAZARD palette and never
-     * against the PICKUP palette. Measured in HSV:
-     *
-     *   racing line   0x5ff0a6   hue 149.4   sat 0.60
-     *   aid pool      0x86eec0   hue 153.5   sat 0.44
-     *   bottle body   0xf6fffb   hue 153.3   sat 0.04
-     *   bottle label, cap, and the aid table's cloth
-     *                 0x2fd39a   hue 159.1   sat 0.78
-     *
-     *   JUMP 38.7    DUCK 192.3    BLOCK 345.3
-     *
-     * The three hazards are 33 degrees from their nearest neighbour at worst.
-     * The line and the whole aid family sat inside TEN DEGREES of each other.
-     * So this game had one colour meaning "follow this" and "collect this" at
-     * the same time, and the only thing separating them was how much of each
-     * you could see.
-     *
-     * That is not theoretical. A blind reader shown 1:1 crops through the chase
-     * camera, asked only about the PEOPLE in them, twice volunteered a green
-     * object they could not name -- and their guess at one of them was "it
-     * might be a BOTTLE". They were looking at this ribbon, cut down to a
-     * 7 x 13 fragment by the two figures standing in front of it, and they read
-     * the game's route hint as the game's aid pickup. tools/routeread.js is the
-     * instrument that came out of it.
-     *
-     * So the line moves and the pickups keep the green, which is the right way
-     * round twice over: the pickup is a world OBJECT the player is scored on
-     * touching, and the line is an affordance drawn on the road. Violet is 109
-     * degrees off the aid family, 75 off DUCK and 76 off BLOCK -- the largest
-     * clear band the palette has left -- it is what every map in the world
-     * draws a planned route in, and it is a hue this game had no other use for.
-     */
-    const routeMesh = new THREE.Mesh(routeGeo, new THREE.MeshBasicMaterial({
-      map: routeTexture(),
-      color: 0xa87bff,          // hue 265, sat 0.52, val 1.00
-      transparent: true,
-      vertexColors: true,       // per-vertex ALPHA only; see updateRoute
-      /**
-       * 0.62 WAS TUNED AGAINST AN EMPTY ROAD, AND THE ROAD IS NOT EMPTY.
-       *
-       * The old note here -- "at full strength the line reads as a beam being
-       * fired down the road rather than as a marking on it" -- is about the
-       * ribbon on its own. Asked to rank what the eye lands on in a frame at
-       * 25 units, which is READ_NEAR and the distance the lane is actually
-       * chosen at, a blind reader put it SECOND of six, above the runner, and
-       * put the aid pickup it shares the road with LAST:
-       *
-       *   "yes, things on the road out-shout the hovering object at 25u,
-       *    clearly and by a lot. The violet streaks beat it decisively -- they
-       *    are bigger, more saturated, higher contrast against their
-       *    background, and there are several of them competing against one
-       *    small item."
-       *
-       * A route hint is meant to be read on the way to reading something else.
-       * The item it was drowning is the one tools/simulate.js says is worth two
-       * extra mistakes over a record attempt, so this is not a matter of taste:
-       * the hint was taking attention from the thing attention is for.
-       *
-       * The colour move that fixed the confusion made this worse and hid it --
-       * violet on dark asphalt is a bigger value break than the mint it
-       * replaced. So the hue keeps its separation from the pickups and the
-       * ribbon gives back the strength it never needed.
-       */
-      opacity: 0.38,
-      depthWrite: false,
-      /**
-       * FOGGED, AND THIS LINE WAS BRIEFLY THE OTHER WAY ROUND.
-       *
-       * The ring trail below carries fog:false with a paragraph saying its job
-       * is to be legible far up the road, which is exactly where the fog is
-       * taking half the contrast out of everything else. That paragraph looks
-       * like it applies verbatim to the ribbon the rings were drawn on top of,
-       * and this material was given the exemption on that reasoning.
-       *
-       * A blind reader shown the aid pickups at 8, 12 and 25 units then said
-       * this, unprompted, about the exempted ribbon: "at 25u the purple streaks
-       * are visually the LOUDEST thing in the frame -- considerably louder than
-       * the pale bottle they share the road with. Whatever they are, they
-       * compete with the small object for attention at long range."
-       *
-       * That is the aid item losing its own frame to the route hint at exactly
-       * the distance the lane is chosen at, which is a worse failure than the
-       * one the exemption was fixing. The paragraph does not transfer, and the
-       * reason is that the RING TRAIL IS SPARSE AND THE RIBBON IS CONTINUOUS:
-       * fourteen small marks that hold their contrast up the road read as a
-       * trail, and 124 unbroken units of paint that hold theirs read as the
-       * brightest object in the scene. Exempting something from aerial
-       * perspective buys attention, and attention is the scarce thing the
-       * pickups need.
-       *
-       * So the fog stays on, and the readability the exemption was after is
-       * bought instead by the constant width in updateRoute -- which is the
-       * axis that was actually being spent, and which costs no salience.
-       */
-      fog: true,
-      side: THREE.DoubleSide,   // the ribbon is rebuilt every frame; not
-    }));                        // depending on winding is one less way to fail
-    // Below the hazard telegraph mats (5) and the finish checker (4): where the
-    // line runs across a gate's own mat, the hazard has to win.
-    routeMesh.renderOrder = 3;
-    routeMesh.userData.notScenery = true;
-    routeMesh.frustumCulled = false;   // its bounds change every frame
-    routeMesh.visible = !!routeLane;
-    group.add(routeMesh);
-
-    /**
-     * The floating half of the hint: a trail of rings riding the same line.
-     *
-     * Paint alone cannot do this job. The chase camera sits low and directly
-     * behind, so the runner's own body covers the centre of the road from about
-     * 35 units out all the way to the horizon -- a line painted in the lane the
-     * player is already in is invisible exactly where the forward read has to
-     * happen. Rings sit high enough off the tarmac to clear the head in frame,
-     * which is the same answer both reference games arrived at.
-     *
-     * A ring is a hollow circle and nothing else in this game is round, so it
-     * cannot be mistaken for a fifth kind of obstacle. It marks the LANE only:
-     * which action a gate wants, and when to commit, are still the player's.
-     *
-     * Evenly spaced along the line and anchored to a world grid rather than
-     * hung off the gates: a trail has to be a trail. Gate spacing runs 46 units
-     * early and 24 late, so per-gate clusters would have left the opening miles
-     * with three rings and a long nothing, which reads as a row of separate
-     * markers rather than a path.
-     */
-    const RING_SPACE = 11;
-    const RING_FROM = 10;
-    // Two slots more than the fade can reach, so the far end of the trail is
-    // always already at zero when the world grid shifts a new ring into it.
-    // Sized to the window rather than to the fade and a ring would wink into
-    // existence at a third opacity, 120 units out, every few seconds.
-    const RING_N = 14;
-    const RING_FADE = 122;
-    // 1.30 is the one height that works: above a JUMP kerb (0.80) and clear
-    // below a DUCK bar (1.41), so a ring never floats at bar height where it
-    // would read as "through here". The radius is chosen the same way -- 0.36
-    // is 42% of a lane, big enough to survive the fog and small enough that the
-    // trail never looks like something in the way.
-    const RING_Y = 1.30;
-    const RING_R = 0.36;
-
-    const ringGeo = new THREE.BufferGeometry();
-    const ringPos = new Float32Array(RING_N * 6 * 3);
-    const ringUvs = new Float32Array(RING_N * 6 * 2);
-    const ringCol = new Float32Array(RING_N * 6 * 4);
-    for (let i = 0; i < RING_N; i++) {
-      // UVs and RGB never change; only the corners and the alpha do.
-      const u = i * 12, c = i * 24;
-      const uvq = [0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1];
-      for (let k = 0; k < 12; k++) ringUvs[u + k] = uvq[k];
-      for (let k = 0; k < 6; k++) { ringCol[c + k * 4] = 1; ringCol[c + k * 4 + 1] = 1; ringCol[c + k * 4 + 2] = 1; }
-    }
-    ringGeo.setAttribute('position', new THREE.BufferAttribute(ringPos, 3));
-    ringGeo.setAttribute('uv', new THREE.BufferAttribute(ringUvs, 2));
-    ringGeo.setAttribute('color', new THREE.BufferAttribute(ringCol, 4));
-    const ringMesh = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({
-      map: ringTexture(), color: 0x5ff0a6, transparent: true, depthWrite: false,
-      vertexColors: true, side: THREE.DoubleSide,
-      // The only thing in the scene exempt from aerial perspective. Its job is
-      // to be legible at 100 units, which is exactly where the fog is taking
-      // half the contrast out of everything else; the trail carries its own
-      // distance cue in the alpha ramp below instead.
-      fog: false,
-    }));
-    ringMesh.renderOrder = 6;   // over the telegraph mats, never under them
-    ringMesh.frustumCulled = false;
-    // The floating ring trail is deliberately NOT added to the scene.
-    //
-    // Playtest verdict: a constant line of markers hovering at head height for
-    // 26 miles reads as something you are obliged to collect, and it sat in the
-    // one part of the frame the player is trying to read hazards through. The
-    // painted racing ribbon on the road carries the same information without
-    // occupying the air. The geometry is kept so a future pass can bring it
-    // back as an occasional beacon (say, only where the line must change lane)
-    // rather than as a continuous chain.
-    ringMesh.visible = false;
-
-    // Sampling walks z forwards, so the gate lookup is a cursor rather than a
-    // search. It rewinds at the start of each frame and costs nothing after.
-    let routeCursor = 0;
-    function routeX(zz) {
-      const gates = course.gates;
-      while (routeCursor > 0 && gates[routeCursor - 1].z >= zz) routeCursor--;
-      while (routeCursor < gates.length && gates[routeCursor].z < zz) routeCursor++;
-      const i = routeCursor;
-      if (i >= gates.length) return K.LANE_X[routeLane[gates.length - 1]];
-      const to = K.LANE_X[routeLane[i]];
-      const from = i > 0 ? K.LANE_X[routeLane[i - 1]] : to;
-      const gz = gates[i].z;
-      const pz = i > 0 ? gates[i - 1].z : gz - 40;
-      // Cross over into the new lane before the gate, never across it: by the
-      // gate line the paint is already where the player has to be.
-      const cross = Math.min(18, Math.max(8, (gz - pz) * 0.55));
-      const t = Math.max(0, Math.min(1, (zz - (gz - cross)) / cross));
-      return from + (to - from) * t * t * (3 - 2 * t);
-    }
-
-    function updateRoute(z, now) {
-      if (!routeLane) return;
-      const step = (ROUTE_FAR - ROUTE_NEAR) / ROUTE_SEGS;
-      let z0 = z + ROUTE_NEAR;
-      let x0 = routeX(z0);
-      for (let i = 0; i < ROUTE_SEGS; i++) {
-        const z1 = z + ROUTE_NEAR + (i + 1) * step;
-        const x1 = routeX(z1);
-        /**
-         * THE FAR END FADES IN ALPHA, NOT IN WIDTH, and the difference is the
-         * whole readability of this thing.
-         *
-         * What was here: a width taper to half of ROUTE_W over the run, so the
-         * far end "thins into the fog rather than stopping on a cut edge". The
-         * intent was right and the axis was wrong. Perspective ALREADY halves
-         * this ribbon's screen width every time the distance doubles, so a
-         * width taper is a second narrowing stacked on the first -- and screen
-         * width is the one dimension that decides whether a strip of paint
-         * reads as a strip of paint. tools/routeread.js scores exactly that,
-         * as ELONGATION: bbox height over bbox width, the property that
-         * separates a line from a blob. Taking width away to buy a fade spends
-         * the measured quantity to pay for an unmeasured one.
-         *
-         * Alpha buys the same soft end and costs nothing in width. So the
-         * ribbon is now a constant ROUTE_W the whole way and fades over its
-         * last quarter, and it is the fade rather than the fog that decides
-         * where it stops -- which is the point of the fog:false above.
-         */
-        const w0 = ROUTE_W, w1 = ROUTE_W;
-        const fade = function (t) {
-          const q = Math.max(0, (t - 0.74) / 0.26);
-          return Math.max(0, 1 - q * q);
-        };
-        const a0 = fade(i / ROUTE_SEGS), a1 = fade((i + 1) / ROUTE_SEGS);
-        const v0 = z0 * ROUTE_UV, v1 = z1 * ROUTE_UV;
-        const p = i * 18, u = i * 12, cc = i * 24;
-        // Vertex order below is l0, r1, r0 -- then l0, l1, r1.
-        const av = [a0, a1, a0, a0, a1, a1];
-        for (let k = 0; k < 6; k++) routeCol[cc + k * 4 + 3] = av[k];
-        // The ribbon is PAINT: it has to lie on the road over the whole 124
-        // units it reaches, or it leaves the surface at the first crest and the
-        // one forward read the player has starts floating in the air.
-        const ry0 = 0.010 + eAt(z0), ry1 = 0.010 + eAt(z1);
-        // l0, r1, r0 -- then l0, l1, r1.
-        routePos[p] = x0 - w0; routePos[p + 1] = ry0; routePos[p + 2] = z0;
-        routePos[p + 3] = x1 + w1; routePos[p + 4] = ry1; routePos[p + 5] = z1;
-        routePos[p + 6] = x0 + w0; routePos[p + 7] = ry0; routePos[p + 8] = z0;
-        routePos[p + 9] = x0 - w0; routePos[p + 10] = ry0; routePos[p + 11] = z0;
-        routePos[p + 12] = x1 - w1; routePos[p + 13] = ry1; routePos[p + 14] = z1;
-        routePos[p + 15] = x1 + w1; routePos[p + 16] = ry1; routePos[p + 17] = z1;
-        routeUvs[u] = 0; routeUvs[u + 1] = v0;
-        routeUvs[u + 2] = 1; routeUvs[u + 3] = v1;
-        routeUvs[u + 4] = 1; routeUvs[u + 5] = v0;
-        routeUvs[u + 6] = 0; routeUvs[u + 7] = v0;
-        routeUvs[u + 8] = 0; routeUvs[u + 9] = v1;
-        routeUvs[u + 10] = 1; routeUvs[u + 11] = v1;
-        z0 = z1; x0 = x1;
-      }
-      routeGeo.attributes.position.needsUpdate = true;
-      routeGeo.attributes.uv.needsUpdate = true;
-      routeGeo.attributes.color.needsUpdate = true;
-      // The pulse runs forward, away from the runner, so the line leads the eye
-      // down the course instead of washing back over it.
-      routeTexture().offset.y = -(now * 0.45) % 1;
-
-      // ---- rings -------------------------------------------------------
-      // Anchored to a world grid, so a ring holds still on the road and slides
-      // toward the runner instead of the whole trail crawling forward with the
-      // camera. New ones therefore only ever appear at the far end, where the
-      // alpha ramp has already faded them to nothing.
-      let cz = Math.ceil((z + RING_FROM) / RING_SPACE) * RING_SPACE;
-      for (let n = 0; n < RING_N; n++, cz += RING_SPACE) {
-        const p = n * 18, c = n * 24;
-        // Alpha falls away down the trail, so the eye is pulled to the next
-        // gate first and the far end stays a suggestion, not a second read.
-        const a = 0.95 * Math.max(0, 1 - Math.pow(Math.min(1, (cz - z) / RING_FADE), 2.2));
-        if (a <= 0.01) { for (let v = 0; v < 18; v++) ringPos[p + v] = 0; continue; }
-        const cx = routeX(cz);
-        const cy = RING_Y + eAt(cz) + Math.sin(now * 1.9 + n * 1.1) * 0.045;
-        routeQuad(ringPos, p, cx - RING_R, cy - RING_R, cx + RING_R, cy + RING_R, cz);
-        for (let v = 0; v < 6; v++) ringCol[c + v * 4 + 3] = a;
-      }
-      ringGeo.attributes.position.needsUpdate = true;
-      ringGeo.attributes.color.needsUpdate = true;
-    }
-
-    /** Two triangles of an axis-aligned quad in the XY plane at depth `zz`. */
-    function routeQuad(arr, p, l, b, r, t, zz) {
-      arr[p] = l; arr[p + 1] = b; arr[p + 2] = zz;
-      arr[p + 3] = r; arr[p + 4] = b; arr[p + 5] = zz;
-      arr[p + 6] = r; arr[p + 7] = t; arr[p + 8] = zz;
-      arr[p + 9] = l; arr[p + 10] = b; arr[p + 11] = zz;
-      arr[p + 12] = r; arr[p + 13] = t; arr[p + 14] = zz;
-      arr[p + 15] = l; arr[p + 16] = t; arr[p + 17] = zz;
-    }
-
     // ---- hazards --------------------------------------------------------
     // Visual extents are pinned to MR.Collision.BOX: JUMP tops out at 0.80,
     // the DUCK bar spans 1.41-1.83, BLOCK is 2.80 tall and 1.30 deep. Anything
@@ -16616,6 +16576,10 @@ MR.World = (function () {
             f.position.set(0, d.face[2], d.face[3]);
             f.rotation.y = Math.PI;
             vg.add(f);
+            // Kept, because a rideable train has to be able to take it down:
+            // this board sits on the rear plane at knee height, which is
+            // straight across the open mouth of a ramp. See the cast site.
+            vg.userData.face = f;
           }
           // The one moving part a variant is allowed: a single extra mesh on
           // its own pivot. Two would be two more draw calls per live hazard.
@@ -16629,6 +16593,30 @@ MR.World = (function () {
             // back off the mesh would drift, because the mesh is the thing the
             // anim is writing to.
             vg.userData.pivotY = d.pivot[1];
+          }
+          /**
+           * THE RIDEABLE TAIL, and it costs no draw call it does not earn.
+           *
+           * A second extra mesh, which the note above rules out for `moving`
+           * and which this one is allowed for a reason that is arithmetic
+           * rather than special pleading: it is HIDDEN unless the course marked
+           * this particular train rideable, and the only variant that carries
+           * one gave up its pantograph to get it. A tram with its tail open
+           * draws body + tail + face; a tram without draws body + face. The old
+           * tram drew body + pantograph + face. Nothing in the frame got more
+           * expensive and a rideable one got a mechanic.
+           *
+           * Hidden HERE rather than at the cast site alone, because the pool
+           * recycles: a claim that forgot to write this would inherit the
+           * previous tenant's open tail and put a ramp on a wall. The cast site
+           * writes it on every claim for the same reason every variant's
+           * visibility is written on every claim.
+           */
+          if (d.ride) {
+            const rd = S.outlined(d.ride, mats.propLit, S.INK.hazard);
+            rd.visible = false;
+            vg.add(rd);
+            vg.userData.ride = rd;
           }
           // THE NEAR-FACE ANCHOR, AND IT IS THIS ONE LINE.
           //
@@ -17979,6 +17967,19 @@ MR.World = (function () {
      * renderer's shading, which returns (168,161,3).
      */
     const TRAM_BODY = 0x1e9cf0, TRAM_DARK = 0x0c2436, TRAM_CREASE = 0x0074a8;
+    /**
+     * The deck walkway, and it is a VALUE and not a hue.
+     *
+     * The one surface in this game a runner stands on has to read as a floor
+     * from behind and above, and it has to do it without borrowing a signal
+     * that already means something: yellow-and-black is DUCK, red-and-white is
+     * construction furniture, and the green family is the aid pickups. So the
+     * deck says "surface" with luminance instead -- a pale warm grey that is
+     * the brightest thing on a cool blue body, sitting between the CHROME trim
+     * and the LEMON cream the fleet already uses, and carrying GLOSS.matte
+     * because a floor is the one panel that must not flare.
+     */
+    const TRAM_DECK = 0xd8d2c4;
     const BUS_BODY = 0x00c896, BUS_DARK = 0x0e2a26, BUS_CREASE = 0x008060;
     const TAXI_BODY = 0xffdd00, TAXI_DARK = 0x2e2412, TAXI_CREASE = 0xd89800;
     const VAN_BODY = 0xff8c00, VAN_DARK = 0x35220a, VAN_CREASE = 0xc26200;
@@ -18061,29 +18062,244 @@ MR.World = (function () {
         grilleY: 0.86, grilleH: 0.24, lampX: 0.82, lampW: 0.30, lampH: 0.20,
         bumpW: 2.22, bumpH: 0.32, bumpY: 0.36, plateW: 0.60, slats: 2,
       });
+      /**
+       * ============ THE ROOF IS A DECK, AND IT IS FLAT AT 2.80 ============
+       *
+       * What was here: four slabs tapering 2.24 -> 2.16 -> 2.02 -> 1.76 and
+       * rising 2.10 -> 2.44. A pretty tram roof, and the wrong object, because
+       * THIS is the body a runner stands on. Measured with a downward raycast
+       * over the footprint (see the probe in roadmap 46 and the one this pass
+       * re-derived), that roof ran 2.340 to 2.551, varied 0.21 across the deck,
+       * and had columns with nothing under them at all -- against a
+       * Course.DECK_Y of 2.80, which is what the runner is placed at. A runner
+       * on it floated between 0.25 and 0.46 depending where they stood, and
+       * crossed holes.
+       *
+       * The fix is not to raise a slab, because the defect was never height --
+       * it was that a domed roof made of narrowing slabs is not a SURFACE.
+       * These three masses are one continuous plate: same depth, same
+       * unchamfered top, all four corners of it at exactly 2.80.
+       *
+       * WHY UNCHAMFERED, ON A FILE WHOSE WHOLE FLEET IS CHAMFERED. hcbx cuts
+       * the top edge DOWNWARD from the number it is given -- correct everywhere
+       * else, and wrong here, because it would make the deck flat at 2.80 only
+       * across the middle and slope away at both edges. The one surface in this
+       * game that is stood on is the one surface that has to be genuinely
+       * planar. The chamfer moves to the mass UNDER it instead, which is where
+       * the silhouette actually reads it.
+       *
+       * IT IS THREE BOXES AND NOT ONE FOR THE READ, NOT FOR THE SHAPE. All
+       * three top out on the same plane, so there is no step and nothing to
+       * z-fight; what differs is colour. A pale centre walkway between two
+       * darker edge panels is what says "this is somewhere you can run" from
+       * behind and above -- which is the angle this is seen from and the angle
+       * a uniform blue slab says nothing at.
+       *
+       * 2.80 IS NOT CHOSEN. It is MR.Collision.BOX[BLOCK].yMax, which is
+       * Course.DECK_Y, which is where the runner's feet go.
+       */
       parts.push(
         gl(hcbx(2.24, 0.16, 3.88, 0, 2.18, 0, CHROME, 0.03), GLOSS.chrome),
-        gl(hcbx(2.16, 0.08, 3.86, 0, 2.30, 0, TRAM_BODY, 0.03), GLOSS.paint),
-        gl(hcbx(2.02, 0.06, 3.70, 0, 2.37, 0, CHROME, 0.02), GLOSS.chrome),
-        gl(hcbx(1.76, 0.04, 3.40, 0, 2.42, 0, TRAM_BODY, 0.02), GLOSS.paint),
+        // The roof volume under the deck, chamfered, carrying the silhouette.
+        // 2.26 to 2.66, so it meets the deck plate's underside with no gap.
+        gl(hcbx(2.16, 0.40, 3.86, 0, 2.46, 0, TRAM_BODY, 0.06), GLOSS.paint),
+        // ...and the deck plate itself: 2.66 to 2.80, flat top, full depth.
+        gl(hbx(0.96, 0.14, 3.88, 0, 2.73, 0, TRAM_DECK), GLOSS.matte),
+        /**
+         * THE EDGE PANELS ARE NEAR-BLACK, AND A FRAME IS WHY.
+         *
+         * They were TRAM_CREASE, the body's own mid-blue, and the first ride
+         * through the chase camera says what that costs: standing on the deck,
+         * the vehicle underneath is invisible -- you are looking along a roof,
+         * so its flanks are hidden by the roof itself -- and a pale strip with
+         * mid-blue edges read as a painted path at road level rather than as
+         * something 2.80 up. On the canal leg the blue edges were the same
+         * value as the water beside them and the deck had no edge at all.
+         *
+         * A raised lip would be the obvious answer and is not available: the
+         * box tops out at 2.80 and nothing may stand above it. So the edge is
+         * made of VALUE instead of height. Near-black against the pale walkway
+         * is the hardest border the palette can draw, it survives every setting
+         * the day can pick, and it is what a real roof walkway has along it
+         * anyway -- the cable duct and the non-slip margin.
+         */
+        gl(hbx(0.62, 0.14, 3.88, -0.79, 2.73, 0, TRAM_DARK), GLOSS.trim),
+        gl(hbx(0.62, 0.14, 3.88, 0.79, 2.73, 0, TRAM_DARK), GLOSS.trim),
         gl(hbx(1.06, 0.12, 0.10, 0, 2.18, -1.90, TRAM_DARK), GLOSS.trim)
       );
       return merge(parts);
     })();
+
     /**
-     * The pantograph, and it is the `moving` child rather than part of the body
-     * for one reason: the body is what a train scales, and a pantograph stretched
-     * to six units is a ladder. On its own child it stays one pantograph however
-     * long the tram is, and it gets a slow sway for free.
+     * ============ THE TAIL, AND THE RAMP THAT COMES OUT OF IT ============
      *
-     * Top of the shoe lands at 2.77 against the 2.80 the collision box records.
+     * The rideable half of BLOCK v0: the tram's own tail, opened, with its
+     * boarding ramp folded down onto the road. This is the object in
+     * reference/ttgr-ramp-onto-truck.png -- a vehicle whose back end is a slope
+     * lying on the tarmac, inset inside the body, with a deck above it -- and
+     * it is drawn ONLY on a train the course marked rideable. A ramp down on
+     * something you cannot ride would be the game lying about an affordance,
+     * which is rule 4, and the ramp down IS the read: the reference frame has
+     * two orange lorries side by side and the one you can take is the one with
+     * its tail open.
+     *
+     * ---- IT IS UNSCALED, AND THAT IS THE WHOLE REASON IT IS A SEPARATE MESH -
+     *
+     * A train sets body.scale.z = span. At a ramp's span of 8.2 to 10.9 that
+     * turns 6.0 units of slope into 49 to 65 and the mechanic into a mountain.
+     * So the tail is its own child at the variant's origin, always 6.0 long,
+     * and the SCALED body is shortened by exactly that 6.0 and pushed forward
+     * to sit on top of it -- see the cast site, which is the one place that
+     * arithmetic is written.
+     *
+     * ---- EVERY NUMBER IS READ OFF THE CONTRACT, NONE IS CHOSEN --------------
+     *
+     * MR.Course states the mechanic and this file draws it, never the other way
+     * round. In the variant's own authoring frame, where the gate line is local
+     * z = -halfZ because the pool sets vg.position.z = +halfZ:
+     *
+     *   mouth on the road   z = -1.95  (-halfZ, the gate line)      y = 0
+     *   top meeting deck    z = +4.05  (-halfZ + RAMP_RUN)          y = 2.80
+     *   slope               atan(2.80 / 6.0) = 25.0 degrees
+     *
+     * DECK_Y and RAMP_RUN are read from MR.Course and halfZ from
+     * MR.Collision.BOX, so there is no number here that can drift away from the
+     * mechanic. Art never decides clearance.
+     *
+     * ---- WHERE THE BRIEF'S CONTRACT WAS WRONG, AND WHAT IT SAYS INSTEAD -----
+     *
+     * The recorded contract also says the ramp is "one lane wide, x in
+     * [-0.85, +0.85] (LANE 1.70), inset inside the body". Those two clauses
+     * contradict each other in this file and the reason is a unit slip: hazard
+     * widths go through LANE_FIT (= LANE / 2.35 = 0.723), so the tram's authored
+     * 2.24 is 1.62 units on the road. A ramp 1.70 wide is WIDER than the tram
+     * it is cut into, not inset in it. The clause that survives is the one the
+     * reference draws and the one the sentence itself ends on -- inset -- so the
+     * ramp is 1.40 across, 0.11 inside the body flank on each side. Nothing in
+     * the mechanic reads the width: deckAt and occupiedAt are indexed by LANE,
+     * not by x, so this is an art number and the lane number was never one.
+     *
+     * ---- RULE 1 ------------------------------------------------------------
+     *
+     * Built on every side. The tongue is a closed solid through prismX -- top,
+     * underside, both flanks, the lip on the road and the cap where it meets
+     * the deck. The two tail walls are closed boxes. Nothing here is a shell
+     * facing the camera: the player runs UP this, ALONG the top of it and looks
+     * back DOWN it, passes it in the next lane at 1.70 units, and the mouth is
+     * photographed from directly behind on every approach.
      */
-    const blockTramPantoGeo = merge([
-      bx(0.66, 0.07, 0.26, 0, 0.02, 0, TRAM_DARK),
-      bx(0.09, 0.42, 0.09, -0.24, 0.20, 0.02, TRAM_DARK, 0.42),
-      bx(0.09, 0.42, 0.09, 0.24, 0.20, 0.02, TRAM_DARK, 0.42),
-      bx(0.96, 0.06, 0.13, 0, 0.36, -0.16, CHROME),
-    ]);
+    const blockTramRampGeo = (function () {
+      const B = MR.Collision.BOX[K.BLOCK];
+      const DECK = MR.Course.DECK_Y;          // 2.80
+      const RUN = MR.Course.RAMP_RUN;         // 6.0
+      const zMouth = -B.halfZ;                // -1.95, the gate line
+      const zTop = zMouth + RUN;              // +4.05, where the deck takes over
+
+      // Half-widths, in WORLD units: these are drawn with bx/prismX directly
+      // rather than through hbx, because the ramp is sized to the vehicle it is
+      // cut into and not to the lane.
+      const bodyHW = 2.24 * LANE_FIT / 2;     // 0.810 -- the tram's widest
+      /**
+       * 1.20 ACROSS, NOT 1.40, AND THE 0.21 IT GIVES BACK IS THE POINT.
+       *
+       * At 1.40 the tail walls either side were 0.11 wide -- two slivers -- and
+       * the first ride through the chase camera showed what that costs: at the
+       * mouth, where the whole read is "there is a way INTO this thing", there
+       * was nothing framing the way in. A doorway is made of its jambs. 1.20 is
+       * still more than twice the runner's shoulders and the mechanic never
+       * asks about width at all (deckAt and occupiedAt are indexed by lane),
+       * so the whole of this number is spent on the read.
+       */
+      const rampHW = 0.60;                    // 1.20 across, 0.21 inside each flank
+
+      const parts = [];
+
+      /**
+       * THE TONGUE. Its profile, in the order the runner meets it:
+       *
+       *   A  the lip, on the road at the gate line
+       *   B  the top, meeting the deck
+       *   C  the underside at that end
+       *   D  the underside back down on the road
+       *
+       * A to B is the running surface and it is the contract line exactly. The
+       * plate is 0.18 thick measured vertically, so the underside reaches the
+       * road 0.386 forward of the lip and the mouth end is a shallow wedge
+       * lying ON the tarmac rather than a step standing on it -- which is what
+       * the reference draws and what stops the mouth reading as a kerb.
+       */
+      const T = 0.18;
+      parts.push(prismX([
+        [zMouth, 0],
+        [zTop, DECK],
+        [zTop, DECK - T],
+        [zMouth + T * RUN / DECK, 0],
+      ], rampHW, TRAM_DECK, 0, 0, 0));
+
+      // Tread battens across the tongue, proud of it by 0.02 -- the one thing
+      // that says a slope is climbable rather than merely slanted. They ride ON
+      // the running surface, so they are rotated into its plane instead of
+      // being laid flat and left poking out of it.
+      const slope = Math.atan(DECK / RUN);
+      for (let i = 1; i <= 5; i++) {
+        const f = i / 6;
+        parts.push(bx(rampHW * 1.80, 0.05, 0.18,
+          0, DECK * f + 0.02 * Math.cos(slope), zMouth + RUN * f - 0.02 * Math.sin(slope),
+          TRAM_DARK, -slope));
+      }
+
+      /**
+       * THE TWO TAIL WALLS. What makes the mouth a MOUTH: the ramp is cut into
+       * the vehicle, so the vehicle has to still be there either side of it,
+       * full height, from the gate line forward to where the scaled body picks
+       * up. Without these the tongue is a plank lying in front of a tram and
+       * the whole read is gone.
+       *
+       * They run the full 2.80 to the deck, so from above the tail is two rails
+       * with the slope descending between them -- which is the shape that says
+       * "down there is the road, up here is the roof".
+       */
+      const wallW = bodyHW - rampHW;          // 0.110
+      const wallX = (bodyHW + rampHW) / 2;    // 0.755
+      for (const sx of [-1, 1]) {
+        parts.push(
+          gl(bx(wallW, DECK - 0.14, RUN, sx * wallX, (DECK - 0.14) / 2, zMouth + RUN / 2,
+            TRAM_BODY), GLOSS.paint),
+          // The wall's own cap, topping out on the deck plane at exactly 2.80
+          // so the tail and the roof are one surface and not two -- and in the
+          // same near-black the deck's edge panels use, so the dark border runs
+          // unbroken from the mouth all the way up the vehicle.
+          gl(bx(wallW, 0.14, RUN, sx * wallX, DECK - 0.07, zMouth + RUN / 2,
+            TRAM_DARK), GLOSS.trim),
+          // The rubbing strip down the outside, which is what the flank of this
+          // thing shows to the next lane for the whole time it is being passed.
+          gl(bx(0.05, 0.12, RUN - 0.30, sx * (wallX + wallW / 2), 1.34, zMouth + RUN / 2,
+            CHROME), GLOSS.chrome)
+        );
+      }
+
+      /**
+       * THE MOUTH SURROUND, and it carries the kind mark.
+       *
+       * The variant's caution face is a lane-wide board on the rear plane at
+       * y 0.63-0.93 -- which is straight across the open mouth at knee height,
+       * reading "do not enter" over the one thing in this game you are invited
+       * to enter. So the cast site hides it on a rideable train and the
+       * red-and-white goes here instead, on the two door posts either side of
+       * the opening, where a real loading ramp carries it and where it cannot
+       * cover the way in. BLOCK still says BLOCK: this is a vehicle you cannot
+       * pass through, and that has not changed because you can go over it.
+       */
+      for (const sx of [-1, 1]) {
+        for (let i = 0; i < 4; i++) {
+          parts.push(gl(bx(wallW + 0.03, 0.30, 0.07,
+            sx * wallX, 0.32 + i * 0.62, zMouth + 0.02,
+            i % 2 ? 0xf2f2f2 : 0xe03a2a), GLOSS.trim));
+        }
+      }
+
+      return merge(parts);
+    })();
 
     /**
      * BLOCK v1: a ROAD CLOSED hoarding on a solid plinth.
@@ -19921,11 +20137,34 @@ MR.World = (function () {
         // audit measures from. Nothing was watching. It is now, and the rows
         // below are all inside their own box.
         geo: blockTramGeo, face: [2.16, 0.30, 0.78, -1.945], weight: 1,
-        // The pantograph sits well forward of the cab now: on a 3.90 tram the
-        // shoe belongs over the trucks, not on the nose. 2.36 rather than 2.38
-        // because the sway lifts the whole variant by 0.012 and 2.38 put the
-        // shoe on 2.812 against the 2.80 ceiling.
-        moving: blockTramPantoGeo, pivot: [0, 2.36, -0.40], anim: 'sway',
+        /**
+         * ---- THE PANTOGRAPH IS GONE, AND THE DECK IS WHY -----------------
+         *
+         * It was the `moving` child at pivot [0, 2.36, -0.40], shoe topping out
+         * at 2.77 "against the 2.80 the collision box records". That 0.03 of
+         * headroom was the whole of the roof's slack, and it existed only
+         * because the roof underneath it stopped at 2.44. Now that the roof IS
+         * 2.80 -- which is what the box always claimed and what the runner is
+         * placed at -- there is no space above it for anything at all: any
+         * fitting on the deck is outside the envelope by construction, and the
+         * envelope guard is not negotiable.
+         *
+         * It could not have stayed anyway, for two reasons that are about the
+         * mechanic rather than about 0.03 of a unit. It sat at z -0.40, which
+         * on a rideable train is halfway up the ramp -- a runner climbing the
+         * slope would have run into it head-first. And a pantograph on a roof
+         * you run along is a wall across the running surface wherever it is
+         * put.
+         *
+         * `anim` goes with it, and that is required rather than tidy. The sway
+         * lifts the whole variant by +/-0.012, so a deck authored at exactly
+         * 2.80 would spend half of every cycle at 2.812 -- outside the box --
+         * while the runner, whose feet are pinned to a constant DECK_Y, watched
+         * the floor slide up and down through them. A vehicle that is stood on
+         * has to be still. It is the same reason v2 is still: not every hazard
+         * is improved by an idle.
+         */
+        ride: blockTramRampGeo,
       },
       { geo: blockSignGeo, face: [2.06, 1.7, 1.58, -0.541], weight: 1 },
       // THE TRAFFIC LIGHT, where the cargo trike used to be. No moving part
@@ -20933,10 +21172,16 @@ MR.World = (function () {
      * a slowly spinning object is unambiguous at any distance, and it is the
      * genre's universal "pick me up" besides.
      *
-     * Collection is lane-match only, with no vertical test and no action (see
-     * player.js), so nothing here is allowed to imply otherwise: the item never
-     * rises above 1.2, never spans the lane, and the pool of light beneath it
-     * says that being in the lane is the whole requirement.
+     * Collection asks for no vertical accuracy and no action (see player.js),
+     * so nothing here is allowed to imply otherwise: the item never rises above
+     * 1.2, never spans the lane, and the pool of light beneath it says that
+     * touching it is not a thing you have to aim at.
+     *
+     * It is NOT lane-match any more, which this paragraph used to say. A road
+     * item is bought at the gate it stands behind, so the bottle is a RECEIPT
+     * for a lane already chosen rather than a thing collected on the way past
+     * -- which is the honest reading of a drink handed over at a feed station,
+     * and is why the art still must not suggest it has to be steered into.
      */
     const AID_Y = 0.95;   // hip height: not the ground (jump), not overhead (duck)
     const AID_POP_TIME = 0.42;
@@ -20944,6 +21189,56 @@ MR.World = (function () {
     // in the next lane back is only clutter -- and the pop needs the slot.
     const AID_BEHIND = 14;
     const aidItems = course.aid || [];
+
+    /**
+     * ============ THE POP READS THE PLAYER'S RECEIPT ============
+     *
+     * Whether an item has been COLLECTED is `player.resolveAid`'s answer and
+     * nobody else's. This asks it; it does not re-decide it.
+     *
+     * WHAT WAS HERE, AND WHY IT WENT WRONG WITHOUT ANYONE TOUCHING IT. The pop
+     * used to fire on `e.it.lane === playerLane` -- a lane match at a point,
+     * with a comment saying it was "exactly what player.js resolves on, so the
+     * pop can never disagree". That was true when it was written and stopped
+     * being true when the aid pass landed: a road item is now bought AT THE
+     * GATE IT STANDS BEHIND, because `changeLane` moves the lane on the frame
+     * the input is served, so any patch of road was reachable by a late swerve
+     * and fairness ended up depending on the frame rate.
+     *
+     * The two rules then disagreed inside a sub-two-unit window, both ways
+     * round: a runner who took the free lane at the gate and cut in a unit
+     * later got the animation and no gain, and one who paid at the gate and
+     * swerved straight out got the gain and no animation. Three frames either
+     * way -- unreachable except on purpose, and still the worst kind of bug
+     * this game has, because the picture was lying about the rules.
+     *
+     * A comment that says two things cannot disagree is not a mechanism for
+     * stopping them disagreeing. So the second copy is deleted rather than
+     * corrected: everything below is read off state the other file owns --
+     * `item.gate` from the course, `lastGate`, `ramp` and `onDeck` from the
+     * player -- and there is no policy here to drift out of step. If
+     * resolveAid's terms change, this stops popping rather than popping
+     * wrongly, which is the failure direction a renderer should have.
+     */
+    function aidTaken(it) {
+      const P = MR.game && MR.game.player;
+      // Before the game object exists -- world.update(0) runs at boot -- there
+      // is no receipt and nothing has been collected.
+      if (!P) return false;
+      if (it.gate != null) {
+        // Bought at the gate, never from a roof: a runner up there did not come
+        // through anything. This is resolveAid's guarded branch, term for term.
+        const r = P.lastGate;
+        return !P.onDeck && !!r && r.idx === it.gate && r.lane === it.lane;
+      }
+      if (it.lane !== P.lane) return false;
+      // The ramp under the ITEM, not under the runner -- the same reason
+      // resolveAid asks it that way: they are the same vehicle whenever this
+      // can pay out, and asking about the item makes it independent of where in
+      // the step the runner's z landed.
+      const carrier = it.roof && course.rampAt ? course.rampAt(it.z, it.lane) : null;
+      return it.roof ? (P.ramp === carrier && carrier !== null) : !P.onDeck;
+    }
 
     /**
      * The pool of light under an item, as GEOMETRY rather than as a soft
@@ -21311,6 +21606,167 @@ MR.World = (function () {
     })();
     const footbridgePool = Pool(function () {
       return S.outlined(footbridgeGeo, mats.prop, S.INK.scenery);
+    }, group);
+
+    /**
+     * ============ THE ARCHWAY: A CITY GATE THE ROAD RUNS THROUGH ============
+     *
+     * reference/ttgr-archway-and-crates.png -- a flat-fronted stone building
+     * straddling the road with a tall arched tunnel cut through it, pale
+     * dressed stone around the opening and at the corners, a deep-warm field
+     * between. It is the one thing in that frame the road passes THROUGH
+     * rather than beside, and it is the only set piece in this game that does.
+     *
+     * ---- SCENERY, AND DELIBERATELY NOT A MECHANIC -------------------------
+     *
+     * The reference's arch is barely a lane wide and closes the road down to
+     * one. docs/roadmap.md entry 35 measured that idea as a mechanic and said
+     * do not ship it: a closure "removes the lane decision and keeps the risk",
+     * and the game already spends 18.48% of a race at two-or-fewer lanes and
+     * 0.88% at exactly one WITHOUT anyone designing it. The same entry says the
+     * archway is worth having as a set piece. So this one spans the whole road
+     * and narrows nothing. Not one lane is touched, no gate moves, and the
+     * course generator does not know it exists.
+     *
+     * ---- IT CANNOT OCCLUDE A GATE, AND THAT IS BUILT IN RATHER THAN CHECKED -
+     *
+     * This is the highest-risk object in the file for LOW / HIDES / BLANKS: it
+     * is the only scenery that reaches across all three lanes at close range,
+     * and one contact ends a record attempt (rule 4). Two constructions, not
+     * two hopes:
+     *
+     *   THE OPENING SPRINGS AT ARCHWAY_SPRING, which is BANNER_CHORD -- the
+     *     same 9.35 the mile gantry and the finish arch use for their lowest
+     *     member over the road, and 0.35 clear of OVERHEAD_Y. Over the play
+     *     corridor the soffit is higher still: the springing is at |x| = 4.95,
+     *     outside CORRIDOR_HALF, and the ring has risen to 12.9 by the time it
+     *     reaches the corridor edge at 3.75.
+     *   THE WALL ABOVE IT IS A COMB, not a slab with a hole described in a
+     *     comment. Every column is generated FROM the arch curve -- its bottom
+     *     is the extrados at its own x -- so there is no arithmetic anywhere
+     *     that could put masonry below the opening. A slab with a subtracted
+     *     hole would have been one sign error away from a stone wall across
+     *     the road, and nothing in the build would have caught it before a
+     *     player did.
+     *
+     * ---- RULE 1 -----------------------------------------------------------
+     *
+     * Built on all sides, and here that is not a formality: the player runs
+     * THROUGH this thing, so the far face is seen for the whole approach, the
+     * near face is seen for as long as it takes to pass under, and the
+     * jamb reveals are at arm's length on the way through. Every piece is a
+     * closed box with real depth; the ring stands proud of the wall on BOTH
+     * faces rather than being a front-facing moulding, and the piers are
+     * modelled to their full depth with their own plinth and cornice returning
+     * on every face.
+     */
+    /**
+     * These are BANNER_CHORD and GANTRY, and they are derived from the same
+     * primitives rather than read off those names for one reason: both are
+     * declared several thousand lines below this, `const` does not hoist, and
+     * the geometry here is built eagerly. Restating a number is the defect this
+     * file keeps a corrections list for, so they are written as the expressions
+     * those two ARE -- if OVERHEAD_Y or the track width move, all four move
+     * together -- and tools/shoot.js measures the result rather than trusting
+     * the arithmetic.
+     */
+    const ARCHWAY_SPRING = OVERHEAD_Y + 0.35;          // 9.35, as BANNER_CHORD
+    const ARCHWAY_HALF = K.TRACK_HALF_WIDTH + 1.2;     // 4.95, as GANTRY
+    const archwayGeo = (function () {
+      const parts = [];
+      const STONE = 0xe8dcc0;      // pale dressed stone: surround, quoins, cornice
+      const STONE2 = 0xd6c7a4;     // its shadowed alternate, for the voussoirs
+      const FIELD = 0xc0533a;      // the warm field between the dressings
+      const FIELD2 = 0xa8442f;
+      const PLINTH = 0x8c7a5e;
+      const RISE = 5.4;            // apex at 14.75
+      const TOP = 17.2;            // the parapet
+      const D = 3.0;               // how deep the gatehouse is along the road
+      const OUT = 13.4;            // how far the block reaches from the middle
+
+      // The soffit of the opening at a given x: the ellipse the ring follows.
+      // Everything above the opening is generated from this, so nothing can sit
+      // below it by arithmetic error.
+      function soffit(x) {
+        const t = Math.abs(x) / ARCHWAY_HALF;
+        if (t >= 1) return 0;
+        return ARCHWAY_SPRING + RISE * Math.sqrt(1 - t * t);
+      }
+      const RING_TH = 0.95;
+
+      // ---- the two piers, full height, outboard of the corridor -----------
+      for (const sx of [-1, 1]) {
+        const w = OUT - ARCHWAY_HALF;
+        const cx = sx * (ARCHWAY_HALF + w / 2);
+        parts.push(
+          bx(w, 0.9, D + 0.7, cx, 0.45, 0, PLINTH),                 // plinth
+          bx(w, TOP - 0.9, D, cx, 0.9 + (TOP - 0.9) / 2, 0, FIELD), // the field
+          // Quoins up the outer corner, alternating, on both faces because the
+          // player sees this block from in front and then from behind.
+          bx(0.9, TOP - 0.9, D + 0.16, sx * (OUT - 0.45), 0.9 + (TOP - 0.9) / 2, 0, STONE)
+        );
+        // The jamb: the dressed stone reveal the opening is cut into. It is as
+        // deep as the whole gatehouse, so the way through is lined rather than
+        // being a hole in a flat.
+        parts.push(bx(0.85, ARCHWAY_SPRING + 0.4, D + 0.30,
+          sx * (ARCHWAY_HALF + 0.42), (ARCHWAY_SPRING + 0.4) / 2, 0, STONE));
+      }
+
+      // ---- the arch ring, standing proud on BOTH faces ---------------------
+      vArc(parts, {
+        cx: 0, cy: ARCHWAY_SPRING, rx: ARCHWAY_HALF, ry: RISE,
+        n: 13, th: RING_TH, d: D + 0.30, color: STONE, alt: STONE2,
+      });
+
+      /**
+       * ---- THE SPANDREL WALL, AS A COMB -----------------------------------
+       *
+       * One column per sample of x, each starting at the extrados of the ring
+       * directly above it. Over the opening that is the arch; outboard of it
+       * the column runs down to the pier. There is no path through this loop
+       * that puts a column below the soffit.
+       */
+      const N = 26;
+      for (let i = 0; i < N; i++) {
+        const x0 = -ARCHWAY_HALF + 2 * ARCHWAY_HALF * i / N;
+        const x1 = -ARCHWAY_HALF + 2 * ARCHWAY_HALF * (i + 1) / N;
+        const xm = (x0 + x1) / 2;
+        // The higher of the two edges, so a column can never cut the curve.
+        const base = Math.max(soffit(x0), soffit(x1)) + RING_TH;
+        if (base >= TOP) continue;
+        parts.push(bx((x1 - x0) + 0.02, TOP - base, D, xm, (base + TOP) / 2, 0,
+          (i % 2) ? FIELD : FIELD2));
+      }
+
+      // ---- cornice and parapet, returning on every face --------------------
+      parts.push(
+        bx(OUT * 2 + 0.5, 0.65, D + 0.55, 0, TOP + 0.32, 0, STONE),
+        bx(OUT * 2 + 0.1, 0.9, D + 0.25, 0, TOP + 1.10, 0, FIELD),
+        bx(OUT * 2 + 0.5, 0.35, D + 0.55, 0, TOP + 1.72, 0, STONE)
+      );
+      /**
+       * The string course at the springing line, which is what ties the piers
+       * to the arch on the reference and what stops the block reading as one
+       * flat panel with a hole in it.
+       *
+       * IT IS TWO PIECES AND NOT ONE, and the one-piece version is exactly the
+       * failure this whole object is built to avoid. Written as a single band
+       * the full width of the gatehouse, it is a stone beam straight across the
+       * opening at 9.14 to 9.56 -- through the arch, 0.14 above OVERHEAD_Y, and
+       * over all three lanes. It would have made the arch decorative and put a
+       * member across the road at the one height the fairness audit is watching.
+       * Each half now stops at the springing, where the ring takes over.
+       */
+      for (const sx of [-1, 1]) {
+        const w = OUT + 0.1 - ARCHWAY_HALF;
+        parts.push(bx(w, 0.42, D + 0.22, sx * (ARCHWAY_HALF + w / 2),
+          ARCHWAY_SPRING + 0.21, 0, STONE));
+      }
+
+      return merge(parts);
+    })();
+    const archwayPool = Pool(function () {
+      return S.outlined(archwayGeo, mats.prop, S.INK.scenery);
     }, group);
 
     /**
@@ -22765,6 +23221,21 @@ MR.World = (function () {
       if (b.name === 'RIVERSIDE') {
         for (let z = b.from; z < b.to; z += 58) structures.push({ z, kind: 'river', side: -1, set: 0 });
       }
+      /**
+       * THE ARCHWAY, ONCE, IN THE CITY THE RACE STARTS IN.
+       *
+       * A city gate is a thing you pass through on the way OUT of a city, so it
+       * goes at the end of CITY START rather than in the middle of it, and
+       * there is exactly one on the course. It is a set piece and a set piece
+       * seen three times is a fence.
+       *
+       * nudgeOver for the reason the overpasses take it: these are the only
+       * pieces that reach across the road, and a mile marker read through one
+       * is a mile marker not read. It is the same rule and the same call.
+       */
+      if (b.name === 'CITY START') {
+        structures.push({ z: nudgeOver(b.to - 150), kind: 'archway', side: 1, set: 0 });
+      }
       if (b.name === 'THE WALL') {
         // nudgeOver, and it was missing here. These are the only opaque decks
         // in the game and nothing kept them off the mile gantries -- the loop
@@ -23102,6 +23573,7 @@ MR.World = (function () {
         if (kind === 'fstand') return finishStandPool;
         if (kind === 'chute') return chutePool;
         if (kind === 'footbridge') return footbridgePool;
+        if (kind === 'archway') return archwayPool;
         if (kind === 'arch') return archPool;
         if (kind === 'aidTable') return aidTablePool;
         if (kind === 'street') return streetPools[si][st.v || 0];
@@ -23118,10 +23590,7 @@ MR.World = (function () {
     }
     function structPool(st) { return markPool(st); }
 
-    // routeLane is exposed so it can be asserted against the course rather than
-    // taken on trust: the lane it names at every gate must never be a BLOCK.
     const api = { group, sky, mats, course };
-    Object.defineProperty(api, 'routeLane', { get: function () { return routeLane; } });
 
     /**
      * ================== THE PALETTE, AND ITS TWO AXES ==================
@@ -23418,16 +23887,21 @@ MR.World = (function () {
     // road is reacting to, instead of each computing their own and drifting.
     api.finale = finale;
 
+    /**
+     * playerLane IS NOW TAKEN AND IGNORED, and that is worth a line because two
+     * separate things stopped needing it in the same pass.
+     *
+     * It drove the route ribbon's replan, and the ribbon is gone. It also drove
+     * the aid pop, and the pop now reads the player's gate receipt instead --
+     * see aidTaken, where an instantaneous lane is exactly the wrong question.
+     * Nothing in this file reads it.
+     *
+     * The parameter stays in the signature because main.js passes it and this
+     * file does not own main.js; dropping it here would be a silent arity
+     * change across a module boundary for no gain. Whoever next owns main.js
+     * can drop it at both ends in one edit.
+     */
     api.update = function (z, playerLane) {
-      if (playerLane !== undefined && playerLane !== routePlannedLane) {
-        routePlannedLane = playerLane;
-        // Replan from the next gate the player has not yet resolved, so the
-        // line starts where they are rather than where they began.
-        let gi = 0;
-        while (gi < course.gates.length && course.gates[gi].z < z) gi++;
-        const re = racingLine(course.gates, playerLane, gi);
-        if (re) routeLane = re;
-      }
       const ahead = z + VIEW;
       const back = z - BEHIND;
       const now = performance.now() * 0.001;
@@ -23574,6 +24048,17 @@ MR.World = (function () {
           o.userData.active = vs[vi];
           o.userData.body = vs[vi].userData.body;
           let span = 1;
+          // Written on EVERY claim, both ways, for the reason the variant
+          // visibility above is: the pool recycles, and a tram that inherited
+          // the last tenant's open tail would be a ramp painted on a wall.
+          const ride = vs[vi].userData.ride;
+          const rideable = kind === K.BLOCK && gate.ramp === l;
+          if (ride) ride.visible = rideable;
+          // The caution board is a lane-wide red-and-white panel on the rear
+          // plane at knee height. On a rideable train that is straight across
+          // the mouth the player is being invited into, so it comes down and
+          // the tail's own door posts carry the mark instead.
+          if (vs[vi].userData.face) vs[vi].userData.face.visible = !rideable;
           if (kind === K.BLOCK) {
             // Stretch a train forward along z rather than repeating blocks, so
             // its NEAR face and the telegraph mat stay put on the gate line
@@ -23582,8 +24067,31 @@ MR.World = (function () {
             // never updated when the envelope was renegotiated to 1.95, and it
             // had been quietly anchoring every train 1.30 units too far back.
             span = gate.train ? 1 + gate.train * 0.9 : 1;
-            o.userData.body.scale.z = span;
-            o.userData.body.position.z = (span - 1) * MR.Collision.BOX[K.BLOCK].halfZ;
+            const halfZ = MR.Collision.BOX[K.BLOCK].halfZ;
+            /**
+             * ---- A RIDEABLE TRAIN IS SHORTENED BY ITS OWN RAMP ------------
+             *
+             * The ramp is an unscaled child occupying the first RAMP_RUN units
+             * of the vehicle, so the SCALED body must give that length back or
+             * the tram is RAMP_RUN longer than the collision box that decides
+             * whether it was hit -- and a nose the player can see but cannot
+             * touch is the same class of defect as a flank they could not, in
+             * the other direction.
+             *
+             * The whole vehicle is 2 * halfZ * span deep. Take the ramp's 6.0
+             * off the front of that and the body scale is span - RUN / (2 *
+             * halfZ); its rear face then has to land on the ramp's top rather
+             * than on the gate line, which is the same offset it always had
+             * plus that same RUN. Both terms come out of the one subtraction,
+             * so they cannot disagree.
+             *
+             * A ramp's span is 8.2 to 10.9 (RAMP_SPAN 8 to 11), so the shortened
+             * scale is 6.66 to 9.36 -- never near zero, and the generator's
+             * RAMP_SPAN_MIN is what keeps it that way.
+             */
+            const s = rideable ? span - MR.Course.RAMP_RUN / (2 * halfZ) : span;
+            o.userData.body.scale.z = s;
+            o.userData.body.position.z = (s - 1) * halfZ + (rideable ? MR.Course.RAMP_RUN : 0);
           }
           // The contact shadow is not written here any more. It is one pooled
           // quad per live hazard, sized from this same userData.foot and this
@@ -23738,16 +24246,18 @@ MR.World = (function () {
       }
 
       // ---- aid ----------------------------------------------------------
-      // Spawned on the same windowed cursor as everything else; the pop is
-      // driven from here rather than plumbed in from main.js, because the rule
-      // that decides it is one line and duplicating it is cheaper than a new
-      // callback the renderer would have to be trusted to fire.
+      // Spawned on the same windowed cursor as everything else. The POP -- the
+      // little punch-out that says you got it -- is decided by aidTaken()
+      // above, which reads the player's own receipt rather than re-deciding.
       while (state.aidIdx < aidItems.length && aidItems[state.aidIdx].z < ahead) {
         const it = aidItems[state.aidIdx++];
         const pool = it.kind === 'banana' ? bananaPool : waterPool;
         const obj = pool.claim();
-        // Claim site 4: aid. Same rule as a hazard -- resolveAid matches on
-        // lane alone, so this is drawing only.
+        // Claim site 4: aid. This is drawing only, and it always was -- what
+        // has changed is that the sentence which used to be here, "resolveAid
+        // matches on lane alone", is no longer true of any item on the course.
+        // Nothing about WHERE the bottle is drawn depends on that; see aidTaken
+        // for the part that does.
         const aidY = eAt(it.z);
         obj.position.set(K.LANE_X[it.lane], aidY, it.z);
         obj.scale.setScalar(1);
@@ -23756,12 +24266,9 @@ MR.World = (function () {
       for (let i = activeAid.length - 1; i >= 0; i--) {
         const e = activeAid[i];
         if (e.pop < 0) {
-          // Lane match only -- exactly what player.js resolves on, so the pop
-          // can never disagree with the streak the player was just granted.
           // The 6-unit gate is what stops an item popping long after the fact
           // when a ?skip= jump spawns one that is already behind the runner.
-          if (playerLane !== undefined && e.it.lane === playerLane
-            && e.it.z <= z && z - e.it.z < 6) {
+          if (e.it.z <= z && z - e.it.z < 6 && aidTaken(e.it)) {
             e.pop = now;
           } else if (e.it.z < z - AID_BEHIND) {
             e.pool.release(e.obj);
@@ -24024,7 +24531,6 @@ MR.World = (function () {
       }
 
       updateShadows();
-      updateRoute(z, now);
 
       api.applyBiome(Math.min(1, z / K.TOTAL_UNITS));
     };
@@ -24036,7 +24542,7 @@ MR.World = (function () {
       abutPool.releaseAll(); riverPool.releaseAll();
       overpassPool.releaseAll(); standPool.releaseAll();
       finishStandPool.releaseAll(); chutePool.releaseAll();
-      footbridgePool.releaseAll();
+      footbridgePool.releaseAll(); archwayPool.releaseAll();
       waterPool.releaseAll(); bananaPool.releaseAll();
       for (const k in landmarkPools) landmarkPools[k].releaseAll();
       for (const k in markPools) markPools[k].releaseAll();
@@ -24531,7 +25037,7 @@ MR.World = (function () {
      * this vehicle have a grille", which is the question rule 1 actually asks.
      * A tool can now put the same object in front of any lens it likes.
      */
-    function assembleVariant(tint, d) {
+    function assembleVariant(tint, d, opts) {
       const g = new THREE.Group();
       const body = S.outlined(d.geo, mats.propLit, S.INK.hazard);
       // Same tag the spawn site puts on, for the same reason -- see there.
@@ -24548,18 +25054,43 @@ MR.World = (function () {
         mv.position.set(d.pivot[0] * LANE_FIT, d.pivot[1], d.pivot[2]);
         g.add(mv);
       }
+      /**
+       * THE RIDEABLE TAIL IS OFF BY DEFAULT, AND THAT IS A STATEMENT ABOUT
+       * WHICH STATE THE INSTRUMENTS SHOULD BE MEASURING.
+       *
+       * A tram with its tail open is rare: 3.70 ramps a day against hundreds of
+       * BLOCKs, and every one of the others is an ordinary tram. The contrast
+       * gate and kindread are asking "what does a player see when they meet
+       * this variant", and the honest answer to that is the closed one. Built
+       * open by default, BLOCK v0's measured contrast fell from over 1.6x to
+       * 1.30x against a fatal floor of 1.25x -- not because the object got
+       * worse, but because the audit had been switched to a different object.
+       *
+       * The tail is not going unmeasured. fleetExtents reads d.ride directly
+       * and gives it its own row against its own box, which is the assertion
+       * that actually matters for it, and a tool that wants to PHOTOGRAPH it
+       * asks for it: variantObject(kind, vi, { ride: true }).
+       *
+       * The caution board comes down with the tail up, exactly as the cast site
+       * does it, so the two states here are the two states the game draws and
+       * there is no third one that exists only in a tool.
+       */
+      if (d.ride && opts && opts.ride) {
+        g.add(S.outlined(d.ride, mats.propLit, S.INK.hazard));
+        for (const c of g.children) if (c.isMesh && c.material === faceMat[tint]) c.visible = false;
+      }
       return g;
     }
-    api.variantObject = function (kind, vi) {
+    api.variantObject = function (kind, vi, opts) {
       for (const grp of HAZARD_DEFS) {
         if (grp.kind !== kind) continue;
         if (!grp.defs[vi]) return null;
-        return assembleVariant(grp.tint, grp.defs[vi]);
+        return assembleVariant(grp.tint, grp.defs[vi], opts);
       }
       return null;
     };
 
-    function variantBox(d, swept) {
+    function variantBox(d, swept, noRide) {
       d.geo.computeBoundingBox();
       const bb = d.geo.boundingBox.clone();
       // The face plane. hplane() puts it through LANE_FIT, so its world
@@ -24568,6 +25099,20 @@ MR.World = (function () {
         const fw = d.face[0] * LANE_FIT / 2, fh = d.face[1] / 2;
         bb.expandByPoint(new THREE.Vector3(-fw, d.face[2] - fh, d.face[3]));
         bb.expandByPoint(new THREE.Vector3(fw, d.face[2] + fh, d.face[3]));
+      }
+      // The rideable tail. It sits at the variant's own origin with no pivot
+      // and no anim, so it contributes its bounding box unchanged -- but it
+      // MUST contribute one, or every extent this file reports would be of a
+      // tram that has never had its ramp down. It is the piece that reaches
+      // furthest forward and the piece that touches the road.
+      //
+      // `noRide` is passed by fleetExtents ALONE, and only for the z axis, for
+      // the reason written out there: the tail's depth is measured against a
+      // different box from the body's, so the two are reported as two rows
+      // rather than unioned into one number that is wrong for both.
+      if (d.ride && !noRide) {
+        d.ride.computeBoundingBox();
+        bb.union(d.ride.boundingBox);
       }
       if (d.moving) {
         d.moving.computeBoundingBox();
@@ -24806,6 +25351,28 @@ MR.World = (function () {
      * defect already in the corrections list: BLANKS under-counts and passes a
      * gate the art really hides. So this reports both directions and shoot.js
      * fails on one of them.
+     *
+     * ---- A RIDEABLE TAIL IS A SECOND ROW, NOT A BIGGER FIRST ONE -----------
+     *
+     * BLOCK v0's tail is 6.0 units deep against a BLOCK box that is 3.90, and
+     * unioning it into the variant's own row made the guard fail an object that
+     * is comfortably inside every volume the game ever gives it. The reason is
+     * that the two pieces are measured against DIFFERENT boxes:
+     *
+     *   the BODY is scaled with the train, so it is measured against the
+     *     span-1 box and grows with it -- unchanged, and still failed.
+     *   the TAIL is NOT scaled. It exists only on a train the course marked
+     *     rideable, whose box is 2 * halfZ * span deep with span at least 8.2,
+     *     and it occupies the first RAMP_RUN of that.
+     *
+     * So the tail gets its own row against its own box, and that box is
+     * deliberately the TIGHTEST honest one rather than the whole train: local
+     * z in [-halfZ, -halfZ + RAMP_RUN], which is exactly the length the cast
+     * site shortens the body by. Stated that way the guard proves something the
+     * old one could not -- that the tail and the body it slides under do not
+     * overlap and do not leave a gap -- and it does it without knowing the
+     * span. If the tail ever grows past its ramp run, the body will be sitting
+     * on top of it and this fails.
      */
     api.fleetExtents = function () {
       const B = MR.Collision.BOX;
@@ -24813,14 +25380,31 @@ MR.World = (function () {
       const out = [];
       for (const grp of HAZARD_DEFS) {
         grp.defs.forEach(function (d, vi) {
-          const bb = variantBox(d, true);
           const box = B[grp.kind] || {};
+          const name = NAME[grp.kind] + ' v' + vi;
+          // x and y are span-independent, so the tail is counted in them here.
+          // z is not, so it is excluded and reported below.
+          const bb = variantBox(d, true);
+          const bz = variantBox(d, true, true);
           out.push({
-            kind: grp.kind, variant: vi, name: NAME[grp.kind] + ' v' + vi,
+            kind: grp.kind, variant: vi, name: name,
             halfX: +Math.max(-bb.min.x, bb.max.x).toFixed(3),
-            halfZ: +Math.max(-bb.min.z, bb.max.z).toFixed(3),
+            halfZ: +Math.max(-bz.min.z, bz.max.z).toFixed(3),
             yMax: +bb.max.y.toFixed(3), yMin: +bb.min.y.toFixed(3),
             boxHalfX: box.halfX, boxHalfZ: box.halfZ,
+            boxYMin: box.yMin, boxYMax: box.yMax,
+          });
+          if (!d.ride) return;
+          d.ride.computeBoundingBox();
+          const rb = d.ride.boundingBox;
+          // The volume the cast site reserves for it, in the variant's frame.
+          const z0 = -box.halfZ, z1 = -box.halfZ + MR.Course.RAMP_RUN;
+          out.push({
+            kind: grp.kind, variant: vi, name: name + ' tail',
+            halfX: +Math.max(-rb.min.x, rb.max.x).toFixed(3),
+            halfZ: +Math.max(-rb.min.z, rb.max.z).toFixed(3),
+            yMax: +rb.max.y.toFixed(3), yMin: +rb.min.y.toFixed(3),
+            boxHalfX: box.halfX, boxHalfZ: +Math.max(-z0, z1).toFixed(3),
             boxYMin: box.yMin, boxYMax: box.yMax,
           });
         });
@@ -24895,6 +25479,32 @@ MR.World = (function () {
         }
       }
       return out;
+    };
+
+    /**
+     * The live aid items and whether each has POPPED, so the picture can be
+     * checked against the rules instead of assumed to match them.
+     *
+     * This exists because the two disagreed. world.js decided the pop from its
+     * own copy of a lane-match test after player.js had replaced that rule with
+     * a gate receipt, and nothing in the build could see it: the animation and
+     * the payout are computed in different files and no instrument had both.
+     * The property a tool can now assert is the one that was quietly false --
+     * every item that pays pops, and every item that pops has paid.
+     *
+     * Read-only and derived, in the same family as crossings(), gateBoxes() and
+     * fleetExtents(): the file that owns the state reports it, and the file
+     * that owns the rule does the failing.
+     */
+    api.aidState = function () {
+      return activeAid.map(function (e) {
+        return {
+          z: e.it.z, lane: e.it.lane,
+          gate: e.it.gate === undefined ? null : e.it.gate,
+          roof: !!e.it.roof,
+          popped: e.pop >= 0,
+        };
+      });
     };
 
     /**
@@ -25577,6 +26187,12 @@ MR.Ghost = (function () {
  * damped oscillation rather than per-frame noise (noise reads as static and
  * makes obstacles unreadable), the punish state *narrows* FOV, and the mile
  * and gear flourishes only ever show more of the road, never less.
+ *
+ * ...with exactly one exception, and it is at the end of the race where there
+ * is no gate left to hide: after the tape the camera leaves the chase
+ * altogether, arcs round to three-quarter FRONT and holds on the runner's face
+ * with a long lens. See THE CELEBRATION below. It is the only shot in this
+ * game that has ever pointed at the front of anything.
  */
 MR.Camera = (function () {
   const K = MR.K;
@@ -25754,10 +26370,77 @@ MR.Camera = (function () {
   const SLIDE_UP = 0.0;          // was 0.34, and it was pointing the wrong way
   const SLIDE_BACK = 0.80;       // pull BACK, framing the longer pose
 
+  // ---- THE CELEBRATION: THE ONE SHOT IN THIS GAME THAT HAS A FRONT --------
+  //
+  // Measured before it was designed. The runner's face owns ZERO PIXELS in 48
+  // of 48 frames of play (tools/resolve.js), zero at the start panel -- which
+  // is a DOM dialog over the same astern view -- and zero at the finish, whose
+  // camera drifts 1.6 units off the centreline and stays BEHIND him. A whole
+  // character pass built a face, two eyes with catchlights, brows that furrow
+  // on effort, an open mouth and a jaw, and no player has ever seen any of it.
+  //
+  // So this term takes the camera round to the front. It is the only place in
+  // the game where that is allowed, and the reasons it is allowed here are the
+  // reasons every other flourish in this file is bounded:
+  //
+  //   NOTHING IS LEFT TO READ. RUNOUT (world.js) is derived from where the
+  //     course's last gate actually is, the tape is behind him, and pace.js has
+  //     already frozen the clock. A camera that hides the road cannot cost a
+  //     player anything when there is no road left to run.
+  //   IT CANNOT TOUCH THE RESULT. Everything below reads p.z, the runner's x
+  //     and the world's finale verdict; it writes only to the lens. The pace
+  //     model, the save and tools/simulate.js are untouched by construction.
+  //   IT IS ONE MOVE, NOT A CUT. The path is polar about the runner and every
+  //     term is a continuous blend of the chase camera's OWN position, so at
+  //     weight 0 the shot is bit-for-bit the one that shipped.
+  //
+  // ---- the path, and why it has a pinch in it ----------------------------
+  //
+  // The chute is narrow. The finish grandstands stand at x = +/-4.30
+  // (FSTAND_X), the tape posts at +/-4.05 and the arch legs at +/-6.75, so a
+  // camera that swings round on a constant radius from twelve units astern
+  // passes THROUGH a grandstand at the broadside quarter of the arc. CEL_PINCH
+  // is what stops it: the radius is pulled in hardest exactly where the
+  // azimuth is broadside and released again as the camera comes to the front,
+  // which both keeps the lens inside the barriers and reads as a swoop rather
+  // than as a turntable. Measured on the shipped path, the largest lateral
+  // excursion from the runner is 3.63 units; taken with the mirror below (see
+  // celSide) that puts the worst absolute case at 3.63 on a centre-lane finish
+  // and 1.94 from either outer lane -- inside the track's own half-width of
+  // 3.75, and 0.67 clear of the stands at their tightest.
+  //
+  // The lens goes the other way from every other flourish here: it NARROWS,
+  // past FOV_MIN, to CEL_FOV. That is deliberate and it is the one exemption
+  // in the file. A narrow lens is what a portrait close-up wants -- it holds
+  // the head at a readable size without putting the camera inside the
+  // character, and it compresses the crowd and the arch behind him instead of
+  // bending them round the frame edge. FOV_MIN exists to stop stacked
+  // transients from making the road unreadable; there is no road.
+  const CEL_HOLD = 0.80;    // seconds the astern tape-break plays on its own
+  const CEL_SWING = 1.80;   // seconds of arc, astern -> three-quarter front
+  const CEL_AZ = 2.60;      // radians travelled, 0 = dead astern
+  const CEL_R = 3.15;       // hero radius, and the face size falls out of it
+  const CEL_PINCH = 2.40;   // radius pulled in while broadside -- see above
+  const CEL_Y = 1.02;       // hero eye height: below his chest, looking up
+  const CEL_AIM_Y = 0.74;   // ...and the aim, which sets where he sits in frame
+  const CEL_FOV = 40;       // a long lens, deliberately outside [FOV_MIN, MAX]
+
   // The honest band, in world units/sec. Derived rather than typed in, so a
   // pace retune moves the camera response with it.
   const SPEED_LO = (K.UNITS_PER_MILE * K.TIME_SCALE) / K.START_PACE;
   const SPEED_HI = (K.UNITS_PER_MILE * K.TIME_SCALE) / K.FLOOR_PACE;
+
+  /**
+   * Which side of him the ending happens on: -1 if the camera should sweep to
+   * -x, +1 to +x. See the block over celSide in update().
+   *
+   * Exported because runner.js needs the SAME answer -- the finish pose turns
+   * his head toward the lens, and a head that turns the wrong way in half of
+   * all finishes is worse than one that does not turn at all. Two copies of
+   * this rule would have been one edit away from exactly that, so main.js
+   * reads it from here and hands it to the runner.
+   */
+  function celSideFor(x) { return (x || 0) > 0.05 ? -1 : 1; }
 
   function clamp01(x) { return x < 0 ? 0 : x > 1 ? 1 : x; }
   function smoothstep(a, b, x) { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); }
@@ -25925,6 +26608,13 @@ MR.Camera = (function () {
       mileT: 0,
       gearT: 0, gearArmed: true,
       finish: 0,
+      // Seconds since the tape, in REAL time, and the celebration's whole
+      // clock. Kept here rather than read off world.finale.since so the move
+      // survives a world built without a game around it (course-test.js) and
+      // so a screenshot harness can drive it by pumping dt like everything
+      // else in this file.
+      cel: 0,
+      celW: 0,         // 0..1 blend into the front shot; exposed for tooling
     };
 
     /**
@@ -26071,12 +26761,48 @@ MR.Camera = (function () {
       const fin0 = MR.game && MR.game.world && MR.game.world.finale;
       const runIn = fin0 ? fin0.run : 0;
       const glory = fin0 && fin0.record ? 1 : (fin0 ? fin0.chase * 0.45 : 0);
+      // WHICH SIDE THE ENDING HAPPENS ON, AND IT IS NOT A CONSTANT ANY MORE.
+      //
+      // The drift below used to be a flat +1.1 to +1.6 whatever lane the runner
+      // finished in, and the arc that now follows it made that a real problem
+      // rather than an untidiness: the grandstands stand at x = +/-4.30 and the
+      // outer lane centre is +2.50, so a camera pushed a further 3.6 out on the
+      // same side flies through a stand full of spectators. (The old drift
+      // already put the lens at 3.6 -- over the shoulder, outside the track's
+      // own 3.75 half-width -- on a right-lane finish; nothing measured it
+      // because nothing had ever asked where that camera was in absolute x.)
+      //
+      // So the ending goes to the side with room. It is still not random and
+      // still not a chase -- it is a mirror, decided once by the lane he
+      // crossed the line in, so a given run frames identically every replay --
+      // and it holds the lens inside the barriers from every finishing lane:
+      // measured, the largest excursion over all three is 3.63, against a
+      // track half-width of 3.75 and stands at 4.30.
+      const celSide = celSideFor(p.x);
       // Squared: nothing happens for the first half of the run-in, then the
       // camera lets go. A linear fall-back starts drifting while the player is
       // still running and reads as the game losing interest.
       const runE = runIn * runIn;
       if (p.z >= K.TOTAL_UNITS - 0.25) s.finish = Math.min(1, s.finish + d / 1.2);
       const fin = s.finish * s.finish * (3 - 2 * s.finish);
+      // Seconds since the tape, handed over by main.js rather than accumulated
+      // here. It is deliberately NOT integrated from `d`: d is clamped to 1/25
+      // so a long frame cannot detonate the springs above, and a parametric
+      // camera path integrated through that clamp plays at 28% speed on a 7fps
+      // machine while the results card, on a real timer, arrives a third of the
+      // way through the move. One clock, unclamped, shared with the pose in
+      // runner.js -- see the note over celClock in main.js.
+      s.cel = p.celT || 0;
+      // The celebration weight. Zero for the whole race and for the first
+      // CEL_HOLD seconds after the tape, so the break, the confetti and the
+      // wide astern shot all play exactly as they did before this pass.
+      const cel01 = clamp01((s.cel - CEL_HOLD) / CEL_SWING);
+      // Smootherstep, not smoothstep: this one drives an azimuth through 149
+      // degrees and the second derivative is visible at both ends of a move
+      // that large. 6t^5-15t^4+10t^3 leaves the astern shot and arrives at the
+      // hero shot with zero acceleration as well as zero velocity.
+      const cw = cel01 * cel01 * cel01 * (cel01 * (cel01 * 6 - 15) + 10);
+      s.celW = cw;
       // Widen with the pull so the arch (13.5 wide, 14.7 tall) clears the frame
       // edges rather than being cropped by them.
       // Tuned by measuring the frame, not by feel. At the tape the camera is
@@ -26195,7 +26921,8 @@ MR.Camera = (function () {
       // finish is seen from three-quarters and the stands on one side crowd
       // the frame. Fixed direction rather than random -- the finish should look
       // the same in every replay and every screenshot.
-      cam.position.set(s.x + bobX + shX + fin * (1.1 + 0.5 * glory), hgt, p.z - back);
+      cam.position.set(s.x + bobX + shX + celSide * fin * (1.1 + 0.5 * glory),
+        hgt, p.z - back);
 
       // ---- aim ------------------------------------------------------------
       // The look point follows the jump arc *more* than the camera does, so
@@ -26239,6 +26966,77 @@ MR.Camera = (function () {
           + s.dk,
         lookZ
       );
+
+      // ---- and round to the front ------------------------------------------
+      //
+      // Everything above produced the chase camera's own position and aim, and
+      // this converts that position into POLAR COORDINATES ABOUT THE RUNNER and
+      // walks it round. Doing it in polar rather than lerping the two cartesian
+      // endpoints is the whole of why it reads as a move: the straight line
+      // from twelve units astern to three units in front passes 2.1 units from
+      // his head, so a cartesian blend is a camera flying through the subject
+      // while the aim whips to keep up. An arc is a camera walking round him.
+      //
+      // It also means the start of the arc is not a number in this file. It is
+      // wherever the chase camera happens to be -- which still carries the
+      // lateral drift, the last of the shake and the tape-break pull -- so
+      // there is no frame at which anything jumps.
+      if (cw > 0) {
+        const px = p.x || 0, pz = p.z;
+        // The ground he is standing on, added to both the eye and the aim for
+        // the reason the hill terms already are: it moves the whole shot, not
+        // the pitch. Flat at the finish today; correct if that ever changes.
+        const gy = elev.at(pz) + s.dk;
+        const dx0 = cam.position.x - px, dz0 = cam.position.z - pz;
+        const r0 = Math.sqrt(dx0 * dx0 + dz0 * dz0);
+        // Azimuth measured from DEAD ASTERN, in the frame celSide mirrors into
+        // -- so it is always "toward the middle of the road" and the sweep has
+        // one unambiguous direction. The chase camera at this point is always
+        // astern (dz0 < 0) and always a little to the celSide side of him (the
+        // tape-break drift is 1.1 to 1.6 and the follow can only move it by
+        // 0.13), so a0 is a small positive angle. Everything below stays in the
+        // mirrored frame and is multiplied back out at the position write,
+        // which is the one place the sign can be got wrong.
+        const a0 = Math.atan2(celSide * dx0, -dz0);
+        // The radius arrives ahead of the azimuth (the 0.30 exponent), so the
+        // camera has already closed most of the distance by the time it is
+        // broadside. That is what keeps the arc inside the barriers, and it is
+        // also the shape of the move: come in, then come round.
+        const rw = Math.pow(cw, 0.30);
+        // The HEIGHT comes down faster still, and that was measured off a frame
+        // rather than reasoned. Eased on rw, the lens is 3.15 up at the
+        // broadside quarter of the arc and looking down on the top of his cap
+        // -- which is where the raised-arms gesture happens, so the one beat
+        // the pose exists for was being photographed from above. 0.20 puts the
+        // same instant at 2.11 and the shot on his chest.
+        const hw = Math.pow(cw, 0.20);
+        const az = a0 + (CEL_AZ - a0) * cw;
+        const rr = (r0 + (CEL_R - r0) * rw) - CEL_PINCH * 4 * cw * (1 - cw);
+        cam.position.set(
+          px + celSide * Math.sin(az) * rr,
+          cam.position.y + ((CEL_Y + gy) - cam.position.y) * hw,
+          pz - Math.cos(az) * rr
+        );
+        // The aim goes onto the runner himself. CEL_AIM_Y is BELOW the eye, so
+        // the lens tips up at him -- and it is low enough to hold his feet
+        // clear of the readout panel, which on a 390x844 phone is a quarter of
+        // the frame. See the measured framing in tools/celebrate.js.
+        // THE AIM ARRIVES ON `rw`, NOT ON `cw`, AND THAT IS A COMPOSITION FIX
+        // RATHER THAN A TASTE ONE. The chase aim at the tape sits at y 3.56 --
+        // LOOK_Y plus the run-in and break lifts, which exist to get the arch
+        // and the bunting into frame. Blended out linearly it is still at 1.39
+        // when the camera has closed to 2.7 units, so the figure hangs below
+        // the frame centre at the exact moment he is largest, and his legs go
+        // 238 px inside the opaque readout panel. Arriving on the same eased
+        // weight the RADIUS uses keeps the aim ahead of the approach, and the
+        // lowest row of the figure stays clear of the panel through the whole
+        // move -- measured, and printed by tools/celebrate.js.
+        look.set(
+          look.x + (px - look.x) * rw,
+          look.y + ((CEL_AIM_Y + gy) - look.y) * rw,
+          look.z + (pz - look.z) * rw
+        );
+      }
       cam.lookAt(look);
 
       // Roll: the lean term is the body, the camera's own lateral velocity is
@@ -26279,8 +27077,16 @@ MR.Camera = (function () {
       if (first) s.fov = fovGoal;                       // ?skip= starts settled
       else s.fov += (fovGoal - s.fov) * (1 - Math.pow(fovRate, d));
 
-      if (Math.abs(cam.fov - s.fov) > 0.01) {
-        cam.fov = s.fov;
+      // The celebration lens is crossfaded ON TOP of the chase lens rather
+      // than folded into targetFov, and that is not tidiness. s.fov is a
+      // stateful filter whose slow half (0.12, a 0.47s time constant) exists
+      // so that losing speed feels like it is being taken away -- driving a
+      // 34-degree narrowing through it would smear the push-in over half the
+      // shot. cw is already smootherstep-shaped, so this needs no filter of
+      // its own, and at cw = 0 the output is s.fov exactly.
+      const fovOut = s.fov + (CEL_FOV - s.fov) * cw;
+      if (Math.abs(cam.fov - fovOut) > 0.01) {
+        cam.fov = fovOut;
         cam.updateProjectionMatrix();
       }
     };
@@ -26332,6 +27138,7 @@ MR.Camera = (function () {
       s.dip = 0; s.dipV = 0; s.kick = 0;
       s.pDuck = 0; s.dk = 0;
       s.mile = -1; s.mileT = 0; s.gearT = 0; s.gearArmed = true; s.finish = 0;
+      s.cel = 0; s.celW = 0;
       cam.fov = BASE_FOV;
       cam.updateProjectionMatrix();
     };
@@ -26339,7 +27146,7 @@ MR.Camera = (function () {
     return s;
   }
 
-  return { create, BASE_FOV };
+  return { create, BASE_FOV, celSideFor };
 })();
 
 /* ==================== src/game/controls.js ==================== */
@@ -26733,161 +27540,6 @@ MR.Collision = (function () {
   };
 })();
 
-/* ==================== src/render/ramp.js ==================== */
-/**
- * THE RIDEABLE ROOF, AS A DELIBERATELY PLAIN PLACEHOLDER.
- *
- * This is not art and is not trying to be. It exists so the ramp mechanic can
- * be photographed and judged as a mechanic -- a frame with the runner standing
- * on nothing proves nothing -- and so the shape the real art has to fill is
- * stated as geometry rather than as a paragraph. src/render/world.js owns the
- * fleet and is being rebuilt by another agent in this same tree; this file does
- * not touch it and must be deleted when world.js grows a real tailgate.
- *
- * ---- RULE 1: BUILT ON ALL SIDES ----------------------------------------
- *
- * Every ramp is ONE CLOSED SOLID. The profile in the (z, y) plane is the
- * silhouette of a bin lorry with its hopper down --
- *
- *     (z0, 0) -> (z0 + run, deck) -> (z1, deck) -> (z1, 0) -> close
- *
- * -- extruded across the lane and capped at both ends: six faces, twelve
- * triangles, no open back, no missing flank, no side left out because the chase
- * camera "starts" behind. The camera does not start anywhere; it goes
- * everywhere. You pass this thing at 1.70 units in the next lane, the lens
- * banks through every lane change, and the whole point of the mechanic is that
- * you also stand on top of it and look down its length.
- *
- * ---- IT FITS INSIDE THE COLLISION BOX, AND THAT IS THE CONTRACT ---------
- *
- * MR.Collision.BOX decides clearance; art never does. So every vertex here is
- * generated FROM the box -- half-width is BOX[BLOCK].halfX, the deck is
- * BOX[BLOCK].yMax, and the far face is the same
- * 2 * halfZ * (1 + 0.9 * span) expression Course.reachOf and world.js's
- * gateBoxes use. Nothing can stick out of the envelope the fairness audit casts
- * against, because there is no number in this file that is not read off it.
- *
- * ---- COST ---------------------------------------------------------------
- *
- * ONE draw call for the whole course, whatever the ramp count, because the
- * ramps are merged into a single static buffer at create time. At the measured
- * 4.09 ramps a day that is 49 triangles against a ceiling of 500,000 and one
- * draw call against a budget of roughly 400. Draw calls are the binding
- * constraint in this project, so a per-ramp mesh would have been the wrong
- * shape even though it is easier to write.
- */
-MR.Ramp = (function () {
-
-  /**
-   * @param course a generated MR.Course; `course.ramps` may be empty
-   * @returns { group } to be added to the scene, or an empty group
-   */
-  function create(course) {
-    const group = new THREE.Group();
-    group.name = 'ramp-placeholders';
-    const ramps = (course && course.ramps) || [];
-    if (!ramps.length) return { group };
-
-    const B = MR.Collision.BOX[MR.K.BLOCK];
-    const hx = B.halfX;
-
-    const pos = [];
-    const nrm = [];
-
-    /**
-     * A quad, emitted as two triangles, WOUND AND NORMALLED OUTWARD BY
-     * CONSTRUCTION rather than by the author getting six orderings right.
-     *
-     * The first draft did it by hand and got three of the six faces backwards,
-     * including the roof -- which back-face culling then deleted, so the frame
-     * showed the runner standing on the tram underneath instead of on the ramp.
-     * A missing face is exactly the failure rule 1 exists to prevent, and it is
-     * invisible in a diff and nearly invisible in a frame.
-     *
-     * So the face is given the solid's centre and orients itself: take the
-     * normal from the winding, and if it points back towards the middle of the
-     * solid, reverse the winding and the normal together. There is no ordering
-     * a caller can supply that produces an inward face.
-     */
-    function quad(cx, cy, cz, a, b, c, d) {
-      // cross(b - a, c - a) is the right-hand normal of the winding a->b->c.
-      const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
-      const vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
-      let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
-      const len = Math.hypot(nx, ny, nz) || 1;
-      nx /= len; ny /= len; nz /= len;
-      // Outward is away from the centre of the solid.
-      const fx = (a[0] + b[0] + c[0] + d[0]) / 4 - cx;
-      const fy = (a[1] + b[1] + c[1] + d[1]) / 4 - cy;
-      const fz = (a[2] + b[2] + c[2] + d[2]) / 4 - cz;
-      const order = (nx * fx + ny * fy + nz * fz) >= 0
-        ? [a, b, c, a, c, d]
-        : (nx = -nx, ny = -ny, nz = -nz, [a, d, c, a, c, b]);
-      for (const p of order) {
-        pos.push(p[0], p[1], p[2]);
-        nrm.push(nx, ny, nz);
-      }
-    }
-
-    for (const r of ramps) {
-      const x = MR.K.LANE_X[r.lane];
-      const xL = x - hx, xR = x + hx;
-      const dy = r.deck;
-      // The profile, near to far. Deliberately in the order the runner meets it.
-      const p0 = r.z0;                 // the tailgate touches the road here
-      const p1 = r.z0 + r.run;         // top of the slope
-      const p2 = r.z1;                 // the far face, where the roof stops
-
-      // The centroid of the solid, which is what orients every face. Only its
-      // SIDE of each face matters, so the crude average of the profile is
-      // enough and is exact for the two flanks and the two caps.
-      const cx = x, cy = dy * 0.4, cz = (p0 + p1 + p2 + p2) / 4;
-
-      // Sloped top (the hopper), flat roof, far face, underside, and the two
-      // flanks. Six faces: this is a closed solid, and none of them is left out
-      // because a chase camera is unlikely to look at it. It is stood on.
-      quad(cx, cy, cz, [xL, 0, p0], [xR, 0, p0], [xR, dy, p1], [xL, dy, p1]);    // slope
-      quad(cx, cy, cz, [xL, dy, p1], [xR, dy, p1], [xR, dy, p2], [xL, dy, p2]);  // roof
-      quad(cx, cy, cz, [xL, dy, p2], [xR, dy, p2], [xR, 0, p2], [xL, 0, p2]);    // far face
-      quad(cx, cy, cz, [xL, 0, p2], [xR, 0, p2], [xR, 0, p0], [xL, 0, p0]);      // underside
-      quad(cx, cy, cz, [xR, 0, p0], [xR, 0, p2], [xR, dy, p2], [xR, dy, p1]);    // right flank
-      quad(cx, cy, cz, [xL, 0, p2], [xL, 0, p0], [xL, dy, p1], [xL, dy, p2]);    // left flank
-    }
-
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
-
-    // Flat, loud and obviously unfinished. A placeholder that looks finished is
-    // the thing that ships by accident.
-    const mat = new THREE.MeshLambertMaterial({ color: 0xf07022, flatShading: true });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.name = 'ramp-placeholder';
-    // Ramps sit on the road, and the road has hills under it. Lifting the whole
-    // buffer is wrong on a slope; lifting per ramp at build time is right, and
-    // the profile is flat over 35 units, so a ramp gets the elevation at its
-    // own mouth. This is a placeholder's approximation and is called out as one.
-    if (course.elevation) {
-      // Per-ramp lift means per-ramp geometry, so it is folded into the vertex
-      // buffer rather than into the transform: walk the positions and raise
-      // each ramp's block by the road height at its own z0.
-      const arr = geo.attributes.position.array;
-      let v = 0;
-      for (const r of ramps) {
-        const lift = course.elevation.at(r.z0);
-        for (let i = 0; i < 36; i++, v++) arr[v * 3 + 1] += lift;   // 6 quads * 6 verts
-      }
-      geo.attributes.position.needsUpdate = true;
-    }
-    geo.computeBoundingSphere();
-    group.add(mesh);
-
-    return { group };
-  }
-
-  return { create };
-})();
-
 /* ==================== src/game/player.js ==================== */
 /**
  * Player state machine: lanes, jump arc, duck, stumble, and gate resolution.
@@ -26963,6 +27615,9 @@ MR.Player = (function () {
       aidIdx: 0,
       lastResult: null,  // 'clean' | 'hit'
       lastResultAt: -99,
+      // The last gate resolved: { idx, lane, clean }. The receipt a guarded aid
+      // item is bought with -- see resolveGates and resolveAid.
+      lastGate: null,
       events: [],        // drained by main for audio/HUD reactions
     };
 
@@ -26979,7 +27634,7 @@ MR.Player = (function () {
       s.duck01 = 0; s.lean = 0; s.stumble = 0; s.bounce = 0; s.tripT = 0;
       s.surface = 0; s.ramp = null; s.falling = 0; s.fallFrom = 0; s.flanked = null;
       s.gateIdx = 0; s.aidIdx = 0;
-      s.lastResult = null; s.events.length = 0;
+      s.lastResult = null; s.lastGate = null; s.events.length = 0;
     };
 
     function changeLane(dir) {
@@ -27233,6 +27888,19 @@ MR.Player = (function () {
 
         const kind = gate.lanes[s.lane];
         const clean = C.clears(kind, s);
+        // ---- THE RECEIPT FOR THE GATE JUST PASSED --------------------------
+        //
+        // Which gate, in which lane, and whether it was cleared. resolveAid
+        // reads this and nothing else to decide whether a guarded item has been
+        // earned -- see the note there. Written BEFORE the BLOCK bounce below,
+        // because the bounce moves s.lane and the receipt has to say the lane
+        // the runner was actually IN when the gate resolved, not the one they
+        // were thrown into by it.
+        //
+        // Index rather than object identity: course.gates is regenerated from
+        // the date seed in several places (the replay path builds its own), and
+        // an item that remembers a gate by pointer would silently never match.
+        s.lastGate = { idx: s.gateIdx - 1, lane: s.lane, clean };
         if (!clean) {
           // Contact is not one thing. Running into a wall and clipping a kerb
           // used to produce the identical result -- pass straight through,
@@ -27301,10 +27969,65 @@ MR.Player = (function () {
     /**
      * Collect any aid the player ran through this step.
      *
-     * Lane match only ON THE ROAD -- no action required and no vertical test.
-     * Aid is a reward for choosing a line, not a fourth thing to time, and a
-     * bottle you can miss by being mid-jump would make the aid lane a trap in a
-     * game where the aid lane is supposed to be the merciful option.
+     * NO ACTION IS REQUIRED AND THERE IS NO VERTICAL TEST. Aid is a reward for
+     * choosing a line, not a fourth thing to time, and a bottle you can miss by
+     * being mid-jump would make the aid lane a trap in a game where the aid
+     * lane is supposed to be the merciful option. That has not changed and must
+     * not: a runner who ploughs straight into the block still takes the bottle
+     * behind it, having paid for it with the streak.
+     *
+     * ---- WHAT A GUARDED ITEM IS BOUGHT WITH, AND WHY IT IS NOT THE LANE ----
+     *
+     * Every road item is now laid directly behind a JUMP or a DUCK, in that
+     * hazard's own lane, at a gate that also offers a lane through for nothing
+     * (see the placement rule in course.js). The point of that is that reaching
+     * the bottle should mean answering the obstacle in front of it.
+     *
+     * A LANE MATCH AT A POINT CANNOT ENFORCE THAT, and measurement is why this
+     * is here rather than a paragraph claiming it does. player.changeLane moves
+     * `lane` on the same frame the input is served, so any patch of road can be
+     * reached by a swerve -- and a bot in tools/aid.js that took the free lane
+     * at the gate and then cut in behind it collected 61% of the course's aid
+     * for a third of a contact. Pushing the item closer to the gate only makes
+     * the window smaller; it never closes it, and it makes the answer depend on
+     * the frame rate, which is not a thing fairness may depend on.
+     *
+     * So a guarded item carries the INDEX OF THE GATE IT STANDS BEHIND, and is
+     * bought at that gate rather than on the road: the runner has to have been
+     * in the item's lane when the gate resolved. Cleanly or not -- see above.
+     *
+     * This is not a new kind of rule. It is exactly the shape the roof already
+     * had, one step down: a roof item is collected only by a runner standing on
+     * the ramp that carries it, and a guarded item only by one who came through
+     * the obstacle that guards it. Both say the same thing -- the reward is
+     * paid for by where you chose to be, and the pickup is the receipt.
+     *
+     * The instantaneous lane test is DROPPED for a guarded item, deliberately.
+     * Keeping both would mean a player who paid at the gate and then swerved
+     * inside the two units before the bottle paid and got nothing, which is a
+     * trap measured in frames. The gate receipt is the whole test.
+     *
+     * ---- ONE PLACE STILL DESCRIBES THE OLD RULE, AND IT IS NOT THIS FILE ---
+     *
+     * world.js decides when to POP a pickup -- the little punch-out that says
+     * you got it -- with its own copy of the test, and its copy is the one this
+     * function used to have:
+     *
+     *     e.it.lane === playerLane && e.it.z <= z && z - e.it.z < 6
+     *
+     * That is a lane match at a point, so it and this function now answer
+     * differently in exactly the case the guard exists for: a runner who takes
+     * the free lane at the gate and cuts into the aid lane a unit later gets the
+     * animation and no gain, and one who pays at the gate and immediately
+     * swerves out gets the gain and no animation. Both windows are under two
+     * units -- three frames -- so neither is reachable except on purpose, which
+     * is why this is a note rather than a fix landed here: world.js belongs to
+     * another pass and a renderer edit made blind from this file is how two
+     * copies of a rule become three.
+     *
+     * The hook it needs is already on the state: `s.lastGate` is the receipt,
+     * and popping off THAT rather than off the lane deletes the second copy of
+     * the rule instead of correcting it. Recorded in docs/roadmap.md.
      *
      * ---- A ROOF ITEM IS NOT A ROAD ITEM AT A DIFFERENT HEIGHT --------------
      *
@@ -27332,12 +28055,20 @@ MR.Player = (function () {
         const item = aid[s.aidIdx];
         if (item.z < unitsBefore - 1e-6) { s.aidIdx++; continue; }
         s.aidIdx++;
-        if (item.lane !== s.lane) continue;
-        // The ramp under the ITEM, not under the runner: they are the same
-        // vehicle whenever this can pay out, and asking about the item is what
-        // makes the test independent of where in the step the z landed.
-        const carrier = item.roof && course.rampAt ? course.rampAt(item.z, item.lane) : null;
-        if (item.roof ? s.ramp !== carrier || carrier === null : s.onDeck) continue;
+        if (item.gate != null) {
+          // Bought at the gate, not on the road. Never from a roof, for the
+          // same reason a road item never was: a runner up there did not come
+          // through anything.
+          const r = s.lastGate;
+          if (s.onDeck || !r || r.idx !== item.gate || r.lane !== item.lane) continue;
+        } else {
+          if (item.lane !== s.lane) continue;
+          // The ramp under the ITEM, not under the runner: they are the same
+          // vehicle whenever this can pay out, and asking about the item is what
+          // makes the test independent of where in the step the z landed.
+          const carrier = item.roof && course.rampAt ? course.rampAt(item.z, item.lane) : null;
+          if (item.roof ? s.ramp !== carrier || carrier === null : s.onDeck) continue;
+        }
         out.push(item);
         s.events.push('aid');
       }
@@ -29652,6 +30383,15 @@ MR.HUD = (function () {
       requestAnimationFrame(markScroll);
     };
 
+    /**
+     * The celebration: the live readout's top-left column steps out of the
+     * frame while the camera is round the front of the runner. See the
+     * .celebrating rule in style.css for what stays and why.
+     */
+    api.celebrate = function (on) {
+      root.classList.toggle('celebrating', !!on);
+    };
+
     api.hideEnd = function () {
       n.endPanel.classList.add('hidden');
       syncPanels();
@@ -29716,6 +30456,13 @@ MR.HUD = (function () {
   // clamp themselves; see the accessors at the foot of course.js.
   if (params.has('narrow')) MR.Course.NARROW = params.get('narrow') || 1;
   if (params.has('ramp')) MR.Course.RAMP = params.get('ramp') || 1;
+  // ?joy=0..1 forces the finish verdict the celebration pose blends on. Same
+  // shape and same reason as ?polish: ONE build photographs both ends of the
+  // gesture, and the losing version does not need a deliberately broken run to
+  // be looked at -- which is exactly how a losing-run animation goes unchecked.
+  // Null means "read it off the result", which is every real game.
+  const JOY = params.has('joy') ? parseFloat(params.get('joy')) : null;
+  const JOY_FORCED = JOY !== null && isFinite(JOY);
 
   // ---- renderer ---------------------------------------------------------
   const canvas = document.getElementById('gl');
@@ -29739,11 +30486,10 @@ MR.HUD = (function () {
   const world = MR.World.create(course);
   scene.add(world.group);
 
-  // The rideable roofs, as plain placeholder solids. One draw call for the
-  // whole course and an empty group when no ramp was generated, so at ?ramp=0
-  // -- which is every default run -- this costs nothing at all.
-  const ramps = MR.Ramp.create(course);
-  scene.add(ramps.group);
+  // The rideable roofs used to be a separate placeholder solid added here.
+  // They are not a separate object any more: a rideable train is BLOCK v0 with
+  // its tail open, built and cast by world.js, so it arrives with the world
+  // above and costs nothing extra to place.
 
   const runner = MR.Runner.create();
   scene.add(runner.group);
@@ -29784,6 +30530,8 @@ MR.HUD = (function () {
   let doneAt = 0;      // wall-clock at the tape, for the run-out ease
   let endTimer = 0;    // the held end card; cleared on reset so it cannot
                        // arrive over a run that has already restarted
+  let showCard = null; // ...and the same card, callable early on any input
+  let celClock = 0;    // seconds since the tape -- see the celebration below
   let countT = 0;
   let lastStep = 0;
   let mileShown = 0;
@@ -29793,6 +30541,29 @@ MR.HUD = (function () {
   // reach is silent today, and so is dropping a rung of the ladder.
   let recordGone = false;
   let tierIdx = -1;
+  // Whether the "you just ran past a bottle that would have helped" cue has
+  // already spoken this run. See the block that sets it for why it is an edge
+  // and not a per-item reaction.
+  let aidNagged = false;
+  // ---- WHAT HIS BODY SAYS ABOUT THE RUN HE JUST FINISHED ------------------
+  //
+  // One number, 0..1, because the finish pose is one blend between two ends of
+  // the same gesture -- see the celebration block in runner.js. The camera move
+  // is IDENTICAL at every value of it, and that is the design rather than an
+  // economy: most runs are not record runs, and a celebration only the best
+  // players ever see is a celebration most players never see. Finishing a
+  // marathon is the accomplishment; the verdict changes what he DOES, not
+  // whether the game turns round and looks at him.
+  //
+  //   1.00  the record went. Both arms up, head back, a roar.
+  //   0.85  an all-time best.
+  //   0.70  a personal best today.
+  //   else  where the run landed on the ladder, top rung 0.60 down to 0.
+  //
+  // At 0 it is the spent finisher: hands to the head, shoulders down, eyes
+  // squeezed shut and a mouth gasping. Which is also a celebration -- it is
+  // what the last third of a real finish line looks like.
+  let finishJoy = 0;
   // WHERE the contacts happened, not just how many. `pace` counts hits and
   // that is all the readout needs while running, but the finish card asks a
   // question a count cannot answer -- which city did this run go wrong in --
@@ -29803,6 +30574,7 @@ MR.HUD = (function () {
 
   function reset() {
     clearTimeout(endTimer);
+    showCard = null;
     // Re-read the save before every run, not once at boot: a second run in the
     // same session has to chase the streak the first one just set.
     hud.setMemory(MR.Store.summary(dateKey));
@@ -29816,10 +30588,14 @@ MR.HUD = (function () {
     lastStep = 0;
     recordGone = false;
     tierIdx = -1;
+    aidNagged = false;
+    finishJoy = 0;
+    celClock = 0;
     hitAt = [];
     runner.phase = 0;
     ghost.reset();
     hud.hideEnd();
+    hud.celebrate(false);
     world.update(0);
   }
 
@@ -29833,7 +30609,14 @@ MR.HUD = (function () {
 
   hud.onStart(begin);
   hud.onAgain(begin);
-  controls.onAny = () => audio.unlock();
+  // Any input during the celebration ends the hold and brings the card up now.
+  // The alternative to this is a player who has seen the ending once being made
+  // to sit through it on every subsequent run, which is how a celebration
+  // becomes a cutscene -- see the note on the 4.9s hold below.
+  controls.onAny = () => {
+    audio.unlock();
+    if (state === DONE && showCard) showCard();
+  };
 
   // ---- autopilot --------------------------------------------------------
   // Plays the course by reading the same gate data the renderer draws, so it
@@ -30064,22 +30847,71 @@ MR.HUD = (function () {
       }
 
       // Aid taken this step. Streak only -- pace still has one source.
-      //
-      // resolveAid walks the index past every item the runner drew level with
-      // and returns only the ones whose lane matched, so the difference is the
-      // count that went by untaken. That is the one event in the run which is
-      // pure loss and has nothing to mark it: no contact, no flash, the streak
-      // simply fails to go up. Hence a sound and nothing else -- a toast here
-      // would be scolding, and the readout is being cut, not grown.
       const aidIdxBefore = player.aidIdx;
-      let aidTaken = 0;
-      for (const item of player.resolveAid(course, before, after)) {
+      const aidTook = player.resolveAid(course, before, after);
+      for (const item of aidTook) {
         pace.onAid(item.gain);
         audio.aid(item.kind === 'banana');
-        aidTaken++;
         if (item.kind === 'banana') hud.toastAid('FUEL', '+' + item.gain + ' STREAK');
+        // Taking one proves the player has not simply stopped seeing them, so
+        // the missed cue below is allowed to speak again. See its note.
+        aidNagged = false;
       }
-      if (player.aidIdx - aidIdxBefore > aidTaken) audio.aidMissed();
+
+      // ---- THE DECLINED BOTTLE, AND WHY THIS RULE HAD TO CHANGE -----------
+      //
+      // This line used to read `if (passed > taken) audio.aidMissed()`, under a
+      // comment calling a passed item "the one event in the run which is pure
+      // loss and has nothing to mark it". Both halves of that were true of the
+      // aid placement it was written against, and roadmap 50 has just made both
+      // false.
+      //
+      // A bottle now stands BEHIND an obstacle, in that obstacle's own lane, at
+      // a gate that always leaves some other lane clear. Measured by
+      // tools/aid.js on the shipped course: items costing the cheapest line
+      // nothing went 56.5% -> 0%, and four natural-line bots went from
+      // collecting 64.4% to 0%. So declining is now the ORDINARY outcome and
+      // very often the correct one -- the free lane is right there, and the
+      // only way to the bottle is over or under the thing in front of it. Left
+      // alone, this cue would have fired for very nearly every bottle in the
+      // race, which turns a meaningful sound into a nag and, worse, nags the
+      // player for making the right decision.
+      //
+      // Nor is it "pure loss" any more, and that is the deeper change: a passed
+      // bottle is now a PRICE DECLINED, not an opportunity fumbled.
+      //
+      // WHAT THE CUE MEANS NOW. There is still one case worth a sound, and
+      // pace.js already defines it exactly. onAid grants
+      // min(streak + gain, gatesSeen, AID_CEILING) - streak, so a bottle is
+      // worth EXACTLY ZERO to a flawless runner -- their streak already equals
+      // the gates they have passed. The quantity below is that arithmetic, not
+      // a threshold invented here, which is why it cannot drift away from what
+      // the bottle would actually have paid.
+      //
+      // So the cue fires only when the bottle really would have bought
+      // something back, at half its face value or better -- i.e. on a run that
+      // has already come apart, which is the run the rescue half of the aid
+      // pool exists for. It cannot fire on a clean line at all.
+      //
+      // AND ONCE, NOT EVERY TIME. A broken run passes fourteen of these. The
+      // informative event is the FIRST one -- "there is help on this road and
+      // you are running past it" -- and the fourteenth is scolding. This is the
+      // same edge-not-held shape recordLost and the tier cues above already
+      // use, and it re-arms when the player takes an item, because taking one
+      // is proof they can see them.
+      if (player.aidIdx - aidIdxBefore > aidTook.length && !aidNagged) {
+        let worth = 0, face = 0;
+        for (let i = aidIdxBefore; i < player.aidIdx; i++) {
+          const item = course.aid[i];
+          if (!item || aidTook.indexOf(item) >= 0) continue;
+          // pace.onAid's own bounds, so the two can never disagree about what a
+          // bottle is worth to this run at this moment.
+          const paid = Math.max(0, Math.min(pace.streak + item.gain,
+            pace.gatesSeen, K.AID_CEILING) - pace.streak);
+          if (paid > worth) { worth = paid; face = item.gain; }
+        }
+        if (face > 0 && worth >= face * 0.5) { aidNagged = true; audio.aidMissed(); }
+      }
 
       // Player events -> audio.
       for (const e of player.drainEvents()) {
@@ -30139,21 +30971,48 @@ MR.HUD = (function () {
           streak: pace.bestStreak,
           tier: MR.Tier.of(pace.finishTime).name,
         });
+        // See finishJoy above. Read here, once, off the result that is now a
+        // fact -- never off the projection, which is still twitching a quarter
+        // of a second before the line.
+        const rung = MR.Tier.of(pace.finishTime);
+        const rungs = MR.Tier.LADDER.length - 1;
+        finishJoy = JOY_FORCED ? Math.max(0, Math.min(1, JOY))
+          : pace.finishTime <= K.RECORD_SECONDS ? 1 : Math.max(
+          saved && saved.allTimeBest && !saved.firstEver ? 0.85 : 0,
+          saved && saved.beatToday && !saved.firstToday ? 0.70 : 0,
+          0.60 * (1 - rung.i / rungs));
+
         // HOLD THE CARD. The tape breaks, the confetti fires, the crowd
         // roars and the camera pulls up into its hero shot -- and all of that
         // used to play behind a full-screen results panel that appeared on the
         // very same frame. The ending was being built and then covered up.
         //
-        // 2.6s is the length of the flourish the world and camera play out
-        // (tape swing 1.8s, confetti fall, camera settle), so the card arrives
-        // as the celebration lands rather than instead of it.
+        // 2.6s WAS the length of that flourish. It is not any more: the camera
+        // now leaves the chase entirely and comes round to the front of him
+        // (see the celebration block in camera.js), which is 0.80s of held
+        // astern break, 1.80s of arc, and a hold on his face. The card is what
+        // covers that up, so the card moves.
+        //
+        // 4.9s is not a free number and it is worth saying what pays for it:
+        // the HUD readout is still on screen through all of it with the race
+        // clock stopped on the finish time, so a player who only wants the
+        // number already has the number. Anyone who wants the card sooner can
+        // touch the screen -- see controls.onAny below, which ends the hold on
+        // any input rather than making them wait out an animation twice.
         audio.finish(pace.finishTime < K.RECORD_SECONDS);
+        // Clear the top-left column out of the shot. See hud.celebrate.
+        hud.celebrate(true);
         clearTimeout(endTimer);
         // hitAt is copied rather than handed over: `reset()` empties this array
         // for the next run, and the card is still on screen when RUN IT AGAIN
         // is pressed.
         const where = hitAt.slice();
-        endTimer = setTimeout(function () { hud.showEnd(pace, saved, where); }, 2600);
+        showCard = function () {
+          clearTimeout(endTimer);
+          showCard = null;
+          hud.showEnd(pace, saved, where);
+        };
+        endTimer = setTimeout(function () { if (showCard) showCard(); }, 4900);
       }
     }
 
@@ -30172,6 +31031,21 @@ MR.HUD = (function () {
       ? pace.speed() * Math.max(0, 1 - (performance.now() - doneAt) / 2200)
       : pace.speed();
 
+    // Seconds since the tape, which is the celebration's clock in runner.js AND
+    // in camera.js. Real time, not race time: the race clock has stopped, and
+    // this drives an animation rather than a result.
+    //
+    // Accumulated from `raw` rather than read off performance.now(), and both
+    // halves of that matter. RAW, because the celebration is a parametric path
+    // and not a spring -- the 1/25 clamp above exists to stop a long frame
+    // detonating an integrator, and applying it here would make the whole move
+    // play at 28% speed on the 7fps SwiftShader harness while the card, on a
+    // real setTimeout, arrived a third of the way through it. ACCUMULATED,
+    // because a screenshot harness that pumps rAF with a synthetic clock then
+    // owns this clock too, which is what makes the framing measurable.
+    if (state === DONE) celClock += raw;
+    const celT = celClock;
+
     // The grade at the runner, -1..1 against the steepest legal one. It only
     // pitches the trunk; the stride slows on the climb and quickens on the
     // descent for free, because cadence already falls out of `speed`.
@@ -30186,6 +31060,14 @@ MR.HUD = (function () {
       bounce: player.bounce,
       lean: player.lean,
       stumble: player.stumble,
+      // The finish. Both are zero for the whole race, so every term they drive
+      // is provably inert until the tape -- the same discipline MR.Runner.POLISH
+      // runs on, and tools/envelope.js holds the eight play silhouettes to it.
+      celT: celT,
+      joy: finishJoy,
+      // Which side the camera will be on when it arrives. Read from camera.js
+      // rather than recomputed, so the head cannot turn away from the lens.
+      celSide: MR.Camera.celSideFor(player.x),
     });
     // ELEVATION IS ADDED HERE AND NOWHERE UPSTREAM. `player.y` is, and stays,
     // the height above the LOCAL road surface -- which is what lets
@@ -30207,6 +31089,10 @@ MR.HUD = (function () {
       // not another gear. See camera.js's header.
       gearSpeed: pace.streakSpeed(),
       lean: player.lean, duck01: player.duck01,
+      // The finish, on the same clock the runner's pose runs on. Zero for the
+      // whole race, so every celebration term in camera.js is inert until the
+      // tape and the shipped chase framing is untouched by construction.
+      celT: celT,
     });
 
     // After the camera, never before: the ghost's tag is placed against this
@@ -30249,6 +31135,15 @@ MR.HUD = (function () {
     // would put a wrong city on the card with nothing to catch it -- so the
     // harness is given the same array the card is given.
     get hitAt() { return hitAt; },
+    // The celebration clock, and it is SETTABLE. A harness that pumps rAF owns
+    // every other clock in this file, and would own this one too except that a
+    // page opened at ?skip=250 is already several real seconds past the tape
+    // before the harness can take the pump -- so without a rewind, a tool can
+    // only ever photograph whichever instant of a 2.6-second move the boot
+    // happened to land on. That is the exact failure tools/stride.js shipped:
+    // a measurement sweep taken at whatever state the page was left in.
+    get celT() { return celClock; },
+    set celT(v) { celClock = Math.max(0, +v || 0); },
     course, world, runner, ghost, cam, hud, audio, renderer, scene,
     begin,
     fps: () => fps,

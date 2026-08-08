@@ -4770,32 +4770,11 @@ MR.shading = (function () {
  *      vertex of extra width.
  *
  *      A hem also has to be MEASURED at the size the game ships, and half of
- *      the first wardrobe pass was not. See the list above the colour block for
- *      what came out again and why -- one item was not merely invisible but
- *      actively read as a hole in the vest, which is the failure mode worth
- *      remembering.
- *
- *      That list has since been re-measured end to end, because it was written
- *      against a figure believed to be 110px who is 163-208px in portrait and
- *      50-67px in landscape (tools/figure.js). All four removals hold, but only
- *      one held for the reason recorded, and the three corrections are all the
- *      same correction: A DIMENSION IS NOT A SCREEN FOOTPRINT. Three tests,
- *      in the order they actually decide things:
- *        1. IS IT DRAWN AT ALL? The lace panel was 0 pixels in 48 of 48 frames
- *           -- buried under the sock and the toe dome, whose ink shells close
- *           the gap between them -- and had been since the day it was written.
- *           A restored finger is 0 in 45 of 48, because it points down the view
- *           axis. Neither was ever a question of size.
- *        2. WHAT IS DIRECTLY ABOVE IT? The waistband is 299 pixels, seven and a
- *           half times the short cuff that was kept, so it passes any size test
- *           -- and it still has to go, because it lands within 8% of the vest
- *           hem above it and cuts the biggest value edge on the lower half of
- *           the figure by 41%. A hem is judged against BOTH its neighbours.
- *        3. WHAT SHAPE DOES IT RESOLVE INTO? The base-layer sleeve reads as a
- *           triangular hole whatever its size, which is why it is the one
- *           removal whose original argument survived contact with the truth.
- *      Only after those three does "how many pixels" mean anything, and
- *      tools/resolve.js answers it by building the part and counting.
+ *      the first wardrobe pass was not. Anything under about three pixels, or
+ *      standing on a neighbour it barely differs from, is not detail; it is
+ *      cost. See the list above the colour block for what came out again and
+ *      why -- one item was not merely invisible but actively read as a hole in
+ *      the vest, which is the failure mode worth remembering.
  *   8. Nothing on a rig where every part is bolted to a joint can arrive late,
  *      and everything real does. Five things here do not arrive with the
  *      skeleton: the hood on a pair of underdamped springs, the bib's hem on a
@@ -5141,91 +5120,23 @@ MR.Runner = (function () {
   // about 12% off its neighbour lands in the same band on most of the surface
   // and the hem simply is not there; these all sit between 15% and 30% off.
   //
-  // ---- HOW BIG HE ACTUALLY IS, and it is not what this file used to say ---
-  //
-  // Every removal below was argued in pixels, and until now the pixels were
-  // guessed. Measured on the shipped build at the shipped camera by
-  // tools/figure.js -- every de-duplicated vertex of every visible mesh
-  // through the real lens, swept across the stride and across six camera-phase
-  // windows, because the FOV swings with pace and the camera's bob clock beats
-  // against the runner's:
-  //
-  //   390x844 portrait   start 189-208   slow 186-208   mid 166-204   fast 163-200
-  //   620x1344           start 302-332                                fast 259-318
-  //   320x568 smallest   start 128-140                                fast 109-134
-  //   1280x800 desktop   start 155-172                                fast 131-162
-  //   844x390 LANDSCAPE  start  60-67    slow  59-67    mid  51-63    fast  50-62
-  //
-  // Three things follow and none of them was known when the list below was
-  // written:
-  //
-  //   THE 110 WAS WRONG and so is the 204-211 that replaced it. On the frame
-  //     that ships he is 163-208px, median 179-199 depending on pace -- so the
-  //     correction that found 204-211 quoted the TOP of the range as though it
-  //     were the figure, and the camera has moved since (CAM_BASE_Y 2.62 to
-  //     3.10, LOOK_AHEAD 8.0 to 11.0, the FOV floor 58 to 61, the swing 10.5 to
-  //     8.5), which took another 2.4% off him. Anything in this file quoting a
-  //     single number for his height is quoting one row of the table above.
-  //   PACE IS WORTH 10% OF HIM. The lens opens from 61 to 70 degrees across the
-  //     honest pace band, so the same detail is a tenth smaller at a record
-  //     pace than at the start -- and a record pace is when the player is
-  //     looking hardest.
-  //   LANDSCAPE IS THE BINDING CASE, and no comment in this file had ever
-  //     mentioned it. At 844x390 he is 50-67px: a THIRD of portrait, and near
-  //     the forty-pixel silhouette the jump and the slide are held to. A
-  //     detail sized against 200px is being drawn at 55px on the same phone
-  //     turned sideways.
-  //
-  // The number that actually settles a removal is not his height at all, it is
-  // PIXELS PER WORLD UNIT at the depth the part lives at, because that is what
-  // converts a dimension into pixels. figure.js reports it: 121-131 across at
-  // 390x844, 39-43 in landscape. Nothing here should ever again divide a part
-  // by 1.60 and multiply by a remembered height.
-  //
-  // WHAT SURVIVES THE CAMERA, AND WHAT WAS TAKEN OUT AGAIN. Kept, because they
-  // were measured to read: the cap band, the vest's red against the shorts'
-  // navy, the short cuff, the shoe. Everything below was re-examined against
-  // the real figure with tools/resolve.js, which BUILDS each candidate, gives
-  // it a flat unique colour and COUNTS its pixels in the real chase frame
-  // across a stride -- against a positive control of the same geometry held
-  // clear of what occludes it, so a zero can be told from a probe that was
-  // never drawn, and against three parts that were kept and are agreed to
-  // read. Every one of them stays out, and only ONE of them stays out for the
-  // reason originally written down:
-  //
-  //   BASE-LAYER SLEEVES  a pale blue cylinder under each deltoid, with its
-  //     own rolled cuff. THE ORIGINAL REASON STANDS and it was never a size
-  //     argument: from the chase camera the sleeve is not a cylinder, it is
-  //     the sliver of one that clears the deltoid, so it resolves as a pale
-  //     triangle at each shoulder and a pale triangle inside a red mass reads
-  //     as a HOLE IN THE VEST. That is a shape fault, and a shape fault does
-  //     not improve when the figure gets bigger -- it gets more legible.
-  //     Measured anyway, for the record: 23px of frame at 390x844, 0 in most
-  //     landscape frames. Its cuff went with it, at 18px; a cuff on a sleeve
-  //     that is not there is nothing.
-  //   LACE PANEL  the recorded reason -- "0.078 across, half a pixel wide at
-  //     gameplay framing" -- IS WRONG TWICE. 0.078 across is nine or ten
-  //     pixels, not half of one. And it never had a size problem, because it
-  //     was never drawn at all: measured at 0 pixels in 48 of 48 frames in
-  //     portrait AND in landscape, while the identical box held clear of the
-  //     shoe measures 260. It is buried. See its own note at the shoe for the
-  //     two neighbours that bury it -- and note that both of them are the same
-  //     geometry they were on the day the panel was written, so the panel was
-  //     invisible from the moment it landed and the wardrobe pass removed it
-  //     for a reason it did not have.
-  //   WAISTBAND  a third navy tone 0.052 tall. The recorded reason -- "a 3px
-  //     band of a near tone" -- is wrong on both counts: it measures 6-11px
-  //     tall in a column, 16px of screen extent, and 299 pixels of frame,
-  //     which is SEVEN AND A HALF TIMES the short cuff that was kept beside
-  //     it; and it is not a near tone, it renders at exactly the tone the
-  //     short cuff renders at. It stays out regardless, for a fault the note
-  //     was reaching for and named against the wrong neighbour. See its own
-  //     note at the pelvis.
-  //   THREE FINGERS  see the hand. 0 pixels in 45 of 48 portrait frames and 48
-  //     of 48 in landscape, because they point down the view axis and sit
-  //     behind the palm. That judgement was made at 26px by a pass that had
-  //     already measured the figure correctly, and it survives.
-  //
+  // WHAT SURVIVES THE CAMERA, AND WHAT WAS TAKEN OUT AGAIN. The wardrobe pass
+  // that put this list here was reviewed at gameplay framing -- the runner is
+  // 110-200px tall in the frame that ships -- and half of it did not resolve.
+  // Detail that does not resolve is not free: it costs triangles, it costs the
+  // eye a moment, and one item was worse than that. Kept, because they were
+  // measured to read: the cap band, the vest's red against the shorts' navy,
+  // the short cuff, the shoe. Taken out:
+  //   BASE-LAYER SLEEVES  a pale blue cylinder under each deltoid. At 110px it
+  //     is two pale triangles at the shoulders and they read as HOLES in the
+  //     vest -- the one failure mode worse than being invisible. Its cuff went
+  //     with it; a cuff on a sleeve that is not there is nothing.
+  //   LACE PANEL  0.078 across on the instep, seen only on the top face of a
+  //     planted shoe, at 0.5px. Gone.
+  //   WAISTBAND  a third navy tone 0.052 tall inside a navy mass that already
+  //     had two. The vest's red meeting the shorts' navy IS the two-garment
+  //     read and it is enormous; the band added a stripe under it that at
+  //     gameplay scale only softened the edge that was doing the work.
   // What the freed budget bought is the hand -- see the mitt below.
   const JACKET = 0xd6394e;   // cap peak, vest collar, vest hem -- under the vest
   const WAIST = 0x434a80;    // hood and short cuff -- one step over the shorts
@@ -5263,14 +5174,8 @@ MR.Runner = (function () {
   // two averaged into one blob. No amount of finger geometry survives that.
   //
   // Cool where the shoe is warm, and a step darker. At gameplay scale the hand
-  // is 25-27px across -- 0.208 on the figure against the 121-131 pixels per
-  // world unit figure.js measures at 390x844, and it was 14px in this comment
-  // for as long as the 110px figure was believed. The conclusion is unchanged
-  // and that is worth saying rather than quietly fixing the number: 26px is
-  // enough for a shape and ONE value break and nothing else, exactly as 14px
-  // was, because what the second break would have to survive is not the hand's
-  // width but the toon ramp's three bands. So both are spent on saying "not
-  // the shoe": MITT against the
+  // is about 14px across, which is enough for a shape and ONE value break and
+  // nothing else, so both are spent on saying "not the shoe": MITT against the
   // shoe's 0xfff2e0 is a 22% value step AND a hue flip, which is the pair of
   // axes MEASUREMENTS.md records the reference using to separate a car from the
   // road it is the same brightness as. It is still far and away the palest
@@ -5284,13 +5189,8 @@ MR.Runner = (function () {
   // so rule 3 -- the gloves flash against the road -- survives.
   const MITT = 0xa8b6de;
   // The curled fingers. Darker again, and it is the only interior detail the
-  // hand gets: at 26px a knuckle line is the difference between a mitt and a
-  // ball, and three separate fingers are three 8px lobes in the palm's own
-  // colour. The 4px in this line was the 110px figure showing again; doubling
-  // it does not rescue them, and measurement says something stronger than the
-  // aliasing argument ever did -- the three capsules that were here are drawn
-  // at ZERO pixels in 45 of 48 frames, because they point down the view axis
-  // and sit behind the palm. See the hand.
+  // hand gets: at 14px a knuckle line is the difference between a mitt and a
+  // ball, and three separate fingers are three 4px lobes that alias into one.
   const MITT_DK = 0x6b74a0;
 
   // ---- how round a round thing is ----------------------------------------
@@ -5305,13 +5205,9 @@ MR.Runner = (function () {
   // of it -- 2.8%.
   //
   // The cost of that mistake was visible in every frame ever shot: at the
-  // 163-208px the shipped 390x844 chase frame actually gives this character, a
+  // 200px the shipped 390x844 chase frame actually gives this character, a
   // fourteen-segment cap band is a POLYGON, not a band, and the trunk is a
-  // dodecagon with a hard vertical crease down the side of it. (This line said
-  // 200px, which was the top of that range read as though it were the middle;
-  // see the measured table above the wardrobe. The argument is unaffected --
-  // it is stronger at the bottom of the range, not weaker, because a polygon
-  // reads as a polygon at every size a facet spans more than a pixel.)
+  // dodecagon with a hard vertical crease down the side of it.
   //
   // So roundness is bought back, and it is bought where the camera looks
   // rather than evenly -- draw calls are the thing worth watching now, and
@@ -5410,7 +5306,7 @@ MR.Runner = (function () {
    * none: under the old triangle ceiling a chamfer was a whole primitive's
    * worth of geometry spent on something nobody could see at 110px, and the
    * shoe -- the only part on the figure whose mass is a box -- kept its hard
-   * corners. At the 163-208px the shipped frame actually gives him, and at every
+   * corners. At the 200px the shipped frame actually gives him, and at every
    * angle but dead astern, a trainer with four square corners reads as a brick
    * with a dome glued on each end.
    *
@@ -5496,14 +5392,10 @@ MR.Runner = (function () {
   //     is a piece of card lying on cloth and not a decal printed into it.
   //
   //   THE NUMERALS HAVE TO BE GEOMETRY. Not because it makes them legible: it
-  //     does not, and that has to be said plainly. The panel is 0.252 wide,
-  //     which against the 121-131 pixels per world unit figure.js measures at
-  //     390x844 is 30-33px for the whole of "26.2" -- and 10px in landscape.
-  //     (This read "17-31px", derived from the figure's height by proportion
-  //     off the 110px number; the direct measurement is narrower and higher.)
-  //     Across four glyphs at 7 cells each that is under two pixels a stroke in
-  //     portrait and well under one in landscape, and NOTHING makes four glyphs
-  //     legible in 31px. What geometry buys is that the one pixel is the RIGHT one: a hard
+  //     does not, and that has to be said plainly. The panel is 0.252 wide on a
+  //     1.60 figure and the figure is 110-200px, so the whole of "26.2" gets
+  //     17-31px and a stroke gets one. NOTHING makes four glyphs legible in
+  //     31px. What geometry buys is that the one pixel is the RIGHT one: a hard
   //     dark stroke at full contrast rather than a minified texel averaged into
   //     grey, so at gameplay scale the bib reads as white card with definite
   //     print on it, and at the finish framing the number is crisp. Which is
@@ -5527,11 +5419,8 @@ MR.Runner = (function () {
   const BIB_BACK = 0xd9d3c2;   // the reverse of the card; only ever edge-on
   const BIB_INK = 0x232046;
 
-  // A 7x9 blocky face with two cells to a stroke. Coarser and "26.2" stops
-  // fitting the panel; finer and a stroke stops holding a pixel -- 27 cells
-  // across a 30-33px panel is 1.2px a cell, so two cells is a 2.3px stroke in
-  // portrait and 0.8px in landscape, and the landscape frame is already the
-  // one where this is print-shaped rather than legible.
+  // A 7x9 blocky face with two cells to a stroke. Finer and a stroke is under
+  // a pixel at gameplay framing; coarser and "26.2" stops fitting the panel.
   const BIB_GLYPH = {
     '2': ['0111110', '1100011', '0000011', '0000110', '0001100', '0011000', '0110000', '1100000', '1111111'],
     '6': ['0011110', '0110000', '1100000', '1111100', '1100110', '1100011', '1100011', '0110110', '0011100'],
@@ -5951,43 +5840,14 @@ MR.Runner = (function () {
 
     const pelvis = multi([
       { g: new THREE.CylinderGeometry(0.228, 0.220, 0.25, R_TORSO), c: P.runnerShort, y: -0.020, sz: 0.78 },
-      // There is no waistband here any more. It stays out -- but NOT for the
-      // reason that was written here, and the difference is worth the space
-      // because the old reason would have been overturned by the first agent
-      // who measured it.
-      //
-      // What this note used to say: "at gameplay scale a 3px band of a near
-      // tone directly beneath a huge hard edge does not add a garment, it blurs
-      // the one that was already there". Both halves of the premise are false.
-      // Built and counted by tools/resolve.js on the real chase frame, the band
-      // is 6-11px tall in a column, 16px of screen extent, and owns 299 pixels
-      // of a 390x844 frame -- SEVEN AND A HALF TIMES the 39 pixels of the short
-      // cuff two hundredths of a unit below it, which was kept and is agreed to
-      // read. And it is not a near tone: it renders at L 42.5 against shorts at
-      // L 25.1, a 1.69x step, and that is EXACTLY the tone the short cuff
-      // renders at (L 42.4). The two bands are the same band. One was removed
-      // for being invisible and the other kept, and nothing about them differs.
-      //
-      // The fault is real and it is one neighbour up. The band was aimed at the
-      // wrong edge: it does not blur the vest/shorts boundary by being close in
-      // value to the SHORTS, it destroys that boundary by being close in value
-      // to the VEST HEM directly above it. JACKET and WAIST are 1.20x apart as
-      // authored, and after the toon ramp they are nearer still. Rendered and
-      // measured across the 11 columns where nothing else overlaps, the value
-      // step from the hem to whatever lies under it goes
-      //
-      //     1.83x  without the band        1.08x  with it
-      //
-      // -- a 41% cut, landing under the 12% floor this file states two screens
-      // up as the point where a tone lands in the same band of the ramp as its
-      // neighbour and the hem simply is not there. The largest value edge on
-      // the lower half of the character is the one thing the two-garment read
-      // is carried by, and the band eats it. So the old conclusion survives its
-      // own argument being wrong, which is luck rather than method.
-      //
-      // A DARKER band would deepen that step instead of filling it, and might
-      // well earn its place. That is a new part rather than a restored one and
-      // is not attempted here.
+      // There is no waistband here any more, and its own argument is why. It
+      // was put in to turn one dark mass into "a top tucked over a bottom" --
+      // but the thing that actually says that is the VEST'S RED meeting the
+      // shorts' NAVY, which is a 0.52-wide edge between the two most different
+      // tones on the figure and is legible at any size the game ever draws. The
+      // waistband sat 0.03 under that edge in a third navy, and at gameplay
+      // scale a 3px band of a near tone directly beneath a huge hard edge does
+      // not add a garment: it blurs the one that was already there.
       //
       // The short's own cuff at the leg opening stays, and the difference is
       // the whole reason one went and one did not: the cuff's edge is against
@@ -6410,39 +6270,11 @@ MR.Runner = (function () {
         // the shell it sits on is the coin-of-scalp bug the hair cap had, and
         // this one is deliberately proud in z and inset in x.
         { g: new THREE.SphereGeometry(0.098, R_NUB, 12), c: SHOE_DK, y: -0.030, z: -0.076, sx: 0.90, sy: 0.72, sz: 0.72 },
-        // The lace panel that used to sit across the instep is gone, and the
-        // reason recorded here was wrong in a way worth keeping. It said the
-        // panel was "0.078 across ... measured at gameplay framing it was half
-        // a pixel wide". 0.078 across is nine or ten pixels: the conversion was
-        // the figure's height divided by 1.60, off the 110px number, and it is
-        // out by twenty.
-        //
-        // The panel had no size problem. It had never been drawn. Built and
-        // counted on the real chase frame by tools/resolve.js it owns ZERO
-        // pixels in 48 of 48 frames, in portrait and in landscape, while the
-        // identical box held clear of the shoe owns 260 -- so the probe works
-        // and the panel is simply buried:
-        //
-        //   THE SOCK. The shin's cylinder is r 0.110 tapering to 0.102 and
-        //     lands at ankle-space y -0.011 to 0.075, which is a tube sitting
-        //     exactly where the panel is. It covers everything nearer than
-        //     z 0.099 at the panel's own top corner.
-        //   THE TOE DOME. r 0.095 scaled 0.82 in y and 0.66 in z at z 0.150
-        //     reaches back to z 0.106 and up to y 0.042 -- OVER the panel's top
-        //     at 0.035.
-        //   THE INK. What is left between those two is a gap 0.008 wide, and
-        //     both neighbours carry a 0.014 outline shell. Two shells close a
-        //     0.008 gap twice over.
-        //
-        // The shin and the toe are the same geometry today that they were in
-        // the commit that added the panel, so it was invisible from the moment
-        // it was written -- and the pass that removed it removed the right
-        // thing while describing a fault it did not have. The lesson is not
-        // "small parts go": it is that a dimension is not a screen footprint,
-        // and only one of those two can be measured off the source.
-        //
-        // The heel counter above is the same idea aimed at the face the camera
-        // never stops seeing -- 231 pixels against the panel's zero -- and it
+        // The lace panel that used to sit across the instep is gone. It was
+        // 0.078 across on the ONE face of the shoe the camera sees least -- the
+        // top of a planted foot, at a glancing angle -- and measured at
+        // gameplay framing it was half a pixel wide. The heel counter above is
+        // the same idea aimed at the face the camera never stops seeing, and it
         // is the reason the shoe still reads as a trainer without it.
         //
         // Thin accent stripe, and thin is the point: it is a crisp bright line
@@ -6483,16 +6315,6 @@ MR.Runner = (function () {
       // as a pale triangle at each shoulder -- and a pale triangle inside a red
       // mass reads as a HOLE IN THE VEST. Being invisible would have been the
       // better outcome of the two.
-      //
-      // Re-examined against the real figure rather than the 110px one this
-      // file used to assume, because half the wardrobe removals were argued on
-      // a number that was out by two. This one is not: the fault is SHAPE, and
-      // a shape fault does not go away when the figure turns out to be bigger
-      // -- a triangular hole reads as a hole more clearly, not less. Counted
-      // anyway, so the next pass does not have to build it to find out: 23
-      // pixels of a 390x844 frame at mid pace, and nothing at all in most
-      // landscape frames. It stays out on the original argument, which is the
-      // only one of the four that came through unchanged.
       //
       // What replaces it is form rather than tone: a triceps swell, in skin,
       // 0.020 proud at the back and nothing at the sides. Same argument as the
@@ -6543,14 +6365,10 @@ MR.Runner = (function () {
         { g: new THREE.CylinderGeometry(0.098, 0.098, 0.052, R_LIMB), c: TRIM, y: -0.180 },
         // ---- the hand ------------------------------------------------------
         //
-        // Sized to the frame that ships and not to a close-up. This pass took
-        // the figure at 200-210px, correcting the 110 an earlier one assumed,
-        // and got the hand right: measured directly, 0.208 across against the
-        // 121-131 pixels per world unit at 390x844 is 25-27 PIXELS, which is
-        // what this note says. The height it reasoned from has since been
-        // measured properly and is 163-208px rather than 200-210 -- and 50-67
-        // in landscape -- but the hand does not move, because it was converted
-        // through the right quantity. The finish does NOT help: its camera
+        // Sized to the frame that ships and not to a close-up. Measured on the
+        // real 390x844 chase frame the figure is 200-210px, not the 110 an
+        // earlier pass assumed, so the hand is 0.208 across on a 1.60 figure
+        // and lands at about 26 PIXELS. The finish does NOT help: its camera
         // pulls BACK to show the arch and both posts, and the held shot has him
         // at 52px. 26px is the largest this hand is ever drawn in play, and it
         // decides everything below:
@@ -6558,15 +6376,7 @@ MR.Runner = (function () {
         //   - Three fingers do not exist at 26px. Each was 0.06 across, under
         //     8px, in the palm's own colour, and the review's verdict on them
         //     was "unarticulated rounded stump". They stay replaced by one
-        //     curled roll carrying the whole hand's single value break -- and
-        //     the size argument turns out to be the weaker of the two available
-        //     ones. Built and counted on the real chase frame, a restored
-        //     finger owns ZERO pixels in 45 of 48 portrait frames and 48 of 48
-        //     in landscape: curled forward at rx 0.60 it points down the view
-        //     axis, which is the axis rule 4 in the header says has nothing to
-        //     see, and the palm is in front of it. The knuckle roll that
-        //     replaced them is deliberately at the LOWER REAR edge for exactly
-        //     that reason.
+        //     curled roll carrying the whole hand's single value break.
         //   - A ball reads as a ball at every size, and a box reads as a card.
         //     Both were built and both were looked at: the flat-faced block
         //     shaded into two clean planes close up and, seen from the shallow

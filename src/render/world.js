@@ -3327,6 +3327,76 @@ MR.World = (function () {
   }
 
   /**
+   * ============ A CLOSED SOLID FROM A (z, y) PROFILE ============
+   *
+   * Extrudes a CONVEX profile in the z-y plane across x, and caps both ends.
+   * Every face is emitted -- the two flanks, both caps and one wall per profile
+   * edge -- so there is no side left out because a chase camera is unlikely to
+   * look at it. That is CLAUDE.md rule 1 as a primitive rather than as a
+   * paragraph an author has to remember: a caller cannot build half of one.
+   *
+   * WINDING IS DERIVED, NOT WRITTEN, and this is the whole reason the helper
+   * exists. src/render/ramp.js records what hand-winding cost: "the first draft
+   * did it by hand and got three of the six faces backwards, including the roof
+   * -- which back-face culling then deleted, so the frame showed the runner
+   * standing on the tram underneath instead of on the ramp." A missing face is
+   * invisible in a diff and nearly invisible in a frame. So each triangle takes
+   * its normal from its own winding and flips itself if that normal points back
+   * at the centroid of the solid. The solid is convex, so "outward is away from
+   * the middle" is exact rather than a heuristic.
+   *
+   * The profile is given in the order the runner meets it and may be wound
+   * either way round; orientation is not the caller's problem.
+   *
+   * @param prof  [[z, y], ...] a convex polygon, at least three points
+   * @param hw    half-width across x
+   */
+  function prismX(prof, hw, color, dx, dy, dz) {
+    const pos = [], nor = [];
+    const n = prof.length;
+    // The centroid of the solid. Only which SIDE of a face it falls on is used,
+    // so the plain mean of the profile is enough and is exact for a convex one.
+    let cz = 0, cy = 0;
+    for (const p of prof) { cz += p[0] / n; cy += p[1] / n; }
+    const cx = 0;
+
+    function tri(a, b, c) {
+      const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
+      const vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+      let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      const len = Math.hypot(nx, ny, nz);
+      if (len < 1e-12) return;              // degenerate, and a zero normal is worse than no face
+      nx /= len; ny /= len; nz /= len;
+      const fx = (a[0] + b[0] + c[0]) / 3 - cx;
+      const fy = (a[1] + b[1] + c[1]) / 3 - cy;
+      const fz = (a[2] + b[2] + c[2]) / 3 - cz;
+      let order = [a, b, c];
+      if (nx * fx + ny * fy + nz * fz < 0) { nx = -nx; ny = -ny; nz = -nz; order = [a, c, b]; }
+      for (const p of order) { pos.push(p[0], p[1], p[2]); nor.push(nx, ny, nz); }
+    }
+
+    for (let i = 0; i < n; i++) {
+      const p = prof[i], q = prof[(i + 1) % n];
+      // The wall on this edge.
+      const a = [-hw, p[1], p[0]], b = [hw, p[1], p[0]];
+      const c = [hw, q[1], q[0]], d = [-hw, q[1], q[0]];
+      tri(a, b, c); tri(a, c, d);
+      // ...and the two caps, as a fan from vertex 0. Convexity is what makes a
+      // fan legal, and it is the same convexity the winding test relies on.
+      if (i > 0 && i < n - 1) {
+        const r = prof[0];
+        tri([-hw, r[1], r[0]], [-hw, p[1], p[0]], [-hw, q[1], q[0]]);
+        tri([hw, r[1], r[0]], [hw, p[1], p[0]], [hw, q[1], q[0]]);
+      }
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    return part(geo, color, dx, dy, dz);
+  }
+
+  /**
    * ============ VEHICLE FITTINGS ============
    *
    * The four things every reference vehicle has and ours did not, measured off
@@ -4898,135 +4968,6 @@ MR.World = (function () {
     };
   }
 
-  /**
-   * The racing line: one concrete lane path that survives the whole course.
-   *
-   * course.js already proves a path EXISTS -- generate() retries a gate until
-   * `solvable()` still says yes. This walks the identical state space, keeps
-   * the cheapest survivor instead of the first, and hands back the lane to be
-   * in at every gate. Identical rules means the line drawn on the road is a
-   * line the player can actually hold, not a suggestion that runs into a train
-   * two gates later.
-   *
-   * Cost is lane changes first and actions second, which is the line a runner
-   * would pick rather than merely a legal one: hold what you have, move only
-   * when the gate makes you, and prefer the lane you can run straight through.
-   *
-   * It is a property of the course, so it is the same for every player on the
-   * same day -- exactly like the course itself.
-   */
-  function racingLine(gates, startLane, startIdx) {
-    if (!gates.length) return null;
-    const AW = MR.Course.ACTION_WINDOW;
-    const from = startIdx || 0;
-    // Same state collapse as Course.solvable: lane, the action still committed
-    // to, and whether that action is recent enough to conflict.
-    //
-    // Seeded from where the player ACTUALLY is, not from a fixed lane 1. A line
-    // planned from lane 1 is always survivable, but it will happily ask a
-    // player sitting in a clear lane to move for no reason, and a hint you
-    // learn to ignore is worse than no hint.
-    let states = [{ lane: startLane === undefined ? 1 : startLane, act: K.CLEAR, z: -1e9, cost: 0, prev: null }];
-
-    for (let i = from; i < gates.length; i++) {
-      const g = gates[i];
-      const next = new Map();
-      for (const s of states) {
-        for (let l = 0; l < 3; l++) {
-          const h = g.lanes[l];
-          if (h === K.BLOCK) continue;
-          if (h !== K.CLEAR && s.act !== K.CLEAR && h !== s.act && g.z - s.z < AW) continue;
-          const act = h === K.CLEAR ? s.act : h;
-          const az = h === K.CLEAR ? s.z : g.z;
-          const tag = l + ':' + act + ':' + (g.z - az < AW ? 1 : 0);
-          // Lane changes dominate; an action is a small tax; and sitting in an
-          // outer lane costs a little every gate, so once a hazard has pushed
-          // the line wide it drifts back to the middle instead of camping out
-          // there. The middle is where a line has an escape on both sides, and
-          // a hint that keeps sending the player to the edge of the road for no
-          // reason is a hint they stop believing.
-          const cost = s.cost + Math.abs(l - s.lane) * 12 + (h === K.CLEAR ? 0 : 1) + (l === 1 ? 0 : 2);
-          const cur = next.get(tag);
-          if (!cur || cost < cur.cost) next.set(tag, { lane: l, act, z: az, cost, prev: s });
-        }
-      }
-      // Unreachable: generate() would have rejected the gate. Fail soft rather
-      // than throw -- a missing line is a missing hint, not a broken race.
-      if (!next.size) return null;
-      states = Array.from(next.values());
-    }
-
-    let best = states[0];
-    for (const s of states) if (s.cost < best.cost) best = s;
-
-    // Backtrack only over the range actually solved. The chain is `from` links
-    // long, not gates.length, so walking to index 0 dereferences null the
-    // moment a replan starts mid-course. Gates already behind the player keep
-    // the start lane, which costs nothing -- the ribbon is only drawn ahead.
-    const lanes = new Array(gates.length);
-    for (let i = gates.length - 1; i >= from; i--) { lanes[i] = best.lane; best = best.prev; }
-    for (let i = 0; i < from; i++) lanes[i] = lanes[from] !== undefined ? lanes[from] : 1;
-    return lanes;
-  }
-
-  /**
-   * The stripe the racing line is painted with: soft-edged, with a pulse
-   * running along it.
-   *
-   * Deliberately paint and not floating pickups. Anything hovering in a lane at
-   * this camera height has to be read and then ruled out as a hazard, and the
-   * entire point of the hint is to reduce what the player has to parse, not to
-   * add a fifth thing on the road that looks like the other four.
-   */
-  let routeTex = null;
-  function routeTexture() {
-    if (routeTex) return routeTex;
-    const c = canvas(32, 128);
-    const g = c.getContext('2d');
-    const img = g.createImageData(32, 128);
-    for (let y = 0; y < 128; y++) {
-      // Two pulses per tile and never fully dark: a line that breaks stops
-      // reading as a path and starts reading as a row of objects.
-      const v = y / 128;
-      const flow = 0.54 + 0.46 * Math.pow(0.5 + 0.5 * Math.sin(v * Math.PI * 4 - 1.6), 2.4);
-      for (let x = 0; x < 32; x++) {
-        // Soft shoulders. A hard-edged stripe aliases into a dotted line at the
-        // far end of the run-up, which is the end that has to carry the read.
-        const u = Math.abs(x - 15.5) / 15.5;
-        const core = Math.max(0, 1 - Math.pow(u, 2.6));
-        const i = (y * 32 + x) * 4;
-        img.data[i] = 255; img.data[i + 1] = 255; img.data[i + 2] = 255;
-        img.data[i + 3] = Math.round(255 * core * flow);
-      }
-    }
-    g.putImageData(img, 0, 0);
-    routeTex = texture(c, true);
-    return routeTex;
-  }
-
-  /**
-   * A ring, for the floating half of the route hint.
-   *
-   * The hard stroke is under a pixel wide by 90 units, so it carries a much
-   * softer halo underneath it -- that is what is actually still visible at the
-   * far end of the trail, where the hint has to do its work.
-   */
-  let ringTex = null;
-  function ringTexture() {
-    if (ringTex) return ringTex;
-    const c = canvas(64, 64);
-    const g = c.getContext('2d');
-    g.strokeStyle = '#ffffff';
-    g.globalAlpha = 0.34;
-    g.lineWidth = 22;
-    g.beginPath(); g.arc(32, 32, 21, 0, Math.PI * 2); g.stroke();
-    g.globalAlpha = 1;
-    g.lineWidth = 9;
-    g.beginPath(); g.arc(32, 32, 21, 0, Math.PI * 2); g.stroke();
-    ringTex = texture(c);
-    return ringTex;
-  }
-
   function create(course) {
     const group = new THREE.Group();
 
@@ -6417,350 +6358,6 @@ MR.World = (function () {
       return t;
     }, group);
 
-    // ---- the racing line ------------------------------------------------
-    /**
-     * A blue line, painted on the road, showing the lane the next few gates
-     * have to be taken in.
-     *
-     * The whole mechanic here is holding one unbroken clean line, and until now
-     * the game gave the player no forward read of where that line was: every
-     * gate was solved on its own, on sight, with no way to see that the lane
-     * you are about to take is the one that runs into a train two gates later.
-     * Both reference runners telegraph the route several gates out with a coin
-     * or ring trail. A marathon already has the perfect version of that idea --
-     * real courses paint the measured shortest route on the tarmac -- so this
-     * is a borrow that costs the game nothing in tone.
-     *
-     * Cost is one draw call, and a second for the rings below. Each is a single
-     * mesh whose vertices are rewritten in place every frame as the route
-     * scrolls past, so neither allocates and neither grows with the length of
-     * the course.
-     *
-     * It hints the LANE and nothing else: which action a gate wants, and when
-     * to commit to it, are still entirely the player's read.
-     */
-    const ROUTE_NEAR = 5;      // starts clear of the runner's own feet
-    const ROUTE_FAR = 124;     // three to five gates -- as far as the fog allows
-    const ROUTE_SEGS = 44;
-    const ROUTE_W = 0.17;      // half-width
-    const ROUTE_UV = 1 / 14;   // one texture tile per 14 units of road
-
-    // Replanned whenever the player changes lane; the solve is ~174 gates x 3
-    // states, far too cheap to be worth caching harder than this.
-    let routeLane = racingLine(course.gates, 1, 0);
-    let routePlannedLane = 1;
-    const routeGeo = new THREE.BufferGeometry();
-    const routePos = new Float32Array(ROUTE_SEGS * 6 * 3);
-    const routeUvs = new Float32Array(ROUTE_SEGS * 6 * 2);
-    // RGB is always 1 and only the alpha moves -- the same four-component
-    // trick the ring trail uses below, and for the same reason: a fade the
-    // geometry owns can be shaped, and the fog's cannot.
-    const routeCol = new Float32Array(ROUTE_SEGS * 6 * 4);
-    for (let i = 0; i < ROUTE_SEGS * 6; i++) {
-      routeCol[i * 4] = 1; routeCol[i * 4 + 1] = 1; routeCol[i * 4 + 2] = 1;
-    }
-    routeGeo.setAttribute('position', new THREE.BufferAttribute(routePos, 3));
-    routeGeo.setAttribute('uv', new THREE.BufferAttribute(routeUvs, 2));
-    routeGeo.setAttribute('color', new THREE.BufferAttribute(routeCol, 4));
-    /**
-     * ============ THE LINE WAS GREEN, AND SO IS EVERY PICKUP ============
-     *
-     * This colour used to be 0x5ff0a6, and the comment that chose it read "the
-     * one hue no hazard owns; amber, cyan and red are all spoken for, and green
-     * reads go". Every clause of that is true and the conclusion is still
-     * wrong, because it was checked against the HAZARD palette and never
-     * against the PICKUP palette. Measured in HSV:
-     *
-     *   racing line   0x5ff0a6   hue 149.4   sat 0.60
-     *   aid pool      0x86eec0   hue 153.5   sat 0.44
-     *   bottle body   0xf6fffb   hue 153.3   sat 0.04
-     *   bottle label, cap, and the aid table's cloth
-     *                 0x2fd39a   hue 159.1   sat 0.78
-     *
-     *   JUMP 38.7    DUCK 192.3    BLOCK 345.3
-     *
-     * The three hazards are 33 degrees from their nearest neighbour at worst.
-     * The line and the whole aid family sat inside TEN DEGREES of each other.
-     * So this game had one colour meaning "follow this" and "collect this" at
-     * the same time, and the only thing separating them was how much of each
-     * you could see.
-     *
-     * That is not theoretical. A blind reader shown 1:1 crops through the chase
-     * camera, asked only about the PEOPLE in them, twice volunteered a green
-     * object they could not name -- and their guess at one of them was "it
-     * might be a BOTTLE". They were looking at this ribbon, cut down to a
-     * 7 x 13 fragment by the two figures standing in front of it, and they read
-     * the game's route hint as the game's aid pickup. tools/routeread.js is the
-     * instrument that came out of it.
-     *
-     * So the line moves and the pickups keep the green, which is the right way
-     * round twice over: the pickup is a world OBJECT the player is scored on
-     * touching, and the line is an affordance drawn on the road. Violet is 109
-     * degrees off the aid family, 75 off DUCK and 76 off BLOCK -- the largest
-     * clear band the palette has left -- it is what every map in the world
-     * draws a planned route in, and it is a hue this game had no other use for.
-     */
-    const routeMesh = new THREE.Mesh(routeGeo, new THREE.MeshBasicMaterial({
-      map: routeTexture(),
-      color: 0xa87bff,          // hue 265, sat 0.52, val 1.00
-      transparent: true,
-      vertexColors: true,       // per-vertex ALPHA only; see updateRoute
-      /**
-       * 0.62 WAS TUNED AGAINST AN EMPTY ROAD, AND THE ROAD IS NOT EMPTY.
-       *
-       * The old note here -- "at full strength the line reads as a beam being
-       * fired down the road rather than as a marking on it" -- is about the
-       * ribbon on its own. Asked to rank what the eye lands on in a frame at
-       * 25 units, which is READ_NEAR and the distance the lane is actually
-       * chosen at, a blind reader put it SECOND of six, above the runner, and
-       * put the aid pickup it shares the road with LAST:
-       *
-       *   "yes, things on the road out-shout the hovering object at 25u,
-       *    clearly and by a lot. The violet streaks beat it decisively -- they
-       *    are bigger, more saturated, higher contrast against their
-       *    background, and there are several of them competing against one
-       *    small item."
-       *
-       * A route hint is meant to be read on the way to reading something else.
-       * The item it was drowning is the one tools/simulate.js says is worth two
-       * extra mistakes over a record attempt, so this is not a matter of taste:
-       * the hint was taking attention from the thing attention is for.
-       *
-       * The colour move that fixed the confusion made this worse and hid it --
-       * violet on dark asphalt is a bigger value break than the mint it
-       * replaced. So the hue keeps its separation from the pickups and the
-       * ribbon gives back the strength it never needed.
-       */
-      opacity: 0.38,
-      depthWrite: false,
-      /**
-       * FOGGED, AND THIS LINE WAS BRIEFLY THE OTHER WAY ROUND.
-       *
-       * The ring trail below carries fog:false with a paragraph saying its job
-       * is to be legible far up the road, which is exactly where the fog is
-       * taking half the contrast out of everything else. That paragraph looks
-       * like it applies verbatim to the ribbon the rings were drawn on top of,
-       * and this material was given the exemption on that reasoning.
-       *
-       * A blind reader shown the aid pickups at 8, 12 and 25 units then said
-       * this, unprompted, about the exempted ribbon: "at 25u the purple streaks
-       * are visually the LOUDEST thing in the frame -- considerably louder than
-       * the pale bottle they share the road with. Whatever they are, they
-       * compete with the small object for attention at long range."
-       *
-       * That is the aid item losing its own frame to the route hint at exactly
-       * the distance the lane is chosen at, which is a worse failure than the
-       * one the exemption was fixing. The paragraph does not transfer, and the
-       * reason is that the RING TRAIL IS SPARSE AND THE RIBBON IS CONTINUOUS:
-       * fourteen small marks that hold their contrast up the road read as a
-       * trail, and 124 unbroken units of paint that hold theirs read as the
-       * brightest object in the scene. Exempting something from aerial
-       * perspective buys attention, and attention is the scarce thing the
-       * pickups need.
-       *
-       * So the fog stays on, and the readability the exemption was after is
-       * bought instead by the constant width in updateRoute -- which is the
-       * axis that was actually being spent, and which costs no salience.
-       */
-      fog: true,
-      side: THREE.DoubleSide,   // the ribbon is rebuilt every frame; not
-    }));                        // depending on winding is one less way to fail
-    // Below the hazard telegraph mats (5) and the finish checker (4): where the
-    // line runs across a gate's own mat, the hazard has to win.
-    routeMesh.renderOrder = 3;
-    routeMesh.userData.notScenery = true;
-    routeMesh.frustumCulled = false;   // its bounds change every frame
-    routeMesh.visible = !!routeLane;
-    group.add(routeMesh);
-
-    /**
-     * The floating half of the hint: a trail of rings riding the same line.
-     *
-     * Paint alone cannot do this job. The chase camera sits low and directly
-     * behind, so the runner's own body covers the centre of the road from about
-     * 35 units out all the way to the horizon -- a line painted in the lane the
-     * player is already in is invisible exactly where the forward read has to
-     * happen. Rings sit high enough off the tarmac to clear the head in frame,
-     * which is the same answer both reference games arrived at.
-     *
-     * A ring is a hollow circle and nothing else in this game is round, so it
-     * cannot be mistaken for a fifth kind of obstacle. It marks the LANE only:
-     * which action a gate wants, and when to commit, are still the player's.
-     *
-     * Evenly spaced along the line and anchored to a world grid rather than
-     * hung off the gates: a trail has to be a trail. Gate spacing runs 46 units
-     * early and 24 late, so per-gate clusters would have left the opening miles
-     * with three rings and a long nothing, which reads as a row of separate
-     * markers rather than a path.
-     */
-    const RING_SPACE = 11;
-    const RING_FROM = 10;
-    // Two slots more than the fade can reach, so the far end of the trail is
-    // always already at zero when the world grid shifts a new ring into it.
-    // Sized to the window rather than to the fade and a ring would wink into
-    // existence at a third opacity, 120 units out, every few seconds.
-    const RING_N = 14;
-    const RING_FADE = 122;
-    // 1.30 is the one height that works: above a JUMP kerb (0.80) and clear
-    // below a DUCK bar (1.41), so a ring never floats at bar height where it
-    // would read as "through here". The radius is chosen the same way -- 0.36
-    // is 42% of a lane, big enough to survive the fog and small enough that the
-    // trail never looks like something in the way.
-    const RING_Y = 1.30;
-    const RING_R = 0.36;
-
-    const ringGeo = new THREE.BufferGeometry();
-    const ringPos = new Float32Array(RING_N * 6 * 3);
-    const ringUvs = new Float32Array(RING_N * 6 * 2);
-    const ringCol = new Float32Array(RING_N * 6 * 4);
-    for (let i = 0; i < RING_N; i++) {
-      // UVs and RGB never change; only the corners and the alpha do.
-      const u = i * 12, c = i * 24;
-      const uvq = [0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1];
-      for (let k = 0; k < 12; k++) ringUvs[u + k] = uvq[k];
-      for (let k = 0; k < 6; k++) { ringCol[c + k * 4] = 1; ringCol[c + k * 4 + 1] = 1; ringCol[c + k * 4 + 2] = 1; }
-    }
-    ringGeo.setAttribute('position', new THREE.BufferAttribute(ringPos, 3));
-    ringGeo.setAttribute('uv', new THREE.BufferAttribute(ringUvs, 2));
-    ringGeo.setAttribute('color', new THREE.BufferAttribute(ringCol, 4));
-    const ringMesh = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({
-      map: ringTexture(), color: 0x5ff0a6, transparent: true, depthWrite: false,
-      vertexColors: true, side: THREE.DoubleSide,
-      // The only thing in the scene exempt from aerial perspective. Its job is
-      // to be legible at 100 units, which is exactly where the fog is taking
-      // half the contrast out of everything else; the trail carries its own
-      // distance cue in the alpha ramp below instead.
-      fog: false,
-    }));
-    ringMesh.renderOrder = 6;   // over the telegraph mats, never under them
-    ringMesh.frustumCulled = false;
-    // The floating ring trail is deliberately NOT added to the scene.
-    //
-    // Playtest verdict: a constant line of markers hovering at head height for
-    // 26 miles reads as something you are obliged to collect, and it sat in the
-    // one part of the frame the player is trying to read hazards through. The
-    // painted racing ribbon on the road carries the same information without
-    // occupying the air. The geometry is kept so a future pass can bring it
-    // back as an occasional beacon (say, only where the line must change lane)
-    // rather than as a continuous chain.
-    ringMesh.visible = false;
-
-    // Sampling walks z forwards, so the gate lookup is a cursor rather than a
-    // search. It rewinds at the start of each frame and costs nothing after.
-    let routeCursor = 0;
-    function routeX(zz) {
-      const gates = course.gates;
-      while (routeCursor > 0 && gates[routeCursor - 1].z >= zz) routeCursor--;
-      while (routeCursor < gates.length && gates[routeCursor].z < zz) routeCursor++;
-      const i = routeCursor;
-      if (i >= gates.length) return K.LANE_X[routeLane[gates.length - 1]];
-      const to = K.LANE_X[routeLane[i]];
-      const from = i > 0 ? K.LANE_X[routeLane[i - 1]] : to;
-      const gz = gates[i].z;
-      const pz = i > 0 ? gates[i - 1].z : gz - 40;
-      // Cross over into the new lane before the gate, never across it: by the
-      // gate line the paint is already where the player has to be.
-      const cross = Math.min(18, Math.max(8, (gz - pz) * 0.55));
-      const t = Math.max(0, Math.min(1, (zz - (gz - cross)) / cross));
-      return from + (to - from) * t * t * (3 - 2 * t);
-    }
-
-    function updateRoute(z, now) {
-      if (!routeLane) return;
-      const step = (ROUTE_FAR - ROUTE_NEAR) / ROUTE_SEGS;
-      let z0 = z + ROUTE_NEAR;
-      let x0 = routeX(z0);
-      for (let i = 0; i < ROUTE_SEGS; i++) {
-        const z1 = z + ROUTE_NEAR + (i + 1) * step;
-        const x1 = routeX(z1);
-        /**
-         * THE FAR END FADES IN ALPHA, NOT IN WIDTH, and the difference is the
-         * whole readability of this thing.
-         *
-         * What was here: a width taper to half of ROUTE_W over the run, so the
-         * far end "thins into the fog rather than stopping on a cut edge". The
-         * intent was right and the axis was wrong. Perspective ALREADY halves
-         * this ribbon's screen width every time the distance doubles, so a
-         * width taper is a second narrowing stacked on the first -- and screen
-         * width is the one dimension that decides whether a strip of paint
-         * reads as a strip of paint. tools/routeread.js scores exactly that,
-         * as ELONGATION: bbox height over bbox width, the property that
-         * separates a line from a blob. Taking width away to buy a fade spends
-         * the measured quantity to pay for an unmeasured one.
-         *
-         * Alpha buys the same soft end and costs nothing in width. So the
-         * ribbon is now a constant ROUTE_W the whole way and fades over its
-         * last quarter, and it is the fade rather than the fog that decides
-         * where it stops -- which is the point of the fog:false above.
-         */
-        const w0 = ROUTE_W, w1 = ROUTE_W;
-        const fade = function (t) {
-          const q = Math.max(0, (t - 0.74) / 0.26);
-          return Math.max(0, 1 - q * q);
-        };
-        const a0 = fade(i / ROUTE_SEGS), a1 = fade((i + 1) / ROUTE_SEGS);
-        const v0 = z0 * ROUTE_UV, v1 = z1 * ROUTE_UV;
-        const p = i * 18, u = i * 12, cc = i * 24;
-        // Vertex order below is l0, r1, r0 -- then l0, l1, r1.
-        const av = [a0, a1, a0, a0, a1, a1];
-        for (let k = 0; k < 6; k++) routeCol[cc + k * 4 + 3] = av[k];
-        // The ribbon is PAINT: it has to lie on the road over the whole 124
-        // units it reaches, or it leaves the surface at the first crest and the
-        // one forward read the player has starts floating in the air.
-        const ry0 = 0.010 + eAt(z0), ry1 = 0.010 + eAt(z1);
-        // l0, r1, r0 -- then l0, l1, r1.
-        routePos[p] = x0 - w0; routePos[p + 1] = ry0; routePos[p + 2] = z0;
-        routePos[p + 3] = x1 + w1; routePos[p + 4] = ry1; routePos[p + 5] = z1;
-        routePos[p + 6] = x0 + w0; routePos[p + 7] = ry0; routePos[p + 8] = z0;
-        routePos[p + 9] = x0 - w0; routePos[p + 10] = ry0; routePos[p + 11] = z0;
-        routePos[p + 12] = x1 - w1; routePos[p + 13] = ry1; routePos[p + 14] = z1;
-        routePos[p + 15] = x1 + w1; routePos[p + 16] = ry1; routePos[p + 17] = z1;
-        routeUvs[u] = 0; routeUvs[u + 1] = v0;
-        routeUvs[u + 2] = 1; routeUvs[u + 3] = v1;
-        routeUvs[u + 4] = 1; routeUvs[u + 5] = v0;
-        routeUvs[u + 6] = 0; routeUvs[u + 7] = v0;
-        routeUvs[u + 8] = 0; routeUvs[u + 9] = v1;
-        routeUvs[u + 10] = 1; routeUvs[u + 11] = v1;
-        z0 = z1; x0 = x1;
-      }
-      routeGeo.attributes.position.needsUpdate = true;
-      routeGeo.attributes.uv.needsUpdate = true;
-      routeGeo.attributes.color.needsUpdate = true;
-      // The pulse runs forward, away from the runner, so the line leads the eye
-      // down the course instead of washing back over it.
-      routeTexture().offset.y = -(now * 0.45) % 1;
-
-      // ---- rings -------------------------------------------------------
-      // Anchored to a world grid, so a ring holds still on the road and slides
-      // toward the runner instead of the whole trail crawling forward with the
-      // camera. New ones therefore only ever appear at the far end, where the
-      // alpha ramp has already faded them to nothing.
-      let cz = Math.ceil((z + RING_FROM) / RING_SPACE) * RING_SPACE;
-      for (let n = 0; n < RING_N; n++, cz += RING_SPACE) {
-        const p = n * 18, c = n * 24;
-        // Alpha falls away down the trail, so the eye is pulled to the next
-        // gate first and the far end stays a suggestion, not a second read.
-        const a = 0.95 * Math.max(0, 1 - Math.pow(Math.min(1, (cz - z) / RING_FADE), 2.2));
-        if (a <= 0.01) { for (let v = 0; v < 18; v++) ringPos[p + v] = 0; continue; }
-        const cx = routeX(cz);
-        const cy = RING_Y + eAt(cz) + Math.sin(now * 1.9 + n * 1.1) * 0.045;
-        routeQuad(ringPos, p, cx - RING_R, cy - RING_R, cx + RING_R, cy + RING_R, cz);
-        for (let v = 0; v < 6; v++) ringCol[c + v * 4 + 3] = a;
-      }
-      ringGeo.attributes.position.needsUpdate = true;
-      ringGeo.attributes.color.needsUpdate = true;
-    }
-
-    /** Two triangles of an axis-aligned quad in the XY plane at depth `zz`. */
-    function routeQuad(arr, p, l, b, r, t, zz) {
-      arr[p] = l; arr[p + 1] = b; arr[p + 2] = zz;
-      arr[p + 3] = r; arr[p + 4] = b; arr[p + 5] = zz;
-      arr[p + 6] = r; arr[p + 7] = t; arr[p + 8] = zz;
-      arr[p + 9] = l; arr[p + 10] = b; arr[p + 11] = zz;
-      arr[p + 12] = r; arr[p + 13] = t; arr[p + 14] = zz;
-      arr[p + 15] = l; arr[p + 16] = t; arr[p + 17] = zz;
-    }
-
     // ---- hazards --------------------------------------------------------
     // Visual extents are pinned to MR.Collision.BOX: JUMP tops out at 0.80,
     // the DUCK bar spans 1.41-1.83, BLOCK is 2.80 tall and 1.30 deep. Anything
@@ -6988,6 +6585,10 @@ MR.World = (function () {
             f.position.set(0, d.face[2], d.face[3]);
             f.rotation.y = Math.PI;
             vg.add(f);
+            // Kept, because a rideable train has to be able to take it down:
+            // this board sits on the rear plane at knee height, which is
+            // straight across the open mouth of a ramp. See the cast site.
+            vg.userData.face = f;
           }
           // The one moving part a variant is allowed: a single extra mesh on
           // its own pivot. Two would be two more draw calls per live hazard.
@@ -7001,6 +6602,30 @@ MR.World = (function () {
             // back off the mesh would drift, because the mesh is the thing the
             // anim is writing to.
             vg.userData.pivotY = d.pivot[1];
+          }
+          /**
+           * THE RIDEABLE TAIL, and it costs no draw call it does not earn.
+           *
+           * A second extra mesh, which the note above rules out for `moving`
+           * and which this one is allowed for a reason that is arithmetic
+           * rather than special pleading: it is HIDDEN unless the course marked
+           * this particular train rideable, and the only variant that carries
+           * one gave up its pantograph to get it. A tram with its tail open
+           * draws body + tail + face; a tram without draws body + face. The old
+           * tram drew body + pantograph + face. Nothing in the frame got more
+           * expensive and a rideable one got a mechanic.
+           *
+           * Hidden HERE rather than at the cast site alone, because the pool
+           * recycles: a claim that forgot to write this would inherit the
+           * previous tenant's open tail and put a ramp on a wall. The cast site
+           * writes it on every claim for the same reason every variant's
+           * visibility is written on every claim.
+           */
+          if (d.ride) {
+            const rd = S.outlined(d.ride, mats.propLit, S.INK.hazard);
+            rd.visible = false;
+            vg.add(rd);
+            vg.userData.ride = rd;
           }
           // THE NEAR-FACE ANCHOR, AND IT IS THIS ONE LINE.
           //
@@ -8351,6 +7976,19 @@ MR.World = (function () {
      * renderer's shading, which returns (168,161,3).
      */
     const TRAM_BODY = 0x1e9cf0, TRAM_DARK = 0x0c2436, TRAM_CREASE = 0x0074a8;
+    /**
+     * The deck walkway, and it is a VALUE and not a hue.
+     *
+     * The one surface in this game a runner stands on has to read as a floor
+     * from behind and above, and it has to do it without borrowing a signal
+     * that already means something: yellow-and-black is DUCK, red-and-white is
+     * construction furniture, and the green family is the aid pickups. So the
+     * deck says "surface" with luminance instead -- a pale warm grey that is
+     * the brightest thing on a cool blue body, sitting between the CHROME trim
+     * and the LEMON cream the fleet already uses, and carrying GLOSS.matte
+     * because a floor is the one panel that must not flare.
+     */
+    const TRAM_DECK = 0xd8d2c4;
     const BUS_BODY = 0x00c896, BUS_DARK = 0x0e2a26, BUS_CREASE = 0x008060;
     const TAXI_BODY = 0xffdd00, TAXI_DARK = 0x2e2412, TAXI_CREASE = 0xd89800;
     const VAN_BODY = 0xff8c00, VAN_DARK = 0x35220a, VAN_CREASE = 0xc26200;
@@ -8433,29 +8071,244 @@ MR.World = (function () {
         grilleY: 0.86, grilleH: 0.24, lampX: 0.82, lampW: 0.30, lampH: 0.20,
         bumpW: 2.22, bumpH: 0.32, bumpY: 0.36, plateW: 0.60, slats: 2,
       });
+      /**
+       * ============ THE ROOF IS A DECK, AND IT IS FLAT AT 2.80 ============
+       *
+       * What was here: four slabs tapering 2.24 -> 2.16 -> 2.02 -> 1.76 and
+       * rising 2.10 -> 2.44. A pretty tram roof, and the wrong object, because
+       * THIS is the body a runner stands on. Measured with a downward raycast
+       * over the footprint (see the probe in roadmap 46 and the one this pass
+       * re-derived), that roof ran 2.340 to 2.551, varied 0.21 across the deck,
+       * and had columns with nothing under them at all -- against a
+       * Course.DECK_Y of 2.80, which is what the runner is placed at. A runner
+       * on it floated between 0.25 and 0.46 depending where they stood, and
+       * crossed holes.
+       *
+       * The fix is not to raise a slab, because the defect was never height --
+       * it was that a domed roof made of narrowing slabs is not a SURFACE.
+       * These three masses are one continuous plate: same depth, same
+       * unchamfered top, all four corners of it at exactly 2.80.
+       *
+       * WHY UNCHAMFERED, ON A FILE WHOSE WHOLE FLEET IS CHAMFERED. hcbx cuts
+       * the top edge DOWNWARD from the number it is given -- correct everywhere
+       * else, and wrong here, because it would make the deck flat at 2.80 only
+       * across the middle and slope away at both edges. The one surface in this
+       * game that is stood on is the one surface that has to be genuinely
+       * planar. The chamfer moves to the mass UNDER it instead, which is where
+       * the silhouette actually reads it.
+       *
+       * IT IS THREE BOXES AND NOT ONE FOR THE READ, NOT FOR THE SHAPE. All
+       * three top out on the same plane, so there is no step and nothing to
+       * z-fight; what differs is colour. A pale centre walkway between two
+       * darker edge panels is what says "this is somewhere you can run" from
+       * behind and above -- which is the angle this is seen from and the angle
+       * a uniform blue slab says nothing at.
+       *
+       * 2.80 IS NOT CHOSEN. It is MR.Collision.BOX[BLOCK].yMax, which is
+       * Course.DECK_Y, which is where the runner's feet go.
+       */
       parts.push(
         gl(hcbx(2.24, 0.16, 3.88, 0, 2.18, 0, CHROME, 0.03), GLOSS.chrome),
-        gl(hcbx(2.16, 0.08, 3.86, 0, 2.30, 0, TRAM_BODY, 0.03), GLOSS.paint),
-        gl(hcbx(2.02, 0.06, 3.70, 0, 2.37, 0, CHROME, 0.02), GLOSS.chrome),
-        gl(hcbx(1.76, 0.04, 3.40, 0, 2.42, 0, TRAM_BODY, 0.02), GLOSS.paint),
+        // The roof volume under the deck, chamfered, carrying the silhouette.
+        // 2.26 to 2.66, so it meets the deck plate's underside with no gap.
+        gl(hcbx(2.16, 0.40, 3.86, 0, 2.46, 0, TRAM_BODY, 0.06), GLOSS.paint),
+        // ...and the deck plate itself: 2.66 to 2.80, flat top, full depth.
+        gl(hbx(0.96, 0.14, 3.88, 0, 2.73, 0, TRAM_DECK), GLOSS.matte),
+        /**
+         * THE EDGE PANELS ARE NEAR-BLACK, AND A FRAME IS WHY.
+         *
+         * They were TRAM_CREASE, the body's own mid-blue, and the first ride
+         * through the chase camera says what that costs: standing on the deck,
+         * the vehicle underneath is invisible -- you are looking along a roof,
+         * so its flanks are hidden by the roof itself -- and a pale strip with
+         * mid-blue edges read as a painted path at road level rather than as
+         * something 2.80 up. On the canal leg the blue edges were the same
+         * value as the water beside them and the deck had no edge at all.
+         *
+         * A raised lip would be the obvious answer and is not available: the
+         * box tops out at 2.80 and nothing may stand above it. So the edge is
+         * made of VALUE instead of height. Near-black against the pale walkway
+         * is the hardest border the palette can draw, it survives every setting
+         * the day can pick, and it is what a real roof walkway has along it
+         * anyway -- the cable duct and the non-slip margin.
+         */
+        gl(hbx(0.62, 0.14, 3.88, -0.79, 2.73, 0, TRAM_DARK), GLOSS.trim),
+        gl(hbx(0.62, 0.14, 3.88, 0.79, 2.73, 0, TRAM_DARK), GLOSS.trim),
         gl(hbx(1.06, 0.12, 0.10, 0, 2.18, -1.90, TRAM_DARK), GLOSS.trim)
       );
       return merge(parts);
     })();
+
     /**
-     * The pantograph, and it is the `moving` child rather than part of the body
-     * for one reason: the body is what a train scales, and a pantograph stretched
-     * to six units is a ladder. On its own child it stays one pantograph however
-     * long the tram is, and it gets a slow sway for free.
+     * ============ THE TAIL, AND THE RAMP THAT COMES OUT OF IT ============
      *
-     * Top of the shoe lands at 2.77 against the 2.80 the collision box records.
+     * The rideable half of BLOCK v0: the tram's own tail, opened, with its
+     * boarding ramp folded down onto the road. This is the object in
+     * reference/ttgr-ramp-onto-truck.png -- a vehicle whose back end is a slope
+     * lying on the tarmac, inset inside the body, with a deck above it -- and
+     * it is drawn ONLY on a train the course marked rideable. A ramp down on
+     * something you cannot ride would be the game lying about an affordance,
+     * which is rule 4, and the ramp down IS the read: the reference frame has
+     * two orange lorries side by side and the one you can take is the one with
+     * its tail open.
+     *
+     * ---- IT IS UNSCALED, AND THAT IS THE WHOLE REASON IT IS A SEPARATE MESH -
+     *
+     * A train sets body.scale.z = span. At a ramp's span of 8.2 to 10.9 that
+     * turns 6.0 units of slope into 49 to 65 and the mechanic into a mountain.
+     * So the tail is its own child at the variant's origin, always 6.0 long,
+     * and the SCALED body is shortened by exactly that 6.0 and pushed forward
+     * to sit on top of it -- see the cast site, which is the one place that
+     * arithmetic is written.
+     *
+     * ---- EVERY NUMBER IS READ OFF THE CONTRACT, NONE IS CHOSEN --------------
+     *
+     * MR.Course states the mechanic and this file draws it, never the other way
+     * round. In the variant's own authoring frame, where the gate line is local
+     * z = -halfZ because the pool sets vg.position.z = +halfZ:
+     *
+     *   mouth on the road   z = -1.95  (-halfZ, the gate line)      y = 0
+     *   top meeting deck    z = +4.05  (-halfZ + RAMP_RUN)          y = 2.80
+     *   slope               atan(2.80 / 6.0) = 25.0 degrees
+     *
+     * DECK_Y and RAMP_RUN are read from MR.Course and halfZ from
+     * MR.Collision.BOX, so there is no number here that can drift away from the
+     * mechanic. Art never decides clearance.
+     *
+     * ---- WHERE THE BRIEF'S CONTRACT WAS WRONG, AND WHAT IT SAYS INSTEAD -----
+     *
+     * The recorded contract also says the ramp is "one lane wide, x in
+     * [-0.85, +0.85] (LANE 1.70), inset inside the body". Those two clauses
+     * contradict each other in this file and the reason is a unit slip: hazard
+     * widths go through LANE_FIT (= LANE / 2.35 = 0.723), so the tram's authored
+     * 2.24 is 1.62 units on the road. A ramp 1.70 wide is WIDER than the tram
+     * it is cut into, not inset in it. The clause that survives is the one the
+     * reference draws and the one the sentence itself ends on -- inset -- so the
+     * ramp is 1.40 across, 0.11 inside the body flank on each side. Nothing in
+     * the mechanic reads the width: deckAt and occupiedAt are indexed by LANE,
+     * not by x, so this is an art number and the lane number was never one.
+     *
+     * ---- RULE 1 ------------------------------------------------------------
+     *
+     * Built on every side. The tongue is a closed solid through prismX -- top,
+     * underside, both flanks, the lip on the road and the cap where it meets
+     * the deck. The two tail walls are closed boxes. Nothing here is a shell
+     * facing the camera: the player runs UP this, ALONG the top of it and looks
+     * back DOWN it, passes it in the next lane at 1.70 units, and the mouth is
+     * photographed from directly behind on every approach.
      */
-    const blockTramPantoGeo = merge([
-      bx(0.66, 0.07, 0.26, 0, 0.02, 0, TRAM_DARK),
-      bx(0.09, 0.42, 0.09, -0.24, 0.20, 0.02, TRAM_DARK, 0.42),
-      bx(0.09, 0.42, 0.09, 0.24, 0.20, 0.02, TRAM_DARK, 0.42),
-      bx(0.96, 0.06, 0.13, 0, 0.36, -0.16, CHROME),
-    ]);
+    const blockTramRampGeo = (function () {
+      const B = MR.Collision.BOX[K.BLOCK];
+      const DECK = MR.Course.DECK_Y;          // 2.80
+      const RUN = MR.Course.RAMP_RUN;         // 6.0
+      const zMouth = -B.halfZ;                // -1.95, the gate line
+      const zTop = zMouth + RUN;              // +4.05, where the deck takes over
+
+      // Half-widths, in WORLD units: these are drawn with bx/prismX directly
+      // rather than through hbx, because the ramp is sized to the vehicle it is
+      // cut into and not to the lane.
+      const bodyHW = 2.24 * LANE_FIT / 2;     // 0.810 -- the tram's widest
+      /**
+       * 1.20 ACROSS, NOT 1.40, AND THE 0.21 IT GIVES BACK IS THE POINT.
+       *
+       * At 1.40 the tail walls either side were 0.11 wide -- two slivers -- and
+       * the first ride through the chase camera showed what that costs: at the
+       * mouth, where the whole read is "there is a way INTO this thing", there
+       * was nothing framing the way in. A doorway is made of its jambs. 1.20 is
+       * still more than twice the runner's shoulders and the mechanic never
+       * asks about width at all (deckAt and occupiedAt are indexed by lane),
+       * so the whole of this number is spent on the read.
+       */
+      const rampHW = 0.60;                    // 1.20 across, 0.21 inside each flank
+
+      const parts = [];
+
+      /**
+       * THE TONGUE. Its profile, in the order the runner meets it:
+       *
+       *   A  the lip, on the road at the gate line
+       *   B  the top, meeting the deck
+       *   C  the underside at that end
+       *   D  the underside back down on the road
+       *
+       * A to B is the running surface and it is the contract line exactly. The
+       * plate is 0.18 thick measured vertically, so the underside reaches the
+       * road 0.386 forward of the lip and the mouth end is a shallow wedge
+       * lying ON the tarmac rather than a step standing on it -- which is what
+       * the reference draws and what stops the mouth reading as a kerb.
+       */
+      const T = 0.18;
+      parts.push(prismX([
+        [zMouth, 0],
+        [zTop, DECK],
+        [zTop, DECK - T],
+        [zMouth + T * RUN / DECK, 0],
+      ], rampHW, TRAM_DECK, 0, 0, 0));
+
+      // Tread battens across the tongue, proud of it by 0.02 -- the one thing
+      // that says a slope is climbable rather than merely slanted. They ride ON
+      // the running surface, so they are rotated into its plane instead of
+      // being laid flat and left poking out of it.
+      const slope = Math.atan(DECK / RUN);
+      for (let i = 1; i <= 5; i++) {
+        const f = i / 6;
+        parts.push(bx(rampHW * 1.80, 0.05, 0.18,
+          0, DECK * f + 0.02 * Math.cos(slope), zMouth + RUN * f - 0.02 * Math.sin(slope),
+          TRAM_DARK, -slope));
+      }
+
+      /**
+       * THE TWO TAIL WALLS. What makes the mouth a MOUTH: the ramp is cut into
+       * the vehicle, so the vehicle has to still be there either side of it,
+       * full height, from the gate line forward to where the scaled body picks
+       * up. Without these the tongue is a plank lying in front of a tram and
+       * the whole read is gone.
+       *
+       * They run the full 2.80 to the deck, so from above the tail is two rails
+       * with the slope descending between them -- which is the shape that says
+       * "down there is the road, up here is the roof".
+       */
+      const wallW = bodyHW - rampHW;          // 0.110
+      const wallX = (bodyHW + rampHW) / 2;    // 0.755
+      for (const sx of [-1, 1]) {
+        parts.push(
+          gl(bx(wallW, DECK - 0.14, RUN, sx * wallX, (DECK - 0.14) / 2, zMouth + RUN / 2,
+            TRAM_BODY), GLOSS.paint),
+          // The wall's own cap, topping out on the deck plane at exactly 2.80
+          // so the tail and the roof are one surface and not two -- and in the
+          // same near-black the deck's edge panels use, so the dark border runs
+          // unbroken from the mouth all the way up the vehicle.
+          gl(bx(wallW, 0.14, RUN, sx * wallX, DECK - 0.07, zMouth + RUN / 2,
+            TRAM_DARK), GLOSS.trim),
+          // The rubbing strip down the outside, which is what the flank of this
+          // thing shows to the next lane for the whole time it is being passed.
+          gl(bx(0.05, 0.12, RUN - 0.30, sx * (wallX + wallW / 2), 1.34, zMouth + RUN / 2,
+            CHROME), GLOSS.chrome)
+        );
+      }
+
+      /**
+       * THE MOUTH SURROUND, and it carries the kind mark.
+       *
+       * The variant's caution face is a lane-wide board on the rear plane at
+       * y 0.63-0.93 -- which is straight across the open mouth at knee height,
+       * reading "do not enter" over the one thing in this game you are invited
+       * to enter. So the cast site hides it on a rideable train and the
+       * red-and-white goes here instead, on the two door posts either side of
+       * the opening, where a real loading ramp carries it and where it cannot
+       * cover the way in. BLOCK still says BLOCK: this is a vehicle you cannot
+       * pass through, and that has not changed because you can go over it.
+       */
+      for (const sx of [-1, 1]) {
+        for (let i = 0; i < 4; i++) {
+          parts.push(gl(bx(wallW + 0.03, 0.30, 0.07,
+            sx * wallX, 0.32 + i * 0.62, zMouth + 0.02,
+            i % 2 ? 0xf2f2f2 : 0xe03a2a), GLOSS.trim));
+        }
+      }
+
+      return merge(parts);
+    })();
 
     /**
      * BLOCK v1: a ROAD CLOSED hoarding on a solid plinth.
@@ -10293,11 +10146,34 @@ MR.World = (function () {
         // audit measures from. Nothing was watching. It is now, and the rows
         // below are all inside their own box.
         geo: blockTramGeo, face: [2.16, 0.30, 0.78, -1.945], weight: 1,
-        // The pantograph sits well forward of the cab now: on a 3.90 tram the
-        // shoe belongs over the trucks, not on the nose. 2.36 rather than 2.38
-        // because the sway lifts the whole variant by 0.012 and 2.38 put the
-        // shoe on 2.812 against the 2.80 ceiling.
-        moving: blockTramPantoGeo, pivot: [0, 2.36, -0.40], anim: 'sway',
+        /**
+         * ---- THE PANTOGRAPH IS GONE, AND THE DECK IS WHY -----------------
+         *
+         * It was the `moving` child at pivot [0, 2.36, -0.40], shoe topping out
+         * at 2.77 "against the 2.80 the collision box records". That 0.03 of
+         * headroom was the whole of the roof's slack, and it existed only
+         * because the roof underneath it stopped at 2.44. Now that the roof IS
+         * 2.80 -- which is what the box always claimed and what the runner is
+         * placed at -- there is no space above it for anything at all: any
+         * fitting on the deck is outside the envelope by construction, and the
+         * envelope guard is not negotiable.
+         *
+         * It could not have stayed anyway, for two reasons that are about the
+         * mechanic rather than about 0.03 of a unit. It sat at z -0.40, which
+         * on a rideable train is halfway up the ramp -- a runner climbing the
+         * slope would have run into it head-first. And a pantograph on a roof
+         * you run along is a wall across the running surface wherever it is
+         * put.
+         *
+         * `anim` goes with it, and that is required rather than tidy. The sway
+         * lifts the whole variant by +/-0.012, so a deck authored at exactly
+         * 2.80 would spend half of every cycle at 2.812 -- outside the box --
+         * while the runner, whose feet are pinned to a constant DECK_Y, watched
+         * the floor slide up and down through them. A vehicle that is stood on
+         * has to be still. It is the same reason v2 is still: not every hazard
+         * is improved by an idle.
+         */
+        ride: blockTramRampGeo,
       },
       { geo: blockSignGeo, face: [2.06, 1.7, 1.58, -0.541], weight: 1 },
       // THE TRAFFIC LIGHT, where the cargo trike used to be. No moving part
@@ -11683,6 +11559,167 @@ MR.World = (function () {
     })();
     const footbridgePool = Pool(function () {
       return S.outlined(footbridgeGeo, mats.prop, S.INK.scenery);
+    }, group);
+
+    /**
+     * ============ THE ARCHWAY: A CITY GATE THE ROAD RUNS THROUGH ============
+     *
+     * reference/ttgr-archway-and-crates.png -- a flat-fronted stone building
+     * straddling the road with a tall arched tunnel cut through it, pale
+     * dressed stone around the opening and at the corners, a deep-warm field
+     * between. It is the one thing in that frame the road passes THROUGH
+     * rather than beside, and it is the only set piece in this game that does.
+     *
+     * ---- SCENERY, AND DELIBERATELY NOT A MECHANIC -------------------------
+     *
+     * The reference's arch is barely a lane wide and closes the road down to
+     * one. docs/roadmap.md entry 35 measured that idea as a mechanic and said
+     * do not ship it: a closure "removes the lane decision and keeps the risk",
+     * and the game already spends 18.48% of a race at two-or-fewer lanes and
+     * 0.88% at exactly one WITHOUT anyone designing it. The same entry says the
+     * archway is worth having as a set piece. So this one spans the whole road
+     * and narrows nothing. Not one lane is touched, no gate moves, and the
+     * course generator does not know it exists.
+     *
+     * ---- IT CANNOT OCCLUDE A GATE, AND THAT IS BUILT IN RATHER THAN CHECKED -
+     *
+     * This is the highest-risk object in the file for LOW / HIDES / BLANKS: it
+     * is the only scenery that reaches across all three lanes at close range,
+     * and one contact ends a record attempt (rule 4). Two constructions, not
+     * two hopes:
+     *
+     *   THE OPENING SPRINGS AT ARCHWAY_SPRING, which is BANNER_CHORD -- the
+     *     same 9.35 the mile gantry and the finish arch use for their lowest
+     *     member over the road, and 0.35 clear of OVERHEAD_Y. Over the play
+     *     corridor the soffit is higher still: the springing is at |x| = 4.95,
+     *     outside CORRIDOR_HALF, and the ring has risen to 12.9 by the time it
+     *     reaches the corridor edge at 3.75.
+     *   THE WALL ABOVE IT IS A COMB, not a slab with a hole described in a
+     *     comment. Every column is generated FROM the arch curve -- its bottom
+     *     is the extrados at its own x -- so there is no arithmetic anywhere
+     *     that could put masonry below the opening. A slab with a subtracted
+     *     hole would have been one sign error away from a stone wall across
+     *     the road, and nothing in the build would have caught it before a
+     *     player did.
+     *
+     * ---- RULE 1 -----------------------------------------------------------
+     *
+     * Built on all sides, and here that is not a formality: the player runs
+     * THROUGH this thing, so the far face is seen for the whole approach, the
+     * near face is seen for as long as it takes to pass under, and the
+     * jamb reveals are at arm's length on the way through. Every piece is a
+     * closed box with real depth; the ring stands proud of the wall on BOTH
+     * faces rather than being a front-facing moulding, and the piers are
+     * modelled to their full depth with their own plinth and cornice returning
+     * on every face.
+     */
+    /**
+     * These are BANNER_CHORD and GANTRY, and they are derived from the same
+     * primitives rather than read off those names for one reason: both are
+     * declared several thousand lines below this, `const` does not hoist, and
+     * the geometry here is built eagerly. Restating a number is the defect this
+     * file keeps a corrections list for, so they are written as the expressions
+     * those two ARE -- if OVERHEAD_Y or the track width move, all four move
+     * together -- and tools/shoot.js measures the result rather than trusting
+     * the arithmetic.
+     */
+    const ARCHWAY_SPRING = OVERHEAD_Y + 0.35;          // 9.35, as BANNER_CHORD
+    const ARCHWAY_HALF = K.TRACK_HALF_WIDTH + 1.2;     // 4.95, as GANTRY
+    const archwayGeo = (function () {
+      const parts = [];
+      const STONE = 0xe8dcc0;      // pale dressed stone: surround, quoins, cornice
+      const STONE2 = 0xd6c7a4;     // its shadowed alternate, for the voussoirs
+      const FIELD = 0xc0533a;      // the warm field between the dressings
+      const FIELD2 = 0xa8442f;
+      const PLINTH = 0x8c7a5e;
+      const RISE = 5.4;            // apex at 14.75
+      const TOP = 17.2;            // the parapet
+      const D = 3.0;               // how deep the gatehouse is along the road
+      const OUT = 13.4;            // how far the block reaches from the middle
+
+      // The soffit of the opening at a given x: the ellipse the ring follows.
+      // Everything above the opening is generated from this, so nothing can sit
+      // below it by arithmetic error.
+      function soffit(x) {
+        const t = Math.abs(x) / ARCHWAY_HALF;
+        if (t >= 1) return 0;
+        return ARCHWAY_SPRING + RISE * Math.sqrt(1 - t * t);
+      }
+      const RING_TH = 0.95;
+
+      // ---- the two piers, full height, outboard of the corridor -----------
+      for (const sx of [-1, 1]) {
+        const w = OUT - ARCHWAY_HALF;
+        const cx = sx * (ARCHWAY_HALF + w / 2);
+        parts.push(
+          bx(w, 0.9, D + 0.7, cx, 0.45, 0, PLINTH),                 // plinth
+          bx(w, TOP - 0.9, D, cx, 0.9 + (TOP - 0.9) / 2, 0, FIELD), // the field
+          // Quoins up the outer corner, alternating, on both faces because the
+          // player sees this block from in front and then from behind.
+          bx(0.9, TOP - 0.9, D + 0.16, sx * (OUT - 0.45), 0.9 + (TOP - 0.9) / 2, 0, STONE)
+        );
+        // The jamb: the dressed stone reveal the opening is cut into. It is as
+        // deep as the whole gatehouse, so the way through is lined rather than
+        // being a hole in a flat.
+        parts.push(bx(0.85, ARCHWAY_SPRING + 0.4, D + 0.30,
+          sx * (ARCHWAY_HALF + 0.42), (ARCHWAY_SPRING + 0.4) / 2, 0, STONE));
+      }
+
+      // ---- the arch ring, standing proud on BOTH faces ---------------------
+      vArc(parts, {
+        cx: 0, cy: ARCHWAY_SPRING, rx: ARCHWAY_HALF, ry: RISE,
+        n: 13, th: RING_TH, d: D + 0.30, color: STONE, alt: STONE2,
+      });
+
+      /**
+       * ---- THE SPANDREL WALL, AS A COMB -----------------------------------
+       *
+       * One column per sample of x, each starting at the extrados of the ring
+       * directly above it. Over the opening that is the arch; outboard of it
+       * the column runs down to the pier. There is no path through this loop
+       * that puts a column below the soffit.
+       */
+      const N = 26;
+      for (let i = 0; i < N; i++) {
+        const x0 = -ARCHWAY_HALF + 2 * ARCHWAY_HALF * i / N;
+        const x1 = -ARCHWAY_HALF + 2 * ARCHWAY_HALF * (i + 1) / N;
+        const xm = (x0 + x1) / 2;
+        // The higher of the two edges, so a column can never cut the curve.
+        const base = Math.max(soffit(x0), soffit(x1)) + RING_TH;
+        if (base >= TOP) continue;
+        parts.push(bx((x1 - x0) + 0.02, TOP - base, D, xm, (base + TOP) / 2, 0,
+          (i % 2) ? FIELD : FIELD2));
+      }
+
+      // ---- cornice and parapet, returning on every face --------------------
+      parts.push(
+        bx(OUT * 2 + 0.5, 0.65, D + 0.55, 0, TOP + 0.32, 0, STONE),
+        bx(OUT * 2 + 0.1, 0.9, D + 0.25, 0, TOP + 1.10, 0, FIELD),
+        bx(OUT * 2 + 0.5, 0.35, D + 0.55, 0, TOP + 1.72, 0, STONE)
+      );
+      /**
+       * The string course at the springing line, which is what ties the piers
+       * to the arch on the reference and what stops the block reading as one
+       * flat panel with a hole in it.
+       *
+       * IT IS TWO PIECES AND NOT ONE, and the one-piece version is exactly the
+       * failure this whole object is built to avoid. Written as a single band
+       * the full width of the gatehouse, it is a stone beam straight across the
+       * opening at 9.14 to 9.56 -- through the arch, 0.14 above OVERHEAD_Y, and
+       * over all three lanes. It would have made the arch decorative and put a
+       * member across the road at the one height the fairness audit is watching.
+       * Each half now stops at the springing, where the ring takes over.
+       */
+      for (const sx of [-1, 1]) {
+        const w = OUT + 0.1 - ARCHWAY_HALF;
+        parts.push(bx(w, 0.42, D + 0.22, sx * (ARCHWAY_HALF + w / 2),
+          ARCHWAY_SPRING + 0.21, 0, STONE));
+      }
+
+      return merge(parts);
+    })();
+    const archwayPool = Pool(function () {
+      return S.outlined(archwayGeo, mats.prop, S.INK.scenery);
     }, group);
 
     /**
@@ -13137,6 +13174,21 @@ MR.World = (function () {
       if (b.name === 'RIVERSIDE') {
         for (let z = b.from; z < b.to; z += 58) structures.push({ z, kind: 'river', side: -1, set: 0 });
       }
+      /**
+       * THE ARCHWAY, ONCE, IN THE CITY THE RACE STARTS IN.
+       *
+       * A city gate is a thing you pass through on the way OUT of a city, so it
+       * goes at the end of CITY START rather than in the middle of it, and
+       * there is exactly one on the course. It is a set piece and a set piece
+       * seen three times is a fence.
+       *
+       * nudgeOver for the reason the overpasses take it: these are the only
+       * pieces that reach across the road, and a mile marker read through one
+       * is a mile marker not read. It is the same rule and the same call.
+       */
+      if (b.name === 'CITY START') {
+        structures.push({ z: nudgeOver(b.to - 150), kind: 'archway', side: 1, set: 0 });
+      }
       if (b.name === 'THE WALL') {
         // nudgeOver, and it was missing here. These are the only opaque decks
         // in the game and nothing kept them off the mile gantries -- the loop
@@ -13474,6 +13526,7 @@ MR.World = (function () {
         if (kind === 'fstand') return finishStandPool;
         if (kind === 'chute') return chutePool;
         if (kind === 'footbridge') return footbridgePool;
+        if (kind === 'archway') return archwayPool;
         if (kind === 'arch') return archPool;
         if (kind === 'aidTable') return aidTablePool;
         if (kind === 'street') return streetPools[si][st.v || 0];
@@ -13490,10 +13543,7 @@ MR.World = (function () {
     }
     function structPool(st) { return markPool(st); }
 
-    // routeLane is exposed so it can be asserted against the course rather than
-    // taken on trust: the lane it names at every gate must never be a BLOCK.
     const api = { group, sky, mats, course };
-    Object.defineProperty(api, 'routeLane', { get: function () { return routeLane; } });
 
     /**
      * ================== THE PALETTE, AND ITS TWO AXES ==================
@@ -13790,16 +13840,11 @@ MR.World = (function () {
     // road is reacting to, instead of each computing their own and drifting.
     api.finale = finale;
 
+    // playerLane is still taken and still ignored here. It was the route
+    // ribbon's replan trigger and nothing else ever read it; the parameter
+    // stays in the signature because main.js passes it and this file does not
+    // own main.js. If a later pass finds no other use for it, drop it there.
     api.update = function (z, playerLane) {
-      if (playerLane !== undefined && playerLane !== routePlannedLane) {
-        routePlannedLane = playerLane;
-        // Replan from the next gate the player has not yet resolved, so the
-        // line starts where they are rather than where they began.
-        let gi = 0;
-        while (gi < course.gates.length && course.gates[gi].z < z) gi++;
-        const re = racingLine(course.gates, playerLane, gi);
-        if (re) routeLane = re;
-      }
       const ahead = z + VIEW;
       const back = z - BEHIND;
       const now = performance.now() * 0.001;
@@ -13946,6 +13991,17 @@ MR.World = (function () {
           o.userData.active = vs[vi];
           o.userData.body = vs[vi].userData.body;
           let span = 1;
+          // Written on EVERY claim, both ways, for the reason the variant
+          // visibility above is: the pool recycles, and a tram that inherited
+          // the last tenant's open tail would be a ramp painted on a wall.
+          const ride = vs[vi].userData.ride;
+          const rideable = kind === K.BLOCK && gate.ramp === l;
+          if (ride) ride.visible = rideable;
+          // The caution board is a lane-wide red-and-white panel on the rear
+          // plane at knee height. On a rideable train that is straight across
+          // the mouth the player is being invited into, so it comes down and
+          // the tail's own door posts carry the mark instead.
+          if (vs[vi].userData.face) vs[vi].userData.face.visible = !rideable;
           if (kind === K.BLOCK) {
             // Stretch a train forward along z rather than repeating blocks, so
             // its NEAR face and the telegraph mat stay put on the gate line
@@ -13954,8 +14010,31 @@ MR.World = (function () {
             // never updated when the envelope was renegotiated to 1.95, and it
             // had been quietly anchoring every train 1.30 units too far back.
             span = gate.train ? 1 + gate.train * 0.9 : 1;
-            o.userData.body.scale.z = span;
-            o.userData.body.position.z = (span - 1) * MR.Collision.BOX[K.BLOCK].halfZ;
+            const halfZ = MR.Collision.BOX[K.BLOCK].halfZ;
+            /**
+             * ---- A RIDEABLE TRAIN IS SHORTENED BY ITS OWN RAMP ------------
+             *
+             * The ramp is an unscaled child occupying the first RAMP_RUN units
+             * of the vehicle, so the SCALED body must give that length back or
+             * the tram is RAMP_RUN longer than the collision box that decides
+             * whether it was hit -- and a nose the player can see but cannot
+             * touch is the same class of defect as a flank they could not, in
+             * the other direction.
+             *
+             * The whole vehicle is 2 * halfZ * span deep. Take the ramp's 6.0
+             * off the front of that and the body scale is span - RUN / (2 *
+             * halfZ); its rear face then has to land on the ramp's top rather
+             * than on the gate line, which is the same offset it always had
+             * plus that same RUN. Both terms come out of the one subtraction,
+             * so they cannot disagree.
+             *
+             * A ramp's span is 8.2 to 10.9 (RAMP_SPAN 8 to 11), so the shortened
+             * scale is 6.66 to 9.36 -- never near zero, and the generator's
+             * RAMP_SPAN_MIN is what keeps it that way.
+             */
+            const s = rideable ? span - MR.Course.RAMP_RUN / (2 * halfZ) : span;
+            o.userData.body.scale.z = s;
+            o.userData.body.position.z = (s - 1) * halfZ + (rideable ? MR.Course.RAMP_RUN : 0);
           }
           // The contact shadow is not written here any more. It is one pooled
           // quad per live hazard, sized from this same userData.foot and this
@@ -14396,7 +14475,6 @@ MR.World = (function () {
       }
 
       updateShadows();
-      updateRoute(z, now);
 
       api.applyBiome(Math.min(1, z / K.TOTAL_UNITS));
     };
@@ -14408,7 +14486,7 @@ MR.World = (function () {
       abutPool.releaseAll(); riverPool.releaseAll();
       overpassPool.releaseAll(); standPool.releaseAll();
       finishStandPool.releaseAll(); chutePool.releaseAll();
-      footbridgePool.releaseAll();
+      footbridgePool.releaseAll(); archwayPool.releaseAll();
       waterPool.releaseAll(); bananaPool.releaseAll();
       for (const k in landmarkPools) landmarkPools[k].releaseAll();
       for (const k in markPools) markPools[k].releaseAll();
@@ -14903,7 +14981,7 @@ MR.World = (function () {
      * this vehicle have a grille", which is the question rule 1 actually asks.
      * A tool can now put the same object in front of any lens it likes.
      */
-    function assembleVariant(tint, d) {
+    function assembleVariant(tint, d, opts) {
       const g = new THREE.Group();
       const body = S.outlined(d.geo, mats.propLit, S.INK.hazard);
       // Same tag the spawn site puts on, for the same reason -- see there.
@@ -14920,18 +14998,43 @@ MR.World = (function () {
         mv.position.set(d.pivot[0] * LANE_FIT, d.pivot[1], d.pivot[2]);
         g.add(mv);
       }
+      /**
+       * THE RIDEABLE TAIL IS OFF BY DEFAULT, AND THAT IS A STATEMENT ABOUT
+       * WHICH STATE THE INSTRUMENTS SHOULD BE MEASURING.
+       *
+       * A tram with its tail open is rare: 3.70 ramps a day against hundreds of
+       * BLOCKs, and every one of the others is an ordinary tram. The contrast
+       * gate and kindread are asking "what does a player see when they meet
+       * this variant", and the honest answer to that is the closed one. Built
+       * open by default, BLOCK v0's measured contrast fell from over 1.6x to
+       * 1.30x against a fatal floor of 1.25x -- not because the object got
+       * worse, but because the audit had been switched to a different object.
+       *
+       * The tail is not going unmeasured. fleetExtents reads d.ride directly
+       * and gives it its own row against its own box, which is the assertion
+       * that actually matters for it, and a tool that wants to PHOTOGRAPH it
+       * asks for it: variantObject(kind, vi, { ride: true }).
+       *
+       * The caution board comes down with the tail up, exactly as the cast site
+       * does it, so the two states here are the two states the game draws and
+       * there is no third one that exists only in a tool.
+       */
+      if (d.ride && opts && opts.ride) {
+        g.add(S.outlined(d.ride, mats.propLit, S.INK.hazard));
+        for (const c of g.children) if (c.isMesh && c.material === faceMat[tint]) c.visible = false;
+      }
       return g;
     }
-    api.variantObject = function (kind, vi) {
+    api.variantObject = function (kind, vi, opts) {
       for (const grp of HAZARD_DEFS) {
         if (grp.kind !== kind) continue;
         if (!grp.defs[vi]) return null;
-        return assembleVariant(grp.tint, grp.defs[vi]);
+        return assembleVariant(grp.tint, grp.defs[vi], opts);
       }
       return null;
     };
 
-    function variantBox(d, swept) {
+    function variantBox(d, swept, noRide) {
       d.geo.computeBoundingBox();
       const bb = d.geo.boundingBox.clone();
       // The face plane. hplane() puts it through LANE_FIT, so its world
@@ -14940,6 +15043,20 @@ MR.World = (function () {
         const fw = d.face[0] * LANE_FIT / 2, fh = d.face[1] / 2;
         bb.expandByPoint(new THREE.Vector3(-fw, d.face[2] - fh, d.face[3]));
         bb.expandByPoint(new THREE.Vector3(fw, d.face[2] + fh, d.face[3]));
+      }
+      // The rideable tail. It sits at the variant's own origin with no pivot
+      // and no anim, so it contributes its bounding box unchanged -- but it
+      // MUST contribute one, or every extent this file reports would be of a
+      // tram that has never had its ramp down. It is the piece that reaches
+      // furthest forward and the piece that touches the road.
+      //
+      // `noRide` is passed by fleetExtents ALONE, and only for the z axis, for
+      // the reason written out there: the tail's depth is measured against a
+      // different box from the body's, so the two are reported as two rows
+      // rather than unioned into one number that is wrong for both.
+      if (d.ride && !noRide) {
+        d.ride.computeBoundingBox();
+        bb.union(d.ride.boundingBox);
       }
       if (d.moving) {
         d.moving.computeBoundingBox();
@@ -15178,6 +15295,28 @@ MR.World = (function () {
      * defect already in the corrections list: BLANKS under-counts and passes a
      * gate the art really hides. So this reports both directions and shoot.js
      * fails on one of them.
+     *
+     * ---- A RIDEABLE TAIL IS A SECOND ROW, NOT A BIGGER FIRST ONE -----------
+     *
+     * BLOCK v0's tail is 6.0 units deep against a BLOCK box that is 3.90, and
+     * unioning it into the variant's own row made the guard fail an object that
+     * is comfortably inside every volume the game ever gives it. The reason is
+     * that the two pieces are measured against DIFFERENT boxes:
+     *
+     *   the BODY is scaled with the train, so it is measured against the
+     *     span-1 box and grows with it -- unchanged, and still failed.
+     *   the TAIL is NOT scaled. It exists only on a train the course marked
+     *     rideable, whose box is 2 * halfZ * span deep with span at least 8.2,
+     *     and it occupies the first RAMP_RUN of that.
+     *
+     * So the tail gets its own row against its own box, and that box is
+     * deliberately the TIGHTEST honest one rather than the whole train: local
+     * z in [-halfZ, -halfZ + RAMP_RUN], which is exactly the length the cast
+     * site shortens the body by. Stated that way the guard proves something the
+     * old one could not -- that the tail and the body it slides under do not
+     * overlap and do not leave a gap -- and it does it without knowing the
+     * span. If the tail ever grows past its ramp run, the body will be sitting
+     * on top of it and this fails.
      */
     api.fleetExtents = function () {
       const B = MR.Collision.BOX;
@@ -15185,14 +15324,31 @@ MR.World = (function () {
       const out = [];
       for (const grp of HAZARD_DEFS) {
         grp.defs.forEach(function (d, vi) {
-          const bb = variantBox(d, true);
           const box = B[grp.kind] || {};
+          const name = NAME[grp.kind] + ' v' + vi;
+          // x and y are span-independent, so the tail is counted in them here.
+          // z is not, so it is excluded and reported below.
+          const bb = variantBox(d, true);
+          const bz = variantBox(d, true, true);
           out.push({
-            kind: grp.kind, variant: vi, name: NAME[grp.kind] + ' v' + vi,
+            kind: grp.kind, variant: vi, name: name,
             halfX: +Math.max(-bb.min.x, bb.max.x).toFixed(3),
-            halfZ: +Math.max(-bb.min.z, bb.max.z).toFixed(3),
+            halfZ: +Math.max(-bz.min.z, bz.max.z).toFixed(3),
             yMax: +bb.max.y.toFixed(3), yMin: +bb.min.y.toFixed(3),
             boxHalfX: box.halfX, boxHalfZ: box.halfZ,
+            boxYMin: box.yMin, boxYMax: box.yMax,
+          });
+          if (!d.ride) return;
+          d.ride.computeBoundingBox();
+          const rb = d.ride.boundingBox;
+          // The volume the cast site reserves for it, in the variant's frame.
+          const z0 = -box.halfZ, z1 = -box.halfZ + MR.Course.RAMP_RUN;
+          out.push({
+            kind: grp.kind, variant: vi, name: name + ' tail',
+            halfX: +Math.max(-rb.min.x, rb.max.x).toFixed(3),
+            halfZ: +Math.max(-rb.min.z, rb.max.z).toFixed(3),
+            yMax: +rb.max.y.toFixed(3), yMin: +rb.min.y.toFixed(3),
+            boxHalfX: box.halfX, boxHalfZ: +Math.max(-z0, z1).toFixed(3),
             boxYMin: box.yMin, boxYMax: box.yMax,
           });
         });

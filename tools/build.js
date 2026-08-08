@@ -27,10 +27,12 @@ const MODULES = [
   'src/render/camera.js',
   'src/game/controls.js',
   'src/game/collision.js',
-  // After collision.js: the ramp placeholder generates every vertex from
-  // MR.Collision.BOX so art cannot disagree with clearance. Delete this line
-  // and the file when world.js grows a real tailgate.
-  'src/render/ramp.js',
+  // src/render/ramp.js was here. It was the deliberately plain orange
+  // placeholder for the rideable roof, and it is gone because world.js grew
+  // the real tailgate -- BLOCK v0 now carries its own tail and ramp, drawn
+  // only on a train the course marked rideable. The placeholder was a SECOND
+  // solid over the same footprint, so while both existed every ramp was drawn
+  // twice; reference/solid-ramp-mouth.png is a picture of that.
   'src/game/player.js',
   'src/audio/audio.js',
   'src/ui/hud.js',

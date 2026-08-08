@@ -68,11 +68,10 @@
   const world = MR.World.create(course);
   scene.add(world.group);
 
-  // The rideable roofs, as plain placeholder solids. One draw call for the
-  // whole course and an empty group when no ramp was generated, so at ?ramp=0
-  // -- which is every default run -- this costs nothing at all.
-  const ramps = MR.Ramp.create(course);
-  scene.add(ramps.group);
+  // The rideable roofs used to be a separate placeholder solid added here.
+  // They are not a separate object any more: a rideable train is BLOCK v0 with
+  // its tail open, built and cast by world.js, so it arrives with the world
+  // above and costs nothing extra to place.
 
   const runner = MR.Runner.create();
   scene.add(runner.group);

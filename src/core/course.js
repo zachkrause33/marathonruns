@@ -139,15 +139,29 @@ MR.Course = (function () {
    * How far a gate's geometry reaches FORWARD of its own gate line, in units.
    *
    * A hazard is not a plane at z, it is a box, and a BLOCK train is a long one:
-   * world.js builds it with span = 1 + train * 0.9 and a rear face at
-   * halfZ * (2 * span - 1), which is 15.99 units at the longest train. That
-   * matters here for one reason only -- the sightline argument in readWindowAt
-   * turns on WHEN THE OCCLUDER LEAVES THE LENS, and a box leaves the lens when
-   * its REAR face passes it, not when its gate line does. Measuring gate line to
-   * gate line credits a train with clearing the shot early, which is a large
-   * fraction of the window it is being checked against.
+   * world.js builds it with span = 1 + train * 0.9. That matters here for one
+   * reason only -- the sightline argument in readWindowAt turns on WHEN THE
+   * OCCLUDER LEAVES THE LENS, and a box leaves the lens when its FAR face
+   * passes it, not when its gate line does. Measuring gate line to gate line
+   * credits a train with clearing the shot early, which is a large fraction of
+   * the window it is being checked against.
    *
    * The first draft of this fix did exactly that, and it made the assertion pass.
+   *
+   * ---- THE BOX IS NOSE-ANCHORED, SO THE WHOLE OF IT IS FORWARD ----------
+   *
+   * This used to read halfZ * (2 * span - 1), which is what a box CENTRED on
+   * the gate line reaches forward. Collision.BOX is anchored at its near face
+   * now -- it spans [gate.z, gate.z + 2 * halfZ] so that contact fires when the
+   * runner touches the geometry instead of 1.95 units inside it -- and a
+   * nose-anchored box reaches 2 * halfZ * span, with nothing at all behind the
+   * gate line. See the anchor note in collision.js.
+   *
+   * A standing BLOCK therefore charges 3.90 where it charged 1.95, and the
+   * longest train charges 17.94 where it charged 15.99. That is the honest
+   * number: the geometry really is in front of the eye for that distance, and
+   * it always was -- what changed is that half of it used to be booked behind
+   * the gate line where the audit never looked for it.
    *
    * ---- PER LANE, AND PER KIND, BECAUSE THAT IS WHAT THE AUDIT MEASURES ----
    *
@@ -170,7 +184,7 @@ MR.Course = (function () {
       const halfZ = HAZARD_HALF_Z[kind];
       if (!halfZ) continue;                     // CLEAR contributes nothing
       const span = (kind === K.BLOCK && train) ? 1 + train * 0.9 : 1;
-      const r = halfZ * (2 * span - 1);
+      const r = 2 * halfZ * span;
       if (r > reach) reach = r;
     }
     return reach;

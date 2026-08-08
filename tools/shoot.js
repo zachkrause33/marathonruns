@@ -302,9 +302,80 @@ const DEFAULT_SHOTS = [
               + `Collision.BOX[${NAME[kind]}].halfZ is ${real}`);
           }
         }
+        // world.js keeps its own copy of halfX for the same reason course.js
+        // keeps its own copy of halfZ -- collision.js loads after both -- and
+        // it is load-bearing for far more than spacing: CORRIDOR_HALF, the
+        // landmark stand-off and every aid clearance in the game are cut from
+        // it. A stale copy walks props into the play corridor.
+        const hx = g.world.HAZARD_HALF;
+        const boxHx = MR.Collision.BOX[MR.K.BLOCK].halfX;
+        if (hx !== undefined && Math.abs(hx - boxHx) > 1e-9) {
+          bad.push(`world.js HAZARD_HALF is ${hx} but Collision.BOX.halfX is ${boxHx}`);
+        }
         return bad.length
-          ? bad.join('; ') + ' -- the gate spacing floor is being derived from the wrong box'
+          ? bad.join('; ') + ' -- a clearance is being derived from the wrong box'
           : null;
+      })();
+
+      /**
+       * ART MAY NOT LEAVE ITS OWN COLLISION BOX.
+       *
+       * `MR.Collision.BOX` is the contract, and until this pass nothing
+       * anywhere compared it with the geometry it stands for. Two holes at
+       * once: the box had no halfX at all -- world.js was writing the audited
+       * width itself, as LANE * 0.5 -- and no axis of any variant had ever
+       * been measured against the envelope it is allowed.
+       *
+       * WHY THIS IS A BUILD FAILURE AND NOT A NOTE. Everything downstream of
+       * the box assumes the box contains the art. `BLANKS` casts rays at these
+       * boxes to decide what a gate hides; a variant wider or deeper than its
+       * box hides more road than the audit believes, so the audit clears a
+       * gate the player genuinely cannot read. That is the exact defect in the
+       * corrections list, and it is the one direction that costs a run.
+       *
+       * The other direction is safe and is only reported: art SHORTER than its
+       * box makes the audit over-count occlusion, which errs toward calling a
+       * readable gate unreadable, and the fleet is deliberately full of it --
+       * 3.90 is a ceiling, not a target, and a moped is not 3.90 long.
+       *
+       * Measured on the SWEPT geometry, not the rest pose: a pantograph or a
+       * stop paddle that fits until the anim runs does not fit. y is reported
+       * and not failed, because two variants have overhung it since long
+       * before this check existed and closing that is a separate argument with
+       * its own measurements -- see the note in docs/roadmap.md.
+       */
+      const envelope = (function () {
+        if (!g.world.fleetExtents) return { bad: [], slack: [], skipped: true };
+        const bad = [], slack = [];
+        for (const e of g.world.fleetExtents()) {
+          if (!e.boxHalfZ) continue;
+          if (e.halfX > e.boxHalfX + 1e-6) {
+            bad.push(`${e.name} reaches halfX ${e.halfX} against box ${e.boxHalfX}`);
+          }
+          if (e.halfZ > e.boxHalfZ + 1e-6) {
+            bad.push(`${e.name} reaches halfZ ${e.halfZ} against box ${e.boxHalfZ}`);
+          }
+          // y IS FAILED FOR JUMP AND BLOCK AND ONLY REPORTED FOR DUCK, and the
+          // asymmetry is a statement about what those boxes mean rather than a
+          // convenience. A JUMP box and a BLOCK box are the whole object: the
+          // hazard stands on the road and the box is what it occupies. The
+          // DUCK box is the BAR ALONE -- 1.41 to 1.83 -- and the frame that
+          // carries it goes on up to 3.5 as two 0.26 posts, deliberately, so
+          // that clearance is decided by the thing the player ducks under and
+          // not by the gantry holding it. Failing y there would be demanding
+          // the box grow into a solid wall the DUCK has already been measured
+          // not to be. It is printed on every run so the choice stays visible.
+          if (e.kind !== MR.K.DUCK && e.yMax > e.boxYMax + 1e-6) {
+            bad.push(`${e.name} reaches y ${e.yMax} against box top ${e.boxYMax}`);
+          }
+          slack.push({
+            name: e.name, halfX: e.halfX, boxHalfX: e.boxHalfX,
+            halfZ: e.halfZ, boxHalfZ: e.boxHalfZ,
+            yMax: e.yMax, boxYMax: e.boxYMax,
+            overY: +(e.yMax - e.boxYMax).toFixed(2),
+          });
+        }
+        return { bad, slack };
       })();
 
       const v = new THREE.Vector3();
@@ -805,6 +876,7 @@ const DEFAULT_SHOTS = [
           w: +(o.hw * 2).toFixed(3), h: +(o.hh * 2).toFixed(3),
         })),
         drift,
+        envelope,
       };
     }).catch((e) => ({ skipped: 'evaluate failed: ' + e.message }));
 
@@ -856,7 +928,8 @@ const DEFAULT_SHOTS = [
 
     if (errors.length) failed = true;
     if (occl && !occl.skipped
-      && (occl.low.length || occl.hide.length || occl.blank.length || occl.drift)) failed = true;
+      && (occl.low.length || occl.hide.length || occl.blank.length || occl.drift
+          || (occl.envelope && occl.envelope.bad && occl.envelope.bad.length))) failed = true;
     if (contrast && !contrast.skipped && contrast.fail.length) failed = true;
     await ctx.close();
   }
@@ -878,6 +951,21 @@ const DEFAULT_SHOTS = [
     if (o && !o.skipped) {
       console.log(`  overhead ${o.elements} crossings, ${o.gates} live hazards`);
       if (o.drift) console.log('  ! DRIFT: ' + o.drift);
+      if (o.envelope && o.envelope.bad) {
+        for (const e of o.envelope.bad) console.log('  ! ENVELOPE: ' + e + ' -- art may not leave its own collision box');
+      }
+      // The whole table once, on the first shot. The fleet is identical in
+      // every frame, and a guard that only prints its failures cannot show
+      // that the envelope was grown into -- which is the thing this pass was
+      // asked for.
+      if (o.envelope && o.envelope.slack && r === report[0]) {
+        console.log('  envelope, swept art vs MR.Collision.BOX  (halfX/box, halfZ/box, yMax/box)');
+        for (const e of o.envelope.slack) {
+          console.log(`    ${e.name.padEnd(9)} x ${e.halfX.toFixed(2)}/${e.boxHalfX}`
+            + `   z ${e.halfZ.toFixed(2)}/${e.boxHalfZ}`
+            + `   y ${e.yMax.toFixed(2)}/${e.boxYMax}${e.overY > 0 ? '  OVER by ' + e.overY : ''}`);
+        }
+      }
       for (const e of o.low.slice(0, 6)) {
         console.log(`  ! LOW: ${e.name} crosses the corridor at y=${e.yMin} (below OVERHEAD_Y)`);
       }

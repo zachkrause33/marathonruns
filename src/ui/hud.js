@@ -297,7 +297,28 @@ MR.HUD = (function () {
           <div id="railGap"></div>
           <div id="railGhost"></div>
         </div>
-        <div id="railCaps"><span>0</span><span id="railHalf">13.1</span><span>26.2</span></div>
+        <!--
+          THE AXIS LABEL BECOMES THE ROUTE.
+
+          This row used to read 0 / 13.1 / 26.2. The stylesheet's own argument
+          for dropping it on short frames is the argument for replacing it
+          here: it is the least live thing on the plate, the halfway point it
+          marked is already drawn on the bar, and the live distance is printed
+          as #distVal in the line directly above it. Three numbers restating
+          the geometry of the bar they sit under.
+
+          What goes in its place is the same axis labelled with the three or
+          four places the run actually passes through. Same row, same height,
+          same element count -- and it is the only statement in the running
+          game of WHERE YOU ARE. Without it the finish card's "clean through
+          Boston" line names a city the player was never told they were in.
+
+          It is geography and nothing else. No outcome is printed here: the
+          per-chapter verdict cannot honestly be computed until the tape (see
+          chapterCost), and a name with a number beside it that only measures
+          the course is what the mile toast was.
+        -->
+        <div id="railRoute"></div>
       </div>
 
       <div id="perf" class="num"></div>
@@ -483,6 +504,7 @@ MR.HUD = (function () {
       gaugeFill: q('gaugeFill'), paceVal: q('paceVal'),
       distVal: q('distVal'),
       rail: q('rail'), railFill: q('railFill'), railGap: q('railGap'), railGhost: q('railGhost'),
+      railRoute: q('railRoute'),
       gapVal: q('gapVal'), gapTrend: q('gapTrend'), gapLabel: q('gapLabel'),
       toast: q('toast'), toastLab: q('toastLab'), toastBig: q('toastBig'),
       startPanel: q('startPanel'), startBtn: q('startBtn'), startDate: q('startDate'),
@@ -542,6 +564,8 @@ MR.HUD = (function () {
     let dateKey = '';
     let course = null;
     let cleanTime = null;  // this course's flawless finish, computed once
+    let chapterCost = null; // per-city counterfactual, computed once at the tape
+    let hitZ = null;       // z of every gate this run made contact with
 
     // Latched, and deliberately so. `recordPossible()` is a bound, not a
     // guess, but at the exact boundary it can flicker: a player holding
@@ -656,6 +680,160 @@ MR.HUD = (function () {
     }
 
     /**
+     * WHICH CITY THE RUN WAS LOST IN.
+     *
+     * The roadmap asked for "a segment clock" per city. Measured over 60
+     * dates, that is a number about the COURSE and not about the player: a
+     * chapter runs 34.3 to 126.9 real seconds (mean 69.4), and the spread is
+     * set almost entirely by where course.js jittered the boundaries. Two
+     * other candidates were measured and rejected for the same reason:
+     *
+     *   THE GHOST DELTA PER CHAPTER is the pace ramp with a city name on it.
+     *   On a FLAWLESS run over ten dates the first chapter reads +97s to
+     *   +134s and the last -51s to -158s -- every time, on every date, on a
+     *   run heading for the record. That is exactly what condemned the
+     *   six-row split table, and it would have printed a large positive
+     *   number in the one place a player looks for a verdict.
+     *
+     *   ELAPSED-MINUS-FLAWLESS per chapter cancels the ramp exactly (a clean
+     *   run measures 0.000s in every chapter over 40 dates) and still charges
+     *   the wrong city, because a broken streak is paid off for the rest of
+     *   the race: five contacts in Berlin billed Boston 2:45 and Chicago 0:57
+     *   for a stretch the player ran clean. On 2026-08-12 it named Sydney as
+     *   the worst chapter of a run whose every contact was in Tokyo.
+     *
+     * What is left is the counterfactual, which is also the language the cost
+     * plate above already speaks ("CLEAN, YOU FINISH 1:58:04 ON THIS
+     * COURSE"): re-run this exact race with one city's contacts erased and
+     * ask what it would have finished in. A city the player ran clean scores
+     * exactly zero by construction, so it cannot be blamed for a neighbour.
+     *
+     * ONE LINE, NOT A TABLE, and that is measured too. Over 60 bursty runs
+     * per row:
+     *
+     *     3 contacts   top city holds 87% of the cost, 60/60 majority
+     *     8 contacts   63%, 47/60
+     *    20 contacts   51%, 27/60
+     *
+     * So on the runs a player is reading the card for, one city IS the story
+     * and the other rows are zeros; on a wreck the breakdown flattens into
+     * three similar numbers -- the split table's second failure, noise -- and
+     * the counterfactuals stop summing to the plate's own total (55s adrift
+     * at 20 contacts, against 1.2s at three). A table would print its worst
+     * self on the runs it reads worst. A single line simply does not appear
+     * unless one city genuinely carried the run, which is the same rule the
+     * memory plates, the best-today line and the aid note already follow.
+     */
+    function chapterCosts() {
+      if (chapterCost !== null) return chapterCost;
+      chapterCost = [];
+      const set = course && course.settings;
+      if (!set || set.length < 2 || !hitZ || !hitZ.size
+          || !course.gates || !course.gates.length) return chapterCost;
+
+      // A gate's city is decided by the gate's own z, not by where the runner
+      // happened to be on the frame that resolved it. Frame-rate independent,
+      // and it is the same test world.js uses to decide which city to build.
+      const cut = set.map(function (s) { return s.from * K.TOTAL_UNITS; });
+      const cityOf = function (z) {
+        let i = 0;
+        for (let k = 0; k < cut.length; k++) if (z >= cut[k]) i = k;
+        return i;
+      };
+
+      // The hill is not modelled here for the same reason cleanFinish() does
+      // not model it: pace.js integrates the grade term to zero over the race,
+      // and it measures 0.01s on a flawless finish. Both sides of every
+      // subtraction below use the identical model anyway, so anything it did
+      // contribute would cancel.
+      const run = function (skip) {
+        const p = Pace.create();
+        let gi = 0, guard = 0;
+        while (!p.finished && guard++ < 40000) {
+          p.update(1 / 60);
+          while (gi < course.gates.length && p.units >= course.gates[gi].z) {
+            const g = course.gates[gi];
+            gi++;
+            if (hitZ.has(g.z) && cityOf(g.z) !== skip) p.onHit();
+            else p.onClean();
+          }
+        }
+        return p.finished ? p.finishTime : 0;
+      };
+
+      // Differenced against the RECONSTRUCTION, never against the real finish
+      // time. The reconstruction cannot reproduce a live run to the
+      // millisecond -- it replays gate outcomes, not the player's exact frame
+      // timings -- and any drift it does have is common to both terms and
+      // cancels here. Differencing against p.finishTime would put that drift
+      // into the answer.
+      const base = run(-1);
+      if (!base) { chapterCost = []; return chapterCost; }
+      for (let i = 0; i < set.length; i++) {
+        chapterCost.push({ name: set[i].name, cost: Math.max(0, base - run(i)) });
+      }
+      return chapterCost;
+    }
+
+    /** The city that carried the run, or nothing when no single city did. */
+    function decisiveChapter(actualFinish) {
+      const rows = chapterCosts();
+      if (!rows.length) return null;
+      let total = 0, top = rows[0];
+      for (const r of rows) { total += r.cost; if (r.cost > top.cost) top = r; }
+      // A majority, and worth naming. Ten seconds is roughly a quarter of what
+      // a single contact costs, so the floor only suppresses trivia; the
+      // majority test is what keeps the line off a run that fell apart
+      // everywhere, where naming one city would be a lie about the other two.
+      if (total <= 0 || top.cost < 10 || top.cost / total <= 0.5) return null;
+      // Reported against the run's OWN finish time, so the two numbers on the
+      // card are commensurable even where the reconstruction drifted.
+      return { name: top.name, would: actualFinish - top.cost };
+    }
+
+    /**
+     * Draw the day's route along the rail.
+     *
+     * THE TWO AXES ARE THE SAME AXIS, and that is not a coincidence to be
+     * checked at runtime. The rail is drawn at `miles / MARATHON_MILES`;
+     * course.js hands settings over as fractions of race distance, which
+     * world.js reads as `from * TOTAL_UNITS`; and TOTAL_UNITS is defined as
+     * MARATHON_MILES * UNITS_PER_MILE. So a setting's `from` is already this
+     * bar's own coordinate and needs no conversion. If either definition ever
+     * moves, the boundary marks and the world's cross-fade move together,
+     * because both read the same field.
+     *
+     * A boundary gets a mark ON the bar as well as a name UNDER it: the name
+     * alone cannot say where a city started, and where a city started is the
+     * whole reason the ghost gap drawn on the same bar becomes a statement
+     * about a place rather than about a distance.
+     */
+    function drawRoute(set) {
+      for (const old of n.rail.querySelectorAll('.railCut')) old.remove();
+      n.railRoute.innerHTML = '';
+      if (!set || !set.length) return;
+
+      for (let i = 1; i < set.length; i++) {
+        const cut = el('div', 'railCut');
+        cut.style.left = (set[i].from * 100) + '%';
+        n.rail.appendChild(cut);
+      }
+      // Each name is boxed to its OWN share of the bar and clipped there. A
+      // four-city day can give a segment as little as 15% of the road (the
+      // generator's floor is 60% of an even share), which is ~51px at 390
+      // wide -- narrower than the word AMSTERDAM. Clipping keeps a long name
+      // inside its own city rather than letting it push the next one along
+      // the axis, which would put every label in the wrong place.
+      for (const s of set) {
+        const span = el('span', 'rcity', s.name);
+        span.style.left = (s.from * 100) + '%';
+        span.style.width = ((s.to - s.from) * 100) + '%';
+        n.railRoute.appendChild(span);
+      }
+      cache.here = undefined;
+    }
+
+    /**
      * Name today's road, and price the wager.
      *
      * The route is the only thing on this panel that is visibly different
@@ -672,10 +850,12 @@ MR.HUD = (function () {
       if (!c) return;
       course = c;
       cleanTime = null;
+      chapterCost = null;
       const set = course.settings;
       n.startRoute.textContent = set && set.length
         ? set.map(function (x) { return x.name; }).join(' → ')
         : '';
+      drawRoute(set);
       const g = course.gates ? course.gates.length : 0;
       n.targetSub.textContent = g ? 'survives one mistake in ' + g : '';
       // The route and the gate count arrive after the panel is first laid out
@@ -916,6 +1096,25 @@ MR.HUD = (function () {
       // gone -- which is exactly why its tone is already neutral there: `tone`
       // can only be red when the projection itself is red, and on a dead run
       // the projection has retargeted onto the ladder and is not.
+      // Which city the runner is in. Written only on the crossing -- there are
+      // two or three of them in a race, against ~14,000 frames.
+      // NOT named `set`: that is the cached text writer this function has been
+      // calling since its first line, and shadowing it here throws on the
+      // temporal dead zone for the whole race while still building clean.
+      const cities = course && course.settings;
+      if (cities && cities.length) {
+        let hi = 0;
+        const f = p.miles / K.MARATHON_MILES;
+        for (let i = cities.length - 1; i >= 0; i--) if (f >= cities[i].from) { hi = i; break; }
+        if (cache.here !== hi) {
+          cache.here = hi;
+          const spans = n.railRoute.children;
+          for (let i = 0; i < spans.length; i++) {
+            spans[i].className = 'rcity' + (i === hi ? ' here' : i < hi ? ' past' : '');
+          }
+        }
+      }
+
       const tone = ahead ? 'ahead' : state === 'off' ? 'behind' : 'level';
       set(n.gapLabel, 'gapLab', 'RECORD GHOST');
       set(n.gapVal, 'gap', Pace.delta(d));
@@ -1028,9 +1227,14 @@ MR.HUD = (function () {
     /**
      * @param p    the finished pace state
      * @param rec  what MR.Store made of it (see Store.record), or nothing
+     * @param hits z of every gate the run made contact with, in any order.
+     *             Optional: without it the chapter line simply does not print,
+     *             which is the same thing that happens on a flawless run.
      */
-    api.showEnd = function (p, rec) {
+    api.showEnd = function (p, rec, hits) {
       rec = rec || {};
+      hitZ = hits && hits.length ? new Set(hits) : null;
+      chapterCost = null;
       const t = p.finishTime;
       const rung = Tier.of(t);
       const up = Tier.next(t);
@@ -1121,6 +1325,12 @@ MR.HUD = (function () {
       const notes = [];
       const turn = turnLine(p);
       if (turn) notes.push(turn);
+      // Where the run went. See chapterCosts(): this is the only per-city
+      // number in the game that moves with how the player ran rather than with
+      // which cities the date drew, and it prints only when one city really
+      // did carry the run.
+      const where = p.hits ? decisiveChapter(t) : null;
+      if (where) notes.push('CLEAN THROUGH ' + where.name + ' · ' + Pace.clock(where.would));
       // Not on a flawless line. cleanFinish() spells out why aid is worth
       // exactly zero to a run that never broke -- it tops a streak up to a
       // ceiling that run is already above -- so "AID TAKEN · 0 OF 14" under a

@@ -398,13 +398,46 @@ html, body {
 }
 .railTick.major { top: 2px; bottom: 2px; background: rgba(255, 253, 245, 0.5); }
 
-#railCaps {
-  position: relative;
-  display: flex; justify-content: space-between;
-  font-size: 9px; font-weight: 500; letter-spacing: 0.1em;
-  opacity: 0.78; margin-top: 4px;
+/* A city boundary. Full height and brighter than a mile tick, because it is a
+ * different KIND of division: the mile ticks are a scale, this is a seam in
+ * the road. It is drawn under the fill and the ghost rather than over them --
+ * the marker whose position the player is reading must never be the thing
+ * that gets a line through it. */
+.railCut {
+  position: absolute; top: -2px; bottom: -2px;
+  width: 1px; background: rgba(255, 253, 245, 0.62);
 }
-#railHalf { position: absolute; left: 50%; transform: translateX(-50%); }
+
+/* THE ROUTE, on the axis it belongs to. Replaces the static 0 / 13.1 / 26.2.
+ *
+ * ONE FIXED HEIGHT, and it is load bearing rather than tidy. This row is the
+ * bottom of #railWrap, which is the floor the runner stands on: tools/
+ * footroom.js asserts the figure's lowest row clears the top of that plate
+ * across 96 combinations, and a plate whose height depends on its own
+ * contents cannot be reasoned about at all -- the same defect #gapLine
+ * already carries three nowraps for. City names vary from BOSTON to
+ * AMSTERDAM, so every one of them is boxed, clipped and nowrapped. */
+#railRoute {
+  position: relative; height: 11px;
+  font-size: 9px; font-weight: 500; letter-spacing: 0.1em;
+  margin-top: 4px;
+}
+.rcity {
+  position: absolute; top: 0;
+  white-space: nowrap; overflow: hidden;
+  padding-right: 3px;
+  opacity: 0.42;
+  transition: opacity 0.35s;
+}
+/* Three states, on one channel. Where you are is bright, where you have been
+ * is dim, where you are going is dimmer -- and nothing here encodes how the
+ * running went, deliberately. Colour in this readout already means ahead /
+ * behind on the bar directly above, and a second meaning on the same channel
+ * a few pixels away is how the ghost gap came to read red on a run the
+ * projection was calling green. The verdict on a chapter is on the finish
+ * card, where it can be computed honestly. */
+.rcity.past { opacity: 0.6; }
+.rcity.here { opacity: 1; font-weight: 700; }
 
 /* ---- overlays ---- */
 .panel {
@@ -811,7 +844,7 @@ html, body {
   #gapLine { margin-bottom: 17px; gap: 12px; }
   #gapVal { font-size: 21px; }
   #gapTrend { font-size: 11px; }
-  #railCaps { font-size: 10px; margin-top: 4px; }
+  #railRoute { font-size: 10px; height: 12px; margin-top: 4px; }
   .railTick { top: 8px; bottom: 8px; }
   .railTick.major { top: 3px; bottom: 3px; }
 
@@ -872,15 +905,23 @@ html, body {
  * and 390x844 are the same width bucket and the same aspect bucket and they are
  * 23px apart. Height is what the sheet was not asking about, so it asks now.
  *
- * This step drops #railCaps, the static axis label reading 0 / 13.1 / 26.2. It
- * is the least live thing on the plate: the halfway point it marks is already
- * drawn on the bar by #railHalf, and the live distance is printed as #distVal
- * in the line immediately above it. The bar itself is the readout and it stays.
+ * This step drops the bottom row of the plate. It used to be a static axis
+ * label reading 0 / 13.1 / 26.2 and is now #railRoute, the day's cities laid
+ * along the bar; either way it is the row this plate can most afford to lose,
+ * because the bar itself is the readout, the live distance is printed as
+ * #distVal in the line immediately above it, and the boundary marks stay on
+ * the bar whether or not the names under them are drawn.
+ *
+ * The cost is stated rather than hidden: on a frame this short the player is
+ * not told which city they are in, and the finish card's chapter line names a
+ * place they were never shown. That is the right trade only because the
+ * alternative is the runner's feet inside an opaque panel, which is a fairness
+ * defect and this is not.
  */
 @media (max-height: 620px) {
   #railWrap { padding-top: 4px; padding-bottom: 3px; }
   #rail { height: 12px; }
-  #railCaps { display: none; }
+  #railRoute { display: none; }
   #gapLine { margin-bottom: 11px; }
 }
 
@@ -958,15 +999,16 @@ html, body {
    * above a panel occupying the bottom quarter of the screen.
    *
    * So the rail gives up what the panels above it already gave up. The bar
-   * itself is the readout and it stays, at 12px instead of 22. #railCaps goes:
-   * it is a static axis label reading 0 / 13.1 / 26.2, the halfway point is
-   * already marked by #railHalf on the bar, and the live distance is printed
-   * on #distVal in the line directly above it. 93px -> 48px, and the gapLine
-   * clearance is held at 11 because the ghost marker's cap still needs its 10.
+   * itself is the readout and it stays, at 12px instead of 22. The bottom row
+   * goes -- #railRoute now, the static 0 / 13.1 / 26.2 when this was written:
+   * the live distance is printed on #distVal in the line directly above it,
+   * and the city boundaries stay marked on the bar even with the names gone.
+   * 93px -> 48px, and the gapLine clearance is held at 11 because the ghost
+   * marker's cap still needs its 10.
    */
   #railWrap { bottom: calc(5px + env(safe-area-inset-bottom, 0px));
               padding: 4px 10px 4px; }
   #rail { height: 12px; }
   #gapLine { margin-bottom: 11px; }
-  #railCaps { display: none; }
+  #railRoute { display: none; }
 }

@@ -110,6 +110,13 @@
   // reach is silent today, and so is dropping a rung of the ladder.
   let recordGone = false;
   let tierIdx = -1;
+  // WHERE the contacts happened, not just how many. `pace` counts hits and
+  // that is all the readout needs while running, but the finish card asks a
+  // question a count cannot answer -- which city did this run go wrong in --
+  // and answering it means re-running the race with one city's mistakes
+  // erased. Gate z is the key because it is stable, unique per gate and is
+  // already what every other part of the game indexes a gate by.
+  let hitAt = [];
 
   function reset() {
     clearTimeout(endTimer);
@@ -126,6 +133,7 @@
     lastStep = 0;
     recordGone = false;
     tierIdx = -1;
+    hitAt = [];
     runner.phase = 0;
     ghost.reset();
     hud.hideEnd();
@@ -305,6 +313,7 @@
           audio.clean(pace.streak);
         } else {
           pace.onHit();
+          hitAt.push(r.gate.z);
           cam.impact(1);
           hud.flashBroken();
         }
@@ -396,7 +405,11 @@
         // as the celebration lands rather than instead of it.
         audio.finish(pace.finishTime < K.RECORD_SECONDS);
         clearTimeout(endTimer);
-        endTimer = setTimeout(function () { hud.showEnd(pace, saved); }, 2600);
+        // hitAt is copied rather than handed over: `reset()` empties this array
+        // for the next run, and the card is still on screen when RUN IT AGAIN
+        // is pressed.
+        const where = hitAt.slice();
+        endTimer = setTimeout(function () { hud.showEnd(pace, saved, where); }, 2600);
       }
     }
 

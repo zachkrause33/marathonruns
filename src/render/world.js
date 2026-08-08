@@ -7790,9 +7790,55 @@ MR.World = (function () {
       // it hid both hi-vis tabards and left two pale heads floating over a
       // board, which is neither a person nor a barrier. At 1.28 the pink
       // torsos read above it and the pair reads as people holding something.
-      parts.push(hbx(2.16, 0.56, 0.18, 0, 0.98, -0.54, 0xff3b6b));
-      parts.push(hbx(2.24, 0.12, 0.20, 0, 1.30, -0.54, 0xfff2e0));
-      parts.push(hbx(2.24, 0.12, 0.20, 0, 0.66, -0.54, 0xfff2e0));
+      parts.push(gl(hcbx(2.16, 0.56, 0.18, 0, 0.98, -0.54, 0xff3b6b, 0.04), GLOSS.matte));
+      parts.push(gl(hcbx(2.24, 0.12, 0.20, 0, 1.30, -0.54, 0xfff2e0, 0.03), GLOSS.matte));
+      parts.push(gl(hcbx(2.24, 0.12, 0.20, 0, 0.66, -0.54, 0xfff2e0, 0.03), GLOSS.matte));
+      /**
+       * ============ THE BARRIER GETS AN UNDERSTRUCTURE ============
+       *
+       * Measured at gameplay framing, this variant was 28.6% cream, 24.1%
+       * navy, 20.0% caution face and 12.8% pink, with NOTHING in any structural
+       * category -- no fittings at all on any of the eleven parts it was made
+       * of. Three stacked slabs and two stacks of boxes.
+       *
+       * WHERE THE STRUCTURE CAN GO IS DECIDED BY OCCLUSION, and the framing
+       * tool is what makes that computable rather than a guess. The board's
+       * screen band runs from its own bottom edge to its top rail; the pair of
+       * marshals stand 0.70 BEHIND it, and the camera looks down, so everything
+       * of them between y 0.35 and y 1.15 is behind the board for the whole
+       * approach. Anything at the BOARD'S OWN z below y 0.60, by contrast, is
+       * clear of it -- there is no parallax at the same depth. So the legs, the
+       * feet, the bottom rail and the cones are all built there, and the pair's
+       * new lower legs are built for the angles the pass shows rather than for
+       * this one.
+       *
+       * IT IS ALSO A LUMINANCE PROBLEM. This variant clears the fairness gate
+       * on luminance ALONE, at 1.365x against 1.25x, with dS 0.023 against a
+       * road at S 0.157 -- and roadmap.md records a lever table in which every
+       * chroma route was tried and every one made it worse, because you cannot
+       * saturate a white barrier band and have it still be a road closure. So
+       * the understructure is built in the two BRIGHT things this object is
+       * already made of, cream and its own pink, and the only dark added is the
+       * boots. Cones are the one saturated element and they are amber, which is
+       * on cream's side of neutral rather than opposite it.
+       */
+      for (const sx of [-1, 1]) {
+        // Legs and feet, at the board's own depth so they clear its bottom edge.
+        parts.push(gl(hbx(0.19, 0.62, 0.17, sx * 0.62, 0.31, -0.54, 0xff3b6b), GLOSS.matte));
+        parts.push(gl(hbx(0.46, 0.09, 0.62, sx * 0.62, 0.045, -0.54, 0xfff2e0), GLOSS.matte));
+        // The brace back from the foot to the board, which is what stops a
+        // free-standing barrier folding over -- and what the pass sees.
+        parts.push(gl(bx(0.09, 0.09, 0.62, sx * 0.45, 0.34, -0.28, 0xfff2e0, 0.72), GLOSS.matte));
+        // A cone at each end. The one saturated element on the object, and the
+        // thing that says ROAD CLOSED before any of the lettering resolves.
+        const cx = sx * 0.86;
+        parts.push(gl(cyl(0.055, 0.20, 0.44, 10, cx, 0.24, -0.50, 0xff8c00), GLOSS.trim));
+        parts.push(gl(cyl(0.135, 0.145, 0.09, 10, cx, 0.26, -0.50, 0xfff2e0), GLOSS.matte));
+        parts.push(gl(cbx(0.40, 0.06, 0.40, cx, 0.035, -0.50, 0xff8c00, 0.03), GLOSS.trim));
+      }
+      // The bottom rail, which is the horizontal a barrier reads by once its
+      // board is a striped rectangle and nothing else.
+      parts.push(gl(hbx(1.44, 0.10, 0.14, 0, 0.30, -0.54, 0xfff2e0), GLOSS.matte));
       /**
        * The pair, rebuilt for the same reason the trike's rider was: a player
        * who ran the whole race did not report two marshals they could not make
@@ -7813,12 +7859,28 @@ MR.World = (function () {
       for (const p of who) {
         const px = p.x * LANE_FIT;
         const y = p.h;
-        parts.push(bx(0.50, 0.86, 0.34, px, 0.43, p.z, 0x2b2f52));
+        // TWO LEGS AND BOOTS, not one navy slab 0.50 x 0.86. Only the boots
+        // and the bottom of the shins clear the board from astern; the rest is
+        // built because the pass and the lane change both show it.
+        for (const lx of [-1, 1]) {
+          parts.push(gl(bx(0.21, 0.50, 0.30, px + lx * 0.14, 0.62, p.z, 0x2b2f52), GLOSS.matte));
+          parts.push(gl(bx(0.19, 0.30, 0.27, px + lx * 0.15, 0.22, p.z + 0.02, 0x2b2f52), GLOSS.matte));
+          parts.push(gl(bx(0.23, 0.11, 0.38, px + lx * 0.15, 0.055, p.z - 0.05, 0x141a33), GLOSS.trim));
+        }
+        parts.push(gl(bx(0.52, 0.18, 0.34, px, 0.94, p.z, 0x2b2f52), GLOSS.matte));
         parts.push(bx(0.80, 0.32, 0.44, px, 1.34 + y, p.z, 0x2b2f52));
-        parts.push(bx(0.86, 0.40, 0.46, px, 1.70 + y, p.z, 0xfff2e0));
+        parts.push(gl(cbx(0.86, 0.40, 0.46, px, 1.70 + y, p.z, 0xfff2e0, 0.04), GLOSS.matte));
+        // One band across the tabard, in the object's own pink. A hi-vis with
+        // no band is a rectangle, and this is the one place on the pair that is
+        // ABOVE the board from astern and therefore always in frame.
+        parts.push(gl(bx(0.88, 0.08, 0.47, px, 1.61 + y, p.z, 0xff3b6b), GLOSS.matte));
         parts.push(bx(0.76, 0.10, 0.42, px, 1.95 + y, p.z, 0x2b2f52));
         parts.push(bx(0.54, 0.48, 0.46, px, 2.24 + y, p.z, p.skin));
-        parts.push(bx(0.62, 0.20, 0.52, px, 2.44 + y, p.z, 0xff3b6b));
+        parts.push(gl(cbx(0.62, 0.20, 0.52, px, 2.44 + y, p.z, 0xff3b6b, 0.04), GLOSS.matte));
+        // Hands ON the rail, sitting on top of it where they clear the board.
+        for (const hx of [-1, 1]) {
+          parts.push(gl(bx(0.17, 0.14, 0.20, px + hx * 0.44, 1.39, -0.50, p.skin), GLOSS.matte));
+        }
         // Arms forward onto the barrier, which is what makes them its holders
         // rather than two figures that happen to be standing behind it.
         parts.push(bx(0.19, 0.70, 0.19, px - 0.40, 1.28 + y, p.z - 0.34, 0x2b2f52, 0.62));

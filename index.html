@@ -2220,6 +2220,45 @@ MR.Pace = (function () {
 MR.Course = (function () {
   const K = MR.K;
 
+  /**
+   * ---- TWO MECHANICS UNDER TEST, BOTH BEHIND A SCALAR ---------------------
+   *
+   * Same A/B shape as MR.Runner.POLISH and for the same reason: ONE build
+   * generates both courses, so a comparison cannot go stale the way a side
+   * branch or a checked-in table does. main.js reads ?narrow= and ?ramp=;
+   * tools/mechanics.js sets them directly.
+   *
+   * THE RULE BOTH OBEY, and it is what makes the A/B honest: at 0 the seeded
+   * stream must not be touched. Every roll either mechanic makes sits behind a
+   * short-circuiting `NARROW > 0 &&` / `RAMP > 0 &&`, so at zero no random
+   * number is drawn, the stream stays in phase, and the course is BIT-IDENTICAL
+   * to the one this file generated before either mechanic existed. That is
+   * checked rather than claimed -- tools/mechanics.js --identity compares a
+   * SHA-1 of gates and aid across the whole calendar against a baseline taken
+   * before the first line of this went in.
+   *
+   * LANE CLOSURE (NARROW) shuts one or two lanes for a few gates, which is the
+   * archway-and-crates squeeze in reference/ttgr-archway-and-crates.png. It is
+   * expressed as a BLOCK train in the closed lanes rather than as a new kind,
+   * because that is exactly what it is: the closure has to be impassable, it
+   * has to occupy the lane continuously, and the generator already knows how to
+   * space, prove and render that.
+   *
+   * THE RAMP (RAMP) marks a BLOCK train RIDEABLE: its roof becomes a second
+   * running surface, entered up the tailgate. That is
+   * reference/ttgr-ramp-onto-truck.png, where the "ramp" is the bin lorry's own
+   * hopper folded down to the road, one lane wide.
+   *
+   * The single most important property of the ramp, and the reason it cannot
+   * break the fairness proof: A RIDEABLE BLOCK ONLY ADDS EDGES TO THE BFS. It
+   * is never generated where a BLOCK train was not already legal, so every lane
+   * path solvable() proved before it existed is still there, untouched, and the
+   * roof is one more way through on top. solvable() therefore needs no change
+   * at all and is not given one -- see the note above it.
+   */
+  let NARROW = 0;
+  let RAMP = 0;
+
   // A jump covers this much ground; two conflicting action gates closer than
   // this would demand being airborne and ducking at once.
   //
@@ -2385,6 +2424,43 @@ MR.Course = (function () {
     }
     return reach;
   }
+
+  /**
+   * ---- THE RIDEABLE ROOF, IN NUMBERS --------------------------------------
+   *
+   * DECK_Y IS NOT CHOSEN. It is Collision.BOX[BLOCK].yMax, the top of the
+   * impassable box, which is the one height in this game that already means
+   * "the surface of the thing standing in the lane". Picking a ramp height by
+   * eye would have put art in charge of clearance, which rule 4 forbids, and
+   * would have let the runner's feet float above or sink into the roof of the
+   * very box the audit casts.
+   *
+   * It is written here and not read from MR.Collision for the same reason
+   * HAZARD_HALF_Z is: collision.js loads AFTER this file, and generation runs
+   * headless in tools/ where collision.js is not loaded at all. So it is
+   * duplicated and then GUARDED -- tools/mechanics.js --guard compares the two
+   * in the live page and fails, exactly as tools/lib/fairness.js already does
+   * for HAZARD_HALF_Z.
+   *
+   * RAMP_RUN is the tailgate: how much of the train's depth is spent climbing.
+   * 6.0 units is 0.21 s at race pace, which is about a stride and a half -- long
+   * enough to read as a slope and short enough that the roof is most of the
+   * ride.
+   *
+   * RAMP_SPAN is where the honest cost of this mechanic is, and it is worth
+   * stating plainly rather than burying. A BLOCK train's depth is
+   * 2 * halfZ * (1 + 0.9 * span) = 3.9 + 3.51 * span, so maybeTrain's biggest
+   * train, span 4, is 17.9 units -- 0.63 s of roof at race pace, and 6.0 of
+   * that is the ramp. The reference ride is nearer two seconds. Buying two
+   * seconds needs span 14, and reachOf charges the whole depth against the gap
+   * to the next gate, so a 14-span train also punches a 75-unit hole in the
+   * course. The prototype takes the middle: span 8-11 is 32-43 units, a
+   * 1.1-1.5 s ride, and tools/mechanics.js reports what the hole costs in gates
+   * and in finish time rather than leaving it as a feeling.
+   */
+  const DECK_Y = 2.80;
+  const RAMP_RUN = 6.0;
+  const RAMP_SPAN_MIN = 8, RAMP_SPAN_MAX = 11;
 
   const START_GRACE = 150;   // clean runway so the first seconds read calmly
   // Clean straight into the tape. It was 190 units -- 0.80 of a mile, about
@@ -2631,6 +2707,57 @@ MR.Course = (function () {
     return rnd.int(2, d > 0.7 ? 4 : 3);   // in gate-spans
   }
 
+  /**
+   * ---- LANE CLOSURE -------------------------------------------------------
+   *
+   * Shut one or two lanes for a few gates, so the road tapers to two lanes or
+   * to one and opens back out. It is expressed as a BLOCK in the closed lanes
+   * at every gate of the stretch, which is not a compromise -- it is what a
+   * closure IS. It has to be impassable, it has to hold the lane for a
+   * distance, and spacingAt, reachOf, solvable() and the renderer already agree
+   * on exactly that object.
+   *
+   * WHAT MAKES IT SAFE IS NOT THIS FUNCTION. It is that the closed gate still
+   * goes through the same solvable() retry as every other gate, so a closure
+   * the BFS cannot get through is never emitted -- it is abandoned and the gate
+   * is built normally. The proof is not extended, weakened or special-cased.
+   *
+   * WHAT MAKES IT FAIR IS ALSO NOT THIS FUNCTION, and it is worth being exact
+   * about which claim is which. The surviving lane is rolled by makeGate like
+   * any other, so it can carry a JUMP or a DUCK. That is not a trap: makeGate
+   * never allows a BLOCK to take the last open lane, so whatever stands in the
+   * corridor is passable WITH the right action -- which is the identical
+   * bargain a three-hazard full-width gate already makes, and the game ships
+   * 62% of those at the top of the difficulty curve. A one-lane corridor with a
+   * JUMP in it asks the player to read ONE thing; a full-width gate asks them to
+   * read three. The corridor is the easier of the two.
+   *
+   * The rate is deliberately low. This is a punctuation mark in a four-minute
+   * race, not a texture.
+   */
+  function narrowRate(f) {
+    // Never in the opening -- START_GRACE and the difficulty ramp already own
+    // the first minute, and a new player meeting a closed road before they have
+    // learned the lane geometry learns the wrong lesson. Never in the run-in
+    // either: difficulty() saturates there on purpose and the last question of
+    // a race should not be a corridor.
+    if (f < 0.12 || f > 0.88) return 0;
+    return 0.06 * NARROW;
+  }
+
+  function narrowPlan(rnd) {
+    // TWO closed is the archway -- a single-lane corridor, and the case that
+    // has to be argued for. ONE closed is the cone taper, the same event one
+    // step milder, and it leaves the player a choice of two lanes throughout.
+    const shut = rnd.chance(0.40) ? 2 : 1;
+    const order = [0, 1, 2];
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = rnd.int(0, i);
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    return { closed: order.slice(0, shut).sort(), span: rnd.int(2, 4) };
+  }
+
 
   /**
    * Aid: water tables and fruit, placed deterministically from the same date
@@ -2653,10 +2780,55 @@ MR.Course = (function () {
    * wall is, where the streak is worth most, and where a rescue is worth
    * having.
    */
-  function generateAid(key, gates) {
+  function generateAid(key, gates, ramps) {
     const rnd = MR.rng.stream(key, 'aid/v3');
     const items = [];
     if (!gates.length) return items;
+
+    /**
+     * ---- WHY THERE IS ANYTHING ON THE ROOF AT ALL --------------------------
+     *
+     * Without this the ramp is STRICTLY DOMINATED and the whole mechanic is
+     * dead, which is a thing measurement said and intuition did not.
+     *
+     * Riding a roof pays the same one clean gate that going round the lorry
+     * pays -- the streak does not care which way you got past it -- and it
+     * charges a real price on top: you cannot change lane for the length of the
+     * vehicle, leaving sideways costs the streak, and 10% of ramps put a BLOCK
+     * in the lane you fall back into. A rational player would never take it.
+     * The reference frame says the same thing in pictures: the gold bars along
+     * the top of the bin lorry are not decoration, they are the reason to be up
+     * there.
+     *
+     * So the roof carries aid, and aid is exactly the right currency for it.
+     * The mechanic it plugs into is already built as a trade -- see the long
+     * note in the placement loop below: half the pool is scored into the
+     * HARDEST legal lane so a strong run has something to go and get, and half
+     * is scored into the easiest so a broken run has a road back. A roof is the
+     * hardest legal lane there is. It also makes the ramp worthless to a
+     * perfect run, which is correct and is the same shape as AID_CEILING: a
+     * flawless line is already above the ceiling and gains nothing from a
+     * bottle, so the ramp becomes what aid is -- the way back into a race you
+     * are losing, not a faster way to win one.
+     *
+     * Its own seeded stream, so switching the ramp on cannot shift a single
+     * road-level item; and skipped entirely when there are no ramps, so at
+     * RAMP = 0 no number is drawn at all.
+     */
+    if (ramps && ramps.length) {
+      const rr = MR.rng.stream(key, 'aid/roof/v1');
+      for (const r of ramps) {
+        // The middle of the FLAT roof, never on the tailgate: an item on the
+        // slope would be collected on the way up whatever the player decided,
+        // which is not a trade.
+        const flat0 = r.z0 + r.run;
+        const z = flat0 + (r.z1 - flat0) * 0.5;
+        const fruit = rr.chance(0.55);
+        items.push(fruit
+          ? { z, lane: r.lane, kind: 'banana', gain: K.AID_BANANA, guarded: true, roof: true }
+          : { z, lane: r.lane, kind: 'water', gain: K.AID_WATER, guarded: true, roof: true });
+      }
+    }
 
     let gi = 0;
     let nudged = 0;   // consecutive gaps a rescue item has declined
@@ -2848,41 +3020,159 @@ MR.Course = (function () {
     const end = K.TOTAL_UNITS - FINISH_GRACE;
     let guard = 0;
 
+    // Instrumentation the generator has never kept, and the reason it is here
+    // is rule 3 rather than curiosity. generate() CANNOT return an unsolvable
+    // course: when 24 attempts fail it degrades to an all-clear gate. So
+    // "solvable on all 365 days" is true by construction and proves nothing
+    // about whether a new mechanic damaged the course -- the damage would show
+    // up as the generator giving up more often, and nothing counted that.
+    const tally = { degraded: 0, attempts: 0, narrowings: 0, narrowAbandoned: 0 };
+
+    // A closure in flight: the lanes it holds shut, and the gate index it runs
+    // to. Deliberately the same shape as trainUntil, because it is the same
+    // thing -- see the note on narrowPlan.
+    let narrowClosed = null;
+    let narrowUntil = -1;
+    const ramps = [];
+
     while (z < end && guard++ < 20000) {
       const f = z / K.TOTAL_UNITS;
       const idx = gates.length;
 
+      if (idx >= narrowUntil) narrowClosed = null;
+      // Open a closure. Never on top of a train -- a train already owns a lane
+      // for a span, and stacking the two is how all three lanes get shut.
+      if (NARROW > 0 && !narrowClosed && trainUntil.every((t) => idx >= t)
+          && rnd.chance(narrowRate(f))) {
+        const plan = narrowPlan(rnd);
+        narrowClosed = plan.closed;
+        narrowUntil = idx + plan.span;
+        tally.narrowings++;
+      }
+
       let lanes = null;
       // Retry until this gate keeps the course solvable.
-      for (let attempt = 0; attempt < 24; attempt++) {
-        const cand = makeGate(rnd, f);
+      //
+      // The closure is applied INSIDE the retry and is the first thing dropped
+      // when the retry fails, so it can never be the reason a gate degrades.
+      for (let pass = 0; pass < 2 && !lanes; pass++) {
+        // pass 0 honours the closure; pass 1 runs only if the closure could not
+        // be made to work, and abandons it.
+        const closed = pass === 0 ? narrowClosed : null;
+        if (pass === 1 && narrowClosed) { narrowClosed = null; tally.narrowAbandoned++; }
+        for (let attempt = 0; attempt < 24; attempt++) {
+          const cand = makeGate(rnd, f);
 
-        // Carry active trains through.
-        for (let l = 0; l < 3; l++) if (idx < trainUntil[l]) cand[l] = K.BLOCK;
-        if (cand.every((l) => l === K.BLOCK)) continue;
+          // Carry active trains through.
+          for (let l = 0; l < 3; l++) if (idx < trainUntil[l]) cand[l] = K.BLOCK;
+          // Then the closure, which outranks the roll: the lanes it shuts are
+          // shut, and the lanes it leaves open may not be BLOCK, or the gate
+          // would have no way through at all.
+          if (closed) {
+            for (const l of closed) cand[l] = K.BLOCK;
+            for (let l = 0; l < 3; l++) {
+              if (closed.indexOf(l) < 0 && cand[l] === K.BLOCK) cand[l] = K.CLEAR;
+            }
+          }
+          if (cand.every((l) => l === K.BLOCK)) continue;
 
-        const trial = gates.concat([{ z, lanes: cand, f }]);
-        if (solvable(trial, elevation)) { lanes = cand; break; }
+          tally.attempts++;
+          const trial = gates.concat([{ z, lanes: cand, f }]);
+          if (solvable(trial, elevation)) { lanes = cand; break; }
+        }
+        if (!closed) break;   // pass 0 had no closure to drop, so pass 1 is moot
       }
       if (!lanes) {
         // Degrade to a guaranteed-safe gate rather than emit something unfair.
         lanes = [K.CLEAR, K.CLEAR, K.CLEAR];
         for (let l = 0; l < 3; l++) if (idx < trainUntil[l]) lanes[l] = K.BLOCK;
+        tally.degraded++;
       }
 
-      const span = maybeTrain(rnd, f, lanes);
+      let span = maybeTrain(rnd, f, lanes);
+      let rampLane = -1;
       if (span) {
         for (let l = 0; l < 3; l++) {
           if (lanes[l] === K.BLOCK && trainUntil[l] <= idx) {
             // Only extend if some other lane survives the whole span.
             const others = [0, 1, 2].filter((x) => x !== l);
-            if (others.some((o) => idx >= trainUntil[o])) trainUntil[l] = idx + span;
+            if (others.some((o) => idx >= trainUntil[o])) {
+              // ---- THE RIDEABLE ROOF -------------------------------------
+              //
+              // Marked here and nowhere else, and the placement is the whole
+              // safety argument: this line runs only inside the branch that has
+              // ALREADY established a BLOCK train is legal in this lane with
+              // another lane surviving its whole span. So a ramp is never the
+              // reason a lane is blocked. It is a second way through a wall the
+              // course was going to build anyway, which is why solvable() is
+              // sound without being touched.
+              //
+              // Not inside a closure: a closure is already a corridor, and
+              // putting the one way through on a roof would make the roof
+              // compulsory rather than optional. That is the difference between
+              // an option and a tax.
+              // ---- AND NOT IN THE RUN-IN, WHICH THE CALENDAR HAD TO SAY ----
+              //
+              // The same window narrowRate uses, and it is here because a
+              // 365-day sweep failed and a 90-day one did not. On 2026-12-02 a
+              // ramp was generated at f = 0.991, so its roof ran to within 3.0
+              // units of the tape: the runner would have crossed the finish
+              // line mid-fall, through the run-in that world.js's finale spends
+              // on a clear-tarmac camera move, with no gate after it for the
+              // fall to be measured against at all. The opening is excluded for
+              // the reason START_GRACE exists, and the closing half-mile
+              // because the last question of a race should not be a novelty.
+              if (RAMP > 0 && !narrowClosed && f > 0.12 && f < 0.90
+                  && rnd.chance(0.34 * RAMP)) {
+                span = rnd.int(RAMP_SPAN_MIN, RAMP_SPAN_MAX);
+                rampLane = l;
+              }
+              // ---- SPAN MEANS TWO DIFFERENT THINGS, AND A RAMP SPLITS THEM --
+              //
+              // `train` is a DEPTH multiplier -- reachOf and world.js's
+              // gateBoxes both read it as 2 * halfZ * (1 + 0.9 * span), so
+              // span 4 is 17.9 units of vehicle. `trainUntil` is a COUNT OF
+              // GATES the lane stays shut for, and at a spacing floor of 43
+              // units that same span 4 shuts the lane for about 150. The two
+              // numbers have never been the same quantity; for an ordinary
+              // train that is harmless, because it just means a long vehicle
+              // followed by a short convoy.
+              //
+              // For a ramp it is fatal, and the frame says so before the
+              // arithmetic does: the roof ends at the train's far face, the
+              // player falls back to the road -- and lands in the next BLOCK
+              // that trainUntil is still holding in that lane. The reward for
+              // taking the ramp would be a wall.
+              //
+              // So a rideable train buys its DEPTH and does not buy the
+              // following gates. The lane is shut at this gate, by this gate's
+              // own BLOCK, and is clear the moment the vehicle ends. That is
+              // strictly fewer blocked lane-slots than the generator would
+              // otherwise have laid down, so it cannot cost solvable() a path.
+              if (rampLane < 0) trainUntil[l] = idx + span;
+            }
             break;
           }
         }
       }
 
-      gates.push({ z, lanes, f, train: span });
+      const gate = { z, lanes, f, train: span };
+      if (narrowClosed) gate.narrow = narrowClosed.slice();
+      if (rampLane >= 0) {
+        gate.ramp = rampLane;
+        ramps.push({
+          lane: rampLane,
+          z0: z,
+          // The far face of the train, from the SAME expression reachOf and
+          // world.js's gateBoxes use. Written once here rather than restated,
+          // because a roof that ends somewhere other than where the box ends is
+          // a runner standing on air or inside a lorry.
+          z1: z + 2 * HAZARD_HALF_Z[K.BLOCK] * (1 + span * 0.9),
+          run: RAMP_RUN,
+          deck: DECK_Y,
+        });
+      }
+      gates.push(gate);
       // The LANES and the span both go in because the gap after a gate is owed
       // by the geometry of THAT gate: which kinds it actually stands in the road
       // decides how deep its deepest lane is, and a train's rear face is a long
@@ -2894,9 +3184,47 @@ MR.Course = (function () {
     for (let m = 1; m <= 26; m++) mileMarkers.push({ mile: m, z: m * K.UNITS_PER_MILE });
     mileMarkers.push({ mile: K.MARATHON_MILES, z: K.TOTAL_UNITS, finish: true });
 
-    const aid = generateAid(key, gates);
+    const aid = generateAid(key, gates, ramps);
     const course = { key, gates, aid, mileMarkers, biomes: BIOMES, length: K.TOTAL_UNITS,
-                     elevation };
+                     elevation, ramps, tally };
+
+    /**
+     * The height of the running surface at (z, lane): 0 on the road, DECK_Y on
+     * a roof, and the slope in between.
+     *
+     * This is the whole of the ramp's world model and it is deliberately a pure
+     * function of the course rather than a property of a mesh. The runner, the
+     * camera, the collision test and the instrument all read THIS, so there is
+     * exactly one answer to "how high is the ground here" and art cannot
+     * disagree with it. Same contract as MR.Collision.BOX, same reason.
+     *
+     * Flat and constant-zero when no ramp was generated, which is every course
+     * at RAMP = 0 -- so nothing downstream needs a null check and nothing
+     * downstream changes behaviour.
+     */
+    course.deckAt = function (z, lane) {
+      for (let i = 0; i < ramps.length; i++) {
+        const r = ramps[i];
+        if (r.lane !== lane || z < r.z0 || z >= r.z1) continue;
+        const up = z - r.z0;
+        return up < r.run ? r.deck * (up / r.run) : r.deck;
+      }
+      return 0;
+    };
+
+    /**
+     * The ramp covering (z, lane), or null. The player needs the OBJECT and not
+     * just the height, because the two ways of leaving a roof are not the same
+     * event -- running off the front is a dismount and swerving off the side is
+     * a fall -- and telling them apart means knowing where the front is.
+     */
+    course.rampAt = function (z, lane) {
+      for (let i = 0; i < ramps.length; i++) {
+        const r = ramps[i];
+        if (r.lane === lane && z >= r.z0 && z < r.z1) return r;
+      }
+      return null;
+    };
 
     // This date's places, in the order they will be run through. Carried
     // ALONGSIDE `biomes` rather than replacing it: `biomes` describes the shape
@@ -2995,14 +3323,28 @@ MR.Course = (function () {
     return { ok: errors.length === 0, errors, gates: g.length };
   }
 
-  return { generate, generateAid, validate, solvable, biomeAt, difficulty,
+  const api = { generate, generateAid, validate, solvable, biomeAt, difficulty,
            BIOMES, SETTINGS, pickSettings, ACTION_WINDOW, actionWindowAt,
            // Exported so tools/shoot.js reads the read window from the file
            // that enforces it instead of recomputing the same sum. The two
            // cannot drift, which is the whole point of the invariant.
            READ_NEAR: ACTION_WINDOW + K.CAM_BASE_BACK, readWindowAt,
            HAZARD_HALF_Z, reachOf,
+           DECK_Y, RAMP_RUN,
            elevationPlan };
+
+  // Accessors rather than plain fields, so a nonsense value cannot be written
+  // and the clamp lives with the flag. Same shape as MR.Runner.POLISH.
+  Object.defineProperty(api, 'NARROW', {
+    get: function () { return NARROW; },
+    set: function (v) { const n = parseFloat(v); if (isFinite(n)) NARROW = Math.max(0, Math.min(1, n)); },
+  });
+  Object.defineProperty(api, 'RAMP', {
+    get: function () { return RAMP; },
+    set: function (v) { const n = parseFloat(v); if (isFinite(n)) RAMP = Math.max(0, Math.min(1, n)); },
+  });
+
+  return api;
 })();
 
 /* ==================== src/core/store.js ==================== */
@@ -15910,10 +16252,47 @@ MR.World = (function () {
     // top of a full jump (2.05 + 1.78 = 3.83), so nothing here can make the
     // player clip something they legitimately cleared.
 
+    /**
+     * ============ THE CAUTION FACES SAY WHAT THE OBJECT IS ============
+     *
+     * These three diagonal-stripe faces are the largest single-colour area on
+     * most hazards, and they used to carry the KIND CODE -- amber, cyan, pink
+     * -- on the theory recorded at the variant header below: that a player
+     * reads over / under / around from hue before the shape resolves.
+     *
+     * tools/kindread.js measured that theory against the other channel, on the
+     * same frames, through the live chase camera, at 12, 25.35 and 40 units. A
+     * nearest-centroid classifier on HUE ALONE misreads 9 of 21 variants. On
+     * the SILHOUETTE PROFILE alone -- how much of the lane width the object
+     * covers in each of fourteen bands from the road to 2.80 -- it misreads 2.
+     * The channel the rule protected is the weaker one, and it is weaker
+     * because the fleet rebuild already spent it: BLOCK v6 is orange at h 34
+     * and sits inside the JUMP cluster, BLOCK v4 and v0 are at h 196 and 216
+     * and sit inside the DUCK cluster. Hue stopped telling the kinds apart
+     * some time ago and nothing measured it.
+     *
+     * So the hue is spent on the owner's ask instead, which is the thing a
+     * road actually signals with:
+     *
+     *   DUCK   YELLOW AND BLACK diagonal -- the thing you go under. This is
+     *          reference/ttgr-duckbar-yellow-black.png exactly, and the owner
+     *          named it: "yellow thing to dive under... construction zone".
+     *   BLOCK  RED AND WHITE -- barrier, road closed. The owner named this one
+     *          too ("note red barrier"), it is the marking a real refuse truck
+     *          and a real works barricade carry, and it replaces a pink that
+     *          meant nothing on a road.
+     *   JUMP   AMBER AND DARK -- works and cones, unchanged and already right.
+     *
+     * WHAT IS NOT TOUCHED, AND THIS IS THE SPLIT THAT MAKES IT SAFE. The
+     * telegraph mats painted on the road keep their abstract kind hues and
+     * their kind glyphs. The mat says WHAT TO DO; the object now says WHAT IT
+     * IS. Those are two channels, not one, and the mat is the one this file
+     * already calls "the channel the race is actually lost by misreading".
+     */
     const stripeTex = {
       jump: stripeTexture('#ffb020', '#2b2f52'),
-      duck: stripeTexture('#37d6ff', '#0d2b36'),
-      block: stripeTexture('#ff3b6b', '#fff2e0'),
+      duck: stripeTexture('#ffc422', '#1a1206'),
+      block: stripeTexture('#f0402f', '#fff6ea'),
     };
     const faceMat = {
       jump: new THREE.MeshBasicMaterial({ map: stripeTex.jump }),
@@ -15978,13 +16357,24 @@ MR.World = (function () {
      *     from these meshes. A variant that broke the envelope would wave a
      *     player through something they visibly hit. Only x is free, and only
      *     through LANE_FIT.
-     *   COLOUR. Amber JUMP, cyan DUCK, pink BLOCK, always, on the mass that
-     *     carries the silhouette. One contact ends the record attempt; the hue
-     *     is how the kind is known before the shape resolves.
-     *   SILHOUETTE CLASS. Low wide mass with a light cap for JUMP; tall thin
-     *     verticals with a bar between them for DUCK; a lane-filling wall for
-     *     BLOCK. Checked at 40 units in portrait, which is where the lane
-     *     decision is actually made.
+     *   SILHOUETTE CLASS, AND IT IS THIS ONE THAT IS THE CONTRACT. Low wide
+     *     mass on the road and nothing above 0.80 for JUMP; a GAP from the road
+     *     to 1.41 with a bar over it for DUCK; mass from the road past the 2.05
+     *     jump apex for BLOCK. Measured, not asserted: tools/kindread.js reads
+     *     the fraction of the lane width each variant covers in fourteen bands
+     *     through the live chase camera, and a nearest-centroid classifier on
+     *     that profile alone misreads 2 of 21 variants at 12, 25.35 and 40
+     *     units. Both failures are the two thin people-hazards.
+     *   COLOUR SAYS WHAT THE OBJECT IS, NOT WHICH KIND IT IS.
+     *     This rule used to read "Amber JUMP, cyan DUCK, pink BLOCK, always,
+     *     on the mass that carries the silhouette -- the hue is how the kind
+     *     is known before the shape resolves." That was never measured, and
+     *     when it was it turned out to be false: the same classifier on HUE
+     *     alone misreads 8 to 10 of 21. It is false because the fleet rebuild
+     *     already spent the channel -- BLOCK v6 is orange inside the JUMP
+     *     cluster, BLOCK v0 and v4 are cyan inside the DUCK cluster -- and no
+     *     one re-measured the rule afterwards. See stripeTex for what the hue
+     *     is spent on now and for the mat/object split that keeps it safe.
      *
      * The telegraph mat and the striped face are untouched by all of this, so
      * the readability device the game depends on is identical whichever variant
@@ -16240,42 +16630,94 @@ MR.World = (function () {
     })()));
 
     /**
-     * JUMP v1: traffic cones on a low plinth.
+     * JUMP v1: FIVE ORANGE CONES STANDING ON THE ROAD, and a cone bar.
      *
-     * The cones are the identity and the PLINTH is the read. At 40 units the
-     * whole hazard is about seventeen pixels tall in portrait, and three cones
-     * alone would be three amber slivers with road showing between them -- an
-     * object you look at rather than a lane you cannot run down. The plinth
-     * carries the lane-filling amber mass and the cream cap band, exactly as
-     * the kerb does, and the cones sit on top and do the talking once you are
-     * close enough for it to be flavour rather than information.
+     * The owner, item 2 of the Gold Run notes: "Add orange cones individual".
+     * The complaint underneath it is item 6, "make it less box like, that goes
+     * for everything" -- and this variant was the purest example of it in the
+     * game. It was three cones sitting on a 2.34 x 0.32 amber plinth with a
+     * lemon cap band, and the header used to argue for the plinth in as many
+     * words: "the cones are the identity and the PLINTH is the read... three
+     * cones alone would be three amber slivers with road showing between them".
+     *
+     * The road showing between them is the point. A coned-off lane IS road with
+     * cones standing in it, and what Gold Run puts on its carriageway is
+     * furniture standing on the surface, never furniture on a pedestal. Every
+     * cone here has its foot on y = 0.
+     *
+     * WHAT REPLACES THE PLINTH AS THE LANE-FILLING MASS. Two things, and
+     * neither is a slab:
+     *
+     *   FIVE cones rather than three, at 0.40 apart across the lane, so their
+     *     feet very nearly touch and the row is continuous at the bottom where
+     *     the eye looks for a gap to run through.
+     *   A CONE BAR -- the plastic plank that clips between two cones on a real
+     *     works layout -- across the front at y 0.46, which is where the
+     *     caution face now lives. It is 0.11 deep with road visible under it
+     *     and cones standing through it, so it reads as a bar between cones
+     *     rather than as the front of a box. That distinction is not a
+     *     nicety: the same lane-spanning striped panel at hub height is
+     *     exactly what made BLOCK v8's bicycles look like they were parked on
+     *     a pallet, and it is measured at that variant.
+     *
+     * The cones are staggered in z in a shallow V -- outer pair at -0.26,
+     * inner pair at +0.02, centre at +0.26 -- because a straight rank of five
+     * reads as a fence, and because the stagger is what the chase camera turns
+     * into depth when it banks through the lane change beside it.
+     *
+     * ENVELOPE. A JUMP box is halfX 1.12, halfZ 0.52, yMax 0.80. Cone tips top
+     * out at 0.72, the widest foot reaches 1.00, and the deepest foot reaches
+     * 0.48. The bar's front plane is -0.51 with the face at -0.512, inside the
+     * 0.52 the box allows. Art gives way to the box.
      */
     const jumpConeGeo = (function () {
       const parts = [
-        // 0.88 deep, so the pilasters below stand proud of it. The plinth is
-        // the shared vocabulary of v1 and v3 and it took the kerb's rebuild
-        // with it: three JUMPs used to carry the same blank slab.
-        hbx(2.24, 0.22, 0.88, 0, 0.11, 0, 0xffb020),
-        hbx(2.34, 0.10, 1.00, 0, 0.27, 0, 0xfff23a),
-        hbx(0.28, 0.32, 1.00, -1.16, 0.16, 0, 0xe07f12),
-        hbx(0.28, 0.32, 1.00, 1.16, 0.16, 0, 0xe07f12),
+        // THE CONE BAR. Chamfered, and the one span in this variant -- so it
+        // follows the lane through hcbx while the cones, which are objects
+        // standing at a place rather than spans across it, do not.
+        // y 0.30, WHICH IS THE COLLAR. At 0.46 the bar crossed every cone at
+        // its widest visible point and the row photographed as five orange
+        // blobs with five spikes above them -- the bar was cutting the object
+        // it was supposed to link. A real cone bar clips at the lower collar,
+        // and at 0.30 the whole taper from 0.38 to the tip at 0.72 is clear.
+        gl(hcbx(2.30, 0.16, 0.11, 0, 0.30, -0.455, 0xff8a24, 0.03), GLOSS.paint),
+        // A lemon reflective strip along the top of the bar, which is the one
+        // bright horizontal at this height and is what survives the fog.
+        gl(hcbx(2.30, 0.05, 0.12, 0, 0.385, -0.455, 0xfff23a, 0.02), GLOSS.matte),
       ];
-      for (const cx of [-0.72, 0, 0.72]) {
-        parts.push(gl(hcbx(0.18, 0.20, 1.00, cx, 0.10, 0, 0xe07f12, 0.03), GLOSS.paint));
-      }
-      for (let i = 0; i < 3; i++) {
-        const cx = (-0.76 + i * 0.76) * LANE_FIT;
-        // The base weight is chamfered and stepped now: a cone's foot is a
-        // moulded ring, and a flat 0.09 slab under a body of revolution was
-        // the one square edge on the object.
-        parts.push(gl(cbx(0.62, 0.07, 0.62, cx, 0.355, 0, 0x3d2408, 0.04), GLOSS.matte));
-        parts.push(gl(cyl(0.26, 0.30, 0.06, 10, cx, 0.42, 0, 0xff7a1f), GLOSS.paint));
-        parts.push(gl(cone(0.30, 0.48, 8, cx, 0.55, 0, 0xff7a1f), GLOSS.paint));
-        parts.push(gl(cyl(0.20, 0.23, 0.11, 8, cx, 0.55, 0, 0xfff23a), GLOSS.matte));
-        // The second collar, high on the taper. Two bands is what a cone
-        // actually wears and it is the difference between a cone and a wedge
-        // at the distance you pass one.
-        parts.push(gl(cyl(0.12, 0.145, 0.07, 8, cx, 0.685, 0, 0xfff23a), GLOSS.matte));
+      // x across the lane, z in a shallow V. Five feet at 0.40 apart with a
+      // 0.40 foot: the row closes at the road without the feet interpenetrating.
+      const lay = [[-0.80, -0.26], [-0.40, 0.02], [0, 0.26], [0.40, 0.02], [0.80, -0.26]];
+      for (const [cx, cz] of lay) {
+        // THE FOOT IS ON THE ROAD. cbx spans y 0 to 0.055 -- a moulded square
+        // weight with its edges cut, which is what a cone's base actually is
+        // and is the part that was hidden on top of the plinth.
+        //
+        // THE WEIGHT IS MID AMBER-BROWN AND NOT NEAR-BLACK, and that is a gate
+        // repair with a number. Losing the plinth cost this variant a bright
+        // 2.34-wide amber slab and a lemon cap band: the gate margin fell from
+        // +0.826 to +0.459 and the 1.6x/0.30 target margin from +0.426 to
+        // +0.070 in one edit. Five feet at 0x3d2408 render at L 27.4, the
+        // darkest area on the object and the nearest to the lens. 0x6b3c0e is
+        // L 47.6 at the same chroma, which is still a weight and not a shadow.
+        parts.push(gl(cbx(0.40, 0.055, 0.40, cx, 0.0275, cz, 0x6b3c0e, 0.02), GLOSS.matte));
+        // The flare where the moulding turns up off the weight.
+        parts.push(gl(cyl(0.18, 0.22, 0.065, 12, cx, 0.0875, cz, 0xff8a24), GLOSS.paint));
+        // The body, 12 segments rather than 8. The owner asked for "round
+        // animations with extensive detail" and a body of revolution at 8
+        // segments is an octagonal pyramid at the distance you pass one.
+        parts.push(gl(cone(0.19, 0.60, 12, cx, 0.42, cz, 0xff8a24), GLOSS.paint));
+        // TWO COLLARS, each straddling the taper it sits on: the cone's radius
+        // is 0.141 at y 0.275 and 0.067 at y 0.51, so these stand proud by
+        // about a centimetre at this scale rather than sinking into the body.
+        //
+        // LEMON AND NOT CREAM, on both. A real cone's bands are white, and
+        // white is what this whole fleet had to give up: MEASUREMENTS.md
+        // records a cream band costing 0.085 of saturation and failing the
+        // build on a variant that had margin to spare. 0xfff23a reads as a
+        // reflective band and keeps the chroma.
+        parts.push(gl(cyl(0.132, 0.152, 0.09, 12, cx, 0.275, cz, 0xfff23a), GLOSS.matte));
+        parts.push(gl(cyl(0.072, 0.090, 0.065, 12, cx, 0.51, cz, 0xfff23a), GLOSS.matte));
       }
       return merge(parts);
     })();
@@ -16597,7 +17039,13 @@ MR.World = (function () {
       // Every face is 0.512 now: outside the 0.50 the art reaches and inside
       // the 0.52 the box allows. They were 0.521 and 0.531.
       { geo: jumpGeo, face: [2.2, 0.62, 0.36, -0.512] },
-      { geo: jumpConeGeo, face: [2.2, 0.24, 0.16, -0.512] },
+      // THE FACE MOVES UP ONTO THE CONE BAR. It was 2.2 x 0.24 at y 0.16 --
+      // flat on the road across the whole lane, which was the front of the
+      // plinth that is gone. On the road it would now be a striped mat lying
+      // between the cones' feet, which is the "sitting on something" the owner
+      // objected to on the bicycles. At y 0.30 it is the front of the plank,
+      // 0.15 tall inside a bar 0.16 tall, with road showing underneath it.
+      { geo: jumpConeGeo, face: [2.26, 0.15, 0.30, -0.512] },
       { geo: jumpWorksGeo, face: [2.2, 0.32, 0.57, -0.512] },
       { geo: jumpScooterGeo, face: [2.2, 0.24, 0.16, -0.512] },
       { geo: jumpBarrierGeo, face: [2.2, 0.26, 0.30, -0.512] },
@@ -16606,14 +17054,15 @@ MR.World = (function () {
 
     /**
      * DUCK: the bar is only 0.42 tall, which is nothing at distance, so the
-     * height comes from tall cyan standards rather than from anything spanning
+     * height comes from tall yellow standards rather than from anything spanning
      * the lane.
      *
      * That distinction is not cosmetic, and it constrains every variant. The
      * chase camera trails 5.1 units and carries 42% of the jump arc, so it
      * sweeps y = 1.76 to 3.14 right through a gate's lane. An earlier version
      * had a header board at 2.44 and the camera flew straight into it -- one
-     * frame of full-screen cyan stripes. ABOVE THE BAR, ONLY THIN MEMBERS,
+     * frame of full-screen yellow-and-black stripes. ABOVE THE BAR, ONLY THIN
+     * MEMBERS,
      * and only out at the standards, so the worst a clip can ever be is a
      * sliver of post.
      */
@@ -16627,7 +17076,8 @@ MR.World = (function () {
      * AT az 0 the five are told apart easily -- roundels, a skirt, a round bar,
      * a boarded ledger -- and the caution face is the same on all five, which
      * is the contract. AT az 180 THREE OF THE FIVE ARE THE SAME OBJECT. v0, v1
-     * and v2 photograph as one flat cyan bar between two flat cyan posts, with
+     * and v2 photograph as one flat bar between two flat posts (cyan at the time;
+     * the vocabulary is construction yellow and black now, see stripeTex), with
      * nothing on the rear of the bar, nothing on the rear of the standards, and
      * no fitting anywhere: every distinguishing feature these variants own is
      * on the face they turn toward the lens at spawn. v3 and v4 pass, because a
@@ -16673,34 +17123,34 @@ MR.World = (function () {
       // 0.56 deep, not 0.60/0.62. A DUCK box is halfZ 0.30 and the cap was
       // 0.62 -- 0.01 outside its own envelope, with the striped face 0.002
       // outside that again. Same correction as the JUMP plinths.
-      gl(hcbx(2.30, 0.30, 0.56, 0, 1.56, 0, 0x37d6ff, 0.05), GLOSS.paint),
-      gl(hcbx(2.36, 0.12, 0.56, 0, 1.77, 0, 0xd8f8ff, 0.03), GLOSS.trim),
+      gl(hcbx(2.30, 0.30, 0.56, 0, 1.56, 0, 0xffc422, 0.05), GLOSS.paint),
+      gl(hcbx(2.36, 0.12, 0.56, 0, 1.77, 0, 0xfff0a0, 0.03), GLOSS.trim),
       // TWO STIFFENER RIBS DOWN THE BACK OF THE BAR. The bar's front is not
       // available: the caution face is 2.26 * LANE_FIT wide against a bar of
       // 2.30 * LANE_FIT, so it covers all but 0.015 of it and anything modelled
       // there is behind a plane at every angle the game can produce. The rear
       // face is 0.55 of the object's silhouette from directly behind and had
       // nothing on it at all.
-      gl(hcbx(2.24, 0.09, 0.10, 0, 1.50, 0.235, 0x1f9fd0, 0.02), GLOSS.paint),
-      gl(hcbx(2.24, 0.09, 0.10, 0, 1.66, 0.235, 0x1f9fd0, 0.02), GLOSS.paint),
+      gl(hcbx(2.24, 0.09, 0.10, 0, 1.50, 0.235, 0xd18a08, 0.02), GLOSS.paint),
+      gl(hcbx(2.24, 0.09, 0.10, 0, 1.66, 0.235, 0xd18a08, 0.02), GLOSS.paint),
       // The standards keep their own thickness -- only where they stand moves.
-      // Scaling a 0.26 post down with the lane would have left the tall cyan
+      // Scaling a 0.26 post down with the lane would have left the tall yellow
       // verticals, which are the whole distance read on a DUCK, as hairlines.
-      gl(bxAt(0.26, 3.30, 0.30, -1.20, 1.65, 0, 0x37d6ff), GLOSS.paint),
-      gl(bxAt(0.26, 3.30, 0.30, 1.20, 1.65, 0, 0x37d6ff), GLOSS.paint),
-      bxAt(0.30, 0.26, 0.34, -1.20, 2.35, 0, 0x0d2b36),
-      bxAt(0.30, 0.26, 0.34, 1.20, 2.35, 0, 0x0d2b36),
-      bxAt(0.30, 0.26, 0.34, -1.20, 2.90, 0, 0x0d2b36),
-      bxAt(0.30, 0.26, 0.34, 1.20, 2.90, 0, 0x0d2b36),
-      bxAt(0.40, 0.22, 0.40, -1.20, 3.41, 0, 0xd8f8ff),
-      bxAt(0.40, 0.22, 0.40, 1.20, 3.41, 0, 0xd8f8ff),
+      gl(bxAt(0.26, 3.30, 0.30, -1.20, 1.65, 0, 0xffc422), GLOSS.paint),
+      gl(bxAt(0.26, 3.30, 0.30, 1.20, 1.65, 0, 0xffc422), GLOSS.paint),
+      bxAt(0.30, 0.26, 0.34, -1.20, 2.35, 0, 0x2b1e05),
+      bxAt(0.30, 0.26, 0.34, 1.20, 2.35, 0, 0x2b1e05),
+      bxAt(0.30, 0.26, 0.34, -1.20, 2.90, 0, 0x2b1e05),
+      bxAt(0.30, 0.26, 0.34, 1.20, 2.90, 0, 0x2b1e05),
+      bxAt(0.40, 0.22, 0.40, -1.20, 3.41, 0, 0xfff0a0),
+      bxAt(0.40, 0.22, 0.40, 1.20, 3.41, 0, 0xfff0a0),
       // THE FOOT IS DARK CYAN AND NOT NAVY, which is the correction the JUMP
       // vocabulary already took and the DUCKs never did. The reasoning is
       // recorded above jumpWorksGeo: a shared near-neutral on a saturated
       // object spends the variant's chroma budget on a part that is not
       // carrying anything.
-      bxAt(0.50, 0.22, 0.50, -1.20, 0.11, 0, 0x0d2b36),
-      bxAt(0.50, 0.22, 0.50, 1.20, 0.11, 0, 0x0d2b36),
+      bxAt(0.50, 0.22, 0.50, -1.20, 0.11, 0, 0x2b1e05),
+      bxAt(0.50, 0.22, 0.50, 1.20, 0.11, 0, 0x2b1e05),
     ].concat((function () {
       // The rear half of the portal. Every member here lives between z 0.14
       // and z 0.29 -- clear of the standard's own 0.30 depth, inside the
@@ -16709,10 +17159,10 @@ MR.World = (function () {
       // stick from the side without the box moving a thousandth.
       const p = [];
       for (const sx of [-1, 1]) {
-        p.push(gl(bxAt(0.18, 2.42, 0.15, sx * 1.20, 1.21, 0.215, 0x37d6ff), GLOSS.paint));
+        p.push(gl(bxAt(0.18, 2.42, 0.15, sx * 1.20, 1.21, 0.215, 0xffc422), GLOSS.paint));
         // The tie rungs, which are what says "frame" rather than "two posts".
         for (const ry of [0.62, 2.06]) {
-          p.push(gl(bxAt(0.12, 0.12, 0.42, sx * 1.20, ry, 0.08, 0x1f9fd0), GLOSS.trim));
+          p.push(gl(bxAt(0.12, 0.12, 0.42, sx * 1.20, ry, 0.08, 0xd18a08), GLOSS.trim));
         }
         // The gusset at the bar, and it is on the REAR PLANE for the reason
         // every above-bar fitting in this vocabulary is placed where it is.
@@ -16724,9 +17174,9 @@ MR.World = (function () {
         // thing the file's own rule permits. Written as a test rather than as
         // a feel, because the header board this rule exists for was also
         // "obviously fine" until it filled the screen.
-        p.push(gl(bxAt(0.20, 0.34, 0.14, sx * 1.16, 1.95, 0.22, 0x1f9fd0), GLOSS.paint));
+        p.push(gl(bxAt(0.20, 0.34, 0.14, sx * 1.16, 1.95, 0.22, 0xd18a08), GLOSS.paint));
         // The rear foot pad under the rear leg.
-        p.push(bxAt(0.30, 0.18, 0.20, sx * 1.20, 0.09, 0.18, 0x0d2b36));
+        p.push(bxAt(0.30, 0.18, 0.20, sx * 1.20, 0.09, 0.18, 0x2b1e05));
         // Hold-down bolts. Four per plate, six-sided, and they are here for
         // the crest of a hill: the camera pitches DOWN onto a base plate and
         // that is the one view in which the flattest part of a DUCK is the
@@ -16734,7 +17184,7 @@ MR.World = (function () {
         for (const bx0 of [-0.16, 0.16]) {
           for (const bz of [-0.16, 0.16]) {
             p.push(gl(cyl(0.045, 0.045, 0.07, 6,
-              sx * 1.20 * LANE_FIT + bx0, 0.245, bz, 0xd8f8ff), GLOSS.chrome));
+              sx * 1.20 * LANE_FIT + bx0, 0.245, bz, 0xfff0a0), GLOSS.chrome));
           }
         }
       }
@@ -16749,7 +17199,7 @@ MR.World = (function () {
      * the point: the distance read must not change.
      *
      * WHAT THE ORBIT SHEET FOUND. At az 180 this was indistinguishable from
-     * v0 and v2: one flat cyan bar between two flat cyan posts. Everything that
+     * v0 and v2: one flat bar between two flat posts. Everything that
      * made it scaffold -- the boarding, the ledger, the braces -- was either on
      * the front face or directly behind the standard that hides it.
      *
@@ -16770,61 +17220,61 @@ MR.World = (function () {
      */
     const duckScaffoldGeo = (function () {
       const parts = [
-        hbx(2.30, 0.34, 0.54, 0, 1.58, 0, 0x37d6ff),
+        hbx(2.30, 0.34, 0.54, 0, 1.58, 0, 0xffc422),
         // 1.77, not 1.79: at 1.79 the cap topped out at 1.85, 0.02 outside the
         // box. Chamfered on the way down from the ceiling, never outward past
         // it, exactly as hcbx's header requires.
-        hbx(2.38, 0.12, 0.56, 0, 1.77, 0, 0xd8f8ff),
+        hbx(2.38, 0.12, 0.56, 0, 1.77, 0, 0xfff0a0),
         // 1.46, not 1.44: at 1.44 the boarding's underside was 1.39, below the
         // 1.41 box floor. It now lands on it.
-        hbx(2.24, 0.10, 0.42, 0, 1.46, 0, 0x1f9fd0),
+        hbx(2.24, 0.10, 0.42, 0, 1.46, 0, 0xd18a08),
         // THE REAR LEDGER, the single tube that turns a flat back into a
         // scaffold. Full span at z +0.22, which is clear of the standards' own
         // 0.30 depth and inside the 0.292 the caution face already sets.
-        gl(cyl(0.075, 0.075, 2.34 * LANE_FIT, 8, 0, 1.58, 0.215, 0x1f9fd0, 0, 0, Math.PI / 2), GLOSS.trim),
-        gl(cyl(0.075, 0.075, 2.34 * LANE_FIT, 8, 0, 1.75, 0.215, 0x1f9fd0, 0, 0, Math.PI / 2), GLOSS.trim),
+        gl(cyl(0.075, 0.075, 2.34 * LANE_FIT, 8, 0, 1.58, 0.215, 0xd18a08, 0, 0, Math.PI / 2), GLOSS.trim),
+        gl(cyl(0.075, 0.075, 2.34 * LANE_FIT, 8, 0, 1.75, 0.215, 0xd18a08, 0, 0, Math.PI / 2), GLOSS.trim),
       ];
       for (const sx of [-1, 1]) {
         const px = sx * 1.20 * LANE_FIT;
-        parts.push(cyl(0.15, 0.15, 3.34, 8, px, 1.67, 0, 0x37d6ff));
-        parts.push(cyl(0.19, 0.19, 0.16, 8, px, 2.42, 0, 0x0d2b36));
-        parts.push(cyl(0.19, 0.19, 0.16, 8, px, 3.02, 0, 0x0d2b36));
+        parts.push(cyl(0.15, 0.15, 3.34, 8, px, 1.67, 0, 0xffc422));
+        parts.push(cyl(0.19, 0.19, 0.16, 8, px, 2.42, 0, 0x2b1e05));
+        parts.push(cyl(0.19, 0.19, 0.16, 8, px, 3.02, 0, 0x2b1e05));
         // 0.50 across, not 0.56: the plate reached 1.148 from the lane centre
         // against a box halfX of 1.12, and it was the widest thing in the game.
-        parts.push(bx(0.50, 0.14, 0.54, px, 0.07, 0, 0x0d2b36));
-        parts.push(bx(0.42, 0.20, 0.42, px, 3.38, 0, 0xd8f8ff));
+        parts.push(bx(0.50, 0.14, 0.54, px, 0.07, 0, 0x2b1e05));
+        parts.push(bx(0.42, 0.20, 0.42, px, 3.38, 0, 0xfff0a0));
         // Kicker braces. Canted, but the cant is 0.12 and the foot is pulled
         // INSIDE the standard, because the number that matters is how far the
         // widest point reaches from the lane centre: 1.02, which is inside the
         // 1.068 the existing cap already reaches, so a runner jumping in the
         // NEXT lane cannot graze a brace on this one.
         parts.push(bx(0.15, 1.5, 0.15, sx * (1.20 * LANE_FIT - 0.02), 2.70, 0,
-          0x1f9fd0, 0, 0, sx * 0.12));
+          0xd18a08, 0, 0, sx * 0.12));
         // THE REAR STANDARD, a second tube on the rear plane. It stops at 2.46
         // rather than running the full height: the tall pair of verticals is
         // the distance read and doubling it at 40 units would change the read
         // this vocabulary is not allowed to change.
-        parts.push(gl(cyl(0.085, 0.085, 2.46, 8, px, 1.23, 0.205, 0x37d6ff), GLOSS.paint));
+        parts.push(gl(cyl(0.085, 0.085, 2.46, 8, px, 1.23, 0.205, 0xffc422), GLOSS.paint));
         // TRANSOMS. Short tubes crossing the depth, which is the member that
         // makes a scaffold a frame rather than two ladders, and the only thing
         // on this object that has any z extent at all from the flank.
         for (const ty of [0.52, 1.66, 2.24]) {
-          parts.push(gl(cyl(0.065, 0.065, 0.40, 8, px, ty, 0.08, 0x1f9fd0, Math.PI / 2), GLOSS.trim));
+          parts.push(gl(cyl(0.065, 0.065, 0.40, 8, px, ty, 0.08, 0xd18a08, Math.PI / 2), GLOSS.trim));
         }
-        // COUPLERS. A right-angle clamp at every node, in the dark cyan the
+        // COUPLERS. A right-angle clamp at every node, in the near-black the
         // collars already use, so the joints read as fittings and not as tubes
         // passing through each other.
         for (const cyy of [0.52, 1.58, 1.74, 2.24]) {
-          parts.push(bx(0.20, 0.17, 0.17, px, cyy, 0.205, 0x0d2b36));
+          parts.push(bx(0.20, 0.17, 0.17, px, cyy, 0.205, 0x2b1e05));
         }
         // The toe board, on the rear plane at the lift.
-        parts.push(gl(bx(0.26, 0.20, 0.06, px, 1.95, 0.255, 0xd8f8ff), GLOSS.trim));
+        parts.push(gl(bx(0.26, 0.20, 0.06, px, 1.95, 0.255, 0xfff0a0), GLOSS.trim));
       }
       return merge(parts);
     })();
 
     /**
-     * DUCK v2: a height-restriction sign gantry. The bar becomes a deeper cyan
+     * DUCK v2: a height-restriction sign gantry. The bar becomes a deeper amber
      * sign board banded top and bottom in cream, and each standard carries a
      * sign roundel. A round mark is the one shape no telegraph mat uses, so it
      * never argues with the rungs painted on the road in front of it.
@@ -16846,27 +17296,27 @@ MR.World = (function () {
      */
     const duckSignGeo = (function () {
       const parts = [
-        hbx(2.30, 0.42, 0.54, 0, 1.62, 0, 0x37d6ff),
+        hbx(2.30, 0.42, 0.54, 0, 1.62, 0, 0xffc422),
         // 1.78 and 1.45, not 1.81 and 1.43. See the header.
-        hbx(2.38, 0.10, 0.56, 0, 1.78, 0, 0xd8f8ff),
-        hbx(2.38, 0.08, 0.56, 0, 1.45, 0, 0xd8f8ff),
+        hbx(2.38, 0.10, 0.56, 0, 1.78, 0, 0xfff0a0),
+        hbx(2.38, 0.08, 0.56, 0, 1.45, 0, 0xfff0a0),
         // THE BACK OF THE BOARD. Perimeter angle top and bottom on the rear
         // plane, and two channel stiffeners standing proud of it -- the frame
         // a sign board is actually built on. All of it between z 0.22 and
         // 0.29, so the board's own 0.54 depth is untouched and the flank does
         // not grow.
-        gl(hbx(2.30, 0.07, 0.08, 0, 1.735, 0.245, 0x1f9fd0), GLOSS.trim),
-        gl(hbx(2.30, 0.07, 0.08, 0, 1.495, 0.245, 0x1f9fd0), GLOSS.trim),
+        gl(hbx(2.30, 0.07, 0.08, 0, 1.735, 0.245, 0xd18a08), GLOSS.trim),
+        gl(hbx(2.30, 0.07, 0.08, 0, 1.495, 0.245, 0xd18a08), GLOSS.trim),
       ];
       // The stiffeners run vertically across the board's back, inboard of the
       // standards, and they are the one place this variant puts a repeating
       // rhythm anywhere but the front.
       for (const cx of [-0.66, 0, 0.66]) {
-        parts.push(gl(hbx(0.12, 0.34, 0.08, cx, 1.62, 0.245, 0x0d2b36), GLOSS.trim));
+        parts.push(gl(hbx(0.12, 0.34, 0.08, cx, 1.62, 0.245, 0x2b1e05), GLOSS.trim));
       }
       for (const sx of [-1, 1]) {
         const px = sx * 1.20 * LANE_FIT;
-        parts.push(bx(0.28, 3.30, 0.28, px, 1.65, 0, 0x37d6ff));
+        parts.push(bx(0.28, 3.30, 0.28, px, 1.65, 0, 0xffc422));
         // The roundel goes on the POST, not on the bar. On the bar it had to
         // sit 0.35 in front of the gate line to clear the board -- past the
         // halfZ the collision box records -- and the striped face covered it
@@ -16874,27 +17324,27 @@ MR.World = (function () {
         // (0.543) and nowhere near the lane centre the camera flies down.
         //
         // BOTH FACES, at -0.20 and +0.20, with the mounting boss between them.
-        // The rear disc is the deep cyan and not the cream, because the back
+        // The rear disc is the deep amber and not the cream, because the back
         // of a sign plate is not a sign: two cream discs on one post read at
         // 45 degrees as one disc drawn twice, which is a rendering fault the
         // eye reaches for before it reaches for "double-sided".
         parts.push(cyl(0.20, 0.20, 0.09, 12, px, 2.30, -0.20, 0xfff2e0, Math.PI / 2));
-        parts.push(gl(cyl(0.20, 0.20, 0.09, 12, px, 2.30, 0.20, 0x1f9fd0, Math.PI / 2), GLOSS.paint));
-        parts.push(bx(0.14, 0.14, 0.34, px, 2.30, 0, 0x0d2b36));
+        parts.push(gl(cyl(0.20, 0.20, 0.09, 12, px, 2.30, 0.20, 0xd18a08, Math.PI / 2), GLOSS.paint));
+        parts.push(bx(0.14, 0.14, 0.34, px, 2.30, 0, 0x2b1e05));
         // The clips that hold the board to the post: one above and one below
         // the board, on the rear plane, in the post's own x band.
         // 1.46 and 1.78, so the clips land inside 1.41-1.83 rather than
         // hanging 0.04 out of it at each end. Same discipline as the bands.
         for (const ky of [1.46, 1.78]) {
-          parts.push(gl(bx(0.34, 0.10, 0.16, px, ky, 0.21, 0xd8f8ff), GLOSS.trim));
+          parts.push(gl(bx(0.34, 0.10, 0.16, px, ky, 0.21, 0xfff0a0), GLOSS.trim));
         }
-        parts.push(bx(0.36, 0.18, 0.36, px, 2.86, 0, 0x0d2b36));
-        parts.push(bx(0.30, 0.44, 0.30, px, 3.14, 0, 0x1f9fd0));
-        parts.push(bx(0.40, 0.24, 0.40, px, 3.44, 0, 0xd8f8ff));
-        parts.push(bx(0.50, 0.24, 0.52, px, 0.12, 0, 0x0d2b36));
+        parts.push(bx(0.36, 0.18, 0.36, px, 2.86, 0, 0x2b1e05));
+        parts.push(bx(0.30, 0.44, 0.30, px, 3.14, 0, 0xd18a08));
+        parts.push(bx(0.40, 0.24, 0.40, px, 3.44, 0, 0xfff0a0));
+        parts.push(bx(0.50, 0.24, 0.52, px, 0.12, 0, 0x2b1e05));
         // The maintenance step at the foot, rear plane, so the base is a
         // fitting rather than a slab seen from behind.
-        parts.push(gl(bx(0.32, 0.07, 0.14, px, 0.60, 0.20, 0x1f9fd0), GLOSS.trim));
+        parts.push(gl(bx(0.32, 0.07, 0.14, px, 0.60, 0.20, 0xd18a08), GLOSS.trim));
       }
       return merge(parts);
     })();
@@ -16933,37 +17383,37 @@ MR.World = (function () {
       const parts = [
         // The beam: 1.61 to 1.83, so the skirt has room under it and the top
         // of the bar is still exactly the box ceiling.
-        gl(hcbx(2.30, 0.22, 0.52, 0, 1.72, 0, 0x37d6ff, 0.05), GLOSS.paint),
-        gl(hcbx(2.36, 0.09, 0.54, 0, 1.785, 0, 0xd8f8ff, 0.03), GLOSS.trim),
+        gl(hcbx(2.30, 0.22, 0.52, 0, 1.72, 0, 0xffc422, 0.05), GLOSS.paint),
+        gl(hcbx(2.36, 0.09, 0.54, 0, 1.785, 0, 0xfff0a0, 0.03), GLOSS.trim),
       ];
-      // The skirt. Alternating cream and deep cyan, which is the boom's real
+      // The skirt. Alternating cream and deep amber, which is the boom's real
       // marking and is also the cheapest way to put a repeating vertical
       // rhythm in the one band the player is looking at.
       for (let i = 0; i < 7; i++) {
         const x = -0.90 + i * 0.30;
-        parts.push(gl(bxAt(0.13, 0.18, 0.22, x, 1.52, 0, i % 2 ? 0x1f9fd0 : 0xd8f8ff), GLOSS.trim));
+        parts.push(gl(bxAt(0.13, 0.18, 0.22, x, 1.52, 0, i % 2 ? 0xd18a08 : 0xfff0a0), GLOSS.trim));
       }
       for (const sx of [-1, 1]) {
         // 3.20 tall, not the 3.30 the other three use. The DUCK superstructure
         // was measured as the tallest thing in the game and a real occluder in
         // R2, so a new variant takes the chance to be shorter rather than
         // taller: this tops out at 3.40 against 3.48-3.56 for v0-v2.
-        parts.push(gl(bxAt(0.26, 3.20, 0.30, sx * 1.20, 1.60, 0, 0x37d6ff), GLOSS.paint));
-        parts.push(bxAt(0.30, 0.24, 0.34, sx * 1.20, 2.62, 0, 0x0d2b36));
-        parts.push(gl(bxAt(0.38, 0.20, 0.38, sx * 1.20, 3.30, 0, 0xd8f8ff), GLOSS.trim));
-        parts.push(bxAt(0.50, 0.22, 0.50, sx * 1.20, 0.11, 0, 0x0d2b36));
+        parts.push(gl(bxAt(0.26, 3.20, 0.30, sx * 1.20, 1.60, 0, 0xffc422), GLOSS.paint));
+        parts.push(bxAt(0.30, 0.24, 0.34, sx * 1.20, 2.62, 0, 0x2b1e05));
+        parts.push(gl(bxAt(0.38, 0.20, 0.38, sx * 1.20, 3.30, 0, 0xfff0a0), GLOSS.trim));
+        parts.push(bxAt(0.50, 0.22, 0.50, sx * 1.20, 0.11, 0, 0x2b1e05));
         // Cabinet doors on the rear plane of each post -- the relay boxes a
         // crossing carries. Out at the standard, inside the post's own x band,
         // and below the bar so they cost no headroom argument at all.
-        parts.push(gl(bxAt(0.26, 0.62, 0.10, sx * 1.20, 0.98, 0.235, 0x1f9fd0), GLOSS.paint));
-        parts.push(gl(bxAt(0.08, 0.10, 0.06, sx * 1.20 + sx * 0.09, 0.98, 0.26, 0xd8f8ff), GLOSS.chrome));
+        parts.push(gl(bxAt(0.26, 0.62, 0.10, sx * 1.20, 0.98, 0.235, 0xd18a08), GLOSS.paint));
+        parts.push(gl(bxAt(0.08, 0.10, 0.06, sx * 1.20 + sx * 0.09, 0.98, 0.26, 0xfff0a0), GLOSS.chrome));
       }
       // The signal post, LEFT ONLY. The backing plate is 0.44 wide at 1.20 out
       // -- 1.088 from the lane centre against a box halfX of 1.12 -- and the
       // lamp discs face the player, axis along z, so they are round from
       // behind and edge-on discs from the next lane rather than flat squares.
       const px = -1.20 * LANE_FIT;
-      parts.push(bxAt(0.44, 0.94, 0.16, -1.20, 2.06, -0.10, 0x0d2b36));
+      parts.push(bxAt(0.44, 0.94, 0.16, -1.20, 2.06, -0.10, 0x2b1e05));
       for (const ly of [1.78, 2.34]) {
         parts.push(gl(cyl(0.15, 0.15, 0.09, 12, px, ly, -0.20, 0xfff2e0, Math.PI / 2), GLOSS.chrome));
         // THE HOOD BEHIND EACH LAMP. A signal lamp is a housing with a lens in
@@ -16971,15 +17421,15 @@ MR.World = (function () {
         // fitting that makes this a level crossing was a pair of pale ellipses
         // floating on a dark plate. The housing is what you actually see once
         // you are past it.
-        parts.push(gl(cyl(0.13, 0.16, 0.16, 12, px, ly, 0.02, 0x1f9fd0, Math.PI / 2), GLOSS.paint));
+        parts.push(gl(cyl(0.13, 0.16, 0.16, 12, px, ly, 0.02, 0xd18a08, Math.PI / 2), GLOSS.paint));
       }
       // THE PIVOT BEARING, and it is the piece this variant most obviously
       // lacked. A boom turns about something. This is a hub through the left
       // standard on the beam's own axis, proud on BOTH faces, so it reads as a
       // mechanism from behind and from either flank rather than only as a
       // lopsided outline from the front.
-      parts.push(gl(cyl(0.17, 0.17, 0.50, 10, px, 1.72, 0, 0x0d2b36, Math.PI / 2), GLOSS.trim));
-      parts.push(gl(cyl(0.09, 0.09, 0.58, 8, px, 1.72, 0, 0xd8f8ff, Math.PI / 2), GLOSS.chrome));
+      parts.push(gl(cyl(0.17, 0.17, 0.50, 10, px, 1.72, 0, 0x2b1e05, Math.PI / 2), GLOSS.trim));
+      parts.push(gl(cyl(0.09, 0.09, 0.58, 8, px, 1.72, 0, 0xfff0a0, Math.PI / 2), GLOSS.chrome));
       // The counterweight, which is what a raised boom is balanced by and
       // which reads as mass on one side of an otherwise even frame.
       //
@@ -16987,13 +17437,13 @@ MR.World = (function () {
       // add and take off, and the stack is the read; a cube at this size is a
       // lump that could be anything. The arm ties it back to the pivot, which
       // is what makes the two fittings one machine.
-      parts.push(gl(bxAt(0.13, 0.96, 0.13, -1.20, 2.24, 0, 0x1f9fd0), GLOSS.paint));
+      parts.push(gl(bxAt(0.13, 0.96, 0.13, -1.20, 2.24, 0, 0xd18a08), GLOSS.paint));
       for (let i = 0; i < 3; i++) {
-        parts.push(gl(cyl(0.17, 0.17, 0.09, 12, px, 2.72 + i * 0.11, 0, 0x0d2b36, Math.PI / 2), GLOSS.trim));
+        parts.push(gl(cyl(0.17, 0.17, 0.09, 12, px, 2.72 + i * 0.11, 0, 0x2b1e05, Math.PI / 2), GLOSS.trim));
       }
       // The rest fork, RIGHT ONLY: the cradle the boom drops into.
-      parts.push(gl(bxAt(0.30, 0.12, 0.36, 1.20, 1.92, 0, 0xd8f8ff), GLOSS.trim));
-      parts.push(gl(bxAt(0.11, 0.22, 0.36, 1.20, 2.03, 0, 0xd8f8ff), GLOSS.trim));
+      parts.push(gl(bxAt(0.30, 0.12, 0.36, 1.20, 1.92, 0, 0xfff0a0), GLOSS.trim));
+      parts.push(gl(bxAt(0.11, 0.22, 0.36, 1.20, 2.03, 0, 0xfff0a0), GLOSS.trim));
       return merge(parts);
     })();
 
@@ -17035,19 +17485,19 @@ MR.World = (function () {
       const parts = [
         // The lagged run. Axis along x: radius spans y and z, which is what
         // puts the whole toon ramp across a 0.38 band.
-        gl(cyl(0.19, 0.19, 2.30 * LANE_FIT, 14, 0, 1.62, 0, 0x37d6ff, 0, 0, Math.PI / 2), GLOSS.paint),
+        gl(cyl(0.19, 0.19, 2.30 * LANE_FIT, 14, 0, 1.62, 0, 0xffc422, 0, 0, Math.PI / 2), GLOSS.paint),
       ];
       // Banding collars. 0.21 not 0.23: at 0.23 they reached 1.39 and 1.85,
       // which is 0.02 out of the box on both faces -- the same two-hundredths
       // v1 and v2 already carry and which nothing in the toolchain reads.
       // (Both of those are now fixed at the variants that carried them.)
       for (const cx of [-0.62, -0.21, 0.21, 0.62]) {
-        parts.push(gl(cyl(0.21, 0.21, 0.10, 14, cx, 1.62, 0, 0xd8f8ff, 0, 0, Math.PI / 2), GLOSS.trim));
+        parts.push(gl(cyl(0.21, 0.21, 0.10, 14, cx, 1.62, 0, 0xfff0a0, 0, 0, Math.PI / 2), GLOSS.trim));
         // Flange bolts standing off each collar, on the rear quarter. Four
         // rings of them is what a bolted pipe joint looks like from anywhere
         // that is not directly in front of it.
         for (const bz of [-0.15, 0.15]) {
-          parts.push(gl(cyl(0.035, 0.035, 0.14, 6, cx * LANE_FIT, 1.76, bz, 0xd8f8ff), GLOSS.chrome));
+          parts.push(gl(cyl(0.035, 0.035, 0.14, 6, cx * LANE_FIT, 1.76, bz, 0xfff0a0), GLOSS.chrome));
         }
       }
       // THE SECOND CONDUIT, and it is the one thing on any DUCK in this file
@@ -17060,37 +17510,37 @@ MR.World = (function () {
       //
       // It sits at y 1.50, inside the 1.41-1.83 band, so it costs no
       // clearance: the bar is already there.
-      parts.push(gl(cyl(0.07, 0.07, 2.30 * LANE_FIT, 10, 0, 1.49, 0.215, 0x1f9fd0, 0, 0, Math.PI / 2), GLOSS.paint));
+      parts.push(gl(cyl(0.07, 0.07, 2.30 * LANE_FIT, 10, 0, 1.49, 0.215, 0xd18a08, 0, 0, Math.PI / 2), GLOSS.paint));
       for (const cx of [-0.62, 0, 0.62]) {
         // The saddle bracket tying the small bore to the main run.
-        parts.push(gl(bx(0.10, 0.22, 0.10, cx * LANE_FIT, 1.55, 0.215, 0x0d2b36), GLOSS.trim));
+        parts.push(gl(bx(0.10, 0.22, 0.10, cx * LANE_FIT, 1.55, 0.215, 0x2b1e05), GLOSS.trim));
       }
       for (const sx of [-1, 1]) {
         // Round columns, and shorter again than v0-v2 for the R2 reason.
-        parts.push(gl(cyl(0.16, 0.16, 3.10, 10, sx * px, 1.55, 0, 0x37d6ff), GLOSS.paint));
-        parts.push(cyl(0.21, 0.21, 0.10, 10, sx * px, 1.05, 0, 0x0d2b36));
-        parts.push(cyl(0.21, 0.21, 0.10, 10, sx * px, 2.40, 0, 0x0d2b36));
-        parts.push(gl(cyl(0.22, 0.22, 0.20, 10, sx * px, 3.20, 0, 0xd8f8ff), GLOSS.trim));
-        parts.push(bxAt(0.50, 0.22, 0.50, sx * 1.20, 0.11, 0, 0x0d2b36));
+        parts.push(gl(cyl(0.16, 0.16, 3.10, 10, sx * px, 1.55, 0, 0xffc422), GLOSS.paint));
+        parts.push(cyl(0.21, 0.21, 0.10, 10, sx * px, 1.05, 0, 0x2b1e05));
+        parts.push(cyl(0.21, 0.21, 0.10, 10, sx * px, 2.40, 0, 0x2b1e05));
+        parts.push(gl(cyl(0.22, 0.22, 0.20, 10, sx * px, 3.20, 0, 0xfff0a0), GLOSS.trim));
+        parts.push(bxAt(0.50, 0.22, 0.50, sx * 1.20, 0.11, 0, 0x2b1e05));
         // The column's base flange, with bolts. A round column landing on a
         // square plate with nothing between them is the join this variant had.
-        parts.push(gl(cyl(0.22, 0.24, 0.13, 10, sx * px, 0.28, 0, 0x1f9fd0), GLOSS.paint));
+        parts.push(gl(cyl(0.22, 0.24, 0.13, 10, sx * px, 0.28, 0, 0xd18a08), GLOSS.paint));
         for (const a of [0, 1, 2, 3]) {
           const t = a * Math.PI / 2 + Math.PI / 4;
           parts.push(gl(cyl(0.04, 0.04, 0.08, 6, sx * px + Math.cos(t) * 0.20, 0.37,
-            Math.sin(t) * 0.20, 0xd8f8ff), GLOSS.chrome));
+            Math.sin(t) * 0.20, 0xfff0a0), GLOSS.chrome));
         }
         // The bracket carrying the small bore into the column.
-        parts.push(gl(bx(0.30, 0.10, 0.10, sx * px, 1.49, 0.215, 0x1f9fd0), GLOSS.trim));
+        parts.push(gl(bx(0.30, 0.10, 0.10, sx * px, 1.49, 0.215, 0xd18a08), GLOSS.trim));
       }
       // The valve wheel, right standard, facing the player. r 0.24 at 0.868
       // out reaches 1.108 against a box halfX of 1.12.
-      parts.push(gl(cyl(0.24, 0.24, 0.07, 14, px, 2.74, -0.17, 0xd8f8ff, Math.PI / 2), GLOSS.chrome));
-      parts.push(gl(cyl(0.08, 0.08, 0.22, 8, px, 2.74, -0.08, 0x1f9fd0, Math.PI / 2), GLOSS.trim));
+      parts.push(gl(cyl(0.24, 0.24, 0.07, 14, px, 2.74, -0.17, 0xfff0a0, Math.PI / 2), GLOSS.chrome));
+      parts.push(gl(cyl(0.08, 0.08, 0.22, 8, px, 2.74, -0.08, 0xd18a08, Math.PI / 2), GLOSS.trim));
       // The elbow, left standard: a stub rising off the column and turning
       // back on itself. Thin, and out at the post, per the rule.
-      parts.push(gl(cyl(0.13, 0.13, 0.54, 10, -px, 2.90, 0, 0x1f9fd0), GLOSS.paint));
-      parts.push(gl(cyl(0.13, 0.13, 0.30, 10, -px + 0.15, 3.14, 0, 0x1f9fd0, 0, 0, Math.PI / 2), GLOSS.paint));
+      parts.push(gl(cyl(0.13, 0.13, 0.54, 10, -px, 2.90, 0, 0xd18a08), GLOSS.paint));
+      parts.push(gl(cyl(0.13, 0.13, 0.30, 10, -px + 0.15, 3.14, 0, 0xd18a08, 0, 0, Math.PI / 2), GLOSS.paint));
       return merge(parts);
     })();
 
@@ -17135,9 +17585,15 @@ MR.World = (function () {
      *     rear plane at exactly -0.65. Nothing reaches behind the gate line.
      *   HEIGHT. BLOCK tops out at 2.80 and nothing here exceeds it. The refuse
      *     truck's beacon lands on it exactly; everything else is under.
-     *   COLOUR. BLOCK pink on the mass that carries the silhouette, always. A
-     *     hazard's kind is known from its hue before its shape resolves, and a
-     *     realistic grey van would be a hazard nobody could name in time.
+     *   COLOUR. Saturated and bright enough to clear the contrast gate against
+     *     every lane -- that is what a realistic grey van would actually fail,
+     *     and it is a measured rule rather than a hue rule. This paragraph used
+     *     to say "BLOCK pink on the mass that carries the silhouette, always,
+     *     because a hazard's kind is known from its hue before its shape
+     *     resolves". The fleet rebuild had already broken that when this was
+     *     written -- seven of the ten BLOCKs are not pink and were not pink
+     *     then -- and tools/kindread.js now shows hue misreading 8 to 10 of 21
+     *     variants against the silhouette profile's 2. See stripeTex.
      *   NOTHING MOVES IN X OR Z. Behaviour is one rotating or sliding CHILD and
      *     a y shudder, and no more. A hazard's lane and z are course data that
      *     course.js has already proved a path through by BFS; a vehicle is a
@@ -17454,267 +17910,251 @@ MR.World = (function () {
     })()));
 
     /**
-     * BLOCK v2: A CARGO TRIKE, RIDDEN, IN A LANE. The player asked for cyclists
-     * on the road as obstacles, and this is what makes that safe to grant.
+     * BLOCK v2: A TRAFFIC LIGHT ON A POLE, STANDING IN A LANE.
      *
-     * It is a K.BLOCK and nothing else: the lane it occupies is fixed by the
-     * course, so "there is always a way around" is not something this file has
-     * to be careful about -- course.js proves by BFS that a lane path exists
-     * from gun to tape, validate() re-checks it and tools/course-test.js
-     * verifies it across dates. A BLOCK that looks like a cyclist is covered by
-     * exactly the same proof as a BLOCK that looks like a barrier. Nothing here
-     * may ever change lane over time, because that would break the proof, and
-     * the proof is the reason the game is fair.
+     * This slot was A CARGO TRIKE, RIDDEN. The owner was asked directly whether
+     * the trike and the delivery moped failed to read as a VEHICLE or as a
+     * PERSON, and answered: "Both. They either need to be fixed or removed."
+     * It is removed, and what stands here instead is
+     * reference/ttgr-lightpole-in-lane.png -- a signal head on a grey pole on a
+     * two-tier plinth, in the middle lane, which is the reference game putting
+     * a piece of road furniture where we were putting a person.
      *
-     * WHY A TRIKE AND NOT A BICYCLE. A road cyclist is 1.75 tall and about a
-     * third of a lane wide, and the jump apex is 2.05: a rider on a two-wheeler
-     * reads as something you could hurdle, which is the exact complaint state
-     * thresholds exist to prevent. A cargo trike fills the lane and its
-     * tailboard is where the caution-striped face goes -- it rides away from the
-     * runner, so the back of the box is the face already turned toward the lens.
+     * ---- WHY FURNITURE AND NOT A BETTER RIDER ---------------------------
      *
-     * THE BOX HAS TO STAY LOW, and the first version got this wrong. At 1.68 it
-     * was taller than the rider was visible above it, so from directly behind
-     * -- which is the ONLY angle this game has -- the whole thing read as a
-     * striped barrier on wheels and the cyclist was invisible. The box now tops
-     * out at 1.28 and the rider runs 1.28 to 2.42, so a back, a head and a
-     * helmet clear it by a wide margin.
+     * Four passes of detail had already gone into that rider and the blind
+     * reader still could not name it: "a stack of blocks... THAT IS THE CART
+     * TALKING, NOT THE PERSON". The measurement that finally settled it is not
+     * about faces at all. tools/kindread.js reads how much of the lane width
+     * each variant covers in fourteen bands, and a nearest-centroid classifier
+     * over that profile misreads exactly two of the twenty-one hazards in this
+     * game -- BLOCK v8 and BLOCK v9, the two thin people-on-machines, both of
+     * which land nearer the DUCK centroid than their own. A BLOCK that reads as
+     * a DUCK is a player sliding into a wall, which rule 4 makes a build
+     * failure rather than a preference. People-as-obstacle was not failing to
+     * be detailed enough; it was failing to fill a lane.
      *
-     * THE BOX IS COURIER LIME and not the fleet pink, and this variant keeps its
-     * old job as the brightest thing on the road while losing the mauve. It
-     * measured L 155.6 and S 0.199 before -- the highest luminance and the
-     * LOWEST chroma in the whole fleet, which is exactly what a bright object
-     * made of pink and cream in equal parts measures. 0xe4ff2a renders at
-     * L 158.3 / S 0.807, so the luminance is not traded for anything.
+     * Gold Run's road hazards are almost entirely furniture and vehicles --
+     * barrier, bin lorry, bus, car, traffic light, crates -- and its PEOPLE are
+     * characters, never obstacles. All five reference frames agree: the only
+     * figure on the carriageway in any of them is a running character in
+     * ttgr-gift-crate-and-bus.png, and it is not something you can hit.
      *
-     * Its cream is gone with everyone else's. The rider's hi-vis is orange,
-     * which is what a courier actually wears and which is 60 luminance below the
-     * box -- so the figure still steps DOWN in value against the thing it is
-     * sitting on, which is the whole point of the ladder below.
+     * ---- WHY THIS IS THE THIN ONE, ON PURPOSE ---------------------------
+     *
+     * The owner, separately: "the road does not always need to be covered."
+     * Every other BLOCK is opaque from the road to 2.80 against an eye height
+     * of 2.62, so a gate behind one is a gate the player cannot see. This one
+     * is a 0.17 pole between a plinth and a head: it fills its lane in the eye
+     * without filling it in the frame, and what shows past it is the next gate.
+     *
+     * THE PROFILE STILL HAS TO SAY BLOCK, and that is what the plinth is for.
+     * A bare pole with a head on it is a DUCK's profile upside down. The
+     * two-tier base is 1.02 across -- 60% of the lane, wider than anything on a
+     * DUCK -- so the bottom bands read as mass on the road, the head reads as
+     * mass above the 2.05 jump apex, and the classifier has both ends.
+     *
+     * ENVELOPE. BLOCK is yMin 0, yMax 2.80, halfX 1.12. The lamp housing tops
+     * out at 2.72 and the plinth reaches 0.51 either side. Nothing here moves,
+     * so there is no shudder to count against the ceiling.
+     *
+     * RULE 1. The signal faces the runner, because the runner is running at it
+     * and the chase camera looks down its own +z at the hazard's -z face -- so
+     * the lenses are the view the game spends its life in. The BACK is built
+     * anyway and is a different object: a plain hinged door with a piano hinge
+     * down one edge, a latch, the pole's own collar band, and the cable entry.
+     * You pass this at 1.70 units and the flank shows both.
      */
-    const blockTrikeGeo = (function () {
-      const parts = [
-        // Cargo box: the lane-filling mass.
-        // 1.86 of load box, not 1.20. A cargo trike is 2.6 m over all, which
-        // is 2.20 here, and the box is most of it -- the whole point of the
-        // vehicle is that it carries something. At 1.30 of envelope the box
-        // was 1.20 and the rider had to stand inside its own footprint.
-        //
-        // CHAMFERED NOW, like the five variants the fleet rebuild reached.
-        // These were plain hbx boxes, and at gameplay framing a square corner
-        // on a mass this large is most of what "it looks like a box" means.
-        gl(hcbx(2.02, 1.02, 1.32, 0, 0.72, -0.52, TRIKE_BODY, 0.06), GLOSS.paint),
-        gl(hcbx(2.10, 0.15, 1.36, 0, 1.28, -0.52, VAN_BODY, 0.04), GLOSS.trim),
-        gl(hcbx(2.06, 0.20, 1.38, 0, 0.20, -0.52, TRIKE_DARK, 0.04), GLOSS.trim),
-        /**
-         * THE RIDER, resized and revalued after a full playtest in which the
-         * player reported seeing no cyclist at all.
-         *
-         * Two things were wrong and neither was the pose. First SIZE: the old
-         * torso was 0.51 world units wide and the head 0.26, which at the 50
-         * units a lane is chosen at is six pixels and three. Nothing legible
-         * about a human being survives three pixels. Second and worse, VALUE:
-         * the torso was the cargo box's own colour, so the one part big enough
-         * to see had no edge against the thing it was sitting on, and the figure
-         * was a bump on a barrier rather than a person.
-         *
-         * The rule the rebuild follows is that the background CHANGES up the
-         * figure. From the chase camera the torso is seen against the box and
-         * the far road, both pale; the head and helmet are seen against sky,
-         * paler still. So the body is dark navy -- the darkest thing in the
-         * scene, unmissable against either -- with one broad hi-vis band where
-         * the eye lands, and the helmet stays BLOCK pink so the top of the
-         * silhouette still says "impassable" before the shape resolves.
-         *
-         * Top of the helmet is 2.72, inside the 2.80 the collision box records.
-         */
-        hbx(0.98, 0.12, 0.12, 0, 1.26, 0.92, 0x2b2f52),
-      ];
-      /**
-       * ---- THE RIDER, WHOM A BLIND READER COULD NOT NAME AT ALL ----------
-       *
-       * Shown a 1:1 crop at 8 and 12 units with no idea what the game was, a
-       * reader wrote: "I cannot tell what kind of person it is. What I
-       * actually see is a stack of blocks: a dark navy slab for the body, a
-       * tan cube above it for a head WITH NO FACE, and a flat magenta-pink
-       * plate laid on top of that cube. The pink plate might be a cap or a
-       * hard hat, but it reads more like a lid than headgear... If I had to
-       * guess from the vehicle rather than the figure, I would say the driver
-       * of a course maintenance or utility cart, but THAT IS THE CART TALKING,
-       * NOT THE PERSON."
-       *
-       * That last clause is the brief for this whole pass. The description is
-       * also exact: five stacked boxes, no neck, no shoulders, no elbows, no
-       * hands, and a helmet that was a plate because it had no depth.
-       *
-       * The rider is now vFigure at tier FACE. tools/people.js measures this
-       * head at 21.5 x 24.5 px at 8 units with a 2.75 px eye mark -- the
-       * second largest face in the game after the marshals -- so it carries
-       * eyes, brows, nose, mouth, ears and hair, and the helmet is a shell
-       * with a peak and a strap rather than a lid.
-       *
-       * The pose is a working cyclist's, not a racer's: upright, hands wide on
-       * a cargo bar, elbows out. That is what tells this apart from BLOCK v8
-       * two lanes over, which is the same species of vehicle ridden by people
-       * doing a completely different thing.
-       */
-      {
-        const TS = 1.30;
-        const TH = 1.74 * TS;
-        const lean = 0.30;
-        const y0 = 1.42 - 0.505 * TH;
-        const hipY = 1.42;
-        vFigure(parts, {
-          x: 0, y: y0, z: 0.34, h: TS, build: 1.00, tier: 2, fz: 1, legs: false,
-          skin: 0xffc79a, hair: 0x4a2c18, style: 1,
-          // Dark navy body with one broad hi-vis band where the eye lands --
-          // the rule this variant was rebuilt on and which still holds: the
-          // background CHANGES up the figure, so the torso is the darkest
-          // thing in the scene against a pale box and a pale road.
-          top: 0x2b2f52, shoulder: 0x2b2f52, sleeve: 0x2b2f52,
-          legCol: 0x2b2f52, hipCol: 0x2b2f52,
-          lean: lean,
-          // Hands wide and forward on the cargo bar at z 0.92.
-          arm: [0.92, 0.92], fore: [0.30, 0.30],
-          browTilt: 0.06, jaw: 0.86,
-        });
-        const shY = hipY + TH * 0.085 + Math.cos(lean) * (TH * 0.265) - TH * 0.04;
-        const shZ = 0.34 + Math.sin(lean) * (TH * 0.265);
-        const hy = shY + TH * 0.045 + TH * 0.028 + (0.262 * TS) / 2;
-        // The hi-vis band, across the chest where the eye lands.
-        parts.push(hbx(1.02, 0.20, 0.44, 0, shY - 0.26, shZ, VAN_BODY));
-        // A courier's satchel on the back, which is what a cargo-trike rider
-        // carries and what separates this figure from the machine behind it.
-        parts.push(gl(bx(0.52, 0.40, 0.20, 0, shY - 0.34, shZ - 0.34, VAN_BODY), GLOSS.matte));
-        parts.push(gl(bx(0.56, 0.07, 0.21, 0, shY - 0.16, shZ - 0.345, 0x2b2f52), GLOSS.matte));
-        // Helmet: a shell with a peak and a chin strap, not a plate. Top of
-        // the shell is 2.72, inside the 2.80 the collision box records.
-        parts.push(gl(cbx(0.60, 0.30, 0.58, 0, hy + 0.14, shZ, PINK, 0.06), GLOSS.paint));
-        parts.push(gl(bx(0.54, 0.07, 0.16, 0, hy + 0.06, shZ + 0.28, PINK), GLOSS.paint));
-        for (const sx of [-1, 1]) {
-          parts.push(bx(0.05, 0.26, 0.05, sx * 0.20, hy - 0.06, shZ + 0.14, 0x2b2f52));
-        }
-      }
-      /**
-       * ============ THE WHEELS OWNED ZERO PIXELS ============
-       *
-       * Measured, not suspected. `node tools/framing.js --kind BLOCK` counts
-       * what every part of a variant contributes to the real frame, and at
-       * 8 / 12 / 20 / 35 units this trike returned **wheel 0.0% at every
-       * distance**. All three were built, all three carried rims and hubs, and
-       * not one of them put a pixel on screen.
-       *
-       * The mechanism is depth, not size. The rear pair sat at x +/-0.62, which
-       * is INBOARD of a cargo box whose flanks are at +/-0.73, and at z -0.52,
-       * which is 0.66 in front of that box's own rear face at -1.18. The
-       * chase camera looks at the rear face. So the box was parked squarely
-       * between the lens and its own wheels for the whole approach, and the
-       * comment above this loop -- "a trike's wheels are the only part of it
-       * below the cargo box, so if they read as three dark smudges the whole
-       * vehicle is a floating crate" -- was exactly right about the stake and
-       * wrong about the state: they read as nothing at all.
-       *
-       * Same family as the side windows buried inside the refuse truck's
-       * bodywork, and as the trike's own cranks pedalling behind their box:
-       * built, merged, shipped, invisible. The fix is the one a real cargo
-       * trike already has -- THE REAR AXLE IS OUTBOARD OF THE LOAD BOX, wheels
-       * standing clear of the flanks on stub axles, with a guard over each. It
-       * costs 0.24 of half-width against 0.25 of headroom in MR.Collision.BOX
-       * and it is the difference between a crate on legs and a vehicle.
-       *
-       * The FRONT wheel stays where it is, under the rider and behind the box,
-       * and it is honestly occluded from astern -- that is what being behind a
-       * load box means, it is visible from every other angle, and rule 1 asks
-       * for it to be BUILT, not for it to be moved somewhere it does not go.
-       */
-      for (const sx of [-1, 1]) {
-        // 0.86 and not further. vWheel's spoke bars rotate about z, so a
-        // horizontal one reaches 0.92 x r / 2 = 0.147 in x beyond the rim face
-        // -- which is where this variant's old halfX of 0.87 came from on a
-        // wheel centred at 0.62, and which put the first outboard build at
-        // 1.153 against a box of 1.12. Measured with fleetExtents, not guessed.
-        const wx = sx * 0.86;
-        // Tyre and rim are DARK-OF-LIME and WARM, not the fleet navy and the
-        // cool pale rim. Two tyres that were invisible cost nothing in chroma;
-        // two that are visible cost 0.057 of dS on a variant whose margin over
-        // target is 0.013, and 0x2b2f52 against a lime body is precisely the
-        // straddle of the neutral axis this file's fleet header forbids.
-        vWheel(parts, wx, 0.32, -0.62, 0.32, 0.14, 0x262e10, WHEEL_RIM_WARM, WHEEL_HUB_WARM);
-        // The stub axle out to it, and a bracket down from the box floor, so
-        // the wheel is carried by something instead of floating beside a crate.
-        parts.push(gl(cyl(0.055, 0.055, 0.28, 8, sx * 0.72, 0.32, -0.62, TRIKE_DARK,
-          0, 0, Math.PI / 2), GLOSS.trim));
-        parts.push(gl(bx(0.09, 0.34, 0.13, sx * 0.69, 0.36, -0.62, TRIKE_DARK), GLOSS.trim));
-        // A guard over each, which is what a cargo trike carries and what
-        // stops an outboard wheel reading as a bare disc stuck on the side.
-        vGuard(parts, wx, 0.32, -0.62, 0.435, 0.18, TRIKE_BODY,
-          0.22 * Math.PI, 0.90 * Math.PI, 6);
-        parts.push(gl(bx(0.05, 0.30, 0.05, wx, 0.50, -0.99, TRIKE_DARK, 0.42), GLOSS.trim));
-      }
-      vWheel(parts, 0, 0.32, 0.88, 0.32, 0.12, 0x2b2f52, WHEEL_RIM, WHEEL_HUB);
-      // The boom from the load box out to the head tube, which is what a
-      // trike has instead of a frame and what the length makes visible.
+    const blockLightGeo = (function () {
+      const parts = [];
+      // THE HOUSING IS A DARK SLATE, NOT A NEAR-BLACK. It was 0x27303c at
+      // L 33.7 over a 0.46 x 1.00 front face -- the largest dark area on an
+      // object whose gate is decided on luminance, and this variant was the
+      // tightest in the game at +0.052 across the eight shots. 0x3c4450 is
+      // L 48.3 and the lenses still sit 2 to 3x above it, which is what the
+      // dark housing was there for.
+      const HOUSE = 0x3c4450;        // the signal housing, dark slate
+      const HOUSE_LIP = 0x59667a;    // one step up, for the visor lips
+      // Galvanised grey, WARMED AND LIFTED. These were 0x8a93a8 / 0x5a6478 /
+      // 0x6e7789 -- a cool near-neutral family on a road that is itself a cool
+      // near-neutral, which is the straddle the fleet header names. Warming
+      // the hue costs nothing structural and moves both axes the same way.
+      const POLE = 0xd0ccc4;
+      const POLE_DK = 0x8e8880;
+      const PLINTH = 0xbcb6ac;
+      const RED = 0xff2b3c, AMB = 0xffb020, GRN = 0x24d46a;
+
+      // ---- THE RED-AND-WHITE WORKS BARRICADE ------------------------------
       //
-      // 2.36 OVER ALL, AND THAT IS THE POINT OF A CEILING. A cargo trike is
-      // 2.6 m, which is 2.20 on the scale that put a 4.6 m saloon at 3.90 --
-      // so this variant takes about 60% of the envelope and leaves the rest.
-      // The first long build gave it 3.42, which is a trike the length of a
-      // van, because "the box got bigger" is not the same instruction as
-      // "the box got right".
-      parts.push(bxAt(0.16, 0.14, 0.76, 0, 0.62, 0.42, TRIKE_DARK));
-      // Safety pennants, one each side.
-      for (const sx of [-1, 1]) {
-        parts.push(bxAt(0.11, 1.56, 0.11, sx * 0.92, 1.94, -0.52, TRIKE_BODY));
-        parts.push(bxAt(0.09, 0.74, 0.58, sx * 0.92, 2.34, -0.22, PINK));
+      // This was not in the first draft of this variant and BOTH instruments
+      // rejected that draft, which is the whole argument for having them.
+      //
+      //   THE GATE. A grey pole with a near-black signal head is a NEAR-NEUTRAL
+      //     object. It measured L 94.8 / S 0.153 against a lane at L 88.4 /
+      //     S 0.156 -- ratio 1.072 against a gate of 1.25 and dS 0.003 against
+      //     a gate of 0.22, a margin of -0.142 and a failed build. The fleet
+      //     header had already predicted it in as many words ("a realistic grey
+      //     van would be a hazard nobody could name in time"); building the
+      //     reference's own grey is how it got proved.
+      //   THE PROFILE. tools/kindread.js put the bare post NEARER THE DUCK
+      //     CENTROID THAN ITS OWN, at -2.721 -- worse than either of the two
+      //     people-hazards this variant was built to replace. A plinth at 60%
+      //     of the lane with a 0.10 pole above it is a DUCK's shape with the
+      //     mass at the wrong end, and "the plinth carries the low bands" was
+      //     a guess that did not survive being measured.
+      //
+      // So the lane is filled by the object standing in the SAME REFERENCE
+      // FRAME as the traffic light: ttgr-lightpole-in-lane.png has a red and
+      // white A-frame works barricade on the carriageway a few lengths beyond
+      // the signal. It is also the owner's item 1 by name -- "note red barrier
+      // ... construction zone pieces" -- so one addition answers the gate, the
+      // profile and the brief together.
+      //
+      // 1.32 TALL AND NOT 0.90. Height is the whole of the profile repair: at
+      // 0.90 the bands from 0.80 to 1.40 are empty on this object and empty on
+      // a DUCK too, and the middle is exactly where the two kinds differ. At
+      // 1.32 the barricade owns every band up to 1.35 and the classifier has
+      // its answer before the pole starts.
+      //
+      // IT STILL DOES NOT COVER THE ROAD, which is the point of the variant.
+      // Eye height is 2.62 and this tops out at 1.35, so the next gate is
+      // visible over it -- against every other BLOCK in the game, which is
+      // opaque to 2.80.
+      // The barrier red, LIFTED from 0xe02233 (L 51.2) to 0xf0402f (L 68.5). It is
+      // three of the seven segments on both boards -- 0.63 of world area on an
+      // object decided by luminance -- and it is still unambiguously the red of
+      // a red-and-white barrier. The caution face texture is lifted with it so
+      // the painted stripes and the moulded segments stay one colour.
+      const RAIL_R = 0xf0402f, RAIL_W = 0xfff6ea;
+      // Two boards, not three. Alternating red and cream SEGMENTS rather than
+      // a striped texture, because the caution face is the only textured quad
+      // a hazard gets and it is spent on the top board's front. Five segments
+      // of 0.332 across 1.66: red at both ends, which is what a real barrier
+      // board does so the ends read as ends.
+      for (const [by, bh] of [[0.51, 0.42], [1.09, 0.46]]) {
+        // SEVEN SEGMENTS, WHITE AT BOTH ENDS -- four white to three red.
+        // It was five, red at both ends, on the reasoning that red ends read
+        // as ends. That was three red against two white and it cost luminance
+        // this variant does not have: red renders at L 51 and this white at
+        // L 176, and the gate here is decided on luminance because dS cannot
+        // reach 0.22 on an object that also has to contain a grey pole and a
+        // near-black lamp housing. Seven also reads as more of a barrier.
+        for (let i = 0; i < 7; i++) {
+          parts.push(gl(cbx(0.237, bh, 0.10, -0.711 + i * 0.237, by, -0.40,
+            i % 2 ? RAIL_R : RAIL_W, 0.025), GLOSS.paint));
+        }
+        // The board's own back edge, one step darker, so the flank shows a
+        // board with a thickness rather than a card. Rule 1: you pass this at
+        // 1.70 units and the 0.10 of depth is what the flank is made of.
+        parts.push(gl(cbx(1.68, 0.05, 0.11, 0, by - bh / 2 + 0.025, -0.40, POLE_DK, 0.02), GLOSS.trim));
       }
-      /**
-       * ============ THE TAILBOARD ============
-       *
-       * 50.9% of this variant's pixels were the cargo box's own lime, at every
-       * distance the framing sheet samples, and the box's rear was one flat
-       * panel with a chevron on it. That number is the second half of the same
-       * finding as the wheels: the object had a mass and no structure.
-       *
-       * The caution face is 1.43 x 0.52 at y 0.36-0.88, it is unlit and it is
-       * drawn in front of everything, so a fitting inside that rectangle would
-       * simply be deleted by it. What is left is the band above the face, the
-       * band below it and the two vertical edges -- which is exactly where a
-       * real tail door carries its ironmongery, so nothing here is invented to
-       * fit round the constraint.
-       */
-      for (const sx of [-1, 1]) {
-        parts.push(gl(bx(0.07, 0.94, 0.08, sx * 0.745, 0.72, -1.19, TRIKE_DARK), GLOSS.trim));
-        parts.push(gl(bx(0.10, 0.09, 0.09, sx * 0.745, 1.10, -1.205, VAN_BODY), GLOSS.chrome));
-        parts.push(gl(bx(0.10, 0.09, 0.09, sx * 0.745, 0.34, -1.205, VAN_BODY), GLOSS.chrome));
-        // Tail lamps, which this variant had none of. Every other rear in the
-        // fleet carries a pair and a cargo trike on a road legally must.
-        parts.push(gl(cyl(0.085, 0.085, 0.09, 8, sx * 0.50, 1.03, -1.225, LAMP_RED,
-          Math.PI / 2), GLOSS.chrome));
-        parts.push(gl(cyl(0.045, 0.045, 0.12, 8, sx * 0.50, 1.03, -1.230, LAMP_CORE,
-          Math.PI / 2), GLOSS.chrome));
+      // The two uprights, from the road to over the top board, and their feet.
+      for (const ux of [-0.72, 0.72]) {
+        // THE UPRIGHTS ARE RED, not the pole's grey, and that is a gate repair
+        // rather than a styling choice. See the note under RAIL_R: with grey
+        // uprights this variant measured S 0.168 and cleared the gate by
+        // +0.041, on luminance alone, which is no margin at all across eight
+        // shots and six lanes. roadmap entry 30 is explicit that the lever
+        // that moves a mean-colour saturation metric is AREA OF SATURATED
+        // BRIGHT and not hue, so the two largest near-neutral areas left on
+        // the object -- these posts -- stop being near-neutral.
+        parts.push(gl(cbx(0.13, 1.36, 0.13, ux, 0.68, -0.40, RAIL_R, 0.03), GLOSS.paint));
+        parts.push(gl(cbx(0.34, 0.07, 0.30, ux, 0.035, -0.40, POLE_DK, 0.025), GLOSS.matte));
+        // A splayed rear stay, so the barricade stands up in three dimensions
+        // instead of being a flat sign seen edge-on from the side.
+        parts.push(gl(cbx(0.09, 1.02, 0.09, ux, 0.50, -0.02, RAIL_R, 0.02, 0.32), GLOSS.paint));
+        parts.push(gl(cbx(0.28, 0.06, 0.26, ux, 0.03, 0.32, POLE_DK, 0.02), GLOSS.matte));
       }
-      parts.push(gl(bx(1.44, 0.06, 0.07, 0, 1.16, -1.20, TRIKE_DARK), GLOSS.trim));
-      parts.push(gl(bx(0.22, 0.14, 0.09, 0, 1.03, -1.20, TRIKE_DARK), GLOSS.trim));
-      parts.push(gl(bx(0.13, 0.07, 0.10, 0, 1.03, -1.225, VAN_BODY), GLOSS.chrome));
-      parts.push(gl(bx(1.30, 0.05, 0.06, 0, 0.315, -1.20, VAN_BODY), GLOSS.chrome));
+
+      // ---- the two-tier plinth, on the road -------------------------------
+      // Chamfered, both tiers. A traffic light's base is a cast collar and the
+      // reference's is visibly bevelled on every edge; two square slabs here
+      // would be the "box like" the owner is objecting to, at the exact place
+      // the eye checks whether a thing is standing on the road or floating.
+      parts.push(gl(cbx(1.02, 0.10, 0.94, 0, 0.05, 0, PLINTH, 0.035), GLOSS.matte));
+      parts.push(gl(cbx(0.78, 0.13, 0.72, 0, 0.165, 0, POLE_DK, 0.035), GLOSS.trim));
+      // The cast collar the column rises out of, round rather than square.
+      parts.push(gl(cyl(0.20, 0.30, 0.16, 12, 0, 0.31, 0, POLE_DK), GLOSS.trim));
+      // A hazard band round the collar -- the one bright ring low on the
+      // object, and the thing that says "this is in your way" at the bottom of
+      // the silhouette where a BLOCK is read from.
+      parts.push(gl(cyl(0.205, 0.235, 0.10, 12, 0, 0.44, 0, 0xfff23a), GLOSS.matte));
+
+      // ---- the column -----------------------------------------------------
+      // 12 segments. The owner asked for round with extensive detail, and a
+      // column is the one part of this object that is a cylinder all the way
+      // up; at 6 segments it is a hexagonal post with a visible seam.
+      parts.push(gl(cyl(0.085, 0.105, 1.50, 12, 0, 1.24, 0, POLE), GLOSS.chrome));
+      // Two collars up the column, which is what a jointed signal post has and
+      // is what stops 1.50 of plain tube reading as a drawn line.
+      parts.push(gl(cyl(0.115, 0.115, 0.07, 12, 0, 0.86, 0, POLE_DK), GLOSS.trim));
+      parts.push(gl(cyl(0.115, 0.115, 0.07, 12, 0, 1.62, 0, POLE_DK), GLOSS.trim));
+      // THE CABLE ENTRY, on the back of the column. Rule 1: from behind, a
+      // plain tube is the same object at every angle, and a signal post's rear
+      // is where its conduit runs.
+      parts.push(gl(cbx(0.09, 1.16, 0.07, 0, 1.16, 0.115, POLE_DK, 0.02), GLOSS.trim));
+
+      // ---- the signal head ------------------------------------------------
+      // 0.46 x 1.00 x 0.26, from 1.99 to 2.72. Chamfered on all twelve edges.
+      parts.push(gl(cbx(0.46, 1.00, 0.26, 0, 2.24, 0, HOUSE, 0.04), GLOSS.trim));
+      // The cap and the sill, proud of the housing on every side.
+      parts.push(gl(cbx(0.52, 0.07, 0.32, 0, 2.755, 0, HOUSE_LIP, 0.025), GLOSS.trim));
+      parts.push(gl(cbx(0.52, 0.06, 0.32, 0, 1.71, 0, HOUSE_LIP, 0.025), GLOSS.trim));
+      // THE YELLOW BACKBOARD. A standard signal fitting -- the high-visibility
+      // plate a signal head is mounted on so it reads against a busy
+      // background -- and here it is doing that job twice over. It is the only
+      // element available that is BOTH bright and saturated (0xffd42b renders
+      // L 146.9 at S 0.83; nothing else on this object is above L 120 without
+      // being a near-neutral), and it is 0.86 x 1.32 at the top of the object,
+      // where the profile also needed occupancy to stop reading as a pole.
+      //
+      // 1.10 TALL AND NOT 1.32. At 1.32 centred on 2.24 the plate spanned 1.58
+      // to 2.90 and its top border sat on 2.94 -- 0.14 THROUGH the 2.80 ceiling
+      // MR.Collision.BOX gives a BLOCK. Art gives way to the box; this is the
+      // same correction the JUMP plinths and the caution faces already took.
+      parts.push(gl(cbx(1.04, 1.10, 0.05, 0, 2.235, 0.10, 0xffd42b, 0.03), GLOSS.paint));
+      // Its dark border, which is what makes a backboard a backboard.
+      parts.push(gl(cbx(1.10, 0.06, 0.06, 0, 2.755, 0.10, HOUSE, 0.02), GLOSS.trim));
+      parts.push(gl(cbx(1.10, 0.06, 0.06, 0, 1.715, 0.10, HOUSE, 0.02), GLOSS.trim));
+      // The bracket that clamps the head to the column, both sides of it.
+      parts.push(gl(cbx(0.16, 0.30, 0.16, 0, 1.84, 0.10, POLE_DK, 0.03), GLOSS.trim));
+
+      // ---- the three lenses, and the visor over each ----------------------
+      // -z is the face the chase camera sees, because the runner runs at this
+      // thing in +z. So the lenses are the view the game spends its life in.
+      const LENS = [[2.50, RED], [2.24, AMB], [1.98, GRN]];
+      for (const [ly, col] of LENS) {
+        // The lens: a short cylinder lying on z, so its rim is round from the
+        // front and it has DEPTH from the flank. A painted disc on a flat
+        // panel is what this used to be everywhere in the fleet.
+        parts.push(gl(cyl(0.145, 0.145, 0.06, 14, 0, ly, -0.155, col, Math.PI / 2), GLOSS.chrome));
+        // The bright core, a hair proud of the lens. 0.055 AND NOT 0.085: at
+        // 0.085 the core is 34% of the lens area and the shipped frame showed
+        // three white discs with coloured rims -- the colour is the entire
+        // read on this object and the highlight was eating it. At 0.055 it is
+        // 14%, which is a highlight on a red lamp rather than a lamp.
+        parts.push(gl(cyl(0.055, 0.055, 0.03, 12, 0, ly, -0.190, LAMP_CORE, Math.PI / 2), GLOSS.chrome));
+        // THE VISOR. A real signal wears a hood over every lens and it is the
+        // single most recognisable thing about the object in silhouette --
+        // three stacked shelves down the front face. Built as a half-collar
+        // above the lens rather than a full ring, which is what a hood is.
+        parts.push(gl(cbx(0.34, 0.055, 0.19, 0, ly + 0.135, -0.20, HOUSE_LIP, 0.02), GLOSS.trim));
+        parts.push(gl(cbx(0.055, 0.13, 0.17, -0.155, ly + 0.075, -0.19, HOUSE_LIP, 0.02), GLOSS.trim));
+        parts.push(gl(cbx(0.055, 0.13, 0.17, 0.155, ly + 0.075, -0.19, HOUSE_LIP, 0.02), GLOSS.trim));
+      }
+
+      // ---- THE BACK, which is a different object -------------------------
+      // Rule 1. A signal head's rear is a hinged access door, and that is what
+      // the camera gets for the whole of the pass and the whole lane change.
+      parts.push(gl(cbx(0.38, 0.86, 0.03, 0, 2.24, 0.135, HOUSE_LIP, 0.02), GLOSS.trim));
+      // The piano hinge down one edge, and the latch on the other.
+      for (let i = 0; i < 5; i++) {
+        parts.push(gl(cyl(0.028, 0.028, 0.12, 8, -0.185, 1.90 + i * 0.17, 0.135,
+          POLE_DK, 0, 0, Math.PI / 2), GLOSS.chrome));
+      }
+      parts.push(gl(cbx(0.06, 0.14, 0.05, 0.185, 2.24, 0.155, POLE, 0.015), GLOSS.chrome));
       return merge(parts);
     })();
-    /**
-     * The pedalling half -- KNEES either side of the rider, not cranks.
-     *
-     * The cranks were correct and invisible. They sat at z = 0.92, further from
-     * the lens than the cargo box's far face at 0.62, so the one moving part on
-     * the one hazard that was supposed to feel alive was occluded by its own
-     * vehicle for the whole approach. Knees orbiting a bottom bracket at
-     * (+/-0.50, 1.30, 0.55) sweep from 0.90 to 1.70 in y, so each knee RISES
-     * INTO VIEW above the 1.355 box line and drops back out of sight.
-     */
-    const blockTrikeCrankGeo = merge([
-      bx(0.30, 0.40, 0.28, -0.50, 0.40, 0, 0x2b2f52),
-      bx(0.34, 0.16, 0.32, -0.50, 0.60, 0.04, VAN_BODY),
-      bx(0.30, 0.40, 0.28, 0.50, -0.40, 0, 0x2b2f52),
-      bx(0.34, 0.16, 0.32, 0.50, -0.60, 0.04, VAN_BODY),
-    ]);
 
     /**
      * BLOCK v3: MARSHALS ACROSS THE LANE. The other half of the same request --
@@ -18553,11 +18993,121 @@ MR.World = (function () {
     const blockRoadBikeGeo = (function () {
       const parts = [];
       const TYRE_BIKE = 0x6d76a8;
+      /**
+       * ============ THE CRATES, AND WHY A LONE RIDER NEEDS THEM ============
+       *
+       * A single road cyclist cannot be a fair BLOCK on its own, and that is
+       * measured rather than argued. tools/kindread.js reads how much of the
+       * lane width a variant covers in each of fourteen bands and runs a
+       * nearest-centroid classifier over the result: the two-abreast pair
+       * ALREADY landed nearer the DUCK centroid than its own, by -1.5, and one
+       * rider is thinner than two. A BLOCK that reads as a DUCK is a player
+       * sliding into a wall, and rule 4 makes that a build failure rather than
+       * a preference. This file's own header says the same thing in words at
+       * the old trike: "one rider is a third of a lane wide and 1.75 tall
+       * against a 2.05 jump apex, so it reads as something to hurdle."
+       *
+       * The answer the pair was giving -- add a second person -- is the one
+       * the owner has just refused. So the lane is filled by the object that
+       * is actually on the carriageway in TWO of the five reference frames:
+       * wooden crates. ttgr-archway-and-crates.png has a pair of them standing
+       * in the road with the runner threading between, and
+       * ttgr-gift-crate-and-bus.png has one square in a lane. They are also
+       * named in this pass's brief as an allowed replacement.
+       *
+       * WHAT THE STACK IS FOR, in order of importance:
+       *   1. It fills bands 0 to 5 at better than 0.8 of the lane, which is
+       *      what makes the profile say BLOCK.
+       *   2. IT CARRIES THE CAUTION FACE, at 0.72 on its own front plane. The
+       *      face is centred on the lane by the pool -- f.position.set(0, y, z)
+       *      -- so it can only ever sit on something centred, and on the bare
+       *      bicycles that meant a 1.23-wide striped board hanging at hub
+       *      height across both wheels. See the note at the face row for what
+       *      that was doing.
+       *   3. Wood is the one material in the hazard fleet that is not painted
+       *      metal, so the stack does not read as more of the same barrier.
+       */
+      const CRATE = 0xb07434, CRATE_DK = 0x6e4418, CRATE_LT = 0xd89a52;
+      (function crates() {
+        // Three boxes: a wide low pair and one across the top, offset, so the
+        // stack has a stepped outline rather than being one slab with lines
+        // drawn on it. Chamfered on every edge -- the owner's "less box like"
+        // applies hardest to the thing that IS a box, and the reference's
+        // crates are visibly rounded at every corner.
+        //
+        // THE THIRD CRATE IS BESIDE, NOT ON TOP. It was stacked at x -0.12 and
+        // spanned y 0.62 to 1.12 in the middle of the lane, which is exactly
+        // where the bicycle is -- the first frame of this build showed crates
+        // and a rider's head with no machine between them, and the owner's ask
+        // was "the bike needs to be on the road", not "the bike needs to be
+        // behind a box". At x -0.62 the stack still owns the low bands and the
+        // whole of the lane centre above 0.68 is open for the frame, the
+        // saddle, the bars and the rider.
+        //
+        // THE TWO FRONT CRATES SHARE A z AND A DEPTH, so their front planes are
+        // both -0.61 and the caution face lies flush across the pair. They were
+        // at -0.30/0.62 and -0.34/0.58, fronts at -0.61 and -0.63, and the
+        // deeper one stood 0.02 PROUD of the face and cut it in half: the
+        // shipped frame showed the stripes on the middle crate only.
+        const boxes = [
+          [-0.30, 0.34, -0.30, 0.84, 0.68, 0.62],
+          [0.46, 0.31, -0.30, 0.80, 0.62, 0.62],
+          [-0.62, 0.90, -0.26, 0.62, 0.44, 0.54],
+          // TWO MORE UP THE COLUMN, and this is a fairness repair rather than a
+          // composition one. With the stack topping out at 1.12 the variant's
+          // profile was 0.72 / 0.71 / 0.72 / 0.57 / 0.48 / 0.41 and then
+          // nothing -- mass on the road tapering to air, which is a JUMP's
+          // shape. tools/kindread.js moved this variant's misread from "nearer
+          // the DUCK centroid" to "nearer the JUMP centroid" and that is not a
+          // fix: one is a player sliding into a wall and the other is a player
+          // jumping into one. A BLOCK has to carry mass past the 2.05 jump
+          // apex, and a loaded stack is how a crate does that.
+          [-0.62, 1.36, -0.26, 0.58, 0.44, 0.52],
+          [-0.60, 1.80, -0.26, 0.54, 0.42, 0.50],
+        ];
+        for (const [bx0, by0, bz0, bw, bh, bd] of boxes) {
+          parts.push(gl(cbx(bw, bh, bd, bx0, by0, bz0, CRATE, 0.045), GLOSS.matte));
+          // The lid rail and the foot rail, proud of the body on all four
+          // sides, which is what a crate has instead of a painted edge.
+          parts.push(gl(cbx(bw + 0.05, 0.055, bd + 0.05, bx0, by0 + bh / 2 - 0.028, bz0, CRATE_LT, 0.02), GLOSS.matte));
+          parts.push(gl(cbx(bw + 0.05, 0.05, bd + 0.05, bx0, by0 - bh / 2 + 0.025, bz0, CRATE_DK, 0.02), GLOSS.trim));
+          // THE DIAGONAL BRACE, on the FRONT and the BACK. Rule 1: the crates
+          // are passed at 1.70 units and the reference's own brace is the
+          // thing that says crate rather than carton. Two of them, mirrored,
+          // so the near face and the far face are different objects.
+          parts.push(gl(bx(bw * 0.86, 0.055, 0.03, bx0, by0, bz0 - bd / 2 - 0.012, CRATE_DK, 0, 0, 0.62), GLOSS.matte));
+          parts.push(gl(bx(bw * 0.86, 0.055, 0.03, bx0, by0, bz0 + bd / 2 + 0.012, CRATE_DK, 0, 0, -0.62), GLOSS.matte));
+          // The corner posts, all four, so the flank is framed too.
+          for (const sx of [-1, 1]) {
+            for (const sz of [-1, 1]) {
+              parts.push(gl(cbx(0.06, bh - 0.06, 0.06, bx0 + sx * (bw / 2 - 0.03),
+                by0, bz0 + sz * (bd / 2 - 0.03), CRATE_DK, 0.015), GLOSS.trim));
+            }
+          }
+        }
+      })();
+      /**
+       * ============ ONE CYCLIST, NOT TWO ============
+       *
+       * The owner, item 3 of the Gold Run notes: "One bicyclist at the time.
+       * The bike needs to be on the road. Ours look like it is sitting on
+       * something."
+       *
+       * So the pair becomes one, and it is the CROUCHED one that survives.
+       * The upright rider was carrying the silhouette to 2.55 with a straight
+       * arm, but the blind reader's finding was that the pair read as
+       * MOTORCYCLISTS, and the three things the header lists as the cause --
+       * open wheels, drop bars, and a back folded near horizontal -- are all
+       * on the crouched rider. Height comes from the crates instead.
+       *
+       * IT SITS AT x 0.40 AND NOT 0, so the crate stack in front of it is not
+       * a hat. From directly astern the rider's shoulders and head clear the
+       * stack's 1.06 top on the near side while the machine reads through the
+       * gap on the far side.
+       */
       const who = [
-        { s: -1, x: -0.55, skin: 0xffc79a, dy: 0.00, jersey: KIT_A, band: KIT_B,
+        { s: -1, x: 0.40, skin: 0xffc79a, dy: 0.00, jersey: KIT_A, band: KIT_B,
           shorts: 0x2a0c16, frame: 0xc42a1e, crouch: true, hair: 0x241a14, style: 3 },
-        { s: 1, x: 0.56, skin: 0xb87a4e, dy: -0.06, jersey: KIT_B, band: KIT_A,
-          shorts: 0x2a0c16, frame: 0xd89800, crouch: false, hair: 0x4a2c18, style: 4 },
       ];
       for (const p of who) {
         const X = p.x, y = p.dy;
@@ -18728,9 +19278,11 @@ MR.World = (function () {
       // SKIN-coloured limbs against a dark road, and it costs the variant
       // nothing it has -- skin is brighter than the shorts it replaces, and
       // this variant clears the gate on luminance.
+      // ONE RIDER, at the x the body geometry puts them at. Two entries here
+      // against one rider in blockRoadBikeGeo would be a pair of legs
+      // pedalling in empty road beside the bicycle.
       const riders = [
-        { x: -0.55, skin: 0xffc79a, shoe: LEMON, sock: 0xfff2e0, phase: 0 },
-        { x: 0.56, skin: 0xb87a4e, shoe: LEMON, sock: 0xfff2e0, phase: Math.PI / 2 },
+        { x: 0.40, skin: 0xffc79a, shoe: LEMON, sock: 0xfff2e0, phase: 0 },
       ];
       for (const p of riders) {
         for (let s = 0; s < 2; s++) {
@@ -19186,13 +19738,28 @@ MR.World = (function () {
         moving: blockTramPantoGeo, pivot: [0, 2.36, -0.40], anim: 'sway',
       },
       { geo: blockSignGeo, face: [2.06, 1.7, 1.58, -0.541], weight: 1 },
-      {
-        geo: blockTrikeGeo, face: [1.98, 0.52, 0.62, -1.221], weight: 1,
-        // Bottom bracket lifted to the box line and pulled forward of its far
-        // face, so the knees break the box's top edge instead of pedalling
-        // behind it. See blockTrikeCrankGeo.
-        moving: blockTrikeCrankGeo, pivot: [0, 1.30, 0.14], anim: 'pedal',
-      },
+      // THE TRAFFIC LIGHT, where the cargo trike used to be. No moving part
+      // and no anim: a signal post standing in a lane is the one hazard in
+      // this game that is CORRECTLY dead still, and the idle shudder every
+      // stopped vehicle carries would read as an earthquake on a pole.
+      //
+      // The face is sized to the plinth and not to the lane. Every other row
+      // here is 1.98 to 2.16 wide because every other variant is a vehicle
+      // filling the carriageway; a lane-wide striped board hanging off a
+      // 1.02 base would be a plank floating in mid-air on both sides, which
+      // is the defect this pass has now measured twice.
+      // y 0.05 AND NOT 0.145, ON THE LOWER TIER'S OWN FRONT PLANE. The lower
+      // tier is 0.94 deep, so its front face is z -0.47; at y 0.145 the face
+      // was standing on the SECOND tier, which is only 0.72 deep, and hung
+      // 0.115 out in front of it. It photographed as a striped mat lying on
+      // the road beside the plinth rather than as a marking on it.
+      // THE FACE GOES ON THE BARRICADE'S TOP BOARD, which is where a works
+      // barrier's marking actually is. The board is 0.46 tall centred at 1.09
+      // and 0.10 deep at z -0.40, so its front plane is -0.45 and a 0.40-tall
+      // face at y 1.09 sits inside it on every edge. Earlier drafts of this
+      // row put the face at y 0.145 and then y 0.05 down on the plinth, where
+      // it photographed as a striped mat lying on the road beside the pole.
+      { geo: blockLightGeo, face: [2.30, 0.40, 1.09, -0.455], weight: 1 },
       {
         geo: blockCrossGeo, face: [2.10, 0.50, 0.98, -0.641], weight: 2,
         // Inner hand, and high. See blockPaddleGeo: the reach is 1.28 from
@@ -19213,7 +19780,23 @@ MR.World = (function () {
         moving: blockRefuseGateGeo, pivot: [0, 1.30, -1.86], anim: 'lift',
       },
       {
-        geo: blockRoadBikeGeo, face: [1.70, 0.20, 0.32, -0.571], weight: 2,
+        // ---- THE FACE, AND WHAT THE BICYCLES WERE SITTING ON -------------
+        //
+        // This row was [1.70, 0.20, 0.32, -0.571]: a 1.23-wide, 0.20-tall
+        // striped panel at y 0.22 to 0.42, at z -0.571, which is NEARER THE
+        // LENS THAN EITHER REAR WHEEL. It spanned 72% of the lane straight
+        // across both bicycles at hub height, and its hard bottom edge at
+        // 0.22 cut off the bottom two thirds of all four wheels, so the tyres
+        // never met the road anywhere the camera could see. That is the
+        // owner's "ours look like it is sitting on something", and it was the
+        // caution face doing it -- not the wheels, which reach y 0.000
+        // exactly (vBikeWheel, centre 0.33, radius 0.33), and not a plinth,
+        // because this variant never had one.
+        //
+        // At 0.40 on the crate stack's own front plane it is a marking on a
+        // crate, the wheels are clear from the hub down, and the road under
+        // the bicycle is visible for the whole approach.
+        geo: blockRoadBikeGeo, face: [1.90, 0.30, 0.40, -0.632], weight: 2,
         moving: blockRoadBikeCrankGeo, pivot: [0, 0.60, 0.16], anim: 'pedal',
       },
       { geo: blockMopedGeo, face: [1.30, 0.24, 1.10, -0.921], weight: 2, anim: 'idle' },
@@ -22983,7 +23566,16 @@ MR.World = (function () {
             // the old rate the pair strobed instead of reading as legs, and a
             // motion you cannot follow is the same as no motion.
             mv.rotation.x = now * 7.6 + ph;
-            a.position.y = Math.sin(now * 15.2 + ph) * 0.030;
+            // 0.008, NOT 0.030. This line moved the WHOLE VARIANT GROUP -- the
+            // bicycle, its wheels and its contact shadow -- 0.030 up and down
+            // at 2.4 Hz, so for half of every cycle the machine was clear of
+            // the road it is standing on. It is the second half of the owner's
+            // "ours look like it is sitting on something": the first half was
+            // the caution face, measured at that variant's face row, and this
+            // is what was left once the face came off the wheels. A crank is
+            // not a suspension; what a pedalling rider transmits to a frame is
+            // a tremor, and 0.008 is about a third of a pixel at eight units.
+            a.position.y = Math.sin(now * 15.2 + ph) * 0.008;
           } else if (kind === 'paddle') {
             // A wave, and a big one. This is the only thing on the road that
             // signals a human intention rather than an obstacle, so it is worth
@@ -24878,6 +25470,32 @@ MR.Camera = (function () {
       kick: 0,         // short FOV punch (landing)
 
       pDuck: 0,        // last frame's duck01, for edge-detecting slide entry
+      // ---- the second running surface ------------------------------------
+      //
+      // THE PROBLEM, STATED BEFORE THE FIX. The resting eye is K.CAM_BASE_Y,
+      // 3.10 above the road, and it aims at LOOK_Y, 1.16 above the road. Put
+      // the runner on a 2.80 roof and his feet are at 2.80 and his crown at
+      // 4.58, so the eye sits 1.48 BELOW his head while pointing at a spot 1.64
+      // below his feet -- the lens is looking at the flank of the lorry he is
+      // standing on, with the runner cropped off the top of the frame and no
+      // road visible at all.
+      //
+      // The fix is the one this file already uses for hills, and deliberately
+      // so: the terrain terms add elev.at() to the eye and to the aim, and the
+      // deck is the same kind of quantity one lane wide. It is added to BOTH,
+      // so the pitch of the lens is unchanged and every framing number this
+      // file was tuned against still holds -- the whole shot simply rises with
+      // the ground, which is what cresting a hill already does.
+      //
+      // IT READS THE RUNNER'S OWN SURFACE, NOT THE COURSE. Sampling the deck
+      // under the LENS (which is 4.35 back, and during a mount is still on the
+      // road) would pitch the camera up at the truck for the length of the
+      // tailgate and then snap. Sampling under the RUNNER means the shot rides
+      // with him, and the smoothing below is what stops the 2.80 cliff at the
+      // end of the roof from arriving as a cut -- the fall is 0.50 s and this
+      // filter is a little slower than that, so the eye settles into the
+      // landing rather than tracking it exactly.
+      dk: 0,           // smoothed surface height under the runner
 
       mile: -1,        // last whole mile crossed
       mileT: 0,
@@ -25074,6 +25692,14 @@ MR.Camera = (function () {
       // Cadence rises ~16% across the band; on its own that is nothing, but
       // under a camera that is also lower and wider it is the difference
       // between a jog and a hunt.
+      // The deck under the runner. Snapped on the first frame for the same
+      // reason the speed filter is: ?skip= can start a shot with the runner
+      // already on a roof, and easing up to it would photograph the camera
+      // halfway through a move that never happened in a real run.
+      const dkTarget = p.surface || 0;
+      if (first) s.dk = dkTarget;
+      else s.dk += (dkTarget - s.dk) * (1 - Math.pow(0.004, d));
+
       const air = clamp01((p.y || 0) / 1.2);
       const cadence = 2.55 * Math.pow(s.sp / 22, 0.72);
       s.stride = (s.stride + d * cadence) % 1;
@@ -25137,7 +25763,9 @@ MR.Camera = (function () {
         + bobY + shY
         + finUp
         // The road under the LENS, which is BASE_BACK behind the runner.
-        + elev.at(p.z - back);
+        + elev.at(p.z - back)
+        // ...and the roof under the RUNNER, if he is on one. See `dk`.
+        + s.dk;
 
       // The lateral drift at the tape: a slow swing off the centreline so the
       // finish is seen from three-quarters and the stands on one side crowd
@@ -25179,7 +25807,12 @@ MR.Camera = (function () {
         s.x * s.fr.lookX * (1 - fin) + (p.x || 0) * fin,
         LOOK_Y + (p.y || 0) * 0.50 - duck * 0.30 - drive * 0.22
           + runE * 1.1 + fin * 1.3
-          + elev.at(lookZ),
+          + elev.at(lookZ)
+          // The SAME term as the eye, not a sampled one. Adding the deck to the
+          // eye alone would pitch the lens down by atan(2.80 / 16.1) = 9.9
+          // degrees for the whole ride, which is a third of a portrait frame's
+          // horizontal field spent looking at the roof he is standing on.
+          + s.dk,
         lookZ
       );
       cam.lookAt(look);
@@ -25273,7 +25906,7 @@ MR.Camera = (function () {
       s.sp = SPEED_LO; s.gsp = SPEED_LO; s.drive = 0; s.accel = 0;
       s.shake = 0; s.punch = 0; s.lurch = 0; s.winded = 0;
       s.dip = 0; s.dipV = 0; s.kick = 0;
-      s.pDuck = 0;
+      s.pDuck = 0; s.dk = 0;
       s.mile = -1; s.mileT = 0; s.gearT = 0; s.gearArmed = true; s.finish = 0;
       cam.fov = BASE_FOV;
       cam.updateProjectionMatrix();
@@ -25572,13 +26205,51 @@ MR.Collision = (function () {
 
   /**
    * Can the player pass `kind` in their current state?
-   * @param st { y, duck01 }
+   * @param st { y, duck01, surface }
+   *
+   * ---- WHAT `surface` ADDED, AND WHY IT IS INERT UNTIL A RAMP EXISTS ------
+   *
+   * `st.surface` is the height of the ground the runner is standing on: 0 on
+   * the road, and MR.Course.DECK_Y on the roof of a rideable BLOCK train. `st.y`
+   * keeps its exact old meaning -- height above THAT surface -- which is the
+   * same discipline main.js already applies to hills, where player.y is height
+   * above the LOCAL road and elevation is added once, at the very end.
+   *
+   * Every clause below reduces to the shipped expression at surface = 0, and
+   * that is checked rather than asserted: tools/mechanics.js --identity
+   * generates the whole calendar with the ramp off and compares a hash.
+   *
+   *   JUMP   feet at (y + surface). On the road this is y, unchanged.
+   *   BLOCK  cleared if and only if the runner is ON it -- `st.onDeck`, the
+   *          player's own answer to "am I standing on this thing", set by
+   *          resolveDeck. A HEIGHT comparison was the obvious way to write this
+   *          and it is wrong: the tailgate meets the road, so at the foot of
+   *          every ramp the surface height is still zero, and `surface >= yMax`
+   *          would call the first frame of every mount a collision with the
+   *          lorry the runner is visibly running up. Being supported by a thing
+   *          is a fact about support, not about altitude. Undefined is false,
+   *          so with no ramp on the course this is `return false`, which is
+   *          exactly what it was.
+   *   DUCK   deliberately reads `surface`, NOT `y + surface`. The jump apex is
+   *          2.05 and a DUCK bar's underside is 1.41 with its top at 1.83, so
+   *          `y + surface >= yMax` would let a plain jump sail over every duck
+   *          bar in the game -- a silent difficulty change worth more than the
+   *          whole of this pass, arriving through a clause that looks like
+   *          tidying. Only a SURFACE above the bar clears it.
+   *
+   * The JUMP and DUCK surface terms are both reachable in exactly one state
+   * that is not a roof: the half-second fall back to the road, where the runner
+   * really is two units up. That is left physically honest rather than special-
+   * cased, because it cannot be farmed -- leaving a roof anywhere but off the
+   * front already costs the streak -- and because tools/mechanics.js proves no
+   * gate ever falls inside a fall on any of the 365 days.
    */
   function clears(kind, st) {
     if (kind === K.CLEAR) return true;
-    if (kind === K.BLOCK) return false;
-    if (kind === K.JUMP) return (st.y || 0) >= JUMP_CLEAR_Y;
-    if (kind === K.DUCK) return (st.duck01 || 0) >= DUCK_CLEAR;
+    const surface = st.surface || 0;
+    if (kind === K.BLOCK) return st.onDeck === true;
+    if (kind === K.JUMP) return (st.y || 0) + surface >= JUMP_CLEAR_Y;
+    if (kind === K.DUCK) return (st.duck01 || 0) >= DUCK_CLEAR || surface >= BOX[K.DUCK].yMax;
     return true;
   }
 
@@ -25623,6 +26294,161 @@ MR.Collision = (function () {
   };
 })();
 
+/* ==================== src/render/ramp.js ==================== */
+/**
+ * THE RIDEABLE ROOF, AS A DELIBERATELY PLAIN PLACEHOLDER.
+ *
+ * This is not art and is not trying to be. It exists so the ramp mechanic can
+ * be photographed and judged as a mechanic -- a frame with the runner standing
+ * on nothing proves nothing -- and so the shape the real art has to fill is
+ * stated as geometry rather than as a paragraph. src/render/world.js owns the
+ * fleet and is being rebuilt by another agent in this same tree; this file does
+ * not touch it and must be deleted when world.js grows a real tailgate.
+ *
+ * ---- RULE 1: BUILT ON ALL SIDES ----------------------------------------
+ *
+ * Every ramp is ONE CLOSED SOLID. The profile in the (z, y) plane is the
+ * silhouette of a bin lorry with its hopper down --
+ *
+ *     (z0, 0) -> (z0 + run, deck) -> (z1, deck) -> (z1, 0) -> close
+ *
+ * -- extruded across the lane and capped at both ends: six faces, twelve
+ * triangles, no open back, no missing flank, no side left out because the chase
+ * camera "starts" behind. The camera does not start anywhere; it goes
+ * everywhere. You pass this thing at 1.70 units in the next lane, the lens
+ * banks through every lane change, and the whole point of the mechanic is that
+ * you also stand on top of it and look down its length.
+ *
+ * ---- IT FITS INSIDE THE COLLISION BOX, AND THAT IS THE CONTRACT ---------
+ *
+ * MR.Collision.BOX decides clearance; art never does. So every vertex here is
+ * generated FROM the box -- half-width is BOX[BLOCK].halfX, the deck is
+ * BOX[BLOCK].yMax, and the far face is the same
+ * 2 * halfZ * (1 + 0.9 * span) expression Course.reachOf and world.js's
+ * gateBoxes use. Nothing can stick out of the envelope the fairness audit casts
+ * against, because there is no number in this file that is not read off it.
+ *
+ * ---- COST ---------------------------------------------------------------
+ *
+ * ONE draw call for the whole course, whatever the ramp count, because the
+ * ramps are merged into a single static buffer at create time. At the measured
+ * 4.09 ramps a day that is 49 triangles against a ceiling of 500,000 and one
+ * draw call against a budget of roughly 400. Draw calls are the binding
+ * constraint in this project, so a per-ramp mesh would have been the wrong
+ * shape even though it is easier to write.
+ */
+MR.Ramp = (function () {
+
+  /**
+   * @param course a generated MR.Course; `course.ramps` may be empty
+   * @returns { group } to be added to the scene, or an empty group
+   */
+  function create(course) {
+    const group = new THREE.Group();
+    group.name = 'ramp-placeholders';
+    const ramps = (course && course.ramps) || [];
+    if (!ramps.length) return { group };
+
+    const B = MR.Collision.BOX[MR.K.BLOCK];
+    const hx = B.halfX;
+
+    const pos = [];
+    const nrm = [];
+
+    /**
+     * A quad, emitted as two triangles, WOUND AND NORMALLED OUTWARD BY
+     * CONSTRUCTION rather than by the author getting six orderings right.
+     *
+     * The first draft did it by hand and got three of the six faces backwards,
+     * including the roof -- which back-face culling then deleted, so the frame
+     * showed the runner standing on the tram underneath instead of on the ramp.
+     * A missing face is exactly the failure rule 1 exists to prevent, and it is
+     * invisible in a diff and nearly invisible in a frame.
+     *
+     * So the face is given the solid's centre and orients itself: take the
+     * normal from the winding, and if it points back towards the middle of the
+     * solid, reverse the winding and the normal together. There is no ordering
+     * a caller can supply that produces an inward face.
+     */
+    function quad(cx, cy, cz, a, b, c, d) {
+      // cross(b - a, c - a) is the right-hand normal of the winding a->b->c.
+      const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
+      const vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+      let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      const len = Math.hypot(nx, ny, nz) || 1;
+      nx /= len; ny /= len; nz /= len;
+      // Outward is away from the centre of the solid.
+      const fx = (a[0] + b[0] + c[0] + d[0]) / 4 - cx;
+      const fy = (a[1] + b[1] + c[1] + d[1]) / 4 - cy;
+      const fz = (a[2] + b[2] + c[2] + d[2]) / 4 - cz;
+      const order = (nx * fx + ny * fy + nz * fz) >= 0
+        ? [a, b, c, a, c, d]
+        : (nx = -nx, ny = -ny, nz = -nz, [a, d, c, a, c, b]);
+      for (const p of order) {
+        pos.push(p[0], p[1], p[2]);
+        nrm.push(nx, ny, nz);
+      }
+    }
+
+    for (const r of ramps) {
+      const x = MR.K.LANE_X[r.lane];
+      const xL = x - hx, xR = x + hx;
+      const dy = r.deck;
+      // The profile, near to far. Deliberately in the order the runner meets it.
+      const p0 = r.z0;                 // the tailgate touches the road here
+      const p1 = r.z0 + r.run;         // top of the slope
+      const p2 = r.z1;                 // the far face, where the roof stops
+
+      // The centroid of the solid, which is what orients every face. Only its
+      // SIDE of each face matters, so the crude average of the profile is
+      // enough and is exact for the two flanks and the two caps.
+      const cx = x, cy = dy * 0.4, cz = (p0 + p1 + p2 + p2) / 4;
+
+      // Sloped top (the hopper), flat roof, far face, underside, and the two
+      // flanks. Six faces: this is a closed solid, and none of them is left out
+      // because a chase camera is unlikely to look at it. It is stood on.
+      quad(cx, cy, cz, [xL, 0, p0], [xR, 0, p0], [xR, dy, p1], [xL, dy, p1]);    // slope
+      quad(cx, cy, cz, [xL, dy, p1], [xR, dy, p1], [xR, dy, p2], [xL, dy, p2]);  // roof
+      quad(cx, cy, cz, [xL, dy, p2], [xR, dy, p2], [xR, 0, p2], [xL, 0, p2]);    // far face
+      quad(cx, cy, cz, [xL, 0, p2], [xR, 0, p2], [xR, 0, p0], [xL, 0, p0]);      // underside
+      quad(cx, cy, cz, [xR, 0, p0], [xR, 0, p2], [xR, dy, p2], [xR, dy, p1]);    // right flank
+      quad(cx, cy, cz, [xL, 0, p2], [xL, 0, p0], [xL, dy, p1], [xL, dy, p2]);    // left flank
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+
+    // Flat, loud and obviously unfinished. A placeholder that looks finished is
+    // the thing that ships by accident.
+    const mat = new THREE.MeshLambertMaterial({ color: 0xf07022, flatShading: true });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.name = 'ramp-placeholder';
+    // Ramps sit on the road, and the road has hills under it. Lifting the whole
+    // buffer is wrong on a slope; lifting per ramp at build time is right, and
+    // the profile is flat over 35 units, so a ramp gets the elevation at its
+    // own mouth. This is a placeholder's approximation and is called out as one.
+    if (course.elevation) {
+      // Per-ramp lift means per-ramp geometry, so it is folded into the vertex
+      // buffer rather than into the transform: walk the positions and raise
+      // each ramp's block by the road height at its own z0.
+      const arr = geo.attributes.position.array;
+      let v = 0;
+      for (const r of ramps) {
+        const lift = course.elevation.at(r.z0);
+        for (let i = 0; i < 36; i++, v++) arr[v * 3 + 1] += lift;   // 6 quads * 6 verts
+      }
+      geo.attributes.position.needsUpdate = true;
+    }
+    geo.computeBoundingSphere();
+    group.add(mesh);
+
+    return { group };
+  }
+
+  return { create };
+})();
+
 /* ==================== src/game/player.js ==================== */
 /**
  * Player state machine: lanes, jump arc, duck, stumble, and gate resolution.
@@ -25641,6 +26467,30 @@ MR.Player = (function () {
   const K = MR.K;
   const C = MR.Collision;
 
+  /**
+   * ---- HOW LONG IT TAKES TO FALL OFF A LORRY -----------------------------
+   *
+   * 0.50 s, and the number is set by the road that is GUARANTEED to be there
+   * rather than by gravity. A free fall from Course.DECK_Y (2.80) at 9.81 is
+   * 0.756 s, and the whole descent has to finish before the next gate -- or the
+   * runner arrives at it still 1.4 units up, which clears a JUMP for free and,
+   * worse, clears a DUCK for free, because a SURFACE above 1.83 is above the
+   * bar (see the DUCK clause in collision.js). A mechanic that hands out free
+   * clears is not a mechanic, it is an exploit.
+   *
+   * What the course guarantees: spacingAt owes the gate after a train
+   * readWindowAt + reachOf, and reachOf for a train IS that train's depth. So
+   * whatever length the vehicle is, there are at least readWindowAt units of
+   * clear road past its far face -- 25.35 on the flat, and MORE on a descent,
+   * because actionWindowAt grows with the local top speed. In time that floor
+   * is 0.89 s at the pace floor. The physical 0.756 leaves 0.13 s of it; 0.50
+   * leaves 0.39.
+   *
+   * tools/mechanics.js measures the real margin for every ramp on all 365 days
+   * rather than trusting this paragraph, and fails when one lands late.
+   */
+  const FALL_TIME = 0.50;
+
   function create() {
     const s = {
       lane: 1,
@@ -25657,6 +26507,16 @@ MR.Player = (function () {
       stumble: 0,
       bounce: 0,        // signed lateral knock from a BLOCK, decays
       tripT: 0,         // 0..1 through a trip on a small obstacle
+      // ---- the second running surface ------------------------------------
+      // `surface` is the height of the GROUND under the runner and `y` stays
+      // height above it, which is the same split main.js already uses for
+      // hills. All three are zero on a course with no ramps, so nothing here
+      // changes for a game that does not use the mechanic.
+      surface: 0,       // 0 on the road, Course.DECK_Y on a roof
+      ramp: null,       // the ramp being ridden, or null
+      falling: 0,       // 0..1 through a fall back to the road
+      fallFrom: 0,      // the height the fall started at
+      flanked: false,   // latched while inside a vehicle, so one hit is one hit
       gateIdx: 0,
       aidIdx: 0,
       lastResult: null,  // 'clean' | 'hit'
@@ -25664,10 +26524,18 @@ MR.Player = (function () {
       events: [],        // drained by main for audio/HUD reactions
     };
 
+    // Derived, not stored. collision.js's BLOCK clause asks whether the runner
+    // is standing on the thing, and the only true answer is "there is a ramp
+    // under him" -- a second boolean kept alongside `ramp` would be one more
+    // pair of numbers that can disagree, which is how four of the corrections
+    // in docs/roadmap.md start.
+    Object.defineProperty(s, 'onDeck', { get: function () { return s.ramp !== null; } });
+
     s.reset = function () {
       s.lane = 1; s.laneFrom = 1; s.laneT = 1; s.x = 0; s.y = 0;
       s.airT = 0; s.airborne = false; s.duckT = 0; s.ducking = false;
       s.duck01 = 0; s.lean = 0; s.stumble = 0; s.bounce = 0; s.tripT = 0;
+      s.surface = 0; s.ramp = null; s.falling = 0; s.fallFrom = 0; s.flanked = false;
       s.gateIdx = 0; s.aidIdx = 0;
       s.lastResult = null; s.events.length = 0;
     };
@@ -25751,10 +26619,138 @@ MR.Player = (function () {
       const rate = s.ducking ? K.DUCK_IN_RATE : K.DUCK_OUT_RATE;
       s.duck01 += (target - s.duck01) * Math.min(1, rate * dt);
 
+      // ---- falling off a roof --------------------------------------------
+      // Driven here rather than in resolveDeck so it keeps running on the
+      // frames the runner is over open road with no ramp to ask about.
+      if (s.falling > 0) {
+        s.falling = Math.min(1, s.falling + dt / FALL_TIME);
+        // 1 - t*t: zero vertical speed at the lip, accelerating downward, and
+        // exactly zero at t = 1. A linear ramp reads as being lowered on a wire.
+        s.surface = s.fallFrom * (1 - s.falling * s.falling);
+        if (s.falling >= 1) {
+          s.falling = 0; s.surface = 0; s.fallFrom = 0;
+          s.events.push('land');
+        }
+      }
+
       s.stumble = Math.max(0, s.stumble - dt * 2.2);
       s.bounce -= s.bounce * Math.min(1, dt * 5.5);
       if (Math.abs(s.bounce) < 0.001) s.bounce = 0;
       if (s.tripT > 0) s.tripT = Math.max(0, s.tripT - dt / 0.55);
+    };
+
+    /**
+     * The second running surface: mount a ramp, ride a roof, leave one.
+     *
+     * ---- WHY THIS IS CONTINUOUS WHEN EVERYTHING ELSE IS A PLANE ----------
+     *
+     * Every other contact in this game is a single-plane test at gate.z, and
+     * that has always been a defensible simplification because a hazard's
+     * relationship to the player does not change between gate lines: you were
+     * in its lane or you were not.
+     *
+     * A roof breaks that, in both directions. You can leave it between gate
+     * lines by changing lane, and you can arrive at its flank between gate
+     * lines by changing lane. Neither has a gate to fire at.
+     *
+     * SO IT ALSO EXPOSES SOMETHING THAT WAS ALREADY TRUE AND IS NOT ABOUT THE
+     * RAMP AT ALL. resolveGates is the only contact path in this file, it fires
+     * only at gate.z, and a BLOCK train is one gate carrying up to eighteen
+     * units of vehicle. A player who is in a clear lane at the gate line and
+     * then swerves into the trained lane runs the entire length of that vehicle
+     * with nothing to touch. That is a hole in the shipped game, it is
+     * measurable (tools/mechanics.js --passthrough drives the real Player
+     * through it), and this function closes it for rideable trains as a side
+     * effect of having to know where the flank is. It does not close it for
+     * ordinary ones -- that would be a difficulty change to the shipped game
+     * and is not this pass's to make.
+     *
+     * @returns null, or { hit, z, why } when contact was made
+     */
+    s.resolveDeck = function (course, unitsBefore, unitsNow) {
+      if (!course || !course.deckAt) return null;
+      const geo = course.deckAt(unitsNow, s.lane);
+      // Over open road: the latch is spent and the next vehicle is a fresh
+      // incident. Cleared here rather than at the bounce, because the bounce
+      // does not always succeed -- see the note on it below.
+      if (geo <= 0) s.flanked = false;
+
+      if (s.ramp) {
+        // Still on the same vehicle: the roof IS the ground.
+        if (geo > 0 && course.rampAt(unitsNow, s.lane) === s.ramp) {
+          s.surface = geo;
+          s.falling = 0;
+          return null;
+        }
+        // Off it. The two ways off are not the same event and must not read as
+        // the same event: running off the front is a dismount the mechanic is
+        // FOR, and leaving sideways is stepping off a lorry at race pace.
+        const offFront = unitsNow >= s.ramp.z1;
+        s.fallFrom = s.surface;
+        s.falling = 1e-6;              // non-zero so update() takes it from here
+        s.ramp = null;
+        if (offFront) { s.events.push('dismount'); return null; }
+        s.tripT = 1;
+        s.stumble = 0.9;
+        s.events.push('fall');
+        s.events.push('hit');
+        return { hit: true, z: unitsNow, why: 'fell off the side' };
+      }
+
+      if (geo <= 0) return null;
+
+      const r = course.rampAt(unitsNow, s.lane);
+      if (!r) return null;
+
+      // There is a vehicle here and the runner is not on top of it. Coming in
+      // over the tailgate is a mount; arriving anywhere past it is arriving at
+      // the flank, which is a wall.
+      if (unitsBefore <= r.z0 + r.run && s.falling <= 0) {
+        s.ramp = r;
+        s.surface = geo;
+        s.events.push('mount');
+        return null;
+      }
+
+      // ---- ONE CONTACT PER VEHICLE, NOT ONE PER FRAME --------------------
+      //
+      // The first version of this bounced the runner back to `laneFrom`, which
+      // is correct only while a lane change is still in flight. Once laneT has
+      // reached 1, laneFrom EQUALS lane, the swap was a no-op, and the runner
+      // stayed inside the lorry taking a fresh contact every frame -- seven of
+      // them per incident at 60 Hz, in a game where one contact ends a record
+      // attempt. tools/mechanics.js found it by tracing the z of every flank
+      // hit and seeing them arrive 1.3 units apart; the summary count alone
+      // read as a design finding about lane changes and was nothing of the sort.
+      //
+      // So it does what resolveGates already does for a BLOCK: pick a lane that
+      // is actually free at this z, preferring the middle so a knock never puts
+      // the player somewhere they cannot recover from.
+      const cands = [];
+      for (const d of [-1, 1]) {
+        const t = s.lane + d;
+        if (t < 0 || t > 2) continue;
+        if (course.deckAt(unitsNow, t) > 0) continue;
+        cands.push(t);
+      }
+      const to = cands.length
+        ? cands.reduce((a, b) => (Math.abs(b - 1) < Math.abs(a - 1) ? b : a))
+        : s.lane;
+      if (to !== s.lane) {
+        s.bounce = to > s.lane ? 1 : -1;
+        s.laneFrom = s.lane;
+        s.lane = to;
+        s.laneT = 0.35;
+      }
+      // ...and a latch as well as a bounce, because `to === s.lane` is reachable
+      // when two vehicles overlap either side. A latch cannot be defeated by
+      // geometry; it clears the moment the runner is over open road again.
+      if (s.flanked) return null;
+      s.flanked = true;
+      s.stumble = 1;
+      s.events.push('bounce');
+      s.events.push('hit');
+      return { hit: true, z: unitsNow, why: 'ran into the flank' };
     };
 
     /**
@@ -28216,6 +29212,12 @@ MR.HUD = (function () {
     const v = parseFloat(params.get('polish'));
     if (isFinite(v)) MR.Runner.POLISH = Math.max(0, Math.min(1, v));
   }
+  // The two mechanics under test. Same shape as ?polish, same reason -- one
+  // build renders both courses -- and read BEFORE Course.generate below,
+  // because they change what is generated and not only how it is drawn. Both
+  // clamp themselves; see the accessors at the foot of course.js.
+  if (params.has('narrow')) MR.Course.NARROW = params.get('narrow') || 1;
+  if (params.has('ramp')) MR.Course.RAMP = params.get('ramp') || 1;
 
   // ---- renderer ---------------------------------------------------------
   const canvas = document.getElementById('gl');
@@ -28238,6 +29240,12 @@ MR.HUD = (function () {
 
   const world = MR.World.create(course);
   scene.add(world.group);
+
+  // The rideable roofs, as plain placeholder solids. One draw call for the
+  // whole course and an empty group when no ramp was generated, so at ?ramp=0
+  // -- which is every default run -- this costs nothing at all.
+  const ramps = MR.Ramp.create(course);
+  scene.add(ramps.group);
 
   const runner = MR.Runner.create();
   scene.add(runner.group);
@@ -28384,7 +29392,12 @@ MR.HUD = (function () {
       }
       let best = null, bestScore = -Infinity;
       order.forEach(function (l, i) {
-        if (g.lanes[l] === K.BLOCK) return;
+        // A RIDEABLE BLOCK IS NOT A WALL TO THIS BOT. `gate.ramp` names the
+        // lane whose roof is a running surface, and a harness that cannot
+        // exercise a mechanic is not verifying that mechanic -- which is
+        // precisely why the aid term below exists, after a 16-contact bot run
+        // collected 0 of 14 items and nobody noticed for a month.
+        if (g.lanes[l] === K.BLOCK && g.ramp !== l) return;
         // Order position is the existing tie-break, kept intact: a lane earlier
         // in `order` wins whenever nothing else separates two candidates.
         let score = (g.lanes[l] === K.CLEAR ? 100 : 0) - i;
@@ -28396,6 +29409,13 @@ MR.HUD = (function () {
         // because a bot that breaks its streak fetching a bottle is measuring
         // the wrong thing.
         if (wants.indexOf(l) >= 0) score += 150;
+        // Take the ramp when there is one, so every automated run that has one
+        // available rides it and the frames, the finish times and the fairness
+        // audit are all measured with the mechanic switched on rather than
+        // routed around. This outranks aid deliberately: the question this pass
+        // is asking is what the roof costs, and a bot that prefers a bottle
+        // would answer a different one.
+        if (g.ramp === l) score += 220;
         if (score > bestScore) { bestScore = score; best = l; }
       });
       if (best === null) best = player.lane;
@@ -28409,7 +29429,12 @@ MR.HUD = (function () {
     }
 
     // Lane change: commit early so the move has settled by the gate.
-    if (bot.planned && player.lane !== bot.plannedLane && dist < 34 && player.laneT >= 0.55) {
+    // ...but never off a roof. Leaving a rideable train sideways is a fall and
+    // costs the streak (player.resolveDeck), so the commitment the mechanic
+    // asks of a human is one the bot has to make too -- otherwise the harness
+    // would measure a version of the ramp that has no downside.
+    if (bot.planned && player.lane !== bot.plannedLane && dist < 34
+        && player.laneT >= 0.55 && !player.ramp) {
       controls.push(player.lane < bot.plannedLane ? 'right' : 'left');
     }
 
@@ -28481,6 +29506,18 @@ MR.HUD = (function () {
       const after = pace.units;
 
       player.update(dt, after - before);
+
+      // The second running surface, BEFORE the gates. Order is load-bearing:
+      // the ramp's own gate line sits at the foot of its tailgate, so the mount
+      // has to be established on the same step the gate resolves or the game
+      // records the runner colliding with the lorry he is running up.
+      const deck = player.resolveDeck(course, before, after);
+      if (deck && deck.hit) {
+        pace.onHit();
+        hitAt.push(deck.z);
+        cam.impact(1);
+        hud.flashBroken();
+      }
 
       // Resolve gates crossed this step.
       const results = player.resolveGates(course, before, after);
@@ -28624,10 +29661,16 @@ MR.HUD = (function () {
     // the height above the LOCAL road surface -- which is what lets
     // collision.js keep testing y >= 0.84 and duck01 >= 0.90 against a flat
     // zero, and is the single finding the whole hill feature rests on.
-    runner.group.position.set(player.x, player.y + elev.at(pace.units), pace.units);
+    // ...and `player.surface` is added in the same breath and for the same
+    // reason: it is the height of the GROUND under the runner, which on a
+    // rideable roof is 2.80 and everywhere else is zero. player.y stays height
+    // above whatever he is standing on, so collision.js keeps testing against a
+    // flat zero on a hill AND on a lorry.
+    runner.group.position.set(player.x,
+      player.y + player.surface + elev.at(pace.units), pace.units);
 
     cam.update(dt, {
-      z: pace.units, x: player.x, y: player.y,
+      z: pace.units, x: player.x, y: player.y, surface: player.surface,
       speed: pace.speed(),
       // The flat speed, for the top-gear latch alone. A descent must not fire
       // the gear flourish or the permanent rumble: speed you did not earn is
@@ -28698,6 +29741,11 @@ MR.HUD = (function () {
       const b = pace.units;
       pace.update(step);
       player.update(step, pace.units - b);
+      // Same order as the live loop, and for the same reason. A fast-forward
+      // that skipped this would photograph the runner standing in mid-air where
+      // a roof should be, or record a mount as a collision.
+      const fd = player.resolveDeck(course, b, pace.units);
+      if (fd && fd.hit) { pace.onHit(); hitAt.push(fd.z); }
       for (const r of player.resolveGates(course, b, pace.units)) {
         // Recorded here as well as in the live loop. This fast-forward exists
         // so tooling can photograph the game deep into a race, and a debug

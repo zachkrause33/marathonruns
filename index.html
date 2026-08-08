@@ -15652,15 +15652,36 @@ MR.World = (function () {
       // beam being fired down the road rather than as a marking on it.
       opacity: 0.62,
       depthWrite: false,
-      // EXEMPT FROM AERIAL PERSPECTIVE, for the reason the ring trail below
-      // already states in its own material and this one never inherited: its
-      // job is to be legible far up the road, which is exactly where the fog is
-      // taking half the contrast out of everything else. This was an oversight
-      // rather than a decision -- the ring was written second, given fog:false
-      // with a paragraph explaining why, and the paragraph applies verbatim to
-      // the ribbon it was drawn on top of. The far end is faded by the alpha
-      // ramp in updateRoute instead, which is a fade this file controls.
-      fog: false,
+      /**
+       * FOGGED, AND THIS LINE WAS BRIEFLY THE OTHER WAY ROUND.
+       *
+       * The ring trail below carries fog:false with a paragraph saying its job
+       * is to be legible far up the road, which is exactly where the fog is
+       * taking half the contrast out of everything else. That paragraph looks
+       * like it applies verbatim to the ribbon the rings were drawn on top of,
+       * and this material was given the exemption on that reasoning.
+       *
+       * A blind reader shown the aid pickups at 8, 12 and 25 units then said
+       * this, unprompted, about the exempted ribbon: "at 25u the purple streaks
+       * are visually the LOUDEST thing in the frame -- considerably louder than
+       * the pale bottle they share the road with. Whatever they are, they
+       * compete with the small object for attention at long range."
+       *
+       * That is the aid item losing its own frame to the route hint at exactly
+       * the distance the lane is chosen at, which is a worse failure than the
+       * one the exemption was fixing. The paragraph does not transfer, and the
+       * reason is that the RING TRAIL IS SPARSE AND THE RIBBON IS CONTINUOUS:
+       * fourteen small marks that hold their contrast up the road read as a
+       * trail, and 124 unbroken units of paint that hold theirs read as the
+       * brightest object in the scene. Exempting something from aerial
+       * perspective buys attention, and attention is the scarce thing the
+       * pickups need.
+       *
+       * So the fog stays on, and the readability the exemption was after is
+       * bought instead by the constant width in updateRoute -- which is the
+       * axis that was actually being spent, and which costs no salience.
+       */
+      fog: true,
       side: THREE.DoubleSide,   // the ribbon is rebuilt every frame; not
     }));                        // depending on winding is one less way to fail
     // Below the hazard telegraph mats (5) and the finish checker (4): where the

@@ -134,8 +134,8 @@ const CATS = {
   // 0.0% wheel and that is a true statement about what the lens can see, not
   // a gap in this table -- see the note in the report.
   0x2b2f52: 'trim', 0x2a0c16: 'trim', 0x141a33: 'trim', 0x3a2a12: 'trim',
-  0xc42a1e: 'trim', 0xd42a55: 'body',
-  0x6d76a8: 'wheel',                     // the cyclists' tyre, a mid grey-blue
+  0xc42a1e: 'trim', 0xd42a55: 'body', 0x4a1024: 'trim', 0x8c2040: 'body',
+  0x6d76a8: 'wheel', 0x262e10: 'wheel',                     // the cyclists' tyre, a mid grey-blue
   0xffc79a: 'skin', 0xb87a4e: 'skin',
   0xfff2e0: 'cream', 0xffe45e: 'lamp',   // hoarding beacons
 };

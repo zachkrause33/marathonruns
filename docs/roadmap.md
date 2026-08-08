@@ -1771,12 +1771,29 @@ nobody measured is worse than no number at all.**
    > saturated, higher contrast against their background, and there are several
    > of them competing against one small item."*
 
-   Two things were tried against that and only the second is a real answer.
-   Restoring the ribbon's fog (see the walk-back below) did not shift the
-   ranking. Dropping its opacity from 0.62 to 0.38 is the change that gives back
-   strength the hint never needed, and `tools/routeread.js` says it costs
-   nothing structural: the biggest component at skip 110 is 19x160 at elongation
-   8.4, unchanged.
+   Two things were tried against that and NEITHER FIXED IT. Restoring the
+   ribbon's fog did not shift the ranking. Dropping its opacity from 0.62 to
+   0.38 moved the ribbon from second of six to fourth, and cost nothing
+   structural -- `tools/routeread.js` still puts the biggest component at skip
+   110 at 19x160, elongation 8.4 -- but the re-read is unambiguous that the job
+   is not done:
+
+   > *"Plain answer to the question you actually asked: yes. In both 25u panels
+   > something on the road surface out-shouts the hovering item, and in the top
+   > one it is not marginal... My eye lands on the streaks before the item every
+   > time in the top-right panel -- call it a clear win for the streaks, not a
+   > tie."*
+
+   **And the same reader supplied the geometry that says opacity was never going
+   to be enough:** *"they are elongated along the view direction and perspective
+   foreshortening costs them much less area than it costs a small compact
+   object."* A ribbon lying along the line of sight loses screen area roughly
+   linearly with distance; a pickup loses it quadratically. So the ribbon gains
+   on the pickup at every distance, for free, and no amount of dimming changes
+   the exponent. Whatever finally settles this has to be structural -- the hint
+   ending well short of the item, or breaking into marks that foreshorten like
+   objects rather than like a strip -- and it needs a 25u blind read as its pass
+   mark. **It is not fixed. It is two steps less bad and measured.**
 
    **The unfixed part, stated rather than buried: the water bottle still cannot
    be named at READ_NEAR.** Nothing in this pass fixed that, because nothing in

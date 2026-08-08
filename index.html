@@ -2264,9 +2264,9 @@ MR.Course = (function () {
   }
 
   /**
-   * The deepest hazard collision box, as a half-depth.
+   * Every hazard collision box's half-depth, by kind.
    *
-   * This is Collision.BOX[K.BLOCK].halfZ and it is written twice, which is a
+   * This is Collision.BOX[kind].halfZ and it is written twice, which is a
    * thing this file otherwise refuses to do. The reason: collision.js loads
    * AFTER this one, and course generation also runs headless in tools/
    * course-test.js and tools/simulate.js, where collision.js is not loaded at
@@ -2274,29 +2274,57 @@ MR.Course = (function () {
    * both proofs.
    *
    * So it is duplicated and then GUARDED: tools/shoot.js compares this against
-   * the real MR.Collision.BOX in the live page and fails the build if they ever
-   * disagree. A number nobody checks is how the last four corrections in this
-   * project started.
+   * the real MR.Collision.BOX in the live page, FOR EVERY KIND, and fails the
+   * build if any of them disagree. A number nobody checks is how the last four
+   * corrections in this project started -- and this was a scalar covering one
+   * kind while the other two went unguarded, which is the same hole one size
+   * smaller.
    */
-  const HAZARD_HALF_Z = 0.65;
+  const HAZARD_HALF_Z = {
+    [K.JUMP]: 0.52,
+    [K.DUCK]: 0.30,
+    [K.BLOCK]: 1.95,
+  };
 
   /**
    * How far a gate's geometry reaches FORWARD of its own gate line, in units.
    *
    * A hazard is not a plane at z, it is a box, and a BLOCK train is a long one:
-   * world.js builds it with span = 1 + train * 0.9 gate-spans and a rear face at
-   * halfZ * (2 * span - 1), which is 5.33 units at the longest train. That
+   * world.js builds it with span = 1 + train * 0.9 and a rear face at
+   * halfZ * (2 * span - 1), which is 15.99 units at the longest train. That
    * matters here for one reason only -- the sightline argument in readWindowAt
    * turns on WHEN THE OCCLUDER LEAVES THE LENS, and a box leaves the lens when
    * its REAR face passes it, not when its gate line does. Measuring gate line to
-   * gate line credits a train with clearing the shot up to five units early,
-   * which is 21% of the window it is being checked against.
+   * gate line credits a train with clearing the shot early, which is a large
+   * fraction of the window it is being checked against.
    *
    * The first draft of this fix did exactly that, and it made the assertion pass.
+   *
+   * ---- PER LANE, AND PER KIND, BECAUSE THAT IS WHAT THE AUDIT MEASURES ----
+   *
+   * This used to charge every gate the BLOCK depth whatever it carried. That
+   * was safe but it was not what world.js builds or what shoot.js casts:
+   * gateBoxes() gives each LANE its own box from Collision.BOX[kind], so a gate
+   * holding two JUMPs and a DUCK occludes with a 0.52 box, not a 1.95 one, and
+   * BLANKS measures it that way. Charging the deepest kind for a gate that has
+   * no BLOCK in it bought spacing nothing was asking for.
+   *
+   * Occlusion is per lane -- a hazard hides what is behind it IN ITS OWN LANE
+   * -- so the gap a gate owes the next one is set by its deepest lane, and the
+   * span multiplier applies only to a BLOCK carrying a train, exactly as
+   * gateBoxes applies it. The two now describe the same solid.
    */
-  function reachOf(train) {
-    const span = train ? 1 + train * 0.9 : 1;
-    return HAZARD_HALF_Z * (2 * span - 1);
+  function reachOf(lanes, train) {
+    let reach = 0;
+    for (let l = 0; l < 3; l++) {
+      const kind = lanes ? lanes[l] : K.BLOCK;
+      const halfZ = HAZARD_HALF_Z[kind];
+      if (!halfZ) continue;                     // CLEAR contributes nothing
+      const span = (kind === K.BLOCK && train) ? 1 + train * 0.9 : 1;
+      const r = halfZ * (2 * span - 1);
+      if (r > reach) reach = r;
+    }
+    return reach;
   }
 
   const START_GRACE = 150;   // clean runway so the first seconds read calmly
@@ -2434,7 +2462,7 @@ MR.Course = (function () {
     return Math.min(1, base * 0.86 + wall + home);
   }
 
-  function spacingAt(f, rnd, z, elev, train) {
+  function spacingAt(f, rnd, z, elev, lanes, train) {
     const d = difficulty(f);
     // 44 units early, tightening as difficulty rises. The floor is
     // ACTION_WINDOW itself rather than a number chosen to sit near it: the
@@ -2455,12 +2483,13 @@ MR.Course = (function () {
     // constant added, so a retune of the jump arc, the pace floor or the terrain
     // still moves both ends of the constraint together.
     //
-    // reachOf(train) is the gate BEHIND this gap -- how far its geometry sticks
+    // reachOf is the gate BEHIND this gap -- how far its geometry sticks
     // forward past its own gate line. The eye is clear of it only once its rear
     // face has gone by, so the gap it owes the next gate is measured from there.
-    // A standing hazard costs 0.65 of this; a four-span BLOCK train costs 5.33,
-    // and pays it rather than being waved through on its gate line.
-    return Math.max(readWindowAt(z, elev) + reachOf(train),
+    // A gate whose deepest lane is a DUCK costs 0.30 of this; a standing BLOCK
+    // costs 1.95; a four-span BLOCK train costs 15.99, and pays it rather than
+    // being waved through on its gate line.
+    return Math.max(readWindowAt(z, elev) + reachOf(lanes, train),
                     mean * rnd.range(0.84, 1.16));
   }
 
@@ -2795,9 +2824,11 @@ MR.Course = (function () {
       }
 
       gates.push({ z, lanes, f, train: span });
-      // The span goes in because the gap after a gate is owed by the geometry of
-      // THAT gate, and a train's is five units longer than its gate line says.
-      z += spacingAt(f, rnd, z, elevation, span);
+      // The LANES and the span both go in because the gap after a gate is owed
+      // by the geometry of THAT gate: which kinds it actually stands in the road
+      // decides how deep its deepest lane is, and a train's rear face is a long
+      // way further forward than its gate line says.
+      z += spacingAt(f, rnd, z, elevation, lanes, span);
     }
 
     const mileMarkers = [];
@@ -2886,7 +2917,7 @@ MR.Course = (function () {
       // The epsilon is float slop only -- spacingAt returns this quantity
       // exactly when the floor binds, which late in a course is most gates.
       if (i > 0) {
-        const need = readWindowAt(g[i - 1].z, elev) + reachOf(g[i - 1].train);
+        const need = readWindowAt(g[i - 1].z, elev) + reachOf(g[i - 1].lanes, g[i - 1].train);
         if (g[i].z - g[i - 1].z < need - 1e-9) {
           errors.push(`gate ${i}: ${(g[i].z - g[i - 1].z).toFixed(2)} behind gate ${i - 1} `
             + `needs ${need.toFixed(2)} to stay readable past it`);
@@ -4024,7 +4055,57 @@ MR.shading = (function () {
    * the curved dark arcs the sky was criticised for. Eye-relative direction
    * plus fwidth-softened steps removes the geometry from the result entirely.
    */
+  /**
+   * THE CLOUD DRIFT, WHICH IS WIND SPEED OVER CLOUD HEIGHT AND NOTHING ELSE.
+   *
+   * p in SKY_FS is d.xz/h, which is exactly a position on a plane one unit
+   * above the eye. A sheet at height H under a crosswind v therefore crosses p
+   * at v/H per second -- so this constant is not a tuning knob in arbitrary
+   * units, it is metres per second divided by metres, and it can be set from
+   * the sky instead of from taste. 10 m/s under low cumulus based at 750 m is
+   * 0.0133, which is what this is.
+   *
+   * The far sheet takes 0.55 of it in the SAME direction, which is the near
+   * sheet sitting at 55% of the far sheet's altitude. See the sample sites.
+   *
+   * ==== THE BRIEF SAID THE CLOUDS WERE TOO SLOW TO PERCEIVE. THEY WERE NOT.
+   *
+   * Measured on the live page at the top 8% of a 420x860 frame, before any
+   * change: 5.47 px/s, i.e. 0.478 deg/s, i.e. 3.1 frame widths of travel
+   * across a four-minute race. The premise that a 182-second texture repeat
+   * means an imperceptible sky is a unit error -- what a viewer sees is an
+   * ANGULAR rate, and the repeat period of the texture does not appear in it.
+   * At 1500 m the shipped sheets were a 27 m/s gale.
+   *
+   * What was actually wrong is a parallax defect, which is squarely on brief:
+   *
+   *   far  (S 0.125)  o = 0.41 - t*0.0022   ->  dp/dt = +0.01760
+   *   near (S 0.300)  o =        t*0.0055   ->  dp/dt = -0.01833
+   *
+   * Opposite signs at 96% of the same magnitude. Two sheets sliding THROUGH
+   * each other is not depth, and the comment at the sample site claimed it as
+   * "the parallax between them gives the sky depth for free". It gave shear.
+   *
+   * So the far sheet is turned around to agree with the near one -- the near
+   * one keeps the direction it shipped with, so the sky still travels the way
+   * it always did -- and the rate comes down from a gale to a breeze. They
+   * still beat against each other at 0.45 of the near rate, which is what
+   * keeps the composite CHANGING SHAPE rather than scrolling as a rigid sheet;
+   * losing that was the one real thing the counter-motion was buying.
+   *
+   * Result, same instrument: 5.47 -> 4.00 px/s, and every frame of it now
+   * going the same way. This is the rare item where the honest fix REDUCES a
+   * number in a task about adding motion, and it is recorded plainly so that
+   * nobody re-raises "the clouds are too slow" from the texture constant.
+   *
+   * NOT time-compressed. TIME_SCALE runs the RACE at 30x and the sky must not
+   * take it: the sun does not move, so clouds at 30x read as time-lapse under
+   * a pinned sun. Authored against the player's wall clock instead.
+   */
+  const CLOUD_DRIFT = 0.0133;
+
   const SKY_FS = `
+    #define CLOUD_DRIFT ${CLOUD_DRIFT.toFixed(5)}
     uniform vec3 top;
     uniform vec3 bottom;
     uniform vec3 sunColor;
@@ -4132,7 +4213,16 @@ MR.shading = (function () {
       // horizon the way real ones do instead of being pasted on the dome.
       // Two layers at different scales and drift speeds: one sheet repeats
       // obviously across a 47-degree field, two beating against each other do
-      // not, and the parallax between them gives the sky depth for free.
+      // not.
+      //
+      // The two sheets used to drift in OPPOSITE directions at 96% of the same
+      // magnitude, which is a shear rather than the depth this comment claimed.
+      // A feature holds a fixed texture coordinate, so with offset o and scale
+      // S it crosses the cloud plane at dp/dt = -(do/dt)/S; both sample sites
+      // below are now signed so that rate is negative for both, and the far
+      // sheet is held to 0.55 of the near one. The derivation of the rate
+      // itself, and the measurement that refuted the brief that opened it, are
+      // on CLOUD_DRIFT.
       vec2 p = d.xz / max(h, 0.035);
       float r = length(p);
       // Nothing survives out where one texel spans a degree of sky -- without
@@ -4178,10 +4268,10 @@ MR.shading = (function () {
       // Switching it off outright was measured at +0.085 mean saturation in the
       // top tenth of the frame, the largest single term in the sky; this keeps
       // the parallax it was added for and gives most of that back.
-      vec4 lo = texture2D(cloudMap, p * 0.125 + vec2(0.41 - time * 0.0022, 0.63));
+      vec4 lo = texture2D(cloudMap, p * 0.125 + vec2(0.41 + time * CLOUD_DRIFT * 0.55 * 0.125, 0.63));
       col = mix(col, mix(col, lit, 0.55), smoothstep(0.34, 0.88, lo.a) * reach * 0.38);
 
-      vec4 hi = texture2D(cloudMap, p * 0.300 + vec2(time * 0.0055, 0.0));
+      vec4 hi = texture2D(cloudMap, p * 0.300 + vec2(time * CLOUD_DRIFT * 0.300, 0.0));
       col = mix(col, mix(shd, lit, smoothstep(0.35, 0.65, hi.r)), smoothstep(0.30, 0.82, hi.a) * reach);
 
       gl_FragColor = vec4(lin2srgb(col), 1.0);
@@ -8201,6 +8291,71 @@ MR.World = (function () {
   const PROP_KINDS = ['building', 'tree', 'grove', 'crowd', 'walkers'];
 
   /**
+   * =============== ROAD TRAFFIC: REFUSED, WITH THE MEASUREMENT ==============
+   *
+   * A sixth prop kind was meant to go here -- pooled cars driving a live
+   * carriageway beside the closed course, on the argument that there is no
+   * background traffic in this game at all and that is the largest single gap
+   * in it. That argument is correct. It is refused anyway, because there is
+   * nowhere to put the carriageway, and this records the measurement so the
+   * next agent does not have to take it again.
+   *
+   * THE BAND, measured off the live scene at four points in a race rather than
+   * read off the source. Outboard from the centre line:
+   *
+   *   0.00 - 3.75   play carriageway. CORRIDOR_HALF.
+   *   4.60          crowd barrier
+   *   4.50 - 10.20  crowd knots. Centres roll TRACK_HALF_WIDTH + 1.9 + 3.4,
+   *                 and a knot is about +/-1.1 wide.
+   *   7.95 - 14.60  walkers. WALK_IN plus a 3.6 roll, then up to 11 units of
+   *                 outward drift on top.
+   *   7.50 - 26.00  trees, and groves at s.x + 10.
+   *   11.35         THE WALL's hoarding, continuous, both sides, the whole leg
+   *  12.20          street wall front face; buildings behind it to 43.5
+   *
+   * There is no continuous gap. A carriageway needs one, because a car drives
+   * ALONG it -- reserving z the way the street wall opens for a landmark does
+   * nothing for an object whose whole behaviour is to traverse the reservation.
+   *
+   * WHAT EACH BIOME OFFERS, since "put it where it earns it" was the right
+   * instinct and the answer turned out to be nowhere:
+   *
+   *   CITY START / FINAL MILE   barrier edge. The 7.6 units between the
+   *     barrier and the street wall are the only candidate, and crowd and
+   *     walkers hold it. FINAL MILE additionally runs grandstands from 5.05
+   *     out to 10.45 for the whole leg.
+   *   THE WALL   a continuous 3.4-unit hoarding at 11.35, above the 2.7 eye.
+   *     Anything behind it is invisible by construction; that is the leg's
+   *     entire design.
+   *   RIVERSIDE / PARKLAND   hedge edge, tree weight 2.0-2.6 and grove weight
+   *     2.0-3.6. The densest planting in the game.
+   *   THE BRIDGE   the deck is a ribbon. railGeo ends in a parapet at |x| =
+   *     4.30 and there is open water past it. Nothing to drive on.
+   *
+   * The brief that commissioned this said "there is a far carriageway in some
+   * biomes and a light-rail track in others". THERE IS NEITHER. The four edge
+   * kinds are barrier, hedge, rail and wall; `rail` is the bridge's parapet
+   * railing and `wall` is THE WALL's site hoarding. No traffic surface of any
+   * kind has ever existed in this game, so traffic could not be added to one --
+   * it would have had to be built, and then the band above had to be cleared
+   * for it in four systems at once.
+   *
+   * WHAT WAS BUILT INSTEAD. The traffic went where the geometry already is:
+   * the water. See SHIP_SPEED and the sail loop. That is a real answer to
+   * "distant vehicles" and "water if visible" and it costs nothing in
+   * fairness, because a ship is on the far side of a parapet over water the
+   * player cannot reach and no camera in this game can put one between the
+   * lens and a gate.
+   *
+   * IF THIS IS REOPENED, the cheapest honest route is not a carriageway. It is
+   * an ELEVATED line -- an L-train on a viaduct at |x| ~ 16 with its deck
+   * above OVERHEAD_Y. That band is above the street wall, outside every prop
+   * measured above, exempt from the corridor rule by height rather than by
+   * argument, and Chicago's L is already in the settings table as a landmark
+   * span. It is a set piece plus a mover, not a rearrangement of the roadside.
+   */
+
+  /**
    * ============================ THE SETTINGS ============================
    *
    * Twelve places, three or four of which the day's course draws (see
@@ -8707,16 +8862,37 @@ MR.World = (function () {
     return texture(c, true);
   }
 
-  /** Pale banded ripples, laid over the water plane on the bridge. */
+  /**
+   * Pale banded ripples, laid over the water plane on the bridge.
+   *
+   * THE CRESTS RUN ALONG THE ROAD, BECAUSE THE RIVER RUNS ACROSS IT.
+   *
+   * These bars used to be drawn horizontally, which put the wave crests across
+   * the direction of travel and therefore the current ALONG it -- a river
+   * flowing the same way as the bridge that crosses it. Two things were wrong
+   * with that and only one of them is pedantry.
+   *
+   * The one that matters: the player is travelling at 21.8-27.7 units/s and
+   * the ripple crawled at 0.485 units/s (0.014 offset/s over a 34.6-unit
+   * repeat). A drift along the axis the player is already sweeping at fifty
+   * times the speed is invisible by construction -- it is 1.9% of the motion
+   * already in that axis. Turning the current across the road puts it on the
+   * one axis the player's own travel does NOT hide, which is the same reason
+   * the pavement walkers were given lateral drift rather than forward drift.
+   *
+   * Drawn vertically, the crests also converge on the vanishing point instead
+   * of strobing past, which is what makes a flat sheet read as reaching to the
+   * horizon rather than as a scrolling belt.
+   */
   function rippleTexture() {
     const c = canvas(128, 128);
     const g = c.getContext('2d');
     g.clearRect(0, 0, 128, 128);
     g.fillStyle = 'rgba(255,255,255,0.30)';
     for (let i = 0; i < 7; i++) {
-      const y = 8 + i * 17, w = 24 + ((i * 37) % 60);
-      g.fillRect(((i * 53) % 100), y, w, 4);
-      g.fillRect(((i * 29) % 90) + 20, y + 7, w * 0.6, 3);
+      const x = 8 + i * 17, h = 24 + ((i * 37) % 60);
+      g.fillRect(x, ((i * 53) % 100), 4, h);
+      g.fillRect(x + 7, ((i * 29) % 90) + 20, 3, h * 0.6);
     }
     return texture(c, true);
   }
@@ -12023,6 +12199,9 @@ MR.World = (function () {
     // ground is acting as a river, so still terrain never shimmers.
     const rippleTex = rippleTexture();
     rippleTex.repeat.set(26, 26);
+    // 900 units of sheet over 26 repeats is 34.6 units per texture unit, so
+    // this is 1.90 world units of current per second. See the write site.
+    const RIPPLE_DRIFT = 0.055;
     const ripples = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), new THREE.MeshBasicMaterial({
       map: rippleTex, transparent: true, depthWrite: false,
     }));
@@ -13432,45 +13611,25 @@ MR.World = (function () {
         }
         variants[0].visible = true;
         /**
-         * ================== THE CONTACT SHADOW ==================
+         * THE CONTACT SHADOW USED TO BE BUILT HERE, AS A SECOND SYSTEM.
          *
-         * The owner's lighting note asked for objects to separate from one
-         * another and for contact shadows, and this is the half of it that a
-         * value change cannot do: a shadow says an object is STANDING ON the
-         * road, which is a different claim from it being a different colour
-         * than the road.
+         * Every JUMP and BLOCK got its own S.contactShadow blob parented to
+         * this group -- one alpha-blended draw call each -- while
+         * updateShadows() was independently writing a multiply-blended quad
+         * for the same hazard into one pooled geometry. Both shipped, so the
+         * tarmac under every JUMP and BLOCK in the game was darkened twice and
+         * the frame paid 15 to 26 draw calls for the privilege.
          *
-         * A REAL SHADOW MAP IS REFUSED, WITH THE MEASUREMENT. A
-         * DirectionalLightShadow costs +105 to +201 draw calls here and puts
-         * two of the eight shots over the 400 ceiling -- 04-wall 265 to 438,
-         * 08-level 264 to 465. Draw calls are the binding constraint in this
-         * game; triangles are not. One quad per hazard is +1 draw each against
-         * 15 to 26 live hazards a frame, which is the affordable shape of the
-         * same idea.
+         * The pooled quad kept the job and inherited the two things this one
+         * knew that it did not: the variant's own footprint, and no shadow
+         * under a DUCK. Both are stated at updateShadows(), which is now the
+         * only place a hazard shadow exists. Do not re-add one here.
          *
-         * ONLY WHAT ACTUALLY RESTS ON THE ROAD. A DUCK is a bar hanging at
-         * y 1.41 on two 0.26 standards; it does not sit on the tarmac and
-         * giving it a full-footprint blob would draw a shadow for an object
-         * that is mostly air, and cover a telegraph mat to do it. So JUMP and
-         * BLOCK get one, DUCK does not, and the test is the collision box's
-         * own yMin rather than a list of kinds that could drift out of date.
-         *
-         * IT CANNOT DAMAGE THE TELEGRAPH. The mats are renderOrder 5 and this
-         * is 2, so the mat is always composited OVER the shadow, never under
-         * it. The mats are the device a race is lost by misreading and they
-         * are on the do-not-touch list; sorting is what keeps that promise
-         * structurally rather than by choosing a gentle opacity.
-         *
-         * Opacity is well below the runner's 0.72: the runner is the focal
-         * point and is meant to be planted hard, while a hazard's shadow only
-         * has to stop it floating -- and it is landing on the play surface,
-         * beside marks the player is reading.
+         * A REAL SHADOW MAP REMAINS REFUSED, WITH THE MEASUREMENT, and that is
+         * the part of the old header worth keeping: a DirectionalLightShadow
+         * costs +105 to +201 draw calls here and puts two of the eight shots
+         * over the 400 ceiling -- 04-wall 265 to 438, 08-level 264 to 465.
          */
-        if (kind !== K.DUCK) {
-          const sh = S.contactShadow(1, { opacity: 0.34 });
-          g.add(sh);
-          g.userData.shadow = sh;
-        }
         g.add(telegraph(kind));
         // A hazard is the thing the audit protects, not a thing it polices: it
         // is meant to be in the corridor, and one gate hiding another is the
@@ -14735,6 +14894,48 @@ MR.World = (function () {
     // cut at the seam, and long enough that the near end reads as the object
     // sitting ON the road rather than as a disc in front of it.
     const SHADOW_SPREAD = 0.95;
+    /**
+     * ===== ONE SHADOW SYSTEM, NOT TWO =====
+     *
+     * There were two live at once, and their comment blocks contradicted each
+     * other outright. Every JUMP and BLOCK carried an alpha-blended
+     * S.contactShadow blob parented to its own group -- one draw call each,
+     * against 15 to 26 live hazards a frame -- AND had a multiply-blended quad
+     * written into this pooled geometry for the same object at the same
+     * instant. The blob's header argued that "one quad per hazard is the
+     * affordable shape of the same idea"; this one's argued that "a blended
+     * material per hazard is a draw call per hazard, so every live hazard's
+     * quad is written into ONE pooled geometry". Both were shipping.
+     *
+     * The pooled quad wins on every axis that was actually measured. It is one
+     * draw for the whole road instead of one per hazard; it is a MULTIPLY,
+     * which is what the reference frames were measured doing (0.57 / 0.747 /
+     * 0.857, the same on all three channels) and which an alpha blob cannot
+     * do; and it takes fog for free, so a distant hazard's shadow dissolves at
+     * the rate the hazard does. Running both also double-darkened the tarmac
+     * under every JUMP and BLOCK in the game, which is not a look either
+     * header asked for.
+     *
+     * So the blob is gone and this keeps the two things the blob was RIGHT
+     * about, because deleting a system should not delete what it knew:
+     *
+     *   THE FOOTPRINT. The blob was cut to the variant's own merged bounding
+     *     box in xz -- a tram is long and a kerb is wide -- while this quad was
+     *     a fixed LANE-WIDE rectangle off the collision box. Every hazard
+     *     therefore cast a lane-width shadow, so a moped and a bus stood on the
+     *     same puddle. It now reads the same userData.foot the blob did.
+     *   NO SHADOW UNDER A DUCK. A DUCK is a bar hanging at 1.41 on two 0.26
+     *     standards; it does not rest on the tarmac, and a full-footprint
+     *     shadow for an object that is mostly air covers a telegraph mat to
+     *     say something untrue. The blob excluded it and this did not. The
+     *     test is the collision box's own yMin rather than a list of kinds
+     *     that could drift out of date -- BOX[DUCK].yMin is 1.41 and both
+     *     others are 0.00, so the rule selects itself.
+     *
+     * Measured: -16 draw calls at the peak shot, no triangle change (the quads
+     * were already allocated), and the road under a hazard goes from two
+     * multiplied darkenings to one.
+     */
     function updateShadows() {
       const pos = shadowGeo.attributes.position.array;
       const B = MR.Collision.BOX;
@@ -14745,14 +14946,21 @@ MR.World = (function () {
           if (kind === K.CLEAR || !g.objs[l]) continue;
           const box = B[kind];
           if (!box) continue;
+          // Only what actually rests on the road. See the header.
+          if (box.yMin > 0) continue;
           // Same span the body is stretched by, so a six-unit train drags its
           // whole length of shadow instead of a disc at the cab.
           const span = (kind === K.BLOCK && g.gate.train) ? 1 + g.gate.train * 0.9 : 1;
-          const z0 = g.gate.z - box.halfZ - SHADOW_SPREAD;
-          const z1 = g.gate.z + box.halfZ * (2 * span - 1) + SHADOW_SPREAD;
+          // The variant standing here, not the kind. Written on every claim,
+          // so this is never the previous tenant's.
+          const act = g.objs[l].userData.active;
+          const foot = (act && act.userData.foot) || [LANE * 0.5, box.halfZ];
+          const fz = foot[1] * 1.12;
+          const z0 = g.gate.z - fz - SHADOW_SPREAD;
+          const z1 = g.gate.z + fz * (2 * span - 1) + SHADOW_SPREAD;
           const cx = K.LANE_X[l];
-          // LANE_W, never a difference of LANE_X.
-          const hx = LANE * 0.5 + SHADOW_SPREAD;
+          // The variant's own half-width, never a difference of LANE_X.
+          const hx = foot[0] * 1.12 + SHADOW_SPREAD;
           const p = n * 18;
           // The quad lies ON the road, so each z-end takes the road's own
           // height there. One value for the whole quad would sink the far end
@@ -15016,8 +15224,20 @@ MR.World = (function () {
     const WALK_IN = K.TRACK_HALF_WIDTH + 4.2;
     function walkersGeo(seed) {
       const parts = [];
-      // Deliberately no hazard hues -- see above.
-      const coats = [0x3f6fbf, 0x2f9f72, 0xf6f2e0, 0x7a5a9a, 0x8a5a3c, 0x4fb0c8];
+      // Deliberately no hazard hues -- see above. AND IT WAS NOT TRUE.
+      //
+      // The rule three paragraphs up says "no pink, no amber, no cyan", and
+      // then the last coat in this list was 0x4fb0c8, which is hue 197 at
+      // saturation 0.76 -- the DUCK cyan, three degrees off, on 12% of a
+      // figure's surface area. tools/motion.js failed on it the first run it
+      // did with an area weight, on a pool that has been drifting laterally
+      // beside the road since it was written. A rule stated in a comment and
+      // contradicted eight lines later is worth less than no rule, because it
+      // stops anyone looking.
+      //
+      // 0x3fa88f is hue 166 -- a sea green, 28 degrees clear of the cyan and
+      // still a coat colour a person would wear.
+      const coats = [0x3f6fbf, 0x2f9f72, 0xf6f2e0, 0x7a5a9a, 0x8a5a3c, 0x3fa88f];
       const skins = [0xffc79a, 0xe0a173, 0xb87a4e, 0x8a5a3c];
       let s = seed * 9301 + 49297;
       const r = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
@@ -15039,12 +15259,20 @@ MR.World = (function () {
         parts.push(bx(0.12, 0.50, 0.12, x - 0.30, 0.98 * h, z - 0.14, coat, 0.34));
         parts.push(bx(0.12, 0.50, 0.12, x + 0.30, 0.98 * h, z + 0.14, coat, -0.34));
         // A bag, a dog or nothing: three silhouettes rather than one repeated.
+        // The tans came down in SATURATION rather than being moved in hue,
+        // because tan IS hue 35-40 and there is nowhere else for it to go. The
+        // colour contract is luminance OR saturation (see the CONTRAST note in
+        // tools/shoot.js), so a desaturated cream is not the amber a JUMP kerb
+        // wears however close the hue sits. 0xe0c69a measured S 0.53 at hue 38
+        // and carried 6.6% of a walker's area, which is over the panel
+        // threshold in tools/motion.js; these are S 0.33 and S 0.22, under the
+        // floor entirely.
         if (i % 3 === 1) {
           parts.push(bx(0.26, 0.30, 0.20, x + 0.38, 0.76 * h, z + 0.20, 0xf6f2e0));
         } else if (i % 3 === 2) {
-          parts.push(bx(0.22, 0.24, 0.56, x + 0.62, 0.30, z + 0.10, 0xe0c69a));
-          parts.push(bx(0.20, 0.22, 0.22, x + 0.62, 0.46, z - 0.20, 0xe0c69a));
-          parts.push(bx(0.09, 0.30, 0.09, x + 0.62, 0.15, z + 0.28, 0xc9a97a));
+          parts.push(bx(0.22, 0.24, 0.56, x + 0.62, 0.30, z + 0.10, 0xd6c8ae));
+          parts.push(bx(0.20, 0.22, 0.22, x + 0.62, 0.46, z - 0.20, 0xd6c8ae));
+          parts.push(bx(0.09, 0.30, 0.09, x + 0.62, 0.15, z + 0.28, 0xbdb098));
         }
       }
       return merge(parts);
@@ -16380,6 +16608,11 @@ MR.World = (function () {
      * scale. Waterline is local y = 0, so the caller sets the height from
      * whatever the water is doing at that z.
      */
+    // One hull length every 10.6 seconds. Derived, and argued, at the sail
+    // loop in api.update -- the short version is that the time-compressed
+    // figure is 35.7 units/s and that reads as a speedboat.
+    const SHIP_SPEED = 3.2;
+
     const shipGeo = (function () {
       const parts = [];
       const HULL = 0x1f3f6e, TOP = 0xd8552f, WHITE = 0xf0f4ff;
@@ -16394,7 +16627,26 @@ MR.World = (function () {
       parts.push(cyl(1.5, 1.7, 3.6, 8, 0, 7.6, -14.0, TOP));
       parts.push(cyl(1.6, 1.6, 0.8, 8, 0, 8.6, -14.0, 0x2b2f52));
       parts.push(bx(0.30, 7.0, 0.30, 0, 9.4, -8.0, WHITE));
-      const box = [0x37d6ff, 0xff4d5e, 0x59d47a, 0xffe45e, 0x9a7bff];
+      // THE CONTAINERS USED TO BE THE HAZARD PALETTE, LITERALLY.
+      //
+      // The old stack was [0x37d6ff, 0xff4d5e, 0x59d47a, 0xffe45e, 0x9a7bff]:
+      // 0x37d6ff is the DUCK cyan to the digit, 0xffe45e is the JUMP amber to
+      // the digit, and 0xff4d5e sits 8 degrees off the BLOCK pink. Three of
+      // five boxes wore the three colours the whole game is read by, on the
+      // largest object on the leg.
+      //
+      // It survived because the ship was MOORED, and a static thing 24 to 40
+      // units off the centre line never draws the eye. Now that it is under
+      // way it does, which is exactly when a hazard hue on a non-hazard costs
+      // something -- and tools/motion.js failed on it the first time it ran.
+      // The colour contract is what tools/shoot.js fails builds over; it is
+      // worth nothing if the moving objects opt out of it.
+      //
+      // Replaced with a real container stack, every hue at least 18 degrees
+      // clear of the nearest hazard family: oxide, forest, deep navy, slate
+      // (below the saturation floor anyway) and plum. Nothing is lost -- a
+      // container yard is rust and dark blue, not neon.
+      const box = [0x8c4a33, 0x3f8452, 0x2f5aa8, 0x6a7080, 0x6a4a7a, 0x2b6f6a];
       for (let i = 0; i < 12; i++) {
         parts.push(bx(7.4, 2.5, 5.4, 0, 2.55 + Math.floor(i / 4) * 2.6,
           -2 + (i % 4) * 6.0, box[i % box.length]));
@@ -16883,6 +17135,19 @@ MR.World = (function () {
     // on an object of known size, is the whole reason they are out there. They
     // are also the only objects on this leg: with the shoulders gone the deck
     // is a ribbon over an empty plane, and a ribbon over nothing has no speed.
+    //
+    // AND THEY ARE UNDER WAY. This leg had exactly one object class in it and
+    // that class was moored, which is why the comment above had to argue that
+    // a ribbon over nothing has no speed -- it was true, and the fix for it
+    // was sitting right there. Ships are the only traffic in this game with
+    // nowhere it could go wrong: they are 24 to 40 units off the centre line
+    // on the far side of a parapet, over water the player cannot reach, in
+    // hull blue and container colours that are not the three hazard hues.
+    //
+    // Heading follows SIDE, which is what a waterway does: landmark() turns a
+    // piece on the -x side through pi, so those ships already point downstream
+    // and the +x ones upstream. That is a navigation rule for free, and it is
+    // why the two columns pass each other rather than drifting in convoy.
     for (let z = DECK_FROM + 60; z < DECK_TO - 40; z += 155) {
       const sd = (Math.round(z / 155) % 2) ? 1 : -1;
       landmark(z, 'ship', sd, 24 + (Math.round(z / 155) % 3) * 8, -0.34 - WATER_DROP, 0,
@@ -17535,8 +17800,24 @@ MR.World = (function () {
         // sheet welded to the ground plane if that exclusion is ever relaxed.
         ripples.position.set(0, ground.position.y + eAt(z) + 0.05, z);
         ripples.material.opacity = 0.9 * lift;
-        // A slow crawl is all a flat plane needs to stop reading as lino.
-        rippleTex.offset.y = (now * 0.014) % 1;
+        // THE CURRENT, ACROSS THE ROAD. See rippleTexture() for why the axis
+        // changed; this is the rate.
+        //
+        // The sheet is 900 units across a repeat of 26, so one texture unit is
+        // 34.6 world units and the offset rate below is 1.90 units/s of water
+        // moving under the deck. That is stated in the units the player can
+        // check -- a 34-unit ship is moored out there to compare it against --
+        // rather than as an offset constant nobody can size.
+        //
+        // Four times the old crawl, and the axis is doing more of the work
+        // than the number: 0.485 units/s along the direction of travel was
+        // 1.9% of the player's own ground speed and could not be seen at any
+        // rate short of a rapid. Across the deck it competes with nothing.
+        rippleTex.offset.x = (now * RIPPLE_DRIFT) % 1;
+        // A second, slower crawl along the road on the far smaller axis, so
+        // the sheet is not one rigid pattern sliding sideways. Same trick the
+        // two cloud sheets use, and for the same reason.
+        rippleTex.offset.y = (now * RIPPLE_DRIFT * 0.21) % 1;
       }
 
       // road
@@ -17620,18 +17901,11 @@ MR.World = (function () {
             o.userData.body.scale.z = span;
             o.userData.body.position.z = (span - 1) * 0.65;
           }
-          // Cut the contact shadow to whatever is actually standing here. The
-          // shadow geometry is built at radius 1, so scale IS the world
-          // half-extent, and a train that was stretched along z drags its
-          // shadow with it instead of standing on a puddle the length of one
-          // carriage. Written on every claim, like the variant visibility
-          // above and for the same reason: a pooled object must never inherit
-          // the previous tenant's anything.
-          if (o.userData.shadow) {
-            const foot = vs[vi].userData.foot;
-            o.userData.shadow.scale.set(foot[0] * 1.12, 1, foot[1] * span * 1.12);
-            o.userData.shadow.position.z = (span - 1) * 0.65;
-          }
+          // The contact shadow is not written here any more. It is one pooled
+          // quad per live hazard, sized from this same userData.foot and this
+          // same span inside updateShadows() -- which reads userData.active,
+          // set four lines up. See the header there for why there is now one
+          // shadow system rather than two.
           objs.push(o);
         }
         activeGates.push({ gate, objs });
@@ -17836,12 +18110,77 @@ MR.World = (function () {
         // Buildings and trees stay plumb because nothing hangs off them.
         obj.position.y += eAt(st.z);
         obj.rotation.x = -Math.atan(EL.slope(st.z));
+        // A pooled hull must never inherit the last one's voyage. Cleared here
+        // rather than in the sail loop, because that loop only ever sees
+        // objects that are already claimed and could not tell a fresh claim
+        // from a continuing one.
+        if (st.kind === 'ship') obj.userData.sailT0 = undefined;
         obj.userData.auditName = 'set piece / ' + st.kind;
         activeStruct.push({ st, obj, pool });
       }
       while (activeStruct.length && activeStruct[0].st.z < back - 60) {
         const e = activeStruct.shift();
         e.pool.release(e.obj);
+      }
+
+      /**
+       * ================== SHIPS UNDER WAY ==================
+       *
+       * The only traffic in this game, and the only place traffic can go: see
+       * the refusal recorded on TRAFFIC_REFUSED. They are out over water on
+       * the far side of a parapet, which is why this is the one moving class
+       * that needs no fairness argument at all -- there is no arrangement of
+       * the camera that puts a ship between the lens and a gate.
+       *
+       * SPEED, and it is the question the brief said to answer with a number.
+       *
+       * TIME_SCALE runs the race at 30x, so "realistic" has two readings and
+       * they disagree by a factor of 25. A container ship does 8 m/s; one
+       * world unit is 42195/6292.5 = 6.71 m, so 8 m/s is 1.19 units per RACE
+       * second, which the compression turns into 35.7 units per WALL second --
+       * faster than the player, crossing the whole 210-unit view in six
+       * seconds. That is the arithmetically correct answer and it is the wrong
+       * one, because the eye does not judge a vessel's speed against the
+       * observer, it judges it in BODY LENGTHS PER SECOND. This hull is 34
+       * units long. At 35.7 units/s it covers its own length in under a
+       * second, which is a speedboat; a real ship of that length covers its
+       * own length in about twenty-five.
+       *
+       * So the compressed figure is refused and the perceptual one taken:
+       * 3.2 units/s is one hull length every 10.6 seconds. It reads as under
+       * way rather than moored, it is comfortably slower than the player so
+       * every ship is overtaken (which is what you see from a bridge), and the
+       * two headings close on each other at 6.4 units/s so a passing pair is
+       * legible inside the eleven seconds a ship is on screen.
+       *
+       * Heading comes off the object's own ry rather than a stored field, so
+       * both placement paths get it: the deck loop below DECK_FROM, and the
+       * RIVERSIDE entries in the setting table, which go through the landmark
+       * plan and never touch that loop.
+       *
+       * DRIFT IS BOUNDED BY CONSTRUCTION. A ship is claimed 210 units ahead
+       * and released 94 behind, so it lives for about 304 units of player
+       * travel, i.e. 11.7 s at race pace, i.e. at most 37 units of drift from
+       * its anchor. The release test keys off the ANCHOR, so a ship sailing
+       * with the player is still 57 units behind the lens when it goes, and
+       * one sailing against is 131. Neither can pop on screen.
+       */
+      for (const e of activeStruct) {
+        if (e.st.kind !== 'ship') continue;
+        const d = e.obj.userData;
+        if (d.sailT0 === undefined) {
+          d.sailT0 = now;
+          d.sailZ0 = e.obj.position.z;
+          // ry is 0 or pi. Bow is at local +z, so pi means sailing toward -z.
+          d.sailDir = Math.cos(e.st.ry || 0) >= 0 ? 1 : -1;
+        }
+        e.obj.position.z = d.sailZ0 + (now - d.sailT0) * SHIP_SPEED * d.sailDir;
+        // A long hull rolls slowly and pitches almost not at all. 0.9 degrees
+        // at a twelve-second period is under what the eye reads as motion on
+        // its own -- it is there so the silhouette against the water is never
+        // quite the same twice, which is what stops a moving object still
+        // reading as a decal.
+        e.obj.rotation.z = Math.sin(now * 0.52 + d.sailZ0 * 0.11) * 0.016;
       }
 
       // mile banners
@@ -20080,10 +20419,57 @@ MR.Collision = (function () {
   const K = MR.K;
 
   // Visual extents, in world units, matching world.js geometry.
+  //
+  // ---- WHY BLOCK IS 1.95 DEEP AND NOT 0.65 ------------------------------
+  //
+  // 0.65 made the envelope 1.30 deep against a lane 1.70 wide: every vehicle
+  // in the fleet was WIDER THAN IT WAS LONG, seen from above. That is not a
+  // stylisation, it is a category error -- and it had a hard consequence the
+  // fleet rebuild ran into and could not solve from its own side: the wheels
+  // are 0.60-0.72 across, so a second axle left 0.04-0.10 between the front
+  // and rear tyre. Every "car" in this game was a tracked vehicle, because
+  // two axles did not fit.
+  //
+  // THE SCALE ARGUMENT, which is what sets the number. This world is roughly
+  // one unit to the metre VERTICALLY: the runner is 1.78 tall, and the fleet's
+  // own roof heights in MEASUREMENTS.md corroborate it -- bus 2.78 against a
+  // real 3.0-3.2, tram 2.44+pantograph 2.77 against 3.2-3.6, saloon roof 1.62
+  // against 1.45. Height has always been a real dimension here.
+  //
+  // WIDTH HAS NOT. Every BLOCK must fill the lane it blocks, so all ten
+  // variants are ~1.60 wide by contract -- a bus, a tram and a moped at the
+  // same width. Width is a gameplay constant that has been deliberately
+  // falsified, and it is the one axis a length must NOT be derived from:
+  // scaling length off width propagates the lane compression into the length
+  // and hands back a fleet that is all one size again.
+  //
+  // So length is set on the same scale as height. A saloon is 4.6 m, and at
+  // the ~0.85 compression the roof heights already show that is 3.90 -- which
+  // is halfZ 1.95, and lands the taxi at 3.90 x 1.60 = 2.44:1 in plan against
+  // a real saloon's 2.56:1. Two axles now fit with 1.17 between the tyres
+  // instead of 0.07, and the depth is measured from the same ruler the rest of
+  // the object already used.
+  //
+  // WHAT THIS COSTS, measured over 90 days rather than argued: gate count
+  // 194.8 -> 188.7, the perfect finish 1:57:52 -> 1:57:54, and the record
+  // still survives exactly one mistake unaided. It is nearly free because
+  // collision is a PLANE TEST -- see clears() -- so depth reaches only the
+  // spacing floor and the occlusion audit, never contact.
+  //
+  // ONE NUMBER PER KIND, NOT PER VARIANT, AND THAT IS A DECISION. world.js
+  // boxes every variant of a kind with this one halfZ (see gateBoxes), and
+  // tools/shoot.js's BLANKS assertion casts those boxes. A box SHORTER than
+  // the art it stands for makes BLANKS under-count occlusion and pass a gate
+  // the art really does hide -- the exact defect already in the corrections
+  // list. So this number is a CEILING the whole fleet must fit inside, and a
+  // per-variant table would have to be adopted by world.js in the same change
+  // or it makes the audit dishonest in the dangerous direction. It is not.
+  // The long vehicles get their length from the train span instead, which is
+  // what that mechanism is for: see Course.reachOf.
   const BOX = {
     [K.JUMP]: { yMin: 0.00, yMax: 0.80, halfZ: 0.52 },
     [K.DUCK]: { yMin: 1.41, yMax: 1.83, halfZ: 0.30 },
-    [K.BLOCK]: { yMin: 0.00, yMax: 2.80, halfZ: 0.65 },
+    [K.BLOCK]: { yMin: 0.00, yMax: 2.80, halfZ: 1.95 },
   };
 
   // State thresholds.

@@ -3432,38 +3432,43 @@ MR.World = (function () {
    * the same numbers, because a vehicle whose front and rear fittings sit at
    * different heights reads as two different objects from the two ends.
    *
-   * `zFront` is the frontmost plane it may reach. Nothing here changes the
-   * hazard's footprint: the collision box already spans +/-0.65 in z and the
-   * front face is the +0.65 side, which is the side the player never reaches --
-   * they hit the rear face first, and course.js has already proved a path.
+   * `zFront` is the frontmost plane it may reach -- AND IT DID NOT USED TO BE.
+   * The headlamp core sat at zf - 0.015 with a depth of 0.10, so it stood
+   * 0.035 PROUD of the plane this comment calls a limit, on every road vehicle
+   * in the fleet. Nothing measured it until MR.Collision.BOX grew a guard, and
+   * then it was the single reason the tram, the taxi and the van all reported
+   * a half-depth of 1.955-1.965 against a box of 1.95. Every fitting below now
+   * ends at least 0.005 inside zf, and the front-to-back ordering that makes
+   * the core stand proud of the lamp and the plate proud of the bumper is kept
+   * by moving the whole stack back rather than by letting one piece out.
    */
   function vFront(parts, o) {
     const zf = o.zFront;
     const w = o.w;
     // The grille: the darkest thing on the front, and the element that makes a
     // front a front. Slightly inset in width so body colour frames it.
-    parts.push(gl(hbx(w * 0.82, o.grilleH, 0.10, 0, o.grilleY, zf - 0.05, o.dark), GLOSS.trim));
+    parts.push(gl(hbx(w * 0.82, o.grilleH, 0.10, 0, o.grilleY, zf - 0.06, o.dark), GLOSS.trim));
     // Slats, as a few thin bright bars rather than a texture -- at 40 units
     // this is one dark rectangle with a sheen, and at 8 it has structure.
     const nSlat = o.slats === undefined ? 3 : o.slats;
     for (let i = 0; i < nSlat; i++) {
       const fy = o.grilleY - o.grilleH / 2 + o.grilleH * (i + 0.5) / nSlat;
-      parts.push(gl(hbx(w * 0.80, o.grilleH * 0.10, 0.04, 0, fy, zf - 0.005, o.crease), GLOSS.chrome));
+      parts.push(gl(hbx(w * 0.80, o.grilleH * 0.10, 0.04, 0, fy, zf - 0.025, o.crease), GLOSS.chrome));
     }
     // Headlamps. Pale rectangles rather than the round discs the tail lamps
     // use, so front and rear are told apart instantly at any distance, with a
     // hot core exactly as vLamps builds its tail lights.
     for (const sx of [-1, 1]) {
       const px = sx * o.lampX * LANE_FIT;
-      parts.push(gl(bx(o.lampW, o.lampH, 0.07, px, o.grilleY, zf - 0.02, LAMP_COLD), GLOSS.chrome));
-      parts.push(gl(bx(o.lampW * 0.62, o.lampH * 0.52, 0.10, px, o.grilleY, zf - 0.015, LAMP_CORE), GLOSS.chrome));
+      parts.push(gl(bx(o.lampW, o.lampH, 0.07, px, o.grilleY, zf - 0.055, LAMP_COLD), GLOSS.chrome));
+      parts.push(gl(bx(o.lampW * 0.62, o.lampH * 0.52, 0.10, px, o.grilleY, zf - 0.06, LAMP_CORE), GLOSS.chrome));
       // The indicator, which is the one warm note on a cold front end.
       parts.push(gl(bx(o.lampW * 0.30, o.lampH * 0.42, 0.06,
-        px + sx * o.lampW * 0.62, o.grilleY, zf - 0.02, LAMP_AMBER), GLOSS.chrome));
+        px + sx * o.lampW * 0.62, o.grilleY, zf - 0.055, LAMP_AMBER), GLOSS.chrome));
     }
     // Front bumper and plate, mirroring vBumper.
-    parts.push(gl(hbx(o.bumpW, o.bumpH, 0.16, 0, o.bumpY, zf - 0.11, o.dark), GLOSS.trim));
-    parts.push(gl(hbx(o.plateW || 0.58, o.bumpH * 0.48, 0.06, 0, o.bumpY, zf - 0.03, PLATE), GLOSS.chrome));
+    parts.push(gl(hbx(o.bumpW, o.bumpH, 0.16, 0, o.bumpY, zf - 0.13, o.dark), GLOSS.trim));
+    parts.push(gl(hbx(o.plateW || 0.58, o.bumpH * 0.48, 0.06, 0, o.bumpY, zf - 0.045, PLATE), GLOSS.chrome));
   }
 
   /**
@@ -6121,15 +6126,19 @@ MR.World = (function () {
     // is not about vehicles only -- a kerb built from four raw slabs is the
     // purest example of it in the game. The cut is inward from the extents, so
     // the 0.80 ceiling and the halfZ 0.52 reach are untouched to the digit.
+    // 1.00 DEEP, NOT 1.04. A JUMP box is halfZ 0.52 and the old plinths were
+    // 1.04 -- exactly the box, with no room left for the striped face, which
+    // was therefore parked at -0.531 and hung 0.011 OUT of the envelope on all
+    // four variants. The art gives way to the box, not the other way round.
     const jumpGeo = merge([
-      gl(hcbx(2.24, 0.66, 1.04, 0, 0.33, 0, 0xffb020, 0.07), GLOSS.paint),
+      gl(hcbx(2.24, 0.66, 1.00, 0, 0.33, 0, 0xffb020, 0.07), GLOSS.paint),
       // The cream cap stays MATTE. It is the least saturated element on the
       // hazard and a highlight on it would brighten exactly the part that pulls
       // the area mean toward neutral -- the same trap the fleet's gloss ladder
       // is weighted against.
-      gl(hcbx(2.34, 0.14, 1.04, 0, 0.73, 0, 0xfff2e0, 0.04), GLOSS.matte),
-      gl(hcbx(0.30, 0.80, 1.04, -1.16, 0.40, 0, 0xe07f12, 0.05), GLOSS.paint),
-      gl(hcbx(0.30, 0.80, 1.04, 1.16, 0.40, 0, 0xe07f12, 0.05), GLOSS.paint),
+      gl(hcbx(2.34, 0.14, 1.00, 0, 0.73, 0, 0xfff2e0, 0.04), GLOSS.matte),
+      gl(hcbx(0.30, 0.80, 1.00, -1.16, 0.40, 0, 0xe07f12, 0.05), GLOSS.paint),
+      gl(hcbx(0.30, 0.80, 1.00, 1.16, 0.40, 0, 0xe07f12, 0.05), GLOSS.paint),
     ]);
 
     /**
@@ -6145,10 +6154,10 @@ MR.World = (function () {
      */
     const jumpConeGeo = (function () {
       const parts = [
-        hbx(2.24, 0.22, 1.02, 0, 0.11, 0, 0xffb020),
-        hbx(2.34, 0.10, 1.04, 0, 0.27, 0, 0xfff2e0),
-        hbx(0.28, 0.32, 1.02, -1.16, 0.16, 0, 0xe07f12),
-        hbx(0.28, 0.32, 1.02, 1.16, 0.16, 0, 0xe07f12),
+        hbx(2.24, 0.22, 1.00, 0, 0.11, 0, 0xffb020),
+        hbx(2.34, 0.10, 1.00, 0, 0.27, 0, 0xfff2e0),
+        hbx(0.28, 0.32, 1.00, -1.16, 0.16, 0, 0xe07f12),
+        hbx(0.28, 0.32, 1.00, 1.16, 0.16, 0, 0xe07f12),
       ];
       for (let i = 0; i < 3; i++) {
         const cx = (-0.76 + i * 0.76) * LANE_FIT;
@@ -6166,13 +6175,13 @@ MR.World = (function () {
      * cap keep it in the same family.
      */
     const jumpWorksGeo = merge([
-      gl(hbx(2.24, 0.16, 1.04, 0, 0.08, 0, 0x2b2f52), GLOSS.matte),
-      gl(hcbx(2.24, 0.34, 1.04, 0, 0.57, 0, 0xffb020, 0.05), GLOSS.paint),
-      gl(hcbx(2.36, 0.14, 1.08, 0, 0.73, 0, 0xfff2e0, 0.04), GLOSS.matte),
-      gl(hcbx(0.34, 0.80, 0.34, -1.13, 0.40, -0.34, 0xe07f12, 0.06), GLOSS.paint),
-      gl(hcbx(0.34, 0.80, 0.34, 1.13, 0.40, -0.34, 0xe07f12, 0.06), GLOSS.paint),
-      gl(hcbx(0.34, 0.80, 0.34, -1.13, 0.40, 0.34, 0xe07f12, 0.06), GLOSS.paint),
-      gl(hcbx(0.34, 0.80, 0.34, 1.13, 0.40, 0.34, 0xe07f12, 0.06), GLOSS.paint),
+      gl(hbx(2.24, 0.16, 1.00, 0, 0.08, 0, 0x2b2f52), GLOSS.matte),
+      gl(hcbx(2.24, 0.34, 1.00, 0, 0.57, 0, 0xffb020, 0.05), GLOSS.paint),
+      gl(hcbx(2.36, 0.14, 1.00, 0, 0.73, 0, 0xfff2e0, 0.04), GLOSS.matte),
+      gl(hcbx(0.34, 0.80, 0.34, -1.13, 0.40, -0.32, 0xe07f12, 0.06), GLOSS.paint),
+      gl(hcbx(0.34, 0.80, 0.34, 1.13, 0.40, -0.32, 0xe07f12, 0.06), GLOSS.paint),
+      gl(hcbx(0.34, 0.80, 0.34, -1.13, 0.40, 0.32, 0xe07f12, 0.06), GLOSS.paint),
+      gl(hcbx(0.34, 0.80, 0.34, 1.13, 0.40, 0.32, 0xe07f12, 0.06), GLOSS.paint),
     ]);
 
     /**
@@ -6194,7 +6203,7 @@ MR.World = (function () {
     const jumpScooterGeo = (function () {
       const parts = [
         hbx(2.24, 0.22, 1.00, 0, 0.11, 0, 0xffb020),
-        hbx(2.34, 0.10, 1.02, 0, 0.27, 0, 0xfff2e0),
+        hbx(2.34, 0.10, 1.00, 0, 0.27, 0, 0xfff2e0),
         hbx(0.28, 0.32, 1.00, -1.16, 0.16, 0, 0xe07f12),
         hbx(0.28, 0.32, 1.00, 1.16, 0.16, 0, 0xe07f12),
       ];
@@ -6220,10 +6229,12 @@ MR.World = (function () {
     })();
 
     const jumpPool = hazardPool(K.JUMP, 'jump', [
-      { geo: jumpGeo, face: [2.2, 0.62, 0.36, -0.531] },
-      { geo: jumpConeGeo, face: [2.2, 0.24, 0.16, -0.521] },
-      { geo: jumpWorksGeo, face: [2.2, 0.32, 0.57, -0.531] },
-      { geo: jumpScooterGeo, face: [2.2, 0.24, 0.16, -0.521] },
+      // Every face is 0.512 now: outside the 0.50 the art reaches and inside
+      // the 0.52 the box allows. They were 0.521 and 0.531.
+      { geo: jumpGeo, face: [2.2, 0.62, 0.36, -0.512] },
+      { geo: jumpConeGeo, face: [2.2, 0.24, 0.16, -0.512] },
+      { geo: jumpWorksGeo, face: [2.2, 0.32, 0.57, -0.512] },
+      { geo: jumpScooterGeo, face: [2.2, 0.24, 0.16, -0.512] },
     ]);
 
     /**
@@ -6244,8 +6255,11 @@ MR.World = (function () {
       // silhouette at forty units, and the cut is small enough not to touch
       // that -- what it changes is the near view, where the bar the camera
       // flies under was four flat faces meeting at square corners.
-      gl(hcbx(2.30, 0.30, 0.60, 0, 1.56, 0, 0x37d6ff, 0.05), GLOSS.paint),
-      gl(hcbx(2.36, 0.12, 0.62, 0, 1.77, 0, 0xd8f8ff, 0.03), GLOSS.trim),
+      // 0.56 deep, not 0.60/0.62. A DUCK box is halfZ 0.30 and the cap was
+      // 0.62 -- 0.01 outside its own envelope, with the striped face 0.002
+      // outside that again. Same correction as the JUMP plinths.
+      gl(hcbx(2.30, 0.30, 0.56, 0, 1.56, 0, 0x37d6ff, 0.05), GLOSS.paint),
+      gl(hcbx(2.36, 0.12, 0.56, 0, 1.77, 0, 0xd8f8ff, 0.03), GLOSS.trim),
       // The standards keep their own thickness -- only where they stand moves.
       // Scaling a 0.26 post down with the lane would have left the tall cyan
       // verticals, which are the whole distance read on a DUCK, as hairlines.
@@ -6270,15 +6284,17 @@ MR.World = (function () {
      */
     const duckScaffoldGeo = (function () {
       const parts = [
-        hbx(2.30, 0.34, 0.58, 0, 1.58, 0, 0x37d6ff),
-        hbx(2.38, 0.12, 0.60, 0, 1.79, 0, 0xd8f8ff),
-        hbx(2.24, 0.10, 0.44, 0, 1.44, 0, 0x1f9fd0),
+        hbx(2.30, 0.34, 0.54, 0, 1.58, 0, 0x37d6ff),
+        hbx(2.38, 0.12, 0.56, 0, 1.79, 0, 0xd8f8ff),
+        hbx(2.24, 0.10, 0.42, 0, 1.44, 0, 0x1f9fd0),
       ];
       for (const sx of [-1, 1]) {
         parts.push(cyl(0.15, 0.15, 3.34, 8, sx * 1.20 * LANE_FIT, 1.67, 0, 0x37d6ff));
         parts.push(cyl(0.19, 0.19, 0.16, 8, sx * 1.20 * LANE_FIT, 2.42, 0, 0x0d2b36));
         parts.push(cyl(0.19, 0.19, 0.16, 8, sx * 1.20 * LANE_FIT, 3.02, 0, 0x0d2b36));
-        parts.push(bx(0.56, 0.14, 0.56, sx * 1.20 * LANE_FIT, 0.07, 0, 0x2b2f52));
+        // 0.50 across, not 0.56: the plate reached 1.148 from the lane centre
+        // against a box halfX of 1.12, and it was the widest thing in the game.
+        parts.push(bx(0.50, 0.14, 0.54, sx * 1.20 * LANE_FIT, 0.07, 0, 0x2b2f52));
         parts.push(bx(0.42, 0.20, 0.42, sx * 1.20 * LANE_FIT, 3.38, 0, 0xd8f8ff));
         // Kicker braces. Canted, but the cant is 0.12 and the foot is pulled
         // INSIDE the standard, because the number that matters is how far the
@@ -6299,9 +6315,9 @@ MR.World = (function () {
      */
     const duckSignGeo = (function () {
       const parts = [
-        hbx(2.30, 0.42, 0.56, 0, 1.62, 0, 0x37d6ff),
-        hbx(2.38, 0.10, 0.58, 0, 1.81, 0, 0xd8f8ff),
-        hbx(2.38, 0.08, 0.58, 0, 1.43, 0, 0xd8f8ff),
+        hbx(2.30, 0.42, 0.54, 0, 1.62, 0, 0x37d6ff),
+        hbx(2.38, 0.10, 0.56, 0, 1.81, 0, 0xd8f8ff),
+        hbx(2.38, 0.08, 0.56, 0, 1.43, 0, 0xd8f8ff),
       ];
       for (const sx of [-1, 1]) {
         const px = sx * 1.20 * LANE_FIT;
@@ -6315,15 +6331,15 @@ MR.World = (function () {
         parts.push(bx(0.36, 0.18, 0.36, px, 2.86, 0, 0x0d2b36));
         parts.push(bx(0.30, 0.44, 0.30, px, 3.14, 0, 0x1f9fd0));
         parts.push(bx(0.40, 0.24, 0.40, px, 3.44, 0, 0xd8f8ff));
-        parts.push(bx(0.54, 0.24, 0.54, px, 0.12, 0, 0x2b2f52));
+        parts.push(bx(0.50, 0.24, 0.52, px, 0.12, 0, 0x2b2f52));
       }
       return merge(parts);
     })();
 
     const duckPool = hazardPool(K.DUCK, 'duck', [
-      { geo: duckGeo, face: [2.26, 0.40, 1.62, -0.302] },
+      { geo: duckGeo, face: [2.26, 0.40, 1.62, -0.292] },
       { geo: duckScaffoldGeo, face: [2.26, 0.36, 1.58, -0.292] },
-      { geo: duckSignGeo, face: [2.26, 0.34, 1.62, -0.282] },
+      { geo: duckSignGeo, face: [2.26, 0.34, 1.62, -0.292] },
     ]);
 
     /**
@@ -6572,13 +6588,19 @@ MR.World = (function () {
       // livery, and it is already the tightest BLOCK but one on chroma. A
       // highlight on the white would be spent making it whiter.
       gl(hcbx(2.20, 0.52, 1.30, 0, 0.26, 0, 0x2b2f52, 0.06), GLOSS.trim),
-      gl(hcbx(2.12, 2.00, 1.06, 0, 1.56, 0, 0xff3b6b, 0.06), GLOSS.paint),
-      gl(hcbx(2.26, 0.16, 1.14, 0, 0.72, 0, 0xfff2e0, 0.04), GLOSS.matte),
-      gl(hcbx(2.26, 0.16, 1.14, 0, 1.60, 0, 0xfff2e0, 0.04), GLOSS.matte),
-      gl(hcbx(2.26, 0.16, 1.14, 0, 2.44, 0, 0xfff2e0, 0.04), GLOSS.matte),
-      gl(hcbx(2.28, 0.24, 1.20, 0, 2.68, 0, 0xd42a55, 0.05), GLOSS.paint),
-      gl(bxAt(0.34, 0.34, 0.34, -0.74, 2.92, 0, 0xffe45e), GLOSS.trim),
-      gl(bxAt(0.34, 0.34, 0.34, 0.74, 2.92, 0, 0xffe45e), GLOSS.trim),
+      // THE WHOLE STACK CAME DOWN 0.10, because the beacons were at 3.09
+      // against a BLOCK ceiling of 2.80 -- 0.29 of hazard standing outside its
+      // own collision box, on the variant that has been in the game longest.
+      // Nothing had ever compared the two. The board, its bands and its cap
+      // drop together so the proportions are untouched and the lamps still
+      // stand proud of the cap; the object now tops out at 2.79.
+      gl(hcbx(2.12, 2.00, 1.06, 0, 1.46, 0, 0xff3b6b, 0.06), GLOSS.paint),
+      gl(hcbx(2.26, 0.16, 1.14, 0, 0.62, 0, 0xfff2e0, 0.04), GLOSS.matte),
+      gl(hcbx(2.26, 0.16, 1.14, 0, 1.50, 0, 0xfff2e0, 0.04), GLOSS.matte),
+      gl(hcbx(2.26, 0.16, 1.14, 0, 2.34, 0, 0xfff2e0, 0.04), GLOSS.matte),
+      gl(hcbx(2.28, 0.24, 1.20, 0, 2.58, 0, 0xd42a55, 0.05), GLOSS.paint),
+      gl(bxAt(0.30, 0.30, 0.30, -0.74, 2.64, 0, 0xffe45e), GLOSS.trim),
+      gl(bxAt(0.30, 0.30, 0.30, 0.74, 2.64, 0, 0xffe45e), GLOSS.trim),
     ]);
 
     /**
@@ -6623,9 +6645,13 @@ MR.World = (function () {
     const blockTrikeGeo = (function () {
       const parts = [
         // Cargo box: the lane-filling mass.
-        hbx(2.02, 1.02, 1.20, 0, 0.72, 0.02, TRIKE_BODY),
-        hbx(2.10, 0.15, 1.24, 0, 1.28, 0.02, VAN_BODY),
-        hbx(2.06, 0.20, 1.26, 0, 0.20, 0.02, TRIKE_DARK),
+        // 1.86 of load box, not 1.20. A cargo trike is 2.6 m over all, which
+        // is 2.20 here, and the box is most of it -- the whole point of the
+        // vehicle is that it carries something. At 1.30 of envelope the box
+        // was 1.20 and the rider had to stand inside its own footprint.
+        hbx(2.02, 1.02, 1.86, 0, 0.72, -0.62, TRIKE_BODY),
+        hbx(2.10, 0.15, 1.90, 0, 1.28, -0.62, VAN_BODY),
+        hbx(2.06, 0.20, 1.92, 0, 0.20, -0.62, TRIKE_DARK),
         /**
          * THE RIDER, resized and revalued after a full playtest in which the
          * player reported seeing no cyclist at all.
@@ -6648,15 +6674,15 @@ MR.World = (function () {
          *
          * Top of the helmet is 2.72, inside the 2.80 the collision box records.
          */
-        hbx(1.14, 0.24, 0.56, 0, 1.42, 0.86, 0x2b2f52),
-        hbx(1.22, 0.54, 0.58, 0, 1.81, 0.86, VAN_BODY),
-        hbx(1.10, 0.10, 0.54, 0, 2.13, 0.86, 0x2b2f52),
-        hbx(0.60, 0.48, 0.50, 0, 2.44, 0.90, 0xffc79a),
-        hbx(0.70, 0.22, 0.60, 0, 2.61, 0.90, PINK),
+        hbx(1.14, 0.24, 0.56, 0, 1.42, 0.62, 0x2b2f52),
+        hbx(1.22, 0.54, 0.58, 0, 1.81, 0.62, VAN_BODY),
+        hbx(1.10, 0.10, 0.54, 0, 2.13, 0.62, 0x2b2f52),
+        hbx(0.60, 0.48, 0.50, 0, 2.44, 0.66, 0xffc79a),
+        hbx(0.70, 0.22, 0.60, 0, 2.61, 0.66, PINK),
         // Arms down onto the bars, which is what puts a lean in the shape.
-        hbx(0.22, 0.62, 0.20, -0.62, 1.56, 1.06, 0x2b2f52, 0.34),
-        hbx(0.22, 0.62, 0.20, 0.62, 1.56, 1.06, 0x2b2f52, 0.34),
-        hbx(0.98, 0.12, 0.12, 0, 1.28, 1.24, 0x2b2f52),
+        hbx(0.22, 0.72, 0.20, -0.62, 1.52, 0.98, 0x2b2f52, 0.44),
+        hbx(0.22, 0.72, 0.20, 0.62, 1.52, 0.98, 0x2b2f52, 0.44),
+        hbx(0.98, 0.12, 0.12, 0, 1.24, 1.34, 0x2b2f52),
       ];
       // Wheels. Seen from directly behind they are slabs rather than discs, so
       // they are built as discs on an x axis and read as tyres under the box.
@@ -6664,13 +6690,16 @@ MR.World = (function () {
       // the only part of it below the cargo box, so if they read as three dark
       // smudges the whole vehicle is a floating crate.
       for (const wx of [-0.86, 0.86]) {
-        vWheel(parts, wx * LANE_FIT, 0.34, 0.20, 0.34, 0.16, 0x2b2f52, WHEEL_RIM, WHEEL_HUB);
+        vWheel(parts, wx * LANE_FIT, 0.34, -0.62, 0.34, 0.16, 0x2b2f52, WHEEL_RIM, WHEEL_HUB);
       }
-      vWheel(parts, 0, 0.32, 1.32, 0.32, 0.12, 0x2b2f52, WHEEL_RIM, WHEEL_HUB);
+      vWheel(parts, 0, 0.32, 1.52, 0.32, 0.12, 0x2b2f52, WHEEL_RIM, WHEEL_HUB);
+      // The boom from the load box out to the head tube, which is what a
+      // trike has instead of a frame and what 2.20 of length makes visible.
+      parts.push(bxAt(0.16, 0.14, 1.10, 0, 0.62, 0.90, TRIKE_DARK));
       // Safety pennants, one each side.
       for (const sx of [-1, 1]) {
-        parts.push(bxAt(0.11, 1.56, 0.11, sx * 0.92, 1.94, 0.02, TRIKE_BODY));
-        parts.push(bxAt(0.09, 0.74, 0.58, sx * 0.92, 2.34, 0.32, PINK));
+        parts.push(bxAt(0.11, 1.56, 0.11, sx * 0.92, 1.94, -0.62, TRIKE_BODY));
+        parts.push(bxAt(0.09, 0.74, 0.58, sx * 0.92, 2.34, -0.32, PINK));
       }
       return merge(parts);
     })();
@@ -6746,11 +6775,31 @@ MR.World = (function () {
       }
       return merge(parts);
     })();
-    /** The stop paddle, on its own pivot at the marshal's hand. */
+    /**
+     * The stop paddle, on its own pivot at the marshal's INNER hand.
+     *
+     * IT USED TO LEAVE THE LANE, AND NOTHING SAID SO. The paddle was a 2.00
+     * stick pivoted at the outer hand (x 0.665 in world) and waved through
+     * +/-0.42 radians: the roundel swung to **1.865 from the lane centre**,
+     * which is past the middle of the next lane along, and it was the widest
+     * moving thing in the game. There was no halfX in MR.Collision.BOX to
+     * measure it against, so it had never been measured at all.
+     *
+     * The lever arm is what does the damage -- a wave sweeps (reach x sin t)
+     * sideways -- and there is no amplitude worth having at a 2.00 reach from
+     * a pivot already 0.665 out. Both change: the pivot moves to the inner
+     * hand and the paddle is rebuilt at 1.28 of reach, so it sweeps to 1.07
+     * with the wave INTACT at +/-0.42. The roundel still lands at 2.5, which
+     * is where it was, because the pivot went up as the stick came down.
+     *
+     * It also reads better: a paddle held up BETWEEN two marshals is what a
+     * road closure looks like, and out at the shoulder it was competing with
+     * the pennant line for the edge of the silhouette.
+     */
     const blockPaddleGeo = merge([
-      bx(0.11, 1.44, 0.11, 0, 0.72, 0, 0xfff2e0),
-      cyl(0.42, 0.42, 0.10, 12, 0, 1.58, -0.07, 0xff3b6b, Math.PI / 2),
-      bx(0.54, 0.15, 0.12, 0, 1.58, -0.14, 0xfff2e0),
+      bx(0.11, 0.80, 0.11, 0, 0.40, 0, 0xfff2e0),
+      cyl(0.38, 0.38, 0.10, 12, 0, 0.90, -0.07, 0xff3b6b, Math.PI / 2),
+      bx(0.50, 0.14, 0.12, 0, 0.90, -0.14, 0xfff2e0),
     ]);
 
     /**
@@ -7246,13 +7295,26 @@ MR.World = (function () {
         // the hazard's own contact shadow, and at 22 units a navy disc on a
         // multiplied shadow is nothing at all -- the bikes were invisible under
         // their own riders.
-        vWheel(parts, X * LANE_FIT, 0.33, 0.06, 0.33, 0.10, 0x6d76a8, WHEEL_RIM, WHEEL_HUB);
-        parts.push(bxAt(0.08, 0.52, 0.10, X, 0.62, 0.14, p.frame));
-        parts.push(bxAt(0.34, 0.09, 0.18, X, 0.92, 0.06, 0x2a0c16));
+        // TWO WHEELS, WHICH IS WHAT A BICYCLE HAS. It had one. At halfZ 0.65
+        // there was 1.30 of envelope and the wheels are 0.66 across, so a
+        // second wheel would have left 0.64 between the tyres -- a wheelbase
+        // shorter than a wheel, which is a unicycle with a spare. At 1.95 the
+        // pair sits at -0.28 and +0.90, a 1.18 wheelbase, and the object is a
+        // bicycle from every angle instead of only from directly behind.
+        vWheel(parts, X * LANE_FIT, 0.33, -0.28, 0.33, 0.10, 0x6d76a8, WHEEL_RIM, WHEEL_HUB);
+        vWheel(parts, X * LANE_FIT, 0.33, 0.90, 0.33, 0.10, 0x6d76a8, WHEEL_RIM, WHEEL_HUB);
+        // Seat tube, down tube and the fork, which is the diamond a bike reads
+        // by from the flank -- and the flank is the view that did not exist.
+        parts.push(bxAt(0.08, 0.52, 0.10, X, 0.62, -0.18, p.frame));
+        parts.push(bxAt(0.08, 0.12, 1.02, X, 0.56, 0.32, p.frame, -0.34));
+        parts.push(bxAt(0.07, 0.66, 0.09, X, 0.66, 0.88, p.frame, 0.22));
+        parts.push(bxAt(0.34, 0.09, 0.18, X, 0.92, -0.24, 0x2a0c16));
+        // Bars, out front where the rider's hands go.
+        parts.push(bxAt(0.44, 0.07, 0.08, X, 1.02, 0.80, 0x2a0c16));
         // The rear light, as a disc facing the lens with a bright core, exactly
         // as the cars carry it -- red alone renders darker than the road.
-        parts.push(cyl(0.09, 0.09, 0.10, 8, X * LANE_FIT, 0.80, -0.03, LAMP_RED, Math.PI / 2));
-        parts.push(cyl(0.048, 0.048, 0.13, 8, X * LANE_FIT, 0.80, -0.035, LAMP_CORE, Math.PI / 2));
+        parts.push(cyl(0.09, 0.09, 0.10, 8, X * LANE_FIT, 0.80, -0.45, LAMP_RED, Math.PI / 2));
+        parts.push(cyl(0.048, 0.048, 0.13, 8, X * LANE_FIT, 0.80, -0.455, LAMP_CORE, Math.PI / 2));
         // Dark waist, hi-vis where the eye lands, dark collar, skin, pink lid.
         // Everything up here is seen against pale road or paler sky.
         parts.push(bxAt(0.50, 0.36, 0.32, X, 1.16 + y, 0.10, p.shorts));
@@ -7316,8 +7378,8 @@ MR.World = (function () {
         bx(0.74, 0.16, 0.44, 0, 0.76, 0.10, 0x2a0c16),
         // The cube was 0.20 taller and hid the rider it exists to carry: only
         // 0.20 of hi-vis cleared it, so the whole thing read as a box on a wheel.
-        gl(cbx(1.52 * LANE_FIT, 0.66, 0.56, 0, 1.19, -0.30, PINK, 0.06), GLOSS.paint),
-        gl(cbx(1.60 * LANE_FIT, 0.10, 0.60, 0, 1.57, -0.30, KIT_B, 0.03), GLOSS.trim),
+        gl(cbx(1.52 * LANE_FIT, 0.66, 0.62, 0, 1.19, -0.52, PINK, 0.06), GLOSS.paint),
+        gl(cbx(1.60 * LANE_FIT, 0.10, 0.66, 0, 1.57, -0.52, KIT_B, 0.03), GLOSS.trim),
         bx(0.56, 0.42, 0.34, 0, 1.14, 0.24, 0x2a0c16),
         bx(0.68, 0.56, 0.40, 0, 1.64, 0.26, KIT_B),        // hi-vis back
         bx(0.58, 0.10, 0.36, 0, 1.97, 0.26, 0x2a0c16),
@@ -7332,13 +7394,23 @@ MR.World = (function () {
         bx(0.28, 0.17, 0.07, 0.62, 1.80, 0.54, KIT_B),
         // The number plate, and it is the lowest bright thing on the vehicle --
         // which is the job the reference gives it on every one of its four.
-        bx(0.34, 0.14, 0.06, 0, 0.72, -0.62, PLATE),
+        bx(0.34, 0.14, 0.06, 0, 0.72, -0.92, PLATE),
       ];
-      // The road wheel, with a rim like everything else that rolls.
-      vWheel(parts, 0, 0.31, -0.06, 0.31, 0.13, TYRE, WHEEL_RIM, WHEEL_HUB);
+      // BOTH ROAD WHEELS. Same correction as the bicycles and for the same
+      // reason: a moped is 1.9 m long, which is 1.61 here, and it had 1.30 to
+      // live in with 0.62 of that taken by one tyre. The pair now sits at
+      // -0.36 and +0.78, with the fork raked forward from the bars to meet the
+      // front hub -- which is the one line that makes a two-wheeler read as a
+      // two-wheeler from the side.
+      vWheel(parts, 0, 0.31, -0.36, 0.31, 0.13, TYRE, WHEEL_RIM, WHEEL_HUB);
+      vWheel(parts, 0, 0.29, 0.78, 0.29, 0.12, TYRE, WHEEL_RIM, WHEEL_HUB);
+      for (const sx of [-1, 1]) {
+        parts.push(bx(0.07, 0.92, 0.09, sx * 0.13, 0.86, 0.66, 0x2a0c16, -0.24));
+      }
+      parts.push(bx(0.30, 0.09, 0.26, 0, 1.34, 0.60, 0x2a0c16));
       // One rear lamp, on the centreline, built the way the cars build theirs.
-      parts.push(cyl(0.13, 0.13, 0.10, 8, 0, 0.94, -0.58, LAMP_RED, Math.PI / 2));
-      parts.push(cyl(0.069, 0.069, 0.13, 8, 0, 0.94, -0.585, LAMP_CORE, Math.PI / 2));
+      parts.push(cyl(0.13, 0.13, 0.10, 8, 0, 0.94, -0.88, LAMP_RED, Math.PI / 2));
+      parts.push(cyl(0.069, 0.069, 0.13, 8, 0, 0.94, -0.885, LAMP_CORE, Math.PI / 2));
       return merge(parts);
     })();
 
@@ -7378,17 +7450,19 @@ MR.World = (function () {
       },
       { geo: blockSignGeo, face: [2.06, 1.7, 1.58, -0.541], weight: 1 },
       {
-        geo: blockTrikeGeo, face: [1.98, 0.52, 0.62, -0.591], weight: 1,
+        geo: blockTrikeGeo, face: [1.98, 0.52, 0.62, -1.571], weight: 1,
         // Bottom bracket lifted to the box line and pulled forward of its far
         // face, so the knees break the box's top edge instead of pedalling
         // behind it. See blockTrikeCrankGeo.
-        moving: blockTrikeCrankGeo, pivot: [0, 1.30, 0.55], anim: 'pedal',
+        moving: blockTrikeCrankGeo, pivot: [0, 1.30, 0.36], anim: 'pedal',
       },
       {
-        geo: blockCrossGeo, face: [2.10, 0.50, 0.98, -0.655], weight: 2,
-        // Dropped 0.20 so the roundel's top lands exactly on the 2.80 the
-        // collision box records for a BLOCK rather than 0.20 over it.
-        moving: blockPaddleGeo, pivot: [0.92, 0.80, 0.30], anim: 'paddle',
+        geo: blockCrossGeo, face: [2.10, 0.50, 0.98, -0.641], weight: 2,
+        // Inner hand, and high. See blockPaddleGeo: the reach is 1.28 from
+        // here, so the +/-0.42 wave sweeps to 1.07 from the lane centre
+        // against a box halfX of 1.12, and the roundel tops out at 2.62
+        // against a ceiling of 2.80 with the shudder counted.
+        moving: blockPaddleGeo, pivot: [0.30, 1.26, 0.34], anim: 'paddle',
       },
       { geo: blockBusGeo, face: [2.16, 0.28, 1.22, -1.941], weight: 2, anim: 'idle' },
       { geo: blockTaxiGeo, face: [2.02, 0.22, 0.98, -1.941], weight: 2, anim: 'idle' },
@@ -7402,10 +7476,10 @@ MR.World = (function () {
         moving: blockRefuseGateGeo, pivot: [0, 1.30, -1.86], anim: 'lift',
       },
       {
-        geo: blockRoadBikeGeo, face: [1.70, 0.20, 0.32, -0.481], weight: 2,
-        moving: blockRoadBikeCrankGeo, pivot: [0, 0.60, 0.14], anim: 'pedal',
+        geo: blockRoadBikeGeo, face: [1.70, 0.20, 0.32, -0.631], weight: 2,
+        moving: blockRoadBikeCrankGeo, pivot: [0, 0.60, 0.20], anim: 'pedal',
       },
-      { geo: blockMopedGeo, face: [1.30, 0.24, 1.10, -0.621], weight: 2, anim: 'idle' },
+      { geo: blockMopedGeo, face: [1.30, 0.24, 1.10, -0.921], weight: 2, anim: 'idle' },
     ]);
 
     /**

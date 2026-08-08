@@ -311,6 +311,71 @@ MR.World = (function () {
   const PROP_KINDS = ['building', 'tree', 'grove', 'crowd', 'walkers'];
 
   /**
+   * =============== ROAD TRAFFIC: REFUSED, WITH THE MEASUREMENT ==============
+   *
+   * A sixth prop kind was meant to go here -- pooled cars driving a live
+   * carriageway beside the closed course, on the argument that there is no
+   * background traffic in this game at all and that is the largest single gap
+   * in it. That argument is correct. It is refused anyway, because there is
+   * nowhere to put the carriageway, and this records the measurement so the
+   * next agent does not have to take it again.
+   *
+   * THE BAND, measured off the live scene at four points in a race rather than
+   * read off the source. Outboard from the centre line:
+   *
+   *   0.00 - 3.75   play carriageway. CORRIDOR_HALF.
+   *   4.60          crowd barrier
+   *   4.50 - 10.20  crowd knots. Centres roll TRACK_HALF_WIDTH + 1.9 + 3.4,
+   *                 and a knot is about +/-1.1 wide.
+   *   7.95 - 14.60  walkers. WALK_IN plus a 3.6 roll, then up to 11 units of
+   *                 outward drift on top.
+   *   7.50 - 26.00  trees, and groves at s.x + 10.
+   *   11.35         THE WALL's hoarding, continuous, both sides, the whole leg
+   *  12.20          street wall front face; buildings behind it to 43.5
+   *
+   * There is no continuous gap. A carriageway needs one, because a car drives
+   * ALONG it -- reserving z the way the street wall opens for a landmark does
+   * nothing for an object whose whole behaviour is to traverse the reservation.
+   *
+   * WHAT EACH BIOME OFFERS, since "put it where it earns it" was the right
+   * instinct and the answer turned out to be nowhere:
+   *
+   *   CITY START / FINAL MILE   barrier edge. The 7.6 units between the
+   *     barrier and the street wall are the only candidate, and crowd and
+   *     walkers hold it. FINAL MILE additionally runs grandstands from 5.05
+   *     out to 10.45 for the whole leg.
+   *   THE WALL   a continuous 3.4-unit hoarding at 11.35, above the 2.7 eye.
+   *     Anything behind it is invisible by construction; that is the leg's
+   *     entire design.
+   *   RIVERSIDE / PARKLAND   hedge edge, tree weight 2.0-2.6 and grove weight
+   *     2.0-3.6. The densest planting in the game.
+   *   THE BRIDGE   the deck is a ribbon. railGeo ends in a parapet at |x| =
+   *     4.30 and there is open water past it. Nothing to drive on.
+   *
+   * The brief that commissioned this said "there is a far carriageway in some
+   * biomes and a light-rail track in others". THERE IS NEITHER. The four edge
+   * kinds are barrier, hedge, rail and wall; `rail` is the bridge's parapet
+   * railing and `wall` is THE WALL's site hoarding. No traffic surface of any
+   * kind has ever existed in this game, so traffic could not be added to one --
+   * it would have had to be built, and then the band above had to be cleared
+   * for it in four systems at once.
+   *
+   * WHAT WAS BUILT INSTEAD. The traffic went where the geometry already is:
+   * the water. See SHIP_SPEED and the sail loop. That is a real answer to
+   * "distant vehicles" and "water if visible" and it costs nothing in
+   * fairness, because a ship is on the far side of a parapet over water the
+   * player cannot reach and no camera in this game can put one between the
+   * lens and a gate.
+   *
+   * IF THIS IS REOPENED, the cheapest honest route is not a carriageway. It is
+   * an ELEVATED line -- an L-train on a viaduct at |x| ~ 16 with its deck
+   * above OVERHEAD_Y. That band is above the street wall, outside every prop
+   * measured above, exempt from the corridor rule by height rather than by
+   * argument, and Chicago's L is already in the settings table as a landmark
+   * span. It is a set piece plus a mover, not a rearrangement of the roadside.
+   */
+
+  /**
    * ============================ THE SETTINGS ============================
    *
    * Twelve places, three or four of which the day's course draws (see
@@ -7179,8 +7244,20 @@ MR.World = (function () {
     const WALK_IN = K.TRACK_HALF_WIDTH + 4.2;
     function walkersGeo(seed) {
       const parts = [];
-      // Deliberately no hazard hues -- see above.
-      const coats = [0x3f6fbf, 0x2f9f72, 0xf6f2e0, 0x7a5a9a, 0x8a5a3c, 0x4fb0c8];
+      // Deliberately no hazard hues -- see above. AND IT WAS NOT TRUE.
+      //
+      // The rule three paragraphs up says "no pink, no amber, no cyan", and
+      // then the last coat in this list was 0x4fb0c8, which is hue 197 at
+      // saturation 0.76 -- the DUCK cyan, three degrees off, on 12% of a
+      // figure's surface area. tools/motion.js failed on it the first run it
+      // did with an area weight, on a pool that has been drifting laterally
+      // beside the road since it was written. A rule stated in a comment and
+      // contradicted eight lines later is worth less than no rule, because it
+      // stops anyone looking.
+      //
+      // 0x3fa88f is hue 166 -- a sea green, 28 degrees clear of the cyan and
+      // still a coat colour a person would wear.
+      const coats = [0x3f6fbf, 0x2f9f72, 0xf6f2e0, 0x7a5a9a, 0x8a5a3c, 0x3fa88f];
       const skins = [0xffc79a, 0xe0a173, 0xb87a4e, 0x8a5a3c];
       let s = seed * 9301 + 49297;
       const r = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
@@ -7202,12 +7279,20 @@ MR.World = (function () {
         parts.push(bx(0.12, 0.50, 0.12, x - 0.30, 0.98 * h, z - 0.14, coat, 0.34));
         parts.push(bx(0.12, 0.50, 0.12, x + 0.30, 0.98 * h, z + 0.14, coat, -0.34));
         // A bag, a dog or nothing: three silhouettes rather than one repeated.
+        // The tans came down in SATURATION rather than being moved in hue,
+        // because tan IS hue 35-40 and there is nowhere else for it to go. The
+        // colour contract is luminance OR saturation (see the CONTRAST note in
+        // tools/shoot.js), so a desaturated cream is not the amber a JUMP kerb
+        // wears however close the hue sits. 0xe0c69a measured S 0.53 at hue 38
+        // and carried 6.6% of a walker's area, which is over the panel
+        // threshold in tools/motion.js; these are S 0.33 and S 0.22, under the
+        // floor entirely.
         if (i % 3 === 1) {
           parts.push(bx(0.26, 0.30, 0.20, x + 0.38, 0.76 * h, z + 0.20, 0xf6f2e0));
         } else if (i % 3 === 2) {
-          parts.push(bx(0.22, 0.24, 0.56, x + 0.62, 0.30, z + 0.10, 0xe0c69a));
-          parts.push(bx(0.20, 0.22, 0.22, x + 0.62, 0.46, z - 0.20, 0xe0c69a));
-          parts.push(bx(0.09, 0.30, 0.09, x + 0.62, 0.15, z + 0.28, 0xc9a97a));
+          parts.push(bx(0.22, 0.24, 0.56, x + 0.62, 0.30, z + 0.10, 0xd6c8ae));
+          parts.push(bx(0.20, 0.22, 0.22, x + 0.62, 0.46, z - 0.20, 0xd6c8ae));
+          parts.push(bx(0.09, 0.30, 0.09, x + 0.62, 0.15, z + 0.28, 0xbdb098));
         }
       }
       return merge(parts);
@@ -8543,6 +8628,11 @@ MR.World = (function () {
      * scale. Waterline is local y = 0, so the caller sets the height from
      * whatever the water is doing at that z.
      */
+    // One hull length every 10.6 seconds. Derived, and argued, at the sail
+    // loop in api.update -- the short version is that the time-compressed
+    // figure is 35.7 units/s and that reads as a speedboat.
+    const SHIP_SPEED = 3.2;
+
     const shipGeo = (function () {
       const parts = [];
       const HULL = 0x1f3f6e, TOP = 0xd8552f, WHITE = 0xf0f4ff;
@@ -8557,7 +8647,26 @@ MR.World = (function () {
       parts.push(cyl(1.5, 1.7, 3.6, 8, 0, 7.6, -14.0, TOP));
       parts.push(cyl(1.6, 1.6, 0.8, 8, 0, 8.6, -14.0, 0x2b2f52));
       parts.push(bx(0.30, 7.0, 0.30, 0, 9.4, -8.0, WHITE));
-      const box = [0x37d6ff, 0xff4d5e, 0x59d47a, 0xffe45e, 0x9a7bff];
+      // THE CONTAINERS USED TO BE THE HAZARD PALETTE, LITERALLY.
+      //
+      // The old stack was [0x37d6ff, 0xff4d5e, 0x59d47a, 0xffe45e, 0x9a7bff]:
+      // 0x37d6ff is the DUCK cyan to the digit, 0xffe45e is the JUMP amber to
+      // the digit, and 0xff4d5e sits 8 degrees off the BLOCK pink. Three of
+      // five boxes wore the three colours the whole game is read by, on the
+      // largest object on the leg.
+      //
+      // It survived because the ship was MOORED, and a static thing 24 to 40
+      // units off the centre line never draws the eye. Now that it is under
+      // way it does, which is exactly when a hazard hue on a non-hazard costs
+      // something -- and tools/motion.js failed on it the first time it ran.
+      // The colour contract is what tools/shoot.js fails builds over; it is
+      // worth nothing if the moving objects opt out of it.
+      //
+      // Replaced with a real container stack, every hue at least 18 degrees
+      // clear of the nearest hazard family: oxide, forest, deep navy, slate
+      // (below the saturation floor anyway) and plum. Nothing is lost -- a
+      // container yard is rust and dark blue, not neon.
+      const box = [0x8c4a33, 0x3f8452, 0x2f5aa8, 0x6a7080, 0x6a4a7a, 0x2b6f6a];
       for (let i = 0; i < 12; i++) {
         parts.push(bx(7.4, 2.5, 5.4, 0, 2.55 + Math.floor(i / 4) * 2.6,
           -2 + (i % 4) * 6.0, box[i % box.length]));
@@ -9046,6 +9155,19 @@ MR.World = (function () {
     // on an object of known size, is the whole reason they are out there. They
     // are also the only objects on this leg: with the shoulders gone the deck
     // is a ribbon over an empty plane, and a ribbon over nothing has no speed.
+    //
+    // AND THEY ARE UNDER WAY. This leg had exactly one object class in it and
+    // that class was moored, which is why the comment above had to argue that
+    // a ribbon over nothing has no speed -- it was true, and the fix for it
+    // was sitting right there. Ships are the only traffic in this game with
+    // nowhere it could go wrong: they are 24 to 40 units off the centre line
+    // on the far side of a parapet, over water the player cannot reach, in
+    // hull blue and container colours that are not the three hazard hues.
+    //
+    // Heading follows SIDE, which is what a waterway does: landmark() turns a
+    // piece on the -x side through pi, so those ships already point downstream
+    // and the +x ones upstream. That is a navigation rule for free, and it is
+    // why the two columns pass each other rather than drifting in convoy.
     for (let z = DECK_FROM + 60; z < DECK_TO - 40; z += 155) {
       const sd = (Math.round(z / 155) % 2) ? 1 : -1;
       landmark(z, 'ship', sd, 24 + (Math.round(z / 155) % 3) * 8, -0.34 - WATER_DROP, 0,
@@ -10008,12 +10130,77 @@ MR.World = (function () {
         // Buildings and trees stay plumb because nothing hangs off them.
         obj.position.y += eAt(st.z);
         obj.rotation.x = -Math.atan(EL.slope(st.z));
+        // A pooled hull must never inherit the last one's voyage. Cleared here
+        // rather than in the sail loop, because that loop only ever sees
+        // objects that are already claimed and could not tell a fresh claim
+        // from a continuing one.
+        if (st.kind === 'ship') obj.userData.sailT0 = undefined;
         obj.userData.auditName = 'set piece / ' + st.kind;
         activeStruct.push({ st, obj, pool });
       }
       while (activeStruct.length && activeStruct[0].st.z < back - 60) {
         const e = activeStruct.shift();
         e.pool.release(e.obj);
+      }
+
+      /**
+       * ================== SHIPS UNDER WAY ==================
+       *
+       * The only traffic in this game, and the only place traffic can go: see
+       * the refusal recorded on TRAFFIC_REFUSED. They are out over water on
+       * the far side of a parapet, which is why this is the one moving class
+       * that needs no fairness argument at all -- there is no arrangement of
+       * the camera that puts a ship between the lens and a gate.
+       *
+       * SPEED, and it is the question the brief said to answer with a number.
+       *
+       * TIME_SCALE runs the race at 30x, so "realistic" has two readings and
+       * they disagree by a factor of 25. A container ship does 8 m/s; one
+       * world unit is 42195/6292.5 = 6.71 m, so 8 m/s is 1.19 units per RACE
+       * second, which the compression turns into 35.7 units per WALL second --
+       * faster than the player, crossing the whole 210-unit view in six
+       * seconds. That is the arithmetically correct answer and it is the wrong
+       * one, because the eye does not judge a vessel's speed against the
+       * observer, it judges it in BODY LENGTHS PER SECOND. This hull is 34
+       * units long. At 35.7 units/s it covers its own length in under a
+       * second, which is a speedboat; a real ship of that length covers its
+       * own length in about twenty-five.
+       *
+       * So the compressed figure is refused and the perceptual one taken:
+       * 3.2 units/s is one hull length every 10.6 seconds. It reads as under
+       * way rather than moored, it is comfortably slower than the player so
+       * every ship is overtaken (which is what you see from a bridge), and the
+       * two headings close on each other at 6.4 units/s so a passing pair is
+       * legible inside the eleven seconds a ship is on screen.
+       *
+       * Heading comes off the object's own ry rather than a stored field, so
+       * both placement paths get it: the deck loop below DECK_FROM, and the
+       * RIVERSIDE entries in the setting table, which go through the landmark
+       * plan and never touch that loop.
+       *
+       * DRIFT IS BOUNDED BY CONSTRUCTION. A ship is claimed 210 units ahead
+       * and released 94 behind, so it lives for about 304 units of player
+       * travel, i.e. 11.7 s at race pace, i.e. at most 37 units of drift from
+       * its anchor. The release test keys off the ANCHOR, so a ship sailing
+       * with the player is still 57 units behind the lens when it goes, and
+       * one sailing against is 131. Neither can pop on screen.
+       */
+      for (const e of activeStruct) {
+        if (e.st.kind !== 'ship') continue;
+        const d = e.obj.userData;
+        if (d.sailT0 === undefined) {
+          d.sailT0 = now;
+          d.sailZ0 = e.obj.position.z;
+          // ry is 0 or pi. Bow is at local +z, so pi means sailing toward -z.
+          d.sailDir = Math.cos(e.st.ry || 0) >= 0 ? 1 : -1;
+        }
+        e.obj.position.z = d.sailZ0 + (now - d.sailT0) * SHIP_SPEED * d.sailDir;
+        // A long hull rolls slowly and pitches almost not at all. 0.9 degrees
+        // at a twelve-second period is under what the eye reads as motion on
+        // its own -- it is there so the silhouette against the water is never
+        // quite the same twice, which is what stops a moving object still
+        // reading as a decal.
+        e.obj.rotation.z = Math.sin(now * 0.52 + d.sailZ0 * 0.11) * 0.016;
       }
 
       // mile banners

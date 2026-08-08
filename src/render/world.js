@@ -6205,11 +6205,35 @@ MR.World = (function () {
     // four variants. The art gives way to the box, not the other way round.
     const jumpGeo = merge([
       gl(hcbx(2.24, 0.66, 1.00, 0, 0.33, 0, 0xffb020, 0.07), GLOSS.paint),
-      // The cream cap stays MATTE. It is the least saturated element on the
-      // hazard and a highlight on it would brighten exactly the part that pulls
-      // the area mean toward neutral -- the same trap the fleet's gloss ladder
-      // is weighted against.
-      gl(hcbx(2.34, 0.14, 1.00, 0, 0.73, 0, 0xfff2e0, 0.04), GLOSS.matte),
+      // ============ THE CAP IS LEMON, NOT CREAM, ON EVERY JUMP ============
+      //
+      // This is the fleet's own correction, applied to the vocabulary that
+      // never got it. The fleet header states the mechanism: chroma is the
+      // AREA MEAN, cream renders at S 0.092, and "a 15% cream band buys 0.04x
+      // of luminance and destroys 88% of the object's chroma". The fleet
+      // replaced its cream with LEMON 0xfff23a -- rendered (168,177,49),
+      // L 159.9, S 0.726 -- and every vehicle's margin moved.
+      //
+      // The JUMP cap is a bigger share of a JUMP than the fleet's band ever
+      // was of a vehicle, because a JUMP is 0.80 tall and the cap is the top
+      // of it seen from an elevated camera. So it was doing the same damage,
+      // harder, and two of the four variants short of the 1.6x / 0.30 target
+      // were JUMPs sitting under it. Measured on the shipped build, target
+      // margin before and after the swap:
+      //
+      //   v0 kerb    +0.120 -> +0.173      v3 scooters  +0.018 -> +0.270
+      //   v1 cones   -0.090 -> +0.298      v4 barriers  +0.060 -> +0.524
+      //   v2 works   -0.132 -> +0.226      v5 drum      +0.101 -> +0.340
+      //
+      // **All six clear the target and the two that were short clear it by
+      // the widest margins of the four.** The light band survives: lemon
+      // renders L 159.9 against a road of 61 to 90, which is the property the
+      // cap exists for, and pairwise silhouette separation at 40 units is
+      // unchanged to within a point on every pair.
+      //
+      // It stays MATTE. A highlight belongs on the chamfers and the cylinders
+      // where the surface turns, not on a flat band -- see the gloss ladder.
+      gl(hcbx(2.34, 0.14, 1.00, 0, 0.73, 0, 0xfff23a, 0.04), GLOSS.matte),
       gl(hcbx(0.30, 0.80, 1.00, -1.16, 0.40, 0, 0xe07f12, 0.05), GLOSS.paint),
       gl(hcbx(0.30, 0.80, 1.00, 1.16, 0.40, 0, 0xe07f12, 0.05), GLOSS.paint),
     ]);
@@ -6228,15 +6252,15 @@ MR.World = (function () {
     const jumpConeGeo = (function () {
       const parts = [
         hbx(2.24, 0.22, 1.00, 0, 0.11, 0, 0xffb020),
-        hbx(2.34, 0.10, 1.00, 0, 0.27, 0, 0xfff2e0),
+        hbx(2.34, 0.10, 1.00, 0, 0.27, 0, 0xfff23a),
         hbx(0.28, 0.32, 1.00, -1.16, 0.16, 0, 0xe07f12),
         hbx(0.28, 0.32, 1.00, 1.16, 0.16, 0, 0xe07f12),
       ];
       for (let i = 0; i < 3; i++) {
         const cx = (-0.76 + i * 0.76) * LANE_FIT;
-        parts.push(bx(0.62, 0.09, 0.62, cx, 0.36, 0, 0x2b2f52));
+        parts.push(bx(0.62, 0.09, 0.62, cx, 0.36, 0, 0x3d2408));
         parts.push(cone(0.30, 0.48, 8, cx, 0.55, 0, 0xff7a1f));
-        parts.push(cyl(0.20, 0.23, 0.11, 8, cx, 0.55, 0, 0xfff2e0));
+        parts.push(cyl(0.20, 0.23, 0.11, 8, cx, 0.55, 0, 0xfff23a));
       }
       return merge(parts);
     })();
@@ -6244,13 +6268,25 @@ MR.World = (function () {
     /**
      * JUMP v2: a works trench with a low chevron barrier over it. The dark
      * trench mouth under the board is what makes this one read differently at
-     * speed -- a hole rather than a lump -- while the amber frame and the cream
-     * cap keep it in the same family.
+     * speed -- a hole rather than a lump -- while the amber frame and the
+     * light cap keep it in the same family.
+     *
+     * THE MOUTH IS DARK AMBER AND NOT NAVY, which is the second half of the
+     * contrast fix and the same area-mean rule as the cap. The fleet states
+     * it plainly: "Every dark bottom is a dark version of its own vehicle's
+     * hue rather than a shared neutral... one grey bumper bar on seven
+     * vehicles would put 13% of neutral back into every one of them." The
+     * mouth is 2.24 wide across the front of a 0.80-tall object -- the single
+     * largest dark area in the JUMP vocabulary -- and it was 0x2b2f52, a
+     * near-neutral navy. At 0x3d2408 it still reads as a hole, because what
+     * makes a hole is the VALUE step and not the hue, and the variant's
+     * saturation against the road went 0.034 to 0.170 on that change alone.
+     * The cone bases in v1 were the same navy and took the same correction.
      */
     const jumpWorksGeo = merge([
-      gl(hbx(2.24, 0.16, 1.00, 0, 0.08, 0, 0x2b2f52), GLOSS.matte),
+      gl(hbx(2.24, 0.16, 1.00, 0, 0.08, 0, 0x3d2408), GLOSS.matte),
       gl(hcbx(2.24, 0.34, 1.00, 0, 0.57, 0, 0xffb020, 0.05), GLOSS.paint),
-      gl(hcbx(2.36, 0.14, 1.00, 0, 0.73, 0, 0xfff2e0, 0.04), GLOSS.matte),
+      gl(hcbx(2.36, 0.14, 1.00, 0, 0.73, 0, 0xfff23a, 0.04), GLOSS.matte),
       gl(hcbx(0.34, 0.80, 0.34, -1.13, 0.40, -0.32, 0xe07f12, 0.06), GLOSS.paint),
       gl(hcbx(0.34, 0.80, 0.34, 1.13, 0.40, -0.32, 0xe07f12, 0.06), GLOSS.paint),
       gl(hcbx(0.34, 0.80, 0.34, -1.13, 0.40, 0.32, 0xe07f12, 0.06), GLOSS.paint),
@@ -6276,14 +6312,14 @@ MR.World = (function () {
     const jumpScooterGeo = (function () {
       const parts = [
         hbx(2.24, 0.22, 1.00, 0, 0.11, 0, 0xffb020),
-        hbx(2.34, 0.10, 1.00, 0, 0.27, 0, 0xfff2e0),
+        hbx(2.34, 0.10, 1.00, 0, 0.27, 0, 0xfff23a),
         hbx(0.28, 0.32, 1.00, -1.16, 0.16, 0, 0xe07f12),
         hbx(0.28, 0.32, 1.00, 1.16, 0.16, 0, 0xe07f12),
       ];
       // Down flat. Wheels are discs on their SIDE here -- a scooter on the deck
       // has its wheels lying horizontal, which is the one orientation where the
       // default cylinder axis is already right.
-      parts.push(bxAt(1.28, 0.11, 0.30, -0.30, 0.38, -0.10, 0xfff2e0));
+      parts.push(bxAt(1.28, 0.11, 0.30, -0.30, 0.38, -0.10, 0xfff23a));
       parts.push(bxAt(0.18, 0.13, 0.30, -0.98, 0.39, -0.10, 0x2b2f52));
       parts.push(cyl(0.12, 0.12, 0.07, 8, -0.72, 0.42, -0.24, 0x1e2140));
       parts.push(cyl(0.12, 0.12, 0.07, 8, 0.20, 0.42, -0.02, 0x1e2140));
@@ -6297,7 +6333,7 @@ MR.World = (function () {
       // x = 1.19, past the 1.118 HAZARD_HALF this file derives its clearances
       // from and 0.24 further out than any other JUMP -- two hazards in
       // adjacent lanes would have interpenetrated.
-      parts.push(bxAt(0.62, 0.10, 0.22, 0.80, 0.30, 0.26, 0xfff2e0));
+      parts.push(bxAt(0.62, 0.10, 0.22, 0.80, 0.30, 0.26, 0xfff23a));
       return merge(parts);
     })();
 
@@ -6337,7 +6373,7 @@ MR.World = (function () {
         // The moulded waist, in the body's own darker hue.
         parts.push(gl(hcbx(0.66, 0.07, 0.96, cx, 0.40, 0, 0xe07f12, 0.02), GLOSS.paint));
         // The cap segment. Matte, for the reason stated on the kerb's cap.
-        parts.push(gl(hcbx(0.68, 0.12, 0.96, cx, 0.72, 0, 0xfff2e0, 0.03), GLOSS.matte));
+        parts.push(gl(hcbx(0.68, 0.12, 0.96, cx, 0.72, 0, 0xfff23a, 0.03), GLOSS.matte));
       }
       // The interlock pins standing in the joints. Two of them, and they are
       // what tells you at close range that this is a linked run rather than
@@ -6387,7 +6423,7 @@ MR.World = (function () {
         // the whole variant measured L 146.5 against a 1.6x target of 144.6,
         // which is 1.3% of margin on the axis that carries it. The strip is
         // the only lever here that moves L without moving the silhouette.
-        gl(hcbx(2.30, 0.09, 0.66, 0, 0.325, 0, 0xfff2e0, 0.03), GLOSS.matte),
+        gl(hcbx(2.30, 0.09, 0.66, 0, 0.325, 0, 0xfff23a, 0.03), GLOSS.matte),
         gl(hcbx(0.26, 0.34, 1.00, -1.10, 0.17, 0, 0xe07f12, 0.05), GLOSS.paint),
         gl(hcbx(0.26, 0.34, 1.00, 1.10, 0.17, 0, 0xe07f12, 0.05), GLOSS.paint),
       ];
@@ -6398,7 +6434,7 @@ MR.World = (function () {
       const dx = 0.40;
       parts.push(gl(cyl(0.20, 0.20, 0.54, 12, dx, 0.50, 0, 0xe07f12, Math.PI / 2), GLOSS.paint));
       for (const s of [-1, 1]) {
-        parts.push(gl(cyl(0.26, 0.26, 0.07, 14, dx, 0.50, s * 0.28, 0xfff2e0, Math.PI / 2), GLOSS.matte));
+        parts.push(gl(cyl(0.26, 0.26, 0.07, 14, dx, 0.50, s * 0.28, 0xfff23a, Math.PI / 2), GLOSS.matte));
       }
       // The wound cable: one darker ring proud of the barrel, so the drum is
       // not an empty spool.
@@ -7064,6 +7100,44 @@ MR.World = (function () {
      * the livery pass on purpose -- red-and-white chevron on a pale ground is
      * the real livery of a road-closure barrier, these are people rather than
      * traffic, and the variant already clears the gate at 1.34x.
+     *
+     * ===== SHORT OF THE 1.6x / 0.30 TARGET, AND NOW REFUSED WITH NUMBERS ====
+     *
+     * This variant has been on the "four short of target" list for four
+     * reviews and had never been attacked. It has now. Every lever the rest of
+     * this file uses was tried on the shipped build and measured; target
+     * margin, where 0 is the target and the build fails below the gate:
+     *
+     *   as it ships                                        -0.144
+     *   hi-vis LIME tabard        0xd8ff2a                  -0.166
+     *   hi-vis AMBER tabard       0xffb020                  -0.196
+     *   hi-vis ORANGE tabard      0xff8c00                  -0.217   gate +0.003
+     *   hi-vis ORANGE tabard      0xff7a1f                  -0.222   FAILS GATE
+     *   navy darks to dark-of-hue 0x4a1428 / 0x3a1a2e       -0.163
+     *   navy darks to dark-of-hue 0x5c1a30                  -0.150
+     *
+     * **Every single change made it worse, and the most obvious one -- give
+     * the marshals a real hi-vis tabard, because cream is not a hi-vis colour
+     * -- FAILS THE BUILD.** All of it is one mechanism. The variant clears on
+     * LUMINANCE (1.37x) and not on chroma, the largest bright area on it is
+     * the cream tabard, and every hi-vis colour on earth is darker than cream.
+     * So the honest tabard costs the gate the object is passing on.
+     *
+     * The chroma route is closed for a different reason and it is structural:
+     * the object's two biggest bright areas are a WHITE BARRIER BAND and a
+     * WHITE TABARD, both near-neutral by definition, and dS would have to
+     * reach 0.30 against a road already at S 0.157. You cannot saturate white
+     * without it stopping being white, and a road-closure barrier that is not
+     * white is not a road-closure barrier.
+     *
+     * The lime result is worth keeping for the next person: it is WORSE than
+     * cream, because the board is pink and lime is opposite it on the wheel,
+     * so the area mean cancels to the neutral axis. That is the fleet
+     * header's "must not straddle the neutral axis" rule showing up on an
+     * object nobody had applied it to.
+     *
+     * REFUSED. It clears the fairness gate on every shot with +0.07 to +0.12
+     * of margin, which is the number that decides whether a player can see it.
      */
     const blockCrossGeo = (function () {
       const parts = [];
@@ -7614,6 +7688,34 @@ MR.World = (function () {
      * arrangements so the pair still reads as two people rather than one prop
      * mirrored. The luminance that cream was buying comes back off 0xffd400,
      * which is L 141 -- 80% of cream's, for ten times the chroma.
+     *
+     * ===== SHORT OF THE 1.6x / 0.30 TARGET, AND REFUSED WITH NUMBERS =====
+     *
+     * It needs L 97.8 against the dark lane and renders 91.3 -- short by 7%,
+     * the closest miss in the game. Measured on the shipped build:
+     *
+     *   as it ships (cool rims)                        -0.066   S 0.460
+     *   WARM rims and hubs, which is what shipped      -0.066   S 0.472
+     *   tyre 0x8a5a3a warm mid                         -0.074   S 0.515
+     *   tyre 0x4a2a2a warm dark                        -0.092   S 0.511
+     *   tyre 0x3a1a1e warm dark                        -0.098   S 0.512
+     *
+     * The trade is closed in both directions. Chroma is reachable -- the tyres
+     * are 0x6d76a8, a near-neutral grey-blue on the four largest curved
+     * surfaces here, and warming them takes S from 0.46 to 0.51. But this
+     * variant passes on LUMINANCE, every warm tyre is darker than a grey-blue
+     * one, and the L it loses is worth more than the S it gains. dS would have
+     * to reach 0.30 against a dark road already at S 0.315, which means an
+     * object at S 0.615 -- and two of the largest remaining areas are SKIN,
+     * which cannot be saturated and stay skin.
+     *
+     * The rims and hubs are WARM and that is the one change kept, because it
+     * is this file's own stated rule -- cool pale trim on a warm body is the
+     * straddle the fleet header names -- and the cyclists were the last warm
+     * two-wheeler still wearing the cool set. It buys 0.012 of saturation and
+     * changes no verdict. It is kept for consistency, not for the number.
+     *
+     * REFUSED. Gate margin +0.195, the widest of the two variants still short.
      */
     const blockRoadBikeGeo = (function () {
       const parts = [];
@@ -7633,8 +7735,8 @@ MR.World = (function () {
         // shorter than a wheel, which is a unicycle with a spare. At 1.95 the
         // pair sits at -0.28 and +0.90, a 1.18 wheelbase, and the object is a
         // bicycle from every angle instead of only from directly behind.
-        vWheel(parts, X * LANE_FIT, 0.33, -0.22, 0.33, 0.10, 0x6d76a8, WHEEL_RIM, WHEEL_HUB);
-        vWheel(parts, X * LANE_FIT, 0.33, 0.74, 0.33, 0.10, 0x6d76a8, WHEEL_RIM, WHEEL_HUB);
+        vWheel(parts, X * LANE_FIT, 0.33, -0.22, 0.33, 0.10, 0x6d76a8, WHEEL_RIM_WARM, WHEEL_HUB_WARM);
+        vWheel(parts, X * LANE_FIT, 0.33, 0.74, 0.33, 0.10, 0x6d76a8, WHEEL_RIM_WARM, WHEEL_HUB_WARM);
         // Seat tube, down tube and the fork, which is the diamond a bike reads
         // by from the flank -- and the flank is the view that did not exist.
         parts.push(bxAt(0.08, 0.52, 0.10, X, 0.62, -0.14, p.frame));

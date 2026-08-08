@@ -15,8 +15,16 @@
  *                DECISION
  *   ramp         how many, how long a ride, whether the fall lands on road the
  *                course guarantees is clear, and what is waiting in the lane
- *   passthrough  the shipped hole this pass ran into: a BLOCK train is one
- *                gate, so swerving into one between gate lines touches nothing
+ *   flank        the hole this pass closed on the owner's instruction: a BLOCK
+ *                train is one gate carrying 17.9 units of vehicle, so swerving
+ *                into one between gate lines used to touch nothing. Three
+ *                probes -- side, head-on, and a clean pass as the control
+ *   transit      that a lane path solvable() proved is still walkable now the
+ *                flanks are solid
+ *   ride         the same course raced over the roofs and around them, and the
+ *                shipped course raced by a bot that reads the road and one
+ *                that reads only the gate table
+ *   roofaid      a roof pickup is collectable on the roof and nowhere else
  *   pace         what each mechanic does to the finish time and the record
  *
  * ---- WHAT THIS INSTRUMENT GETS WRONG IF NOBODY WATCHES IT ----------------
@@ -393,61 +401,155 @@ if (rampAcc.gateInRide) bad(`${rampAcc.gateInRide} gates sit inside a rideable v
   }
 })();
 
-// ---- the shipped hole ----------------------------------------------------
-console.log(`\n=== passthrough: what a BLOCK train does between gate lines ===\n`);
+// ---- the flank -----------------------------------------------------------
+console.log(`\n=== flank: a vehicle you can see is a vehicle you can hit ===\n`);
 /**
- * Drives the REAL MR.Player, not a description of one. The scenario is the
- * simplest thing a human does by accident: be in a clear lane at the gate line
- * of a BLOCK train, then change into the train's lane a moment later.
+ * THE OWNER'S DECISION, MEASURED THREE WAYS.
  *
- * If contact is a plane at gate.z -- which it is -- the runner walks the whole
- * length of the vehicle and the game never says a word.
+ * The shipped game let you run the whole length of a bus: contact was a single
+ * plane at gate.z (player.resolveGates) and a BLOCK train is ONE gate carrying
+ * up to 17.9 units of vehicle. The owner was shown that, told plainly that
+ * closing it makes the game harder, and chose to close it -- "a vehicle you can
+ * see is a vehicle you can hit."
+ *
+ * Every probe below drives the REAL MR.Player, in main.js's own order (update,
+ * resolveDeck, resolveGates), on a SHIPPED course with both scalars at zero. A
+ * description of the state machine would not have caught the per-frame re-fire
+ * the previous pass found, and would not catch a double charge now.
+ *
+ * ---- WHAT THIS INSTRUMENT WOULD GET WRONG WITHOUT ALL THREE -------------
+ *
+ * SIDE alone flatters the fix: it proves the flank now bites and says nothing
+ * about what it costs elsewhere. So:
+ *
+ *   SIDE     swerve into the flank mid-vehicle. Must record EXACTLY ONE
+ *            contact -- zero is the shipped hole, and more than one is the
+ *            per-frame re-fire that made four incidents read as 27.
+ *   HEAD     take the same vehicle head-on at its gate line, which the game
+ *            already charged for. Must STILL be exactly one contact, and must
+ *            not also hand back a clean gate: resolveDeck and resolveGates are
+ *            two contact paths over one solid, and the near face belongs to
+ *            the gate line.
+ *   PAST     stay in the clear lane for the vehicle's whole length. Must be
+ *            ZERO. This is the control, and it is the one that fails if the
+ *            occupancy spans are built wrong -- without it a fix that made
+ *            EVERY lane solid would pass the other two.
  */
-(function passthrough() {
-  const key = KEYS[0];
-  const c = withFlags(0, 0, () => Course.generate(key));
-  let found = 0, silent = 0, skipped = 0;
-  for (let i = 0; i < c.gates.length; i++) {
-    const g = c.gates[i];
-    if (!g.train) continue;
-    const lane = g.lanes.findIndex((l) => l === K.BLOCK);
-    // ---- THE FIRST DRAFT OF THIS PROBE WAS CONTAMINATED, AND IT UNDERSTATED
-    // THE HOLE, WHICH IS THE DIRECTION THAT MATTERS.
-    //
-    // It took `safe` as the first lane that is not a BLOCK -- which is very
-    // often a JUMP or a DUCK. The runner then walked into it standing up, took
-    // an honest contact at the gate line, and the probe counted that as the
-    // train having been guarded. It reported 8 of 16 trains as silent when the
-    // true figure is every one of them. The approach has to be genuinely clean
-    // or the scenario is not the scenario.
-    const safe = g.lanes.findIndex((l) => l === K.CLEAR);
-    if (lane < 0 || safe < 0) { skipped++; continue; }
-    found++;
-    const p = Player.create();
-    p.lane = safe; p.laneFrom = safe; p.laneT = 1;
-    // Cross the gate line in a genuinely CLEAR lane. Asserted, not assumed.
-    const approach = p.resolveGates(c, g.z - 1, g.z + 0.01);
-    if (approach.some((r) => !r.clean)) { bad('probe approach was not clean'); continue; }
-    // ...then swerve into the wall and run its whole length.
-    p.laneFrom = safe; p.lane = lane; p.laneT = 0;
-    const depth = 2 * Collision.BOX[K.BLOCK].halfZ * (1 + g.train * 0.9);
-    let hits = 0;
-    for (let z = g.z + 0.02; z < g.z + depth; z += 0.5) {
-      p.update(1 / 60, 0.5);
-      hits += p.resolveGates(c, z, z + 0.5).filter((r) => !r.clean).length;
+function flankProbe(c, g, lane, mode) {
+  // Drive from one unit before the gate line to one unit past the far face.
+  const depth = 2 * Collision.BOX[K.BLOCK].halfZ * (1 + (g.train || 0) * 0.9);
+  const safe = g.lanes.findIndex((l) => l === K.CLEAR);
+  const p = Player.create();
+  const start = mode === 'head' ? lane : safe;
+  p.lane = start; p.laneFrom = start; p.laneT = 1;
+  const out = { hits: 0, cleanGates: 0, zs: [] };
+  let z = g.z - 1.0;
+  const STEP = 0.5;
+  let swerved = false;
+  while (z < g.z + depth + 1.0) {
+    // Swerve into the vehicle a third of the way along it -- past the gate
+    // line by a long way, which is exactly the moment the shipped game had
+    // nothing to say.
+    if (mode === 'side' && !swerved && z > g.z + depth * 0.33) {
+      p.laneFrom = p.lane; p.lane = lane; p.laneT = 0; swerved = true;
     }
-    if (hits === 0) silent++;
+    p.update(1 / 60, STEP);
+    const d = p.resolveDeck ? p.resolveDeck(c, z, z + STEP) : null;
+    if (d && d.hit) { out.hits++; out.zs.push(z + STEP); }
+    for (const r of p.resolveGates(c, z, z + STEP)) {
+      if (r.clean) out.cleanGates++; else { out.hits++; out.zs.push(z + STEP); }
+    }
+    z += STEP;
   }
-  console.log(`  ${key}: ${found} BLOCK trains with a genuinely CLEAR lane to approach in`
-    + ` (${skipped} skipped, no clear lane)`);
-  console.log(`  swerved into the flank of each one, mid-vehicle: ${silent} of ${found} recorded NO contact`);
-  console.log('  This is the shipped game, with both flags off. Contact is a single-plane');
-  console.log('  test at gate.z (player.resolveGates), and a train is ONE gate carrying up');
-  console.log('  to 17.9 units of vehicle -- so the lane is only guarded where the plane is.');
-  console.log('  Not a defect this pass introduced and not one it fixes in general; the ramp');
-  console.log('  closes it for rideable trains only, because a roof forces the flank to be');
-  console.log('  known. Reported here because it is the reason the ramp needs a continuous');
-  console.log('  test at all, and because nothing else in tools/ has ever asked.');
+  return out;
+}
+
+(function flank() {
+  const acc = { trains: 0, side: [0, 0, 0], head: [0, 0, 0], past: [0, 0, 0], headClean: 0, days: 0 };
+  // The whole calendar, not one day. Rule 3, and the previous pass's own
+  // lesson: its landing-margin defect was invisible at 90 days.
+  for (const key of KEYS) {
+    const c = withFlags(0, 0, () => Course.generate(key));
+    acc.days++;
+    for (let i = 0; i < c.gates.length; i++) {
+      const g = c.gates[i];
+      if (!g.train) continue;
+      const lane = g.lanes.findIndex((l) => l === K.BLOCK);
+      // The approach lane has to be genuinely CLEAR or the probe measures a
+      // JUMP taken standing up and calls it a guarded train. That contamination
+      // is on the record: it reported 8 of 16 where the truth was 13 of 13.
+      const safe = g.lanes.findIndex((l) => l === K.CLEAR);
+      if (lane < 0 || safe < 0) continue;
+      acc.trains++;
+      for (const mode of ['side', 'head', 'past']) {
+        const r = flankProbe(c, g, mode === 'past' ? safe : lane, mode);
+        const bucket = acc[mode];
+        bucket[Math.min(2, r.hits)]++;
+        if (mode === 'head') acc.headClean += r.cleanGates;
+      }
+    }
+  }
+  const pct = (n) => (100 * n / acc.trains).toFixed(1).padStart(6) + '%';
+  console.log(`  ${acc.trains} BLOCK trains over ${acc.days} days with a genuinely CLEAR lane to approach in\n`);
+  console.log('  contacts recorded          none    exactly one    two or more');
+  for (const [label, b] of [['SIDE  swerve into the flank', acc.side],
+                            ['HEAD  take it at the gate line', acc.head],
+                            ['PAST  stay in the clear lane', acc.past]]) {
+    console.log('  ' + label.padEnd(30) + pct(b[0]) + pct(b[1]).padStart(15) + pct(b[2]).padStart(15));
+  }
+  console.log(`\n  clean gates credited on a HEAD-ON contact: ${acc.headClean}  (must be 0)`);
+  if (acc.side[0]) bad(`${acc.side[0]} of ${acc.trains} flanks are still silent -- you can run through the side of a tram`);
+  if (acc.side[2]) bad(`${acc.side[2]} flanks charge more than one contact for one vehicle`);
+  if (acc.head[1] !== acc.trains) bad(`a head-on BLOCK is not exactly one contact on ${acc.trains - acc.head[1]} trains`);
+  if (acc.headClean) bad(`${acc.headClean} head-on contacts ALSO credited a clean gate -- the bounce is stealing a streak`);
+  if (acc.past[0] !== acc.trains) bad(`${acc.trains - acc.past[0]} clean passes recorded a contact -- a lane that is not occupied is being called occupied`);
+})();
+
+// ---- is a proved path still walkable? ------------------------------------
+console.log(`\n=== transit: solid flanks against the lane path solvable() proved ===\n`);
+/**
+ * solvable() proves a sequence of LANES AT GATE LINES. With flanks solid, the
+ * player also has to get BETWEEN those lanes without touching anything, and
+ * the lane they cross through may be occupied by the vehicle standing at the
+ * gate they have just left.
+ *
+ * The proof survives for a reason that is structural rather than lucky, and it
+ * is checked here rather than argued. Every occupancy span starts at a gate
+ * line and ends at gate.z + reachOf, and spacingAt owes the NEXT gate
+ * readWindowAt + reachOf -- so after the deepest vehicle in any gate there are
+ * at least readWindowAt units of empty road before the next gate line. If that
+ * clear run is longer than the ground two lane changes cover, every edge the
+ * BFS drew is physically walkable: wait for the vehicle to end, then cross.
+ *
+ * This is the assertion that fails first if anyone retunes the sightline floor,
+ * the jump arc or the pace floor, because readWindowAt is derived from all
+ * three.
+ */
+(function transit() {
+  const need = 1.55 * K.LANE_CHANGE_TIME * ((K.UNITS_PER_MILE * K.TIME_SCALE) / K.FLOOR_PACE);
+  let worst = Infinity, worstKey = '-', worstZ = 0, spans = 0, crossing = 0;
+  for (const key of KEYS) {
+    const c = withFlags(0, 0, () => Course.generate(key));
+    for (let i = 0; i < c.gates.length - 1; i++) {
+      const g = c.gates[i];
+      const far = g.z + Course.reachOf(g.lanes, g.train);
+      const clear = c.gates[i + 1].z - far;
+      if (clear < worst) { worst = clear; worstKey = key; worstZ = g.z; }
+      // ...and no vehicle may reach the next gate line, or a lane the BFS
+      // called free at that gate would have a lorry standing in it.
+      for (let l = 0; l < 3; l++) {
+        if (g.lanes[l] !== K.BLOCK) continue;
+        spans++;
+        if (far > c.gates[i + 1].z) crossing++;
+      }
+    }
+  }
+  console.log(`  occupancy spans checked            ${spans}`);
+  console.log(`  spans reaching the next gate line  ${crossing}   (must be 0)`);
+  console.log(`  two lane changes need              ${need.toFixed(1)}u at the pace floor`);
+  console.log(`  tightest clear road after a gate   ${worst.toFixed(1)}u  (${worstKey} at z ${worstZ.toFixed(0)})`);
+  if (crossing) bad(`${crossing} vehicles reach past the next gate line -- solvable() is proving a lane that is occupied`);
+  if (worst < need) bad(`only ${worst.toFixed(1)}u of clear road after a vehicle, and crossing lanes needs ${need.toFixed(1)}u`);
 })();
 
 // ---- is the roof worth taking? -------------------------------------------
@@ -479,27 +581,41 @@ function stubControls() {
 }
 
 /**
- * Is lane `l` physically occupied by a rideable vehicle anywhere between here
- * and there? Sampled rather than solved, because the answer only has to be good
- * enough to steer a bot and the vehicles are 32-43 units long against a 2-unit
- * step.
+ * Is lane `l` physically occupied anywhere between here and there? Sampled
+ * rather than solved, because the answer only has to be good enough to steer a
+ * bot -- but the STEP is now a quarter of the shortest vehicle rather than a
+ * round number, so a standing taxi cannot fall between two samples.
  *
  * THIS FUNCTION IS THE FINDING. A bot that does not call it walks into the side
  * of a lorry 27 times in four races -- not at a gate line, but 26 units past
  * one, changing lane towards a gate that is still 34 units ahead. The shipped
  * mental model is "a lane is tested where the gate is", and a 43-unit vehicle
  * hanging off a single gate line breaks it.
+ *
+ * ---- AND IT ASKED THE WRONG QUESTION, WHICH ONLY SHOWED UP WHEN THE FLANK
+ *      BECAME SOLID --------------------------------------------------------
+ *
+ * It read `deckAt > 0`, which is the height of a RUNNING SURFACE and is zero
+ * over every vehicle that is not rideable. So the "flank-aware" column was
+ * aware of ramps and blind to the other 27,000 vehicles on the calendar, and
+ * the moment ordinary flanks became solid it took 137 contacts in four races
+ * while the table went on calling it aware. The right question is
+ * `occupiedAt`, which is the one place a lane's occupancy is stated. The old
+ * form was harmless only because nothing but a ramp could be hit -- an
+ * instrument that is correct because the bug it would expose does not exist
+ * yet is not correct.
  */
+const OCC_STEP = 2 * Collision.BOX[K.BLOCK].halfZ * 0.25;   // 0.98u
 function occupied(course, lane, z0, z1) {
-  for (let z = z0; z < z1; z += 2) if (course.deckAt(z, lane) > 0) return true;
-  return course.deckAt(z1, lane) > 0;
+  for (let z = z0; z < z1; z += OCC_STEP) if (course.occupiedAt(z, lane)) return true;
+  return !!course.occupiedAt(z1, lane);
 }
 
 function race(course, takeRamps, flankAware) {
   const p = Pace.create(course.elevation);
   const pl = Player.create();
   const ctrl = stubControls();
-  const out = { hits: 0, aid: 0, roofAid: 0, mounts: 0, falls: 0, dismounts: 0, deckHits: 0, stuck: 0 };
+  const out = { hits: 0, aid: 0, roofAid: 0, mounts: 0, falls: 0, dismounts: 0, deckHits: 0, stuck: 0, waited: 0 };
   let gi = 0, planned = false, plannedLane = 1, acted = false, guard = 0;
   const DT = 1 / 60;
 
@@ -520,33 +636,46 @@ function race(course, takeRamps, flankAware) {
         order.forEach(function (l, i) {
           const rideable = g.ramp === l;
           if (g.lanes[l] === K.BLOCK && !(rideable && takeRamps)) return;
-          // Do not steer into the flank of something 43 units long.
-          if (flankAware && !(rideable && takeRamps)
-              && occupied(course, l, p.units, g.z)) return;
           let score = (g.lanes[l] === K.CLEAR ? 100 : 0) - i;
           if (rideable && takeRamps) score += 220;
           if (score > bestScore) { bestScore = score; best = l; }
         });
-        // best === null means EVERY lane was rejected: the two the gate blocks,
-        // and the third because a rideable vehicle's flank is standing in it.
-        // That is a gate solvable() proved was passable and that a player who
-        // declined the ramp cannot pass -- see the note on `occupied`.
         if (best === null) out.stuck++;
         plannedLane = best === null ? pl.lane : best;
       }
-      // The flank has to be re-checked HERE and not only at plan time. The plan
-      // is made up to 46 units out and executed at 34, and a vehicle 43 units
-      // long can be clear of the sampled span at the first instant and standing
-      // squarely in it at the second -- so a bot that only checks when it plans
-      // bounces off the lorry, gets pushed into a free lane, and immediately
-      // steers back into it because the plan has not changed. That loop is what
-      // made the first version of this table report 27 contacts where there were
-      // four incidents.
-      const blocked = flankAware && !(g.ramp === plannedLane && takeRamps)
-        && course.deckAt(p.units + 2, plannedLane) > 0;
+      /**
+       * ---- WHERE FLANK AWARENESS ACTUALLY BELONGS ------------------------
+       *
+       * The first version of this put it in the PLAN: reject any lane with a
+       * vehicle standing anywhere between here and the gate. That is the wrong
+       * model and the table said so out loud -- 13 gates a race with "no way
+       * out", every one of them a gate solvable() had proved was passable. A
+       * lorry between you and a lane is not a reason to give the lane up; it is
+       * a reason to WAIT, and the course guarantees the room to wait
+       * (Course.validate's LANE_TRANSIT clause).
+       *
+       * So the plan is made off the gate table, exactly as solvable() proves
+       * it, and awareness lives in the EXECUTION: never take a step sideways
+       * into a lane that has something in it right now. `right now` is the
+       * whole test and it is exact rather than approximate -- every span starts
+       * at a gate line, the bot is always past the previous gate line when it
+       * is steering for the next, so a vehicle that is not in the lane at this
+       * instant cannot appear in it before the gate. The 1.0-unit lookahead is
+       * float slack, not modelling.
+       *
+       * A two-lane move re-tests on every hop, so the lane crossed THROUGH is
+       * checked as well as the lane arrived in. That was never true of the plan-
+       * time version and is the case a human meets most often.
+       */
+      const stepDir = pl.lane < plannedLane ? 1 : -1;
+      const nextLane = pl.lane + stepDir;
+      const canEnter = !flankAware
+        || (g.ramp === nextLane && takeRamps && nextLane === plannedLane)
+        || !occupied(course, nextLane, p.units, p.units + 1.0);
       if (planned && pl.lane !== plannedLane && dist < 34 && pl.laneT >= 0.55
-          && !pl.ramp && !blocked) {
-        ctrl.push(pl.lane < plannedLane ? 'right' : 'left');
+          && !pl.ramp) {
+        if (canEnter) ctrl.push(pl.lane < plannedLane ? 'right' : 'left');
+        else out.waited++;
       }
       if (planned && !acted && pl.lane === plannedLane) {
         const kind = g.lanes[plannedLane];
@@ -594,21 +723,30 @@ function race(course, takeRamps, flankAware) {
   // two-column table cannot tell those apart. The third column is the same bot
   // on the same dates with the ramp switched off entirely, and the only honest
   // reading of the other two is the difference from it.
+  //
+  // ...and a FIFTH column, which is the one the flank decision turns on. `none`
+  // is the shipped course played by a bot that already looks at the road; it
+  // says what a competent player pays for solid flanks, and the answer has to
+  // be nothing. `blind` is the SAME shipped course played off the gate table
+  // alone -- the mental model the game itself had until this pass -- and the
+  // gap between the two columns IS the difficulty change, isolated from the
+  // ramp entirely.
   const COLS = [
     ['ride', 'takes every ramp', true, true, 1],
     ['naive', 'goes round, gate model', false, false, 1],
     ['aware', 'goes round, sees flanks', false, true, 1],
-    ['none', 'no ramps on the course', false, true, 0],
+    ['none', 'no ramps, sees flanks', false, true, 0],
+    ['blind', 'no ramps, gate model', false, false, 0],
   ];
   for (const [side] of COLS) {
-    acc[side] = { time: 0, hits: 0, deckHits: 0, stuck: 0, aid: 0, roofAid: 0, mounts: 0, falls: 0, dismounts: 0, n: 0 };
+    acc[side] = { time: 0, hits: 0, deckHits: 0, stuck: 0, waited: 0, aid: 0, roofAid: 0, mounts: 0, falls: 0, dismounts: 0, n: 0 };
   }
   for (const key of PKEYS_RIDE) {
     for (const [side, , take, aware, flag] of COLS) {
       const course = withFlags(0, flag, () => Course.generate(key));
       const r = race(course, take, aware);
       const a = acc[side];
-      a.n++; a.time += r.time; a.hits += r.hits; a.deckHits += r.deckHits; a.stuck += r.stuck;
+      a.n++; a.time += r.time; a.hits += r.hits; a.deckHits += r.deckHits; a.stuck += r.stuck; a.waited += r.waited;
       a.aid += r.aid; a.roofAid += r.roofAid;
       a.mounts += r.mounts; a.falls += r.falls; a.dismounts += r.dismounts;
     }
@@ -622,6 +760,7 @@ function race(course, takeRamps, flankAware) {
   row('contacts', (a) => String(a.hits));
   row('  of them on a flank', (a) => String(a.deckHits));
   row('gates with no way out', (a) => String(a.stuck));
+  row('frames spent waiting', (a) => String(a.waited));
   row('mounts', (a) => String(a.mounts));
   row('clean dismounts', (a) => String(a.dismounts));
   row('falls off the side', (a) => String(a.falls));
@@ -630,7 +769,75 @@ function race(course, takeRamps, flankAware) {
   const dt = (acc.ride.time - acc.aware.time) / acc.ride.n;
   console.log(`\n  taking every ramp costs ${dt >= 0 ? '+' : ''}${dt.toFixed(1)}s against going round it`
     + ` and buys ${acc.ride.roofAid} roof pickups`);
+  console.log(`  on the SHIPPED course, solid flanks cost a bot that reads the road `
+    + `${acc.none.deckHits} contacts and one that reads only the gate table ${acc.blind.deckHits}`);
+  // Not an assertion, because it is a property of the mechanic rather than a
+  // defect: this bot INSISTS on every ramp (+220), so when the ramp is two
+  // lanes away across an occupied middle lane it waits for the crossing, gets
+  // to the vehicle past the top of its tailgate, and meets the flank instead of
+  // the mouth. A human abandons; the bot does not, which is what makes the
+  // number visible. It is the one way the ramp can cost a contact that going
+  // round it would not, and it wants saying before RAMP is switched on.
+  if (acc.ride.deckHits) {
+    console.log(`  ${acc.ride.deckHits} of ${acc.ride.mounts + acc.ride.deckHits} ramp approaches `
+      + 'reached the vehicle past its tailgate and hit the flank -- committing late to a ramp');
+    console.log('  two lanes away, across an occupied middle lane, is the way to miss the mouth');
+  }
   if (acc.ride.mounts === 0) bad('the bot never got onto a roof -- the mechanic is unexercised');
+  // The claim the owner was sold on: this punishes steering into a lorry you
+  // can see, and nothing else. A bot that looks at the road must pay nothing.
+  if (acc.none.deckHits) bad(`${acc.none.deckHits} flank contacts taken by a bot that DOES look at the road `
+    + '-- solid flanks are charging a player who read the lane correctly');
+})();
+
+// ---- aid on the roof -----------------------------------------------------
+console.log(`\n=== roofaid: reachable up there, and not from the road ===\n`);
+/**
+ * The roof pickup is the whole reason to take a ramp (see generateAid), so
+ * "there is an item at that z in that lane" is not the claim that matters --
+ * the claim is that standing on the roof COLLECTS it and being anywhere else
+ * does not. resolveAid took lane match alone, deliberately, so an item on a
+ * roof was collectable by a runner at road level inside the lorry.
+ *
+ * Driven through the real resolveAid on both sides rather than reasoned about,
+ * because the failing direction here is silent: a roof item that pays out at
+ * road level makes the ramp free, which is the opposite of the trade it exists
+ * to be.
+ */
+(function roofReach() {
+  let items = 0, onRoof = 0, fromRoad = 0, roadItemsOnDeck = 0;
+  for (const key of KEYS.slice(0, 60)) {
+    const c = withFlags(0, 1, () => Course.generate(key));
+    for (const it of c.aid) {
+      if (!it.roof) continue;
+      items++;
+      const r = c.rampAt(it.z, it.lane);
+      if (!r) { bad(`a roof item at z ${it.z.toFixed(0)} has no ramp under it`); continue; }
+      // On the roof: mounted, riding, in the item's lane.
+      const up = Player.create();
+      up.lane = it.lane; up.laneFrom = it.lane; up.laneT = 1;
+      up.ramp = r; up.surface = r.deck;
+      if (up.resolveAid(c, it.z - 0.5, it.z + 0.5).length) onRoof++;
+      // At road level in the same lane -- physically inside the lorry, which
+      // the flank test now forbids, but resolveAid must refuse it on its own.
+      const down = Player.create();
+      down.lane = it.lane; down.laneFrom = it.lane; down.laneT = 1;
+      if (down.resolveAid(c, it.z - 0.5, it.z + 0.5).length) fromRoad++;
+    }
+    // ...and the mirror: a ROAD item must not need a roof. Cheap to check and
+    // it is the direction a careless gate would break.
+    for (const it of c.aid) {
+      if (it.roof) continue;
+      if (c.rampAt(it.z, it.lane)) roadItemsOnDeck++;
+    }
+  }
+  console.log(`  roof items probed             ${items}`);
+  console.log(`  collected standing on it      ${onRoof}   (must be all of them)`);
+  console.log(`  collected from the road       ${fromRoad}   (must be 0)`);
+  console.log(`  road items inside a vehicle   ${roadItemsOnDeck}   (must be 0)`);
+  if (items && onRoof !== items) bad(`${items - onRoof} roof items cannot be collected from the roof`);
+  if (fromRoad) bad(`${fromRoad} roof items pay out at road level -- the ramp is free`);
+  if (roadItemsOnDeck) bad(`${roadItemsOnDeck} road items sit inside a rideable vehicle`);
 })();
 
 // ---- pace ----------------------------------------------------------------

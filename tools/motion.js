@@ -150,6 +150,8 @@ const SKIPS = arg('skip', null) !== null
       const pump = () => { clockMs += STEP; captured(clockMs); };
 
       // ---- world-space census of every drawn mesh ------------------------
+      const envOf = new Map();
+      const objOf = new Map();
       const runnerRoot = (g.runner && g.runner.group) || null;
       const ghostRoot = (g.ghost && g.ghost.group) || null;
       const V = new THREE.Vector3();
@@ -159,10 +161,15 @@ const SKIPS = arg('skip', null) !== null
       // than quietly fall back to a guess: undefined arithmetic gives NaN,
       // every NaN comparison is false, and a box grown by NaN would disable
       // the CORRIDOR assertion instead of failing it.
-      const ENV = g.world.WAVE_ENVELOPE;
-      for (const f of ['x', 'y', 'z']) {
-        if (!ENV || typeof ENV[f] !== 'number' || !isFinite(ENV[f]) || ENV[f] < 0) {
-          return { err: 'world.WAVE_ENVELOPE has no finite ' + f + ' -- motion.js needs updating' };
+      const ENVS = g.world.WAVE_ENVELOPE;
+      if (!ENVS || typeof ENVS !== 'object' || !Object.keys(ENVS).length) {
+        return { err: 'world.WAVE_ENVELOPE is not a chunk-keyed map -- motion.js needs updating' };
+      }
+      for (const k in ENVS) {
+        for (const f of ['x', 'y', 'z']) {
+          if (typeof ENVS[k][f] !== 'number' || !isFinite(ENVS[k][f]) || ENVS[k][f] < 0) {
+            return { err: 'WAVE_ENVELOPE.' + k + ' has no finite ' + f + ' -- motion.js needs updating' };
+          }
         }
       }
       function census() {
@@ -196,13 +203,24 @@ const SKIPS = arg('skip', null) !== null
           // constant that lives in one file and is re-derived by hand in
           // another will go stale; this one now cannot.
           const aw = o.geometry.attributes.aWave;
+          let waveAmp = 0;
           if (aw) {
-            let amp = 0;
-            for (let i = 0; i < aw.count; i++) amp = Math.max(amp, aw.getY(i));
-            if (amp > 0) {
-              BB.min.y -= amp * ENV.y; BB.max.y += amp * ENV.y;
-              BB.min.x -= amp * ENV.x; BB.max.x += amp * ENV.x;
-              BB.min.z -= amp * ENV.z; BB.max.z += amp * ENV.z;
+            // WHICH envelope, not the largest one. The material names the
+            // chunk it was built with; a mesh carrying aWave under a material
+            // that does not animate is not moving and must not be grown.
+            const vc = o.material && o.material.userData && o.material.userData.vertexChunk;
+            const env = vc && ENVS[vc.key];
+            if (vc && !env) throw new Error('no WAVE_ENVELOPE for chunk ' + vc.key);
+            if (env) {
+              let amp = 0;
+              for (let i = 0; i < aw.count; i++) amp = Math.max(amp, aw.getY(i));
+              waveAmp = amp;
+              envOf.set(o.uuid, env);
+              if (amp > 0) {
+                BB.min.y -= amp * env.y; BB.max.y += amp * env.y;
+                BB.min.x -= amp * env.x; BB.max.x += amp * env.x;
+                BB.min.z -= amp * env.z; BB.max.z += amp * env.z;
+              }
             }
           }
           BB.applyMatrix4(o.matrixWorld);
@@ -221,6 +239,7 @@ const SKIPS = arg('skip', null) !== null
             if (q === runnerRoot || q === ghostRoot) { exempt = true; if (!name) name = (q === runnerRoot ? 'the runner' : 'the ghost'); }
             q = q.parent;
           }
+          objOf.set(o.uuid, o);
           m.set(o.uuid, {
             // Named so the report says what a thing IS. The pinned backdrop --
             // sky, hills, ground, ripples -- is the single most interesting
@@ -230,6 +249,7 @@ const SKIPS = arg('skip', null) !== null
             min: BB.min.toArray(), max: BB.max.toArray(),
             uuid: o.uuid,
             exempt,
+            waveAmp,
           });
         });
         return m;
@@ -290,6 +310,32 @@ const SKIPS = arg('skip', null) !== null
         });
       }
 
+      /**
+       * SHADER MOVERS, which every assertion below was silently blind to.
+       *
+       * Movers above are discovered by watching a bounding box travel, and
+       * vertex-shader animation never moves one -- it moves the vertices
+       * inside it. So the crowd wave, from the day it shipped, and the wind on
+       * every tree and pennant, were absent from this list entirely: CORRIDOR
+       * saw them only because the box is GROWN above, and READBAND and HUE did
+       * not see them at all. That is the gap this whole file exists to close,
+       * left open in the one class of motion the game had most of.
+       *
+       * They enter with the SWEPT box, not the rest box, because that is where
+       * the eye is drawn and it is what the assertions are about. Speed is not
+       * fabricated for them: a peak vertex rate is not the same quantity as a
+       * rigid body's speed and printing it in the same column would invite the
+       * comparison. The baked amplitude is reported instead.
+       */
+      const isMover = new Set(movers.map((m) => m.uuid));
+      for (const [uuid, b] of after) {
+        if (!b.waveAmp || isMover.has(uuid)) continue;
+        movers.push({
+          name: b.name, uuid, dx: 0, dy: 0, dz: 0, speed: 0,
+          min: b.min, max: b.max, exempt: b.exempt, shader: b.waveAmp,
+        });
+      }
+
       // ---- the assertions -------------------------------------------------
       const CH = g.world.CORRIDOR_HALF, OY = g.world.OVERHEAD_Y;
       const cam = g.cam.camera;
@@ -298,14 +344,53 @@ const SKIPS = arg('skip', null) !== null
       const READ_NEAR = 25.35;
       const SIGHT_MIN = 90;
 
+      /**
+       * A BOX TEST TO FIND CANDIDATES, THEN THE VERTICES TO CONVICT.
+       *
+       * Box3.applyMatrix4 transforms the eight corners of a LOCAL axis-aligned
+       * box and re-bounds them, so for anything carrying a rotation the result
+       * is the AABB of an AABB and is strictly larger than the object. The
+       * claim site turns every tree through a random yaw, and that inflation
+       * is worth up to three quarters of a unit: a PARKLAND tree whose nearest
+       * vertex genuinely sits at x 4.40 reported a box edge at 3.68 and was
+       * convicted of a corridor breach it does not commit.
+       *
+       * A false CORRIDOR failure is not a harmless over-strictness. This
+       * assertion's whole job is to be believed, and one that cries wolf on
+       * correct geometry is one somebody eventually switches off -- so the
+       * cheap box stays as the filter and the expensive exact test decides.
+       * Only candidates pay for it, which in a green run is nobody.
+       */
+      const P = new THREE.Vector3();
+      function reallyInCorridor(m) {
+        const o = objOf.get(m.uuid);
+        if (!o) return { x: [m.min[0], m.max[0]], yMin: m.min[1] };
+        const pos = o.geometry.attributes.position;
+        const env = envOf.get(m.uuid);
+        const aw = env ? o.geometry.attributes.aWave : null;
+        let hit = null;
+        for (let i = 0; i < pos.count; i++) {
+          P.set(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(o.matrixWorld);
+          // The swept interval of THIS vertex, not of the whole object.
+          const a = aw ? aw.getY(i) : 0;
+          const ex = a * (env ? env.x : 0), ey = a * (env ? env.y : 0);
+          if (P.x - ex < CH && P.x + ex > -CH && P.y - ey < OY) {
+            if (!hit || P.y - ey < hit.yMin) {
+              hit = { x: [P.x - ex, P.x + ex], yMin: P.y - ey };
+            }
+          }
+        }
+        return hit;
+      }
       const corridor = [];
       for (const m of movers) {
         if (m.exempt || hazardish(m.name)) continue;
         // Overlaps the corridor in x AND reaches below the overhead ceiling.
-        if (m.min[0] < CH && m.max[0] > -CH && m.min[1] < OY) {
-          corridor.push({ name: m.name, x: [+m.min[0].toFixed(2), +m.max[0].toFixed(2)],
-                          yMin: +m.min[1].toFixed(2) });
-        }
+        if (!(m.min[0] < CH && m.max[0] > -CH && m.min[1] < OY)) continue;
+        const hit = reallyInCorridor(m);
+        if (!hit) continue;
+        corridor.push({ name: m.name, x: [+hit.x[0].toFixed(2), +hit.x[1].toFixed(2)],
+                        yMin: +hit.yMin.toFixed(2) });
       }
 
       // Screen rects.
@@ -367,6 +452,28 @@ const SKIPS = arg('skip', null) !== null
       const seen = new Set();
       for (const m of movers) {
         if (m.exempt || hazardish(m.name)) continue;
+        /**
+         * HUE IS ABOUT THINGS THAT CAN CLOSE ON YOU, so it asks for a mover
+         * that TRANSLATES and skips the shader class.
+         *
+         * The rule exists because background traffic in hazard colours makes
+         * the colour contract meaningless -- the player reads amber, cyan and
+         * pink as JUMP, DUCK and BLOCK and must not be made to check. What
+         * makes an object mistakable for a gate is that it occupies or
+         * approaches the lanes. A shader mover does neither by construction:
+         * it oscillates about a fixed anchor outside the corridor, at a fixed
+         * z, and CORRIDOR and READBAND above already test its full swept
+         * volume for exactly that.
+         *
+         * The line is drawn deliberately rather than by convenience, and the
+         * case that forced it is worth recording: the crowd wears BLOCK pink
+         * over 18% of its area and JUMP amber over 7.6%. That is not a defect
+         * to fix, it is the crowd -- every reference frame in this project has
+         * a stand full of primary colour in it, and draining it to satisfy an
+         * assertion would be the assertion driving the art. What the rule must
+         * keep catching is a VEHICLE in hazard paint, and it still does.
+         */
+        if (m.shader) continue;
         if (seen.has(m.name)) continue;
         seen.add(m.name);
         let obj = null;
@@ -426,6 +533,12 @@ const SKIPS = arg('skip', null) !== null
         byName.get(m.name).push(m);
       }
       for (const [name, list] of byName) {
+        if (list[0].shader) {
+          const amp = list.reduce((s, m) => Math.max(s, m.shader), 0);
+          report.push({ name, n: list.length, speed: 0, vx: 0, vz: 0,
+                        head: 'shader wave, amp ' + amp.toFixed(2) });
+          continue;
+        }
         const sp = list.reduce((s, m) => s + m.speed, 0) / list.length;
         // MAGNITUDES, NOT SIGNED MEANS. Two ships passing in opposite
         // directions averaged to vz = 0.000 in the first version of this

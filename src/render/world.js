@@ -3824,6 +3824,24 @@ MR.World = (function () {
     uZ: { value: 0 },
     uHot: { value: 0 },
   };
+  /**
+   * THE SWEPT VOLUME OF EACH VERTEX ANIMATION, per unit of baked aWave
+   * amplitude, keyed by the chunk that produces it. Published on the api so
+   * tools/motion.js can grow a bounding box by it -- shader motion never moves
+   * a box, it moves the vertices inside one, so an audit of where moving
+   * things GO is blind without this.
+   *
+   * IT IS PER CHUNK AND NOT A UNION, and the difference is not pedantry. The
+   * first version published a single envelope taking the max of both across
+   * every axis, on the reasoning that too large a box can only ever make an
+   * assertion stricter. It made it WRONG: the crowd's lateral term is
+   * 0.085*exc, at most 0.132, and the union handed it the wind's 0.40, so a
+   * grandstand's swept box was inflated by half a unit inboard and the tool
+   * reported CORRIDOR failures against finish stands that do not move
+   * laterally at all. An assertion that fires on things that are fine is not
+   * stricter, it is broken, and it gets switched off.
+   */
+  const WAVE_ENVELOPES = {};
   // Declarations and body are kept apart because the ink shell needs the same
   // displacement and does NOT go through the three.js include pipeline, so it
   // has to supply its own `transformed`. See outlineVS in shading.js.
@@ -3859,8 +3877,14 @@ MR.World = (function () {
         + shader.vertexShader.replace('#include <begin_vertex>', WAVE_CHUNK);
     };
     // What the ink shell has to replay so the silhouette moves with the body.
-    m.userData.vertexChunk = {
-      key: 'crowdwave/' + (steps || 2), decl: WAVE_DECL, body: WAVE_BODY, uniforms: crowdU,
+    const key = 'crowdwave/' + (steps || 2);
+    m.userData.vertexChunk = { key, decl: WAVE_DECL, body: WAVE_BODY, uniforms: crowdU };
+    // Read straight off WAVE_CHUNK above, at the exc cap of 1.55: the standing
+    // lift 0.30*exc plus the jump (0.05 + 0.26*exc), and 0.085*exc laterally.
+    WAVE_ENVELOPES[key] = {
+      x: 1.55 * 0.085,
+      y: 0.30 * 1.55 + (0.05 + 0.26 * 1.55),
+      z: 0,
     };
     // Pinned, so this compiles once rather than being hashed off the function
     // source -- see the note on the shared ramp patch in shading.js.
@@ -4009,10 +4033,10 @@ MR.World = (function () {
       shader.vertexShader = WIND_DECL
         + shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n' + body);
     };
-    m.userData.vertexChunk = {
-      key: 'wind/' + f.toFixed(2) + '/' + a.toFixed(2),
-      decl: WIND_DECL, body: body, uniforms: { uT: crowdU.uT },
-    };
+    const key = 'wind/' + f.toFixed(2) + '/' + a.toFixed(2);
+    m.userData.vertexChunk = { key, decl: WIND_DECL, body: body, uniforms: { uT: crowdU.uT } };
+    // Read straight off windBody: gust tops at 1.0 and sway at (0.30 + 0.70).
+    WAVE_ENVELOPES[key] = { x: a, y: a * 0.18, z: a * 0.26 };
     // Keyed on the terms that actually vary the PROGRAM, so the two wind
     // materials compile once each rather than being hashed off function source.
     m.customProgramCacheKey = function () {
@@ -7394,12 +7418,27 @@ MR.World = (function () {
       const parts = [];
       vTree(parts, st.look.tree, 1);
       const geo = merge(parts);
-      geo.computeBoundingBox();
-      const bb = geo.boundingBox;
-      treeReach.push(Math.max(
-        Math.abs(bb.min.x), Math.abs(bb.max.x),
-        Math.abs(bb.min.z), Math.abs(bb.max.z)
-      ));
+      // THE CIRCUMSCRIBED RADIUS, NOT THE BOX HALF-EXTENT.
+      //
+      // This used to be max(|x|, |z|) off the bounding box, which is the right
+      // number for an axis-aligned tree and the wrong one for this tree,
+      // because the claim site turns it through a random yaw. A crown lobe
+      // offset in BOTH x and z swings out to hypot(x, z) at some angle, and
+      // the box half-extent never sees that: measured on the live page at
+      // skip 140, a PARKLAND tree at scale 1.24 stood off by the formula and
+      // still put its crown at x 3.61 against a CORRIDOR_HALF of 3.75.
+      //
+      // That is the same breach the standoff was written to fix, surviving in
+      // the fix, and it is the reason to prefer a rotation-INVARIANT measure:
+      // the largest distance any vertex sits from the stem is true at every
+      // yaw the claim site can roll, so there is no angle left to be unlucky
+      // at. It costs one pass over the geometry, once per setting, at build.
+      const tp = geo.attributes.position;
+      let reach = 0;
+      for (let i = 0; i < tp.count; i++) {
+        reach = Math.max(reach, Math.hypot(tp.getX(i), tp.getZ(i)));
+      }
+      treeReach.push(reach);
       return Pool(function () { return S.outlined(geo, mats.leaf, S.INK.prop); }, group);
     });
     const grovePools = SETS.map(function (st) {
@@ -10298,7 +10337,17 @@ MR.World = (function () {
         } else {
           // Crowd packs against the barrier line; the far side of a wide road
           // is where a real course puts the overflow.
-          obj.position.set(s.side * (K.TRACK_HALF_WIDTH + 1.9 + s.b * 3.4), 0, s.z);
+          //
+          // 1.9 became 2.25 TO PAY FOR THE WAVE. The knots stand off by their
+          // own inward reach, and that reach was measured on the rest pose --
+          // but vwave() displaces a body up to 0.085*exc laterally, which at
+          // the exc cap and the amplitudes baked into a knot is 0.30 units
+          // inboard. Measured on the live page at skip 140, a knot's swept box
+          // reached x 3.70 against a CORRIDOR_HALF of 3.75. Nothing caught it
+          // for as long as the wave has existed, because the corridor rule
+          // only ever tested things whose bounding box MOVED and a crowd's
+          // never does; see the shader-mover note in tools/motion.js.
+          obj.position.set(s.side * (K.TRACK_HALF_WIDTH + 2.25 + s.b * 3.4), 0, s.z);
           obj.rotation.y = s.side > 0 ? Math.PI : 0;
           // A pooled knot inherits the last tenant's lift, and the lift is now
           // the shader's. Zero it on claim rather than leaving a knot standing
@@ -10690,26 +10739,16 @@ MR.World = (function () {
     const Y_FLOOR = 0.06;      // above this is "over the road", below is paint
     api.OVERHEAD_Y = OVERHEAD_Y;
     /**
-     * THE SWEPT VOLUME OF EVERY VERTEX-SHADER ANIMATION IN THE GAME, per unit
-     * of baked aWave amplitude. Published because a bounding box cannot see
-     * shader motion: geometry.boundingBox never changes while the crowd jumps
-     * and the trees sway, so any tool auditing where moving things GO has to
-     * grow the box by this, and tools/motion.js does.
+     * See WAVE_ENVELOPES above for what this is and why it is keyed per chunk
+     * rather than unioned.
      *
-     * It is exported rather than written into a comment in that file because
-     * that is precisely how the number goes stale. tools/motion.js shipped
-     * carrying 0.79 for the vertical, taken from reading WAVE_CHUNK as
+     * Exported rather than written into a comment in tools/motion.js, because
+     * that is precisely how the number goes stale: that file shipped carrying
+     * 0.79 for the crowd vertical, taken from reading WAVE_CHUNK as
      * "0.30*exc + 0.31*|b|" -- but the second coefficient is (0.05 + 0.26*exc),
-     * which at the exc cap of 1.55 is 0.453 and not 0.31. The true crowd
-     * envelope is 0.918, so the instrument was growing the box by 86% of the
-     * volume it was meant to be testing and every CORRIDOR pass it reported
-     * was that much more generous than it claimed. A copied constant that
-     * flatters the thing it measures is the failure this project keeps
-     * rediscovering; this is the fix for the class.
-     *
-     * Both animated materials write the same attribute and are unioned here,
-     * because the audit does not know which material a given mesh wears and
-     * an over-large box can only ever make an assertion stricter.
+     * which at the exc cap of 1.55 is 0.453 and not 0.31. The true envelope is
+     * 0.918, so the instrument was growing the box by 86% of the volume it was
+     * meant to be testing, and it erred in the flattering direction.
      */
     /**
      * The shared animation clock, exposed so an instrument can advance the
@@ -10727,14 +10766,7 @@ MR.World = (function () {
      * so the difference IS the animation, with no subtraction to get wrong.
      */
     api.waveClock = crowdU.uT;
-    api.WAVE_ENVELOPE = {
-      // crowd: exc * 0.085 laterally, capped at exc 1.55. wind: WIND_REACH.
-      x: Math.max(1.55 * 0.085, WIND_REACH),
-      // crowd: 0.30*exc + (0.05 + 0.26*exc), at exc 1.55. wind: the lean arc.
-      y: Math.max(0.30 * 1.55 + (0.05 + 0.26 * 1.55), WIND_REACH * 0.18),
-      // The crowd has no z term at all; this is the wind's decorrelation swing.
-      z: WIND_REACH * 0.26,
-    };
+    api.WAVE_ENVELOPE = WAVE_ENVELOPES;
     api.CORRIDOR_HALF = CORRIDOR_HALF;
     api.crossings = function (fromZ, toZ) {
       // 0.05 of slack, so a kerb notch whose inner face is authored ON the

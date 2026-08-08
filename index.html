@@ -19023,6 +19023,51 @@ MR.World = (function () {
       });
     }
 
+    /**
+     * THE FRAME MUST CONTAIN THE OBJECT, and until this pass it did not.
+     *
+     * shotMean is an ORTHOGRAPHIC render and its mean is taken over covered
+     * pixels only, so the frame's SIZE does not bias the number at all -- what
+     * biases it is the frame's EDGE. Anything outside is not measured, and an
+     * area mean that silently drops a vehicle's roof or its outer flank is a
+     * measurement of the camera.
+     *
+     * It was already happening before the fleet grew. contrastAudit frames at
+     * a fixed halfW of LANE * 0.62 = 1.054, which is 2.108 across, and the
+     * refuse truck is 2.14 wide: 0.03 of it, both flanks, has never been in
+     * shot. And a 3.90-deep vehicle seen down the game's own sightline stands
+     * 0.70 taller on screen than its own height, because an elevated camera
+     * reads depth as height -- so the old halfH of h * 0.62 would have started
+     * cropping roofs the moment the fleet filled its envelope.
+     *
+     * This returns the half-extents the object actually needs, in the audit
+     * camera's own screen basis. Callers take the MAX of this and whatever they
+     * asked for, so every framing that already contained its object is
+     * unchanged to the digit and only the ones that were cropping move.
+     *
+     * The basis: the camera sits at azimuth az, elevation el, looking at the
+     * centre. Its right is (cos az, 0, sin az) and its up is
+     * (-sin el sin az, cos el, sin el cos az) -- so a point's screen offsets
+     * are those two dots, and the eight corners of the box bound them.
+     */
+    function fitHalf(bb, cx, cy, cz, az, el) {
+      const ca = Math.cos(az), sa = Math.sin(az);
+      const ce = Math.cos(el), se = Math.sin(el);
+      let hw = 0, hh = 0;
+      for (const px of [bb.min.x, bb.max.x]) {
+        for (const py of [bb.min.y, bb.max.y]) {
+          for (const pz of [bb.min.z, bb.max.z]) {
+            const dx = px - cx, dy = py - cy, dz = pz - cz;
+            hw = Math.max(hw, Math.abs(dx * ca + dz * sa));
+            hh = Math.max(hh, Math.abs(-dx * se * sa + dy * ce + dz * se * ca));
+          }
+        }
+      }
+      // 4% of headroom, because the ink shell stands slightly outside the
+      // geometry it wraps and the merged box does not know about it.
+      return [hw * 1.04, hh * 1.04];
+    }
+
     const _clr = new THREE.Color();
     /**
      * Render `obj` alone, down the game's sightline, and average the pixels it
@@ -19120,6 +19165,75 @@ MR.World = (function () {
     }
 
     /**
+     * EVERYTHING A VARIANT OCCUPIES, as one box in the variant's own frame.
+     *
+     * The merged body is not the whole object: every variant also turns a
+     * caution face toward the lens, and most carry one moving part on a pivot.
+     * Both were outside every extent this file reported -- so `wide` on a
+     * fleet sheet was the body's width and not the object's, and the framing
+     * that measures contrast was sized from the body alone.
+     *
+     * It is also what the halfX and halfZ guards are asked against: a variant
+     * is inside MR.Collision.BOX only if ALL of it is, and the striped face is
+     * the piece most likely to be the widest thing on a hazard.
+     */
+    function variantBox(d, swept) {
+      d.geo.computeBoundingBox();
+      const bb = d.geo.boundingBox.clone();
+      // The face plane. hplane() puts it through LANE_FIT, so its world
+      // half-width is not the number written in the def.
+      const fw = d.face[0] * LANE_FIT / 2, fh = d.face[1] / 2;
+      bb.expandByPoint(new THREE.Vector3(-fw, d.face[2] - fh, d.face[3]));
+      bb.expandByPoint(new THREE.Vector3(fw, d.face[2] + fh, d.face[3]));
+      if (d.moving) {
+        d.moving.computeBoundingBox();
+        const mb = d.moving.boundingBox;
+        const px = d.pivot[0] * LANE_FIT, py = d.pivot[1], pz = d.pivot[2];
+        // SWEPT, WHEN THE QUESTION IS "DOES IT FIT". A fitting that sits inside
+        // the envelope at rest and leaves it the moment the game runs is the
+        // defect this project keeps a corrections list for, so the guard asks
+        // for the swept reach -- but the SHEET must not, or a variant whose
+        // moving part happens to turn through a wide arc prints as a speck
+        // beside variants that do not, and the sheet's one job is that every
+        // tile is at the same scale.
+        //
+        // The sweep is per anim and not a ball, because the anims are not
+        // balls: 'pedal' turns about x, 'paddle' about z through +/-0.42, and
+        // 'sway' about x through +/-0.045. A ball around the paddle's pivot
+        // reaches 1.66 units in every direction on a part that never leaves a
+        // 0.42 radian fan, which is not conservatism, it is a wrong number.
+        const arc = swept ? { pedal: [1, Math.PI], paddle: [3, 0.42], sway: [1, 0.045] }[d.anim] : null;
+        const lift = swept && d.anim === 'lift' ? 0.48 : 0;
+        // The whole variant group also takes a y shudder, and the largest of
+        // them is the paddle's 0.050.
+        const shud = swept ? 0.050 : 0;
+        for (const qx of [mb.min.x, mb.max.x]) {
+          for (const qy of [mb.min.y, mb.max.y]) {
+            for (const qz of [mb.min.z, mb.max.z]) {
+              const steps = arc ? 16 : 0;
+              for (let i = 0; i <= steps; i++) {
+                let ax = qx, ay = qy, az2 = qz;
+                if (arc) {
+                  const t = arc[1] * (-1 + 2 * i / steps);
+                  const c = Math.cos(t), s = Math.sin(t);
+                  if (arc[0] === 1) { ay = qy * c - qz * s; az2 = qy * s + qz * c; }
+                  else { ax = qx * c - qy * s; ay = qx * s + qy * c; }
+                }
+                bb.expandByPoint(new THREE.Vector3(px + ax, py + ay, pz + az2));
+                if (lift) bb.expandByPoint(new THREE.Vector3(px + ax, py + ay + lift, pz + az2));
+              }
+            }
+          }
+        }
+        if (shud) {
+          bb.min.y -= shud;
+          bb.max.y += shud;
+        }
+      }
+      return bb;
+    }
+
+    /**
      * Every hazard variant's rendered tone, and every lane's road tone under
      * the palette live in this frame. Needs the renderer and the scene, which
      * this file deliberately does not hold: it is a build-time audit, called
@@ -19155,10 +19269,15 @@ MR.World = (function () {
             mv.position.set(d.pivot[0] * LANE_FIT, d.pivot[1], d.pivot[2]);
             g.add(mv);
           }
-          d.geo.computeBoundingBox();
-          const bb = d.geo.boundingBox;
-          const h = Math.max(bb.max.y, d.face[2] + d.face[1] / 2);
-          const m = shotMean(renderer, scene, g, 0, h / 2, 0, LANE * 0.62, h * 0.62);
+          const bb = variantBox(d);
+          const h = bb.max.y;
+          // The pose is what it always was -- centred on the object's own
+          // half-height, down the game's sightline. What is new is that the
+          // frame is never allowed to be smaller than the object: see fitHalf.
+          // Every variant that already fitted keeps its old numbers exactly.
+          const need = fitHalf(bb, 0, h / 2, 0, 0, _audit.pitch);
+          const m = shotMean(renderer, scene, g, 0, h / 2, 0,
+            Math.max(LANE * 0.62, need[0]), Math.max(h * 0.62, need[1]));
           hazards.push(Object.assign({
             kind: grp.kind, variant: vi, name: NAME[grp.kind] + ' v' + vi,
           }, m));
@@ -19218,23 +19337,51 @@ MR.World = (function () {
       auditSetup();
       const prevImages = _audit.images;
       _audit.images = !(opts && opts.images === false);
-      // Square framing: halfW === halfH, so one world unit is one pixel count
-      // in both axes. 1.58 covers the 2.80 a BLOCK may reach plus the road.
-      const half = (opts && opts.half) || 1.58;
-      // Put the road a little below centre so the full 0..2.80 band is in
-      // frame with the contact line visible on every variant.
-      const cy = (opts && opts.cy !== undefined) ? opts.cy : half - 0.16;
       // See shotMean: az 0 / el = the game's sightline is the default, so
       // every existing caller is unaffected. Passing an angle is how CLAUDE.md
       // rule 1 gets checked -- a flank or a front that was never built shows
       // here and nowhere else.
       _audit.az = (opts && opts.az) || 0;
       _audit.el = (opts && opts.el !== undefined) ? opts.el : undefined;
+      const az = _audit.az;
+      const el = _audit.el === undefined ? _audit.pitch : _audit.el;
       const NAME = { [K.JUMP]: 'JUMP', [K.DUCK]: 'DUCK', [K.BLOCK]: 'BLOCK' };
-      const out = [];
+
+      const picked = [];
       for (const grp of HAZARD_DEFS) {
         if (kind !== undefined && kind !== null && grp.kind !== kind) continue;
-        grp.defs.forEach(function (d, vi) {
+        grp.defs.forEach(function (d, vi) { picked.push({ grp, d, vi, bb: variantBox(d) }); });
+      }
+      // ONE SCALE FOR THE WHOLE SHEET, and that is the entire value of this
+      // instrument -- relative height and relative width are only facts about
+      // the fleet if every tile is photographed at the same magnification. So
+      // the frame is not fitted per variant the way contrastAudit's is; it is
+      // grown once until the LARGEST variant fits, and then every tile uses it.
+      //
+      // Growing it at all is new, and it is the fleet's new depth that forced
+      // it: at az PI/2 a 3.90-long vehicle is 3.90 across the frame, and the
+      // old fixed 1.58 would have printed the middle 81% of every car in the
+      // set and called it a flank. The loop converges because cy is a function
+      // of half and the required half is monotone in cy.
+      let half = (opts && opts.half) || 1.58;
+      let cy = (opts && opts.cy !== undefined) ? opts.cy : half - 0.16;
+      for (let pass = 0; pass < 6; pass++) {
+        let need = half;
+        for (const p of picked) {
+          const f = fitHalf(p.bb, 0, cy, 0, az, el);
+          need = Math.max(need, f[0], f[1]);
+        }
+        if (need <= half + 1e-6) break;
+        half = need;
+        // Put the road a little below centre so the full 0..2.80 band is in
+        // frame with the contact line visible on every variant.
+        cy = (opts && opts.cy !== undefined) ? opts.cy : half - 0.16;
+      }
+
+      const out = [];
+      {
+        picked.forEach(function (p) {
+          const grp = p.grp, d = p.d, vi = p.vi;
           // Assembled exactly as contrastAudit assembles it, so the two sheets
           // describe the same object.
           const g = new THREE.Group();
@@ -19248,19 +19395,69 @@ MR.World = (function () {
             mv.position.set(d.pivot[0] * LANE_FIT, d.pivot[1], d.pivot[2]);
             g.add(mv);
           }
-          d.geo.computeBoundingBox();
-          const bb = d.geo.boundingBox;
+          const bb = p.bb;
           const m = shotMean(renderer, scene, g, 0, cy, 0, half, half);
           out.push(Object.assign({
             kind: grp.kind, variant: vi, name: NAME[grp.kind] + ' v' + vi,
-            top: +Math.max(bb.max.y, d.face[2] + d.face[1] / 2).toFixed(2),
+            top: +bb.max.y.toFixed(2),
             wide: +(bb.max.x - bb.min.x).toFixed(2),
+            // DEPTH, which this sheet has never reported and which is the axis
+            // the fleet was rebuilt on. Reported alongside the box it has to
+            // fit inside, so a variant that outgrows its envelope is visible
+            // in the table and not only in the guard that fails the build.
+            deep: +(bb.max.z - bb.min.z).toFixed(2),
+            zMin: +bb.min.z.toFixed(2), zMax: +bb.max.z.toFixed(2),
+            halfX: +Math.max(-bb.min.x, bb.max.x).toFixed(2),
+            half: +half.toFixed(2),
           }, m));
         });
       }
       _audit.images = prevImages;
       _audit.az = 0;
       _audit.el = undefined;
+      return out;
+    };
+
+    /**
+     * WHAT EVERY VARIANT ACTUALLY OCCUPIES, against the box it is allowed.
+     *
+     * "Art never decides clearance" (CLAUDE.md rule 4) was a sentence and not a
+     * test. MR.Collision.BOX had no halfX at all -- world.js was choosing the
+     * width of the audited envelope itself, as LANE * 0.5 -- and no assertion
+     * anywhere compared a variant's geometry with the box that stands for it.
+     * Nothing was watching either axis.
+     *
+     * So this reports the swept extents of every variant, in the variant's own
+     * frame, next to the box; tools/shoot.js turns it into a build failure. It
+     * is the same shape of guard as the HAZARD_HALF_Z drift check: the file
+     * that owns the numbers reports them, and the file that owns the rule
+     * fails the build.
+     *
+     * THE DIRECTION THAT MATTERS. Art SHORTER than its box is safe -- the
+     * occlusion audit then over-counts what a gate hides, which errs toward
+     * calling a gate unreadable when it is not. Art LONGER than its box is the
+     * defect already in the corrections list: BLANKS under-counts and passes a
+     * gate the art really hides. So this reports both directions and shoot.js
+     * fails on one of them.
+     */
+    api.fleetExtents = function () {
+      const B = MR.Collision.BOX;
+      const NAME = { [K.JUMP]: 'JUMP', [K.DUCK]: 'DUCK', [K.BLOCK]: 'BLOCK' };
+      const out = [];
+      for (const grp of HAZARD_DEFS) {
+        grp.defs.forEach(function (d, vi) {
+          const bb = variantBox(d, true);
+          const box = B[grp.kind] || {};
+          out.push({
+            kind: grp.kind, variant: vi, name: NAME[grp.kind] + ' v' + vi,
+            halfX: +Math.max(-bb.min.x, bb.max.x).toFixed(3),
+            halfZ: +Math.max(-bb.min.z, bb.max.z).toFixed(3),
+            yMax: +bb.max.y.toFixed(3), yMin: +bb.min.y.toFixed(3),
+            boxHalfX: box.halfX, boxHalfZ: box.halfZ,
+            boxYMin: box.yMin, boxYMax: box.yMax,
+          });
+        });
+      }
       return out;
     };
 

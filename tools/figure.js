@@ -266,25 +266,34 @@ function pageSweep(opt) {
   for (const vp of VIEWPORTS) {
     if (ONLY && vp.name !== ONLY) continue;
     for (const pace of PACES) {
-      const ctx = await browser.newContext({
-        viewport: { width: vp.w, height: vp.h }, deviceScaleFactor: 1,
-      });
-      const page = await ctx.newPage();
-      const errs = [];
-      page.on('pageerror', function (e) { errs.push(e.message.split('\n')[0]); });
-      await page.goto('file://' + html + '?bot=1&skip=' + pace.skip);
-      await page.waitForFunction(function () { return window.MR && MR.game && MR.game.ready; }, { timeout: 30000 });
-      await page.waitForTimeout(400);
-      await page.evaluate(pageHarness);
-      // Let the real scheduler hand over.
-      for (let i = 0; i < 40 && !(await page.evaluate(function () { return !!(window.__fg && window.__fg.pump); })); i++) {
-        await page.waitForTimeout(50);
+      // One combination that will not start must not cost the other 23. An
+      // aborted sweep reports nothing, and nothing is the reading that lets a
+      // stale number stand.
+      let ctx = null;
+      try {
+        ctx = await browser.newContext({
+          viewport: { width: vp.w, height: vp.h }, deviceScaleFactor: 1,
+        });
+        const page = await ctx.newPage();
+        const errs = [];
+        page.on('pageerror', function (e) { errs.push(e.message.split('\n')[0]); });
+        await page.goto('file://' + html + '?bot=1&skip=' + pace.skip);
+        await page.waitForFunction(function () { return window.MR && MR.game && MR.game.ready; }, { timeout: 60000 });
+        await page.waitForTimeout(400);
+        await page.evaluate(pageHarness);
+        // Let the real scheduler hand over.
+        for (let i = 0; i < 60 && !(await page.evaluate(function () { return !!(window.__fg && window.__fg.pump); })); i++) {
+          await page.waitForTimeout(50);
+        }
+        await page.evaluate(pageSetup);
+        const res = await page.evaluate(pageSweep, { windows: WINDOWS });
+        if (res.error || errs.length) { bad++; console.error('  !! ' + vp.name + '/' + pace.name + ' ' + (res.error || errs[0])); }
+        else rows.push({ vp: vp.name, viewH: vp.h, pace: pace.name, r: res });
+      } catch (e) {
+        bad++;
+        console.error('  !! ' + vp.name + '/' + pace.name + ' ' + String(e.message).split('\n')[0]);
       }
-      await page.evaluate(pageSetup);
-      const res = await page.evaluate(pageSweep, { windows: WINDOWS });
-      if (res.error || errs.length) { bad++; console.error('  !! ' + vp.name + '/' + pace.name + ' ' + (res.error || errs[0])); }
-      else rows.push({ vp: vp.name, viewH: vp.h, pace: pace.name, r: res });
-      await ctx.close();
+      if (ctx) await ctx.close();
     }
   }
   await browser.close();

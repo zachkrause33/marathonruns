@@ -578,10 +578,56 @@ Both are now settled.
   390×844: plate coverage 16.35% → **16.03%**, left column 204.6px unchanged,
   words 24 → **24**, elements 60 → **62** (the boundary marks). The end card
   gains one note and five words, and only on runs where it is true.
-- **The 110px assumption is wrong everywhere in the source.** The runner
-  measures 204-211px in an ordinary chase frame. Detail removed on the old
-  figure deserves re-examination — but only the parts cut for size, not the
-  base-layer sleeves, which read as holes in the vest and stay out. **OPEN**
+- **The 110px assumption is wrong everywhere in the source** — **DONE, and
+  the 204-211 that replaced it was wrong too.** Measured on the shipped build
+  at the shipped camera by the new `tools/figure.js`: **163-208px at 390×844,
+  median 179-199 by pace**. So 204-211 quoted the top of the range as though
+  it were the figure, and the camera has moved twice since it was written
+  (`CAM_BASE_Y` 2.62 → 3.10, `LOOK_AHEAD` 8.0 → 11.0, the FOV floor 58 → 61,
+  the swing 10.5 → 8.5). Two things nobody had noticed at all: **pace is worth
+  10% of him**, because the lens opens 61 → 70 across the honest band; and
+  **in landscape he is 50-67px**, a third of portrait and near the forty-pixel
+  silhouette the jump and slide are held to. No comment in `runner.js` had
+  ever mentioned that framing exists.
+
+  The number that settles a removal is not his height but **pixels per world
+  unit at the part's own depth** — 121-131 portrait, 39-43 landscape — and no
+  comment had that either. Every removal argued in this file converted by
+  dividing the part by 1.60 and multiplying by a remembered height.
+
+  **All four removals stay out, and only one for the reason recorded.**
+  Re-judged with a second new tool, `tools/resolve.js`, which BUILDS each
+  candidate, gives it a flat unique colour and COUNTS its pixels in the real
+  chase frame across a stride, against a positive control of the same geometry
+  held clear of what occludes it.
+
+  - **Lace panel** — recorded as "half a pixel wide"; 0.078 across is nine or
+    ten. It never had a size problem: **0 pixels in 48 of 48 frames**, both
+    framings, while the same box held clear owns 260. The sock covers
+    everything nearer than z 0.099, the toe dome reaches back to 0.106 and
+    *over* it, and two 0.014 ink shells close the 0.008 left between them.
+    The shin and the toe are unchanged since the panel was written, so **it
+    was invisible from the moment it landed**.
+  - **Waistband** — recorded as "a 3px band of a near tone"; it is 6-11px in a
+    column, 16px of extent, **299 pixels of frame, 7.5× the short cuff kept
+    beside it**, and it renders at L 42.5 where that cuff renders at L 42.4.
+    They are the same band. It goes anyway for the fault the note was reaching
+    for and aimed at the wrong neighbour: it sits within 8% of the **vest hem
+    above it**, and cuts the hem-to-shorts value step **1.83× → 1.08×** across
+    the 11 columns nothing else overlaps — a 41% cut, under this file's own
+    12% floor for a tone that vanishes into its neighbour's band of the ramp.
+  - **Three fingers** — 0 pixels in 45 of 48 portrait frames, 48 of 48
+    landscape. Curled forward they point down the view axis, which header
+    rule 4 already says has nothing to see, and the palm is in front of them.
+  - **Base-layer sleeves** — the one original argument that survives, and the
+    only one never about size: a triangular **hole in the vest** reads *more*
+    clearly as the figure grows. 23px, recorded so nobody rebuilds it.
+
+  The correction in three of the four is one correction: **a dimension is not
+  a screen footprint.** Occlusion and foreshortening decide whether a small
+  part is drawn and neither is computable from the source.
+- **Hedge and grass are true greens** (R/G 0.30-0.36) beside chartreuse trees.
+  Next visible inconsistency in PARKLAND. **OPEN**
 - **Hedge and grass are true greens** (R/G 0.30-0.36) beside chartreuse trees.
   Next visible inconsistency in PARKLAND. **OPEN**
 
@@ -755,6 +801,30 @@ nobody measured is worse than no number at all.**
    incompatible ways and neither was right — it put a colour 17% low, in the
    direction that made a defect look harder to fix than it was.
 4. **The 110px runner.** Assumed throughout; he is 204-211px.
+
+   **And this correction was itself wrong, which is the part worth keeping.**
+   204-211 was the TOP of a range read as though it were the figure, and the
+   camera moved twice after it was written. Measured properly he is
+   **163-208px at 390×844 and 50-67px in landscape**. So the file's history now
+   runs 110 → 204-211 → 163-208, and only the third was ever measured with an
+   instrument rather than derived from a frame somebody looked at. A correction
+   is not automatically better than what it corrects; `tools/figure.js` exists
+   so the next one does not have to be believed either.
+
+   The removals argued on the bad number were re-judged with `tools/resolve.js`
+   and **all four stayed out — three of them for reasons entirely different
+   from the ones recorded**, which is the same outcome as the triangle budget:
+   the conclusion survived and the reasoning did not. `resolve.js` had three
+   defects of its own before its output was believed, all flattering: a colour
+   tolerance that let the yellow probe match TRIM and the red probe match the
+   vest (1084 pixels over a 323×773 box, for a cylinder 0.024 tall); probes
+   multiplying across both sides and across the record ghost, 22 meshes where
+   6 were asked for; and capped cylinders counting a disc that would be buried
+   inside the shorts. The polish-identity harness had a fourth: stepping to a
+   target phase lands within one step of it and where inside that step depends
+   on the phase the page was at when the loop was frozen, which held the noise
+   floor at 3.8e-2 on a shoulder quaternion — coarse enough to have "proved"
+   almost anything bit-identical. Pinned, the floor is 3.4e-13.
 5. **The LOD justification** — "past a hundred units a spectator is under a
    pixel wide". Projected properly: 4.0px at 60 units, 1.9px at the swap
    distance.

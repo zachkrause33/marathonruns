@@ -128,6 +128,16 @@ const CATS = {
   0x0c2436: 'trim', 0x0074a8: 'trim', 0x0e2a26: 'trim', 0x008060: 'trim',
   0x2e2412: 'trim', 0xd89800: 'trim', 0x35220a: 'trim', 0xc26200: 'trim',
   0x22300a: 'trim', 0x7ab800: 'trim', 0x1a1608: 'trim',
+  // ---- the five that are figures on a machine ----
+  // 0x2b2f52 is the fleet's structural navy AND the trike's tyre. Counted as
+  // trim, which is where the structure belongs; the trike therefore reports
+  // 0.0% wheel and that is a true statement about what the lens can see, not
+  // a gap in this table -- see the note in the report.
+  0x2b2f52: 'trim', 0x2a0c16: 'trim', 0x141a33: 'trim', 0x3a2a12: 'trim',
+  0xc42a1e: 'trim', 0xd42a55: 'body',
+  0x6d76a8: 'wheel',                     // the cyclists' tyre, a mid grey-blue
+  0xffc79a: 'skin', 0xb87a4e: 'skin',
+  0xfff2e0: 'cream', 0xffe45e: 'lamp',   // hoarding beacons
 };
 // The category colours written into the probe render. Pure and half channels
 // only, so they survive the sRGB round trip exactly. Black is the clear colour.
@@ -139,10 +149,13 @@ const CAT_RGB = {
   wheel: [255, 0, 0],
   plate: [255, 128, 0],
   trim: [0, 0, 255],
+  skin: [255, 0, 128],
+  cream: [128, 255, 128],
   ink: [255, 255, 255],
-  other: [128, 128, 128],
+  other: [128, 128, 255],
 };
-const CAT_ORDER = ['face', 'body', 'glass', 'lamp', 'plate', 'wheel', 'trim', 'ink', 'other'];
+const CAT_ORDER = ['face', 'body', 'glass', 'lamp', 'plate', 'wheel', 'trim',
+  'skin', 'cream', 'ink', 'other'];
 
 // ---------------------------------------------------------------------------
 function pageRun(o) {

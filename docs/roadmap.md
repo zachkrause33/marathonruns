@@ -2555,3 +2555,134 @@ nobody measured is worse than no number at all.**
    `d24862235d30ff68daf8e6142d7162f1f230b6e1` and has **not** moved; the aid hash
    was re-taken once, on purpose, and the split was checked to reproduce the old
    combined `f046dcfc...` exactly rather than being a re-baseline in disguise.
+
+50. **The rideable roof is built, the placeholder is gone, and the route line
+   with it -- plus three places the recorded contract was wrong about its own
+   file.**
+
+   `MR.Course.RAMP` waited two passes on art. Everything structural was already
+   proved (entries 46-48: occupancy, the solid flank, the roof reward, the
+   landing, the camera); what did not exist was a vehicle you could stand on.
+   It exists now, as BLOCK v0 itself rather than as a prop beside it.
+
+   **THE DECK. Measured before, on a downward raycast over the footprint: the
+   tram roof ran 2.340 to 2.551 and varied 0.211, against a `Course.DECK_Y` of
+   2.80 that the runner is placed at.** Four slabs tapering 2.24 -> 2.16 ->
+   2.02 -> 1.76 and rising 2.10 -> 2.44 -- a good tram roof and not a surface.
+   Now: **flat at 2.800, spread 0.000, over 100% of the vehicle's own width and
+   the full stretched depth**, as three boxes topping out on one plane, a pale
+   walkway between two near-black edge panels. Unchamfered on top, deliberately:
+   `hcbx` cuts the top edge DOWNWARD, which would have made the deck flat at
+   2.80 only across the middle. The one surface that is stood on is the one
+   surface that has to be genuinely planar, so the chamfer moved to the mass
+   under it.
+
+   **THE PANTOGRAPH HAD TO GO, AND THAT IS THE DECK'S DOING RATHER THAN A
+   PREFERENCE.** Its shoe topped out at 2.77 "against the 2.80 the collision box
+   records" -- 0.03 of slack that existed only because the roof under it stopped
+   at 2.44. With the roof at 2.80 there is no space above it for anything at
+   all. It also sat at local z -0.40, which on a rideable train is halfway up
+   the ramp, and a pantograph on a roof you run along is a wall wherever it is
+   put. `anim` went with it, and that is required rather than tidy: the sway
+   lifts the whole variant by +/-0.012, so a deck authored at exactly 2.80 spends
+   half of every cycle at 2.812 -- outside the box -- while the runner, pinned to
+   a constant DECK_Y, watches the floor slide through their feet. **A vehicle
+   that is stood on cannot shudder.**
+
+   **THE TAILGATE IS THE VEHICLE'S OWN TAIL, OPENED.** An unscaled child at
+   local z -1.95 to +4.05, climbing 0 to 2.80 at 25.0 degrees, with two full-
+   height tail walls either side so the mouth is a portal rather than a plank
+   leaning on a lorry. Measured on the running page against the contract line
+   `2.80 * dz / 6.0`: **err 0.000 the whole way, and +0.050 exactly where a
+   tread cleat stands proud.** It is drawn ONLY where `gate.ramp` names the
+   lane; a ramp down on something you cannot ride would be the game lying about
+   an affordance. That is also the read, and it is the reference's: two lorries
+   side by side, and the one you can take is the one with its tail open.
+
+   **THE SCALED BODY IS SHORTENED BY EXACTLY THE RAMP.** A train sets
+   `body.scale.z = span`; a ramp's 6.0 must come off it or the tram is 6.0
+   longer than the collision box that decides whether it was hit. `s = span -
+   RUN / (2 * halfZ)` and the body slides forward by RUN, both from the one
+   subtraction so they cannot disagree.
+
+   **THREE THINGS THE RECORDED CONTRACT (entry 46) GOT WRONG ABOUT THIS FILE,
+   all one root cause -- it was written in lane units and the art is not.**
+
+   - *"one lane wide, x in [-0.85, +0.85] (LANE 1.70) ... inset inside the
+     body"*. Those two clauses contradict each other: hazard widths go through
+     `LANE_FIT` (= LANE / 2.35 = 0.723), so the tram's authored 2.24 is **1.62
+     units on the road** and a 1.70-wide ramp is WIDER than the tram it is cut
+     into. Inset is the clause that survives; the ramp is 1.20 across. Nothing
+     in the mechanic reads the width -- `deckAt` and `occupiedAt` are indexed by
+     LANE, not by x -- so the whole of that number is art.
+   - *"deck flat at 2.80 across 100% of x within +/-1.12"*. 1.12 is
+     `BOX.halfX`, the collision envelope, and **no vehicle in the fleet is that
+     wide**: measured, the twenty-one variants run 0.675 to 1.102, and the tram
+     is the narrowest at 0.830. A deck built to 1.12 would be a plank overhanging
+     the vehicle by 0.32 a side. The deck is 100% of the VEHICLE.
+   - The recorded roof numbers (89% covered, 2.399-2.750) did not reproduce;
+     this pass measured 77.8% / 2.340-2.551 on a 9x9 grid. Both are sampling
+     artefacts of a coarse grid over a tapered roof and both say the same thing.
+     **The number worth keeping is the one neither grid could disagree about:
+     the roof was not flat and it was not at 2.80.**
+
+   **THE INSTRUMENT WAS WRONG FIRST, AGAIN (rule 3).** The live probe collected
+   the pooled hazard groups and called `intersectObjects(.., true)`. THREE's
+   Raycaster **does not test `.visible`** -- and a pooled BLOCK carries all ten
+   variant bodies stacked at one place with nine hidden. So it read the roof of
+   whichever variant happened to be highest and printed a flat, entirely
+   plausible **2.760 over the whole tailgate**: a ramp measured through nine
+   other lorries. It collects visible meshes with no hidden ancestor now.
+
+   **AND THE CONTRAST GATE MEASURED A DIFFERENT OBJECT.** Built with the tail
+   open by default, BLOCK v0 fell from over 1.6x to **1.30x against a fatal floor
+   of 1.25x** -- not because the object got worse but because `assembleVariant`
+   had been switched to a state that is 3.70 gates a day out of hundreds. Closed
+   by default, every contrast number matches the baseline to the digit. A tool
+   that wants the open state asks for it. **The envelope guard is the opposite
+   case and gets its own row**: the tail is 6.0 deep against a span-1 box of
+   3.90, which is not a violation because it only ever exists on a train of span
+   8.2+, so it is checked against the volume the cast site reserves for it --
+   `[-halfZ, -halfZ + RAMP_RUN]` -- which also proves the tail and the shortened
+   body neither overlap nor leave a gap.
+
+   **WHAT THE FIRST RIDE THROUGH THE CHASE CAMERA CHANGED, AND IT WAS NOT THE
+   NUMBERS.** The deck measured perfect and read as a painted path at road
+   level: standing on a roof, the vehicle's flanks are hidden BY the roof, and
+   mid-blue edge panels were the same value as the canal beside them. A raised
+   lip is unavailable at a 2.80 ceiling, so the edge is made of VALUE -- near
+   black against the pale walkway. The tail walls went from 0.11 to 0.21 wide
+   (the ramp narrowing from 1.40 to 1.20 pays for it) because at the mouth,
+   where the whole read is "there is a way INTO this thing", a doorway is made
+   of its jambs. Neither was visible in any measurement; both were obvious in
+   one frame.
+
+   **THE ROUTE LINE IS GONE.** The owner asked -- *"Players don't need to be
+   told where to go"* -- and three separate findings agreed with him: a blind
+   reader flagged it unprompted in every picture of two separate sets (*"a
+   purple-violet smear... shaped like nothing"*), it was measured out-shouting
+   the aid pickup at READ_NEAR (2nd of six against the pickup's last), and
+   dimming could not fix that because a ribbon loses area linearly with distance
+   and a pickup quadratically. Removed properly: `racingLine`, `routeTexture`,
+   `ringTexture`, both meshes, `updateRoute`, `routeX`, `routeQuad` and the
+   replan in `api.update`. **It carried no other function** -- `api.routeLane`
+   existed "so it can be asserted against the course", and nothing in the repo
+   ever asserted it. **`tools/routeread.js` now measures an object that does not
+   exist** and should be deleted by whoever next owns tools.
+
+   **THE ARCHWAY IS SCENERY AND CANNOT OCCLUDE A GATE, BY CONSTRUCTION.** Entry
+   35 said the lane closure is not worth shipping and the archway is worth
+   having as a set piece; this is the set piece. It springs at OVERHEAD_Y + 0.35
+   -- the same 9.35 the mile gantry and the finish arch use -- from |x| = 4.95,
+   outside CORRIDOR_HALF, and the spandrel above it is **a comb, not a slab with
+   a hole**: every column's bottom is generated FROM the arch curve at its own
+   x, so no arithmetic error can put masonry below the opening. A subtracted
+   hole would have been one sign away from a stone wall across the road. The
+   string course at the springing is two pieces for the same reason -- written
+   as one band it is a beam through the opening at 9.14. It costs the occlusion
+   assertions nothing: LOW, HIDES, BLANKS and PAINTS all clean at 60, 25.35 and
+   5 units and through.
+
+   **`src/render/ramp.js` IS DELETED.** `reference/solid-ramp-mouth.png` was a
+   picture of the double draw -- a tram inside the orange placeholder, because
+   world.js cast its own BLOCK over the same footprint.

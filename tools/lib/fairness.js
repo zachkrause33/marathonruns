@@ -584,7 +584,40 @@ function fairnessAudit() {
               // line credits the longest occluder in the game with clearing the
               // view 21% of a read window early, and the first draft of this
               // assertion did exactly that -- and passed.
-              if (hit && gt.z - hit.z1 < READ_NEAR) {
+              // MINUS 1e-6, and this is a boundary correction rather than a
+              // tolerance. Loosening an occlusion test is the move this
+              // project records a correction about, so here is the whole case.
+              //
+              // `spacingAt()` floors gate spacing at
+              // `readWindowAt(z) + reachOf(lanes)`, and on flat ground
+              // `readWindowAt` IS `READ_NEAR`. So a floor-bound pair sits at
+              // `gt.z - hit.z1 === READ_NEAR` exactly -- it is CONFORMING, by
+              // construction, at the design equality. A strict `<` then decides
+              // it by whichever way a subtraction of two coordinates near 4,000
+              // happens to round.
+              //
+              // Censused over the full year with `node tools/calendar.js
+              // --ties --full`, 155,599 (gate, lane) pairs:
+              //
+              //   clear of READ_NEAR   126,938  (81.6%)
+              //   EXACT ties            28,661  (18.4%)  the floor binding
+              //     ...on the failing side   8,662  (30.2% of ties)
+              //     ...largest deviation     5.471e-13u
+              //   GENUINE deficits           0   none in the year
+              //
+              // The ulp of a coordinate at TOTAL_UNITS is 1.819e-12u, so every
+              // one of those 8,662 rows is inside the float noise. 1e-6 is not
+              // chosen for comfort: it is the tolerance world.js and shoot.js
+              // already use for this class (the envelope guard's
+              // `halfX > boxHalfX + 1e-6`), it is four orders of magnitude
+              // above the noise, and it sits in a gap with nothing in it --
+              // there is no pair in 365 days between 5.5e-13 and 1e-6 inside
+              // the window. Anything genuinely short still fails.
+              //
+              // Re-run that census after any change to spacingAt, reachOf or
+              // READ_NEAR. If a genuine deficit ever appears, this line is the
+              // first thing to re-examine.
+              if (hit && gt.z - hit.z1 < READ_NEAR - 1e-6) {
                 tight++;
                 const k = ['-', 'JUMP', 'DUCK', 'BLOCK'][hit.kind] + ' lane ' + hit.lane
                   + ' at ' + (hit.z - camZ).toFixed(0) + 'u';

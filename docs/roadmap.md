@@ -1691,3 +1691,111 @@ nobody measured is worse than no number at all.**
    IN FRONT of them.** Depth order down the object's own axis is the opposite of
    depth order to the lens, and every part of a two-wheeler mounted aft of the
    seat occludes the person it belongs to.
+
+32. **The blind identification test is contaminated, and it has been all along.**
+
+   Every reader used to prove this pass declared the same thing unprompted, in
+   almost the same words. One of them:
+
+   > *"A project instruction file was auto-injected into my context by the
+   > harness before your message arrived. I did not go and read it. It appeared
+   > on its own... from it I involuntarily learned roughly this: that this is a
+   > game; that it has obstacles, vehicles, buildings, trees, crowds, marshals,
+   > signs, banners, a ghost and a runner; that there is a chase camera behind
+   > the player; that hazards have to be visible against the road."*
+
+   `CLAUDE.md` is injected into any agent started in this repository. It names
+   **marshal, runner, ghost, hazard, chase camera, crowd, walkers, banner,
+   gantry, finish arch** -- which is most of the answer key for a test whose
+   whole question is "what is each one". The reader who spotted it was right to
+   say the test still has value, because nothing in that file says which
+   specific object is which, but it hands over the vocabulary.
+
+   **The before and after transcripts in `docs/people/` were almost certainly
+   taken under the same contamination and do not disclose it.** So the pass mark
+   this project judges its people by has an unmeasured advantage baked into it,
+   in the flattering direction, exactly like `stride.js`.
+
+   The path names leak too. One reader was given `docs/people/after2/aid.png`
+   and said so: *"the word 'aid' was in front of me before I saw the picture...
+   'marathon' plus a file named 'aid' makes AID STATION the first thing my mind
+   reached for."* Its answer on the top row was "a drink cup, or a small bottle"
+   -- and the word cup may have come from the filename rather than the pixels.
+
+   **If this test is going to keep being the acceptance criterion it should be
+   run from outside the repository, on neutrally-named files, with the reader
+   asked to declare contamination at the top.** The last of those three is free
+   and every reader here did it unasked.
+
+33. **The pickup does not survive to READ_NEAR, and the route hint was drowning
+   it. The item worth two mistakes is the one that reads worst.**
+
+   `tools/simulate.js` says the record survives 1 mistake with no aid and 3
+   taking all of it, so the aid item is the most consequential thing on the road
+   to read correctly. It had never been shown to a blind reader. Shown one, at
+   8, 12 and 25 units -- 25.35 is `READ_NEAR`, the distance the lane is actually
+   chosen at -- the answers were:
+
+   - **The banana passes.** *"Unmistakable... I am as confident about this as I
+     am about anything."* At 25u: *"still a recognisably curved yellow sliver...
+     I would have said banana and I think I would have been right."*
+   - **The bottle passes near and FAILS at range.** At 8u one reader got it
+     exactly (*"the give-away is the neck-and-cap silhouette"*) and another got
+     *"a drink cup, or a small bottle... about as tall as it is wide, which
+     pushes me to cup"*. At 25u, both failed: *"a small pale-green vertical
+     smudge and I would not be able to name it from that alone"*, and asked
+     directly whether it could be named from the 25u panel alone, *"No, not
+     honestly."*
+
+   The comment on `waterGeo` says the identity is entirely in the silhouette
+   because at 20-40 units nothing else survives. The silhouette is correct and
+   the premise is wrong: at 25 units nothing survives, silhouette included. What
+   survives is what survived for the banana -- **a hue nothing else in frame
+   owns, on a shape unlike every other shape in frame.** The bottle has neither:
+   it is pale, and it shares the mint of its own pool of light, so reader two
+   found *"the two merge into one soft blob rather than reading as
+   marker-plus-object."*
+
+   **And the marker beats the thing it marks.** *"The green ellipse also beats
+   the object it is meant to point at, which is the more awkward of the two: the
+   marker is brighter and larger than the thing it marks."*
+
+   Then the part this pass caused. Moving the racing line to violet fixed the
+   confusion with the pickups and made it LOUDER, because violet on dark asphalt
+   is a bigger value break than the mint it replaced. Asked to rank a 25u frame,
+   the reader put the route ribbon **second of six, above the runner**, and the
+   pickup **last**:
+
+   > *"yes, things on the road out-shout the hovering object at 25u, clearly and
+   > by a lot. The violet streaks beat it decisively -- they are bigger, more
+   > saturated, higher contrast against their background, and there are several
+   > of them competing against one small item."*
+
+   Two things were tried against that and only the second is a real answer.
+   Restoring the ribbon's fog (see the walk-back below) did not shift the
+   ranking. Dropping its opacity from 0.62 to 0.38 is the change that gives back
+   strength the hint never needed, and `tools/routeread.js` says it costs
+   nothing structural: the biggest component at skip 110 is 19x160 at elongation
+   8.4, unchanged.
+
+   **The unfixed part, stated rather than buried: the water bottle still cannot
+   be named at READ_NEAR.** Nothing in this pass fixed that, because nothing in
+   this pass knew it until the last measurement. It wants the banana's
+   treatment -- a colour nothing else owns and a pool that does not share it --
+   and it wants a blind read at 25u as its pass mark, not at 8.
+
+34. **A paragraph that is right about one object is not right about the object
+   underneath it.**
+
+   The ring trail carries `fog: false` with a paragraph explaining that its job
+   is to be legible at 100 units, which is exactly where the fog is taking half
+   the contrast out of everything else. That paragraph reads as though it
+   applies verbatim to the route ribbon the rings are drawn over, and this pass
+   gave the ribbon the exemption on that reading. The blind read above is what
+   it cost.
+
+   The reason it does not transfer is a property of the two objects and not of
+   the fog: **fourteen small marks that hold their contrast up the road read as
+   a trail; 124 unbroken units of paint that hold theirs read as the brightest
+   object in the scene.** Exemption from aerial perspective buys attention, and
+   attention was the scarce thing.

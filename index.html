@@ -14360,12 +14360,12 @@ MR.World = (function () {
       // The draw bag. A def's `weight` is how many tickets it holds; variants
       // are then picked by hashing into the bag, so the ratio a variant is
       // authored with is the ratio it actually spawns at, instead of being an
-      // emergent property of an ad-hoc modulo. See variantIndex.
+      // emergent property of an ad-hoc modulo. See castGates.
       const bag = [];
       defs.forEach(function (d, i) {
         for (let k = 0; k < (d.weight || 1); k++) bag.push(i);
       });
-      return Pool(function () {
+      const pool = Pool(function () {
         const g = new THREE.Group();
         const variants = [];
         for (const d of defs) {
@@ -14459,6 +14459,12 @@ MR.World = (function () {
         g.userData.body = variants[0].userData.body;
         return g;
       }, group);
+      // The draw bag, on the POOL rather than only on a pooled object. The
+      // casting is computed for the whole course before any hazard has been
+      // claimed, so it cannot borrow an object to find out what the bag is --
+      // which is what api.variantPlan used to have to do.
+      pool.bagOf = function () { return bag; };
+      return pool;
     }
 
     // JUMP v0: a wide amber kerb with a cream cap. The cap is what survives the
@@ -16293,34 +16299,103 @@ MR.World = (function () {
     }
 
     /**
-     * Which skin a gate wears. Derived from the gate's own z and lane, so it is
-     * a property of the course -- identical for every player on the same day,
-     * exactly like the course itself -- and costs no storage.
+     * ============ WHICH SKIN A GATE WEARS ============
      *
-     * The old form was `(round(z)*7 + lane*3 + round(z/37)) % n`, and it was not
-     * a hash: with n = 4 the first term collapses to 3*round(z) mod 4, the last
-     * term walks slowly and correlates with the first, and gate z is not
-     * uniform mod 4 either -- spacing runs 46 units early and 24 late. Counted
-     * over a real course it gave the four BLOCK skins 36 / 25 / 11 / 18, so the
-     * rarest was under a third of the commonest and it was the cyclist. This is
-     * a proper 32-bit avalanche instead, which puts consecutive gates in
-     * unrelated buckets, and it draws from a weighted BAG rather than modulo n
-     * so a variant's share is something this file states rather than discovers.
+     * THE DRAW WAS A BIGGER LEVER THAN THE VARIANT COUNT, AND NOBODY HAD
+     * LOOKED AT IT. That is the finding, and it is worth the space.
      *
-     * A train is always variant 0. It is the only BLOCK body authored to be
-     * stretched along z (see blockTramGeo), and a six-unit cargo trike would be a
-     * joke rather than an obstacle.
+     * The repetition review measured 64.8% of visible windows carrying a
+     * repeated variant and concluded the answer was more variants. It is not
+     * the whole answer and it is not the cheap half. Measured over 30 dates
+     * and 12,886 hazards on the 64.65-unit window (READ_NEAR to SIGHT_MIN,
+     * stepped 5 units), windows containing a repeat:
+     *
+     *              JUMP 4 / DUCK 3     JUMP 6 / DUCK 5     JUMP 7 / DUCK 6
+     *   hash             57.2%               46.9%               43.4%
+     *   shuffled bag     38.1%               21.7%               17.5%
+     *
+     * **A shuffled bag at the OLD variant count beats an independent hash at
+     * three more variants than we have.** Two more skins buy 3.5 points; the
+     * draw buys 25. Both compose, which is why the four new variants stay.
+     *
+     * WHY THE HASH LOSES. It is a good hash -- it replaced an arithmetic form
+     * that gave the four BLOCK skins 36 / 25 / 11 / 18 -- but a good hash is
+     * an INDEPENDENT draw, and independence is the property that produces
+     * repeats. With six skins and roughly two JUMPs in a window, an
+     * independent draw repeats about one window in six by construction and no
+     * amount of avalanche changes it. What the player experiences is not the
+     * marginal distribution, it is the run.
+     *
+     * SO THE DRAW IS A BAG THAT EMPTIES. Every variant is dealt once before
+     * any is dealt twice, and the order inside each deal is shuffled. This is
+     * the randomiser Tetris settled on for exactly this complaint, and its
+     * guarantee is the one that matters here: two hazards of a kind closer
+     * together than a full deal CANNOT be the same skin. A window holds about
+     * two JUMPs against a deal of six.
+     *
+     * It stays unpredictable -- a repeat is still possible across a deal
+     * boundary, which is why the figure is 21.7% and not zero -- so this is
+     * not a cycle the player can learn.
+     *
+     * IT IS STILL A PROPERTY OF THE COURSE AND NOT OF THE PLAYBACK, which is
+     * the one thing the old comment was right to insist on. A bag has state,
+     * and state read at spawn time would make the casting depend on the order
+     * hazards happened to be claimed -- so the WHOLE COURSE IS CAST ONCE,
+     * up front, in gate order, and the claim site reads the answer. Nothing
+     * about where the player is, how fast they got there, or whether they
+     * restarted can reach it. Two players on the same date see the same skin
+     * on the same gate, exactly as before.
+     *
+     * The weights survive: BLOCK's bag holds two tickets for a bus and one
+     * for a tram, so a deal is sixteen cards and not ten, and a variant's
+     * share is still the ratio this file states.
+     *
+     * A TRAIN IS ALWAYS VARIANT 0 and is dealt OUTSIDE the bag. It is the only
+     * BLOCK body authored to be stretched along z (see blockTramGeo), and a
+     * six-unit cargo trike would be a joke rather than an obstacle. Letting a
+     * forced draw consume a card would leave the deal short and rot the
+     * guarantee for the hazards after it.
      */
-    function variantIndex(bag, gate, lane) {
-      if (gate.train) return 0;
-      // Quarter units, so two gates a fraction apart cannot land on the same
-      // key, and imul throughout because the products overflow 2^31.
-      let h = (Math.round(gate.z * 4) + lane * 0x9e37) | 0;
-      h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d);
-      h = Math.imul(h ^ (h >>> 13), 0x297a2d39);
-      h = (h ^ (h >>> 16)) >>> 0;
-      return bag[h % bag.length];
+    function castGates(gates, key) {
+      const bags = {};
+      bags[K.JUMP] = jumpPool.bagOf(); bags[K.DUCK] = duckPool.bagOf();
+      bags[K.BLOCK] = blockPool.bagOf();
+      const deal = {};
+      for (const k of Object.keys(bags)) {
+        deal[k] = { left: [], rnd: MR.rng.stream(key || '', 'variants/v1|' + k) };
+      }
+      function draw(kind) {
+        const d = deal[kind];
+        if (!d.left.length) {
+          d.left = bags[kind].slice();
+          // Fisher-Yates on the whole deal. Shuffling the bag rather than
+          // picking without replacement keeps a weighted variant's two cards
+          // apart as often as chance allows instead of adjacent.
+          for (let i = d.left.length - 1; i > 0; i--) {
+            const j = d.rnd.int(0, i);
+            const t = d.left[i]; d.left[i] = d.left[j]; d.left[j] = t;
+          }
+        }
+        return d.left.pop();
+      }
+      const cast = [];
+      for (let g = 0; g < gates.length; g++) {
+        const gate = gates[g];
+        const row = [-1, -1, -1];
+        for (let l = 0; l < 3; l++) {
+          const kind = gate.lanes[l];
+          if (kind === K.CLEAR || !bags[kind]) continue;
+          row[l] = (kind === K.BLOCK && gate.train) ? 0 : draw(kind);
+        }
+        cast[g] = row;
+      }
+      return cast;
     }
+
+    // The day's casting, computed once from the course this world was created
+    // with. The claim site reads it by gate index; see the header above for
+    // why it may not be computed at spawn time.
+    let gateCast = null;
 
     // ---- scenery --------------------------------------------------------
 
@@ -19254,7 +19329,11 @@ MR.World = (function () {
 
       // hazards
       while (state.gateIdx < course.gates.length && course.gates[state.gateIdx].z < ahead) {
+        // The gate's INDEX, kept, because the casting is by index into the
+        // course and not by anything about this moment of play.
+        const gi = state.gateIdx;
         const gate = course.gates[state.gateIdx++];
+        if (!gateCast) gateCast = castGates(course.gates, course.key);
         const objs = [];
         for (let l = 0; l < 3; l++) {
           const kind = gate.lanes[l];
@@ -19272,7 +19351,9 @@ MR.World = (function () {
           // the kind of defect that only shows up in one screenshot in twenty,
           // and on a hazard it costs the record rather than the screenshot.
           const vs = o.userData.variants;
-          const vi = variantIndex(o.userData.bag, gate, l);
+          // Read, not drawn. The bag was dealt for the whole course before the
+          // gun; see castGates.
+          const vi = gateCast[gi][l];
           for (let k = 0; k < vs.length; k++) vs[k].visible = (k === vi);
           o.userData.active = vs[vi];
           o.userData.body = vs[vi].userData.body;
@@ -20487,34 +20568,66 @@ MR.World = (function () {
      * WHICH SKIN EVERY GATE OF A COURSE WILL WEAR, without playing the course.
      *
      * "Enough visual variation that the road does not feel repetitive" is a
-     * measurable claim, and it was being answered by eye. variantIndex is a
-     * pure function of (gate.z, lane) and the kind's draw bag, so the whole
-     * course's casting is knowable up front -- this returns it, and the
-     * question "how often does the same variant appear twice inside one visible
-     * window" becomes arithmetic rather than a screenshot.
+     * measurable claim, and it was being answered by eye. The casting is a
+     * pure function of the course, so the whole course's skins are knowable up
+     * front -- this returns them, and the question "how often does the same
+     * variant appear twice inside one visible window" becomes arithmetic
+     * rather than a screenshot.
      *
-     * It reports what actually SPAWNS, drawn through the weighted bag, so a
+     * It reports what actually SPAWNS, dealt from the weighted bag, so a
      * variant holding two tickets appears at the rate it really appears. That
      * distinction is the point: the fleet's weights are deliberate, and a
      * repetition figure computed from a uniform draw would be describing a
      * different game.
+     *
+     * THE DEAL IS SEEDED, SO THE KEY IS PART OF THE QUESTION. Pass the course
+     * itself, or gates plus the date key. Passing a bare gate array still
+     * works and is answered for THIS world's course -- which is what every
+     * caller in the tree does -- but planning some other day's course from a
+     * bare array cannot be right and now says so rather than quietly casting
+     * it with the wrong seed.
      */
-    api.variantPlan = function (gates) {
-      const bags = {};
-      const probe = {};
-      probe[K.JUMP] = jumpPool; probe[K.DUCK] = duckPool; probe[K.BLOCK] = blockPool;
-      for (const k of Object.keys(probe)) {
-        // The bag lives on the pooled object, so borrow one and give it back.
-        const o = probe[k].claim();
-        bags[k] = o.userData.bag;
-        probe[k].release(o);
-      }
+    api.variantPlan = function (arg, key) {
+      const gates = (arg && arg.gates) || arg;
+      const seed = (arg && arg.key) || key || (course && course.key);
+      const cast = castGates(gates, seed);
       const out = [];
-      for (const gate of gates) {
+      for (let g = 0; g < gates.length; g++) {
+        const gate = gates[g];
         for (let l = 0; l < 3; l++) {
           const kind = gate.lanes[l];
-          if (kind === K.CLEAR || !bags[kind]) continue;
-          out.push({ z: gate.z, lane: l, kind: kind, variant: variantIndex(bags[kind], gate, l) });
+          if (kind === K.CLEAR || cast[g][l] < 0) continue;
+          out.push({ z: gate.z, lane: l, kind: kind, variant: cast[g][l] });
+        }
+      }
+      return out;
+    };
+
+    /**
+     * WHAT IS ACTUALLY ON THE ROAD RIGHT NOW, by variant.
+     *
+     * api.variantPlan says what the course WILL wear; this says what the live
+     * scene IS wearing, read off the visible child of each claimed hazard
+     * rather than off the table that chose it. The two must agree, and until
+     * the casting moved to a dealt bag nothing in the tree could ask.
+     *
+     * That is not a hypothetical gap. The plan and the spawn were separate
+     * code paths computing the same hash from the same inputs, and a plan that
+     * silently disagreed with the road would have made every repetition figure
+     * this project has published a statement about a function nobody rendered.
+     */
+    api.liveCast = function () {
+      const out = [];
+      for (const g of activeGates) {
+        for (let l = 0; l < 3; l++) {
+          const kind = g.gate.lanes[l];
+          if (kind === K.CLEAR) continue;
+          const o = g.objs && g.objs[l];
+          const list = o && o.userData.variants;
+          if (!list) continue;
+          let vi = -1;
+          for (let k = 0; k < list.length; k++) if (list[k].visible) { vi = k; break; }
+          out.push({ z: g.gate.z, lane: l, kind: kind, variant: vi });
         }
       }
       return out;

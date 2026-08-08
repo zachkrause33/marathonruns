@@ -15,6 +15,30 @@ MR.Player = (function () {
   const K = MR.K;
   const C = MR.Collision;
 
+  /**
+   * ---- HOW LONG IT TAKES TO FALL OFF A LORRY -----------------------------
+   *
+   * 0.50 s, and the number is set by the road that is GUARANTEED to be there
+   * rather than by gravity. A free fall from Course.DECK_Y (2.80) at 9.81 is
+   * 0.756 s, and the whole descent has to finish before the next gate -- or the
+   * runner arrives at it still 1.4 units up, which clears a JUMP for free and,
+   * worse, clears a DUCK for free, because a SURFACE above 1.83 is above the
+   * bar (see the DUCK clause in collision.js). A mechanic that hands out free
+   * clears is not a mechanic, it is an exploit.
+   *
+   * What the course guarantees: spacingAt owes the gate after a train
+   * readWindowAt + reachOf, and reachOf for a train IS that train's depth. So
+   * whatever length the vehicle is, there are at least readWindowAt units of
+   * clear road past its far face -- 25.35 on the flat, and MORE on a descent,
+   * because actionWindowAt grows with the local top speed. In time that floor
+   * is 0.89 s at the pace floor. The physical 0.756 leaves 0.13 s of it; 0.50
+   * leaves 0.39.
+   *
+   * tools/mechanics.js measures the real margin for every ramp on all 365 days
+   * rather than trusting this paragraph, and fails when one lands late.
+   */
+  const FALL_TIME = 0.50;
+
   function create() {
     const s = {
       lane: 1,
@@ -31,6 +55,16 @@ MR.Player = (function () {
       stumble: 0,
       bounce: 0,        // signed lateral knock from a BLOCK, decays
       tripT: 0,         // 0..1 through a trip on a small obstacle
+      // ---- the second running surface ------------------------------------
+      // `surface` is the height of the GROUND under the runner and `y` stays
+      // height above it, which is the same split main.js already uses for
+      // hills. All three are zero on a course with no ramps, so nothing here
+      // changes for a game that does not use the mechanic.
+      surface: 0,       // 0 on the road, Course.DECK_Y on a roof
+      ramp: null,       // the ramp being ridden, or null
+      falling: 0,       // 0..1 through a fall back to the road
+      fallFrom: 0,      // the height the fall started at
+      flanked: false,   // latched while inside a vehicle, so one hit is one hit
       gateIdx: 0,
       aidIdx: 0,
       lastResult: null,  // 'clean' | 'hit'
@@ -38,10 +72,18 @@ MR.Player = (function () {
       events: [],        // drained by main for audio/HUD reactions
     };
 
+    // Derived, not stored. collision.js's BLOCK clause asks whether the runner
+    // is standing on the thing, and the only true answer is "there is a ramp
+    // under him" -- a second boolean kept alongside `ramp` would be one more
+    // pair of numbers that can disagree, which is how four of the corrections
+    // in docs/roadmap.md start.
+    Object.defineProperty(s, 'onDeck', { get: function () { return s.ramp !== null; } });
+
     s.reset = function () {
       s.lane = 1; s.laneFrom = 1; s.laneT = 1; s.x = 0; s.y = 0;
       s.airT = 0; s.airborne = false; s.duckT = 0; s.ducking = false;
       s.duck01 = 0; s.lean = 0; s.stumble = 0; s.bounce = 0; s.tripT = 0;
+      s.surface = 0; s.ramp = null; s.falling = 0; s.fallFrom = 0; s.flanked = false;
       s.gateIdx = 0; s.aidIdx = 0;
       s.lastResult = null; s.events.length = 0;
     };
@@ -125,10 +167,138 @@ MR.Player = (function () {
       const rate = s.ducking ? K.DUCK_IN_RATE : K.DUCK_OUT_RATE;
       s.duck01 += (target - s.duck01) * Math.min(1, rate * dt);
 
+      // ---- falling off a roof --------------------------------------------
+      // Driven here rather than in resolveDeck so it keeps running on the
+      // frames the runner is over open road with no ramp to ask about.
+      if (s.falling > 0) {
+        s.falling = Math.min(1, s.falling + dt / FALL_TIME);
+        // 1 - t*t: zero vertical speed at the lip, accelerating downward, and
+        // exactly zero at t = 1. A linear ramp reads as being lowered on a wire.
+        s.surface = s.fallFrom * (1 - s.falling * s.falling);
+        if (s.falling >= 1) {
+          s.falling = 0; s.surface = 0; s.fallFrom = 0;
+          s.events.push('land');
+        }
+      }
+
       s.stumble = Math.max(0, s.stumble - dt * 2.2);
       s.bounce -= s.bounce * Math.min(1, dt * 5.5);
       if (Math.abs(s.bounce) < 0.001) s.bounce = 0;
       if (s.tripT > 0) s.tripT = Math.max(0, s.tripT - dt / 0.55);
+    };
+
+    /**
+     * The second running surface: mount a ramp, ride a roof, leave one.
+     *
+     * ---- WHY THIS IS CONTINUOUS WHEN EVERYTHING ELSE IS A PLANE ----------
+     *
+     * Every other contact in this game is a single-plane test at gate.z, and
+     * that has always been a defensible simplification because a hazard's
+     * relationship to the player does not change between gate lines: you were
+     * in its lane or you were not.
+     *
+     * A roof breaks that, in both directions. You can leave it between gate
+     * lines by changing lane, and you can arrive at its flank between gate
+     * lines by changing lane. Neither has a gate to fire at.
+     *
+     * SO IT ALSO EXPOSES SOMETHING THAT WAS ALREADY TRUE AND IS NOT ABOUT THE
+     * RAMP AT ALL. resolveGates is the only contact path in this file, it fires
+     * only at gate.z, and a BLOCK train is one gate carrying up to eighteen
+     * units of vehicle. A player who is in a clear lane at the gate line and
+     * then swerves into the trained lane runs the entire length of that vehicle
+     * with nothing to touch. That is a hole in the shipped game, it is
+     * measurable (tools/mechanics.js --passthrough drives the real Player
+     * through it), and this function closes it for rideable trains as a side
+     * effect of having to know where the flank is. It does not close it for
+     * ordinary ones -- that would be a difficulty change to the shipped game
+     * and is not this pass's to make.
+     *
+     * @returns null, or { hit, z, why } when contact was made
+     */
+    s.resolveDeck = function (course, unitsBefore, unitsNow) {
+      if (!course || !course.deckAt) return null;
+      const geo = course.deckAt(unitsNow, s.lane);
+      // Over open road: the latch is spent and the next vehicle is a fresh
+      // incident. Cleared here rather than at the bounce, because the bounce
+      // does not always succeed -- see the note on it below.
+      if (geo <= 0) s.flanked = false;
+
+      if (s.ramp) {
+        // Still on the same vehicle: the roof IS the ground.
+        if (geo > 0 && course.rampAt(unitsNow, s.lane) === s.ramp) {
+          s.surface = geo;
+          s.falling = 0;
+          return null;
+        }
+        // Off it. The two ways off are not the same event and must not read as
+        // the same event: running off the front is a dismount the mechanic is
+        // FOR, and leaving sideways is stepping off a lorry at race pace.
+        const offFront = unitsNow >= s.ramp.z1;
+        s.fallFrom = s.surface;
+        s.falling = 1e-6;              // non-zero so update() takes it from here
+        s.ramp = null;
+        if (offFront) { s.events.push('dismount'); return null; }
+        s.tripT = 1;
+        s.stumble = 0.9;
+        s.events.push('fall');
+        s.events.push('hit');
+        return { hit: true, z: unitsNow, why: 'fell off the side' };
+      }
+
+      if (geo <= 0) return null;
+
+      const r = course.rampAt(unitsNow, s.lane);
+      if (!r) return null;
+
+      // There is a vehicle here and the runner is not on top of it. Coming in
+      // over the tailgate is a mount; arriving anywhere past it is arriving at
+      // the flank, which is a wall.
+      if (unitsBefore <= r.z0 + r.run && s.falling <= 0) {
+        s.ramp = r;
+        s.surface = geo;
+        s.events.push('mount');
+        return null;
+      }
+
+      // ---- ONE CONTACT PER VEHICLE, NOT ONE PER FRAME --------------------
+      //
+      // The first version of this bounced the runner back to `laneFrom`, which
+      // is correct only while a lane change is still in flight. Once laneT has
+      // reached 1, laneFrom EQUALS lane, the swap was a no-op, and the runner
+      // stayed inside the lorry taking a fresh contact every frame -- seven of
+      // them per incident at 60 Hz, in a game where one contact ends a record
+      // attempt. tools/mechanics.js found it by tracing the z of every flank
+      // hit and seeing them arrive 1.3 units apart; the summary count alone
+      // read as a design finding about lane changes and was nothing of the sort.
+      //
+      // So it does what resolveGates already does for a BLOCK: pick a lane that
+      // is actually free at this z, preferring the middle so a knock never puts
+      // the player somewhere they cannot recover from.
+      const cands = [];
+      for (const d of [-1, 1]) {
+        const t = s.lane + d;
+        if (t < 0 || t > 2) continue;
+        if (course.deckAt(unitsNow, t) > 0) continue;
+        cands.push(t);
+      }
+      const to = cands.length
+        ? cands.reduce((a, b) => (Math.abs(b - 1) < Math.abs(a - 1) ? b : a))
+        : s.lane;
+      if (to !== s.lane) {
+        s.bounce = to > s.lane ? 1 : -1;
+        s.laneFrom = s.lane;
+        s.lane = to;
+        s.laneT = 0.35;
+      }
+      // ...and a latch as well as a bounce, because `to === s.lane` is reachable
+      // when two vehicles overlap either side. A latch cannot be defeated by
+      // geometry; it clears the moment the runner is over open road again.
+      if (s.flanked) return null;
+      s.flanked = true;
+      s.stumble = 1;
+      s.events.push('bounce');
+      s.events.push('hit');
+      return { hit: true, z: unitsNow, why: 'ran into the flank' };
     };
 
     /**

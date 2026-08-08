@@ -1,0 +1,678 @@
+#!/usr/bin/env node
+/**
+ * THE TWO MECHANICS UNDER TEST, MEASURED.
+ *
+ *   node tools/mechanics.js              everything below, 365 days
+ *   node tools/mechanics.js --days 90    a shorter sweep
+ *
+ * Sections, in the order a reader needs them:
+ *
+ *   identity     flags off is BIT-IDENTICAL to the generator before either
+ *                mechanic existed
+ *   guard        Course.DECK_Y still equals Collision.BOX[BLOCK].yMax
+ *   narrow       how narrow the road already gets today, and how narrow lane
+ *                closure makes it -- and whether each closure is a REST or a
+ *                DECISION
+ *   ramp         how many, how long a ride, whether the fall lands on road the
+ *                course guarantees is clear, and what is waiting in the lane
+ *   passthrough  the shipped hole this pass ran into: a BLOCK train is one
+ *                gate, so swerving into one between gate lines touches nothing
+ *   pace         what each mechanic does to the finish time and the record
+ *
+ * ---- WHAT THIS INSTRUMENT GETS WRONG IF NOBODY WATCHES IT ----------------
+ *
+ * Rule 3 says audit the instrument as hard as the work, and every instrument
+ * this project has written was wrong first, always in the direction that
+ * flattered the thing measured. The five ways this one could have been:
+ *
+ *  1. MEASURING A CLOSURE IN GATES. A closure of three gates is 60 units at one
+ *     spacing and 130 at another, and the player experiences the units. Every
+ *     length here is in world units and, where it matters, in seconds at the
+ *     local top speed.
+ *
+ *  2. CALLING A CLOSURE SOLVABLE BECAUSE Course.generate SAID SO. It cannot say
+ *     otherwise: after 24 failed attempts generate() DEGRADES to an all-clear
+ *     gate, so an unsolvable course is unreachable by construction and
+ *     "solvable on all 365 days" is a tautology. What a bad mechanic actually
+ *     does is make the generator give up more often, and nothing counted that
+ *     until this pass added course.tally. The degrade count is reported here,
+ *     and it is the number that matters.
+ *
+ *  3. SIZING THE FALL AT RECORD PACE. A slower runner falls a shorter distance,
+ *     so record pace flatters the landing margin. The fall is sized at the
+ *     FASTEST the runner can be at that point -- the pace floor plus the local
+ *     descent, which is the same quantity Course.actionWindowAt is derived
+ *     against -- and the margin reported is the minimum over every ramp on
+ *     every day, not the mean.
+ *
+ *  4. CALLING A CLOSURE A DECISION BECAUSE IT CONTAINS A HAZARD. It is only a
+ *     decision if the player can get it WRONG. A closure that leaves two lanes
+ *     open with one of them CLEAR at every gate is answerable by sitting in the
+ *     clear lane, so it is a rest however many hazards are in the other one.
+ *     The test below is per gate and asks whether EVERY open lane demands an
+ *     action -- see restOrDecision.
+ *
+ *  5. COUNTING ONLY THE CLOSURES IT PLANTED. The generator already produces
+ *     one-lane stretches by accident, because two trains can overlap. Reporting
+ *     only planned closures would credit the mechanic with inventing something
+ *     the game already does. The same scan runs at NARROW = 0 and NARROW = 1
+ *     and both numbers are printed.
+ */
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const crypto = require('crypto');
+
+const ROOT = path.resolve(__dirname, '..');
+
+const args = process.argv.slice(2);
+function arg(name, def) {
+  const i = args.indexOf('--' + name);
+  return i >= 0 && args[i + 1] && !args[i + 1].startsWith('--') ? args[i + 1] : def;
+}
+const DAYS = parseInt(arg('days', 365), 10);
+
+// ---- the sandbox ---------------------------------------------------------
+// The REAL modules, including collision.js and player.js, so the pass-through
+// probe below drives the shipped state machine rather than a description of it.
+// collision.js reads MR.Runner.HEIGHT and nothing else off the renderer, so a
+// one-field stub is the whole of what a headless player needs -- and the stub
+// carries the shipped value rather than a guess, checked below.
+const ctx = {
+  MR: { Runner: { HEIGHT: 1.78 } },
+  Math, console, isFinite, String, Number, Set, Array, JSON, Float64Array,
+  parseFloat, parseInt, Object,
+};
+vm.createContext(ctx);
+for (const f of ['src/core/rng.js', 'src/core/constants.js', 'src/core/elevation.js',
+                 'src/core/pace.js', 'src/core/course.js',
+                 'src/game/collision.js', 'src/game/player.js']) {
+  vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: f });
+}
+const { Course, Collision, Player, Pace, K, Elevation } = ctx.MR;
+
+let fail = 0;
+function bad(msg) { fail++; console.log('  ! ' + msg); }
+
+function keys(n) {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    out.push(ctx.MR.rng.dateKey(new Date(Date.UTC(2026, 0, 1) + i * 86400000)));
+  }
+  return out;
+}
+const KEYS = keys(DAYS);
+// The same four dates tools/simulate.js averages over, so every finish time in
+// this file sits alongside the ones that already gate the build.
+const PKEYS_RIDE = ['2026-08-05', '2026-08-06', '2026-12-25', '2027-03-14'];
+
+function withFlags(narrow, ramp, fn) {
+  Course.NARROW = narrow; Course.RAMP = ramp;
+  try { return fn(); } finally { Course.NARROW = 0; Course.RAMP = 0; }
+}
+
+/** The fastest the runner can be at z: the pace floor plus the local grade. */
+function topSpeedAt(elev, z) {
+  const g = elev ? elev.gradeAt(z) : 0;
+  const pace = K.FLOOR_PACE + K.GRADE_SPM * Math.min(0, g);   // descent only
+  return (K.UNITS_PER_MILE * K.TIME_SCALE) / pace;
+}
+
+console.log(`\n=== identity: flags off must be the generator that shipped ===\n`);
+/**
+ * ONE HASH OVER THE WHOLE CALENDAR, taken before the first line of either
+ * mechanic went into course.js.
+ *
+ * This is a golden number and it is SUPPOSED to be brittle. Any deliberate
+ * change to course generation will break it, and the correct response is to
+ * re-take it and say so in docs/roadmap.md -- never to delete the check. What
+ * it is guarding is narrower and worth keeping: that NARROW = 0 and RAMP = 0
+ * draw no random numbers, so the seeded stream stays in phase and today's
+ * course is today's course whether or not the mechanics exist.
+ */
+const BASELINE_365 = 'f046dcfc84a59c08a3a7b51c78449853f3bd90f8';
+(function identity() {
+  const h = crypto.createHash('sha1');
+  for (const key of keys(365)) {
+    const c = Course.generate(key);
+    h.update(JSON.stringify(c.gates) + '|' + JSON.stringify(c.aid));
+  }
+  const got = h.digest('hex');
+  console.log(`  365-day course hash  ${got}`);
+  if (got !== BASELINE_365) {
+    bad(`course generation has MOVED at NARROW=0 RAMP=0 (expected ${BASELINE_365}).`);
+    console.log('    Either a flag is drawing from the seeded stream when it should not,');
+    console.log('    or course generation was deliberately changed -- in which case re-take');
+    console.log('    this hash and record why in docs/roadmap.md.');
+  } else {
+    console.log('  flags off is bit-identical to the pre-mechanic generator  OK');
+  }
+})();
+
+console.log(`\n=== guard: duplicated constants ===\n`);
+(function guard() {
+  // Same class of guard tools/lib/fairness.js already runs for HAZARD_HALF_Z,
+  // and here for the same reason: course.js cannot read MR.Collision, because
+  // collision.js loads after it and generation runs headless where it is not
+  // loaded at all. So the number is duplicated and then checked where both are
+  // live -- which, unlike the browser-only guard, is here.
+  const a = Course.DECK_Y, b = Collision.BOX[K.BLOCK].yMax;
+  console.log(`  Course.DECK_Y ${a}   Collision.BOX[BLOCK].yMax ${b}`);
+  if (a !== b) bad(`the ramp deck is not the top of the box it stands on (${a} vs ${b})`);
+  const r = ctx.MR.Runner.HEIGHT, c = Collision.PLAYER_STAND_TOP;
+  if (r !== c) bad(`this harness stubs Runner.HEIGHT at ${r}, collision reads ${c}`);
+  const audit = Collision.audit();
+  if (!audit.ok) for (const n of audit.notes) bad('collision audit: ' + n);
+  if (!fail) console.log('  the deck is the box top, and the collision audit is clean  OK');
+})();
+
+// ---- lane closure --------------------------------------------------------
+/**
+ * A gate is a REST when at least one lane the player may enter is CLEAR: they
+ * can answer it by standing still. It is a DECISION when every enterable lane
+ * demands a jump or a slide -- which the game already ships as the full-width
+ * gate, at 62% of gates at the top of the difficulty curve.
+ */
+function restGate(lanes) {
+  for (let l = 0; l < 3; l++) if (lanes[l] === K.CLEAR) return true;
+  return false;
+}
+
+/** Maximal runs of consecutive gates with at most `max` lanes open, in units. */
+function narrowRuns(gates, max) {
+  const runs = [];
+  let start = -1;
+  for (let i = 0; i <= gates.length; i++) {
+    const open = i < gates.length
+      ? gates[i].lanes.filter((l) => l !== K.BLOCK).length : 99;
+    if (open <= max) { if (start < 0) start = i; continue; }
+    if (start >= 0) {
+      // In UNITS, from the first constrained gate line to the last. A single
+      // constrained gate is a run of length zero and is still counted -- the
+      // constraint is real, it just has no depth.
+      runs.push({
+        from: start, to: i - 1,
+        z0: gates[start].z, z1: gates[i - 1].z,
+        units: gates[i - 1].z - gates[start].z,
+        gates: i - start,
+        rest: gates.slice(start, i).every((g) => restGate(g.lanes)),
+      });
+      start = -1;
+    }
+  }
+  return runs;
+}
+
+function narrowScan(narrow) {
+  const acc = {
+    days: 0, gates: 0, degraded: 0, attempts: 0, planned: 0, abandoned: 0,
+    one: [], two: [], oneRest: 0, oneDecision: 0, invalid: 0,
+    // EXPOSURE, in units of road, which is the number the player experiences.
+    // The run COUNT flatters a mechanic that produces many tiny constraints and
+    // the run LENGTH flatters one that produces a few long ones; the share of
+    // the course spent constrained is neither.
+    oneUnits: 0, twoUnits: 0, total: 0,
+    // Does a corridor ASK more or less than open road? Counted per gate, over
+    // the lanes the player may actually enter.
+    corridorGates: 0, corridorAction: 0, allGates: 0, allAction: 0,
+  };
+  for (const key of KEYS) {
+    const c = withFlags(narrow, 0, () => Course.generate(key));
+    acc.days++;
+    acc.gates += c.gates.length;
+    acc.total += K.TOTAL_UNITS;
+    acc.degraded += c.tally.degraded;
+    acc.attempts += c.tally.attempts;
+    acc.planned += c.tally.narrowings;
+    acc.abandoned += c.tally.narrowAbandoned;
+    if (!c.valid.ok) { acc.invalid++; bad(`${key}: ${c.valid.errors[0]}`); }
+    for (const g of c.gates) {
+      acc.allGates++;
+      if (!restGate(g.lanes)) acc.allAction++;
+    }
+    for (const r of narrowRuns(c.gates, 1)) {
+      acc.one.push(r);
+      acc.oneUnits += r.units;
+      if (r.rest) acc.oneRest++; else acc.oneDecision++;
+      for (let i = r.from; i <= r.to; i++) {
+        acc.corridorGates++;
+        if (!restGate(c.gates[i].lanes)) acc.corridorAction++;
+      }
+    }
+    for (const r of narrowRuns(c.gates, 2)) { acc.two.push(r); acc.twoUnits += r.units; }
+  }
+  return acc;
+}
+
+/** Runs of at least two gates -- a STRETCH, as opposed to a single tight gate. */
+function stretches(list) { return list.filter((r) => r.gates >= 2); }
+
+function stat(list, f) {
+  if (!list.length) return { n: 0, mean: 0, max: 0, p50: 0 };
+  const v = list.map(f).sort((a, b) => a - b);
+  return {
+    n: v.length,
+    mean: v.reduce((a, b) => a + b, 0) / v.length,
+    max: v[v.length - 1],
+    p50: v[Math.floor(v.length / 2)],
+  };
+}
+
+console.log(`\n=== narrow: how narrow the road gets, over ${DAYS} days ===\n`);
+const nOff = narrowScan(0);
+const nOn = narrowScan(1);
+console.log('                                  NARROW=0        NARROW=1');
+for (const [label, f] of [
+  ['gates per day', (a) => (a.gates / a.days).toFixed(1)],
+  ['generator gave up (degrades)', (a) => String(a.degraded)],
+  ['solvable attempts per gate', (a) => (a.attempts / a.gates).toFixed(2)],
+  ['closures planted', (a) => String(a.planned)],
+  ['closures abandoned as unsolvable', (a) => String(a.abandoned)],
+  ['ONE lane open -- occurrences', (a) => String(a.one.length)],
+  ['  per day', (a) => (a.one.length / a.days).toFixed(2)],
+  ['  of those, runs of 2+ gates', (a) => String(stretches(a.one).length)],
+  ['  median length of those, units', (a) => stat(stretches(a.one), (r) => r.units).p50.toFixed(1)],
+  ['  longest, units', (a) => stat(a.one, (r) => r.units).max.toFixed(1)],
+  ['  share of the race, %', (a) => (100 * a.oneUnits / a.total).toFixed(2)],
+  ['  RESTS (some open lane CLEAR)', (a) => String(a.oneRest)],
+  ['  DECISIONS (every open lane acts)', (a) => String(a.oneDecision)],
+  ['TWO or fewer lanes -- occurrences', (a) => String(a.two.length)],
+  ['  share of the race, %', (a) => (100 * a.twoUnits / a.total).toFixed(2)],
+  ['gates demanding an action, %', (a) => (100 * a.allAction / a.allGates).toFixed(1)],
+  ['  inside a one-lane corridor, %', (a) => (a.corridorGates ? (100 * a.corridorAction / a.corridorGates).toFixed(1) : '-')],
+  ['courses failing validate()', (a) => String(a.invalid)],
+]) {
+  console.log('  ' + label.padEnd(32) + String(f(nOff)).padStart(10) + String(f(nOn)).padStart(16));
+}
+
+// ---- the ramp ------------------------------------------------------------
+console.log(`\n=== ramp: the rideable roof, over ${DAYS} days ===\n`);
+const rampAcc = {
+  n: 0, days: 0, rides: [], margins: [], landing: { CLEAR: 0, JUMP: 0, DUCK: 0, BLOCK: 0, END: 0 },
+  gateInFall: 0, gateInRide: 0, degraded: 0, gates: 0, invalid: 0,
+};
+for (const key of KEYS) {
+  const c = withFlags(0, 1, () => Course.generate(key));
+  rampAcc.days++;
+  rampAcc.gates += c.gates.length;
+  rampAcc.degraded += c.tally.degraded;
+  if (!c.valid.ok) { rampAcc.invalid++; bad(`${key}: ${c.valid.errors[0]}`); }
+  const gz = c.gates.map((g) => g.z);
+  for (const r of c.ramps) {
+    rampAcc.n++;
+    const v = topSpeedAt(c.elevation, r.z1);
+    // The ride, in units and in the seconds a runner at the local TOP speed
+    // spends on it -- the shortest honest answer, not the most flattering.
+    rampAcc.rides.push({ units: r.z1 - r.z0, secs: (r.z1 - r.z0) / v, roof: r.z1 - r.z0 - r.run });
+    // Where the fall lands, against the next GATE LINE.
+    //
+    // ---- AND THE FINISH IS NOT A GATE, WHICH THIS GOT WRONG -------------
+    //
+    // The first version substituted K.TOTAL_UNITS when a ramp was the last gate
+    // on the course, and then reported the distance to the TAPE as a landing
+    // margin. That fired the trap assertion at 3.0 units on 2026-12-02 -- and
+    // the assertion was right that something was wrong and wrong about what.
+    // There is no hazard at the finish, so landing near it costs the player
+    // nothing; what it actually broke was the run-in, which is a different
+    // problem with a different fix (course.js now refuses a ramp past f=0.90).
+    // A margin against a thing that cannot be hit is not a margin, so those
+    // ramps are counted as END and left out of the statistic entirely.
+    const nextI = gz.findIndex((z) => z > r.z1);
+    const land = r.z1 + 0.50 * v;              // FALL_TIME in player.js
+    if (nextI < 0) {
+      rampAcc.landing.END++;
+      bad(`${key}: a ramp at z ${r.z0.toFixed(0)} (f=${(r.z0 / K.TOTAL_UNITS).toFixed(3)}) is the `
+        + 'last gate on the course -- its roof runs into the finish run-in');
+    } else {
+      const nextZ = gz[nextI];
+      rampAcc.margins.push({ margin: nextZ - land, key, z: r.z0 });
+      if (nextZ - land < 0) rampAcc.gateInFall++;
+      // Anything standing in the lane the runner is committed to when he lands.
+      rampAcc.landing[['CLEAR', 'JUMP', 'DUCK', 'BLOCK'][c.gates[nextI].lanes[r.lane]]]++;
+    }
+    // A gate INSIDE the vehicle would mean the runner resolving a hazard while
+    // standing on a lorry roof, which nothing in the audit can see.
+    for (let i = 0; i < gz.length; i++) if (gz[i] > r.z0 && gz[i] < r.z1) rampAcc.gateInRide++;
+  }
+}
+const ride = stat(rampAcc.rides, (r) => r.units);
+const secs = stat(rampAcc.rides, (r) => r.secs);
+const marg = stat(rampAcc.margins, (m) => m.margin);
+console.log(`  ramps                       ${rampAcc.n}  (${(rampAcc.n / rampAcc.days).toFixed(2)} per day)`);
+console.log(`  gates per day               ${(rampAcc.gates / rampAcc.days).toFixed(1)}   against ${(nOff.gates / nOff.days).toFixed(1)} with no ramps`);
+console.log(`  generator gave up           ${rampAcc.degraded}`);
+console.log(`  ride length, units          median ${ride.p50.toFixed(1)}   max ${ride.max.toFixed(1)}`);
+console.log(`  ride length, seconds        median ${secs.p50.toFixed(2)}   max ${secs.max.toFixed(2)}   (at the local TOP speed)`);
+console.log(`  landing margin, units       min ${marg.n ? Math.min(...rampAcc.margins.map((m) => m.margin)).toFixed(1) : '-'}   median ${marg.p50.toFixed(1)}`);
+console.log(`  falls that reach a gate     ${rampAcc.gateInFall}`);
+console.log(`  gates inside a vehicle      ${rampAcc.gateInRide}`);
+console.log(`  what is in the lane you land in:`);
+for (const k of ['CLEAR', 'JUMP', 'DUCK', 'BLOCK', 'END']) {
+  console.log(`    ${k.padEnd(6)} ${String(rampAcc.landing[k]).padStart(5)}`);
+}
+console.log(`  courses failing validate()  ${rampAcc.invalid}`);
+if (rampAcc.gateInFall) bad(`${rampAcc.gateInFall} falls are still in the air at the next gate -- a free clear`);
+if (rampAcc.gateInRide) bad(`${rampAcc.gateInRide} gates sit inside a rideable vehicle`);
+
+/**
+ * ---- CAN THE PLAYER ANSWER WHAT THEY LAND IN? --------------------------
+ *
+ * `solvable()` proves a path that never uses a ramp. A player who takes one is
+ * off that path, so the roof owes its own proof, and 10% of ramps put a BLOCK
+ * in the lane the runner falls back into.
+ *
+ * The worst case is two lane changes, not one: solvable() allows two BLOCKs at
+ * a gate, so the lane the runner lands in and the lane next to it can both be
+ * walls, and the only way out is two lanes across. changeLane will not serve a
+ * second move until laneT >= 0.55, so two changes cost 1.55 * LANE_CHANGE_TIME,
+ * and that is priced at the FASTEST the runner can be there.
+ */
+(function landing() {
+  const worst = rampAcc.margins.reduce((a, b) => (b.margin < a.margin ? b : a),
+    { margin: Infinity, key: '-', z: 0 });
+  const need = 1.55 * K.LANE_CHANGE_TIME * ((K.UNITS_PER_MILE * K.TIME_SCALE) / K.FLOOR_PACE);
+  console.log(`  two lane changes need         ${need.toFixed(1)}u at the pace floor`);
+  console.log(`  tightest landing on record    ${worst.margin.toFixed(1)}u  (${worst.key} at z ${worst.z.toFixed(0)})`);
+  if (rampAcc.n && worst.margin < need) {
+    bad(`a fall lands ${worst.margin.toFixed(1)}u short of the next gate and needs ${need.toFixed(1)}u `
+      + 'to get out of a doubly-blocked lane -- the roof would be a trap');
+  }
+})();
+
+// Aid on the roof. Without it the ramp is strictly dominated; see the note in
+// generateAid. Counted here so the claim is a number rather than an intention.
+(function roofAid() {
+  let roof = 0, road = 0;
+  for (const key of KEYS) {
+    const c = withFlags(0, 1, () => Course.generate(key));
+    for (const a of c.aid) { if (a.roof) roof++; else road++; }
+  }
+  console.log(`  aid items on roofs            ${roof}   against ${road} on the road`);
+  if (rampAcc.n && roof !== rampAcc.n) {
+    bad(`${rampAcc.n} ramps but ${roof} roof pickups -- the reward does not match the ride`);
+  }
+})();
+
+// ---- the shipped hole ----------------------------------------------------
+console.log(`\n=== passthrough: what a BLOCK train does between gate lines ===\n`);
+/**
+ * Drives the REAL MR.Player, not a description of one. The scenario is the
+ * simplest thing a human does by accident: be in a clear lane at the gate line
+ * of a BLOCK train, then change into the train's lane a moment later.
+ *
+ * If contact is a plane at gate.z -- which it is -- the runner walks the whole
+ * length of the vehicle and the game never says a word.
+ */
+(function passthrough() {
+  const key = KEYS[0];
+  const c = withFlags(0, 0, () => Course.generate(key));
+  let found = 0, silent = 0, skipped = 0;
+  for (let i = 0; i < c.gates.length; i++) {
+    const g = c.gates[i];
+    if (!g.train) continue;
+    const lane = g.lanes.findIndex((l) => l === K.BLOCK);
+    // ---- THE FIRST DRAFT OF THIS PROBE WAS CONTAMINATED, AND IT UNDERSTATED
+    // THE HOLE, WHICH IS THE DIRECTION THAT MATTERS.
+    //
+    // It took `safe` as the first lane that is not a BLOCK -- which is very
+    // often a JUMP or a DUCK. The runner then walked into it standing up, took
+    // an honest contact at the gate line, and the probe counted that as the
+    // train having been guarded. It reported 8 of 16 trains as silent when the
+    // true figure is every one of them. The approach has to be genuinely clean
+    // or the scenario is not the scenario.
+    const safe = g.lanes.findIndex((l) => l === K.CLEAR);
+    if (lane < 0 || safe < 0) { skipped++; continue; }
+    found++;
+    const p = Player.create();
+    p.lane = safe; p.laneFrom = safe; p.laneT = 1;
+    // Cross the gate line in a genuinely CLEAR lane. Asserted, not assumed.
+    const approach = p.resolveGates(c, g.z - 1, g.z + 0.01);
+    if (approach.some((r) => !r.clean)) { bad('probe approach was not clean'); continue; }
+    // ...then swerve into the wall and run its whole length.
+    p.laneFrom = safe; p.lane = lane; p.laneT = 0;
+    const depth = 2 * Collision.BOX[K.BLOCK].halfZ * (1 + g.train * 0.9);
+    let hits = 0;
+    for (let z = g.z + 0.02; z < g.z + depth; z += 0.5) {
+      p.update(1 / 60, 0.5);
+      hits += p.resolveGates(c, z, z + 0.5).filter((r) => !r.clean).length;
+    }
+    if (hits === 0) silent++;
+  }
+  console.log(`  ${key}: ${found} BLOCK trains with a genuinely CLEAR lane to approach in`
+    + ` (${skipped} skipped, no clear lane)`);
+  console.log(`  swerved into the flank of each one, mid-vehicle: ${silent} of ${found} recorded NO contact`);
+  console.log('  This is the shipped game, with both flags off. Contact is a single-plane');
+  console.log('  test at gate.z (player.resolveGates), and a train is ONE gate carrying up');
+  console.log('  to 17.9 units of vehicle -- so the lane is only guarded where the plane is.');
+  console.log('  Not a defect this pass introduced and not one it fixes in general; the ramp');
+  console.log('  closes it for rideable trains only, because a roof forces the flank to be');
+  console.log('  known. Reported here because it is the reason the ramp needs a continuous');
+  console.log('  test at all, and because nothing else in tools/ has ever asked.');
+})();
+
+// ---- is the roof worth taking? -------------------------------------------
+console.log(`\n=== ride: the same course run over the roofs and around them ===\n`);
+/**
+ * THE QUESTION THE BRIEF ACTUALLY ASKS: does the ramp add a decision, or does
+ * it just add time?
+ *
+ * A decision needs two options that are both live. So the same generated course
+ * is raced twice by the same bot, differing in ONE bit -- take every ramp, or
+ * route around every ramp -- through the real MR.Player, the real
+ * MR.Collision and the real MR.Pace. Nothing here re-implements the game.
+ *
+ * The bot is main.js's botThink, minus the deliberate-miss path, and it drives
+ * the state machine through a controls queue exactly as a human does rather
+ * than writing player.lane directly -- because the cost of the ramp IS a lane
+ * constraint, and a bot that teleports between lanes would measure a version of
+ * the mechanic that does not have one.
+ */
+function stubControls() {
+  const q = [];
+  return {
+    push: (a) => q.push(a),
+    take: function (pred) {
+      for (let i = 0; i < q.length; i++) if (pred(q[i])) return q.splice(i, 1)[0];
+      return null;
+    },
+  };
+}
+
+/**
+ * Is lane `l` physically occupied by a rideable vehicle anywhere between here
+ * and there? Sampled rather than solved, because the answer only has to be good
+ * enough to steer a bot and the vehicles are 32-43 units long against a 2-unit
+ * step.
+ *
+ * THIS FUNCTION IS THE FINDING. A bot that does not call it walks into the side
+ * of a lorry 27 times in four races -- not at a gate line, but 26 units past
+ * one, changing lane towards a gate that is still 34 units ahead. The shipped
+ * mental model is "a lane is tested where the gate is", and a 43-unit vehicle
+ * hanging off a single gate line breaks it.
+ */
+function occupied(course, lane, z0, z1) {
+  for (let z = z0; z < z1; z += 2) if (course.deckAt(z, lane) > 0) return true;
+  return course.deckAt(z1, lane) > 0;
+}
+
+function race(course, takeRamps, flankAware) {
+  const p = Pace.create(course.elevation);
+  const pl = Player.create();
+  const ctrl = stubControls();
+  const out = { hits: 0, aid: 0, roofAid: 0, mounts: 0, falls: 0, dismounts: 0, deckHits: 0, stuck: 0 };
+  let gi = 0, planned = false, plannedLane = 1, acted = false, guard = 0;
+  const DT = 1 / 60;
+
+  while (!p.finished && guard++ < 200000) {
+    // ---- plan ------------------------------------------------------------
+    while (gi < course.gates.length && course.gates[gi].z < p.units - 1) {
+      gi++; planned = false; acted = false;
+    }
+    const g = course.gates[gi];
+    if (g) {
+      const dist = g.z - p.units;
+      const speed = p.speed();
+      if (!planned && dist < 46) {
+        planned = true; acted = false;
+        const order = [pl.lane, pl.lane - 1, pl.lane + 1, 0, 1, 2]
+          .filter((l, i, a) => l >= 0 && l <= 2 && a.indexOf(l) === i);
+        let best = null, bestScore = -Infinity;
+        order.forEach(function (l, i) {
+          const rideable = g.ramp === l;
+          if (g.lanes[l] === K.BLOCK && !(rideable && takeRamps)) return;
+          // Do not steer into the flank of something 43 units long.
+          if (flankAware && !(rideable && takeRamps)
+              && occupied(course, l, p.units, g.z)) return;
+          let score = (g.lanes[l] === K.CLEAR ? 100 : 0) - i;
+          if (rideable && takeRamps) score += 220;
+          if (score > bestScore) { bestScore = score; best = l; }
+        });
+        // best === null means EVERY lane was rejected: the two the gate blocks,
+        // and the third because a rideable vehicle's flank is standing in it.
+        // That is a gate solvable() proved was passable and that a player who
+        // declined the ramp cannot pass -- see the note on `occupied`.
+        if (best === null) out.stuck++;
+        plannedLane = best === null ? pl.lane : best;
+      }
+      // The flank has to be re-checked HERE and not only at plan time. The plan
+      // is made up to 46 units out and executed at 34, and a vehicle 43 units
+      // long can be clear of the sampled span at the first instant and standing
+      // squarely in it at the second -- so a bot that only checks when it plans
+      // bounces off the lorry, gets pushed into a free lane, and immediately
+      // steers back into it because the plan has not changed. That loop is what
+      // made the first version of this table report 27 contacts where there were
+      // four incidents.
+      const blocked = flankAware && !(g.ramp === plannedLane && takeRamps)
+        && course.deckAt(p.units + 2, plannedLane) > 0;
+      if (planned && pl.lane !== plannedLane && dist < 34 && pl.laneT >= 0.55
+          && !pl.ramp && !blocked) {
+        ctrl.push(pl.lane < plannedLane ? 'right' : 'left');
+      }
+      if (planned && !acted && pl.lane === plannedLane) {
+        const kind = g.lanes[plannedLane];
+        // A rideable BLOCK is answered by being on it, not by an action.
+        if (kind === K.JUMP && dist < speed * 0.30) { ctrl.push('jump'); acted = true; }
+        else if (kind === K.DUCK && dist < speed * 0.16) { ctrl.push('duck'); acted = true; }
+      }
+    }
+
+    // ---- step ------------------------------------------------------------
+    pl.handle(ctrl);
+    const before = p.units;
+    p.update(DT);
+    const after = p.units;
+    pl.update(DT, after - before);
+
+    const deck = pl.resolveDeck(course, before, after);
+    if (deck && deck.hit) { p.onHit(); out.hits++; out.deckHits++;
+      if (process.env.MR_TRACE) { const rr = course.rampAt(after, pl.lane); console.log('    trace flank z=' + after.toFixed(1) + ' lane=' + pl.lane + ' why=' + deck.why + ' vehicle=' + (rr ? rr.z0.toFixed(0) + '-' + rr.z1.toFixed(0) : '?') + ' nextGate=' + (g ? g.z.toFixed(0) : '-')); } }
+    for (const r of pl.resolveGates(course, before, after)) {
+      if (r.clean) p.onClean(); else { p.onHit(); out.hits++; }
+    }
+    for (const it of pl.resolveAid(course, before, after)) {
+      p.onAid(it.gain); out.aid++; if (it.roof) out.roofAid++;
+    }
+    for (const e of pl.drainEvents()) {
+      if (e === 'mount') out.mounts++;
+      else if (e === 'fall') out.falls++;
+      else if (e === 'dismount') out.dismounts++;
+    }
+  }
+  out.time = p.finishTime;
+  out.streak = p.bestStreak;
+  return out;
+}
+
+(function ride() {
+  const acc = {};
+  // ---- THE CONTROL, AND IT IS NOT OPTIONAL ------------------------------
+  //
+  // The first run of this comparison reported 0 contacts taking the ramps
+  // against 27 routing around them, which reads as the mechanic being free
+  // safety. It is nothing of the kind: this bot is a port of main.js's and it
+  // is not perfect, so SOME contacts are the harness and not the mechanic. A
+  // two-column table cannot tell those apart. The third column is the same bot
+  // on the same dates with the ramp switched off entirely, and the only honest
+  // reading of the other two is the difference from it.
+  const COLS = [
+    ['ride', 'takes every ramp', true, true, 1],
+    ['naive', 'goes round, gate model', false, false, 1],
+    ['aware', 'goes round, sees flanks', false, true, 1],
+    ['none', 'no ramps on the course', false, true, 0],
+  ];
+  for (const [side] of COLS) {
+    acc[side] = { time: 0, hits: 0, deckHits: 0, stuck: 0, aid: 0, roofAid: 0, mounts: 0, falls: 0, dismounts: 0, n: 0 };
+  }
+  for (const key of PKEYS_RIDE) {
+    for (const [side, , take, aware, flag] of COLS) {
+      const course = withFlags(0, flag, () => Course.generate(key));
+      const r = race(course, take, aware);
+      const a = acc[side];
+      a.n++; a.time += r.time; a.hits += r.hits; a.deckHits += r.deckHits; a.stuck += r.stuck;
+      a.aid += r.aid; a.roofAid += r.roofAid;
+      a.mounts += r.mounts; a.falls += r.falls; a.dismounts += r.dismounts;
+    }
+  }
+  console.log('  ' + ' '.repeat(22) + COLS.map(([s]) => s.padStart(9)).join(''));
+  for (const [side, what] of COLS) console.log(`    ${side.padEnd(7)} ${what}`);
+  console.log('');
+  const row = (label, f) => console.log('  ' + label.padEnd(22)
+    + COLS.map(([s]) => String(f(acc[s])).padStart(9)).join(''));
+  row('finish, mean', (a) => Pace.clock(a.time / a.n));
+  row('contacts', (a) => String(a.hits));
+  row('  of them on a flank', (a) => String(a.deckHits));
+  row('gates with no way out', (a) => String(a.stuck));
+  row('mounts', (a) => String(a.mounts));
+  row('clean dismounts', (a) => String(a.dismounts));
+  row('falls off the side', (a) => String(a.falls));
+  row('aid collected', (a) => String(a.aid));
+  row('  of it from a roof', (a) => String(a.roofAid));
+  const dt = (acc.ride.time - acc.aware.time) / acc.ride.n;
+  console.log(`\n  taking every ramp costs ${dt >= 0 ? '+' : ''}${dt.toFixed(1)}s against going round it`
+    + ` and buys ${acc.ride.roofAid} roof pickups`);
+  if (acc.ride.mounts === 0) bad('the bot never got onto a roof -- the mechanic is unexercised');
+})();
+
+// ---- pace ----------------------------------------------------------------
+console.log(`\n=== pace: what each mechanic costs the race ===\n`);
+/**
+ * The same model tools/simulate.js uses, on the same four dates, so these
+ * numbers sit alongside the ones that already gate the build.
+ *
+ * A PERFECT LINE ONLY. That is not laziness: the question each mechanic has to
+ * answer is whether it moves the record, and the record is run clean. What a
+ * mechanic does to a broken run is a different question and simulate.js's
+ * forgiveness table is where it belongs.
+ */
+const PKEYS = PKEYS_RIDE;
+function perfect(narrow, ramp) {
+  const times = PKEYS.map((key) => {
+    const course = withFlags(narrow, ramp, () => Course.generate(key));
+    const p = Pace.create(course.elevation);
+    let gi = 0, guard = 0;
+    while (!p.finished && guard++ < 200000) {
+      p.update(1 / 60);
+      while (gi < course.gates.length && p.units >= course.gates[gi].z) { gi++; p.onClean(); }
+    }
+    return { t: p.finishTime, gates: course.gates.length };
+  });
+  return {
+    t: times.reduce((a, b) => a + b.t, 0) / times.length,
+    gates: times.reduce((a, b) => a + b.gates, 0) / times.length,
+  };
+}
+const rows = [['both off', 0, 0], ['narrow on', 1, 0], ['ramp on', 0, 1], ['both on', 1, 1]];
+console.log('  config       gates   perfect finish   vs record');
+const base = perfect(0, 0);
+for (const [label, n, r] of rows) {
+  const p = perfect(n, r);
+  const vs = p.t - K.RECORD_SECONDS;
+  console.log(`  ${label.padEnd(12)} ${p.gates.toFixed(1).padStart(5)}   ${Pace.clock(p.t).padStart(13)}   `
+    + `${(vs >= 0 ? '+' : '') + vs.toFixed(0)}s   ${(p.t - base.t >= 0 ? '+' : '') + (p.t - base.t).toFixed(1)}s vs both off`);
+  if (vs >= 0) bad(`${label}: a perfect line no longer beats the record`);
+}
+
+console.log('');
+console.log(fail === 0 ? 'PASS  both mechanics measured, no assertion broken'
+                       : `FAIL  ${fail} assertion(s) broken -- see the ! lines above`);
+process.exit(fail === 0 ? 0 : 1);

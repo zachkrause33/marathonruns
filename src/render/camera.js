@@ -352,6 +352,32 @@ MR.Camera = (function () {
       kick: 0,         // short FOV punch (landing)
 
       pDuck: 0,        // last frame's duck01, for edge-detecting slide entry
+      // ---- the second running surface ------------------------------------
+      //
+      // THE PROBLEM, STATED BEFORE THE FIX. The resting eye is K.CAM_BASE_Y,
+      // 3.10 above the road, and it aims at LOOK_Y, 1.16 above the road. Put
+      // the runner on a 2.80 roof and his feet are at 2.80 and his crown at
+      // 4.58, so the eye sits 1.48 BELOW his head while pointing at a spot 1.64
+      // below his feet -- the lens is looking at the flank of the lorry he is
+      // standing on, with the runner cropped off the top of the frame and no
+      // road visible at all.
+      //
+      // The fix is the one this file already uses for hills, and deliberately
+      // so: the terrain terms add elev.at() to the eye and to the aim, and the
+      // deck is the same kind of quantity one lane wide. It is added to BOTH,
+      // so the pitch of the lens is unchanged and every framing number this
+      // file was tuned against still holds -- the whole shot simply rises with
+      // the ground, which is what cresting a hill already does.
+      //
+      // IT READS THE RUNNER'S OWN SURFACE, NOT THE COURSE. Sampling the deck
+      // under the LENS (which is 4.35 back, and during a mount is still on the
+      // road) would pitch the camera up at the truck for the length of the
+      // tailgate and then snap. Sampling under the RUNNER means the shot rides
+      // with him, and the smoothing below is what stops the 2.80 cliff at the
+      // end of the roof from arriving as a cut -- the fall is 0.50 s and this
+      // filter is a little slower than that, so the eye settles into the
+      // landing rather than tracking it exactly.
+      dk: 0,           // smoothed surface height under the runner
 
       mile: -1,        // last whole mile crossed
       mileT: 0,
@@ -548,6 +574,14 @@ MR.Camera = (function () {
       // Cadence rises ~16% across the band; on its own that is nothing, but
       // under a camera that is also lower and wider it is the difference
       // between a jog and a hunt.
+      // The deck under the runner. Snapped on the first frame for the same
+      // reason the speed filter is: ?skip= can start a shot with the runner
+      // already on a roof, and easing up to it would photograph the camera
+      // halfway through a move that never happened in a real run.
+      const dkTarget = p.surface || 0;
+      if (first) s.dk = dkTarget;
+      else s.dk += (dkTarget - s.dk) * (1 - Math.pow(0.004, d));
+
       const air = clamp01((p.y || 0) / 1.2);
       const cadence = 2.55 * Math.pow(s.sp / 22, 0.72);
       s.stride = (s.stride + d * cadence) % 1;
@@ -611,7 +645,9 @@ MR.Camera = (function () {
         + bobY + shY
         + finUp
         // The road under the LENS, which is BASE_BACK behind the runner.
-        + elev.at(p.z - back);
+        + elev.at(p.z - back)
+        // ...and the roof under the RUNNER, if he is on one. See `dk`.
+        + s.dk;
 
       // The lateral drift at the tape: a slow swing off the centreline so the
       // finish is seen from three-quarters and the stands on one side crowd
@@ -653,7 +689,12 @@ MR.Camera = (function () {
         s.x * s.fr.lookX * (1 - fin) + (p.x || 0) * fin,
         LOOK_Y + (p.y || 0) * 0.50 - duck * 0.30 - drive * 0.22
           + runE * 1.1 + fin * 1.3
-          + elev.at(lookZ),
+          + elev.at(lookZ)
+          // The SAME term as the eye, not a sampled one. Adding the deck to the
+          // eye alone would pitch the lens down by atan(2.80 / 16.1) = 9.9
+          // degrees for the whole ride, which is a third of a portrait frame's
+          // horizontal field spent looking at the roof he is standing on.
+          + s.dk,
         lookZ
       );
       cam.lookAt(look);
@@ -747,7 +788,7 @@ MR.Camera = (function () {
       s.sp = SPEED_LO; s.gsp = SPEED_LO; s.drive = 0; s.accel = 0;
       s.shake = 0; s.punch = 0; s.lurch = 0; s.winded = 0;
       s.dip = 0; s.dipV = 0; s.kick = 0;
-      s.pDuck = 0;
+      s.pDuck = 0; s.dk = 0;
       s.mile = -1; s.mileT = 0; s.gearT = 0; s.gearArmed = true; s.finish = 0;
       cam.fov = BASE_FOV;
       cam.updateProjectionMatrix();

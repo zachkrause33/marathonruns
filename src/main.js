@@ -39,6 +39,12 @@
     const v = parseFloat(params.get('polish'));
     if (isFinite(v)) MR.Runner.POLISH = Math.max(0, Math.min(1, v));
   }
+  // The two mechanics under test. Same shape as ?polish, same reason -- one
+  // build renders both courses -- and read BEFORE Course.generate below,
+  // because they change what is generated and not only how it is drawn. Both
+  // clamp themselves; see the accessors at the foot of course.js.
+  if (params.has('narrow')) MR.Course.NARROW = params.get('narrow') || 1;
+  if (params.has('ramp')) MR.Course.RAMP = params.get('ramp') || 1;
 
   // ---- renderer ---------------------------------------------------------
   const canvas = document.getElementById('gl');
@@ -61,6 +67,12 @@
 
   const world = MR.World.create(course);
   scene.add(world.group);
+
+  // The rideable roofs, as plain placeholder solids. One draw call for the
+  // whole course and an empty group when no ramp was generated, so at ?ramp=0
+  // -- which is every default run -- this costs nothing at all.
+  const ramps = MR.Ramp.create(course);
+  scene.add(ramps.group);
 
   const runner = MR.Runner.create();
   scene.add(runner.group);
@@ -207,7 +219,12 @@
       }
       let best = null, bestScore = -Infinity;
       order.forEach(function (l, i) {
-        if (g.lanes[l] === K.BLOCK) return;
+        // A RIDEABLE BLOCK IS NOT A WALL TO THIS BOT. `gate.ramp` names the
+        // lane whose roof is a running surface, and a harness that cannot
+        // exercise a mechanic is not verifying that mechanic -- which is
+        // precisely why the aid term below exists, after a 16-contact bot run
+        // collected 0 of 14 items and nobody noticed for a month.
+        if (g.lanes[l] === K.BLOCK && g.ramp !== l) return;
         // Order position is the existing tie-break, kept intact: a lane earlier
         // in `order` wins whenever nothing else separates two candidates.
         let score = (g.lanes[l] === K.CLEAR ? 100 : 0) - i;
@@ -219,6 +236,13 @@
         // because a bot that breaks its streak fetching a bottle is measuring
         // the wrong thing.
         if (wants.indexOf(l) >= 0) score += 150;
+        // Take the ramp when there is one, so every automated run that has one
+        // available rides it and the frames, the finish times and the fairness
+        // audit are all measured with the mechanic switched on rather than
+        // routed around. This outranks aid deliberately: the question this pass
+        // is asking is what the roof costs, and a bot that prefers a bottle
+        // would answer a different one.
+        if (g.ramp === l) score += 220;
         if (score > bestScore) { bestScore = score; best = l; }
       });
       if (best === null) best = player.lane;
@@ -232,7 +256,12 @@
     }
 
     // Lane change: commit early so the move has settled by the gate.
-    if (bot.planned && player.lane !== bot.plannedLane && dist < 34 && player.laneT >= 0.55) {
+    // ...but never off a roof. Leaving a rideable train sideways is a fall and
+    // costs the streak (player.resolveDeck), so the commitment the mechanic
+    // asks of a human is one the bot has to make too -- otherwise the harness
+    // would measure a version of the ramp that has no downside.
+    if (bot.planned && player.lane !== bot.plannedLane && dist < 34
+        && player.laneT >= 0.55 && !player.ramp) {
       controls.push(player.lane < bot.plannedLane ? 'right' : 'left');
     }
 
@@ -304,6 +333,18 @@
       const after = pace.units;
 
       player.update(dt, after - before);
+
+      // The second running surface, BEFORE the gates. Order is load-bearing:
+      // the ramp's own gate line sits at the foot of its tailgate, so the mount
+      // has to be established on the same step the gate resolves or the game
+      // records the runner colliding with the lorry he is running up.
+      const deck = player.resolveDeck(course, before, after);
+      if (deck && deck.hit) {
+        pace.onHit();
+        hitAt.push(deck.z);
+        cam.impact(1);
+        hud.flashBroken();
+      }
 
       // Resolve gates crossed this step.
       const results = player.resolveGates(course, before, after);
@@ -447,10 +488,16 @@
     // the height above the LOCAL road surface -- which is what lets
     // collision.js keep testing y >= 0.84 and duck01 >= 0.90 against a flat
     // zero, and is the single finding the whole hill feature rests on.
-    runner.group.position.set(player.x, player.y + elev.at(pace.units), pace.units);
+    // ...and `player.surface` is added in the same breath and for the same
+    // reason: it is the height of the GROUND under the runner, which on a
+    // rideable roof is 2.80 and everywhere else is zero. player.y stays height
+    // above whatever he is standing on, so collision.js keeps testing against a
+    // flat zero on a hill AND on a lorry.
+    runner.group.position.set(player.x,
+      player.y + player.surface + elev.at(pace.units), pace.units);
 
     cam.update(dt, {
-      z: pace.units, x: player.x, y: player.y,
+      z: pace.units, x: player.x, y: player.y, surface: player.surface,
       speed: pace.speed(),
       // The flat speed, for the top-gear latch alone. A descent must not fire
       // the gear flourish or the permanent rumble: speed you did not earn is
@@ -521,6 +568,11 @@
       const b = pace.units;
       pace.update(step);
       player.update(step, pace.units - b);
+      // Same order as the live loop, and for the same reason. A fast-forward
+      // that skipped this would photograph the runner standing in mid-air where
+      // a roof should be, or record a mount as a collision.
+      const fd = player.resolveDeck(course, b, pace.units);
+      if (fd && fd.hit) { pace.onHit(); hitAt.push(fd.z); }
       for (const r of player.resolveGates(course, b, pace.units)) {
         // Recorded here as well as in the live loop. This fast-forward exists
         // so tooling can photograph the game deep into a race, and a debug

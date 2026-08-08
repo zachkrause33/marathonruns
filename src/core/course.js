@@ -24,6 +24,45 @@
 MR.Course = (function () {
   const K = MR.K;
 
+  /**
+   * ---- TWO MECHANICS UNDER TEST, BOTH BEHIND A SCALAR ---------------------
+   *
+   * Same A/B shape as MR.Runner.POLISH and for the same reason: ONE build
+   * generates both courses, so a comparison cannot go stale the way a side
+   * branch or a checked-in table does. main.js reads ?narrow= and ?ramp=;
+   * tools/mechanics.js sets them directly.
+   *
+   * THE RULE BOTH OBEY, and it is what makes the A/B honest: at 0 the seeded
+   * stream must not be touched. Every roll either mechanic makes sits behind a
+   * short-circuiting `NARROW > 0 &&` / `RAMP > 0 &&`, so at zero no random
+   * number is drawn, the stream stays in phase, and the course is BIT-IDENTICAL
+   * to the one this file generated before either mechanic existed. That is
+   * checked rather than claimed -- tools/mechanics.js --identity compares a
+   * SHA-1 of gates and aid across the whole calendar against a baseline taken
+   * before the first line of this went in.
+   *
+   * LANE CLOSURE (NARROW) shuts one or two lanes for a few gates, which is the
+   * archway-and-crates squeeze in reference/ttgr-archway-and-crates.png. It is
+   * expressed as a BLOCK train in the closed lanes rather than as a new kind,
+   * because that is exactly what it is: the closure has to be impassable, it
+   * has to occupy the lane continuously, and the generator already knows how to
+   * space, prove and render that.
+   *
+   * THE RAMP (RAMP) marks a BLOCK train RIDEABLE: its roof becomes a second
+   * running surface, entered up the tailgate. That is
+   * reference/ttgr-ramp-onto-truck.png, where the "ramp" is the bin lorry's own
+   * hopper folded down to the road, one lane wide.
+   *
+   * The single most important property of the ramp, and the reason it cannot
+   * break the fairness proof: A RIDEABLE BLOCK ONLY ADDS EDGES TO THE BFS. It
+   * is never generated where a BLOCK train was not already legal, so every lane
+   * path solvable() proved before it existed is still there, untouched, and the
+   * roof is one more way through on top. solvable() therefore needs no change
+   * at all and is not given one -- see the note above it.
+   */
+  let NARROW = 0;
+  let RAMP = 0;
+
   // A jump covers this much ground; two conflicting action gates closer than
   // this would demand being airborne and ducking at once.
   //
@@ -189,6 +228,43 @@ MR.Course = (function () {
     }
     return reach;
   }
+
+  /**
+   * ---- THE RIDEABLE ROOF, IN NUMBERS --------------------------------------
+   *
+   * DECK_Y IS NOT CHOSEN. It is Collision.BOX[BLOCK].yMax, the top of the
+   * impassable box, which is the one height in this game that already means
+   * "the surface of the thing standing in the lane". Picking a ramp height by
+   * eye would have put art in charge of clearance, which rule 4 forbids, and
+   * would have let the runner's feet float above or sink into the roof of the
+   * very box the audit casts.
+   *
+   * It is written here and not read from MR.Collision for the same reason
+   * HAZARD_HALF_Z is: collision.js loads AFTER this file, and generation runs
+   * headless in tools/ where collision.js is not loaded at all. So it is
+   * duplicated and then GUARDED -- tools/mechanics.js --guard compares the two
+   * in the live page and fails, exactly as tools/lib/fairness.js already does
+   * for HAZARD_HALF_Z.
+   *
+   * RAMP_RUN is the tailgate: how much of the train's depth is spent climbing.
+   * 6.0 units is 0.21 s at race pace, which is about a stride and a half -- long
+   * enough to read as a slope and short enough that the roof is most of the
+   * ride.
+   *
+   * RAMP_SPAN is where the honest cost of this mechanic is, and it is worth
+   * stating plainly rather than burying. A BLOCK train's depth is
+   * 2 * halfZ * (1 + 0.9 * span) = 3.9 + 3.51 * span, so maybeTrain's biggest
+   * train, span 4, is 17.9 units -- 0.63 s of roof at race pace, and 6.0 of
+   * that is the ramp. The reference ride is nearer two seconds. Buying two
+   * seconds needs span 14, and reachOf charges the whole depth against the gap
+   * to the next gate, so a 14-span train also punches a 75-unit hole in the
+   * course. The prototype takes the middle: span 8-11 is 32-43 units, a
+   * 1.1-1.5 s ride, and tools/mechanics.js reports what the hole costs in gates
+   * and in finish time rather than leaving it as a feeling.
+   */
+  const DECK_Y = 2.80;
+  const RAMP_RUN = 6.0;
+  const RAMP_SPAN_MIN = 8, RAMP_SPAN_MAX = 11;
 
   const START_GRACE = 150;   // clean runway so the first seconds read calmly
   // Clean straight into the tape. It was 190 units -- 0.80 of a mile, about
@@ -435,6 +511,57 @@ MR.Course = (function () {
     return rnd.int(2, d > 0.7 ? 4 : 3);   // in gate-spans
   }
 
+  /**
+   * ---- LANE CLOSURE -------------------------------------------------------
+   *
+   * Shut one or two lanes for a few gates, so the road tapers to two lanes or
+   * to one and opens back out. It is expressed as a BLOCK in the closed lanes
+   * at every gate of the stretch, which is not a compromise -- it is what a
+   * closure IS. It has to be impassable, it has to hold the lane for a
+   * distance, and spacingAt, reachOf, solvable() and the renderer already agree
+   * on exactly that object.
+   *
+   * WHAT MAKES IT SAFE IS NOT THIS FUNCTION. It is that the closed gate still
+   * goes through the same solvable() retry as every other gate, so a closure
+   * the BFS cannot get through is never emitted -- it is abandoned and the gate
+   * is built normally. The proof is not extended, weakened or special-cased.
+   *
+   * WHAT MAKES IT FAIR IS ALSO NOT THIS FUNCTION, and it is worth being exact
+   * about which claim is which. The surviving lane is rolled by makeGate like
+   * any other, so it can carry a JUMP or a DUCK. That is not a trap: makeGate
+   * never allows a BLOCK to take the last open lane, so whatever stands in the
+   * corridor is passable WITH the right action -- which is the identical
+   * bargain a three-hazard full-width gate already makes, and the game ships
+   * 62% of those at the top of the difficulty curve. A one-lane corridor with a
+   * JUMP in it asks the player to read ONE thing; a full-width gate asks them to
+   * read three. The corridor is the easier of the two.
+   *
+   * The rate is deliberately low. This is a punctuation mark in a four-minute
+   * race, not a texture.
+   */
+  function narrowRate(f) {
+    // Never in the opening -- START_GRACE and the difficulty ramp already own
+    // the first minute, and a new player meeting a closed road before they have
+    // learned the lane geometry learns the wrong lesson. Never in the run-in
+    // either: difficulty() saturates there on purpose and the last question of
+    // a race should not be a corridor.
+    if (f < 0.12 || f > 0.88) return 0;
+    return 0.06 * NARROW;
+  }
+
+  function narrowPlan(rnd) {
+    // TWO closed is the archway -- a single-lane corridor, and the case that
+    // has to be argued for. ONE closed is the cone taper, the same event one
+    // step milder, and it leaves the player a choice of two lanes throughout.
+    const shut = rnd.chance(0.40) ? 2 : 1;
+    const order = [0, 1, 2];
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = rnd.int(0, i);
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    return { closed: order.slice(0, shut).sort(), span: rnd.int(2, 4) };
+  }
+
 
   /**
    * Aid: water tables and fruit, placed deterministically from the same date
@@ -457,10 +584,55 @@ MR.Course = (function () {
    * wall is, where the streak is worth most, and where a rescue is worth
    * having.
    */
-  function generateAid(key, gates) {
+  function generateAid(key, gates, ramps) {
     const rnd = MR.rng.stream(key, 'aid/v3');
     const items = [];
     if (!gates.length) return items;
+
+    /**
+     * ---- WHY THERE IS ANYTHING ON THE ROOF AT ALL --------------------------
+     *
+     * Without this the ramp is STRICTLY DOMINATED and the whole mechanic is
+     * dead, which is a thing measurement said and intuition did not.
+     *
+     * Riding a roof pays the same one clean gate that going round the lorry
+     * pays -- the streak does not care which way you got past it -- and it
+     * charges a real price on top: you cannot change lane for the length of the
+     * vehicle, leaving sideways costs the streak, and 10% of ramps put a BLOCK
+     * in the lane you fall back into. A rational player would never take it.
+     * The reference frame says the same thing in pictures: the gold bars along
+     * the top of the bin lorry are not decoration, they are the reason to be up
+     * there.
+     *
+     * So the roof carries aid, and aid is exactly the right currency for it.
+     * The mechanic it plugs into is already built as a trade -- see the long
+     * note in the placement loop below: half the pool is scored into the
+     * HARDEST legal lane so a strong run has something to go and get, and half
+     * is scored into the easiest so a broken run has a road back. A roof is the
+     * hardest legal lane there is. It also makes the ramp worthless to a
+     * perfect run, which is correct and is the same shape as AID_CEILING: a
+     * flawless line is already above the ceiling and gains nothing from a
+     * bottle, so the ramp becomes what aid is -- the way back into a race you
+     * are losing, not a faster way to win one.
+     *
+     * Its own seeded stream, so switching the ramp on cannot shift a single
+     * road-level item; and skipped entirely when there are no ramps, so at
+     * RAMP = 0 no number is drawn at all.
+     */
+    if (ramps && ramps.length) {
+      const rr = MR.rng.stream(key, 'aid/roof/v1');
+      for (const r of ramps) {
+        // The middle of the FLAT roof, never on the tailgate: an item on the
+        // slope would be collected on the way up whatever the player decided,
+        // which is not a trade.
+        const flat0 = r.z0 + r.run;
+        const z = flat0 + (r.z1 - flat0) * 0.5;
+        const fruit = rr.chance(0.55);
+        items.push(fruit
+          ? { z, lane: r.lane, kind: 'banana', gain: K.AID_BANANA, guarded: true, roof: true }
+          : { z, lane: r.lane, kind: 'water', gain: K.AID_WATER, guarded: true, roof: true });
+      }
+    }
 
     let gi = 0;
     let nudged = 0;   // consecutive gaps a rescue item has declined
@@ -652,41 +824,159 @@ MR.Course = (function () {
     const end = K.TOTAL_UNITS - FINISH_GRACE;
     let guard = 0;
 
+    // Instrumentation the generator has never kept, and the reason it is here
+    // is rule 3 rather than curiosity. generate() CANNOT return an unsolvable
+    // course: when 24 attempts fail it degrades to an all-clear gate. So
+    // "solvable on all 365 days" is true by construction and proves nothing
+    // about whether a new mechanic damaged the course -- the damage would show
+    // up as the generator giving up more often, and nothing counted that.
+    const tally = { degraded: 0, attempts: 0, narrowings: 0, narrowAbandoned: 0 };
+
+    // A closure in flight: the lanes it holds shut, and the gate index it runs
+    // to. Deliberately the same shape as trainUntil, because it is the same
+    // thing -- see the note on narrowPlan.
+    let narrowClosed = null;
+    let narrowUntil = -1;
+    const ramps = [];
+
     while (z < end && guard++ < 20000) {
       const f = z / K.TOTAL_UNITS;
       const idx = gates.length;
 
+      if (idx >= narrowUntil) narrowClosed = null;
+      // Open a closure. Never on top of a train -- a train already owns a lane
+      // for a span, and stacking the two is how all three lanes get shut.
+      if (NARROW > 0 && !narrowClosed && trainUntil.every((t) => idx >= t)
+          && rnd.chance(narrowRate(f))) {
+        const plan = narrowPlan(rnd);
+        narrowClosed = plan.closed;
+        narrowUntil = idx + plan.span;
+        tally.narrowings++;
+      }
+
       let lanes = null;
       // Retry until this gate keeps the course solvable.
-      for (let attempt = 0; attempt < 24; attempt++) {
-        const cand = makeGate(rnd, f);
+      //
+      // The closure is applied INSIDE the retry and is the first thing dropped
+      // when the retry fails, so it can never be the reason a gate degrades.
+      for (let pass = 0; pass < 2 && !lanes; pass++) {
+        // pass 0 honours the closure; pass 1 runs only if the closure could not
+        // be made to work, and abandons it.
+        const closed = pass === 0 ? narrowClosed : null;
+        if (pass === 1 && narrowClosed) { narrowClosed = null; tally.narrowAbandoned++; }
+        for (let attempt = 0; attempt < 24; attempt++) {
+          const cand = makeGate(rnd, f);
 
-        // Carry active trains through.
-        for (let l = 0; l < 3; l++) if (idx < trainUntil[l]) cand[l] = K.BLOCK;
-        if (cand.every((l) => l === K.BLOCK)) continue;
+          // Carry active trains through.
+          for (let l = 0; l < 3; l++) if (idx < trainUntil[l]) cand[l] = K.BLOCK;
+          // Then the closure, which outranks the roll: the lanes it shuts are
+          // shut, and the lanes it leaves open may not be BLOCK, or the gate
+          // would have no way through at all.
+          if (closed) {
+            for (const l of closed) cand[l] = K.BLOCK;
+            for (let l = 0; l < 3; l++) {
+              if (closed.indexOf(l) < 0 && cand[l] === K.BLOCK) cand[l] = K.CLEAR;
+            }
+          }
+          if (cand.every((l) => l === K.BLOCK)) continue;
 
-        const trial = gates.concat([{ z, lanes: cand, f }]);
-        if (solvable(trial, elevation)) { lanes = cand; break; }
+          tally.attempts++;
+          const trial = gates.concat([{ z, lanes: cand, f }]);
+          if (solvable(trial, elevation)) { lanes = cand; break; }
+        }
+        if (!closed) break;   // pass 0 had no closure to drop, so pass 1 is moot
       }
       if (!lanes) {
         // Degrade to a guaranteed-safe gate rather than emit something unfair.
         lanes = [K.CLEAR, K.CLEAR, K.CLEAR];
         for (let l = 0; l < 3; l++) if (idx < trainUntil[l]) lanes[l] = K.BLOCK;
+        tally.degraded++;
       }
 
-      const span = maybeTrain(rnd, f, lanes);
+      let span = maybeTrain(rnd, f, lanes);
+      let rampLane = -1;
       if (span) {
         for (let l = 0; l < 3; l++) {
           if (lanes[l] === K.BLOCK && trainUntil[l] <= idx) {
             // Only extend if some other lane survives the whole span.
             const others = [0, 1, 2].filter((x) => x !== l);
-            if (others.some((o) => idx >= trainUntil[o])) trainUntil[l] = idx + span;
+            if (others.some((o) => idx >= trainUntil[o])) {
+              // ---- THE RIDEABLE ROOF -------------------------------------
+              //
+              // Marked here and nowhere else, and the placement is the whole
+              // safety argument: this line runs only inside the branch that has
+              // ALREADY established a BLOCK train is legal in this lane with
+              // another lane surviving its whole span. So a ramp is never the
+              // reason a lane is blocked. It is a second way through a wall the
+              // course was going to build anyway, which is why solvable() is
+              // sound without being touched.
+              //
+              // Not inside a closure: a closure is already a corridor, and
+              // putting the one way through on a roof would make the roof
+              // compulsory rather than optional. That is the difference between
+              // an option and a tax.
+              // ---- AND NOT IN THE RUN-IN, WHICH THE CALENDAR HAD TO SAY ----
+              //
+              // The same window narrowRate uses, and it is here because a
+              // 365-day sweep failed and a 90-day one did not. On 2026-12-02 a
+              // ramp was generated at f = 0.991, so its roof ran to within 3.0
+              // units of the tape: the runner would have crossed the finish
+              // line mid-fall, through the run-in that world.js's finale spends
+              // on a clear-tarmac camera move, with no gate after it for the
+              // fall to be measured against at all. The opening is excluded for
+              // the reason START_GRACE exists, and the closing half-mile
+              // because the last question of a race should not be a novelty.
+              if (RAMP > 0 && !narrowClosed && f > 0.12 && f < 0.90
+                  && rnd.chance(0.34 * RAMP)) {
+                span = rnd.int(RAMP_SPAN_MIN, RAMP_SPAN_MAX);
+                rampLane = l;
+              }
+              // ---- SPAN MEANS TWO DIFFERENT THINGS, AND A RAMP SPLITS THEM --
+              //
+              // `train` is a DEPTH multiplier -- reachOf and world.js's
+              // gateBoxes both read it as 2 * halfZ * (1 + 0.9 * span), so
+              // span 4 is 17.9 units of vehicle. `trainUntil` is a COUNT OF
+              // GATES the lane stays shut for, and at a spacing floor of 43
+              // units that same span 4 shuts the lane for about 150. The two
+              // numbers have never been the same quantity; for an ordinary
+              // train that is harmless, because it just means a long vehicle
+              // followed by a short convoy.
+              //
+              // For a ramp it is fatal, and the frame says so before the
+              // arithmetic does: the roof ends at the train's far face, the
+              // player falls back to the road -- and lands in the next BLOCK
+              // that trainUntil is still holding in that lane. The reward for
+              // taking the ramp would be a wall.
+              //
+              // So a rideable train buys its DEPTH and does not buy the
+              // following gates. The lane is shut at this gate, by this gate's
+              // own BLOCK, and is clear the moment the vehicle ends. That is
+              // strictly fewer blocked lane-slots than the generator would
+              // otherwise have laid down, so it cannot cost solvable() a path.
+              if (rampLane < 0) trainUntil[l] = idx + span;
+            }
             break;
           }
         }
       }
 
-      gates.push({ z, lanes, f, train: span });
+      const gate = { z, lanes, f, train: span };
+      if (narrowClosed) gate.narrow = narrowClosed.slice();
+      if (rampLane >= 0) {
+        gate.ramp = rampLane;
+        ramps.push({
+          lane: rampLane,
+          z0: z,
+          // The far face of the train, from the SAME expression reachOf and
+          // world.js's gateBoxes use. Written once here rather than restated,
+          // because a roof that ends somewhere other than where the box ends is
+          // a runner standing on air or inside a lorry.
+          z1: z + 2 * HAZARD_HALF_Z[K.BLOCK] * (1 + span * 0.9),
+          run: RAMP_RUN,
+          deck: DECK_Y,
+        });
+      }
+      gates.push(gate);
       // The LANES and the span both go in because the gap after a gate is owed
       // by the geometry of THAT gate: which kinds it actually stands in the road
       // decides how deep its deepest lane is, and a train's rear face is a long
@@ -698,9 +988,47 @@ MR.Course = (function () {
     for (let m = 1; m <= 26; m++) mileMarkers.push({ mile: m, z: m * K.UNITS_PER_MILE });
     mileMarkers.push({ mile: K.MARATHON_MILES, z: K.TOTAL_UNITS, finish: true });
 
-    const aid = generateAid(key, gates);
+    const aid = generateAid(key, gates, ramps);
     const course = { key, gates, aid, mileMarkers, biomes: BIOMES, length: K.TOTAL_UNITS,
-                     elevation };
+                     elevation, ramps, tally };
+
+    /**
+     * The height of the running surface at (z, lane): 0 on the road, DECK_Y on
+     * a roof, and the slope in between.
+     *
+     * This is the whole of the ramp's world model and it is deliberately a pure
+     * function of the course rather than a property of a mesh. The runner, the
+     * camera, the collision test and the instrument all read THIS, so there is
+     * exactly one answer to "how high is the ground here" and art cannot
+     * disagree with it. Same contract as MR.Collision.BOX, same reason.
+     *
+     * Flat and constant-zero when no ramp was generated, which is every course
+     * at RAMP = 0 -- so nothing downstream needs a null check and nothing
+     * downstream changes behaviour.
+     */
+    course.deckAt = function (z, lane) {
+      for (let i = 0; i < ramps.length; i++) {
+        const r = ramps[i];
+        if (r.lane !== lane || z < r.z0 || z >= r.z1) continue;
+        const up = z - r.z0;
+        return up < r.run ? r.deck * (up / r.run) : r.deck;
+      }
+      return 0;
+    };
+
+    /**
+     * The ramp covering (z, lane), or null. The player needs the OBJECT and not
+     * just the height, because the two ways of leaving a roof are not the same
+     * event -- running off the front is a dismount and swerving off the side is
+     * a fall -- and telling them apart means knowing where the front is.
+     */
+    course.rampAt = function (z, lane) {
+      for (let i = 0; i < ramps.length; i++) {
+        const r = ramps[i];
+        if (r.lane === lane && z >= r.z0 && z < r.z1) return r;
+      }
+      return null;
+    };
 
     // This date's places, in the order they will be run through. Carried
     // ALONGSIDE `biomes` rather than replacing it: `biomes` describes the shape
@@ -799,12 +1127,26 @@ MR.Course = (function () {
     return { ok: errors.length === 0, errors, gates: g.length };
   }
 
-  return { generate, generateAid, validate, solvable, biomeAt, difficulty,
+  const api = { generate, generateAid, validate, solvable, biomeAt, difficulty,
            BIOMES, SETTINGS, pickSettings, ACTION_WINDOW, actionWindowAt,
            // Exported so tools/shoot.js reads the read window from the file
            // that enforces it instead of recomputing the same sum. The two
            // cannot drift, which is the whole point of the invariant.
            READ_NEAR: ACTION_WINDOW + K.CAM_BASE_BACK, readWindowAt,
            HAZARD_HALF_Z, reachOf,
+           DECK_Y, RAMP_RUN,
            elevationPlan };
+
+  // Accessors rather than plain fields, so a nonsense value cannot be written
+  // and the clamp lives with the flag. Same shape as MR.Runner.POLISH.
+  Object.defineProperty(api, 'NARROW', {
+    get: function () { return NARROW; },
+    set: function (v) { const n = parseFloat(v); if (isFinite(n)) NARROW = Math.max(0, Math.min(1, n)); },
+  });
+  Object.defineProperty(api, 'RAMP', {
+    get: function () { return RAMP; },
+    set: function (v) { const n = parseFloat(v); if (isFinite(n)) RAMP = Math.max(0, Math.min(1, n)); },
+  });
+
+  return api;
 })();

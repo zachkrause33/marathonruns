@@ -151,13 +151,51 @@ MR.Collision = (function () {
 
   /**
    * Can the player pass `kind` in their current state?
-   * @param st { y, duck01 }
+   * @param st { y, duck01, surface }
+   *
+   * ---- WHAT `surface` ADDED, AND WHY IT IS INERT UNTIL A RAMP EXISTS ------
+   *
+   * `st.surface` is the height of the ground the runner is standing on: 0 on
+   * the road, and MR.Course.DECK_Y on the roof of a rideable BLOCK train. `st.y`
+   * keeps its exact old meaning -- height above THAT surface -- which is the
+   * same discipline main.js already applies to hills, where player.y is height
+   * above the LOCAL road and elevation is added once, at the very end.
+   *
+   * Every clause below reduces to the shipped expression at surface = 0, and
+   * that is checked rather than asserted: tools/mechanics.js --identity
+   * generates the whole calendar with the ramp off and compares a hash.
+   *
+   *   JUMP   feet at (y + surface). On the road this is y, unchanged.
+   *   BLOCK  cleared if and only if the runner is ON it -- `st.onDeck`, the
+   *          player's own answer to "am I standing on this thing", set by
+   *          resolveDeck. A HEIGHT comparison was the obvious way to write this
+   *          and it is wrong: the tailgate meets the road, so at the foot of
+   *          every ramp the surface height is still zero, and `surface >= yMax`
+   *          would call the first frame of every mount a collision with the
+   *          lorry the runner is visibly running up. Being supported by a thing
+   *          is a fact about support, not about altitude. Undefined is false,
+   *          so with no ramp on the course this is `return false`, which is
+   *          exactly what it was.
+   *   DUCK   deliberately reads `surface`, NOT `y + surface`. The jump apex is
+   *          2.05 and a DUCK bar's underside is 1.41 with its top at 1.83, so
+   *          `y + surface >= yMax` would let a plain jump sail over every duck
+   *          bar in the game -- a silent difficulty change worth more than the
+   *          whole of this pass, arriving through a clause that looks like
+   *          tidying. Only a SURFACE above the bar clears it.
+   *
+   * The JUMP and DUCK surface terms are both reachable in exactly one state
+   * that is not a roof: the half-second fall back to the road, where the runner
+   * really is two units up. That is left physically honest rather than special-
+   * cased, because it cannot be farmed -- leaving a roof anywhere but off the
+   * front already costs the streak -- and because tools/mechanics.js proves no
+   * gate ever falls inside a fall on any of the 365 days.
    */
   function clears(kind, st) {
     if (kind === K.CLEAR) return true;
-    if (kind === K.BLOCK) return false;
-    if (kind === K.JUMP) return (st.y || 0) >= JUMP_CLEAR_Y;
-    if (kind === K.DUCK) return (st.duck01 || 0) >= DUCK_CLEAR;
+    const surface = st.surface || 0;
+    if (kind === K.BLOCK) return st.onDeck === true;
+    if (kind === K.JUMP) return (st.y || 0) + surface >= JUMP_CLEAR_Y;
+    if (kind === K.DUCK) return (st.duck01 || 0) >= DUCK_CLEAR || surface >= BOX[K.DUCK].yMax;
     return true;
   }
 

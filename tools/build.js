@@ -27,6 +27,10 @@ const MODULES = [
   'src/render/camera.js',
   'src/game/controls.js',
   'src/game/collision.js',
+  // After collision.js: the ramp placeholder generates every vertex from
+  // MR.Collision.BOX so art cannot disagree with clearance. Delete this line
+  // and the file when world.js grows a real tailgate.
+  'src/render/ramp.js',
   'src/game/player.js',
   'src/audio/audio.js',
   'src/ui/hud.js',

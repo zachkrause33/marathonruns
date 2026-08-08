@@ -95,6 +95,22 @@ const FRAMES = parseInt(arg('frames', 60), 10);
 const W = parseInt(arg('w', 420), 10);
 const H = parseInt(arg('h', 860), 10);
 const LIST = has('list');
+/**
+ * --date, AND IT IS NOT A CONVENIENCE.
+ *
+ * This file pinned the query string, so every assertion it makes was made
+ * against ONE COURSE out of 365 -- the default day. A setting only draws when
+ * the day happens to place it, and a mover that belongs to a setting is
+ * therefore invisible to this tool on all but the days that draw it.
+ *
+ * That is not hypothetical. The trains on Chicago's L are the only vehicles in
+ * this game that drive, and CHICAGO owns a CITY START or RIVERSIDE leg -- the
+ * only legs the viaduct runs on -- on 66 of 365 days. The default day is not
+ * one of them, so without this flag the one class of motion the game has is
+ * asserted on exactly never. tools/shoot.js has the same blind spot and it hid
+ * a real LOW/HIDES failure in the quayside crane on the same legs.
+ */
+const DATE = arg('date', null);
 // The sweep. One point per biome the course actually draws, so a green run
 // means every leg was visited rather than the two the default shots land on.
 const SKIPS = arg('skip', null) !== null
@@ -119,7 +135,8 @@ const SKIPS = arg('skip', null) !== null
         errs.push(m.type() + ' ' + m.text().slice(0, 140));
       }
     });
-    await page.goto('file://' + FILE + '?bot=1&skip=' + SKIP);
+    await page.goto('file://' + FILE + '?bot=1&skip=' + SKIP
+      + (DATE ? '&date=' + DATE : ''));
     await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, { timeout: 30000 });
     await page.waitForTimeout(500);
 

@@ -84,6 +84,7 @@ const MARK = parseFloat(arg('mark', 3927.0));
 const PHASE = parseFloat(arg('phase', 0.28));
 const FILE = path.resolve(String(arg('file', path.join(ROOT, 'index.html'))));
 const VERIFY = !!arg('verify', false);
+const CHASE = !!arg('chase', false);
 const BEFORE = path.resolve(String(arg('before', path.join(ROOT, 'reference', 'runner-orbit-before.png'))));
 
 function pageHarness() {
@@ -158,6 +159,53 @@ function pageSheet(o) {
   const prevRT = g.renderer.getRenderTarget();
   const target = new THREE.Vector3(c.x, c.y + o.ty, c.z);
   const el = o.elev * Math.PI / 180;
+
+  // ---- the shipped lens, for the one tile that is not an orbit -----------
+  //
+  // --chase replaces the orbit lens with the LIVE chase camera, snapshotted
+  // after the springs have settled, and crops a window out of the real frame
+  // at 1:1. It exists because every other tile on this sheet is a view the
+  // game does not have, and a character pass that only ever looks at itself
+  // through its own instrument is the mistake tools/framing.js was written to
+  // correct. The tile is shipped pixels: nothing is scaled.
+  if (o.chase) {
+    const live = g.cam.camera;
+    live.updateMatrixWorld(true);
+    const el = g.renderer.domElement;
+    const W = el.width, H = el.height;
+    const frt = new THREE.WebGLRenderTarget(W, H);
+    frt.texture.colorSpace = THREE.SRGBColorSpace;
+    frt.texture.generateMipmaps = false;
+    const fbuf = new Uint8Array(W * H * 4);
+    g.renderer.setRenderTarget(frt);
+    g.renderer.render(g.scene, live);
+    g.renderer.readRenderTargetPixels(frt, 0, 0, W, H, fbuf);
+    g.renderer.setRenderTarget(prevRT);
+    // Where the rig lands on screen, so the crop is centred on him rather than
+    // on the middle of a frame he is not in the middle of.
+    const sp = c.clone(); sp.y += 0.75;
+    sp.project(live);
+    const cx = Math.round((sp.x * 0.5 + 0.5) * W);
+    const cy = Math.round((1 - (sp.y * 0.5 + 0.5)) * H);
+    const cv2 = document.createElement('canvas');
+    cv2.width = o.tw; cv2.height = o.th;
+    const g2 = cv2.getContext('2d');
+    const img2 = g2.createImageData(o.tw, o.th);
+    for (let y = 0; y < o.th; y++) {
+      for (let x = 0; x < o.tw; x++) {
+        const sx = cx - (o.tw >> 1) + x;
+        const sy = cy - (o.th >> 1) + y;
+        const d = (y * o.tw + x) * 4;
+        if (sx < 0 || sx >= W || sy < 0 || sy >= H) { img2.data[d + 3] = 255; continue; }
+        const src = ((H - 1 - sy) * W + sx) * 4;
+        img2.data[d] = fbuf[src]; img2.data[d + 1] = fbuf[src + 1];
+        img2.data[d + 2] = fbuf[src + 2]; img2.data[d + 3] = 255;
+      }
+    }
+    g2.putImageData(img2, 0, 0);
+    return { png: cv2.toDataURL('image/png'), at: [+c.x.toFixed(3), +c.y.toFixed(3), +c.z.toFixed(3)],
+      chase: true, fov: +live.fov.toFixed(2), buf: [W, H] };
+  }
 
   o.az.forEach(function (adeg, ai) {
     const a = adeg * Math.PI / 180;
@@ -259,7 +307,7 @@ function pageRows(o) {
   }
   const res = await page.evaluate(pageSheet, {
     az: AZ, tw: TW, th: TH, dist: DIST, fov: FOV, ty: TARGET_Y, elev: ELEV, steps: STEPS,
-    mark: MARK, phase: PHASE,
+    mark: MARK, phase: PHASE, chase: CHASE,
   });
 
   fs.mkdirSync(path.dirname(OUT), { recursive: true });

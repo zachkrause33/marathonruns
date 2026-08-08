@@ -607,6 +607,131 @@ MR.Runner = (function () {
   // and sit behind the palm. See the hand.
   const MITT_DK = 0x6b74a0;
 
+  // ---- the face's four tones ---------------------------------------------
+  //
+  // No new HUE enters the character here, and that is the constraint the whole
+  // face pass was built under: the owner's brief says his colours do not move.
+  // SKIN_SH is his own skin one step down in value, which is what the wardrobe
+  // note two screens up calls a NEIGHBOUR tone rather than a contrast, and it
+  // is used exactly where a form has a hollow in it that the ramp cannot find
+  // on its own -- the ear's concha and the shadow under the jaw. MOUTH is the
+  // hair's own dark purple-brown warmed and darkened; it is the same family
+  // and it is the only tone on the character that could be called new, which
+  // is unavoidable because he had no mouth to have a colour.
+  //
+  // SCLERA is deliberately NOT white. 0xffffff on a figure whose brightest
+  // existing tone is the 0xfff2e0 shoe would put the highest value in the
+  // frame in two 3-pixel slivers, and the eye goes to the brightest thing --
+  // which at gameplay range would be a pair of white specks on the back of a
+  // head that has no eyes in view at all. A warm off-white sits under the shoe
+  // and does the same job in the views that have a face in them.
+  const SKIN_SH = 0xe0a077;
+  const MOUTH = 0x46212f;
+  const SCLERA = 0xf6ece0;
+  // The iris. Dark enough that the assembly still averages to the ink oval it
+  // replaces -- see the eye block in create() for why that matters -- and warm
+  // enough to separate from the pupil sitting inside it. A brown eye, which is
+  // what the reference frames all have and what the skin says he should.
+  const IRIS = 0x4a3040;
+  const CATCH = 0xfdf7ef;
+
+  /**
+   * The face's mass: the four planes a head has, at the size a head this size
+   * can hold them.
+   *
+   * The numbers are all solved against one ellipsoid -- the skull is r 0.266
+   * scaled 1.06 in y and 0.97 in z, so its semi-axes are 0.266 / 0.282 / 0.258
+   * about (0, HY, 0) -- and each piece's clearance is quoted as how far proud
+   * of that surface it emerges at its own centre line. Under one ink width
+   * (0.014) two surfaces grow teeth; every clearance here is 0.020 or better.
+   */
+  function faceMass(HY) {
+    return [
+      // THE NOSE, and it is a button rather than a wedge. At 163-208 px of
+      // whole figure the head is about 70 px and the nose is 5 of them; the
+      // only thing that can read at that size is a silhouette break on the
+      // profile, which is what 0.029 proud buys, and a bridge would spend
+      // three times the geometry to be invisible from everywhere but dead
+      // ahead -- which is the one angle this game never uses.
+      //
+      // It sits on the SKULL and not on a muzzle. The first version of this
+      // block put it on a broad lower-face mass on the reasoning that a plane
+      // break between the upper face and the lower is what a head has, and
+      // that is true of a head and false of THIS head: at 0.108 across the
+      // mass read as a snout, and the nose disappeared into it because the
+      // muzzle had already spent the 0.03 of relief the nose needed. Three
+      // more pieces were cut in the same pass and for versions of the same
+      // reason -- see the note under this list.
+      { g: new THREE.SphereGeometry(0.046, R_NUB, 12), c: P.runnerSkin,
+        y: HY - 0.078, z: 0.240, sx: 0.80, sy: 0.72, sz: 0.80 },
+      // THE JAW, and it is ONE piece across the whole lower face rather than a
+      // chin plus two jaw angles, which is what the second version of this
+      // block had. Rendered, three masses along the bottom of a round head do
+      // not read as a jaw; they read as a chin between two jowls, because at
+      // this size every one of them is resolved as its own closed outline and
+      // the eye counts outlines before it reads form.
+      //
+      // So: 0.306 across, 0.120 deep, standing 0.024 proud on the centre line
+      // and tapering back INTO the skull before x = 0.153. That last property
+      // is what makes it a jaw rather than a jaw stuck on a ball -- it has no
+      // edge of its own anywhere the lens can find one, and what it leaves is
+      // a plane change under the mouth and a break in the profile, which is
+      // the whole of what a jaw is from 70 px.
+      //
+      // SKIN, not SKIN_SH, and that is a reversal within this pass. Under a
+      // jaw is the one plane on a head that never faces a light and a tone can
+      // say what geometry cannot -- but rendered, a darker patch at the corner
+      // of the jaw does not read as shadow, it reads as a BEARD, and a beard
+      // is a design change and the brief says his design does not move. Form
+      // only; the ramp finds it.
+      { g: new THREE.SphereGeometry(0.150, R_LIMB, 14), c: P.runnerSkin,
+        y: HY - 0.192, z: 0.108, sx: 1.02, sy: 0.40, sz: 0.70 },
+    ];
+  }
+
+  /**
+   * The eye, outward in. See the block above create()'s eye mesh for the
+   * argument; the geometry is here so both eyes are one loop and the z ladder
+   * is one list rather than eight numbers scattered down a weld.
+   */
+  function eyePieces(HY) {
+    const out = [];
+    const y = HY - 0.016;
+    for (const s of [-1, 1]) {
+      const x = s * 0.100;
+      out.push(
+        { g: new THREE.CircleGeometry(0.062, R_TORSO), c: SCLERA, x: x, y: y, z: 0.2610, sy: 0.82 },
+        { g: new THREE.CircleGeometry(0.052, R_TORSO), c: IRIS, x: x, y: y - 0.002, z: 0.2630 },
+        { g: new THREE.CircleGeometry(0.026, R_NUB), c: P.ink, x: x, y: y - 0.002, z: 0.2650 },
+        // Inboard and high. Both catchlights have to be in frame together at
+        // the three-quarter views or the near eye reads as alive and the far
+        // one as a hole.
+        { g: new THREE.CircleGeometry(0.012, R_NUB), c: CATCH, x: x - s * 0.016, y: y + 0.018, z: 0.2670 }
+      );
+    }
+    return out;
+  }
+
+  /**
+   * The mouth: an open one, because he is running.
+   *
+   * A closed line would be the safer drawing and the wrong one. This character
+   * is at 4:14 mile pace with a fuel bar draining, and the single cheapest
+   * thing that says effort on a face is an open mouth -- it is what every
+   * reference frame of a running character in reference/ has. It is two
+   * pieces: the aperture, and a lower lip in the skin's own shade beneath it
+   * so the opening has a floor rather than being a hole punched in the head.
+   *
+   * Built in its own pivot's space, centred on the origin, so the expression
+   * work can scale it open and shut about its own top edge.
+   */
+  function mouthPieces() {
+    return [
+      { g: new THREE.CircleGeometry(0.050, R_TORSO), c: MOUTH, y: 0, z: 0.036, sx: 1.30, sy: 0.46 },
+      { g: new THREE.CircleGeometry(0.050, R_TORSO), c: SKIN_SH, y: -0.017, z: 0.034, sx: 1.24, sy: 0.34 },
+    ];
+  }
+
   // ---- how round a round thing is ----------------------------------------
   //
   // THE BUDGET THIS CHARACTER WAS BUILT AGAINST WAS WRONG BY AN ORDER OF
@@ -1634,17 +1759,115 @@ MR.Runner = (function () {
         y: HY + 0.062, z: 0.080, rx: 0.06, sz: 1.40 },
       { g: new THREE.SphereGeometry(0.080, R_NUB, 12), c: P.runnerSkin, x: -0.254, y: HY - 0.020, z: -0.013, sx: 0.48, sz: 0.82 },
       { g: new THREE.SphereGeometry(0.080, R_NUB, 12), c: P.runnerSkin, x: 0.254, y: HY - 0.020, z: -0.013, sx: 0.48, sz: 0.82 },
+      // THERE IS NO CONCHA IN THE EAR, and it is not for want of trying.
+      //
+      // The ear is a skin nub on a skin skull -- one tone, so the toon ramp
+      // gives it one band and from most angles it is a lump rather than an
+      // ear. The obvious fix is the one the heel counter won on: an ear is a
+      // form with a HOLE in it and the hole is the readable part. So a bowl
+      // one value step down was built, inset in x so the ear's outer edge --
+      // 0.2924 from the spine, second only to the cap band's 0.294 -- was
+      // untouched to the float.
+      //
+      // tools/resolve.js counted it at ZERO pixels in 48 of 48 frames through
+      // BOTH lenses, the chase camera and the face lens. Inset in x on an
+      // ellipsoid does not mean behind it, it means INSIDE it: the nub's outer
+      // pole is at 0.2924 and every point of the bowl was under that surface.
+      // Same class as the lace panel, found the same way, and the arithmetic
+      // that would have caught it is not hard -- which is exactly why it has to
+      // be measured instead.
+      //
+      // Nor is it rescuable. A bowl proud enough to clear the nub by one ink
+      // width is a bowl standing 0.026 out of the ear, which is a bump and not
+      // a hollow; and a flat decal on the ear's outer face has to sit past the
+      // pole at 0.2935 to be in front of the surface everywhere, which is
+      // 0.0005 inside the cap band and is not a clearance anyone should ship.
+      // At the 70 px this head is drawn at, an ear has no interior.
+      // ---- the face ------------------------------------------------------
+      //
+      // The skull was one smooth ovoid with two discs on it, and the owner's
+      // word for it was "mannequin". What follows is not more detail: it is
+      // the four PLANES a head has, built at the size they are seen at.
+      //
+      // Where they can go is decided for them, and by the cap. The band is a
+      // cylinder 0.074 tall whose underside sits at HY + 0.023, and the eye
+      // discs reach HY + 0.040 -- so the top 0.017 of each eye is already
+      // behind the band and there is NO BROW LINE on this character to build
+      // on. That is not a defect to route around, it is what wearing a cap
+      // pulled down is; the band IS his brow, and it is why the expression
+      // work later in this file drives the eye's own aperture rather than a
+      // pair of brows that would be drawn inside a hat.
+      //
+      // Everything here is skin, welded into the head, and shaded by the same
+      // ramp as the skull. That is the whole reason it is geometry and not a
+      // texture: a plane that the light finds is a plane at every angle the
+      // orbit puts the head through, and a painted one is a plane at one.
+      //
+      // Every piece is checked against TWO clearances rather than one:
+      //   PROUD    it has to stand more than one ink width (0.014) out of the
+      //            skull where it emerges, or the two surfaces spend an arc
+      //            within the outline's own thickness and grow the row of dark
+      //            teeth this file has now recorded three times -- the hair on
+      //            the crown, the cap peak on the band, the wristband on the
+      //            mitt. Every clearance below is 0.020 or better.
+      //   INSIDE   it has to stay inside the skull's own x extent of 0.266,
+      //            because the head's contribution to the figure's half-width
+      //            is the cap band's 0.294 and nothing on the face may be
+      //            allowed to become the widest thing on the character in a
+      //            slide, where the head is yawed and the margin is smallest.
+      ...faceMass(HY),
     ]);
     head.add(headMesh);
 
-    // Eyes are flat unlit discs so they never band or catch a highlight.
-    // Welded into one mesh -- they are a single draw the back view never
-    // spends, but the character still needs a face for the finish framing.
-    const eyes = new THREE.Mesh(weld([
-      { g: new THREE.CircleGeometry(0.056, R_TORSO), c: P.ink, x: -0.100, y: HY - 0.016, z: 0.262 },
-      { g: new THREE.CircleGeometry(0.056, R_TORSO), c: P.ink, x: 0.100, y: HY - 0.016, z: 0.262 },
-    ]), S.flat(0xffffff, { vertexColors: true }));
+    // ---- the eyes --------------------------------------------------------
+    //
+    // Flat and unlit, which is unchanged and is the one thing about them that
+    // was already right: an eye that catches the toon ramp's specular reads as
+    // a wet marble stuck on the face, and an eye that BANDS across the ramp
+    // reads as a crescent moon whenever the head turns.
+    //
+    // What changed is that there is now an eye inside the eye. It was one ink
+    // disc, and one disc is a dot -- the construction a face gets when nobody
+    // has decided whether it has eyelids. Four rings now, outward in:
+    //
+    //   SCLERA     an ALMOND, not a circle: 0.064 across and 0.055 tall. The
+    //              aspect is the whole of what separates an eye from a dot,
+    //              and it costs nothing because the iris covers the middle of
+    //              it -- what shows is a sliver of white at each corner, which
+    //              is exactly what the eye reads off.
+    //   IRIS       0.048, so it fills three quarters of the opening. That is
+    //              deliberate and it is the identity guard: at the 50-67 px
+    //              this character is drawn at in landscape the sclera slivers
+    //              are under a pixel and the whole assembly averages back to
+    //              the dark oval it has always been. He does not become a
+    //              different character at distance; he becomes a built one up
+    //              close.
+    //   PUPIL      ink, 0.024, and it is what the eye POINTS with.
+    //   CATCHLIGHT 0.013, off-centre high and inboard. The single highest-value
+    //              mark on the whole face: it is the only thing on this
+    //              character that says the eye is wet, and every reference
+    //              frame in reference/ has one. It is inboard rather than
+    //              outboard so that both of them are visible together through
+    //              the three-quarter views, which are the ones the start panel
+    //              and the finish actually show.
+    //
+    // Stacked at 0.002 in z rather than being made coplanar. Coplanar rings
+    // z-fight, and the depth buffer's precision at the 3.4 units the orbit
+    // sheet shoots from is about 1.4e-5, so 0.002 is two orders of margin --
+    // while being far too small to read as a stack from any angle.
+    //
+    // The whole thing stays ONE mesh and therefore one draw, which is the
+    // budget line that actually binds on this character.
+    const eyes = new THREE.Mesh(weld(eyePieces(HY)), S.flat(0xffffff, { vertexColors: true }));
     head.add(eyes);
+
+    // The mouth is its own flat mesh rather than a weld into the eyes, and the
+    // reason is expression: the eyes narrow and the mouth opens, and those are
+    // two different scales on two different pivots. One draw, and it is the
+    // only one the face pass spends.
+    const mouthPivot = pivot(head, 0, HY - 0.150, 0.196);
+    const mouth = new THREE.Mesh(weld(mouthPieces()), S.flat(0xffffff, { vertexColors: true }));
+    mouthPivot.add(mouth);
 
     // ---- limbs ----------------------------------------------------------
     // Short bones, oversized terminals. That split is the whole trick in the

@@ -1372,8 +1372,17 @@ MR.World = (function () {
     const m = new THREE.Matrix4().makeRotationY(ry || 0);
     m.setPosition(x || 0, y || 0, z || 0);
     for (const p of sub) {
+      // wave AND gloss ride through the transform. They were both dropped
+      // here, silently: a sub-assembly placed by this function lost its crowd
+      // wave and its cel specular and there was nothing to notice, because
+      // both attributes are only emitted when some part asks for them, so
+      // losing every request simply produced a geometry with no attribute and
+      // no error. It cost nothing until now only because the one caller that
+      // passes waving parts is groveGeo, and groves did not move until the
+      // wind was added -- at which point the densest vegetation in the game
+      // would have been the one vegetation that stayed still.
       parts.push({
-        geo: p.geo, color: p.color,
+        geo: p.geo, color: p.color, wave: p.wave, gloss: p.gloss,
         matrix: new THREE.Matrix4().multiplyMatrices(m, p.matrix),
       });
     }
@@ -1907,6 +1916,32 @@ MR.World = (function () {
     // fewer step to spend and the step it keeps should be at the top.
     const v = canopy(c);
     const band = function (i) { return v[Math.min(i, v.length - 1)]; };
+    /**
+     * WHAT MOVES IN A TREE IS THE CANOPY, AND IT MOVES AS A CANTILEVER.
+     *
+     * Every leaf-bearing part goes through here and every woody part does not,
+     * so trunks, stems, forks and branches stay rigid while the crowns they
+     * carry sway. That split is the whole illusion: a tree that translates as
+     * one piece reads as a sprite being slid, and it is exactly what a
+     * per-object sine would have produced.
+     *
+     * Amplitude is the part's own height over the tallest thing vTree builds,
+     * which is a palm at 7.4. A crown lobe six units up therefore moves four
+     * times as far as one at a metre and a half, which is what a springy stem
+     * does, and it falls out of the geometry rather than being tuned per
+     * species: the Roman pine's parasol at 8.0 is near full amplitude, the
+     * fynbos scrub at 0.5 barely stirs, and both are right for what they are
+     * without either being a special case. Scale cancels, so a 0.75x sapling
+     * and a 1.45x mature tree sway by the same FRACTION of their own size.
+     *
+     * Phase carries the lobe's own local position on top of the world-space
+     * term the shader adds, so lobes within one crown shear against each other
+     * instead of the crown moving as a rigid ball.
+     */
+    const HREF = 7.4 * s;
+    const lf = function (p, x, y) {
+      return wv(p, y * 0.9 + x * 1.7, Math.min(1, Math.max(0, y / HREF)));
+    };
     if (kind === 'palm') {
       // A palm is a bare leaning stem and a burst at the top, and the LEAN is
       // what tells it from a lamp post.
@@ -1918,11 +1953,14 @@ MR.World = (function () {
       const tx = 1.35 * s, ty = 7.4 * s;
       for (let f = 0; f < 7; f++) {
         const a = (f / 7) * Math.PI * 2;
-        parts.push(bx(3.4 * s, 0.14 * s, 0.9 * s,
+        parts.push(lf(bx(3.4 * s, 0.14 * s, 0.9 * s,
           tx + Math.cos(a) * 1.5 * s, ty - 0.35 * s, Math.sin(a) * 1.5 * s,
-          band(f % 2), 0, a, -0.30));
+          band(f % 2), 0, a, -0.30), Math.cos(a) * 1.5 * s, ty - 0.35 * s));
       }
-      parts.push(sph(0.5 * s, 6, tx, ty, 0, 0x6a4a2c));
+      // The nut cluster is the one crown part that is not a frond, and it is
+      // tagged anyway: it is carried BY the fronds, so a still cluster inside
+      // a moving burst reads as a hole in the tree.
+      parts.push(lf(sph(0.5 * s, 6, tx, ty, 0, 0x6a4a2c), 0, ty));
     } else if (kind === 'umbrella') {
       // The Roman stone pine: a long bare trunk and a flat wide canopy sitting
       // on top of it like a parasol.
@@ -1930,24 +1968,30 @@ MR.World = (function () {
       parts.push(bx(0.4 * s, 2.4 * s, 0.4 * s, -0.8 * s, 6.4 * s, 0, trunk, 0, 0, 0.5));
       for (let i = 0; i < 5; i++) {
         const a = (i / 5) * 6.283;
-        parts.push(sph(1.9 * s, 7, Math.cos(a) * 1.9 * s, 7.4 * s, Math.sin(a) * 1.9 * s,
-          band(1 + (i & 1))));
+        parts.push(lf(sph(1.9 * s, 7, Math.cos(a) * 1.9 * s, 7.4 * s, Math.sin(a) * 1.9 * s,
+          band(1 + (i & 1))), Math.cos(a) * 1.9 * s, 7.4 * s));
       }
       // The parasol's own top is the lit surface; the ring under its rim is not.
-      parts.push(sph(2.3 * s, 7, 0, 8.0 * s, 0, band(0)));
+      parts.push(lf(sph(2.3 * s, 7, 0, 8.0 * s, 0, band(0)), 0, 8.0 * s));
     } else if (kind === 'columnar') {
       parts.push(cyl(0.16 * s, 0.26 * s, 1.2 * s, 6, 0, 0.6 * s, 0, trunk));
       for (let i = 0; i < 4; i++) {
         // A columnar crown is a stack, so value tracks height straight up it.
-        parts.push(cone((1.05 - i * 0.16) * s, 2.2 * s, 7, 0, (1.9 + i * 1.35) * s, 0,
-          band(3 - i)));
+        parts.push(lf(cone((1.05 - i * 0.16) * s, 2.2 * s, 7, 0, (1.9 + i * 1.35) * s, 0,
+          band(3 - i)), 0, (1.9 + i * 1.35) * s));
       }
     } else if (kind === 'scrub') {
       // Fynbos: low, dense, many-crowned and never a single trunk.
       const r = lcg(31);
       for (let i = 0; i < 6; i++) {
-        parts.push(sph((0.7 + r() * 0.7) * s, 6, (r() - 0.5) * 4 * s, (0.5 + r() * 0.5) * s,
-          (r() - 0.5) * 4 * s, band(i % v.length)));
+        // Drawn in the ORDER THE SEEDED STREAM ALREADY HAD -- radius, x, y, z.
+        // Hoisting x and y out to name them for lf() reorders the pulls and
+        // rebuilds every fynbos bush in the game into a different shape, which
+        // is a silent art change smuggled in by a motion commit.
+        const rad = (0.7 + r() * 0.7) * s;
+        const cx = (r() - 0.5) * 4 * s;
+        const cy = (0.5 + r() * 0.5) * s;
+        parts.push(lf(sph(rad, 6, cx, cy, (r() - 0.5) * 4 * s, band(i % v.length)), cx, cy));
       }
     } else if (kind === 'pollard') {
       // The Paris plane tree: a pale stubby trunk under a tight clipped ball.
@@ -1955,9 +1999,9 @@ MR.World = (function () {
       for (const a of [-0.6, 0.6]) {
         parts.push(bx(0.24 * s, 1.4 * s, 0.24 * s, 0, 3.4 * s, 0, trunk, 0, 0, a));
       }
-      parts.push(sph(2.0 * s, 8, 0, 5.0 * s, 0, band(0)));
-      parts.push(sph(1.5 * s, 7, -0.9 * s, 4.3 * s, 0.6 * s, band(1)));
-      parts.push(sph(1.4 * s, 7, 0.9 * s, 4.4 * s, -0.7 * s, band(2)));
+      parts.push(lf(sph(2.0 * s, 8, 0, 5.0 * s, 0, band(0)), 0, 5.0 * s));
+      parts.push(lf(sph(1.5 * s, 7, -0.9 * s, 4.3 * s, 0.6 * s, band(1)), -0.9 * s, 4.3 * s));
+      parts.push(lf(sph(1.4 * s, 7, 0.9 * s, 4.4 * s, -0.7 * s, band(2)), 0.9 * s, 4.4 * s));
     } else if (kind === 'round') {
       // A FORKED TRUNK. Every trunk in `tgr-taxi-street` and `tgr-boulevard`
       // splits into two or three branches before it enters the crown, and that
@@ -1975,17 +2019,17 @@ MR.World = (function () {
       // lobe is nine pixels across and the segment count does not resolve; the
       // pair costs 72 triangles that way instead of 112, which is a real saving
       // for no read, and the crown is 320 triangles against 248.
-      parts.push(sph(2.0 * s, 8, 0, 4.40 * s, 0, band(1)));
-      parts.push(sph(1.6 * s, 7, -1.45 * s, 4.05 * s, 0.55 * s, band(1)));
-      parts.push(sph(1.5 * s, 7, 1.35 * s, 4.25 * s, -0.65 * s, band(1)));
-      parts.push(sph(1.4 * s, 7, -1.05 * s, 3.15 * s, -0.85 * s, band(2)));
-      parts.push(sph(1.2 * s, 6, 0.20 * s, 5.70 * s, 0.30 * s, band(0)));
-      parts.push(sph(0.9 * s, 6, 1.55 * s, 3.05 * s, 0.75 * s, band(2)));
+      parts.push(lf(sph(2.0 * s, 8, 0, 4.40 * s, 0, band(1)), 0, 4.40 * s));
+      parts.push(lf(sph(1.6 * s, 7, -1.45 * s, 4.05 * s, 0.55 * s, band(1)), -1.45 * s, 4.05 * s));
+      parts.push(lf(sph(1.5 * s, 7, 1.35 * s, 4.25 * s, -0.65 * s, band(1)), 1.35 * s, 4.25 * s));
+      parts.push(lf(sph(1.4 * s, 7, -1.05 * s, 3.15 * s, -0.85 * s, band(2)), -1.05 * s, 3.15 * s));
+      parts.push(lf(sph(1.2 * s, 6, 0.20 * s, 5.70 * s, 0.30 * s, band(0)), 0.20 * s, 5.70 * s));
+      parts.push(lf(sph(0.9 * s, 6, 1.55 * s, 3.05 * s, 0.75 * s, band(2)), 1.55 * s, 3.05 * s));
     } else {
       parts.push(cyl(0.17 * s, 0.26 * s, 1.3 * s, 6, 0, 0.65 * s, 0, trunk));
-      parts.push(cone(1.30 * s, 1.7 * s, 8, 0, 2.0 * s, 0, band(2)));
-      parts.push(cone(1.05 * s, 1.5 * s, 8, 0, 2.9 * s, 0, band(1)));
-      parts.push(cone(0.75 * s, 1.2 * s, 8, 0, 3.7 * s, 0, band(0)));
+      parts.push(lf(cone(1.30 * s, 1.7 * s, 8, 0, 2.0 * s, 0, band(2)), 0, 2.0 * s));
+      parts.push(lf(cone(1.05 * s, 1.5 * s, 8, 0, 2.9 * s, 0, band(1)), 0, 2.9 * s));
+      parts.push(lf(cone(0.75 * s, 1.2 * s, 8, 0, 3.7 * s, 0, band(0)), 0, 3.7 * s));
     }
   }
 
@@ -3740,6 +3784,126 @@ MR.World = (function () {
     return m;
   }
 
+  // ---- the wind ---------------------------------------------------------
+  /**
+   * ===================== ONE WIND, AND IT IS THE SKY'S =====================
+   *
+   * The brief asked for flags and vegetation to move. The cheap way to do that
+   * is a sine per object, and it is also the way that makes a world look
+   * WRONG rather than alive: a tree nodding one way beside a pennant streaming
+   * the other reads as two broken props, not as weather. Wind is a property of
+   * the SCENE, so it is declared once here and every material that moves in it
+   * takes its direction and its gusting from this one place.
+   *
+   * DIRECTION IS NOT A CHOICE. It is already committed, in shading.js, by the
+   * clouds. A cloud feature holds a fixed texture coordinate, so with sample
+   * offset o and scale S it crosses the cloud plane at dp/dt = -(do/dt)/S;
+   * both sheets there are signed so that rate is NEGATIVE, and p is d.xz/h, so
+   * the sky travels toward world -x. Anything on the ground that claims to be
+   * in the same wind therefore leans toward world -x too. That agreement is
+   * the entire reason this is one constant and not four: the player never
+   * names it, and would notice at once if the sky and the trees disagreed.
+   *
+   * WHY -X IS ALSO THE LUCKY AXIS. The ripple comment above makes the argument
+   * in full and it applies unchanged here: the player is sweeping z at 21.8 to
+   * 27.7 units/s, so any animation along z is competing with motion fifty
+   * times its size and is invisible by construction. The wind blows ACROSS the
+   * road, which is the one axis the player's own travel does not hide. The
+   * small z term below is decorrelation, not direction.
+   *
+   * A STEADY LEAN, NOT A WOBBLE. The sway term is (0.55 + 0.45*sin), which
+   * never changes sign -- so every leaf and every pennant sits displaced
+   * downwind and BREATHES about that offset. This is the whole difference
+   * between wind and vibration, and it is why the first term is a bias rather
+   * than a swing. On top of it `gust` breathes far more slowly (0.23 of the
+   * sway rate) so the whole roadside surges and eases together.
+   *
+   * THE GUST IS A PLACE, NOT A CLOCK. Phase carries world x and z, so the
+   * surge is a travelling front across the scene rather than a global pulse:
+   * neighbouring trees are out of step, and 2*pi of phase spans 48 units of x
+   * and 70 of z, which is the scale a hedge row and its neighbour differ over.
+   * Without this every tree in the frame nods in unison, which is the single
+   * most obvious way a vertex wind gives itself away.
+   *
+   * RATES, AND THEY ARE FREQUENCIES OF REAL THINGS.
+   *
+   *   foliage  2.83 rad/s = 0.45 Hz. The sway period of a street tree is
+   *            about two seconds; this is that, not a number that looked
+   *            right. A canopy moving faster reads as underwater.
+   *   cloth   11.30 rad/s = 1.80 Hz. A pennant is a metre of light fabric and
+   *            flutters roughly four times faster than a tree sways. Running
+   *            both at one frequency is what makes bunting look like foliage.
+   *
+   * NOT TIME-COMPRESSED, for the same reason the sky is not: uT is the shared
+   * wall clock (see the crowd wave), and TIME_SCALE's 30x would turn a breeze
+   * into a shimmer.
+   *
+   * COST: zero draws, zero triangles, zero per-frame CPU -- the clock is
+   * already written for the crowd and is deliberately SHARED rather than
+   * duplicated, so the crowd wave and the wind can never drift apart. Two
+   * extra shader programs, and 8 bytes a vertex on the geometries that opt in.
+   */
+  const WIND_F_LEAF = 2.83;
+  const WIND_F_CLOTH = 11.30;
+  const WIND_A_LEAF = 0.22;
+  const WIND_A_CLOTH = 0.16;
+  /**
+   * The largest LATERAL displacement any wind material can produce per unit of
+   * baked amplitude, which is exactly WIND_A at gust 1.0 and sway 1.0.
+   *
+   * It is a named constant because two places outside this function need it
+   * and both of them are correctness rather than looks: the tree claim site
+   * stands a crown off the corridor by its own reach, and that reach has to
+   * include the wind or a swaying crown reintroduces the exact corridor breach
+   * the standoff was written to fix; and tools/motion.js has to grow a
+   * bounding box by it, because vertex-shader motion is invisible to a bounding
+   * box. See api.WAVE_ENVELOPE, which is how the tool gets it without anybody
+   * copying a number into another file.
+   */
+  const WIND_REACH = Math.max(WIND_A_LEAF, WIND_A_CLOTH);
+
+  function windChunk(f, a) {
+    return [
+      '#include <begin_vertex>',
+      'if (aWave.y > 0.0) {',
+      '  vec3 wp = (modelMatrix * vec4(transformed, 1.0)).xyz;',
+      '  float ph = aWave.x + wp.x * 0.13 + wp.z * 0.09;',
+      '  float gust = 0.62 + 0.38 * sin(uT * ' + (f * 0.23).toFixed(4) + ' + ph * 0.6);',
+      '  float sway = aWave.y * ' + a.toFixed(4) + ' * gust * (0.55 + 0.45 * sin(uT * ' + f.toFixed(4) + ' + ph));',
+      '  transformed.x -= sway;',
+      // Leaning is an ARC about the stem, not a slide along the ground, so the
+      // tip drops as it goes over. It is a small term and it is the one that
+      // stops a swaying crown looking like a crown being dragged sideways.
+      '  transformed.y -= abs(sway) * 0.18;',
+      '  transformed.z += aWave.y * ' + (a * 0.26).toFixed(4) + ' * gust * sin(uT * ' + (f * 0.81).toFixed(4) + ' + ph * 1.3);',
+      '}',
+    ].join('\n');
+  }
+
+  /**
+   * Same opt-in as vwave and the same attribute: a part tagged with wv() moves,
+   * a part left alone is structure and is not touched. Trunks, masts, posts and
+   * bunting wire all get amplitude 0 on purpose -- the thing that sells a wind
+   * is that what should be rigid stays rigid.
+   */
+  function vwind(steps, floor, f, a) {
+    const m = vtoon(steps, floor);
+    const prev = m.onBeforeCompile;
+    const chunk = windChunk(f, a);
+    m.onBeforeCompile = function (shader, renderer) {
+      if (prev) prev.call(this, shader, renderer);
+      shader.uniforms.uT = crowdU.uT;
+      shader.vertexShader = 'attribute vec2 aWave;\nuniform float uT;\n'
+        + shader.vertexShader.replace('#include <begin_vertex>', chunk);
+    };
+    // Keyed on the terms that actually vary the PROGRAM, so the two wind
+    // materials compile once each rather than being hashed off function source.
+    m.customProgramCacheKey = function () {
+      return 'mr/wind/' + (steps || 2) + '/' + f.toFixed(2) + '/' + a.toFixed(2);
+    };
+    return m;
+  }
+
   // ---- generic pool -----------------------------------------------------
   function Pool(factory, parent) {
     const free = [];
@@ -4097,6 +4261,13 @@ MR.World = (function () {
       // Everything that is made of people. Same toon ramp as `prop`, plus the
       // vertex wave -- see vwave() above.
       crowd: vwave(2),
+      // Everything that is made of leaves, and everything that is made of
+      // cloth. Same toon ramp as `prop`, plus the wind -- see vwind() above.
+      // They are two materials rather than one because a canopy and a pennant
+      // have genuinely different natural frequencies, which is the only thing
+      // that differs between them.
+      leaf: vwind(2, undefined, WIND_F_LEAF, WIND_A_LEAF),
+      cloth: vwind(2, undefined, WIND_F_CLOTH, WIND_A_CLOTH),
       water: new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, depthWrite: false }),
     };
 
@@ -7112,12 +7283,12 @@ MR.World = (function () {
         Math.abs(bb.min.x), Math.abs(bb.max.x),
         Math.abs(bb.min.z), Math.abs(bb.max.z)
       ));
-      return Pool(function () { return S.outlined(geo, mats.prop, S.INK.prop); }, group);
+      return Pool(function () { return S.outlined(geo, mats.leaf, S.INK.prop); }, group);
     });
     const grovePools = SETS.map(function (st) {
       return [5, 29, 97].map(function (seed) {
         const geo = groveGeo(seed, st.look.tree);
-        return Pool(function () { return S.outlined(geo, mats.prop, S.INK.prop); }, group);
+        return Pool(function () { return S.outlined(geo, mats.leaf, S.INK.prop); }, group);
       });
     });
 
@@ -9980,7 +10151,14 @@ MR.World = (function () {
           const sc = 0.7 + s.a * 0.75;
           obj.scale.setScalar(sc);
           const si = Math.min(SETS.length - 1, s.set || 0);
-          const minX = CORRIDOR_HALF + treeReach[si] * sc + 0.15;
+          // WIND_REACH is part of the reach, not a decoration on top of it.
+          // The standoff above exists because a scaled crown reached back over
+          // the carriageway; a crown that also LEANS reaches further still, and
+          // at the 1.45 scale cap the sway alone is 0.32 units against the 0.15
+          // of slack this line used to carry. Adding it inside the scale keeps
+          // the fix at the level of the class, which is what the note above
+          // says the standoff is for.
+          const minX = CORRIDOR_HALF + (treeReach[si] + WIND_REACH) * sc + 0.15;
           obj.position.set(Math.sign(s.x || 1) * Math.max(Math.abs(s.x), minX), 0, s.z);
           obj.rotation.y = s.b * 6.3;
         } else if (s.kind === 'grove') {
@@ -10394,6 +10572,36 @@ MR.World = (function () {
      */
     const Y_FLOOR = 0.06;      // above this is "over the road", below is paint
     api.OVERHEAD_Y = OVERHEAD_Y;
+    /**
+     * THE SWEPT VOLUME OF EVERY VERTEX-SHADER ANIMATION IN THE GAME, per unit
+     * of baked aWave amplitude. Published because a bounding box cannot see
+     * shader motion: geometry.boundingBox never changes while the crowd jumps
+     * and the trees sway, so any tool auditing where moving things GO has to
+     * grow the box by this, and tools/motion.js does.
+     *
+     * It is exported rather than written into a comment in that file because
+     * that is precisely how the number goes stale. tools/motion.js shipped
+     * carrying 0.79 for the vertical, taken from reading WAVE_CHUNK as
+     * "0.30*exc + 0.31*|b|" -- but the second coefficient is (0.05 + 0.26*exc),
+     * which at the exc cap of 1.55 is 0.453 and not 0.31. The true crowd
+     * envelope is 0.918, so the instrument was growing the box by 86% of the
+     * volume it was meant to be testing and every CORRIDOR pass it reported
+     * was that much more generous than it claimed. A copied constant that
+     * flatters the thing it measures is the failure this project keeps
+     * rediscovering; this is the fix for the class.
+     *
+     * Both animated materials write the same attribute and are unioned here,
+     * because the audit does not know which material a given mesh wears and
+     * an over-large box can only ever make an assertion stricter.
+     */
+    api.WAVE_ENVELOPE = {
+      // crowd: exc * 0.085 laterally, capped at exc 1.55. wind: WIND_REACH.
+      x: Math.max(1.55 * 0.085, WIND_REACH),
+      // crowd: 0.30*exc + (0.05 + 0.26*exc), at exc 1.55. wind: the lean arc.
+      y: Math.max(0.30 * 1.55 + (0.05 + 0.26 * 1.55), WIND_REACH * 0.18),
+      // The crowd has no z term at all; this is the wind's decorrelation swing.
+      z: WIND_REACH * 0.26,
+    };
     api.CORRIDOR_HALF = CORRIDOR_HALF;
     api.crossings = function (fromZ, toZ) {
       // 0.05 of slack, so a kerb notch whose inner face is authored ON the

@@ -154,6 +154,17 @@ const SKIPS = arg('skip', null) !== null
       const ghostRoot = (g.ghost && g.ghost.group) || null;
       const V = new THREE.Vector3();
       const BB = new THREE.Box3();
+      // A SCHEMA GUARD, for the same reason gateBoxes() has one below. If
+      // world.js stops publishing the envelope, this tool must stop rather
+      // than quietly fall back to a guess: undefined arithmetic gives NaN,
+      // every NaN comparison is false, and a box grown by NaN would disable
+      // the CORRIDOR assertion instead of failing it.
+      const ENV = g.world.WAVE_ENVELOPE;
+      for (const f of ['x', 'y', 'z']) {
+        if (!ENV || typeof ENV[f] !== 'number' || !isFinite(ENV[f]) || ENV[f] < 0) {
+          return { err: 'world.WAVE_ENVELOPE has no finite ' + f + ' -- motion.js needs updating' };
+        }
+      }
       function census() {
         const m = new Map();
         g.world.group.traverse((o) => {
@@ -166,22 +177,32 @@ const SKIPS = arg('skip', null) !== null
           BB.copy(o.geometry.boundingBox);
           // SHADER MOTION IS INVISIBLE TO A BOUNDING BOX, and this is the one
           // place that can be fixed rather than merely admitted. The crowd
-          // wave, and anything else riding vwave(), displaces vertices in the
+          // wave, and the wind on foliage and cloth, displace vertices in the
           // VERTEX SHADER -- geometry.boundingBox never changes, so a census
-          // like this one reports a stand full of jumping spectators as
-          // perfectly still. Where a geometry carries aWave, the box is grown
-          // by the largest amplitude baked into it, so the CORRIDOR assertion
-          // is testing the swept volume the shader can actually reach rather
-          // than the rest pose. See WAVE_CHUNK in world.js for the terms; the
-          // largest is 0.30*exc + 0.31*|b| with exc capped at 1.55, so 0.79
-          // times amplitude vertically, and 0.085*exc laterally.
+          // like this one reports a stand full of jumping spectators, and a
+          // whole avenue of swaying trees, as perfectly still. Where a geometry
+          // carries aWave, the box is grown by the swept volume, so CORRIDOR is
+          // testing where the shader can actually put the vertex rather than
+          // the rest pose.
+          //
+          // THE ENVELOPE IS READ OFF THE PAGE, NOT COPIED INTO THIS FILE, and
+          // that change fixed a live defect. This tool shipped with 0.79 for
+          // the vertical, derived by hand from WAVE_CHUNK as "0.30*exc +
+          // 0.31*|b|" -- but the second coefficient is (0.05 + 0.26*exc), which
+          // at the exc cap of 1.55 is 0.453, not 0.31. The real crowd envelope
+          // is 0.918. The instrument was growing the box by 86% of the volume
+          // it claimed to test, and it erred in the flattering direction, which
+          // is the exact failure mode this project's roadmap is a list of. A
+          // constant that lives in one file and is re-derived by hand in
+          // another will go stale; this one now cannot.
           const aw = o.geometry.attributes.aWave;
           if (aw) {
             let amp = 0;
             for (let i = 0; i < aw.count; i++) amp = Math.max(amp, aw.getY(i));
             if (amp > 0) {
-              BB.min.y -= amp * 0.79; BB.max.y += amp * 0.79;
-              BB.min.x -= amp * 0.14; BB.max.x += amp * 0.14;
+              BB.min.y -= amp * ENV.y; BB.max.y += amp * ENV.y;
+              BB.min.x -= amp * ENV.x; BB.max.x += amp * ENV.x;
+              BB.min.z -= amp * ENV.z; BB.max.z += amp * ENV.z;
             }
           }
           BB.applyMatrix4(o.matrixWorld);

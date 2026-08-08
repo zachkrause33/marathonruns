@@ -24,8 +24,18 @@
  * then CHECKED against it: --verify renders the sheet and prints, per tile,
  * the row of the crown and the row of the lowest sole beside the same two
  * rows measured out of the committed before. Run against an unmodified build
- * those two columns agree to a couple of pixels, which is what licenses
- * calling the after "the same framing".
+ * those two columns agree to within 6 px on the crown at --skip 90, which is
+ * the same order as the bob's own travel and is what licenses calling the
+ * after "the same framing".
+ *
+ * The verification is run at --skip 90 and the DELIVERABLE sheets are shot at
+ * --skip 150, and the split is deliberate. At 150 the runner is on a graded
+ * section against grass and trees, which is the background the owner's sheet
+ * has and is far easier to read a face against; but a graded section pitches
+ * the whole figure, and the road paint under him is white, which is the one
+ * colour the sole detector below keys on. So the tile that MEASURES the lens
+ * and the tile that SHOWS the character are shot at different points on the
+ * course, and neither is asked to do the other's job.
  *
  * DIST is measured to the look-at point, not to the runner's origin, and the
  * lens is held at the look-at height rather than pitched down: a pitched lens
@@ -62,10 +72,10 @@ const AZ = String(arg('az', '0,45,90,135,180,270')).split(',').map(Number);
 const TW = parseInt(arg('tw', 200), 10);
 const TH = parseInt(arg('th', 420), 10);
 const DIST = parseFloat(arg('dist', 3.4));
-const FOV = parseFloat(arg('fov', 32));
-const TARGET_Y = parseFloat(arg('ty', 0.90));
+const FOV = parseFloat(arg('fov', 27.2));
+const TARGET_Y = parseFloat(arg('ty', 0.975));
 const ELEV = parseFloat(arg('elev', 0));
-const SKIP = String(arg('skip', '90'));
+const SKIP = String(arg('skip', '150'));
 const STEPS = parseInt(arg('steps', 96), 10);
 const FILE = path.resolve(String(arg('file', path.join(ROOT, 'index.html'))));
 const VERIFY = !!arg('verify', false);

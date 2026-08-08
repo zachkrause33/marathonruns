@@ -1929,3 +1929,137 @@ nobody measured is worse than no number at all.**
    are placed in course space and drawn by `world.js` at road level, i.e. inside
    the lorry; they want lifting to `Course.DECK_Y`. Delete `ramp.js` when the
    fleet grows a hopper.
+
+35. **The hue was never telling the three kinds apart, and the rule that said
+   it was had stopped being true before this pass touched anything.**
+
+   `world.js` carried the rule in two places, in almost the same words:
+   *"COLOUR. Amber JUMP, cyan DUCK, pink BLOCK, always, on the mass that
+   carries the silhouette. One contact ends the record attempt; the hue is how
+   the kind is known before the shape resolves."* Entry-era notes record the
+   three sitting 33 degrees apart. It was the reason the DUCK bar could not be
+   the yellow-and-black a real road uses, and the reason JUMP v1's cones could
+   not simply be orange.
+
+   `tools/kindread.js` measures it against the channel it was competing with,
+   on the same frames, through the live chase camera, at 12, 25.35 and 40
+   units. Two features per variant: the mean hue of its own pixels, and a
+   PROFILE -- the fraction of the lane width the silhouette covers in each of
+   fourteen world bands from the road to 2.80. A nearest-centroid classifier is
+   run over each channel alone.
+
+   | channel | misread, of 21 |
+   |---|---|
+   | hue | **9** |
+   | silhouette profile | **2** |
+
+   The protected channel is the weaker one by a factor of four, and it is
+   weaker because **the fleet rebuild had already spent it and nobody
+   re-measured the rule afterwards.** BLOCK v6 is orange at h 34 and sits
+   inside the JUMP cluster; BLOCK v0 and v4 are at h 216 and 196 and sit inside
+   the DUCK cluster. Seven of the ten BLOCKs were not pink. The rule was
+   describing a game that had not existed for several passes.
+
+   So the hue is spent on the owner's ask instead -- yellow-and-black for the
+   thing you go under, red-and-white for the barrier -- and the split that
+   makes it safe is that **the telegraph mats keep their abstract kind hues and
+   their kind glyphs. The mat says what to DO; the object says what it IS.**
+   Collapsing DUCK into the amber family cost the profile channel nothing
+   measurable: 2 of 21 before, 2 of 21 after.
+
+   **The general form: a rule that forbids something is worth re-deriving every
+   time the thing it protects is rebuilt.** This one survived four rebuilds of
+   the objects it was about.
+
+36. **Two defects in the new instrument, both flattering, both found by its own
+   audit trail rather than by eye.**
+
+   `tools/stride.js` shipped with six. `tools/kindread.js` was written with the
+   memory of that and still shipped two into its first run:
+
+   - **It banded every variant against its OWN collision box.** JUMP yMax is
+     0.80, DUCK 1.83, BLOCK 2.80, so band 13 meant y 0.77 on a JUMP and y 2.70
+     on a BLOCK, and three different objects would have printed as three
+     identical profiles. **That is entry 2's defect, verbatim, in a tool
+     written by someone who had just read entry 2.** One ruler now.
+   - **The lane column came out inverted and every profile read a clean zero.**
+     The chase camera looks down -z, so world +x projects to the SMALLER screen
+     x: `sx(-halfX)` returned 227 and `sx(+halfX)` returned 185, the column
+     window never opened, and the first run printed `0.00` twenty-one times
+     with a perfectly plausible hue column beside it. Nothing threw. **A tool
+     that returns zeros looks like a finding.** It was caught because the tool
+     records its own column bounds and mask bounding box next to every row.
+
+37. **What the cyclists were sitting on was the caution face, and the wheels
+   were never the problem.**
+
+   The owner: *"One bicyclist at the time. The bike needs to be on the road.
+   Ours look like it is sitting on something."* Four candidates were named and
+   three of them were wrong. Measured, per child mesh, off `api.variantObject`:
+
+   - **The caution face. This is the one.** `face: [1.70, 0.20, 0.32, -0.571]`
+     is a 1.23-wide, 0.20-tall striped panel spanning y 0.22 to 0.42 at
+     z -0.571 -- **nearer the lens than either rear wheel**, across 72% of the
+     lane, straight through both bicycles at hub height. Its hard bottom edge
+     at 0.22 cut off the bottom two thirds of all four wheels, so the tyres
+     never met the road anywhere the camera could see.
+   - **The pedal shudder, second and smaller.** `a.position.y = sin(now *
+     15.2 + ph) * 0.030` moves the WHOLE variant group -- machine, wheels and
+     contact shadow -- so for half of every 0.41s cycle the bicycle was clear
+     of the road. Now 0.008.
+   - **CLEARED: the wheels reach the road exactly.** `vBikeWheel` centre 0.33,
+     radius 0.33, tyre bottom y 0.000. The merged body's y-min of -0.0583 is
+     the ink shell extruding below the surface, not a gap.
+   - **CLEARED: there is no plinth.** This variant never had one.
+
+   **The general form, and it is the third time this pass hit it: a bright
+   lane-spanning quad at the height of a thing's contact with the ground makes
+   that thing look parked on a pallet.** The same panel was the whole front of
+   JUMP v1's plinth and had to move up onto the cone bar, and the traffic
+   light's first two face positions both photographed as a striped mat lying on
+   the road beside the pole. The face is centred on the lane by the pool --
+   `f.position.set(0, ...)` -- so it can only ever sit on something centred,
+   and every variant has to be built to give it somewhere to sit.
+
+38. **A thin BLOCK is not free, and the profile said so before a frame was
+   shot.**
+
+   The brief for this pass suggested a traffic light might IMPROVE the
+   occlusion assertions because it is thin, and that the owner's *"the road
+   does not always need to be covered"* wanted exactly that. Built as the
+   reference draws it -- a grey pole on a two-tier plinth -- it failed twice:
+
+   - **The gate.** L 94.8 / S 0.153 against a lane at L 88.4 / S 0.156: ratio
+     1.072 against 1.25, dS 0.003 against 0.22, **margin -0.142 and a failed
+     build.** The fleet header had predicted it in words years earlier ("a
+     realistic grey van would be a hazard nobody could name in time"); building
+     the reference's own grey is how it got proved.
+   - **The profile.** The bare post landed nearer the DUCK centroid than its
+     own, at **-2.721 -- worse than either people-hazard it was built to
+     replace.** A plinth at 60% of the lane with a 0.10 pole above it is a
+     DUCK's shape with the mass at the wrong end. "The plinth will carry the
+     low bands" was a guess that did not survive being measured.
+
+   Both were fixed by the object standing in the SAME reference frame: the red
+   and white works barricade in `ttgr-lightpole-in-lane.png`, at **1.32 tall
+   and not 0.90**, because the bands from 0.80 to 1.40 are empty on a DUCK too
+   and the middle is where the two kinds differ. It still tops out at 1.35
+   against an eye height of 2.62, so the next gate is visible over it -- which
+   is the thin-BLOCK benefit the brief wanted, delivered by a short wide object
+   rather than a tall thin one.
+
+39. **The unfinished item, stated rather than buried: BLOCK v9, the delivery
+   moped, is the last hazard in the game that misreads its own kind.**
+
+   Profile misreads went 2 of 21 to 1 of 21 across this pass -- BLOCK v2 was
+   removed with the cargo trike, BLOCK v8 was repaired by giving the lone
+   cyclist a crate stack -- and the moped is what is left, nearest the DUCK
+   centroid at -1.523. Its profile is `0.06 0.20 0.28 0.30 0.43 0.50 0.50 0.51
+   0.50 0.50 0.40 0.24 0.13`: **almost nothing at the road** and a broad soft
+   middle, which is a DUCK's shape.
+
+   The owner was asked directly whether the trike and the moped failed as a
+   vehicle or as a person and answered **"Both. They either need to be fixed or
+   removed."** The trike is removed. The moped is not, and it should get the
+   same treatment or the same fate. The measurement to beat is in one line of
+   `node tools/kindread.js`.

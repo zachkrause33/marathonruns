@@ -4428,6 +4428,72 @@ MR.World = (function () {
   }
 
   /**
+   * ================== ONE SPECTATOR, FIVE THINGS THEY MIGHT BE DOING =======
+   *
+   * Shared by the roadside knots, the grandstands and the finish arena, so a
+   * person leaning on the rail in the last mile is the same animal as one in a
+   * knot at mile two rather than a separate pile of boxes that happens to be
+   * the same colour.
+   *
+   * Everything about this is tier READ and that is measured, not assumed: see
+   * the table on vFigure. The heads are 1.0 to 2.2 px in the stands and 1.5 px
+   * at the median in a knot, so the entire budget goes into the SILHOUETTE
+   * separating -- head, neck, shoulders, chest, hips, two legs, two arms --
+   * and into MOTION, which is the only thing that survives to ninety units.
+   *
+   * o.r is the caller's own rng, so a knot and a stand seeded differently get
+   * different people and the same knot is the same people every time.
+   */
+  function vSpectator(parts, o) {
+    const r = o.r;
+    const pick = (a) => a[Math.floor(r() * a.length)];
+    const S = (o.lo === undefined ? 0.86 : o.lo) + r() * (o.hi === undefined ? 0.30 : o.hi);
+    const ph = o.phase === undefined ? r() * 6.2832 : o.phase;
+    // The five, dealt at random rather than by index, so two knots side by
+    // side are not the same nine people in the same nine moods.
+    const act = o.act === undefined ? Math.floor(r() * 5) : o.act;
+    const amp = (act === 3 ? 1.35 : act === 4 ? 1.0 : 0.72 + r() * 0.34) * (o.amp || 1);
+    const kind = act === 4 ? CHEER.BRACED : CHEER.BODY;
+
+    let arm = [0, 0], fore = [0, 0], lean = 0;
+    if (act === 0) { arm = [3.05, 3.05]; fore = [0.10, -0.10]; }
+    else if (act === 1) { arm = [3.02, 0.35]; fore = [0.15, 0.50]; }
+    else if (act === 2) { arm = [1.15, 1.15]; fore = [1.15, 1.15]; }
+    else if (act === 3) { arm = [2.72, 2.72]; fore = [0.35, -0.35]; }
+    else { arm = [-1.05, -1.05]; fore = [-0.35, -0.35]; lean = 0.34; }
+
+    const before = parts.length;
+    vFigure(parts, {
+      x: o.x, y: o.y || 0, z: o.z, h: S, build: 0.88 + r() * 0.30,
+      tier: 0, fz: o.fz === undefined ? -1 : o.fz,
+      skin: pick(FIG.skin), hair: pick(FIG.hair), style: Math.floor(r() * 6),
+      top: pick(o.shirts), legCol: pick(o.trousers), shoe: 0x241f2c,
+      arm: arm, fore: fore, lean: lean,
+      leg: act === 3 ? [-0.30, 0.30] : [(r() - 0.5) * 0.22, (r() - 0.5) * 0.22],
+      knee: act === 3 ? [0.55, 0.55] : [0.05, 0.05],
+      wrap: function (p, role) { p.__role = role; return p; },
+    });
+    // The clap is the one place a limb takes its own kind, and only the SIDE
+    // can separate the pair because they share the figure's phase.
+    let seen = 0;
+    for (let q = before; q < parts.length; q++) {
+      const role = parts[q].__role;
+      const k = (act === 2 && role === 'arm') ? (seen++ < 1 ? CHEER.CLAP_L : CHEER.CLAP_R) : kind;
+      wv(parts[q], ph, amp, k);
+    }
+    // A placard, on the ones with both arms up. It is the highest, brightest
+    // and largest thing on the figure and therefore the part whose movement
+    // survives furthest -- at ninety units it is the single element that says
+    // SPECTATORS rather than shrubs.
+    if (act === 0 && o.signs && r() < (o.placard === undefined ? 0.5 : o.placard)) {
+      const py = 1.74 * S * 1.02 + (o.y || 0);
+      parts.push(wv(bx(0.075, 0.42, 0.075, o.x, py + 0.16, o.z, 0x8a5a3c), ph, amp, CHEER.WAVE));
+      parts.push(wv(bx(0.78, 0.50, 0.07, o.x, py + 0.56, o.z, pick(o.signs)), ph, amp, CHEER.WAVE));
+    }
+    return S;
+  }
+
+  /**
    * One lane's surface: a road-length quad, laid flat on the slab and tinted
    * with a vertex colour so it multiplies whatever the biome has made the road.
    *
@@ -10196,81 +10262,16 @@ MR.World = (function () {
       const parts = [];
       const shirts = [0xff4d5e, 0x37d6ff, 0xffe45e, 0x59d47a, 0xff9ad5, 0xfff2e0, 0xffb020, 0x9a7bff];
       const trousers = [0x2b2f52, 0x3a4472, 0x4a3a52, 0x2f3a38, 0x5a4a3a, 0x37405e];
+      const signs = [0xffe45e, 0xfffdf5, 0x37d6ff, 0xff9ad5];
       let s = seed * 9301 + 49297;
       const r = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
-      const pick = (a) => a[Math.floor(r() * a.length)];
-      const signs = [0xffe45e, 0xfffdf5, 0x37d6ff, 0xff9ad5];
       for (let i = 0; i < 9; i++) {
-        const x = -1.5 + (i % 3) * 1.15 + r() * 0.35;
-        const z = -2.6 + Math.floor(i / 3) * 2.4 + r() * 0.9;
-        // Height AND build vary independently. One scalar makes a crowd of one
-        // person photocopied at different sizes; two makes tall thin people
-        // and short broad ones, which is what a crowd is.
-        const S = 0.86 + r() * 0.30;
-        const build = 0.88 + r() * 0.30;
-        const shirt = pick(shirts);
-        const skin = pick(FIG.skin);
-        const hair = pick(FIG.hair);
-        const ph = r() * 6.2832;
-        // The five behaviours, dealt round the knot rather than by i % 3, so
-        // two knots side by side are not the same nine people in the same nine
-        // moods.
-        const act = Math.floor(r() * 5);
-        // ONE AMPLITUDE PER FIGURE for everything that is body. See the rule in
-        // WAVE_BODY: a differential between two connected parts is a tear, and
-        // this file has paid for that once already. Jumpers get a big one and
-        // the braced get a small one, which is the difference between the back
-        // of a crowd and the front of it.
-        const amp = act === 3 ? 1.35 : act === 4 ? 1.0 : 0.72 + r() * 0.34;
-        const kind = act === 4 ? CHEER.BRACED : CHEER.BODY;
-        const wrap = function (p, role) {
-          // The clap is the one place a limb takes its own kind, and it is
-          // lateral-only so it cannot part from the arm it hangs off.
-          if (act === 2 && role === 'arm') return wv(p, ph, amp, p.__cl);
-          return wv(p, ph, amp, kind);
-        };
-
-        // Arms: the pose is what says which of the five this person is doing,
-        // and the pose is free -- it is the same boxes at different angles.
-        //   0 both arms straight up          3 jumping, arms up and out
-        //   1 one arm up, waving             4 braced on the barrier, leaning
-        //   2 clapping in front of the chest
-        let arm = [0, 0], fore = [0, 0], lean = 0;
-        if (act === 0) { arm = [3.05, 3.05]; fore = [0.1, -0.1]; }
-        else if (act === 1) { arm = [3.02, 0.35]; fore = [0.15, 0.5]; }
-        else if (act === 2) { arm = [1.15, 1.15]; fore = [1.15, 1.15]; }
-        else if (act === 3) { arm = [2.72, 2.72]; fore = [0.35, -0.35]; }
-        else { arm = [-1.05, -1.05]; fore = [-0.35, -0.35]; lean = 0.34; }
-
-        const before = parts.length;
-        vFigure(parts, {
-          x: x, y: 0, z: z, h: S, build: build, tier: 0, fz: -1,
-          skin: skin, hair: hair, style: Math.floor(r() * 6),
-          top: shirt, legCol: pick(trousers), shoe: 0x241f2c,
-          arm: arm, fore: fore, lean: lean,
-          // Legs apart on a jumper, feet together on someone braced: the
-          // stance is the other half of what the silhouette says.
-          leg: act === 3 ? [-0.30, 0.30] : [(r() - 0.5) * 0.22, (r() - 0.5) * 0.22],
-          knee: act === 3 ? [0.55, 0.55] : [0.05, 0.05],
-          wrap: function (p, role) { p.__role = role; return p; },
+        vSpectator(parts, {
+          x: -1.5 + (i % 3) * 1.15 + r() * 0.35,
+          z: -2.6 + Math.floor(i / 3) * 2.4 + r() * 0.9,
+          r: r, shirts: shirts, trousers: trousers, signs: signs,
+          lo: 0.86, hi: 0.30, placard: 0.55,
         });
-        // Tag the two arms for the clap AFTER the fact, because vFigure builds
-        // them in order and only the pair's SIDE can separate them.
-        let armSeen = 0;
-        for (let q = before; q < parts.length; q++) {
-          if (parts[q].__role === 'arm') { parts[q].__cl = armSeen++ < 1 ? CHEER.CLAP_L : CHEER.CLAP_R; }
-        }
-        for (let q = before; q < parts.length; q++) wrap(parts[q], parts[q].__role);
-
-        // A placard, on one person in three, held in both raised hands. It is
-        // the highest, brightest and largest thing on the figure and therefore
-        // the part whose movement survives furthest -- and at 90 units it is
-        // the single element that says SPECTATORS rather than shrubs.
-        if (act === 0 && i % 3 === 0) {
-          const py = 1.74 * S * 1.02;
-          parts.push(wv(bx(0.075, 0.42, 0.075, x, py + 0.16, z, 0x8a5a3c), ph, amp, CHEER.WAVE));
-          parts.push(wv(bx(0.78, 0.50, 0.07, x, py + 0.56, z, pick(signs)), ph, amp, CHEER.WAVE));
-        }
       }
       return merge(parts);
     }
@@ -10307,6 +10308,21 @@ MR.World = (function () {
      * not, and there is no middle ground.
      */
     const WALK_IN = K.TRACK_HALF_WIDTH + 4.2;
+    /**
+     * ---- TIER BODY, AND THE MEASUREMENT THAT PUT THEM THERE --------------
+     *
+     * tools/people.js through the live chase camera: a walker's head is 6.8 px
+     * across at the very best and 1.5 to 4.3 at the median, with a 1.25 px eye
+     * mark on the best one. That is the definition of marginal -- a mark that
+     * lands across one pixel boundary -- so they get the whole articulated
+     * figure and NO facial marks: neck, shoulders, upper arm, forearm, hand,
+     * hips, thigh, shin, foot, hair and ears, and nothing inside the face.
+     *
+     * This is the population where the tier actually bites. They are the
+     * closest civilians in the game -- the blind reader picked them out
+     * correctly as "ordinary passers-by or commuters, not race staff" -- and
+     * they are still too far for an eye.
+     */
     function walkersGeo(seed) {
       const parts = [];
       // Deliberately no hazard hues -- see above. AND IT WAS NOT TRUE.
@@ -10323,26 +10339,32 @@ MR.World = (function () {
       // 0x3fa88f is hue 166 -- a sea green, 28 degrees clear of the cyan and
       // still a coat colour a person would wear.
       const coats = [0x3f6fbf, 0x2f9f72, 0xf6f2e0, 0x7a5a9a, 0x8a5a3c, 0x3fa88f];
-      const skins = [0xffc79a, 0xe0a173, 0xb87a4e, 0x8a5a3c];
+      const legwear = [0x2b2f52, 0x3a3444, 0x4a4a5a, 0x5a4a3a, 0x33405e];
       let s = seed * 9301 + 49297;
       const r = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+      const pick = (a) => a[Math.floor(r() * a.length)];
       const n = 3 + Math.floor(r() * 2);
       for (let i = 0; i < n; i++) {
         const x = -1.1 + r() * 2.2;
         const z = -1.8 + i * 1.5 + r() * 0.7;
-        const h = 1.0 + r() * 0.22;
-        const coat = coats[Math.floor(r() * coats.length)];
-        const skin = skins[Math.floor(r() * skins.length)];
-        // Mid-stride: one leg forward, one back. A figure with its feet
-        // together reads as standing however much the group is moving, and
-        // "standing beside the road" is what the crowd knots already say.
-        parts.push(bx(0.17, 0.62 * h, 0.19, x - 0.11, 0.31 * h, z + 0.16, 0x2b2f52, -0.30));
-        parts.push(bx(0.17, 0.62 * h, 0.19, x + 0.11, 0.31 * h, z - 0.16, 0x2b2f52, 0.30));
-        parts.push(bx(0.48, 0.64 * h, 0.34, x, 0.94 * h, z, coat));
-        parts.push(bx(0.30, 0.30, 0.28, x, 1.41 * h, z, skin));
-        parts.push(bx(0.32, 0.11, 0.30, x, 1.56 * h, z, 0x3a2b46));
-        parts.push(bx(0.12, 0.50, 0.12, x - 0.30, 0.98 * h, z - 0.14, coat, 0.34));
-        parts.push(bx(0.12, 0.50, 0.12, x + 0.30, 0.98 * h, z + 0.14, coat, -0.34));
+        const S = 0.90 + r() * 0.26;
+        const coat = pick(coats);
+        // Mid-stride: one leg forward, one back, with the OPPOSITE arm
+        // forward, which is what a walking human does and what a figure with
+        // both arms hanging does not. A figure with its feet together reads as
+        // standing however much the group is moving, and "standing beside the
+        // road" is what the crowd knots already say.
+        const step = 0.24 + r() * 0.16;
+        const flip = r() < 0.5 ? 1 : -1;
+        vFigure(parts, {
+          x: x, y: 0, z: z, h: S, build: 0.90 + r() * 0.26, tier: 1, fz: -1,
+          skin: pick(FIG.skin), hair: pick(FIG.hair), style: Math.floor(r() * 6),
+          top: coat, legCol: pick(legwear), shoe: 0x241f2c,
+          leg: [step * flip, -step * flip], knee: [0.16, 0.16],
+          arm: [-step * 1.5 * flip, step * 1.5 * flip],
+          fore: [0.30, 0.30],
+          lean: 0.05,
+        });
         // A bag, a dog or nothing: three silhouettes rather than one repeated.
         // The tans came down in SATURATION rather than being moved in hue,
         // because tan IS hue 35-40 and there is nowhere else for it to go. The
@@ -10353,11 +10375,20 @@ MR.World = (function () {
         // threshold in tools/motion.js; these are S 0.33 and S 0.22, under the
         // floor entirely.
         if (i % 3 === 1) {
-          parts.push(bx(0.26, 0.30, 0.20, x + 0.38, 0.76 * h, z + 0.20, 0xf6f2e0));
+          parts.push(bx(0.26, 0.30, 0.20, x + 0.38, 0.76 * S, z + 0.20, 0xf6f2e0));
         } else if (i % 3 === 2) {
-          parts.push(bx(0.22, 0.24, 0.56, x + 0.62, 0.30, z + 0.10, 0xd6c8ae));
-          parts.push(bx(0.20, 0.22, 0.22, x + 0.62, 0.46, z - 0.20, 0xd6c8ae));
-          parts.push(bx(0.09, 0.30, 0.09, x + 0.62, 0.15, z + 0.28, 0xbdb098));
+          // The dog got legs. It was a body, a head and ONE 0.09 post, which
+          // at four pixels is a lump on a lead -- and it is the only animal in
+          // the game, so it is the only thing that can read as one.
+          const dx = x + 0.62, dz = z + 0.10;
+          parts.push(bx(0.22, 0.24, 0.56, dx, 0.30, dz, 0xd6c8ae));
+          parts.push(bx(0.20, 0.22, 0.22, dx, 0.46, dz - 0.20, 0xd6c8ae));
+          parts.push(bx(0.09, 0.11, 0.09, dx, 0.55, dz - 0.26, 0xbdb098));
+          for (const lx of [-1, 1]) {
+            parts.push(bx(0.075, 0.20, 0.08, dx + lx * 0.07, 0.10, dz - 0.18, 0xbdb098));
+            parts.push(bx(0.075, 0.20, 0.08, dx + lx * 0.07, 0.10, dz + 0.20, 0xbdb098));
+          }
+          parts.push(bx(0.07, 0.16, 0.07, dx, 0.48, dz + 0.30, 0xbdb098, -0.5));
         }
       }
       return merge(parts);
@@ -10847,35 +10878,30 @@ MR.World = (function () {
       const r = lcg(7717);
 
       // ---- the rank at the rail ------------------------------------------
+      // THE RANK AT THE RAIL is vSpectator now -- the same builder the roadside
+      // knots and the finish arena use, so a person leaning on the barrier in
+      // the last mile is the same animal as one at mile two. Tier READ: this
+      // population's head measures 1.0 px at the median and 2.2 at the best
+      // through the live chase camera, so it is all silhouette and motion.
+      //
+      // Raised arms go STRAIGHT UP and placards are centred on the body, which
+      // is the fairness constraint this object is built against: local x runs
+      // outward from 5.05 and the rank sits at 0.14, so the nearest triangle is
+      // an arm at 4.76 against a barrier face at 4.65 and a CORRIDOR_HALF of
+      // 3.75. vFigure hangs its arms from a 0.52 shoulder rather than splaying
+      // them at 0.28, so the reach came DOWN.
+      const trousers = [0x2b2f52, 0x3a4472, 0x4a3a52, 0x2f3a38, 0x5a4a3a, 0x37405e];
       const RAIL_N = 17;
       for (let i = 0; i < RAIL_N; i++) {
         const z = -TILE / 2 + 0.9 + i * ((TILE - 1.8) / (RAIL_N - 1)) + (r() - 0.5) * 0.5;
-        const x = 0.14 + (r() - 0.5) * 0.20;
-        const h = 0.90 + r() * 0.24;
-        const shirt = shirts[Math.floor(r() * shirts.length)];
-        const skin = skins[Math.floor(r() * skins.length)];
-        const ph = z * 0.53 + r() * 2.4;
-        // Legs to 0.88h so they run up inside the shirt: the wave lifts by
-        // amplitude and anything that differs from the torso's has to slide
-        // within it rather than part from it. See crowdGeo.
-        parts.push(wv(bx(0.36, 0.88 * h, 0.26, x, 0.44 * h, z, 0x2b2f52), ph, 0.85));
-        parts.push(wv(bx(0.50, 0.68 * h, 0.32, x, 0.99 * h, z, shirt), ph, 1.1));
-        parts.push(wv(bx(0.30, 0.30, 0.28, x, 1.48 * h, z, skin), ph, 1.1));
-        const k = i % 3;
-        if (k === 0) {
-          // Straight up, not splayed: a leaning arm is the one part of this
-          // object that could reach past the barrier line, and the read is in
-          // the arm being ABOVE the head, not in where its hand is.
-          parts.push(wv(bx(0.13, 0.60, 0.13, x - 0.26, 1.44 * h, z, skin), ph, 1.7));
-          parts.push(wv(bx(0.13, 0.60, 0.13, x + 0.26, 1.44 * h, z, skin), ph, 1.7));
-        } else if (k === 1) {
-          parts.push(wv(bx(0.10, 0.80, 0.10, x, 1.72 * h, z, 0x8a5a3c), ph, 1.9));
-          parts.push(wv(bx(0.50, 0.38, 0.06, x, 2.12 * h, z,
-            signs[Math.floor(r() * signs.length)]), ph, 2.2));
-        } else {
-          parts.push(wv(bx(0.13, 0.48, 0.13, x - 0.28, 1.02 * h, z, shirt), ph, 1.0));
-          parts.push(wv(bx(0.13, 0.48, 0.13, x + 0.28, 1.02 * h, z, shirt), ph, 1.0));
-        }
+        vSpectator(parts, {
+          x: 0.14 + (r() - 0.5) * 0.20, z: z,
+          r: r, shirts: shirts, trousers: trousers, signs: signs,
+          lo: 0.82, hi: 0.26, amp: 1.15, placard: 0.45,
+          // Phase off the SEAT rather than off a counter, so neighbours are a
+          // beat apart down the row instead of pumping as one object.
+          phase: z * 0.53 + r() * 2.4,
+        });
       }
 
       // ---- the seating ----------------------------------------------------
@@ -10998,6 +11024,7 @@ MR.World = (function () {
                       0xfff2e0, 0x9a7bff];
       const skins = [0xffc79a, 0xe0a173, 0xb87a4e, 0x8a5a3c];
       const flags = [0xffe45e, 0xfffdf5, 0x37d6ff, 0xff9ad5, 0xff4d5e];
+      const ftrousers = [0x2b2f52, 0x3a4472, 0x4a3a52, 0x2f3a38, 0x5a4a3a, 0x37405e];
       const r = lcg(seed);
 
       // ---- the front rail: the reason this object exists -----------------
@@ -11012,31 +11039,24 @@ MR.World = (function () {
           const n = 8;
           for (let i = 0; i < n; i++) {
             const z = -TILE / 2 + 1.4 + i * ((TILE - 2.8) / (n - 1)) + (r() - 0.5) * 0.7;
-            const h = 0.94 + r() * 0.20;
-            const shirt = shirts[Math.floor(r() * shirts.length)];
-            const skin = skins[Math.floor(r() * skins.length)];
-            const ph = z * 0.55 + row * 2.3 + r() * 2.0;
-            // Legs up inside the shirt and within 0.3 of its amplitude, so the
-            // wave cannot open daylight between a body and its own legs. This
-            // is the crowd the player is closest to in the game. See crowdGeo.
-            parts.push(wv(bx(0.36, 0.92 * h, 0.26, rx, 0.46 * h, z, 0x2b2f52), ph, 0.85));
-            parts.push(wv(bx(0.50, 0.70 * h, 0.34, rx, 1.02 * h, z, shirt), ph, 1.15));
-            parts.push(wv(bx(0.30, 0.30, 0.28, rx, 1.52 * h, z, skin), ph, 1.15));
-            // One in three has both arms over their head, one in three is
-            // waving something. A crowd where everybody does the same thing
-            // is a chorus line; the mix is what makes it a crowd.
-            const k = (i + row) % 3;
-            if (k === 0) {
-              parts.push(wv(bx(0.13, 0.62, 0.13, rx - 0.30, 1.44 * h, z, skin, 0, 0, 0.40), ph, 1.7));
-              parts.push(wv(bx(0.13, 0.62, 0.13, rx + 0.30, 1.44 * h, z, skin, 0, 0, -0.40), ph, 1.7));
-            } else if (k === 1) {
-              parts.push(wv(bx(0.10, 0.86, 0.10, rx - 0.24, 1.72 * h, z, 0x8a5a3c), ph, 1.9));
-              parts.push(wv(bx(0.62, 0.42, 0.06, rx - 0.24, 2.16 * h, z,
-                flags[Math.floor(r() * flags.length)]), ph, 2.3));
-            } else {
-              parts.push(wv(bx(0.13, 0.50, 0.13, rx - 0.30, 1.06 * h, z, shirt, 0, 0, 0.22), ph, 1.0));
-              parts.push(wv(bx(0.13, 0.50, 0.13, rx + 0.30, 1.06 * h, z, shirt, 0, 0, -0.22), ph, 1.0));
-            }
+            // THE ONLY CROWD IN THIS GAME MEASURED AT A REAL FACE SIZE, and
+            // it is still not one. tools/people.js puts the widest head in
+            // these two rows at 21.4 px with a 3.92 px eye mark -- which
+            // clears the threshold -- but the MEDIAN head in the population is
+            // 1.9 px, and 878 head pixels a frame are shared between 183
+            // visible heads. Four and a half pixels a face. The two front rows
+            // could carry eyes; the other three hundred and fifty figures they
+            // are merged into could not, and they are one geometry and one
+            // draw. Tier READ, and the front row gets its legibility from
+            // being the only rank that BRACES on the rail while everything
+            // behind it jumps.
+            const braced = (i + row) % 3 === 0;
+            vSpectator(parts, {
+              x: rx, z: z, r: r, shirts: shirts, trousers: ftrousers, signs: flags,
+              lo: 0.90, hi: 0.22, amp: 1.2, placard: 0.5,
+              act: braced ? 4 : undefined,
+              phase: z * 0.55 + row * 2.3 + r() * 2.0,
+            });
           }
         }
       }

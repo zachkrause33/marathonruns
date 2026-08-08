@@ -507,8 +507,7 @@ const KIND = ['-', 'JUMP', 'DUCK', 'BLOCK'];
   console.log(`settings       ${sets.length}/12  ${sets.join(' ')}`);
   console.log(`setting/biome  ${pairs.length}/72 pairs reached`);
   if (pairs.length < 72 && !ONE) {
-    const missing = [];
-    console.log(`               short of the 72 a year contains -- raise --days`);
+    console.log('               short of the 72 a year contains -- raise --days');
   }
   const cen = Object.keys(censusAll).sort();
   if (cen.length) {
@@ -531,7 +530,23 @@ const KIND = ['-', 'JUMP', 'DUCK', 'BLOCK'];
       + `shortest run ${shortest}u of ${(races[0].res && races[0].res.total || 0).toFixed(0)}u; `
       + `widest sample gap ${worstGap}u against a ${view}u spawn distance`
       + (worstGap > view ? '  -- TOO WIDE, road went unsampled' : ''));
+    // BOTH ENDS OF THE RACE LAYER'S COVERAGE CLAIM ARE FATAL, for the reason
+    // the walk's are: an audit that quietly covered less road than it says is
+    // indistinguishable from one that covered all of it and found nothing.
+    // A run that stopped short never looked at the closing miles -- which is
+    // where course.js puts the hardest gates of the race.
     if (worstGap > view) failed = true;
+    if (finished < races.length) {
+      failed = true;
+      console.log(`               ${races.length - finished} race(s) never reached the tape, so the `
+        + 'closing miles went unaudited -- that is a coverage hole, not a pass');
+    }
+    for (const r of races) {
+      if (r.res && !r.res.err && !r.res.samples) {
+        failed = true;
+        console.log(`               ${r.date} took no sightline samples at all`);
+      }
+    }
   }
   const walkCov = walks.map((r) => r.res && r.res.step).filter(Boolean);
   if (walkCov.length) {

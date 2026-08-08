@@ -6764,10 +6764,47 @@ MR.World = (function () {
     // top of a full jump (2.05 + 1.78 = 3.83), so nothing here can make the
     // player clip something they legitimately cleared.
 
+    /**
+     * ============ THE CAUTION FACES SAY WHAT THE OBJECT IS ============
+     *
+     * These three diagonal-stripe faces are the largest single-colour area on
+     * most hazards, and they used to carry the KIND CODE -- amber, cyan, pink
+     * -- on the theory recorded at the variant header below: that a player
+     * reads over / under / around from hue before the shape resolves.
+     *
+     * tools/kindread.js measured that theory against the other channel, on the
+     * same frames, through the live chase camera, at 12, 25.35 and 40 units. A
+     * nearest-centroid classifier on HUE ALONE misreads 9 of 21 variants. On
+     * the SILHOUETTE PROFILE alone -- how much of the lane width the object
+     * covers in each of fourteen bands from the road to 2.80 -- it misreads 2.
+     * The channel the rule protected is the weaker one, and it is weaker
+     * because the fleet rebuild already spent it: BLOCK v6 is orange at h 34
+     * and sits inside the JUMP cluster, BLOCK v4 and v0 are at h 196 and 216
+     * and sit inside the DUCK cluster. Hue stopped telling the kinds apart
+     * some time ago and nothing measured it.
+     *
+     * So the hue is spent on the owner's ask instead, which is the thing a
+     * road actually signals with:
+     *
+     *   DUCK   YELLOW AND BLACK diagonal -- the thing you go under. This is
+     *          reference/ttgr-duckbar-yellow-black.png exactly, and the owner
+     *          named it: "yellow thing to dive under... construction zone".
+     *   BLOCK  RED AND WHITE -- barrier, road closed. The owner named this one
+     *          too ("note red barrier"), it is the marking a real refuse truck
+     *          and a real works barricade carry, and it replaces a pink that
+     *          meant nothing on a road.
+     *   JUMP   AMBER AND DARK -- works and cones, unchanged and already right.
+     *
+     * WHAT IS NOT TOUCHED, AND THIS IS THE SPLIT THAT MAKES IT SAFE. The
+     * telegraph mats painted on the road keep their abstract kind hues and
+     * their kind glyphs. The mat says WHAT TO DO; the object now says WHAT IT
+     * IS. Those are two channels, not one, and the mat is the one this file
+     * already calls "the channel the race is actually lost by misreading".
+     */
     const stripeTex = {
       jump: stripeTexture('#ffb020', '#2b2f52'),
-      duck: stripeTexture('#37d6ff', '#0d2b36'),
-      block: stripeTexture('#ff3b6b', '#fff2e0'),
+      duck: stripeTexture('#ffc422', '#1a1206'),
+      block: stripeTexture('#e02233', '#fff2e0'),
     };
     const faceMat = {
       jump: new THREE.MeshBasicMaterial({ map: stripeTex.jump }),
@@ -6832,13 +6869,24 @@ MR.World = (function () {
      *     from these meshes. A variant that broke the envelope would wave a
      *     player through something they visibly hit. Only x is free, and only
      *     through LANE_FIT.
-     *   COLOUR. Amber JUMP, cyan DUCK, pink BLOCK, always, on the mass that
-     *     carries the silhouette. One contact ends the record attempt; the hue
-     *     is how the kind is known before the shape resolves.
-     *   SILHOUETTE CLASS. Low wide mass with a light cap for JUMP; tall thin
-     *     verticals with a bar between them for DUCK; a lane-filling wall for
-     *     BLOCK. Checked at 40 units in portrait, which is where the lane
-     *     decision is actually made.
+     *   SILHOUETTE CLASS, AND IT IS THIS ONE THAT IS THE CONTRACT. Low wide
+     *     mass on the road and nothing above 0.80 for JUMP; a GAP from the road
+     *     to 1.41 with a bar over it for DUCK; mass from the road past the 2.05
+     *     jump apex for BLOCK. Measured, not asserted: tools/kindread.js reads
+     *     the fraction of the lane width each variant covers in fourteen bands
+     *     through the live chase camera, and a nearest-centroid classifier on
+     *     that profile alone misreads 2 of 21 variants at 12, 25.35 and 40
+     *     units. Both failures are the two thin people-hazards.
+     *   COLOUR SAYS WHAT THE OBJECT IS, NOT WHICH KIND IT IS.
+     *     This rule used to read "Amber JUMP, cyan DUCK, pink BLOCK, always,
+     *     on the mass that carries the silhouette -- the hue is how the kind
+     *     is known before the shape resolves." That was never measured, and
+     *     when it was it turned out to be false: the same classifier on HUE
+     *     alone misreads 8 to 10 of 21. It is false because the fleet rebuild
+     *     already spent the channel -- BLOCK v6 is orange inside the JUMP
+     *     cluster, BLOCK v0 and v4 are cyan inside the DUCK cluster -- and no
+     *     one re-measured the rule afterwards. See stripeTex for what the hue
+     *     is spent on now and for the mat/object split that keeps it safe.
      *
      * The telegraph mat and the striped face are untouched by all of this, so
      * the readability device the game depends on is identical whichever variant
@@ -7460,14 +7508,15 @@ MR.World = (function () {
 
     /**
      * DUCK: the bar is only 0.42 tall, which is nothing at distance, so the
-     * height comes from tall cyan standards rather than from anything spanning
+     * height comes from tall yellow standards rather than from anything spanning
      * the lane.
      *
      * That distinction is not cosmetic, and it constrains every variant. The
      * chase camera trails 5.1 units and carries 42% of the jump arc, so it
      * sweeps y = 1.76 to 3.14 right through a gate's lane. An earlier version
      * had a header board at 2.44 and the camera flew straight into it -- one
-     * frame of full-screen cyan stripes. ABOVE THE BAR, ONLY THIN MEMBERS,
+     * frame of full-screen yellow-and-black stripes. ABOVE THE BAR, ONLY THIN
+     * MEMBERS,
      * and only out at the standards, so the worst a clip can ever be is a
      * sliver of post.
      */
@@ -7481,7 +7530,8 @@ MR.World = (function () {
      * AT az 0 the five are told apart easily -- roundels, a skirt, a round bar,
      * a boarded ledger -- and the caution face is the same on all five, which
      * is the contract. AT az 180 THREE OF THE FIVE ARE THE SAME OBJECT. v0, v1
-     * and v2 photograph as one flat cyan bar between two flat cyan posts, with
+     * and v2 photograph as one flat bar between two flat posts (cyan at the time;
+     * the vocabulary is construction yellow and black now, see stripeTex), with
      * nothing on the rear of the bar, nothing on the rear of the standards, and
      * no fitting anywhere: every distinguishing feature these variants own is
      * on the face they turn toward the lens at spawn. v3 and v4 pass, because a
@@ -7527,34 +7577,34 @@ MR.World = (function () {
       // 0.56 deep, not 0.60/0.62. A DUCK box is halfZ 0.30 and the cap was
       // 0.62 -- 0.01 outside its own envelope, with the striped face 0.002
       // outside that again. Same correction as the JUMP plinths.
-      gl(hcbx(2.30, 0.30, 0.56, 0, 1.56, 0, 0x37d6ff, 0.05), GLOSS.paint),
-      gl(hcbx(2.36, 0.12, 0.56, 0, 1.77, 0, 0xd8f8ff, 0.03), GLOSS.trim),
+      gl(hcbx(2.30, 0.30, 0.56, 0, 1.56, 0, 0xffc422, 0.05), GLOSS.paint),
+      gl(hcbx(2.36, 0.12, 0.56, 0, 1.77, 0, 0xfff0a0, 0.03), GLOSS.trim),
       // TWO STIFFENER RIBS DOWN THE BACK OF THE BAR. The bar's front is not
       // available: the caution face is 2.26 * LANE_FIT wide against a bar of
       // 2.30 * LANE_FIT, so it covers all but 0.015 of it and anything modelled
       // there is behind a plane at every angle the game can produce. The rear
       // face is 0.55 of the object's silhouette from directly behind and had
       // nothing on it at all.
-      gl(hcbx(2.24, 0.09, 0.10, 0, 1.50, 0.235, 0x1f9fd0, 0.02), GLOSS.paint),
-      gl(hcbx(2.24, 0.09, 0.10, 0, 1.66, 0.235, 0x1f9fd0, 0.02), GLOSS.paint),
+      gl(hcbx(2.24, 0.09, 0.10, 0, 1.50, 0.235, 0xd18a08, 0.02), GLOSS.paint),
+      gl(hcbx(2.24, 0.09, 0.10, 0, 1.66, 0.235, 0xd18a08, 0.02), GLOSS.paint),
       // The standards keep their own thickness -- only where they stand moves.
-      // Scaling a 0.26 post down with the lane would have left the tall cyan
+      // Scaling a 0.26 post down with the lane would have left the tall yellow
       // verticals, which are the whole distance read on a DUCK, as hairlines.
-      gl(bxAt(0.26, 3.30, 0.30, -1.20, 1.65, 0, 0x37d6ff), GLOSS.paint),
-      gl(bxAt(0.26, 3.30, 0.30, 1.20, 1.65, 0, 0x37d6ff), GLOSS.paint),
-      bxAt(0.30, 0.26, 0.34, -1.20, 2.35, 0, 0x0d2b36),
-      bxAt(0.30, 0.26, 0.34, 1.20, 2.35, 0, 0x0d2b36),
-      bxAt(0.30, 0.26, 0.34, -1.20, 2.90, 0, 0x0d2b36),
-      bxAt(0.30, 0.26, 0.34, 1.20, 2.90, 0, 0x0d2b36),
-      bxAt(0.40, 0.22, 0.40, -1.20, 3.41, 0, 0xd8f8ff),
-      bxAt(0.40, 0.22, 0.40, 1.20, 3.41, 0, 0xd8f8ff),
+      gl(bxAt(0.26, 3.30, 0.30, -1.20, 1.65, 0, 0xffc422), GLOSS.paint),
+      gl(bxAt(0.26, 3.30, 0.30, 1.20, 1.65, 0, 0xffc422), GLOSS.paint),
+      bxAt(0.30, 0.26, 0.34, -1.20, 2.35, 0, 0x2b1e05),
+      bxAt(0.30, 0.26, 0.34, 1.20, 2.35, 0, 0x2b1e05),
+      bxAt(0.30, 0.26, 0.34, -1.20, 2.90, 0, 0x2b1e05),
+      bxAt(0.30, 0.26, 0.34, 1.20, 2.90, 0, 0x2b1e05),
+      bxAt(0.40, 0.22, 0.40, -1.20, 3.41, 0, 0xfff0a0),
+      bxAt(0.40, 0.22, 0.40, 1.20, 3.41, 0, 0xfff0a0),
       // THE FOOT IS DARK CYAN AND NOT NAVY, which is the correction the JUMP
       // vocabulary already took and the DUCKs never did. The reasoning is
       // recorded above jumpWorksGeo: a shared near-neutral on a saturated
       // object spends the variant's chroma budget on a part that is not
       // carrying anything.
-      bxAt(0.50, 0.22, 0.50, -1.20, 0.11, 0, 0x0d2b36),
-      bxAt(0.50, 0.22, 0.50, 1.20, 0.11, 0, 0x0d2b36),
+      bxAt(0.50, 0.22, 0.50, -1.20, 0.11, 0, 0x2b1e05),
+      bxAt(0.50, 0.22, 0.50, 1.20, 0.11, 0, 0x2b1e05),
     ].concat((function () {
       // The rear half of the portal. Every member here lives between z 0.14
       // and z 0.29 -- clear of the standard's own 0.30 depth, inside the
@@ -7563,10 +7613,10 @@ MR.World = (function () {
       // stick from the side without the box moving a thousandth.
       const p = [];
       for (const sx of [-1, 1]) {
-        p.push(gl(bxAt(0.18, 2.42, 0.15, sx * 1.20, 1.21, 0.215, 0x37d6ff), GLOSS.paint));
+        p.push(gl(bxAt(0.18, 2.42, 0.15, sx * 1.20, 1.21, 0.215, 0xffc422), GLOSS.paint));
         // The tie rungs, which are what says "frame" rather than "two posts".
         for (const ry of [0.62, 2.06]) {
-          p.push(gl(bxAt(0.12, 0.12, 0.42, sx * 1.20, ry, 0.08, 0x1f9fd0), GLOSS.trim));
+          p.push(gl(bxAt(0.12, 0.12, 0.42, sx * 1.20, ry, 0.08, 0xd18a08), GLOSS.trim));
         }
         // The gusset at the bar, and it is on the REAR PLANE for the reason
         // every above-bar fitting in this vocabulary is placed where it is.
@@ -7578,9 +7628,9 @@ MR.World = (function () {
         // thing the file's own rule permits. Written as a test rather than as
         // a feel, because the header board this rule exists for was also
         // "obviously fine" until it filled the screen.
-        p.push(gl(bxAt(0.20, 0.34, 0.14, sx * 1.16, 1.95, 0.22, 0x1f9fd0), GLOSS.paint));
+        p.push(gl(bxAt(0.20, 0.34, 0.14, sx * 1.16, 1.95, 0.22, 0xd18a08), GLOSS.paint));
         // The rear foot pad under the rear leg.
-        p.push(bxAt(0.30, 0.18, 0.20, sx * 1.20, 0.09, 0.18, 0x0d2b36));
+        p.push(bxAt(0.30, 0.18, 0.20, sx * 1.20, 0.09, 0.18, 0x2b1e05));
         // Hold-down bolts. Four per plate, six-sided, and they are here for
         // the crest of a hill: the camera pitches DOWN onto a base plate and
         // that is the one view in which the flattest part of a DUCK is the
@@ -7588,7 +7638,7 @@ MR.World = (function () {
         for (const bx0 of [-0.16, 0.16]) {
           for (const bz of [-0.16, 0.16]) {
             p.push(gl(cyl(0.045, 0.045, 0.07, 6,
-              sx * 1.20 * LANE_FIT + bx0, 0.245, bz, 0xd8f8ff), GLOSS.chrome));
+              sx * 1.20 * LANE_FIT + bx0, 0.245, bz, 0xfff0a0), GLOSS.chrome));
           }
         }
       }
@@ -7603,7 +7653,7 @@ MR.World = (function () {
      * the point: the distance read must not change.
      *
      * WHAT THE ORBIT SHEET FOUND. At az 180 this was indistinguishable from
-     * v0 and v2: one flat cyan bar between two flat cyan posts. Everything that
+     * v0 and v2: one flat bar between two flat posts. Everything that
      * made it scaffold -- the boarding, the ledger, the braces -- was either on
      * the front face or directly behind the standard that hides it.
      *
@@ -7624,61 +7674,61 @@ MR.World = (function () {
      */
     const duckScaffoldGeo = (function () {
       const parts = [
-        hbx(2.30, 0.34, 0.54, 0, 1.58, 0, 0x37d6ff),
+        hbx(2.30, 0.34, 0.54, 0, 1.58, 0, 0xffc422),
         // 1.77, not 1.79: at 1.79 the cap topped out at 1.85, 0.02 outside the
         // box. Chamfered on the way down from the ceiling, never outward past
         // it, exactly as hcbx's header requires.
-        hbx(2.38, 0.12, 0.56, 0, 1.77, 0, 0xd8f8ff),
+        hbx(2.38, 0.12, 0.56, 0, 1.77, 0, 0xfff0a0),
         // 1.46, not 1.44: at 1.44 the boarding's underside was 1.39, below the
         // 1.41 box floor. It now lands on it.
-        hbx(2.24, 0.10, 0.42, 0, 1.46, 0, 0x1f9fd0),
+        hbx(2.24, 0.10, 0.42, 0, 1.46, 0, 0xd18a08),
         // THE REAR LEDGER, the single tube that turns a flat back into a
         // scaffold. Full span at z +0.22, which is clear of the standards' own
         // 0.30 depth and inside the 0.292 the caution face already sets.
-        gl(cyl(0.075, 0.075, 2.34 * LANE_FIT, 8, 0, 1.58, 0.215, 0x1f9fd0, 0, 0, Math.PI / 2), GLOSS.trim),
-        gl(cyl(0.075, 0.075, 2.34 * LANE_FIT, 8, 0, 1.75, 0.215, 0x1f9fd0, 0, 0, Math.PI / 2), GLOSS.trim),
+        gl(cyl(0.075, 0.075, 2.34 * LANE_FIT, 8, 0, 1.58, 0.215, 0xd18a08, 0, 0, Math.PI / 2), GLOSS.trim),
+        gl(cyl(0.075, 0.075, 2.34 * LANE_FIT, 8, 0, 1.75, 0.215, 0xd18a08, 0, 0, Math.PI / 2), GLOSS.trim),
       ];
       for (const sx of [-1, 1]) {
         const px = sx * 1.20 * LANE_FIT;
-        parts.push(cyl(0.15, 0.15, 3.34, 8, px, 1.67, 0, 0x37d6ff));
-        parts.push(cyl(0.19, 0.19, 0.16, 8, px, 2.42, 0, 0x0d2b36));
-        parts.push(cyl(0.19, 0.19, 0.16, 8, px, 3.02, 0, 0x0d2b36));
+        parts.push(cyl(0.15, 0.15, 3.34, 8, px, 1.67, 0, 0xffc422));
+        parts.push(cyl(0.19, 0.19, 0.16, 8, px, 2.42, 0, 0x2b1e05));
+        parts.push(cyl(0.19, 0.19, 0.16, 8, px, 3.02, 0, 0x2b1e05));
         // 0.50 across, not 0.56: the plate reached 1.148 from the lane centre
         // against a box halfX of 1.12, and it was the widest thing in the game.
-        parts.push(bx(0.50, 0.14, 0.54, px, 0.07, 0, 0x0d2b36));
-        parts.push(bx(0.42, 0.20, 0.42, px, 3.38, 0, 0xd8f8ff));
+        parts.push(bx(0.50, 0.14, 0.54, px, 0.07, 0, 0x2b1e05));
+        parts.push(bx(0.42, 0.20, 0.42, px, 3.38, 0, 0xfff0a0));
         // Kicker braces. Canted, but the cant is 0.12 and the foot is pulled
         // INSIDE the standard, because the number that matters is how far the
         // widest point reaches from the lane centre: 1.02, which is inside the
         // 1.068 the existing cap already reaches, so a runner jumping in the
         // NEXT lane cannot graze a brace on this one.
         parts.push(bx(0.15, 1.5, 0.15, sx * (1.20 * LANE_FIT - 0.02), 2.70, 0,
-          0x1f9fd0, 0, 0, sx * 0.12));
+          0xd18a08, 0, 0, sx * 0.12));
         // THE REAR STANDARD, a second tube on the rear plane. It stops at 2.46
         // rather than running the full height: the tall pair of verticals is
         // the distance read and doubling it at 40 units would change the read
         // this vocabulary is not allowed to change.
-        parts.push(gl(cyl(0.085, 0.085, 2.46, 8, px, 1.23, 0.205, 0x37d6ff), GLOSS.paint));
+        parts.push(gl(cyl(0.085, 0.085, 2.46, 8, px, 1.23, 0.205, 0xffc422), GLOSS.paint));
         // TRANSOMS. Short tubes crossing the depth, which is the member that
         // makes a scaffold a frame rather than two ladders, and the only thing
         // on this object that has any z extent at all from the flank.
         for (const ty of [0.52, 1.66, 2.24]) {
-          parts.push(gl(cyl(0.065, 0.065, 0.40, 8, px, ty, 0.08, 0x1f9fd0, Math.PI / 2), GLOSS.trim));
+          parts.push(gl(cyl(0.065, 0.065, 0.40, 8, px, ty, 0.08, 0xd18a08, Math.PI / 2), GLOSS.trim));
         }
-        // COUPLERS. A right-angle clamp at every node, in the dark cyan the
+        // COUPLERS. A right-angle clamp at every node, in the near-black the
         // collars already use, so the joints read as fittings and not as tubes
         // passing through each other.
         for (const cyy of [0.52, 1.58, 1.74, 2.24]) {
-          parts.push(bx(0.20, 0.17, 0.17, px, cyy, 0.205, 0x0d2b36));
+          parts.push(bx(0.20, 0.17, 0.17, px, cyy, 0.205, 0x2b1e05));
         }
         // The toe board, on the rear plane at the lift.
-        parts.push(gl(bx(0.26, 0.20, 0.06, px, 1.95, 0.255, 0xd8f8ff), GLOSS.trim));
+        parts.push(gl(bx(0.26, 0.20, 0.06, px, 1.95, 0.255, 0xfff0a0), GLOSS.trim));
       }
       return merge(parts);
     })();
 
     /**
-     * DUCK v2: a height-restriction sign gantry. The bar becomes a deeper cyan
+     * DUCK v2: a height-restriction sign gantry. The bar becomes a deeper amber
      * sign board banded top and bottom in cream, and each standard carries a
      * sign roundel. A round mark is the one shape no telegraph mat uses, so it
      * never argues with the rungs painted on the road in front of it.
@@ -7700,27 +7750,27 @@ MR.World = (function () {
      */
     const duckSignGeo = (function () {
       const parts = [
-        hbx(2.30, 0.42, 0.54, 0, 1.62, 0, 0x37d6ff),
+        hbx(2.30, 0.42, 0.54, 0, 1.62, 0, 0xffc422),
         // 1.78 and 1.45, not 1.81 and 1.43. See the header.
-        hbx(2.38, 0.10, 0.56, 0, 1.78, 0, 0xd8f8ff),
-        hbx(2.38, 0.08, 0.56, 0, 1.45, 0, 0xd8f8ff),
+        hbx(2.38, 0.10, 0.56, 0, 1.78, 0, 0xfff0a0),
+        hbx(2.38, 0.08, 0.56, 0, 1.45, 0, 0xfff0a0),
         // THE BACK OF THE BOARD. Perimeter angle top and bottom on the rear
         // plane, and two channel stiffeners standing proud of it -- the frame
         // a sign board is actually built on. All of it between z 0.22 and
         // 0.29, so the board's own 0.54 depth is untouched and the flank does
         // not grow.
-        gl(hbx(2.30, 0.07, 0.08, 0, 1.735, 0.245, 0x1f9fd0), GLOSS.trim),
-        gl(hbx(2.30, 0.07, 0.08, 0, 1.495, 0.245, 0x1f9fd0), GLOSS.trim),
+        gl(hbx(2.30, 0.07, 0.08, 0, 1.735, 0.245, 0xd18a08), GLOSS.trim),
+        gl(hbx(2.30, 0.07, 0.08, 0, 1.495, 0.245, 0xd18a08), GLOSS.trim),
       ];
       // The stiffeners run vertically across the board's back, inboard of the
       // standards, and they are the one place this variant puts a repeating
       // rhythm anywhere but the front.
       for (const cx of [-0.66, 0, 0.66]) {
-        parts.push(gl(hbx(0.12, 0.34, 0.08, cx, 1.62, 0.245, 0x0d2b36), GLOSS.trim));
+        parts.push(gl(hbx(0.12, 0.34, 0.08, cx, 1.62, 0.245, 0x2b1e05), GLOSS.trim));
       }
       for (const sx of [-1, 1]) {
         const px = sx * 1.20 * LANE_FIT;
-        parts.push(bx(0.28, 3.30, 0.28, px, 1.65, 0, 0x37d6ff));
+        parts.push(bx(0.28, 3.30, 0.28, px, 1.65, 0, 0xffc422));
         // The roundel goes on the POST, not on the bar. On the bar it had to
         // sit 0.35 in front of the gate line to clear the board -- past the
         // halfZ the collision box records -- and the striped face covered it
@@ -7728,27 +7778,27 @@ MR.World = (function () {
         // (0.543) and nowhere near the lane centre the camera flies down.
         //
         // BOTH FACES, at -0.20 and +0.20, with the mounting boss between them.
-        // The rear disc is the deep cyan and not the cream, because the back
+        // The rear disc is the deep amber and not the cream, because the back
         // of a sign plate is not a sign: two cream discs on one post read at
         // 45 degrees as one disc drawn twice, which is a rendering fault the
         // eye reaches for before it reaches for "double-sided".
         parts.push(cyl(0.20, 0.20, 0.09, 12, px, 2.30, -0.20, 0xfff2e0, Math.PI / 2));
-        parts.push(gl(cyl(0.20, 0.20, 0.09, 12, px, 2.30, 0.20, 0x1f9fd0, Math.PI / 2), GLOSS.paint));
-        parts.push(bx(0.14, 0.14, 0.34, px, 2.30, 0, 0x0d2b36));
+        parts.push(gl(cyl(0.20, 0.20, 0.09, 12, px, 2.30, 0.20, 0xd18a08, Math.PI / 2), GLOSS.paint));
+        parts.push(bx(0.14, 0.14, 0.34, px, 2.30, 0, 0x2b1e05));
         // The clips that hold the board to the post: one above and one below
         // the board, on the rear plane, in the post's own x band.
         // 1.46 and 1.78, so the clips land inside 1.41-1.83 rather than
         // hanging 0.04 out of it at each end. Same discipline as the bands.
         for (const ky of [1.46, 1.78]) {
-          parts.push(gl(bx(0.34, 0.10, 0.16, px, ky, 0.21, 0xd8f8ff), GLOSS.trim));
+          parts.push(gl(bx(0.34, 0.10, 0.16, px, ky, 0.21, 0xfff0a0), GLOSS.trim));
         }
-        parts.push(bx(0.36, 0.18, 0.36, px, 2.86, 0, 0x0d2b36));
-        parts.push(bx(0.30, 0.44, 0.30, px, 3.14, 0, 0x1f9fd0));
-        parts.push(bx(0.40, 0.24, 0.40, px, 3.44, 0, 0xd8f8ff));
-        parts.push(bx(0.50, 0.24, 0.52, px, 0.12, 0, 0x0d2b36));
+        parts.push(bx(0.36, 0.18, 0.36, px, 2.86, 0, 0x2b1e05));
+        parts.push(bx(0.30, 0.44, 0.30, px, 3.14, 0, 0xd18a08));
+        parts.push(bx(0.40, 0.24, 0.40, px, 3.44, 0, 0xfff0a0));
+        parts.push(bx(0.50, 0.24, 0.52, px, 0.12, 0, 0x2b1e05));
         // The maintenance step at the foot, rear plane, so the base is a
         // fitting rather than a slab seen from behind.
-        parts.push(gl(bx(0.32, 0.07, 0.14, px, 0.60, 0.20, 0x1f9fd0), GLOSS.trim));
+        parts.push(gl(bx(0.32, 0.07, 0.14, px, 0.60, 0.20, 0xd18a08), GLOSS.trim));
       }
       return merge(parts);
     })();
@@ -7787,37 +7837,37 @@ MR.World = (function () {
       const parts = [
         // The beam: 1.61 to 1.83, so the skirt has room under it and the top
         // of the bar is still exactly the box ceiling.
-        gl(hcbx(2.30, 0.22, 0.52, 0, 1.72, 0, 0x37d6ff, 0.05), GLOSS.paint),
-        gl(hcbx(2.36, 0.09, 0.54, 0, 1.785, 0, 0xd8f8ff, 0.03), GLOSS.trim),
+        gl(hcbx(2.30, 0.22, 0.52, 0, 1.72, 0, 0xffc422, 0.05), GLOSS.paint),
+        gl(hcbx(2.36, 0.09, 0.54, 0, 1.785, 0, 0xfff0a0, 0.03), GLOSS.trim),
       ];
-      // The skirt. Alternating cream and deep cyan, which is the boom's real
+      // The skirt. Alternating cream and deep amber, which is the boom's real
       // marking and is also the cheapest way to put a repeating vertical
       // rhythm in the one band the player is looking at.
       for (let i = 0; i < 7; i++) {
         const x = -0.90 + i * 0.30;
-        parts.push(gl(bxAt(0.13, 0.18, 0.22, x, 1.52, 0, i % 2 ? 0x1f9fd0 : 0xd8f8ff), GLOSS.trim));
+        parts.push(gl(bxAt(0.13, 0.18, 0.22, x, 1.52, 0, i % 2 ? 0xd18a08 : 0xfff0a0), GLOSS.trim));
       }
       for (const sx of [-1, 1]) {
         // 3.20 tall, not the 3.30 the other three use. The DUCK superstructure
         // was measured as the tallest thing in the game and a real occluder in
         // R2, so a new variant takes the chance to be shorter rather than
         // taller: this tops out at 3.40 against 3.48-3.56 for v0-v2.
-        parts.push(gl(bxAt(0.26, 3.20, 0.30, sx * 1.20, 1.60, 0, 0x37d6ff), GLOSS.paint));
-        parts.push(bxAt(0.30, 0.24, 0.34, sx * 1.20, 2.62, 0, 0x0d2b36));
-        parts.push(gl(bxAt(0.38, 0.20, 0.38, sx * 1.20, 3.30, 0, 0xd8f8ff), GLOSS.trim));
-        parts.push(bxAt(0.50, 0.22, 0.50, sx * 1.20, 0.11, 0, 0x0d2b36));
+        parts.push(gl(bxAt(0.26, 3.20, 0.30, sx * 1.20, 1.60, 0, 0xffc422), GLOSS.paint));
+        parts.push(bxAt(0.30, 0.24, 0.34, sx * 1.20, 2.62, 0, 0x2b1e05));
+        parts.push(gl(bxAt(0.38, 0.20, 0.38, sx * 1.20, 3.30, 0, 0xfff0a0), GLOSS.trim));
+        parts.push(bxAt(0.50, 0.22, 0.50, sx * 1.20, 0.11, 0, 0x2b1e05));
         // Cabinet doors on the rear plane of each post -- the relay boxes a
         // crossing carries. Out at the standard, inside the post's own x band,
         // and below the bar so they cost no headroom argument at all.
-        parts.push(gl(bxAt(0.26, 0.62, 0.10, sx * 1.20, 0.98, 0.235, 0x1f9fd0), GLOSS.paint));
-        parts.push(gl(bxAt(0.08, 0.10, 0.06, sx * 1.20 + sx * 0.09, 0.98, 0.26, 0xd8f8ff), GLOSS.chrome));
+        parts.push(gl(bxAt(0.26, 0.62, 0.10, sx * 1.20, 0.98, 0.235, 0xd18a08), GLOSS.paint));
+        parts.push(gl(bxAt(0.08, 0.10, 0.06, sx * 1.20 + sx * 0.09, 0.98, 0.26, 0xfff0a0), GLOSS.chrome));
       }
       // The signal post, LEFT ONLY. The backing plate is 0.44 wide at 1.20 out
       // -- 1.088 from the lane centre against a box halfX of 1.12 -- and the
       // lamp discs face the player, axis along z, so they are round from
       // behind and edge-on discs from the next lane rather than flat squares.
       const px = -1.20 * LANE_FIT;
-      parts.push(bxAt(0.44, 0.94, 0.16, -1.20, 2.06, -0.10, 0x0d2b36));
+      parts.push(bxAt(0.44, 0.94, 0.16, -1.20, 2.06, -0.10, 0x2b1e05));
       for (const ly of [1.78, 2.34]) {
         parts.push(gl(cyl(0.15, 0.15, 0.09, 12, px, ly, -0.20, 0xfff2e0, Math.PI / 2), GLOSS.chrome));
         // THE HOOD BEHIND EACH LAMP. A signal lamp is a housing with a lens in
@@ -7825,15 +7875,15 @@ MR.World = (function () {
         // fitting that makes this a level crossing was a pair of pale ellipses
         // floating on a dark plate. The housing is what you actually see once
         // you are past it.
-        parts.push(gl(cyl(0.13, 0.16, 0.16, 12, px, ly, 0.02, 0x1f9fd0, Math.PI / 2), GLOSS.paint));
+        parts.push(gl(cyl(0.13, 0.16, 0.16, 12, px, ly, 0.02, 0xd18a08, Math.PI / 2), GLOSS.paint));
       }
       // THE PIVOT BEARING, and it is the piece this variant most obviously
       // lacked. A boom turns about something. This is a hub through the left
       // standard on the beam's own axis, proud on BOTH faces, so it reads as a
       // mechanism from behind and from either flank rather than only as a
       // lopsided outline from the front.
-      parts.push(gl(cyl(0.17, 0.17, 0.50, 10, px, 1.72, 0, 0x0d2b36, Math.PI / 2), GLOSS.trim));
-      parts.push(gl(cyl(0.09, 0.09, 0.58, 8, px, 1.72, 0, 0xd8f8ff, Math.PI / 2), GLOSS.chrome));
+      parts.push(gl(cyl(0.17, 0.17, 0.50, 10, px, 1.72, 0, 0x2b1e05, Math.PI / 2), GLOSS.trim));
+      parts.push(gl(cyl(0.09, 0.09, 0.58, 8, px, 1.72, 0, 0xfff0a0, Math.PI / 2), GLOSS.chrome));
       // The counterweight, which is what a raised boom is balanced by and
       // which reads as mass on one side of an otherwise even frame.
       //
@@ -7841,13 +7891,13 @@ MR.World = (function () {
       // add and take off, and the stack is the read; a cube at this size is a
       // lump that could be anything. The arm ties it back to the pivot, which
       // is what makes the two fittings one machine.
-      parts.push(gl(bxAt(0.13, 0.96, 0.13, -1.20, 2.24, 0, 0x1f9fd0), GLOSS.paint));
+      parts.push(gl(bxAt(0.13, 0.96, 0.13, -1.20, 2.24, 0, 0xd18a08), GLOSS.paint));
       for (let i = 0; i < 3; i++) {
-        parts.push(gl(cyl(0.17, 0.17, 0.09, 12, px, 2.72 + i * 0.11, 0, 0x0d2b36, Math.PI / 2), GLOSS.trim));
+        parts.push(gl(cyl(0.17, 0.17, 0.09, 12, px, 2.72 + i * 0.11, 0, 0x2b1e05, Math.PI / 2), GLOSS.trim));
       }
       // The rest fork, RIGHT ONLY: the cradle the boom drops into.
-      parts.push(gl(bxAt(0.30, 0.12, 0.36, 1.20, 1.92, 0, 0xd8f8ff), GLOSS.trim));
-      parts.push(gl(bxAt(0.11, 0.22, 0.36, 1.20, 2.03, 0, 0xd8f8ff), GLOSS.trim));
+      parts.push(gl(bxAt(0.30, 0.12, 0.36, 1.20, 1.92, 0, 0xfff0a0), GLOSS.trim));
+      parts.push(gl(bxAt(0.11, 0.22, 0.36, 1.20, 2.03, 0, 0xfff0a0), GLOSS.trim));
       return merge(parts);
     })();
 
@@ -7889,19 +7939,19 @@ MR.World = (function () {
       const parts = [
         // The lagged run. Axis along x: radius spans y and z, which is what
         // puts the whole toon ramp across a 0.38 band.
-        gl(cyl(0.19, 0.19, 2.30 * LANE_FIT, 14, 0, 1.62, 0, 0x37d6ff, 0, 0, Math.PI / 2), GLOSS.paint),
+        gl(cyl(0.19, 0.19, 2.30 * LANE_FIT, 14, 0, 1.62, 0, 0xffc422, 0, 0, Math.PI / 2), GLOSS.paint),
       ];
       // Banding collars. 0.21 not 0.23: at 0.23 they reached 1.39 and 1.85,
       // which is 0.02 out of the box on both faces -- the same two-hundredths
       // v1 and v2 already carry and which nothing in the toolchain reads.
       // (Both of those are now fixed at the variants that carried them.)
       for (const cx of [-0.62, -0.21, 0.21, 0.62]) {
-        parts.push(gl(cyl(0.21, 0.21, 0.10, 14, cx, 1.62, 0, 0xd8f8ff, 0, 0, Math.PI / 2), GLOSS.trim));
+        parts.push(gl(cyl(0.21, 0.21, 0.10, 14, cx, 1.62, 0, 0xfff0a0, 0, 0, Math.PI / 2), GLOSS.trim));
         // Flange bolts standing off each collar, on the rear quarter. Four
         // rings of them is what a bolted pipe joint looks like from anywhere
         // that is not directly in front of it.
         for (const bz of [-0.15, 0.15]) {
-          parts.push(gl(cyl(0.035, 0.035, 0.14, 6, cx * LANE_FIT, 1.76, bz, 0xd8f8ff), GLOSS.chrome));
+          parts.push(gl(cyl(0.035, 0.035, 0.14, 6, cx * LANE_FIT, 1.76, bz, 0xfff0a0), GLOSS.chrome));
         }
       }
       // THE SECOND CONDUIT, and it is the one thing on any DUCK in this file
@@ -7914,37 +7964,37 @@ MR.World = (function () {
       //
       // It sits at y 1.50, inside the 1.41-1.83 band, so it costs no
       // clearance: the bar is already there.
-      parts.push(gl(cyl(0.07, 0.07, 2.30 * LANE_FIT, 10, 0, 1.49, 0.215, 0x1f9fd0, 0, 0, Math.PI / 2), GLOSS.paint));
+      parts.push(gl(cyl(0.07, 0.07, 2.30 * LANE_FIT, 10, 0, 1.49, 0.215, 0xd18a08, 0, 0, Math.PI / 2), GLOSS.paint));
       for (const cx of [-0.62, 0, 0.62]) {
         // The saddle bracket tying the small bore to the main run.
-        parts.push(gl(bx(0.10, 0.22, 0.10, cx * LANE_FIT, 1.55, 0.215, 0x0d2b36), GLOSS.trim));
+        parts.push(gl(bx(0.10, 0.22, 0.10, cx * LANE_FIT, 1.55, 0.215, 0x2b1e05), GLOSS.trim));
       }
       for (const sx of [-1, 1]) {
         // Round columns, and shorter again than v0-v2 for the R2 reason.
-        parts.push(gl(cyl(0.16, 0.16, 3.10, 10, sx * px, 1.55, 0, 0x37d6ff), GLOSS.paint));
-        parts.push(cyl(0.21, 0.21, 0.10, 10, sx * px, 1.05, 0, 0x0d2b36));
-        parts.push(cyl(0.21, 0.21, 0.10, 10, sx * px, 2.40, 0, 0x0d2b36));
-        parts.push(gl(cyl(0.22, 0.22, 0.20, 10, sx * px, 3.20, 0, 0xd8f8ff), GLOSS.trim));
-        parts.push(bxAt(0.50, 0.22, 0.50, sx * 1.20, 0.11, 0, 0x0d2b36));
+        parts.push(gl(cyl(0.16, 0.16, 3.10, 10, sx * px, 1.55, 0, 0xffc422), GLOSS.paint));
+        parts.push(cyl(0.21, 0.21, 0.10, 10, sx * px, 1.05, 0, 0x2b1e05));
+        parts.push(cyl(0.21, 0.21, 0.10, 10, sx * px, 2.40, 0, 0x2b1e05));
+        parts.push(gl(cyl(0.22, 0.22, 0.20, 10, sx * px, 3.20, 0, 0xfff0a0), GLOSS.trim));
+        parts.push(bxAt(0.50, 0.22, 0.50, sx * 1.20, 0.11, 0, 0x2b1e05));
         // The column's base flange, with bolts. A round column landing on a
         // square plate with nothing between them is the join this variant had.
-        parts.push(gl(cyl(0.22, 0.24, 0.13, 10, sx * px, 0.28, 0, 0x1f9fd0), GLOSS.paint));
+        parts.push(gl(cyl(0.22, 0.24, 0.13, 10, sx * px, 0.28, 0, 0xd18a08), GLOSS.paint));
         for (const a of [0, 1, 2, 3]) {
           const t = a * Math.PI / 2 + Math.PI / 4;
           parts.push(gl(cyl(0.04, 0.04, 0.08, 6, sx * px + Math.cos(t) * 0.20, 0.37,
-            Math.sin(t) * 0.20, 0xd8f8ff), GLOSS.chrome));
+            Math.sin(t) * 0.20, 0xfff0a0), GLOSS.chrome));
         }
         // The bracket carrying the small bore into the column.
-        parts.push(gl(bx(0.30, 0.10, 0.10, sx * px, 1.49, 0.215, 0x1f9fd0), GLOSS.trim));
+        parts.push(gl(bx(0.30, 0.10, 0.10, sx * px, 1.49, 0.215, 0xd18a08), GLOSS.trim));
       }
       // The valve wheel, right standard, facing the player. r 0.24 at 0.868
       // out reaches 1.108 against a box halfX of 1.12.
-      parts.push(gl(cyl(0.24, 0.24, 0.07, 14, px, 2.74, -0.17, 0xd8f8ff, Math.PI / 2), GLOSS.chrome));
-      parts.push(gl(cyl(0.08, 0.08, 0.22, 8, px, 2.74, -0.08, 0x1f9fd0, Math.PI / 2), GLOSS.trim));
+      parts.push(gl(cyl(0.24, 0.24, 0.07, 14, px, 2.74, -0.17, 0xfff0a0, Math.PI / 2), GLOSS.chrome));
+      parts.push(gl(cyl(0.08, 0.08, 0.22, 8, px, 2.74, -0.08, 0xd18a08, Math.PI / 2), GLOSS.trim));
       // The elbow, left standard: a stub rising off the column and turning
       // back on itself. Thin, and out at the post, per the rule.
-      parts.push(gl(cyl(0.13, 0.13, 0.54, 10, -px, 2.90, 0, 0x1f9fd0), GLOSS.paint));
-      parts.push(gl(cyl(0.13, 0.13, 0.30, 10, -px + 0.15, 3.14, 0, 0x1f9fd0, 0, 0, Math.PI / 2), GLOSS.paint));
+      parts.push(gl(cyl(0.13, 0.13, 0.54, 10, -px, 2.90, 0, 0xd18a08), GLOSS.paint));
+      parts.push(gl(cyl(0.13, 0.13, 0.30, 10, -px + 0.15, 3.14, 0, 0xd18a08, 0, 0, Math.PI / 2), GLOSS.paint));
       return merge(parts);
     })();
 
@@ -7989,9 +8039,15 @@ MR.World = (function () {
      *     rear plane at exactly -0.65. Nothing reaches behind the gate line.
      *   HEIGHT. BLOCK tops out at 2.80 and nothing here exceeds it. The refuse
      *     truck's beacon lands on it exactly; everything else is under.
-     *   COLOUR. BLOCK pink on the mass that carries the silhouette, always. A
-     *     hazard's kind is known from its hue before its shape resolves, and a
-     *     realistic grey van would be a hazard nobody could name in time.
+     *   COLOUR. Saturated and bright enough to clear the contrast gate against
+     *     every lane -- that is what a realistic grey van would actually fail,
+     *     and it is a measured rule rather than a hue rule. This paragraph used
+     *     to say "BLOCK pink on the mass that carries the silhouette, always,
+     *     because a hazard's kind is known from its hue before its shape
+     *     resolves". The fleet rebuild had already broken that when this was
+     *     written -- seven of the ten BLOCKs are not pink and were not pink
+     *     then -- and tools/kindread.js now shows hue misreading 8 to 10 of 21
+     *     variants against the silhouette profile's 2. See stripeTex.
      *   NOTHING MOVES IN X OR Z. Behaviour is one rotating or sliding CHILD and
      *     a y shudder, and no more. A hazard's lane and z are course data that
      *     course.js has already proved a path through by BFS; a vehicle is a

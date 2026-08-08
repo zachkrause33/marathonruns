@@ -753,6 +753,19 @@ function corridorWalk(step, wantCensus) {
   const OY = g.world.OVERHEAD_Y;
   const TOTAL = MR.K.TOTAL_UNITS;
   const S = step || 150;
+  // THE COVERAGE CLAIM, ASSERTED RATHER THAN COMMENTED.
+  //
+  // The walk only sees an object if the object is standing when crossings()
+  // is called, and world.js spawns at VIEW ahead. A step wider than VIEW
+  // therefore steps OVER stretches of road -- silently, and in the direction
+  // that makes the sweep look clean. docs/roadmap.md's whole corrections list
+  // is numbers nobody checked, so this one refuses to run rather than assume.
+  const VIEW = MR.World && MR.World.VIEW;
+  if (!VIEW) return { skipped: 'MR.World exposes no VIEW -- cannot prove the step covers the road' };
+  if (S > VIEW) {
+    return { skipped: 'step ' + S + ' is wider than the ' + VIEW + '-unit spawn distance, '
+      + 'so the walk would step over road it never built' };
+  }
   const low = [], seen = {};
   const census = {};
   let samples = 0, elements = 0;
@@ -794,7 +807,7 @@ function corridorWalk(step, wantCensus) {
       });
     }
   }
-  return { low, samples, elements, census, step: S, overheadY: OY, total: TOTAL };
+  return { low, samples, elements, census, step: S, overheadY: OY, total: TOTAL, view: VIEW };
 }
 
 /**

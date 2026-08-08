@@ -285,6 +285,7 @@ const KIND = ['-', 'JUMP', 'DUCK', 'BLOCK'];
         const seenPair = {};
         let samples = 0, frames = 0, drift = null, envelope = null;
         let minVis = 2, minVisRow = null;
+        let lastU = -1, maxGap = 0;
 
         for (; frames < CAP; frames++) {
           clock += STEP_MS;
@@ -341,6 +342,14 @@ const KIND = ['-', 'JUMP', 'DUCK', 'BLOCK'];
               g.renderer.render = function () { };
             }
           }
+          // WHERE THE RACE ACTUALLY GOT TO, kept per sample so the coverage
+          // claim is a measurement. The RACE layer is only a whole-course
+          // audit if consecutive samples are closer together than the spawn
+          // distance; at 2 s and race pace that is about 53 units against 210,
+          // but "about" is what this project keeps having to retract.
+          const u = g.pace.units;
+          if (lastU >= 0 && u - lastU > maxGap) maxGap = u - lastU;
+          lastU = u;
           if (g.pace.finished) break;
         }
         return {
@@ -350,6 +359,9 @@ const KIND = ['-', 'JUMP', 'DUCK', 'BLOCK'];
           blank, contrast, drift, envelope,
           overlays: Object.keys(overlays),
           miles: +g.pace.miles.toFixed(2), hits: g.pace.hits,
+          units: +g.pace.units.toFixed(0), total: MR.K.TOTAL_UNITS,
+          maxGap: +maxGap.toFixed(1), view: MR.World && MR.World.VIEW,
+          finished: !!g.pace.finished,
           tightest: minVisRow,
         };
       }, { AUDIT: fairness.call.replace(/^\(|\)\(\)$/g, ''), EVERY, CONTRAST: !NO_CONTRAST })
@@ -497,6 +509,30 @@ const KIND = ['-', 'JUMP', 'DUCK', 'BLOCK'];
   if (cen.length) {
     console.log(`named scenery  ${cen.length} distinct, over the walked days`);
     console.log('               ' + cen.map((k) => k + ' x' + censusAll[k]).join(', '));
+  }
+  // ---- THE COVERAGE OF THE RACE LAYER, AS A NUMBER ---------------------
+  //
+  // Not "it samples every two seconds, which is about 53 units". A whole-course
+  // claim is only true if the widest gap between consecutive samples is inside
+  // the spawn distance and the race actually reached the tape, and both of
+  // those are measured per day rather than asserted here.
+  const finished = races.filter((r) => r.res && r.res.finished).length;
+  const gaps = races.map((r) => r.res && r.res.maxGap).filter((x) => x !== undefined);
+  if (races.length) {
+    const worstGap = Math.max.apply(null, gaps.concat([0]));
+    const view = (races[0].res && races[0].res.view) || 210;
+    const shortest = Math.min.apply(null, races.map((r) => (r.res && r.res.units) || 0));
+    console.log(`race coverage  ${finished}/${races.length} reached the tape; `
+      + `shortest run ${shortest}u of ${(races[0].res && races[0].res.total || 0).toFixed(0)}u; `
+      + `widest sample gap ${worstGap}u against a ${view}u spawn distance`
+      + (worstGap > view ? '  -- TOO WIDE, road went unsampled' : ''));
+    if (worstGap > view) failed = true;
+  }
+  const walkCov = walks.map((r) => r.res && r.res.step).filter(Boolean);
+  if (walkCov.length) {
+    const w0 = walks.find((r) => r.res && r.res.step).res;
+    console.log(`walk coverage  step ${w0.step}u against a ${w0.view}u spawn distance, `
+      + `${w0.samples} samples over ${w0.total.toFixed(0)}u`);
   }
   const tightest = races.map((r) => r.res && r.res.tightest).filter(Boolean)
     .sort((a, b) => (a.vis - a.need) - (b.vis - b.need))[0];

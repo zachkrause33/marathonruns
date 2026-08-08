@@ -398,6 +398,47 @@ added for.
 
 ---
 
+## Open, from the visual-polish pass
+
+- **The fleet has not grown into its new envelope.** `BLOCK` depth was
+  renegotiated 1.30 -> 3.90 so vehicles could have car proportions; the art is
+  still the old 1.30-deep build sitting inside it. This is the direct
+  continuation of "match the mocks" and it carries two riders:
+  - **Nose-anchor the collision box.** It is centred on the gate line, so once
+    the art fills 3.90 the player is inside the car's nose for **74 ms, 4.4
+    frames**, before the plane test fires (up from 25 ms). Costed at 2.9 gates
+    and 1 second. Harmless today because the art is short; it arrives with the
+    rebuild.
+  - **`Collision.BOX` has no `halfX`.** Width is decided in `world.js`
+    (`halfX: LANE * 0.5`), which contradicts rule 4 -- art never decides
+    clearance. Safe today (box 1.70 against widest art 1.56) and nothing is
+    watching it. **OPEN**
+- **Elevated traffic is the one route not refused.** Road traffic was refused
+  twice with measurements: no continuous gap in the 0-12.2 band, and 0 of 14
+  bridge days with 15-22 clear. **Every blocker found on both routes is at
+  ground level.** A raised railway or flyover crossing above `OVERHEAD_Y` is
+  untouched by any of it. **OPEN**
+- **Variant repetition is DUCK and JUMP, not the fleet.** Across 8 dates and
+  3,612 hazards, 64.8% of visible windows contain a repeat -- but per hazard
+  seen, a DUCK produces **3x** the repetition of a BLOCK. BLOCK has ten
+  variants, DUCK three, JUMP four. The premise that vehicles were the
+  repetitive thing is backwards. **OPEN**
+- **Per-variant hazard depth**, rejected for now rather than refused: right in
+  principle and cheap on the course side (`variantIndex` is a pure hash), but
+  a box shorter than its art makes `BLANKS` under-count and pass a gate the art
+  really hides. Needs box and art changed together. **OPEN**
+
+## Decisions waiting on the owner
+
+- **Moving hazards.** The other reading of "passing cars" is to make the
+  obstacles drive rather than sit, as the queue in the Sonic reference does.
+  Achievable and it would look right, but a moving hazard opens and closes
+  differently from a parked one and the solvability proof would need re-running
+  against it. A gameplay change, not an art one.
+- **Forcing a CLEAR lane in a BLOCK's shadow** (R2's open lever). Would make
+  the second gate genuinely visible rather than merely fair. Costs ~14% of lane
+  slots and would nearly double the CLEAR share.
+
 ## Standing, from measured reviews
 
 - **Accent colour is not a closed set** — `#ffe45e` appears 29 times in
@@ -538,6 +579,52 @@ done._
 
 ---
 
+## Done in the visual-polish pass
+
+- **The sky.** The horizon faded to a fixed 42% white; the band just above it
+  measured S 0.039 against sonic's 0.511. Worse, the gradient was scaled so the
+  deep stop at the top of every biome palette **was never on screen** -- the
+  chase eye reaches only 21.8 degrees above centre and the ramp topped out
+  before that. It now fades to the live fog colour, which makes the horizon
+  seamless by construction in all six biomes rather than in whichever one the
+  white was picked against. Sky saturation +42%.
+- **The road stopped out-valuing the runner.** `mats.paint` was
+  `MeshBasicMaterial` -- unlit, drawing at its authored value -- so the
+  brightest object in the gameplay band was road marking at L p95 0.96 against
+  a character ramped to 0.66. Paint moved to the lit material and every tone is
+  now a **multiple of the tarmac** rather than an absolute. Frame bright extreme
+  0.96 -> 0.66. Near-band edges fell on all eight shots and near-band
+  saturation rose on seven, which nobody aimed at: near-white paint carries no
+  chroma, valued paint does.
+- **The fleet, built on all sides.** An orbit sheet found what the chase view
+  never could: every vehicle's front was a featureless slab, no BLOCK had side
+  glass (a pillar 0.98-1.26 deep was parked over the flank, hiding windows that
+  were already built), and wheels were three darks stacked. `MeshToonMaterial`
+  has no specular term, so nothing in this game had ever carried a highlight;
+  there is now a cel specular opted into **per vertex**, because a glossy tyre
+  is worse than no highlight. Draws went **down** 297 -> 281 while the fleet
+  gained fittings, because contact shadows were costing two draw calls each --
+  three renders a transparent double-sided material in two passes unless told
+  otherwise, and for a flat quad the second pass cannot change the image.
+- **Hazard depth renegotiated**, 0.65 -> 1.95 half-depth. The ratio could not
+  be measured from the mocks and the agent said so rather than dressing up an
+  estimate: converting an on-screen length to a lateral one needs the focal
+  length, the only in-image bridge is a wheel's circularity, and in a 1206px
+  screenshot the tyre's foreshortened edge does not resolve. Derived instead
+  from the one exact ruler -- this world is ~1 unit to the metre vertically --
+  and checked against the mocks qualitatively. Gates 194.8 -> 190.4, finish
+  1:57:52 -> 1:57:54, mistake budget unchanged.
+- **One wind for the whole world.** Direction was not a choice: the sky shader
+  already committed the clouds to travelling toward world -x. Foliage sways at
+  0.45 Hz with amplitude cantilevered off each part's own height; bunting
+  flutters at 1.80 Hz with phase running along the span. **Rates were sized in
+  pixels, not world units** -- the first attempt measured 0.55% of pixels
+  changing over a hundred seconds, about one pixel, and was caught
+  reintroducing "perceptually still" inside a commit about adding motion.
+- **`tools/motion.js`**, the motion assertion. `shoot.js` fails the build on
+  four occlusion tests and on contrast, and **every one runs on a single
+  frame**, so the fairness harness was blind to motion by construction.
+
 ## Corrections this project has had to make to itself
 
 Kept because each cost real work, and the pattern is the lesson: **a number
@@ -590,7 +677,31 @@ nobody measured is worse than no number at all.**
    not a measurement, it is a preference with decimal places** — and the
    corollary is that the reviewer's own tools need a reviewer.
 
-9. **Two shipped constants were derived from numbers nobody had measured.**
+9. **I briefed a rear-only detail budget for the fleet.** The argument was
+   that the chase camera only sees the back of an obstacle. You pass obstacles:
+   a hazard in the next lane goes by 1.70 units from a camera 4.35 back at a
+   61-72 degree field of view, the camera banks through every lane change, and
+   background traffic shows every face within seconds. And the trade did not
+   exist -- a rear-only mesh and a fully-built mesh cost the SAME draw calls.
+   Now rule 1 of `CLAUDE.md`, and it applies to everything in the game.
+
+10. **My tree stand-off fix was not rotation-invariant.** I used the larger of
+   a merged box's x and z extents as the radius, on an object the claim site
+   yaws randomly -- up to 41% short. Now the circumscribed radius. Found by
+   `motion.js` when it was taught to see shader movers.
+
+11. **The ink shell never moved with what it wrapped.** `outlined()` builds the
+   silhouette from a separate material reading `position` directly, so every
+   spectator in the game has been inside a rigid ghost of its rest pose since
+   the crowd wave shipped -- and because the shell draws exactly at the
+   silhouette, it was *masking* the animation.
+
+12. **I told an agent the game had "a far carriageway in some biomes and a
+   light-rail track in others".** It has neither. The four edge kinds are
+   barrier, hedge, rail and wall; `rail` is the bridge's parapet and `wall` is
+   THE WALL's site hoarding. No traffic surface has ever existed here.
+
+13. **Two shipped constants were derived from numbers nobody had measured.**
    `camera.js` normalised its acceleration cue by 3.2, on a header claim that
    streak-driven acceleration reaches "~4 u/s²". Measured on the smoothed
    signal the file actually uses, 7,460 samples of real play: **+0.702**. So

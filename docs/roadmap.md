@@ -1816,3 +1816,116 @@ nobody measured is worse than no number at all.**
    a trail; 124 unbroken units of paint that hold theirs read as the brightest
    object in the scene.** Exemption from aerial perspective buys attention, and
    attention was the scarce thing.
+
+35. **The two Gold Run mechanics, tested: the ramp is worth building, the lane
+   closure is not — and the ramp's real cost is a hole it did not create.**
+
+   The owner sent five Talking Tom Gold Run frames and asked us to *test* two of
+   them: running up a ramp onto a vehicle, and closing the road to two lanes or
+   one and opening it back out. Both are prototyped behind scalars —
+   `MR.Course.RAMP`, `MR.Course.NARROW`, `?ramp=0..1`, `?narrow=0..1` — on the
+   `MR.Runner.POLISH` pattern, so one build generates both courses. At zero
+   neither draws a random number, so the seeded stream stays in phase and the
+   365-day course hash is **bit-identical** to the generator that shipped before
+   them. `tools/mechanics.js --identity` is that check and it is meant to be
+   brittle.
+
+   **LANE CLOSURE — DO NOT SHIP, and the reason is that it is already shipped.**
+
+   It needs no new mechanism at all: a closure IS a BLOCK in the closed lanes,
+   which the spacing rules, `solvable()` and the renderer already agree on. Zero
+   new geometry, zero new draw calls, zero degrades over 365 days, and the
+   perfect finish moves +3.4s against a 95s margin.
+
+   And measuring the baseline is what settled it. **The shipped game already
+   spends 18.48% of the race with two or fewer lanes open and 0.88% with exactly
+   one, including a single-lane corridor 145 units long**, produced by accident
+   when two BLOCK trains overlap. Nobody designed that and nothing measured it.
+   Turning `NARROW` on takes those to 27.56% and 4.27%.
+
+   What it costs is the thing the roadmap already refused once. Correction "the
+   lever left open" declined to force a CLEAR lane because *it buys visibility
+   by removing gameplay*. A closure is the mirror image and lands in the same
+   place from the other side: **it removes the lane decision and keeps the
+   risk.** Inside a deliberate corridor 40.0% of gates demand an action, against
+   41.4% on open road — so the player is asked the same question with one of the
+   two ways of answering it taken away. It is not a rest (they can lose) and not
+   a tax (they can win); it is the same difficulty with less agency, and the
+   game already reaches that state 18% of the time without being asked.
+
+   The honest counter-argument, recorded because it is not weak: `makeGate`
+   deliberately builds full-width gates at 62% of gates at the top of the
+   difficulty curve, and a one-lane corridor is a MILDER version of that — one
+   thing to read instead of three. So closure is aligned with the design, it is
+   simply not *new*. **Reopen only if the owner wants the archway as a set
+   piece.** As art it is worth having; as a mechanic it buys nothing that is not
+   already on the road.
+
+   **THE RAMP — SHIP IT, AFTER THE ART AND AFTER ONE STRUCTURAL FIX.**
+
+   The reference "ramp" is the bin lorry's own tailgate, one lane wide, so the
+   mechanic reduces to something the generator already builds: **a rideable
+   BLOCK train.** That reduction carries the whole fairness argument.
+   `solvable()` is not changed and does not need to be — a roof is only ever
+   marked on a train that was ALREADY legal with another lane surviving its
+   whole span, so it only ADDS edges to the BFS. Every path proved before is
+   still there.
+
+   Measured over 365 days: 3.70 ramps a day, a 35.5-unit / 1.25 s ride, 2.3
+   gates a day given up to the longer train, minimum landing margin 11.0 units
+   against the 6.0 two lane changes need, zero falls reaching a gate, zero gates
+   inside a vehicle, zero degrades. Cost in the currency that binds: **+1 draw
+   call and 44 triangles for the whole course.** Perfect finish +1.1s.
+
+   Four findings the code did not expect:
+
+   - **Without a reward the ramp is strictly dominated, and only measurement
+     said so.** Riding pays the same one clean gate as going round, and charges
+     a locked lane, a fall, and a BLOCK in the landing lane 11% of the time.
+     Aid on the roof is the fix and it is the reference's own answer (the gold
+     bars along the top). It also lands in exactly the right currency: a roof is
+     the hardest legal lane there is, so it is worthless to a perfect run and a
+     road back for a broken one — the same shape `AID_CEILING` already has.
+
+   - **A rideable train is the first object in this game that occupies a lane
+     BETWEEN gate lines in a way that matters, and nothing in `Course` models
+     it.** A bot planning off the gate table walks into a 43-unit lorry's flank
+     **27 times in four races**; taught to sample `deckAt` it still does it 8
+     times, against 0 on a course with no ramps. Every lane-reasoning thing in
+     this game — the proof, the spacing floor, the telegraph mats, the bot —
+     reasons at gate lines. **The ramp needs course-level lane occupancy before
+     it ships.** That is the structural fix.
+
+   - **The hole is older than the ramp.** `player.resolveGates` is the only
+     contact path and it fires at `gate.z`, while a train is ONE gate carrying
+     up to 17.9 units of vehicle. `tools/mechanics.js --passthrough` drives the
+     real `MR.Player` into the flank of 13 of 13 trains on a shipped course and
+     records **no contact on any of them**. You can run the whole length of a
+     bus. Not fixed here — making trains solid along their length is a
+     difficulty change to the whole game and is not this pass's to make.
+
+   - **The roof reads BETTER than the road.** The eye goes from 3.10 to 5.90,
+     and the project already measured what eye height buys the far road at +0.48
+     units. See `shots/mech/ramp-portrait.png`.
+
+   **Three instrument defects, all found and all flattering.** (1) The
+   pass-through probe took "the first non-BLOCK lane" as safe, walked into the
+   JUMP standing in it, and scored the resulting contact as the train being
+   guarded — 8 of 16 reported where the truth is 13 of 13. (2) The flank hit
+   re-fired every frame instead of once, so four incidents read as 27 contacts
+   and looked like a design finding; the bounce only worked while a lane change
+   was still in flight. (3) The landing-margin assertion substituted the FINISH
+   LINE for a missing next gate and failed at 3.0 units on 2026-12-02 — right
+   that something was wrong, wrong about what. The real fault was a ramp at
+   f=0.991 running its roof into the finish run-in, now refused at generation.
+   **A 90-day sweep found none of the third; only the full calendar did.**
+
+   **Needs art, specifically.** `world.js` casts BLOCK variants whose measured
+   roofs run 2.34–2.79 against a box top of 2.80, so four of ten would leave the
+   runner floating up to 0.46 above the roof: a rideable train has to cast a
+   full-height variant, or carry its own. The tailgate does not exist —
+   `src/render/ramp.js` is a deliberately plain closed solid standing in for it,
+   and `shots/mech/ramp-mouth.png` shows a tram drawn inside it. Roof pickups
+   are placed in course space and drawn by `world.js` at road level, i.e. inside
+   the lorry; they want lifting to `Course.DECK_Y`. Delete `ramp.js` when the
+   fleet grows a hopper.

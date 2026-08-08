@@ -405,6 +405,10 @@ const KIND = ['-', 'JUMP', 'DUCK', 'BLOCK'];
     const res = r.res || {};
     if (r.errors.length) failed = true;
     if (res.err) failed = true;
+    // A SKIPPED AUDIT IS A FAILED AUDIT. This checked res.err and not
+    // res.skipped, so an audit that refused to run passed the sweep -- the
+    // same class of hole as the NaN it was written to catch.
+    if (res.skipped) failed = true;
     if (res.low && res.low.length) failed = true;
     if (res.hide && res.hide.length) failed = true;
     if (res.blank && res.blank.length) failed = true;
@@ -442,12 +446,13 @@ const KIND = ['-', 'JUMP', 'DUCK', 'BLOCK'];
   console.log('');
   for (const r of report) {
     const res = r.res || {};
-    const bad = r.errors.length || res.err || (res.low || []).length || (res.hide || []).length
+    const bad = r.errors.length || res.err || res.skipped || (res.low || []).length || (res.hide || []).length
       || (res.blank || []).length || res.drift || res.envelope || r.contrastFail.length;
     if (!bad) continue;
     console.log(`\n=== ${r.date}  [${r.layer}]  ${r.plan ? r.plan.settings.join(' / ') : '?'} ===`);
     for (const e of r.errors) console.log('  ! ' + e);
     if (res.err) console.log('  ! ' + res.err);
+    if (res.skipped) console.log('  ! AUDIT DID NOT RUN: ' + res.skipped);
     if (res.drift) console.log('  ! DRIFT: ' + res.drift);
     for (const e of (res.envelope || [])) console.log('  ! ENVELOPE: ' + e);
     for (const e of (res.low || [])) {
@@ -532,7 +537,8 @@ const KIND = ['-', 'JUMP', 'DUCK', 'BLOCK'];
   if (walkCov.length) {
     const w0 = walks.find((r) => r.res && r.res.step).res;
     console.log(`walk coverage  step ${w0.step}u against a ${w0.view}u spawn distance, `
-      + `${w0.samples} samples over ${w0.total.toFixed(0)}u`);
+      + `${w0.samples} samples reaching ${w0.reach}u of ${w0.total.toFixed(0)}u, `
+      + `${w0.elements} crossings seen`);
   }
   const tightest = races.map((r) => r.res && r.res.tightest).filter(Boolean)
     .sort((a, b) => (a.vis - a.need) - (b.vis - b.need))[0];

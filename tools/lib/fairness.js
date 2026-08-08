@@ -770,7 +770,20 @@ function corridorWalk(step, wantCensus) {
   const census = {};
   let samples = 0, elements = 0;
 
-  for (let z = 0; z <= TOTAL + MR.K.LANE; z += S) {
+  // z <= TOTAL, and NOTHING ADDED TO IT.
+  //
+  // This read "z <= TOTAL + MR.K.LANE" for one commit. K.LANE does not exist
+  // -- LANE lives in world.js, not in constants.js -- so the bound was NaN,
+  // every comparison against it was false, the loop never ran once, and the
+  // walk reported zero failures on all 365 days of the year. It reported them
+  // in 890 seconds, which made it look like it had done the work.
+  //
+  // Exactly the failure docs/roadmap.md keeps recording, on the tool written to
+  // stop it: undefined arithmetic gives NaN, every NaN comparison is false, and
+  // a guard that evaluates to false is a guard that is off. The last sample
+  // lands at or before TOTAL and reaches VIEW beyond it, which is checked
+  // below rather than argued here.
+  for (let z = 0; z <= TOTAL; z += S) {
     // Lane 1 throughout. The racing line is the only thing world.update reads
     // the lane for, and the racing line is paint on the road -- it is exempt
     // from crossings() by userData.notScenery, so it cannot change the answer.
@@ -807,7 +820,29 @@ function corridorWalk(step, wantCensus) {
       });
     }
   }
-  return { low, samples, elements, census, step: S, overheadY: OY, total: TOTAL, view: VIEW };
+  // ---- THE WALK MUST PROVE IT WALKED ---------------------------------
+  //
+  // Three ways this loop can do nothing and still return a clean-looking
+  // empty list, and all three have to be fatal rather than green. A sweep that
+  // silently measures nothing is the most dangerous object in a toolchain:
+  // it is indistinguishable from a pass, and it is what this file did.
+  const reach = samples ? (samples - 1) * S + VIEW : 0;
+  if (!samples) {
+    return { skipped: 'the walk took no samples -- the loop bound was not a number' };
+  }
+  if (reach < TOTAL) {
+    return { skipped: 'the walk reached ' + reach.toFixed(0) + 'u of ' + TOTAL.toFixed(0)
+      + 'u -- the last ' + (TOTAL - reach).toFixed(0) + 'u of road was never built' };
+  }
+  if (!elements) {
+    // Every course carries 26 mile banners and a finish arch, and all of them
+    // reach over the road by construction. A walk that found no crossing at
+    // all did not fail to find a defect, it failed to look.
+    return { skipped: 'the walk found no corridor crossings at all over '
+      + samples + ' samples -- crossings() is returning nothing and the audit is blind' };
+  }
+  return { low, samples, elements, census, step: S, overheadY: OY, total: TOTAL,
+           view: VIEW, reach: +reach.toFixed(0) };
 }
 
 /**

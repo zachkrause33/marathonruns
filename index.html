@@ -3452,6 +3452,47 @@ MR.shading = (function () {
       0xffabcb,  // candy pink
       0xd8e6f5,  // pale steel
     ],
+    /**
+     * THE WORLD'S GOLD. It shares a hex with the HUD's `--accent` and it is
+     * NOT the same token, and that distinction has been read the wrong way
+     * round once already, so here is the measurement.
+     *
+     * `src/ui/style.css` says colour carries meaning and nothing else, and
+     * names `--accent` as the speed engine -- the fuel gauge, the rail fill,
+     * tomorrow's road. A review counted 0xffe45e appearing 43 times in
+     * world.js, on spectator shirts and streetlamps and bunting, plus the
+     * runner's TRIM through this entry, and concluded the accent was not a
+     * closed set and the claim was false.
+     *
+     * COUNTING SOURCE HEX IS THE WRONG INSTRUMENT, and the same lesson as the
+     * 110px runner: an authored colour is not a screen colour. Everything the
+     * world paints this with is LIT -- toon ramp, hemisphere fill, then fog --
+     * and comes out somewhere else. Counted on shipped frames at 390x844,
+     * canvas alone with the UI hidden, pixels equal to #ffe45e:
+     *
+     *   skip  40    0 at +/-8      317 at +/-26
+     *   skip 120    0 at +/-8      166 at +/-26
+     *   skip 185    0 at +/-8       23 at +/-26
+     *
+     * **Zero, at every gameplay skip.** The nearest yellow the world renders
+     * is (239,212,87), 16 per channel off. Masked at +/-30 the entire frame
+     * holds 78 near-accent pixels and every one of them is the RUNNER'S
+     * headband and shoe midsoles -- 0.02% of the frame against the HUD's own
+     * 1.3% to 5.1%. Not one spectator shirt, lamp, cable, sign or bunting
+     * flag in the game comes that close.
+     *
+     * So the claim is not falsified in the channel that decides it, and the
+     * fix the review asked for -- repaint 43 props -- would move numbers that
+     * are already zero.
+     *
+     * THE ONE REAL COLLISION IS AT THE TAPE, and it is recorded rather than
+     * removed: the finish confetti is unlit, so it paints (255,228,94)
+     * exactly, 1,327 pixels of it at the finish. That is the only place in
+     * the game where the world puts the HUD's accent on screen, it lasts as
+     * long as the celebration does, and gold confetti at a record IS "what
+     * you are buying". Anything unlit added here in future will land on the
+     * hex exactly, which is the thing to watch.
+     */
     accent: 0xffe45e,
 
     // Contact-shadow tint. Deliberately a deep blue-violet rather than black:

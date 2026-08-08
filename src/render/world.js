@@ -6448,17 +6448,73 @@ MR.World = (function () {
     const routeGeo = new THREE.BufferGeometry();
     const routePos = new Float32Array(ROUTE_SEGS * 6 * 3);
     const routeUvs = new Float32Array(ROUTE_SEGS * 6 * 2);
+    // RGB is always 1 and only the alpha moves -- the same four-component
+    // trick the ring trail uses below, and for the same reason: a fade the
+    // geometry owns can be shaped, and the fog's cannot.
+    const routeCol = new Float32Array(ROUTE_SEGS * 6 * 4);
+    for (let i = 0; i < ROUTE_SEGS * 6; i++) {
+      routeCol[i * 4] = 1; routeCol[i * 4 + 1] = 1; routeCol[i * 4 + 2] = 1;
+    }
     routeGeo.setAttribute('position', new THREE.BufferAttribute(routePos, 3));
     routeGeo.setAttribute('uv', new THREE.BufferAttribute(routeUvs, 2));
+    routeGeo.setAttribute('color', new THREE.BufferAttribute(routeCol, 4));
+    /**
+     * ============ THE LINE WAS GREEN, AND SO IS EVERY PICKUP ============
+     *
+     * This colour used to be 0x5ff0a6, and the comment that chose it read "the
+     * one hue no hazard owns; amber, cyan and red are all spoken for, and green
+     * reads go". Every clause of that is true and the conclusion is still
+     * wrong, because it was checked against the HAZARD palette and never
+     * against the PICKUP palette. Measured in HSV:
+     *
+     *   racing line   0x5ff0a6   hue 149.4   sat 0.60
+     *   aid pool      0x86eec0   hue 153.5   sat 0.44
+     *   bottle body   0xf6fffb   hue 153.3   sat 0.04
+     *   bottle label, cap, and the aid table's cloth
+     *                 0x2fd39a   hue 159.1   sat 0.78
+     *
+     *   JUMP 38.7    DUCK 192.3    BLOCK 345.3
+     *
+     * The three hazards are 33 degrees from their nearest neighbour at worst.
+     * The line and the whole aid family sat inside TEN DEGREES of each other.
+     * So this game had one colour meaning "follow this" and "collect this" at
+     * the same time, and the only thing separating them was how much of each
+     * you could see.
+     *
+     * That is not theoretical. A blind reader shown 1:1 crops through the chase
+     * camera, asked only about the PEOPLE in them, twice volunteered a green
+     * object they could not name -- and their guess at one of them was "it
+     * might be a BOTTLE". They were looking at this ribbon, cut down to a
+     * 7 x 13 fragment by the two figures standing in front of it, and they read
+     * the game's route hint as the game's aid pickup. tools/routeread.js is the
+     * instrument that came out of it.
+     *
+     * So the line moves and the pickups keep the green, which is the right way
+     * round twice over: the pickup is a world OBJECT the player is scored on
+     * touching, and the line is an affordance drawn on the road. Violet is 109
+     * degrees off the aid family, 75 off DUCK and 76 off BLOCK -- the largest
+     * clear band the palette has left -- it is what every map in the world
+     * draws a planned route in, and it is a hue this game had no other use for.
+     */
     const routeMesh = new THREE.Mesh(routeGeo, new THREE.MeshBasicMaterial({
       map: routeTexture(),
-      color: 0x5ff0a6,          // the one hue no hazard owns; amber, cyan and
-      transparent: true,        // red are all spoken for, and green reads "go"
+      color: 0xa87bff,          // hue 265, sat 0.52, val 1.00
+      transparent: true,
+      vertexColors: true,       // per-vertex ALPHA only; see updateRoute
       // Held under the rings: the paint is the connective tissue, the rings are
       // what the eye is meant to land on. At full strength the line reads as a
       // beam being fired down the road rather than as a marking on it.
       opacity: 0.62,
       depthWrite: false,
+      // EXEMPT FROM AERIAL PERSPECTIVE, for the reason the ring trail below
+      // already states in its own material and this one never inherited: its
+      // job is to be legible far up the road, which is exactly where the fog is
+      // taking half the contrast out of everything else. This was an oversight
+      // rather than a decision -- the ring was written second, given fog:false
+      // with a paragraph explaining why, and the paragraph applies verbatim to
+      // the ribbon it was drawn on top of. The far end is faded by the alpha
+      // ramp in updateRoute instead, which is a fade this file controls.
+      fog: false,
       side: THREE.DoubleSide,   // the ribbon is rebuilt every frame; not
     }));                        // depending on winding is one less way to fail
     // Below the hazard telegraph mats (5) and the finish checker (4): where the
@@ -6569,12 +6625,37 @@ MR.World = (function () {
       for (let i = 0; i < ROUTE_SEGS; i++) {
         const z1 = z + ROUTE_NEAR + (i + 1) * step;
         const x1 = routeX(z1);
-        // Taper away with distance, so the far end thins into the fog rather
-        // than stopping on a cut edge in the middle of the road.
-        const w0 = ROUTE_W * (1 - 0.5 * (i / ROUTE_SEGS));
-        const w1 = ROUTE_W * (1 - 0.5 * ((i + 1) / ROUTE_SEGS));
+        /**
+         * THE FAR END FADES IN ALPHA, NOT IN WIDTH, and the difference is the
+         * whole readability of this thing.
+         *
+         * What was here: a width taper to half of ROUTE_W over the run, so the
+         * far end "thins into the fog rather than stopping on a cut edge". The
+         * intent was right and the axis was wrong. Perspective ALREADY halves
+         * this ribbon's screen width every time the distance doubles, so a
+         * width taper is a second narrowing stacked on the first -- and screen
+         * width is the one dimension that decides whether a strip of paint
+         * reads as a strip of paint. tools/routeread.js scores exactly that,
+         * as ELONGATION: bbox height over bbox width, the property that
+         * separates a line from a blob. Taking width away to buy a fade spends
+         * the measured quantity to pay for an unmeasured one.
+         *
+         * Alpha buys the same soft end and costs nothing in width. So the
+         * ribbon is now a constant ROUTE_W the whole way and fades over its
+         * last quarter, and it is the fade rather than the fog that decides
+         * where it stops -- which is the point of the fog:false above.
+         */
+        const w0 = ROUTE_W, w1 = ROUTE_W;
+        const fade = function (t) {
+          const q = Math.max(0, (t - 0.74) / 0.26);
+          return Math.max(0, 1 - q * q);
+        };
+        const a0 = fade(i / ROUTE_SEGS), a1 = fade((i + 1) / ROUTE_SEGS);
         const v0 = z0 * ROUTE_UV, v1 = z1 * ROUTE_UV;
-        const p = i * 18, u = i * 12;
+        const p = i * 18, u = i * 12, cc = i * 24;
+        // Vertex order below is l0, r1, r0 -- then l0, l1, r1.
+        const av = [a0, a1, a0, a0, a1, a1];
+        for (let k = 0; k < 6; k++) routeCol[cc + k * 4 + 3] = av[k];
         // The ribbon is PAINT: it has to lie on the road over the whole 124
         // units it reaches, or it leaves the surface at the first crest and the
         // one forward read the player has starts floating in the air.
@@ -6596,6 +6677,7 @@ MR.World = (function () {
       }
       routeGeo.attributes.position.needsUpdate = true;
       routeGeo.attributes.uv.needsUpdate = true;
+      routeGeo.attributes.color.needsUpdate = true;
       // The pulse runs forward, away from the runner, so the line leads the eye
       // down the course instead of washing back over it.
       routeTexture().offset.y = -(now * 0.45) % 1;
@@ -9621,6 +9703,166 @@ MR.World = (function () {
         parts.push(gl(bx(0.66, 0.09, 0.28, 0, shY - 0.16, shZ - 0.02, LEMON, 0, 0, 0.62), GLOSS.matte));
         parts.push(gl(cbx(0.34, 0.26, 0.20, 0.26, shY - 0.52, shZ - 0.06, M_MID, 0.04), GLOSS.trim));
         parts.push(gl(bx(0.24, 0.05, 0.06, 0.26, shY - 0.44, shZ - 0.16, LEMON), GLOSS.matte));
+
+        /**
+         * ---- THE CUBE, AND WHY THE STRAP WAS NOT ENOUGH -------------------
+         *
+         * After the strap went on, the same blind reader still landed on the
+         * wrong service and said exactly why: "The chevrons and the lamps are
+         * what push me toward official escort rather than delivery rider,
+         * though a courier with a big top box would honestly look much the
+         * same from here; I CANNOT SEE ANY BADGE, LETTERING OR LIVERY TO
+         * SETTLE IT."
+         *
+         * Two things in that sentence. The first is that the chevrons cannot
+         * be answered by deleting them: they are the caution face, this
+         * variant is carried entirely by saturation, and CLAUDE.md rule 4 says
+         * a fairness gate is not tradeable against a cosmetic one. The second
+         * is that a top box is genuinely ambiguous -- an escort bike has one
+         * too -- so the object has to carry something an escort rider does not
+         * have at all.
+         *
+         * What an escort has is a clean silhouette and matched official kit.
+         * What a courier has is CARGO ON THEIR BACK: a square insulated cube
+         * rising above the shoulders on webbing straps, which is the one piece
+         * of equipment that means this job and no other job anywhere in the
+         * world. It is also the right shape for this camera -- the chase view
+         * is the rear elevation, and the cube's whole identity (square, taller
+         * than the shoulders, strapped rather than bolted) is in that
+         * elevation rather than in a badge that would be four pixels wide.
+         *
+         * COLOUR, AND THE FIRST CHOICE FAILED THE BUILD. Measured before this
+         * went on: BLOCK v9 sat at 1.216x luminance -- UNDER the 1.25x gate --
+         * and cleared on saturation alone, dS 0.302 against a 0.30 target and
+         * a 0.22 gate. The cube therefore could not be a pale neutral, which
+         * is what failed the build on the cyclists. It was drafted in 0x2b6bff,
+         * a delivery blue at sat 0.83 val 1.00, on the reasoning that a vivid
+         * colour cannot cost saturation.
+         *
+         * It cost all of it. v9 went from a gate margin of +0.373 to -0.108 --
+         * a build failure -- with dS collapsing 0.302 to 0.040. THE REASON IS
+         * A PROPERTY OF THE INSTRUMENT THAT NOTHING IN THIS FILE STATED:
+         * shotMean averages the RGB of every covered pixel FIRST and takes
+         * satOf of that one mean colour. So saturation here is the saturation
+         * of the object's average colour, not the average of its pixels'
+         * saturations, and two vivid parts on opposite sides of the hue wheel
+         * measure as grey. Blue at 222 against this bike's pink at 345 is 123
+         * degrees apart, and the mean of the two is a neutral.
+         *
+         * That is not a defect to route around -- it is the correct metric for
+         * what the gate is about, since a confetti object really does read as
+         * one grey mass once saturation has e-folded down the road. It is a
+         * constraint on where a large new part may sit: NEAR ITS OBJECT'S OWN
+         * HUE, or the object loses the axis it is carried by.
+         *
+         * So the cube is 0xff5a2b, hue 14 -- 29 degrees round the wheel from
+         * the bike's pink, far enough to read as the rider's own kit rather
+         * than matched livery, near enough that the mean stays saturated.
+         *
+         * Moving the hue was not what recovered the margin, and it is worth
+         * saying which lever did, because the obvious one is the weak one.
+         * Sliding the cube from hue 14 to hue 4 and then to hue 355 moved the
+         * gate margin by 0.005 and 0.032 -- nothing. What moved it was getting
+         * the NEAR-NEUTRALS off the new part: a cream reflective bar at sat
+         * 0.12 and lemon webbing at sat 0.73 became KIT_B at sat 0.98 (+0.041),
+         * the cube grew in WIDTH rather than height so its bright face is a
+         * larger share of the object without touching the head (+0.068), and
+         * the dark-of-hue trim went from 0x8c2a0c at val 0.55 to 0xd1400f at
+         * val 0.82 (+0.050). On a metric that reads the mean colour, area of
+         * saturated bright is the whole lever and hue placement is a rounding.
+         *
+         * Landed, measured the same way, against the same build without it:
+         *
+         *   gate margin      +0.373  ->  +0.382
+         *   target margin    +0.007  ->  +0.013
+         *   dS               0.302   ->  0.304
+         *
+         * Both margins end up wider than they started, which is the only
+         * acceptable outcome: rule 4 does not allow an identification win to
+         * be bought with a fairness number.
+         *
+         * Built on all six faces per rule 1, and it is seen on all six: the
+         * cube is the widest thing on the rider, so the pass shows its flank
+         * at arm's length and the lid reads from the crest of every hill.
+         */
+        /**
+         * SIZED BY THE FIRST DRAFT'S FAILURE, WHICH WAS NOT A COLOUR FAILURE.
+         *
+         * The cube went on at 0.80 x 0.76 x 0.46 centred 0.06 ABOVE the
+         * shoulder line and 0.40 behind it, which is roughly what a real one
+         * looks like on a real rider. Shot through framing.js at 8 units it
+         * deleted the rider. The cube is nearer the lens than the head by its
+         * whole standoff, so from dead astern -- the only view the chase camera
+         * has -- it covered the helmet, the visor, the shoulders and the hi-vis
+         * band together, and the object went back to being a stack of boxes.
+         *
+         * That would have traded away the one part this variant is known to be
+         * carried by. The reader's words about the previous build: "unlike
+         * every other figure here, the head is an actual helmet with a black
+         * visor band across it. THAT VISOR is what makes it read as a person on
+         * a bike rather than a stack of boxes."
+         *
+         * So the cube is sized against the HEAD rather than against the rider:
+         * its lid finishes at 2.11, which is the underside of the helmet, and
+         * everything above that line is left alone. It still rises 0.15 clear
+         * of the shoulders, which is what says worn-pack rather than pannier,
+         * and it is narrower than the top box it sits above so the two never
+         * read as one mass.
+         */
+        const CUBE = 0xff5a2b;
+        const CUBE_D = 0xd1400f;          // the dark of its own hue, never a neutral
+        /**
+         * AND THE SECOND DRAFT WAS A STACK. Sized to clear the helmet, the
+         * cube still filled the whole gap between the top box's lid at 1.665
+         * and the underside of the helmet at 2.11 -- the only band of this
+         * object the chase camera can see the rider in at all -- and the
+         * silhouette came back helmet, box, box: exactly the "stack of blocks"
+         * this whole pass exists to stop.
+         *
+         * The band is 0.45 units tall and nothing can widen it, because the
+         * top box is nearer the lens than the rider and owns everything below
+         * it. So the cube stops competing for the band and starts DECLARING
+         * ITSELF INSIDE IT: it is narrower than the top box by more than half,
+         * so the two can never merge into one mass, and its rear face -- the
+         * only face this camera gets -- carries two lemon webbing straps and a
+         * cream reflective bar. Bright webbing on a soft bag is not something
+         * a painted panel does, and at 8 units those three marks are 4 to 6 px
+         * each, which tools/people.js's own floor says is drawable.
+         */
+        const cz = shZ - 0.34;
+        const cy = shY - 0.12;
+        parts.push(gl(cbx(0.82, 0.54, 0.42, 0, cy, cz, CUBE, 0.05), GLOSS.paint));
+        // The lid, proud of the box on every edge, with a webbing grab handle
+        // standing off it. A soft-sided bag has a lid that overhangs; a bolted
+        // pannier does not, and that difference is the whole read at 12 units.
+        parts.push(gl(cbx(0.86, 0.08, 0.46, 0, cy + 0.31, cz, CUBE_D, 0.03), GLOSS.trim));
+        parts.push(gl(bx(0.20, 0.045, 0.05, 0, cy + 0.375, cz, 0x2a0c16), GLOSS.matte));
+        // Corner seams down all four vertical edges, so the cube is a made
+        // object rather than a painted block, from any angle it is passed at.
+        for (const sx of [-1, 1]) {
+          for (const sz of [-1, 1]) {
+            parts.push(gl(bx(0.055, 0.52, 0.055, sx * 0.39, cy, cz + sz * 0.19, CUBE_D), GLOSS.trim));
+          }
+        }
+        // Compression webbing down both faces and a reflective bar across
+        // them. Front as well as rear: the cube is seen head-on by oncoming
+        // traffic, from the flank on every pass, and from above on a crest,
+        // and rule 1 does not have a cheaper side.
+        for (const sz of [-1, 1]) {
+          for (const sx of [-1, 1]) {
+            parts.push(gl(bx(0.085, 0.50, 0.03, sx * 0.21, cy, cz + sz * 0.225, KIT_B), GLOSS.matte));
+          }
+          parts.push(gl(bx(0.62, 0.06, 0.025, 0, cy - 0.17, cz + sz * 0.232, KIT_B), GLOSS.chrome));
+        }
+        // WEBBING STRAPS over both shoulders, running from the top of the cube
+        // forward and down onto the chest. This is what makes it luggage WORN
+        // rather than a second box BOLTED on -- the reader had already read the
+        // top box as a top box, so a shape with no visible attachment would
+        // simply have become a third one.
+        for (const sx of [-1, 1]) {
+          parts.push(gl(bx(0.09, 0.40, 0.10, sx * 0.21, cy + 0.22, cz + 0.26, LEMON, 0.46), GLOSS.matte));
+          parts.push(gl(bx(0.09, 0.28, 0.10, sx * 0.21, cy - 0.08, cz + 0.42, LEMON, -0.30), GLOSS.matte));
+        }
         // The helmet: a full shell over the hair with a DARK VISOR BAND, which
         // is the one feature the blind reader named by itself.
         parts.push(gl(cbx(0.46, 0.40, 0.44, 0, hy + 0.10, shZ, PINK, 0.07), GLOSS.paint));
@@ -10171,6 +10413,74 @@ MR.World = (function () {
     const treePools = SETS.map(function (st) {
       const parts = [];
       vTree(parts, st.look.tree, 1);
+      /**
+       * ---- THE UNDERSTOREY, AND THE MEASUREMENT THAT CHOSE IT -----------
+       *
+       * A blind reader shown a whole gameplay frame, asked only about the
+       * people in it, volunteered this: "a group of tall brown vertical slabs
+       * I genuinely cannot identify; they might be people in brown, or wooden
+       * posts, or market stall frames." docs/roadmap.md entry 23 recorded it
+       * and named the cause: tree trunks "standing behind the aid station with
+       * their canopies occluded by THE STREET WALL".
+       *
+       * THAT DIAGNOSIS IS WRONG, and tools/canopy.js is what settles it. It
+       * keys each placed tree's trunk and crown to two pure colours, renders
+       * the real frame with every other object untouched so the occlusion is
+       * the shipped occlusion, and counts. Over 51 tree appearances at eleven
+       * skips inside the race: 49 read as trees, 0 as thin, 2 as POSTS --
+       * trunk over the floor with zero crown. Then each occluder class was
+       * hidden in turn. The class that recovers the crown is not the street
+       * wall at 12.20. It is "road tile / hedge": THE GAME'S OWN AVENUE, the
+       * four broadleaves baked into every hedge tile at x 7.95, standing in
+       * front of everything. The worst tree goes from 55 trunk / 0 crown to
+       * 127 / 1700 the moment the avenue is hidden.
+       *
+       * That changes the fix. The brief's two options were "make the canopy
+       * visible" and "do not place trees where the wall eats them", and both
+       * were written against the wrong occluder. Neither survives the real
+       * one: the avenue is a continuous line 12 units apart down both verges,
+       * so there is no lateral band behind it that is clear -- a tree pushed
+       * outboard far enough to miss it is off the side of a portrait frame
+       * long before it clears, and one pushed inboard is in the corridor.
+       *
+       * So the fix is neither. It is that A TRUNK SEEN WITHOUT ITS CROWN
+       * SHOULD NOT BE A BARE POLE. Real dense planting has an understorey, and
+       * the pixels that survive through a gap in the avenue are the ones
+       * nearest the ground. Putting a shrub mass at the foot of every scatter
+       * tree means the thing that shows through that gap is FOLIAGE -- which
+       * is identifiable, and true -- instead of a brown slab. It fixes the
+       * class rather than the two instances: any occluder, any distance, any
+       * leg, including the ones no skip in the sweep happened to land on.
+       *
+       * It costs no draw call: this is merged into the tree's own geometry and
+       * claimed with it. It costs triangles, which the budget has. And the
+       * corridor standoff below is computed from the merged vertices, so the
+       * skirt is inside the reach it measures automatically and cannot push
+       * anything over the carriageway.
+       */
+      {
+        const uc = canopy(st.look.tree.colors);
+        const ub = function (i) { return uc[Math.min(i, uc.length - 1)]; };
+        // Seven lobes on a ring plus one over the stem, radii and heights
+        // stepped so the mass has a top rather than being a flat disc, and
+        // sized off the trunk rather than off the crown -- an understorey that
+        // reaches as far as the crown is a bush with a tree in it.
+        const RING = [
+          [0.00, 0.00, 0.62, 0.50, 0],
+          [0.86, 0.30, 0.44, 0.32, 1],
+          [-0.62, 0.74, 0.40, 0.26, 2],
+          [-0.80, -0.46, 0.46, 0.30, 1],
+          [0.36, -0.82, 0.42, 0.24, 2],
+          [0.58, 0.72, 0.34, 0.44, 0],
+          [-0.30, -0.90, 0.32, 0.20, 2],
+          [0.94, -0.40, 0.30, 0.22, 1],
+        ];
+        for (const s of RING) {
+          parts.push(sph(s[2] * (st.look.tree.h || 1), 6,
+            s[0] * (st.look.tree.h || 1), s[3] * (st.look.tree.h || 1),
+            s[1] * (st.look.tree.h || 1), ub(s[4])));
+        }
+      }
       const geo = merge(parts);
       // THE CIRCUMSCRIBED RADIUS, NOT THE BOX HALF-EXTENT.
       //
@@ -10193,7 +10503,16 @@ MR.World = (function () {
         reach = Math.max(reach, Math.hypot(tp.getX(i), tp.getZ(i)));
       }
       treeReach.push(reach);
-      return Pool(function () { return S.outlined(geo, mats.leaf, S.INK.prop); }, group);
+      return Pool(function () {
+        const o = S.outlined(geo, mats.leaf, S.INK.prop);
+        // Stamped so tools/canopy.js can find the shaded mesh of every placed
+        // tree without guessing at a material or a name -- the same contract
+        // userData.people gives the crowd pools. It answers one question that
+        // no tree instrument could: how much of THIS tree's crown survives the
+        // street wall, the barrier and the top of the viewport.
+        o.userData.treeAudit = o.userData.fill;
+        return o;
+      }, group);
     });
     const grovePools = SETS.map(function (st) {
       return [5, 29, 97].map(function (seed) {
@@ -10578,14 +10897,21 @@ MR.World = (function () {
     // Aid stands IN the corridor on purpose -- it is collected by lane -- so it
     // is exempt from the crossing audit the same way a hazard is. See
     // api.crossings().
+    // aidAudit names the KIND on every pooled item, so a tool can pull the
+    // bottle and the fruit out of the live scene and photograph either one at
+    // a chosen distance without a claim site happening to put it there. The
+    // same contract userData.people gives the crowd and userData.treeAudit
+    // gives the trees.
     const waterPool = Pool(function () {
       const o = S.outlined(waterGeo, mats.propLit, S.INK.prop);
       o.userData.notScenery = true;
+      o.userData.aidAudit = 'bottle';
       return o;
     }, group);
     const bananaPool = Pool(function () {
       const o = S.outlined(bananaGeo, mats.propLit, S.INK.prop);
       o.userData.notScenery = true;
+      o.userData.aidAudit = 'banana';
       return o;
     }, group);
 

@@ -2686,3 +2686,50 @@ nobody measured is worse than no number at all.**
    **`src/render/ramp.js` IS DELETED.** `reference/solid-ramp-mouth.png` was a
    picture of the double draw -- a tram inside the orange placeholder, because
    world.js cast its own BLOCK over the same footprint.
+
+   **AND THE PICTURE WAS LYING ABOUT THE AID RULES.** Landed in the same pass
+   because it is a `world.js` line and it was live. The aid pass (entry 50)
+   replaced the lane-match test with a receipt -- a road item is bought at the
+   gate it stands behind -- and `world.js` still decided the POP from its own
+   copy of the old test, under a comment asserting the two "can never disagree".
+   They disagreed both ways inside a sub-two-unit window: pay at the gate and
+   swerve out, and you got the gain with no animation; take the free lane and
+   cut in behind it, and you got the animation with no gain. Three frames
+   either way, and the worst class of bug this game has -- the picture
+   contradicting the rules, in a game where one contact ends a record.
+
+   The second copy is DELETED rather than corrected. `aidTaken` reads
+   `item.gate` from the course and `lastGate`, `ramp` and `onDeck` from the
+   player, so there is no policy left in the renderer to drift out of step, and
+   if resolveAid's terms change this stops popping rather than popping wrongly
+   -- the failure direction a renderer should have. **A comment saying two
+   things cannot disagree is not a mechanism for stopping them disagreeing**;
+   the only reason the old one was ever true is that nobody had changed the rule
+   yet. `api.aidState()` exists now so the property can be asserted instead of
+   argued: every item that pays pops, and every item that pops has paid.
+
+   **`RAMP` IS ON, AND THE IDENTITY GUARD KEPT ITS GOLDEN NUMBERS.** Flipping
+   the default broke `tools/mechanics.js --identity` -- it hashed
+   `Course.generate` at whatever the DEFAULTS happened to be and called that
+   "flags off", which is true only for as long as both flags ship at zero. The
+   day RAMP ships at 1 that sentence goes quietly false and the check reports
+   "GATE generation has MOVED", **indistinguishable from the thing it exists to
+   catch**: a flag leaking into the seeded stream.
+
+   The fix is not a re-baseline. The invariant being protected was never "the
+   defaults are zero", it is "NARROW and RAMP draw no random numbers when OFF",
+   so the flags are now SET to zero for the hash rather than assumed to be, and
+   the shipped defaults are printed beside it. **Neither baseline moved** --
+   gates `d24862235d30ff68daf8e6142d7162f1f230b6e1` and aid
+   `e81209a3dd064fbebaf5c7253b4d3ac0c634d39b`, both bit-identical with RAMP
+   shipping at 1. That is the check doing exactly what it was built to do: the
+   number that must never move has not moved, and it now survives a release
+   that turns a mechanic on. A guard that has to be re-based every time a flag
+   ships is a guard nobody will believe the third time.
+
+   What shipping it costs, measured: **+1.1s on a perfect run against a 95s
+   margin**, 186.3 gates against 186.5, 90 courses still deterministic and
+   solvable, and the 32-day calendar clean at 12/12 settings and 72/72
+   setting-biome pairs. The bot takes 11 mounts, 11 clean dismounts and **0
+   falls off the side**, and 215 of 215 roof pickups are collectable on the
+   roof and 0 from the road.

@@ -2419,6 +2419,106 @@ nobody measured is worse than no number at all.**
    Correction 46 is the spec for the real tailgate. Flipping the default is one
    line in `course.js` the day that lands.
 
+49. **The face was 0 pixels in every frame the game has ever drawn, and the fix
+   was a camera, not a face.**
+
+   The character pass built a face -- two eyes with catchlights, brows heavy
+   enough to furrow, an open mouth, a jaw -- measured it at **0 pixels in 48 of
+   48 frames of play**, and shipped it anyway under rule 1. It also checked the
+   two places that might have saved it and found neither did: the start panel is
+   a DOM dialog over the same astern view, and the finish camera drifts 1.6
+   units off the centreline and stays **behind** him. Nothing on that face had
+   ever been on a player's screen.
+
+   The camera now leaves the chase after the tape and arcs round to
+   three-quarter front. Measured on the shipped build at 390x844
+   (`tools/celebrate.js`), brow line to chin:
+
+   | | face px | % of frame height | turn to lens |
+   |---|---|---|---|
+   | in play, every state | **0** | 0 | 180 deg |
+   | held shot, 390x844 | **96** | 11.4% | 21 deg |
+   | held shot, 320x568 | 65 | 11.4% | 21 deg |
+   | held shot, 620x1344 | 154 | 11.5% | 21 deg |
+   | held shot, 1280x800 | 91 | 11.4% | 21 deg |
+
+   ...for **3.4 seconds**, from the moment the arc brings him round at t=1.8 to
+   the results card at t=4.9. The fraction is the same to a tenth of a percent
+   at every size the game is played at, because the framing is set by a lens and
+   a radius rather than by pixels.
+
+   It costs **zero draw calls**, and in fact spends fewer: the frame draws 108
+   during the astern tape-break and **63** once the camera is round the front,
+   because a lens pointed at a runner three units away has most of the chute
+   behind it. No geometry was added at all.
+
+   Three things came out of it that outlive the pass.
+
+   **A CLAMPED dt IS THE WRONG CLOCK FOR A PARAMETRIC MOVE.** The first version
+   integrated the celebration clock from `camera.update`'s own `d`, which is
+   clamped to 1/25 so a long frame cannot detonate the springs. On the 7fps
+   SwiftShader harness that plays a 2.6-second move at **28% speed** -- while the
+   results card, on a real `setTimeout`, arrives a third of the way through it.
+   Springs want the clamp; paths want wall time. `main.js` now owns one
+   unclamped celebration clock and hands it to both `camera.js` and `runner.js`,
+   and exposes it as a **settable** `MR.game.celT` so a harness can rewind it.
+
+   **A LANDMARK FOUND BY SEARCH CAN FIND THE WRONG THING, AND IT WILL FLATTER
+   YOU.** `celebrate.js` locates the chin as the lowest vertex of the head mesh
+   on the front centre line. The head mesh is one weld that also contains the
+   bare neck cylinder, whose bottom rim is 0.22 below the jaw and passes any
+   `|x|` test -- so the first run reported a face of **152 px** where the answer
+   is 86. Adding `z > 0.16`, which is forward of every vertex the neck column
+   has, fixes it. Fifth instance in this project of an instrument flattering the
+   thing it measured, and the first where the defect was in a landmark rather
+   than in a formula.
+
+   **THE ENDING HAD NEVER BEEN ASKED WHERE IT WAS IN ABSOLUTE x.** The finish
+   drift is `+1.1` to `+1.6`, applied whatever lane the runner finished in. The
+   outer lane centre is `+2.50` and the track half-width is `3.75`, so a
+   right-lane finish already put the lens **over the shoulder, outside the
+   track**, and the new arc would have taken it 3.6 further -- through a
+   grandstand at `x = 4.30`. The ending is now mirrored to the side with room
+   (`Camera.celSideFor`, which `runner.js` reads too so the head cannot turn
+   away from the lens). Worst absolute case over all three finishing lanes:
+   **3.63**, inside the track and 0.67 clear of the stands.
+
+   **AND ONE THING LEFT OPEN, WHICH IS THE REAL COST OF THIS PASS.** The hand
+   was designed at **26 px** -- three fingers deleted for being 8 px across, a
+   knuckle row that drew a median of two pixels, a thumb kept only because it
+   breaks the outline -- and every one of those decisions was converted through
+   the right quantity at the framing that then existed. The finish comment in
+   `runner.js` even says so: *"The finish does NOT help: its camera pulls BACK
+   ... and the held shot has him at 52px."* That sentence is now false. At the
+   held shot the figure is **588 px** and the hand measures **65 px**, two and a
+   half times the largest it had ever been drawn. Nothing was rebuilt for it
+   here -- a raised fist is what a runner crossing a line actually makes, so
+   nothing is faked in the meantime -- but **four removals argued at 26 px want
+   re-judging at 65**, and `tools/resolve.js` is the instrument that already
+   knows how to do it. The same applies to the cap band, the wristband and the
+   shoe, all of which are now seen from the front for the first time.
+
+   **AND THE REACH IS 0.50, WHICH IS THE OTHER HALF OF THE SAME LESSON.** The
+   first draft asked for the two poses everybody pictures at a finish line --
+   fists high beside the head, and hands on the crown for the collapse -- and
+   neither is reachable: shoulder to hand is 0.50, the shoulder sits at
+   (0.222, 0.78) and the crown at 1.55, so hands on the head wants 0.687 of arm
+   and hands above it 0.746. An unreachable pose does not fail loudly. It puts
+   the arm somewhere else, and where it put them was **directly in front of his
+   mouth**, in the one shot the whole pass exists to produce. Both gestures are
+   now built from ABDUCTION, which is the axis with the room: 2.36 rad puts the
+   fist at (0.575, 1.134), 0.31 clear of the skull. Pose targets on a toy rig
+   want checking against the bone lengths before they are checked against a
+   reference photograph.
+
+   **TIMING IS A CAMERA QUESTION, NOT AN ANIMATION ONE.** The gesture was first
+   written at 0.15-1.45s because that is when a celebration feels like it should
+   happen. The camera is astern and high until 0.8s and does not reach the front
+   until about 2.0s, so the whole gesture played out at 82-182 px of figure,
+   seen from above, and was over before the lens arrived. It now runs 0.80-3.50s
+   against a camera that is in front of him from 2.0. Nothing about the pose
+   changed; only when it happens.
+
 50. **Aid was scenery that happened to pay. A bottle now stands behind an
    obstacle, and the obstacle is what you buy it with.**
 
@@ -2733,3 +2833,38 @@ nobody measured is worse than no number at all.**
    setting-biome pairs. The bot takes 11 mounts, 11 clean dismounts and **0
    falls off the side**, and 215 of 215 roof pickups are collectable on the
    roof and 0 from the road.
+
+52. **A cue that meant something under one design becomes a nag under the
+   next, and it will not announce itself.**
+
+   `main.js` fired `audio.aidMissed()` for every bottle that went past untaken,
+   under a comment calling it *"the one event in the run which is pure loss and
+   has nothing to mark it"*. That was true of the placement it was written
+   against. Correction 50 put the bottle **behind an obstacle in that obstacle's
+   own lane, at a gate that always leaves a free lane through** -- so declining
+   became the ordinary outcome and usually the correct one. Measured on the
+   shipped build, driving the real page through four whole races:
+
+   | | items | declined | old cue would fire | new cue fires |
+   |---|---|---|---|---|
+   | bot=1, 0 contacts | 15 | 15 | **15** | **0** |
+   | bot=0.9, 14 contacts | 15 | 15 | **15** | **1** |
+   | bot=0.8, 27 contacts | 15 | 15 | **15** | **1** |
+   | bot=0.7, 43 contacts | 15 | 15 | **15** | **1** |
+
+   Fifteen times a race, *including on a flawless run* -- a sound telling the
+   best possible player off fifteen times for correctly declining something
+   worth nothing to them.
+
+   **THE NEW RULE IS DERIVED, NOT CHOSEN.** `pace.onAid` grants
+   `min(streak + gain, gatesSeen, AID_CEILING) - streak`, so a bottle is worth
+   exactly zero to a runner whose streak already equals the gates they have
+   passed. `main.js` now computes that same expression for the declined item and
+   speaks only when it would have paid **at least half its face value** -- which
+   is to say, only on a run that has actually come apart, which is the run the
+   rescue half of the aid pool exists for. It cannot fire on a clean line at all.
+
+   **AND ONCE, NOT FIFTEEN TIMES.** The informative event is the first one;
+   the fifteenth is scolding. It is an edge, fired at the crossing and never
+   held, re-armed when the player takes an item -- the same shape `recordLost`
+   and the tier cues in the same file already use.

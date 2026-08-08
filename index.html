@@ -8748,8 +8748,17 @@ MR.World = (function () {
    * bridge meets the land and it is not movable by argument. And `ship`, which
    * this very file put out there as the answer to "distant vehicles", carries a
    * 34-unit hull whose box reaches back into the band from a centre at 24.
-   * Per-setting bridges then take what is left: stoneArch reaches |x| 67.5,
+   * Per-setting bridges then take what is left: stoneArch reaches |x| 37.8,
    * bascule 29, magere 18.4, against zakim's 13.
+   *
+   * **stoneArch was 67.5 here and the number was a defect, not a budget.** Its
+   * downstream viaduct had its arch centres stepping along the extrusion axis
+   * instead of the span axis, so four arches marched across the map from -64
+   * to -0.5 -- through the player's road -- while their own deck and piers
+   * stayed at -34. Fixed at the geometry (see stoneArch), and the reach it
+   * really wanted is 37.8. **The refusal above is unaffected**: it rests on
+   * `abut` at 24 and `ship`'s 34-unit hull from a centre at 24, both of which
+   * appear on every bridge day, and 37.8 still fills the same band.
    *
    * So the bridge flank is not empty either. It is full of the bridge.
    *
@@ -11195,11 +11204,46 @@ MR.World = (function () {
         parts.push(bx(1.0, 3.2, 1.0, sx * 5.4, 3.0, 0, GREEN));
         parts.push(bx(1.6, 1.4, 1.6, sx * 5.4, 5.2, 0, GREEN));
       }
-      // The next bridge downstream, which is where the arches can be seen.
+      /**
+       * The next bridge downstream, which is where the arches can be seen.
+       *
+       * ===== THE ARCHES WERE LAID OUT ON THE UNROTATED AXIS =====
+       *
+       * This ran four arches THROUGH THE PLAYER'S ROAD on every day it was
+       * drawn -- 51 triangles inside the corridor, `LOW` and two `HIDES`, a
+       * BLOCK at 45u and a JUMP at 84u both hidden behind masonry. 72 of 365
+       * days, PARIS and ROME, always on THE BRIDGE leg. It shipped because
+       * `shoot.js` photographed one date.
+       *
+       * `vArc` builds its ring in the X-Y PLANE: `rx` is the span along x,
+       * `ry` the rise in y, and `d` the extrusion along z at `cz`. So the
+       * arches of a viaduct step along X, the span axis. This stepped `cz` --
+       * the EXTRUSION axis -- which fans four arches sideways across 60 units
+       * of thickness instead of laying them end to end.
+       *
+       * `placeAt` then rotates the whole sub-assembly by PI/2, which maps
+       * local x to world z. Everything else in the assembly was authored for
+       * that and agreed with it: the deck is 72 along local x (72 of world z),
+       * and the piers are pushed to `parts` UNROTATED at world x -34, stepping
+       * along world z. Only the arch centres were on the wrong axis, so they
+       * marched out along world x from -64 to **-0.5** -- half a unit from the
+       * centre line -- while their own deck and piers stayed at x -34.
+       *
+       * THE PIERS ARE THE PROOF, and they are why this is a one-word fix
+       * rather than a redesign. With the centres on x the arches land at world
+       * z {30, 10, -10, -30}, each spanning +/-8.6, leaving a 2.8 gap between
+       * adjacent extrados -- and the piers are 3.0 deep at world z
+       * {20, 0, -20}, which is exactly those gaps. The geometry was designed
+       * for this layout and only the loop disagreed.
+       *
+       * Inner reach goes from x -0.5 to **-30.2**, outer from -67.5 to -37.8.
+       * See the traffic-refusal note near the top of this file, which quoted
+       * the 67.5.
+       */
       const sub = [];
       for (let i = 0; i < 4; i++) {
         const z = -30 + i * 20;
-        vArc(sub, { cx: 0, cy: -1.4, cz: z, rx: 8.6, ry: 5.2, n: 8, th: 1.1, d: 7.0, color: S, alt: S2 });
+        vArc(sub, { cx: z, cy: -1.4, cz: 0, rx: 8.6, ry: 5.2, n: 8, th: 1.1, d: 7.0, color: S, alt: S2 });
         if (i) parts.push(bx(7.2, 8.0, 3.0, -34, 1.0, z - 10, S2));
       }
       sub.push(bx(72, 1.4, 7.6, 0, 4.4, 0, S));

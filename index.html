@@ -4945,26 +4945,34 @@ MR.shading = (function () {
  *     "0.017 proud" of a mitt that had already curved away to 81% of its
  *     section under it, and drew a MEDIAN OF TWO PIXELS. Fourth instance in
  *     this file, after the coin of scalp, the cap peak and the wristband.
- *   THIS CHARACTER HAS NO BROW LINE, AND THAT IS A CONSEQUENCE RATHER THAN A
- *     STYLE. The cap band's underside sits at HY + 0.023 and the eye's sclera
- *     reaches HY + 0.035, so the band is 0.012 INTO the top of each eye and
- *     there is no forehead at all. The aperture is therefore the brow, which is
- *     why expression drives the eye's own scale.
+ *   THIS CHARACTER HAD NO BROW LINE, AND THE OWNER MOVED THE HAT TO GIVE HIM
+ *     ONE. The eye's sclera reaches HY + 0.035 and the cap band's underside sat
+ *     at HY + 0.023, so the brim was 0.012 INTO the top of each eye and there
+ *     was nowhere for a brow to be. The first pass wrote that up as "what
+ *     wearing a cap pulled down means" -- a limitation dressed as an intention
+ *     -- and the owner's own quality bar refutes it: both reference characters
+ *     have heavy dark brows on bare forehead BELOW the brim, in the same hat,
+ *     because their brim sits higher. The cost was named (the hat moves, and
+ *     the hat is his identity), the owner was asked, and they chose to pay it.
+ *     Band centre HY + 0.060 -> HY + 0.102, carrying the crown shell's lower
+ *     edge and the peak with it.
  *
- *     This was first written here as "what wearing a cap pulled down means",
- *     i.e. as a design choice being honoured. It is not. The owner's actual
- *     quality bar -- reference/ss-character-quality.png, which was a
- *     mislabelled screenshot of THIS GAME until another agent refiled it --
- *     gives both its characters heavy dark brows, drawn on bare forehead
- *     BELOW the cap brim. The reference wears the same hat and still has room,
- *     because its brim sits higher.
- *
- *     The number, so the next pass does not have to derive it: the band's
- *     underside has to rise 0.042 -- band centre HY + 0.060 to HY + 0.102 --
- *     to open a brow line with one ink width of clearance above the eye. That
- *     moves the hat, and the hat is the character's identity, so this pass did
- *     not do it. It is the owner's call and it is the one item on their list
- *     that could not be delivered without touching something they ruled out.
+ *     What 0.042 buys is 0.0302 of bare forehead, which is enough for a brow to
+ *     SIT and not enough for one to TRAVEL -- so the brow was moved in FRONT of
+ *     the whole eye stack in z instead, where it can cut across the top of the
+ *     iris. That one decision took the available tilt from about four degrees
+ *     to nine, and it is the difference between a brow that is present and a
+ *     brow that furrows.
+ *   TWO CORRECT ANIMATION TERMS CAN SUBTRACT. The brow and the eye's own
+ *     aperture were both defensible and, measured together, read LESS than the
+ *     brow alone -- 8585 changed pixels against 11668 -- because a symmetric
+ *     aperture pulls the eye's top edge down and away exactly as the brow comes
+ *     down to meet it. The fix was not smaller gains but a different EDGE: the
+ *     aperture now closes from the BOTTOM, the pivot translating by half the
+ *     height it loses so the top edge is pinned. The pair then measures 13713,
+ *     which is a swing of 6062 pixels for one line of geometry reasoning and no
+ *     change in gains. Whenever two terms drive the same feature, measure them
+ *     TOGETHER as well as apart; "both are good" is not a measurement.
  *   THE FACE IS NEVER SEEN IN PLAY. 0 pixels in 48 of 48 frames through the
  *     chase camera, the start panel is a DOM dialog over that same view, and
  *     the finish camera swings 1.6 units off the centreline but stays BEHIND
@@ -5492,6 +5500,85 @@ MR.Runner = (function () {
       );
     }
     return out;
+  }
+
+  // How long half a brow is, in the brow mesh's own space. Hoisted because the
+  // rest pose, the per-vertex tilt weight and the clearance arithmetic in the
+  // expression block all have to agree on it.
+  const BROW_HALF = 0.0465;
+
+  // The sclera's own half-height: CircleGeometry(0.062) squashed to 0.82. The
+  // expression block needs it to hold the eye's TOP edge still while the lower
+  // lid closes, and deriving it twice is how two numbers drift apart.
+  const EYE_SEMI = 0.062 * 0.82;
+
+  /**
+   * The brows, and they exist because the owner moved the hat for them.
+   *
+   * There was no forehead on this character until the brim went up 0.042 (see
+   * the band). What that bought is 0.0302 of bare skin between the eye's top at
+   * HY + 0.035 and the band's underside at HY + 0.065, and 0.0302 is enough for
+   * a brow to sit and not enough for one to travel.
+   *
+   * THE FIX IS THE Z, NOT THE Y. The brow is at z 0.2690, which is IN FRONT OF
+   * THE WHOLE EYE -- sclera 0.2610, iris 0.2630, pupil 0.2650, catchlight
+   * 0.2670. Behind them, a descending brow would have disappeared under the
+   * eye and the drive would have been capped at the 0.0034 of skin under the
+   * rest pose. In front of them it CUTS the top of the eye, which is what a
+   * furrow physically is, and the travel is bounded by the PUPIL instead: at
+   * full effort and a full wince the inner end reaches HY + 0.0243, still
+   * 0.0163 clear of the pupil's top at HY + 0.008. That is 9.2 degrees of tilt
+   * on top of a 4.0 degree rest angle, where staying behind the eye would have
+   * bought about four in total.
+   *
+   * THE CLEARANCE TARGET THIS PASS NAMED WAS NOT MET AND SHOULD NOT HAVE BEEN.
+   * The 0.042 lift was derived to give "one ink width of clearance over the
+   * eye", and what came out is 0.0034 at rest and a deliberate OVERLAP under
+   * load. Both halves of the target turned out to be wrong once the z was
+   * settled: an ink width is the clearance two SHADED surfaces need so their
+   * outline shells do not interpenetrate, and this brow is welded into a flat
+   * unlit mesh that has no ink shell at all -- there is nothing to grow teeth.
+   * And a brow that never touches the eye cannot furrow. The number that
+   * replaced it is the pupil clearance above.
+   *
+   * That is also why the brow is the primary expression channel and the eye's
+   * own aperture is now secondary -- see the expression block, where both were
+   * measured before either was believed.
+   *
+   * P.runnerHair, which is his own hair, so no colour enters the character
+   * here. Heavy: 0.093 long and 0.015 deep, against an eye 0.124 wide. The
+   * reference's brows are the heaviest mark on either of its faces and thin
+   * ones would be the version of this that is technically present.
+   */
+  function browPieces() {
+    const out = [];
+    for (const s of [-1, 1]) {
+      out.push({
+        g: new THREE.CircleGeometry(0.030, R_TORSO), c: P.runnerHair,
+        x: s * 0.100, y: 0, z: 0.2690, sx: 1.55, sy: 0.25, rz: s * 0.07,
+      });
+    }
+    return out;
+  }
+
+  /**
+   * Per-vertex weights for the brow's tilt: -1 at the inner end of each brow,
+   * +1 at the outer end.
+   *
+   * The tilt has to MIRROR -- both inner ends drop together -- and a single
+   * mesh cannot be rotated two ways at once. Two meshes would have done it and
+   * cost a second draw call; rewriting the position buffer costs none, and it
+   * is the same technique the two hems use, for the same reason.
+   */
+  function browRig(mesh) {
+    const pos = mesh.geometry.attributes.position;
+    const rest = new Float32Array(pos.array);
+    const u = new Float32Array(pos.count);
+    for (let i = 0; i < pos.count; i++) {
+      const t = (Math.abs(rest[i * 3]) - 0.100) / BROW_HALF;
+      u[i] = t < -1 ? -1 : t > 1 ? 1 : t;
+    }
+    return { pos, rest, u };
   }
 
   /**
@@ -6582,7 +6669,15 @@ MR.Runner = (function () {
       // obvious once the slide started presenting the crown to the camera --
       // the tucked head rendered as a dark cap with a tan rivet in it. Still
       // inside the headband's 0.294, which is the other clearance that matters.
-      { g: new THREE.SphereGeometry(0.288, R_HEAD, 12, 0, Math.PI * 2, 0, Math.PI * 0.42), c: CAP, y: HY },
+      //
+      // phiLength 0.42pi -> 0.3812pi, and it is not a taste change: it is the
+      // brim lift below, propagated. The crown is the cap's FABRIC and it has
+      // to die inside the band or its raw cut edge shows. At 0.42pi its lower
+      // edge sat at HY + 0.072, which was comfortably inside a band spanning
+      // HY + 0.023 to HY + 0.097 and is 0.007 under the underside of the band
+      // once that moves to HY + 0.065. 0.3812pi puts the edge at HY + 0.105,
+      // which is 0.040 inside the new band and 0.034 under its top.
+      { g: new THREE.SphereGeometry(0.288, R_HEAD, 12, 0, Math.PI * 2, 0, Math.PI * 0.3812), c: CAP, y: HY },
       // ...and a rear-only shell that carries the hair down to the nape but
       // leaves the face clear. Restricting phi to the back 210 degrees is
       // what lets one primitive do a haircut. It now reads as the hair showing
@@ -6615,7 +6710,39 @@ MR.Runner = (function () {
       // (dark / bright / dark / lit neck) untouched by all of this.
       // Radius has to clear the shells everywhere: two this close together
       // interpenetrate on their facets and the crown grew a row of teeth.
-      { g: new THREE.CylinderGeometry(0.294, 0.294, 0.074, R_HEAD), c: TRIM, y: HY + 0.060 },
+      //
+      // ---- THE BRIM LIFT, AND IT IS THE ONE SILHOUETTE NUMBER THAT MOVED ---
+      //
+      // y HY + 0.060 -> HY + 0.102. The band's underside goes with it, from
+      // HY + 0.023 to HY + 0.065, and that 0.042 is the whole of this change.
+      //
+      // WHY. This character had no forehead. The eye's sclera reaches
+      // HY + 0.035 and the band's underside sat at HY + 0.023, so the brim was
+      // 0.012 INTO the top of each eye and there was nowhere for a brow to be.
+      // The pass that found that wrote it up as "what wearing a cap pulled
+      // down means" -- a limitation dressed as an intention -- and the owner's
+      // own quality bar, reference/ss-character-quality.png, refutes it: both
+      // its characters have heavy dark brows on bare forehead BELOW the brim,
+      // wearing the same hat, because their brim sits higher.
+      //
+      // The cost was named before it was paid: the hat moves, and the hat is
+      // this character's identity. The owner was asked and chose to pay it.
+      // The authorisation is for the BRIM SPECIFICALLY; every other number on
+      // this figure is pinned exactly where it was, which is why the crown
+      // shell above and the peak below both move by the same 0.042 rather than
+      // being re-tuned, and why nothing else in this file moved at all.
+      //
+      // WHAT THE 0.042 BUYS, exactly: 0.0302 of bare forehead between the eye's
+      // top and the band's underside. That is enough for a brow to EXIST and
+      // very nearly not enough for one to MOVE -- see the brow's own note and
+      // the expression block for what that forced.
+      //
+      // Nothing about the band's RADIUS changed, so the head's 0.294 contribu-
+      // tion to half-width is untouched to the float; and the band's new top at
+      // HY + 0.139 is still 0.143 under the cap's pole, so the crown of the
+      // figure is untouched too. tools/envelope.js confirms both across all
+      // eight states.
+      { g: new THREE.CylinderGeometry(0.294, 0.294, 0.074, R_HEAD), c: TRIM, y: HY + 0.102 },
       // The peak, and it is at the FRONT, where a running cap's peak is.
       //
       // It used to be worn backwards, on the argument that a forward peak
@@ -6682,7 +6809,13 @@ MR.Runner = (function () {
       // unchanged reason: the peak is a plane seen against the dome behind it
       // and a plane the same colour as its background is a shape with no edge.
       { g: new THREE.CylinderGeometry(0.250, 0.250, 0.022, R_TORSO, 1, false, -Math.PI * 0.5, Math.PI), c: JACKET,
-        y: HY + 0.062, z: 0.080, rx: 0.06, sz: 1.40 },
+        //
+        // y + 0.042, carried by the brim lift. Every clearance in the note
+        // above is stated RELATIVE TO THE BAND -- the plate rides at the
+        // band's own mid-height with 0.024 of clear air over it and 0.028
+        // under it -- so moving the two together preserves all of them
+        // exactly, and re-deriving them would have been the mistake.
+        y: HY + 0.104, z: 0.080, rx: 0.06, sz: 1.40 },
       { g: new THREE.SphereGeometry(0.080, R_NUB, 12), c: P.runnerSkin, x: -0.254, y: HY - 0.020, z: -0.013, sx: 0.48, sz: 0.82 },
       { g: new THREE.SphereGeometry(0.080, R_NUB, 12), c: P.runnerSkin, x: 0.254, y: HY - 0.020, z: -0.013, sx: 0.48, sz: 0.82 },
       // THERE IS NO CONCHA IN THE EAR, and it is not for want of trying.
@@ -6789,7 +6922,8 @@ MR.Runner = (function () {
     // expression possible later: a mesh welded in head space scales about the
     // HEAD's origin, so narrowing the eyes by scaling y would slide them down
     // the face at the same time. The pivot puts the origin between them.
-    const eyePivot = pivot(head, 0, HY - 0.016, 0);
+    const EYE_PIVOT_Y = HY - 0.016;
+    const eyePivot = pivot(head, 0, EYE_PIVOT_Y, 0);
     const eyes = new THREE.Mesh(weld(eyePieces()), S.flat(0xffffff, { vertexColors: true }));
     eyePivot.add(eyes);
 
@@ -6797,6 +6931,15 @@ MR.Runner = (function () {
     // reason is expression: the eyes narrow and the mouth opens, and those are
     // two different scales on two different pivots. One draw, and it is the
     // only one the face pass spends.
+    // The brows get their own pivot for the same reason the eyes did: they must
+    // NOT ride the eye's aperture scale. Narrowing an eye does not squash the
+    // brow above it, and welding the two into one mesh to save a draw call
+    // would have tied them together permanently.
+    const browPivot = pivot(head, 0, HY + 0.0490, 0);
+    const brows = new THREE.Mesh(weld(browPieces()), S.flat(0xffffff, { vertexColors: true }));
+    browPivot.add(brows);
+    const browGeo = browRig(brows);
+
     // The pivot is at the UPPER LIP, not at the middle of the mouth, so the
     // aperture opens downward the way a jaw does. A mouth scaled about its own
     // centre grows upward into the nose as well, which reads as a shout rather
@@ -7685,7 +7828,7 @@ MR.Runner = (function () {
       // are the newest thing on this rig and therefore the ones most in need
       // of it.
       parts: { body, hips, spine, chest, neck, head, hood: hoodPivot,
-        eyes: eyePivot, mouth: mouthPivot, legs, arms },
+        eyes: eyePivot, brows: browPivot, mouth: mouthPivot, legs, arms },
       phase: 0,
     };
 
@@ -8795,9 +8938,59 @@ MR.Runner = (function () {
       const effort = Math.max(0, Math.min(1,
         0.30 + 0.52 * sp01 + 0.85 * Math.max(0, grade) + 0.55 * surge));
       const wince = Math.max(stumble, trip, knock);
+      // ---- THE BROW IS THE PRIMARY CHANNEL, AND THE APERTURE WAS FIGHTING IT
+      //
+      // This block used to drive the eye's aperture alone, because there were
+      // no brows and this file said there could not be. There are now, so the
+      // honest question is not "add the brow too" but which of the two carries
+      // the expression -- and that was settled by counting pixels.
+      //
+      // Both channels were isolated in a patched build and the head rendered at
+      // effort 0 against effort 1 through the face lens, counting the pixels
+      // that CHANGE:
+      //
+      //     brow alone   11668        eye alone    3900        both    8585
+      //
+      // The brow wins 3.0x, and the reason is structural rather than a matter
+      // of gains: an aperture can only shrink a shape the eye is already
+      // looking at, while a brow ARRIVES over the top of the iris and changes
+      // the eye's outline. A shape that moves into a region beats a shape that
+      // shrinks inside one.
+      //
+      // BUT LOOK AT THE THIRD NUMBER. Both together read LESS than the brow on
+      // its own -- 8585 against 11668 -- so the second channel was not seconding
+      // the first, it was DELETING 3083 pixels of it. A symmetric aperture
+      // pulls the eye's top edge down and away exactly as the brow comes down
+      // to meet it, so the brow lands on skin instead of on eye and neither
+      // mark gets its contrast. Two correct animation terms, each defensible on
+      // its own, subtracting.
+      //
+      // The fix is not smaller gains, it is a different EDGE. The aperture now
+      // closes from the BOTTOM: the pivot is translated by half the height it
+      // loses, which pins the eye's top edge exactly where it was and raises
+      // the lower lid instead. The brow then owns the top of the eye and the
+      // lid owns the bottom, they never compete for the same pixels, and the
+      // pair measures as the sum of its parts. It is also the truer squint --
+      // what closes on a face under effort is the lower lid, and the upper one
+      // is being pushed by the brow above it.
+      const browLift = -POLISH * (0.0035 * effort + 0.0030 * wince);
+      const browTilt = POLISH * (0.0045 * effort + 0.0030 * wince);
+      {
+        const ba = browGeo.pos.array, br = browGeo.rest, bu = browGeo.u;
+        for (let i = 0; i < browGeo.pos.count; i++) {
+          ba[i * 3 + 1] = br[i * 3 + 1] + browLift + browTilt * bu[i];
+        }
+        browGeo.pos.needsUpdate = true;
+      }
       // Narrowing only, never widening: a toy character with eyes OPENED past
       // their drawn size reads as startled, and he is running, not surprised.
-      eyePivot.scale.y = 1 - POLISH * (0.20 * effort + 0.42 * wince);
+      const eyeShut = POLISH * (0.16 * effort + 0.34 * wince);
+      eyePivot.scale.y = 1 - eyeShut;
+      // EYE_SEMI is the sclera's own half-height. Translating by half of what
+      // the scale takes away holds the TOP edge on the float and spends the
+      // whole closure on the bottom one. At POLISH 0 eyeShut is identically
+      // zero, so the scale is 1 and the offset is 0 -- the A/B is untouched.
+      eyePivot.position.y = EYE_PIVOT_Y + EYE_SEMI * eyeShut;
       eyePivot.scale.x = 1 - POLISH * 0.06 * wince;
       // The mouth opens downward about the upper lip. 0.62 at rest to 1.55 at
       // full effort, which on an aperture 0.046 tall is 0.029 to 0.071 -- four

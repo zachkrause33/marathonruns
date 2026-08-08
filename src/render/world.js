@@ -6191,6 +6191,13 @@ MR.World = (function () {
         for (const d of defs) {
           const vg = new THREE.Group();
           const body = S.outlined(d.geo, mats.propLit, S.INK.hazard);
+          // Four of the twenty-four hazards in this game are PEOPLE -- the
+          // marshals, the two cyclists, the trike's rider and the moped's --
+          // and they are the only human figures the player is ever close to.
+          // The tag puts them in tools/people.js beside the crowd, which is
+          // the only way to compare a face at 8 units with a face at 90.
+          // A variant with no skin in it contributes no heads and is silent.
+          body.userData.people = 'hazard';
           vg.add(body);
           const f = new THREE.Mesh(hplane(d.face[0], d.face[1]), faceMat[tint]);
           f.position.set(0, d.face[2], d.face[3]);
@@ -13091,7 +13098,10 @@ MR.World = (function () {
      */
     function assembleVariant(tint, d) {
       const g = new THREE.Group();
-      g.add(S.outlined(d.geo, mats.propLit, S.INK.hazard));
+      const body = S.outlined(d.geo, mats.propLit, S.INK.hazard);
+      // Same tag the spawn site puts on, for the same reason -- see there.
+      body.userData.people = 'hazard';
+      g.add(body);
       const f = new THREE.Mesh(hplane(d.face[0], d.face[1]), faceMat[tint]);
       f.position.set(0, d.face[2], d.face[3]);
       f.rotation.y = Math.PI;

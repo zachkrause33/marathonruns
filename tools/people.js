@@ -79,6 +79,8 @@ const SKIPS = String(arg('skip', '150,900,1560,2050')).split(',');
 const FILE = path.resolve(String(arg('file', path.join(ROOT, 'index.html'))));
 const FEATURE = parseFloat(arg('feature', 0.055));
 const SAMPLES = parseInt(arg('samples', 6), 10);
+const HAZ = arg('hazard', null);
+const HAZ_D = String(arg('hd', '8,12,20,35')).split(',').map(Number);
 
 // The four skin hexes every figure in the game is built from, plus the two
 // the hazard fleet's riders use. Stated here rather than sniffed, so a skin
@@ -107,16 +109,10 @@ function pageRun(o) {
   const pops = {};
   const heads = [];          // { pop, world corners, depth }
   const marks = [];          // { mesh, indices } to key-colour for the render pass
+  const rejects = {};        // shape histogram, so a filter that eats everything is visible
   const _c = new THREE.Color();
 
-  g.scene.traverse(function (n) {
-    if (!n.isMesh || !n.visible) return;
-    let p = n;
-    let tag = null;
-    while (p) { if (p.userData && p.userData.people) { tag = p.userData.people; break; } p = p.parent; }
-    if (!tag) return;
-    // The ink shell is the same geometry drawn twice; measure the fill only.
-    if (p.userData.line === n) return;
+  function scan(n, tag) {
     const geo = n.geometry;
     const col = geo.attributes.color;
     const pos = geo.attributes.position;
@@ -124,12 +120,18 @@ function pageRun(o) {
     n.updateMatrixWorld(true);
     const mw = n.matrixWorld;
 
-    // Which vertices are skin, in the author's own hex.
+    // Which vertices are skin, in the author's own hex -- and which authored
+    // PART each one belongs to. merge() lays parts down contiguously with one
+    // flat colour each, so the run index increments at every colour change.
     const cache = {};
     const isSkin = new Uint8Array(pos.count);
+    const run = new Int32Array(pos.count);
+    let lastKey = null, runId = -1;
     for (let i = 0; i < pos.count; i++) {
       const key = Math.round(col.getX(i) * 4096) + '_' + Math.round(col.getY(i) * 4096)
         + '_' + Math.round(col.getZ(i) * 4096);
+      if (key !== lastKey) { runId++; lastKey = key; }
+      run[i] = runId;
       let v = cache[key];
       if (v === undefined) {
         _c.setRGB(col.getX(i), col.getY(i), col.getZ(i));
@@ -139,37 +141,65 @@ function pageRun(o) {
       isSkin[i] = v;
     }
 
-    // Cluster the skin vertices in OBJECT space on a 0.34 grid. A head is one
-    // box 0.24-0.60 across; a hand is a box a third of that. Grid cells are
-    // unioned to their already-seen neighbours so a box straddling a boundary
-    // is one cluster and not eight.
-    const CELL = 0.34;
-    const cellOf = {};
+    /**
+     * ============ RECOVERING THE AUTHORED PART, NOT A BLOB ============
+     *
+     * The first version of this clustered every skin vertex on a 0.34 grid and
+     * called each cluster a head. IT WAS NOT MEASURING HEADS. A spectator's
+     * RAISED ARMS are skin-coloured, and so is the placard pole (0x8a5a3c is
+     * in both the skin list and the pole colour), and the gap between a 0.28
+     * head and an arm 0.30 out is 0.10 -- well inside a 0.34 cell. So head,
+     * both arms and a 0.9-tall pole fused into one cluster and the tool
+     * reported a 41.9 px "head" where the projection of the actual head box is
+     * about 7. Every conclusion drawn from that would have been wrong in the
+     * flattering direction, which is the pattern docs/roadmap.md is made of.
+     *
+     * The honest unit is the AUTHORED PART. merge() lays parts down
+     * contiguously and writes one flat colour across each, so a run of
+     * same-coloured consecutive vertices is a part -- or several parts that
+     * happen to share a colour, which are then split by spatial connectivity
+     * at a tight 0.10 threshold because two arms 0.48 apart are not one box.
+     *
+     * A head is then identified by SHAPE and not by position: a skin part
+     * 0.20-0.70 across, 0.20-0.60 tall, with an aspect ratio between 0.6 and
+     * 1.8. An arm is 0.12 x 0.56 (aspect 0.21) and a hand is 0.17 x 0.14
+     * (too small); neither can pass, and neither is guessed at by height.
+     *
+     * ---- AND THE SPLIT IS TOPOLOGICAL, NOT A GRID -------------------------
+     *
+     * The second version of this clustered a run on a 0.10 grid and got 1444
+     * "heads" of size 0.00 x 0.00. A BOX HAS NO INTERIOR VERTICES: its corners
+     * are 0.28 apart on a 0.28 head, which is three cells at 0.10, and a union
+     * that only reaches its immediate neighbours can never bridge that. Widen
+     * the cell to bridge it and it fuses the head with the arm beside it --
+     * the failure the previous version had. There is no cell size that works,
+     * because a grid is the wrong primitive for the question.
+     *
+     * The right one is the mesh's own topology. The geometry is non-indexed
+     * triangles, so two vertices belong to the same part if they are in the
+     * same triangle, or if they sit at the same position (a shared corner,
+     * duplicated once per face). Union on both and each authored box comes
+     * back whole, at any size, with no threshold to tune.
+     */
     const parent = [];
     function find(a) { while (parent[a] !== a) { parent[a] = parent[parent[a]]; a = parent[a]; } return a; }
     function uni(a, b) { a = find(a); b = find(b); if (a !== b) parent[b] = a; }
-    const vcell = new Int32Array(pos.count).fill(-1);
+    for (let i = 0; i < pos.count; i++) parent.push(i);
+    const atPos = {};
     for (let i = 0; i < pos.count; i++) {
       if (!isSkin[i]) continue;
-      const cx = Math.floor(pos.getX(i) / CELL), cy = Math.floor(pos.getY(i) / CELL),
-        cz = Math.floor(pos.getZ(i) / CELL);
-      const k = cx + ',' + cy + ',' + cz;
-      let id = cellOf[k];
-      if (id === undefined) { id = parent.length; parent.push(id); cellOf[k] = id; }
-      vcell[i] = id;
-      for (let dx = -1; dx <= 1; dx++) {
-        for (let dy = -1; dy <= 1; dy++) {
-          for (let dz = -1; dz <= 1; dz++) {
-            const nk = (cx + dx) + ',' + (cy + dy) + ',' + (cz + dz);
-            if (cellOf[nk] !== undefined) uni(id, cellOf[nk]);
-          }
-        }
-      }
+      // Same triangle.
+      const t0 = i - (i % 3);
+      if (isSkin[t0] && isSkin[t0 + 1] && isSkin[t0 + 2]) { uni(t0, t0 + 1); uni(t0, t0 + 2); }
+      // Same position, same authored part.
+      const k = run[i] + ':' + Math.round(pos.getX(i) * 10000) + ','
+        + Math.round(pos.getY(i) * 10000) + ',' + Math.round(pos.getZ(i) * 10000);
+      if (atPos[k] === undefined) atPos[k] = i; else uni(atPos[k], i);
     }
     const groups = {};
     for (let i = 0; i < pos.count; i++) {
-      if (vcell[i] < 0) continue;
-      const rootId = find(vcell[i]);
+      if (!isSkin[i]) continue;
+      const rootId = find(i);
       (groups[rootId] || (groups[rootId] = [])).push(i);
     }
 
@@ -184,8 +214,15 @@ function pageRun(o) {
         if (z < z0) z0 = z; if (z > z1) z1 = z;
       }
       const wW = x1 - x0, wH = y1 - y0;
-      // A head, not a hand and not a bare forearm.
-      if (wW < 0.20 || wH < 0.20) continue;
+      // A head, by SHAPE: roughly as wide as it is tall, and neither a hand
+      // (0.17 x 0.14, too small) nor a raised arm (0.12 x 0.56, aspect 0.21)
+      // nor a placard pole (0.10 x 0.90, and 0x8a5a3c is in the skin list).
+      const okShape = !(wW < 0.20 || wH < 0.20 || wW > 0.70 || wH > 0.60)
+        && !(wW / wH < 0.6 || wW / wH > 1.8);
+      rejects[tag] = rejects[tag] || {};
+      const rk = wW.toFixed(2) + 'x' + wH.toFixed(2) + (okShape ? ' HEAD' : '');
+      rejects[tag][rk] = (rejects[tag][rk] || 0) + 1;
+      if (!okShape) continue;
       /**
        * Project all eight corners of the object-space box through the world
        * transform and the live lens.
@@ -228,7 +265,59 @@ function pageRun(o) {
     pops[tag] = pops[tag] || { n: 0, meshes: 0 };
     pops[tag].meshes++;
     if (keyIdx.length) marks.push({ mesh: n, idx: keyIdx, tag: tag });
+  }
+
+  g.scene.traverse(function (n) {
+    if (!n.isMesh || !n.visible) return;
+    let p = n;
+    let tag = null;
+    while (p) { if (p.userData && p.userData.people) { tag = p.userData.people; break; } p = p.parent; }
+    if (!tag) return;
+    // The ink shell is the same geometry drawn twice; measure the fill only.
+    if (p.userData.line === n) return;
+    scan(n, tag);
   });
+
+  /**
+   * ---- HAZARDS, AT THE DISTANCES THE GAME SHOWS THEM AT -------------------
+   *
+   * A hazard cannot be measured where the autopilot leaves it: the autopilot
+   * DODGES, so a free run samples the fleet at 31 to 217 units and never at
+   * the range a player passes one. So the four hazards that are people are
+   * placed exactly as tools/framing.js places them -- lane x, the course's own
+   * elevation, pitched by the road's own slope, at d units ahead -- and
+   * scanned there. Same claim site, same lens, same question.
+   */
+  if (o.haz) {
+    const KID = { JUMP: 1, DUCK: 2, BLOCK: 3 }[o.haz.kind];
+    const EL = (g.course && g.course.elevation) || MR.Elevation.FLAT;
+    const runnerZ = g.pace.units;
+    const lane = g.player.lane;
+    const holder = new THREE.Group();
+    g.scene.add(holder);
+    for (let vi = 0; vi < 24; vi++) {
+      const probe = g.world.variantObject(KID, vi);
+      if (!probe) break;
+      for (const d of o.haz.dists) {
+        const obj = g.world.variantObject(KID, vi);
+        const z = runnerZ + d;
+        obj.position.set(MR.K.LANE_X[lane], EL.at(z), z);
+        obj.rotation.x = -Math.atan(EL.slope(z));
+        holder.clear();
+        holder.add(obj);
+        obj.updateMatrixWorld(true);
+        obj.traverse(function (n) {
+          if (!n.isMesh) return;
+          let p = n, tg = null;
+          while (p) { if (p.userData && p.userData.people) { tg = p.userData.people; break; } p = p.parent; }
+          if (!tg || p.userData.line === n) return;
+          scan(n, o.haz.kind + ' v' + vi + ' @' + d);
+        });
+      }
+    }
+    holder.clear();
+    g.scene.remove(holder);
+  }
 
   // ---- rendered head pixels ----------------------------------------------
   // The real frame, twice: once as it ships, once with head vertices keyed to
@@ -285,7 +374,7 @@ function pageRun(o) {
   g.renderer.setRenderTarget(prevRT);
 
   return {
-    heads, perTag,
+    heads, perTag, rejects,
     pops: Object.keys(pops).map((k) => ({ tag: k, meshes: pops[k].meshes })),
     lens: {
       fov: +cam.fov.toFixed(2), aspect: +cam.aspect.toFixed(4),
@@ -337,7 +426,10 @@ function pct(a, q) {
     let lens = null, z0 = 0, z1 = 0;
     for (let s = 0; s < SAMPLES; s++) {
       if (s) await page.waitForTimeout(650);
-      const r = await page.evaluate(pageRun, { w: buf[0], h: buf[1], skins: SKINS });
+      const r = await page.evaluate(pageRun, {
+        w: buf[0], h: buf[1], skins: SKINS,
+        haz: HAZ ? { kind: String(HAZ).toUpperCase(), dists: HAZ_D } : null,
+      });
       samples.push(r);
       lens = r.lens;
       if (!s) z0 = r.lens.runnerZ;
@@ -352,7 +444,17 @@ function pct(a, q) {
       for (const h of r.heads) (byPop[h.pop] || (byPop[h.pop] = [])).push(h);
       for (const k in r.perTag) (rend[k] || (rend[k] = [])).push(r.perTag[k]);
     }
-    if (!Object.keys(byPop).length) { console.log('    no human figures on this leg'); continue; }
+    if (!Object.keys(byPop).length) {
+      console.log('    no heads passed the shape filter on this leg');
+      for (const r of samples.slice(0, 1)) {
+        for (const tag in r.rejects) {
+          const hist = Object.keys(r.rejects[tag]).sort((a, b) => r.rejects[tag][b] - r.rejects[tag][a]);
+          console.log('      ' + tag + ': ' + hist.slice(0, 8)
+            .map((k) => k + ' x' + r.rejects[tag][k]).join(', '));
+        }
+      }
+      continue;
+    }
     console.log('');
     console.log('   population        heads  inframe   depth range     head px w x h      best w   eye px   rendered/frame');
     for (const tag of Object.keys(byPop).sort()) {

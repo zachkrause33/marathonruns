@@ -9632,10 +9632,27 @@ MR.World = (function () {
           parts.push(bx(0.08, 0.26, 0.08, sx * 0.54, shY - 0.28, shZ + 0.32, 0x2a0c16));
         }
       }
-      parts.push(
-        bx(0.28, 0.17, 0.07, -0.62, 1.80, 0.54, KIT_B),    // mirror glass
-        bx(0.28, 0.17, 0.07, 0.62, 1.80, 0.54, KIT_B)
-      );
+      /**
+       * THE MIRRORS, AND THEY WERE READING AS LUGGAGE. A blind reader shown
+       * this variant after the rebuild described "square yellow panniers or
+       * hard boxes on either side at shoulder height" -- which is exactly what
+       * a 0.28 x 0.17 flat slab of hi-vis yellow floating at 1.80 is. It also
+       * pushed the whole object toward the wrong service: boxes at shoulder
+       * height on a machine that already has a top box is a loaded escort
+       * bike, not a courier.
+       *
+       * A mirror is a SMALL PALE FACE on a THIN STALK with a dark back, and
+       * the stalk is most of the read: it is what puts air between the mirror
+       * and the rider. Half the area, on an arm, and the pale is kept warm
+       * rather than neutral because this variant has the narrowest saturation
+       * margin in the fleet.
+       */
+      for (const sx of [-1, 1]) {
+        parts.push(gl(bx(0.05, 0.05, 0.30, sx * 0.50, 1.76, 0.60, 0x2a0c16), GLOSS.trim));
+        parts.push(gl(bx(0.055, 0.20, 0.055, sx * 0.60, 1.84, 0.66, 0x2a0c16), GLOSS.trim));
+        parts.push(gl(bx(0.15, 0.13, 0.05, sx * 0.60, 1.93, 0.68, 0x2a0c16), GLOSS.trim));
+        parts.push(gl(bx(0.12, 0.10, 0.04, sx * 0.60, 1.93, 0.70, KIT_B), GLOSS.chrome));
+      }
 
       // ---- THE FRONT END, which rule 1 owns and which had nothing on it ----
       // A leg shield is what tells a scooter from a motorcycle, and it is the

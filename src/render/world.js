@@ -6649,9 +6649,9 @@ MR.World = (function () {
         // is 2.20 here, and the box is most of it -- the whole point of the
         // vehicle is that it carries something. At 1.30 of envelope the box
         // was 1.20 and the rider had to stand inside its own footprint.
-        hbx(2.02, 1.02, 1.86, 0, 0.72, -0.62, TRIKE_BODY),
-        hbx(2.10, 0.15, 1.90, 0, 1.28, -0.62, VAN_BODY),
-        hbx(2.06, 0.20, 1.92, 0, 0.20, -0.62, TRIKE_DARK),
+        hbx(2.02, 1.02, 1.32, 0, 0.72, -0.52, TRIKE_BODY),
+        hbx(2.10, 0.15, 1.36, 0, 1.28, -0.52, VAN_BODY),
+        hbx(2.06, 0.20, 1.38, 0, 0.20, -0.52, TRIKE_DARK),
         /**
          * THE RIDER, resized and revalued after a full playtest in which the
          * player reported seeing no cyclist at all.
@@ -6674,15 +6674,15 @@ MR.World = (function () {
          *
          * Top of the helmet is 2.72, inside the 2.80 the collision box records.
          */
-        hbx(1.14, 0.24, 0.56, 0, 1.42, 0.62, 0x2b2f52),
-        hbx(1.22, 0.54, 0.58, 0, 1.81, 0.62, VAN_BODY),
-        hbx(1.10, 0.10, 0.54, 0, 2.13, 0.62, 0x2b2f52),
-        hbx(0.60, 0.48, 0.50, 0, 2.44, 0.66, 0xffc79a),
-        hbx(0.70, 0.22, 0.60, 0, 2.61, 0.66, PINK),
+        hbx(1.14, 0.24, 0.56, 0, 1.42, 0.34, 0x2b2f52),
+        hbx(1.22, 0.54, 0.58, 0, 1.81, 0.34, VAN_BODY),
+        hbx(1.10, 0.10, 0.54, 0, 2.13, 0.34, 0x2b2f52),
+        hbx(0.60, 0.48, 0.50, 0, 2.44, 0.38, 0xffc79a),
+        hbx(0.70, 0.22, 0.60, 0, 2.61, 0.38, PINK),
         // Arms down onto the bars, which is what puts a lean in the shape.
-        hbx(0.22, 0.72, 0.20, -0.62, 1.52, 0.98, 0x2b2f52, 0.44),
-        hbx(0.22, 0.72, 0.20, 0.62, 1.52, 0.98, 0x2b2f52, 0.44),
-        hbx(0.98, 0.12, 0.12, 0, 1.24, 1.34, 0x2b2f52),
+        hbx(0.22, 0.66, 0.20, -0.62, 1.54, 0.66, 0x2b2f52, 0.40),
+        hbx(0.22, 0.66, 0.20, 0.62, 1.54, 0.66, 0x2b2f52, 0.40),
+        hbx(0.98, 0.12, 0.12, 0, 1.26, 0.92, 0x2b2f52),
       ];
       // Wheels. Seen from directly behind they are slabs rather than discs, so
       // they are built as discs on an x axis and read as tyres under the box.
@@ -6690,16 +6690,23 @@ MR.World = (function () {
       // the only part of it below the cargo box, so if they read as three dark
       // smudges the whole vehicle is a floating crate.
       for (const wx of [-0.86, 0.86]) {
-        vWheel(parts, wx * LANE_FIT, 0.34, -0.62, 0.34, 0.16, 0x2b2f52, WHEEL_RIM, WHEEL_HUB);
+        vWheel(parts, wx * LANE_FIT, 0.34, -0.52, 0.34, 0.16, 0x2b2f52, WHEEL_RIM, WHEEL_HUB);
       }
-      vWheel(parts, 0, 0.32, 1.52, 0.32, 0.12, 0x2b2f52, WHEEL_RIM, WHEEL_HUB);
+      vWheel(parts, 0, 0.32, 0.88, 0.32, 0.12, 0x2b2f52, WHEEL_RIM, WHEEL_HUB);
       // The boom from the load box out to the head tube, which is what a
-      // trike has instead of a frame and what 2.20 of length makes visible.
-      parts.push(bxAt(0.16, 0.14, 1.10, 0, 0.62, 0.90, TRIKE_DARK));
+      // trike has instead of a frame and what the length makes visible.
+      //
+      // 2.36 OVER ALL, AND THAT IS THE POINT OF A CEILING. A cargo trike is
+      // 2.6 m, which is 2.20 on the scale that put a 4.6 m saloon at 3.90 --
+      // so this variant takes about 60% of the envelope and leaves the rest.
+      // The first long build gave it 3.42, which is a trike the length of a
+      // van, because "the box got bigger" is not the same instruction as
+      // "the box got right".
+      parts.push(bxAt(0.16, 0.14, 0.76, 0, 0.62, 0.42, TRIKE_DARK));
       // Safety pennants, one each side.
       for (const sx of [-1, 1]) {
-        parts.push(bxAt(0.11, 1.56, 0.11, sx * 0.92, 1.94, -0.62, TRIKE_BODY));
-        parts.push(bxAt(0.09, 0.74, 0.58, sx * 0.92, 2.34, -0.32, PINK));
+        parts.push(bxAt(0.11, 1.56, 0.11, sx * 0.92, 1.94, -0.52, TRIKE_BODY));
+        parts.push(bxAt(0.09, 0.74, 0.58, sx * 0.92, 2.34, -0.22, PINK));
       }
       return merge(parts);
     })();
@@ -7301,20 +7308,20 @@ MR.World = (function () {
         // shorter than a wheel, which is a unicycle with a spare. At 1.95 the
         // pair sits at -0.28 and +0.90, a 1.18 wheelbase, and the object is a
         // bicycle from every angle instead of only from directly behind.
-        vWheel(parts, X * LANE_FIT, 0.33, -0.28, 0.33, 0.10, 0x6d76a8, WHEEL_RIM, WHEEL_HUB);
-        vWheel(parts, X * LANE_FIT, 0.33, 0.90, 0.33, 0.10, 0x6d76a8, WHEEL_RIM, WHEEL_HUB);
+        vWheel(parts, X * LANE_FIT, 0.33, -0.22, 0.33, 0.10, 0x6d76a8, WHEEL_RIM, WHEEL_HUB);
+        vWheel(parts, X * LANE_FIT, 0.33, 0.74, 0.33, 0.10, 0x6d76a8, WHEEL_RIM, WHEEL_HUB);
         // Seat tube, down tube and the fork, which is the diamond a bike reads
         // by from the flank -- and the flank is the view that did not exist.
-        parts.push(bxAt(0.08, 0.52, 0.10, X, 0.62, -0.18, p.frame));
-        parts.push(bxAt(0.08, 0.12, 1.02, X, 0.56, 0.32, p.frame, -0.34));
-        parts.push(bxAt(0.07, 0.66, 0.09, X, 0.66, 0.88, p.frame, 0.22));
-        parts.push(bxAt(0.34, 0.09, 0.18, X, 0.92, -0.24, 0x2a0c16));
+        parts.push(bxAt(0.08, 0.52, 0.10, X, 0.62, -0.14, p.frame));
+        parts.push(bxAt(0.08, 0.12, 0.86, X, 0.56, 0.28, p.frame, -0.34));
+        parts.push(bxAt(0.07, 0.62, 0.09, X, 0.66, 0.72, p.frame, 0.22));
+        parts.push(bxAt(0.34, 0.09, 0.18, X, 0.92, -0.20, 0x2a0c16));
         // Bars, out front where the rider's hands go.
-        parts.push(bxAt(0.44, 0.07, 0.08, X, 1.02, 0.80, 0x2a0c16));
+        parts.push(bxAt(0.44, 0.07, 0.08, X, 1.02, 0.66, 0x2a0c16));
         // The rear light, as a disc facing the lens with a bright core, exactly
         // as the cars carry it -- red alone renders darker than the road.
-        parts.push(cyl(0.09, 0.09, 0.10, 8, X * LANE_FIT, 0.80, -0.45, LAMP_RED, Math.PI / 2));
-        parts.push(cyl(0.048, 0.048, 0.13, 8, X * LANE_FIT, 0.80, -0.455, LAMP_CORE, Math.PI / 2));
+        parts.push(cyl(0.09, 0.09, 0.10, 8, X * LANE_FIT, 0.80, -0.40, LAMP_RED, Math.PI / 2));
+        parts.push(cyl(0.048, 0.048, 0.13, 8, X * LANE_FIT, 0.80, -0.405, LAMP_CORE, Math.PI / 2));
         // Dark waist, hi-vis where the eye lands, dark collar, skin, pink lid.
         // Everything up here is seen against pale road or paler sky.
         parts.push(bxAt(0.50, 0.36, 0.32, X, 1.16 + y, 0.10, p.shorts));
@@ -7450,11 +7457,11 @@ MR.World = (function () {
       },
       { geo: blockSignGeo, face: [2.06, 1.7, 1.58, -0.541], weight: 1 },
       {
-        geo: blockTrikeGeo, face: [1.98, 0.52, 0.62, -1.571], weight: 1,
+        geo: blockTrikeGeo, face: [1.98, 0.52, 0.62, -1.221], weight: 1,
         // Bottom bracket lifted to the box line and pulled forward of its far
         // face, so the knees break the box's top edge instead of pedalling
         // behind it. See blockTrikeCrankGeo.
-        moving: blockTrikeCrankGeo, pivot: [0, 1.30, 0.36], anim: 'pedal',
+        moving: blockTrikeCrankGeo, pivot: [0, 1.30, 0.14], anim: 'pedal',
       },
       {
         geo: blockCrossGeo, face: [2.10, 0.50, 0.98, -0.641], weight: 2,
@@ -7476,8 +7483,8 @@ MR.World = (function () {
         moving: blockRefuseGateGeo, pivot: [0, 1.30, -1.86], anim: 'lift',
       },
       {
-        geo: blockRoadBikeGeo, face: [1.70, 0.20, 0.32, -0.631], weight: 2,
-        moving: blockRoadBikeCrankGeo, pivot: [0, 0.60, 0.20], anim: 'pedal',
+        geo: blockRoadBikeGeo, face: [1.70, 0.20, 0.32, -0.571], weight: 2,
+        moving: blockRoadBikeCrankGeo, pivot: [0, 0.60, 0.16], anim: 'pedal',
       },
       { geo: blockMopedGeo, face: [1.30, 0.24, 1.10, -0.921], weight: 2, anim: 'idle' },
     ]);

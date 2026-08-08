@@ -6295,6 +6295,117 @@ MR.World = (function () {
       return merge(parts);
     })();
 
+    /**
+     * JUMP v4: LINKED WATER-FILLED BARRIERS, the moulded plastic run that
+     * closes a lane at every set of roadworks in the world.
+     *
+     * The reason this one is worth a variant is its TOP EDGE. Every other JUMP
+     * in the set carries one straight cream band across the full lane, so at
+     * forty units the four of them differ only below the cap -- which is the
+     * part fog and foreshortening take first. A barrier run is three separate
+     * moulded units with rounded shoulders and a 0.06 gap at each joint, so
+     * the light band is THREE segments with two notches in it, and that is a
+     * difference in the one part of the silhouette that survives distance.
+     *
+     * The gaps are deliberately narrow and the sill under them is continuous.
+     * The cone note in this file is the reason: three separate objects with
+     * road showing between them read as things to look at rather than as a
+     * lane you cannot run down, and the sill is what keeps this a lane.
+     *
+     * NO NAVY ANYWHERE, and that is the contrast lesson from the fleet applied
+     * to a JUMP for the first time. The dark parts are dark AMBER. See the
+     * note above jumpConeGeo's rebuild.
+     */
+    const jumpBarrierGeo = (function () {
+      const parts = [
+        // The continuous sill. Dark amber rather than a neutral, so the one
+        // element that spans the whole lane still carries the hue.
+        gl(hcbx(2.28, 0.16, 1.00, 0, 0.08, 0, 0xe07f12, 0.04), GLOSS.paint),
+      ];
+      for (let i = 0; i < 3; i++) {
+        const cx = -0.76 + i * 0.76;
+        // Heavy chamfer: these are blow-moulded, and the shoulder is the
+        // whole shape. 0.14 on a 0.52 module is the most the primitive will
+        // take without inverting (see chamferGeo's clamp).
+        parts.push(gl(hcbx(0.62, 0.52, 0.94, cx, 0.42, 0, 0xffb020, 0.13), GLOSS.paint));
+        // The moulded waist, in the body's own darker hue.
+        parts.push(gl(hcbx(0.66, 0.07, 0.96, cx, 0.40, 0, 0xe07f12, 0.02), GLOSS.paint));
+        // The cap segment. Matte, for the reason stated on the kerb's cap.
+        parts.push(gl(hcbx(0.68, 0.12, 0.96, cx, 0.72, 0, 0xfff2e0, 0.03), GLOSS.matte));
+      }
+      // The interlock pins standing in the joints. Two of them, and they are
+      // what tells you at close range that this is a linked run rather than
+      // three bins in a row.
+      for (const sx of [-0.38, 0.38]) {
+        parts.push(gl(bxAt(0.09, 0.62, 0.16, sx, 0.45, 0, 0xe07f12), GLOSS.trim));
+      }
+      return merge(parts);
+    })();
+
+    /**
+     * JUMP v5: A CABLE DRUM ON A CROSSING RAMP.
+     *
+     * The only round-topped JUMP in the set, and that is the entire design
+     * argument. Four of the five others are a rectangular mass with a straight
+     * or scalloped light band; a drum on its side puts a CIRCLE on the
+     * skyline, which is the one silhouette primitive the vocabulary has never
+     * used at this height. The telegraph mat's rungs and the striped face are
+     * unchanged, so the kind read is identical -- what changes is the shape
+     * that resolves first.
+     *
+     * Both objects are real and belong together: a rubber cable ramp across
+     * the carriageway and the drum the cable came off, which is what an event
+     * power run looks like from the moment it is laid to the moment it is
+     * lifted.
+     *
+     * THE DRUM'S AXIS RUNS ALONG Z, AND THE FIRST DRAFT HAD IT ALONG X.
+     * That is not a detail. A cylinder lying across the lane shows the player
+     * its BARREL -- a rectangle -- and hides both flanges edge-on, so the one
+     * thing this variant exists for was invisible from the chase view and only
+     * appeared from the flank. Down the lane instead, the rear flange is a
+     * cream disc facing the lens and the barrel is what the next lane sees.
+     * Caught on the fleet sheet at az 0, not by reading the code.
+     *
+     * The flanges are cream on both ends and the barrel is fully wound on all
+     * sides, per rule 1: you pass this at 1.70 units and the far flange is in
+     * shot for as long as the near one.
+     */
+    const jumpDrumGeo = (function () {
+      const parts = [
+        // The ramp. Chamfered hard on all twelve edges, which at 0.30 tall
+        // over a 1.00 depth is most of the section -- so the profile really is
+        // a wedge up to a flat top rather than a slab with cut corners.
+        gl(hcbx(2.24, 0.30, 1.00, 0, 0.15, 0, 0xffb020, 0.14), GLOSS.paint),
+        // The cream tread strip down the middle of the ramp, which is the
+        // light band this family is read by. 0.66 deep and not 0.44: at 0.44
+        // the whole variant measured L 146.5 against a 1.6x target of 144.6,
+        // which is 1.3% of margin on the axis that carries it. The strip is
+        // the only lever here that moves L without moving the silhouette.
+        gl(hcbx(2.30, 0.09, 0.66, 0, 0.325, 0, 0xfff2e0, 0.03), GLOSS.matte),
+        gl(hcbx(0.26, 0.34, 1.00, -1.10, 0.17, 0, 0xe07f12, 0.05), GLOSS.paint),
+        gl(hcbx(0.26, 0.34, 1.00, 1.10, 0.17, 0, 0xe07f12, 0.05), GLOSS.paint),
+      ];
+      // The drum. Rotated PI/2 about x puts the cylinder axis along z, so the
+      // radius spans x and y: the top is 0.50 + 0.26 = 0.76 against a box
+      // ceiling of 0.80, and the flanges reach z 0.315 against a halfZ of
+      // 0.52. Both checked by fleetExtents, neither guessed.
+      const dx = 0.40;
+      parts.push(gl(cyl(0.20, 0.20, 0.54, 12, dx, 0.50, 0, 0xe07f12, Math.PI / 2), GLOSS.paint));
+      for (const s of [-1, 1]) {
+        parts.push(gl(cyl(0.26, 0.26, 0.07, 14, dx, 0.50, s * 0.28, 0xfff2e0, Math.PI / 2), GLOSS.matte));
+      }
+      // The wound cable: one darker ring proud of the barrel, so the drum is
+      // not an empty spool.
+      parts.push(gl(cyl(0.23, 0.23, 0.34, 12, dx, 0.50, 0, 0xc26200, Math.PI / 2), GLOSS.trim));
+      // The coiled tail, lying flat on the ramp on the other side. Upright
+      // axis, so it is a disc seen edge-on from behind and a ring from above
+      // -- the crest of a hill is where that reads, and hills pitch the
+      // camera down onto it.
+      parts.push(gl(cyl(0.24, 0.24, 0.09, 12, -0.50, 0.345, 0.02, 0xc26200), GLOSS.trim));
+      parts.push(gl(cyl(0.13, 0.13, 0.11, 10, -0.50, 0.355, 0.02, 0xffb020), GLOSS.paint));
+      return merge(parts);
+    })();
+
     const jumpPool = hazardPool(K.JUMP, 'jump', [
       // Every face is 0.512 now: outside the 0.50 the art reaches and inside
       // the 0.52 the box allows. They were 0.521 and 0.531.
@@ -6302,6 +6413,8 @@ MR.World = (function () {
       { geo: jumpConeGeo, face: [2.2, 0.24, 0.16, -0.512] },
       { geo: jumpWorksGeo, face: [2.2, 0.32, 0.57, -0.512] },
       { geo: jumpScooterGeo, face: [2.2, 0.24, 0.16, -0.512] },
+      { geo: jumpBarrierGeo, face: [2.2, 0.26, 0.30, -0.512] },
+      { geo: jumpDrumGeo, face: [2.2, 0.22, 0.16, -0.512] },
     ]);
 
     /**
@@ -6403,10 +6516,149 @@ MR.World = (function () {
       return merge(parts);
     })();
 
+    /**
+     * DUCK v3: A LEVEL-CROSSING BOOM, and it is the first ASYMMETRIC duck.
+     *
+     * Three things constrain every variant here and it is worth restating them
+     * together, because they are what makes a duck hard to vary at all:
+     *
+     *   NOTHING ABOVE THE BAR IN THE LANE CENTRE. The chase camera sweeps
+     *     y 1.76 to 3.14 straight down a gate's lane, so the only structure
+     *     that may live above 1.83 is out at the standards. The header board
+     *     at 2.44 that this file already threw away is the proof. A traffic
+     *     signal head standing on top of the beam was designed and rejected
+     *     here for exactly that reason -- it is the same object as that board.
+     *   NOTHING BELOW 1.41 ACROSS THE LANE. That is where the ducking runner
+     *     goes. He is lower than this file used to think -- see the note on
+     *     the corridor probe below -- but the box floor is still the floor.
+     *   THE DISTANCE READ MAY NOT CHANGE. Two tall thin verticals with a bar
+     *     between them, at forty units, whatever the variant.
+     *
+     * What is left to vary is the bar's own profile, the stock the standards
+     * are made of, and the fittings out at the posts. This one spends all
+     * three on being LOPSIDED: the left standard is a signal post with a
+     * lamp pair and a counterweight, the right is a plain rest with a fork
+     * for the boom to lie in. Every other hazard in the game is bilaterally
+     * symmetric, so a silhouette whose two halves differ is a new read even
+     * though the class is unchanged.
+     *
+     * The boom's hanging skirt sits between 1.43 and 1.61 -- inside the bar
+     * band, not below it -- so the thing that makes a level crossing look like
+     * a level crossing costs no clearance at all.
+     */
+    const duckBoomGeo = (function () {
+      const parts = [
+        // The beam: 1.61 to 1.83, so the skirt has room under it and the top
+        // of the bar is still exactly the box ceiling.
+        gl(hcbx(2.30, 0.22, 0.52, 0, 1.72, 0, 0x37d6ff, 0.05), GLOSS.paint),
+        gl(hcbx(2.36, 0.09, 0.54, 0, 1.785, 0, 0xd8f8ff, 0.03), GLOSS.trim),
+      ];
+      // The skirt. Alternating cream and deep cyan, which is the boom's real
+      // marking and is also the cheapest way to put a repeating vertical
+      // rhythm in the one band the player is looking at.
+      for (let i = 0; i < 7; i++) {
+        const x = -0.90 + i * 0.30;
+        parts.push(gl(bxAt(0.13, 0.18, 0.22, x, 1.52, 0, i % 2 ? 0x1f9fd0 : 0xd8f8ff), GLOSS.trim));
+      }
+      for (const sx of [-1, 1]) {
+        // 3.20 tall, not the 3.30 the other three use. The DUCK superstructure
+        // was measured as the tallest thing in the game and a real occluder in
+        // R2, so a new variant takes the chance to be shorter rather than
+        // taller: this tops out at 3.40 against 3.48-3.56 for v0-v2.
+        parts.push(gl(bxAt(0.26, 3.20, 0.30, sx * 1.20, 1.60, 0, 0x37d6ff), GLOSS.paint));
+        parts.push(bxAt(0.30, 0.24, 0.34, sx * 1.20, 2.62, 0, 0x0d2b36));
+        parts.push(gl(bxAt(0.38, 0.20, 0.38, sx * 1.20, 3.30, 0, 0xd8f8ff), GLOSS.trim));
+        parts.push(bxAt(0.50, 0.22, 0.50, sx * 1.20, 0.11, 0, 0x2b2f52));
+      }
+      // The signal post, LEFT ONLY. The backing plate is 0.44 wide at 1.20 out
+      // -- 1.088 from the lane centre against a box halfX of 1.12 -- and the
+      // lamp discs face the player, axis along z, so they are round from
+      // behind and edge-on discs from the next lane rather than flat squares.
+      const px = -1.20 * LANE_FIT;
+      parts.push(bxAt(0.44, 0.94, 0.16, -1.20, 2.06, -0.10, 0x0d2b36));
+      for (const ly of [1.78, 2.34]) {
+        parts.push(gl(cyl(0.15, 0.15, 0.09, 12, px, ly, -0.20, 0xfff2e0, Math.PI / 2), GLOSS.chrome));
+      }
+      // The counterweight, which is what a raised boom is balanced by and
+      // which reads as mass on one side of an otherwise even frame.
+      parts.push(gl(bxAt(0.34, 0.34, 0.34, -1.20, 2.86, 0, 0x1f9fd0), GLOSS.paint));
+      // The rest fork, RIGHT ONLY: the cradle the boom drops into.
+      parts.push(gl(bxAt(0.30, 0.12, 0.36, 1.20, 1.92, 0, 0xd8f8ff), GLOSS.trim));
+      parts.push(gl(bxAt(0.11, 0.22, 0.36, 1.20, 2.03, 0, 0xd8f8ff), GLOSS.trim));
+      return merge(parts);
+    })();
+
+    /**
+     * DUCK v4: A SERVICES CROSSING -- a lagged pipe run bridging the road on
+     * two round columns, with a valve wheel at one of them.
+     *
+     * The bar is a CYLINDER for the first time. v0 is a chamfered box, v1 a
+     * boarded ledger, v2 a sign board, v3 a beam with a skirt: four flat-faced
+     * bars in a row, all of which take the same two toon bands across their
+     * height. A round bar takes the whole ramp across its section, so it is
+     * shaded as a curve rather than as a face.
+     *
+     * AND THAT BUYS NOTHING FROM BEHIND, which is worth writing down because
+     * it was this variant's original argument and the fleet sheet refuted it.
+     * The caution face every DUCK turns toward the lens sits at z -0.292, in
+     * front of a bar whose own front is at -0.19 to -0.26, and it is 0.34 to
+     * 0.40 tall -- so THE FACE IS THE BAR, visually, on all five variants.
+     * From the flank the bar is edge-on and the near standard covers it. The
+     * pipe is therefore a pass-by and overhead read, not a lane-decision one,
+     * and it is built out because rule 1 says so rather than because it
+     * carries the variant.
+     *
+     * What carries the variant at lane-decision distance is the STANDARDS:
+     * round columns with flange collars against v0's square posts, a valve
+     * wheel where v2 has a roundel. Measured at the size the player has it --
+     * 17.77 px per world unit at 40 units in portrait -- this pair separates
+     * further from v0 than any other pair in the kind, new or old.
+     *
+     * The pipe is 0.19 in radius about 1.62, so it fills 1.43 to 1.81 and the
+     * collars that band it are held to 0.21 so they land on 1.41 and 1.83
+     * exactly rather than hanging out of the box on both sides.
+     *
+     * Nothing crosses the lane above the bar. The elbow and the valve wheel
+     * are both out at a standard, per the rule restated on v3.
+     */
+    const duckPipeGeo = (function () {
+      const px = 1.20 * LANE_FIT;
+      const parts = [
+        // The lagged run. Axis along x: radius spans y and z, which is what
+        // puts the whole toon ramp across a 0.38 band.
+        gl(cyl(0.19, 0.19, 2.30 * LANE_FIT, 14, 0, 1.62, 0, 0x37d6ff, 0, 0, Math.PI / 2), GLOSS.paint),
+      ];
+      // Banding collars. 0.21 not 0.23: at 0.23 they reached 1.39 and 1.85,
+      // which is 0.02 out of the box on both faces -- the same two-hundredths
+      // v1 and v2 already carry and which nothing in the toolchain reads.
+      for (const cx of [-0.62, -0.21, 0.21, 0.62]) {
+        parts.push(gl(cyl(0.21, 0.21, 0.10, 14, cx, 1.62, 0, 0xd8f8ff, 0, 0, Math.PI / 2), GLOSS.trim));
+      }
+      for (const sx of [-1, 1]) {
+        // Round columns, and shorter again than v0-v2 for the R2 reason.
+        parts.push(gl(cyl(0.16, 0.16, 3.10, 10, sx * px, 1.55, 0, 0x37d6ff), GLOSS.paint));
+        parts.push(cyl(0.21, 0.21, 0.10, 10, sx * px, 1.05, 0, 0x0d2b36));
+        parts.push(cyl(0.21, 0.21, 0.10, 10, sx * px, 2.40, 0, 0x0d2b36));
+        parts.push(gl(cyl(0.22, 0.22, 0.20, 10, sx * px, 3.20, 0, 0xd8f8ff), GLOSS.trim));
+        parts.push(bxAt(0.50, 0.22, 0.50, sx * 1.20, 0.11, 0, 0x2b2f52));
+      }
+      // The valve wheel, right standard, facing the player. r 0.24 at 0.868
+      // out reaches 1.108 against a box halfX of 1.12.
+      parts.push(gl(cyl(0.24, 0.24, 0.07, 14, px, 2.74, -0.17, 0xd8f8ff, Math.PI / 2), GLOSS.chrome));
+      parts.push(gl(cyl(0.08, 0.08, 0.22, 8, px, 2.74, -0.08, 0x1f9fd0, Math.PI / 2), GLOSS.trim));
+      // The elbow, left standard: a stub rising off the column and turning
+      // back on itself. Thin, and out at the post, per the rule.
+      parts.push(gl(cyl(0.13, 0.13, 0.54, 10, -px, 2.90, 0, 0x1f9fd0), GLOSS.paint));
+      parts.push(gl(cyl(0.13, 0.13, 0.30, 10, -px + 0.15, 3.14, 0, 0x1f9fd0, 0, 0, Math.PI / 2), GLOSS.paint));
+      return merge(parts);
+    })();
+
     const duckPool = hazardPool(K.DUCK, 'duck', [
       { geo: duckGeo, face: [2.26, 0.40, 1.62, -0.292] },
       { geo: duckScaffoldGeo, face: [2.26, 0.36, 1.58, -0.292] },
       { geo: duckSignGeo, face: [2.26, 0.34, 1.62, -0.292] },
+      { geo: duckBoomGeo, face: [2.26, 0.38, 1.62, -0.292] },
+      { geo: duckPipeGeo, face: [2.26, 0.34, 1.62, -0.292] },
     ]);
 
     /**

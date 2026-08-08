@@ -5421,9 +5421,9 @@ MR.Runner = (function () {
    * argument; the geometry is here so both eyes are one loop and the z ladder
    * is one list rather than eight numbers scattered down a weld.
    */
-  function eyePieces(HY) {
+  function eyePieces() {
     const out = [];
-    const y = HY - 0.016;
+    const y = 0;
     for (const s of [-1, 1]) {
       const x = s * 0.100;
       out.push(
@@ -5454,8 +5454,8 @@ MR.Runner = (function () {
    */
   function mouthPieces() {
     return [
-      { g: new THREE.CircleGeometry(0.050, R_TORSO), c: MOUTH, y: 0, z: 0.036, sx: 1.30, sy: 0.46 },
-      { g: new THREE.CircleGeometry(0.050, R_TORSO), c: SKIN_SH, y: -0.017, z: 0.034, sx: 1.24, sy: 0.34 },
+      { g: new THREE.CircleGeometry(0.050, R_TORSO), c: MOUTH, y: -0.023, z: 0.036, sx: 1.30, sy: 0.46 },
+      { g: new THREE.CircleGeometry(0.050, R_TORSO), c: SKIN_SH, y: -0.040, z: 0.034, sx: 1.24, sy: 0.34 },
     ];
   }
 
@@ -6729,14 +6729,24 @@ MR.Runner = (function () {
     //
     // The whole thing stays ONE mesh and therefore one draw, which is the
     // budget line that actually binds on this character.
-    const eyes = new THREE.Mesh(weld(eyePieces(HY)), S.flat(0xffffff, { vertexColors: true }));
-    head.add(eyes);
+    //
+    // On its own pivot AT THE EYE LINE, which is the whole of what makes
+    // expression possible later: a mesh welded in head space scales about the
+    // HEAD's origin, so narrowing the eyes by scaling y would slide them down
+    // the face at the same time. The pivot puts the origin between them.
+    const eyePivot = pivot(head, 0, HY - 0.016, 0);
+    const eyes = new THREE.Mesh(weld(eyePieces()), S.flat(0xffffff, { vertexColors: true }));
+    eyePivot.add(eyes);
 
     // The mouth is its own flat mesh rather than a weld into the eyes, and the
     // reason is expression: the eyes narrow and the mouth opens, and those are
     // two different scales on two different pivots. One draw, and it is the
     // only one the face pass spends.
-    const mouthPivot = pivot(head, 0, HY - 0.150, 0.196);
+    // The pivot is at the UPPER LIP, not at the middle of the mouth, so the
+    // aperture opens downward the way a jaw does. A mouth scaled about its own
+    // centre grows upward into the nose as well, which reads as a shout rather
+    // than as breathing.
+    const mouthPivot = pivot(head, 0, HY - 0.127, 0.196);
     const mouth = new THREE.Mesh(weld(mouthPieces()), S.flat(0xffffff, { vertexColors: true }));
     mouthPivot.add(mouth);
 
@@ -7614,7 +7624,13 @@ MR.Runner = (function () {
       group: root,
       height: HEIGHT,
       shadow,
-      parts: { body, hips, spine, chest, neck, head, hood: hoodPivot, legs, arms },
+      // eyes and mouth are exported for the same reason every other pivot
+      // here is: tools/pose-diff.js compares joints BY NAME, and a joint the
+      // api does not name is a joint no A/B can check. The expression terms
+      // are the newest thing on this rig and therefore the ones most in need
+      // of it.
+      parts: { body, hips, spine, chest, neck, head, hood: hoodPivot,
+        eyes: eyePivot, mouth: mouthPivot, legs, arms },
       phase: 0,
     };
 
@@ -8681,6 +8697,60 @@ MR.Runner = (function () {
         POLISH * ((0.014 + 0.008 * sp01) * (1 - slid * 0.45) + spread * 0.006 + drop * 0.012),
         shortT, 3, 0.45);
 
+      // ---- expression --------------------------------------------------------
+      //
+      // The owner's last item, and the one where it is easiest to build
+      // something nobody will ever see. So it is worth writing down exactly
+      // where this is and is not visible before writing any of it:
+      //
+      //   IN PLAY, NOWHERE. The chase camera is dead astern, the face owns 0
+      //     pixels in 48 of 48 frames through it (tools/resolve.js), and a
+      //     slide deliberately yaws the head FURTHER away because a face
+      //     turned to the lens reads as a fall. Nothing below is drawn during
+      //     a race.
+      //   AT THE START PANEL, THE FINISH AND THE ORBIT SHEET, ALL OF IT.
+      //
+      // Which makes this cheap rather than pointless: two scale writes on two
+      // pivots, no geometry, no draw call, no allocation. It is the least
+      // expensive item on the whole list and it is the one that decides whether
+      // the face reads as a face or as a mask.
+      //
+      // WHAT DRIVES IT. Effort, assembled from the three things this file
+      // already knows and none of which it had a use for on the face: pace
+      // across the honest band, the climb, and the surge stage 3 built. Not
+      // fuel -- main.js does not hand this file fuel, and inventing a channel
+      // for a term this small would be the tail wagging the dog.
+      //
+      // WHAT IT DOES. The mouth opens and the eyes narrow, which is the pair
+      // every reference frame of a running character has, and they are driven
+      // TOGETHER off one signal so they cannot disagree. There are no brows to
+      // drive: the cap band's underside sits 0.017 into the top of the eye and
+      // this character's brow line is inside his hat, which is what wearing a
+      // cap pulled down means. The aperture is the brow.
+      //
+      // A WINCE, separately and on top. Any of the three contact signals --
+      // the wall bounce, the kerb trip, the generic stumble -- squeezes the
+      // eyes and pulls the mouth wide. This is the one expression term with a
+      // gameplay argument behind it as well as an art one: a contact is the
+      // event that ends a record attempt, and the replay and the finish are
+      // where a player looks at what happened.
+      //
+      // Everything is scaled by POLISH and every factor is exactly 1 at
+      // POLISH 0, so the A/B build shows the face he had before this.
+      const effort = Math.max(0, Math.min(1,
+        0.30 + 0.52 * sp01 + 0.85 * Math.max(0, grade) + 0.55 * surge));
+      const wince = Math.max(stumble, trip, knock);
+      // Narrowing only, never widening: a toy character with eyes OPENED past
+      // their drawn size reads as startled, and he is running, not surprised.
+      eyePivot.scale.y = 1 - POLISH * (0.20 * effort + 0.42 * wince);
+      eyePivot.scale.x = 1 - POLISH * 0.06 * wince;
+      // The mouth opens downward about the upper lip. 0.62 at rest to 1.55 at
+      // full effort, which on an aperture 0.046 tall is 0.029 to 0.071 -- four
+      // to nine pixels at the face lens and a shape change rather than a size
+      // change, because the lower lip travels with it and the opening between
+      // them is what grows.
+      mouthPivot.scale.y = 1 + POLISH * (0.55 * effort + 0.30 * wince);
+      mouthPivot.scale.x = 1 + POLISH * (0.10 * effort + 0.22 * wince);
 
       // Ducking drops the whole body rather than only folding the spine, so
       // the collision capsule and the silhouette agree. The 0.42 matches

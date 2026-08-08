@@ -162,33 +162,81 @@ const CANDIDATES = [
   {
     name: 'eye sclera',
     kind: 'added',
-    anchor: '    head.add(eyes);',
+    anchor: '    eyePivot.add(eyes);',
     note: 'the whole eye opening, both eyes pooled -- the ceiling on the four rings',
-    code: (c) => `__probe('eye sclera', head, new THREE.CircleGeometry(0.062, 24), ${c}, { x: -0.100, y: HY - 0.016, z: 0.2610, sy: 0.82 });
-      __probe('eye sclera', head, new THREE.CircleGeometry(0.062, 24), ${c}, { x: 0.100, y: HY - 0.016, z: 0.2610, sy: 0.82 });`,
+    code: (c) => `__probe('eye sclera', eyePivot, new THREE.CircleGeometry(0.062, 24), ${c}, { x: -0.100, z: 0.2610, sy: 0.82 });
+      __probe('eye sclera', eyePivot, new THREE.CircleGeometry(0.062, 24), ${c}, { x: 0.100, z: 0.2610, sy: 0.82 });`,
   },
   {
     name: 'eye pupil',
     kind: 'added',
-    anchor: '    head.add(eyes);',
+    anchor: '    eyePivot.add(eyes);',
     note: 'both pupils pooled',
-    code: (c) => `__probe('eye pupil', head, new THREE.CircleGeometry(0.026, 16), ${c}, { x: -0.100, y: HY - 0.018, z: 0.2650 });
-      __probe('eye pupil', head, new THREE.CircleGeometry(0.026, 16), ${c}, { x: 0.100, y: HY - 0.018, z: 0.2650 });`,
+    code: (c) => `__probe('eye pupil', eyePivot, new THREE.CircleGeometry(0.026, 16), ${c}, { x: -0.100, y: -0.002, z: 0.2650 });
+      __probe('eye pupil', eyePivot, new THREE.CircleGeometry(0.026, 16), ${c}, { x: 0.100, y: -0.002, z: 0.2650 });`,
   },
   {
     name: 'eye catchlight',
     kind: 'added',
-    anchor: '    head.add(eyes);',
+    anchor: '    eyePivot.add(eyes);',
     note: 'the smallest mark on the character -- both pooled',
-    code: (c) => `__probe('eye catchlight', head, new THREE.CircleGeometry(0.012, 16), ${c}, { x: -0.084, y: HY + 0.002, z: 0.2670 });
-      __probe('eye catchlight', head, new THREE.CircleGeometry(0.012, 16), ${c}, { x: 0.084, y: HY + 0.002, z: 0.2670 });`,
+    code: (c) => `__probe('eye catchlight', eyePivot, new THREE.CircleGeometry(0.012, 16), ${c}, { x: -0.084, y: 0.018, z: 0.2670 });
+      __probe('eye catchlight', eyePivot, new THREE.CircleGeometry(0.012, 16), ${c}, { x: 0.084, y: 0.018, z: 0.2670 });`,
   },
   {
     name: 'mouth',
     kind: 'added',
     anchor: '    mouthPivot.add(mouth);',
     note: 'the aperture, open',
-    code: (c) => `__probe('mouth', mouthPivot, new THREE.CircleGeometry(0.050, 24), ${c}, { z: 0.036, sx: 1.30, sy: 0.46 });`,
+    code: (c) => `__probe('mouth', mouthPivot, new THREE.CircleGeometry(0.050, 24), ${c}, { y: -0.023, z: 0.036, sx: 1.30, sy: 0.46 });`,
+  },
+  // ---- the anatomy pass ----------------------------------------------------
+  //
+  // These are on the body rather than the face, so unlike the face pass they
+  // are expected to read through the SHIPPED lens, and a zero here would be a
+  // finding rather than a confirmation.
+  {
+    name: 'arm deltoid',
+    kind: 'added',
+    anchor: '      shoulder.add(upper);',
+    note: 'the shoulder mass moved onto the arm so the limb has ONE outline',
+    code: (c) => `__probe('arm deltoid', shoulder, new THREE.SphereGeometry(0.108, 20, 14), ${c}, { y: -0.058, sy: 0.86, sz: 0.92 });`,
+  },
+  {
+    name: 'forearm belly',
+    kind: 'added',
+    anchor: '      elbow.add(fore);',
+    note: 'the taper from elbow to wrist -- 0.020 of relief in z, 0.006 in x',
+    code: (c) => `__probe('forearm belly', elbow, new THREE.SphereGeometry(0.098, 16, 12), ${c}, { y: -0.072, sx: 0.86, sy: 1.05 });`,
+  },
+  {
+    name: 'jaw fillet',
+    kind: 'added',
+    anchor: '    head.add(headMesh);',
+    note: 'the concave corner between the skull and the neck, front 200 degrees',
+    code: (c) => `__probe('jaw fillet', head, new THREE.TorusGeometry(0.111, 0.024, 8, 20, Math.PI * 1.11), ${c}, { y: HY - 0.244, rx: -Math.PI / 2, rz: Math.PI * 0.945 });`,
+  },
+  {
+    name: 'neck SCM',
+    kind: 'added',
+    anchor: '    head.add(headMesh);',
+    note: 'the two ridges on the front of the neck -- both pooled',
+    code: (c) => `__probe('neck SCM', head, new THREE.SphereGeometry(0.052, 16, 10), ${c}, { x: -0.052, y: HY - 0.317, z: 0.078, sx: 0.60, sy: 1.70, sz: 0.55, rz: -0.16 });
+      __probe('neck SCM', head, new THREE.SphereGeometry(0.052, 16, 10), ${c}, { x: 0.052, y: HY - 0.317, z: 0.078, sx: 0.60, sy: 1.70, sz: 0.55, rz: 0.16 });`,
+  },
+  {
+    name: 'thumb',
+    kind: 'kept',
+    anchor: '      elbow.add(fore);',
+    note: 'MOVED by this tool: was 0-7 px and unseen in 36/48, inside the mitt',
+    code: (c) => `__probe('thumb', elbow, new THREE.CapsuleGeometry(0.041, 0.048, 4, 12), ${c}, { x: -side * 0.085, y: -0.230, z: -0.040, rx: 0.30, rz: side * 0.62 });`,
+  },
+  {
+    name: 'knuckle row',
+    kind: 'kept',
+    anchor: '      elbow.add(fore);',
+    note: 'MOVED by this tool: was median 2 px, proud of a surface already curved away',
+    code: (c) => `__probe('knuckle row', elbow, new THREE.SphereGeometry(0.042, 16, 12), ${c}, { y: -0.300, z: -0.055 });`,
   },
   // ---- positive controls ---------------------------------------------------
   //

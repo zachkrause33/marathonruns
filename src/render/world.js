@@ -5448,8 +5448,28 @@ MR.World = (function () {
       for (const sx of [-1, 1]) {
         const x = sx * (K.TRACK_HALF_WIDTH + 1.6);
         pavement(parts, sx, 0xd8c9a0, 0xefe3c2, 0xb0a37e);
-        parts.push(bx(1.5, 0.78, TILE, x, 0.28, 0, 0x2f9f52));
-        parts.push(bx(1.62, 0.16, TILE, x, 0.68, 0, 0x49c96b));
+        // ===== THE HEDGE IS CHARTREUSE NOW, LIKE EVERY OTHER LEAF =====
+        //
+        // It was 0x2f9f52 with a 0x49c96b cap: R = 0.296 and 0.363 of G, a
+        // true emerald. The trees standing behind it on this same tile are
+        // 0.72 to 0.76, because a previous pass warmed the whole vocabulary
+        // to the reference's chartreuse and reordered value by height.
+        //
+        // The hedge was missed for the same reason the avenue was missed
+        // before it, and the note twenty lines down says so in its own words:
+        // it is baked into the road tile rather than pooled per setting, so
+        // nothing that walks the tree palettes ever reaches it. It is the
+        // largest continuous area of foliage in the game -- two rows the full
+        // length of every PARKLAND and RIVERSIDE tile, nearer the lens than
+        // any pooled tree -- and it was the last true green left in the
+        // vegetation.
+        //
+        // A clipped hedge is a DENSE DARK MASS, so it takes the bottom of the
+        // ladder rather than the middle: the body is a step below the
+        // avenue's darkest lobe (0x5c8028) and the cap lands on the avenue's
+        // own mid lobe, which is what a sunlit hedge top is.
+        parts.push(bx(1.5, 0.78, TILE, x, 0.28, 0, 0x4a6a20));
+        parts.push(bx(1.62, 0.16, TILE, x, 0.68, 0, 0x7fa838));
         for (let i = 0; i < 4; i++) {
           parts.push(cyl(0.10, 0.12, 0.7, 6, sx * (K.TRACK_HALF_WIDTH + 0.4), 0.35,
             -TILE / 2 + 3 + i * 6, 0xfff2e0));
@@ -10004,7 +10024,11 @@ MR.World = (function () {
       for (let i = 0; i < 14; i++) {
         const a = r() * 6.3, rad = 11.5 + r() * 2.4;
         parts.push(cone(0.55 + r() * 0.4, 1.5 + r() * 1.2, 5,
-          Math.cos(a) * rad, 0.6, Math.sin(a) * rad, r() > 0.5 ? 0x2f9f52 : 0x8f9a3e));
+          // Reeds, half chartreuse and half olive. The green half was the
+          // hedge's old 0x2f9f52 emerald -- the last true green in the
+          // vegetation after the hedge took the ladder, and standing in the
+          // one place a PARKLAND landmark puts foliage next to water.
+          Math.cos(a) * rad, 0.6, Math.sin(a) * rad, r() > 0.5 ? 0x7fa838 : 0x8f9a3e));
       }
       parts.push(bx(2.0, 0.26, 7.0, -11.5, 0.35, 4.0, 0x8a5a3c));
       parts.push(bx(0.22, 0.8, 0.22, -10.7, 0.7, 7.0, 0x8a5a3c));

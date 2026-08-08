@@ -79,6 +79,13 @@ function pageSample(o) {
     ['body', P.body], ['hips', P.hips], ['spine', P.spine], ['chest', P.chest],
     ['neck', P.neck], ['head', P.head], ['hood', P.hood],
   ];
+  // The expression pivots are newer than this tool and may not exist in the
+  // build on the other side of an A/B, so they are added only when BOTH have
+  // them -- a missing joint is reported as a joint-set mismatch, which is the
+  // right answer for a rename and the wrong one for a comparison against a
+  // build that predates the pass.
+  if (P.eyes) joints.push(['eyes', P.eyes]);
+  if (P.mouth) joints.push(['mouth', P.mouth]);
   P.legs.forEach(function (L, i) {
     joints.push(['leg' + i + '.hip', L.hip], ['leg' + i + '.knee', L.knee], ['leg' + i + '.ankle', L.ankle]);
   });
@@ -137,23 +144,41 @@ async function sample(browser, file, polish) {
   return res;
 }
 
+/**
+ * Compare two samples on the joints they SHARE.
+ *
+ * An A/B across a pass that added a pivot has two joint sets that differ by
+ * that pivot, and refusing to compare at all is the wrong answer: the whole
+ * question is whether the joints that existed before still do the same thing.
+ * So the intersection is compared and the difference is reported as a fact
+ * about the pass rather than as an error. Each side is indexed by its OWN
+ * name list, which is what stops an added pivot shifting every joint after it
+ * by one and turning a shoulder into an elbow.
+ */
 function diff(a, b) {
-  if (a.names.join('|') !== b.names.join('|')) return { error: 'joint sets differ' };
+  const ia = {}, ib = {};
+  a.names.forEach(function (n, i) { ia[n] = i; });
+  b.names.forEach(function (n, i) { ib[n] = i; });
+  const shared = a.names.filter(function (n) { return ib[n] !== undefined; });
+  if (!shared.length) return { error: 'no joints in common' };
   let worst = 0, at = '';
   const perJoint = {};
   for (const s in a.states) {
     const ra = a.states[s], rb = b.states[s];
     if (!rb || ra.length !== rb.length) return { error: 'sample counts differ in ' + s };
     for (let i = 0; i < ra.length; i++) {
-      for (let k = 0; k < ra[i].length; k++) {
-        const d = Math.abs(ra[i][k] - rb[i][k]);
-        const jn = a.names[(k / 10) | 0];
-        if (!(perJoint[jn] > d)) perJoint[jn] = Math.max(perJoint[jn] || 0, d);
-        if (d > worst) { worst = d; at = s + ' ' + jn + ' [' + (k % 10) + ']'; }
+      for (const n of shared) {
+        for (let k = 0; k < 10; k++) {
+          const d = Math.abs(ra[i][ia[n] * 10 + k] - rb[i][ib[n] * 10 + k]);
+          if (!(perJoint[n] > d)) perJoint[n] = Math.max(perJoint[n] || 0, d);
+          if (d > worst) { worst = d; at = s + ' ' + n + ' [' + k + ']'; }
+        }
       }
     }
   }
-  return { worst, at, perJoint };
+  const onlyA = a.names.filter(function (n) { return ib[n] === undefined; });
+  const onlyB = b.names.filter(function (n) { return ia[n] === undefined; });
+  return { worst, at, perJoint, shared: shared.length, onlyA, onlyB };
 }
 
 (async () => {
@@ -185,7 +210,9 @@ function diff(a, b) {
 
   console.log('');
   console.log('POSE DIFF   polish ' + (POLISH === null ? '(as shipped)' : POLISH)
-    + '   ' + a.names.length + ' joints x ' + N + ' samples x ' + STATES.length + ' states');
+    + '   ' + d.shared + ' shared joints x ' + N + ' samples x ' + STATES.length + ' states');
+  if (d.onlyA.length) console.log('  only in A: ' + d.onlyA.join(', '));
+  if (d.onlyB.length) console.log('  only in B: ' + d.onlyB.join(', '));
   console.log('  A  ' + A);
   console.log('  B  ' + B);
   console.log('');

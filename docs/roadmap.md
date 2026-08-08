@@ -1152,3 +1152,50 @@ nobody measured is worse than no number at all.**
    The lesson: **an assertion that passes tells you about the property it
    tests and nothing else.** A rule that only ever asks "can this hide a
    hazard" will happily let the frame fill up with everything that cannot.
+
+19. **A brief indicted six objects and the sheet exonerated four of them.**
+   The pass that rebuilt the JUMPs and DUCKs was commissioned on the claim
+   that "every JUMP is a slab with a striped face on the front and nothing
+   anywhere else. v0 is literally a box." Photographed at az 0 / 90 / 180 /
+   270 before anything was designed, that is false for five of the six: v1's
+   cones, v3's scooters, v4's three moulded modules and v5's drum are
+   through-objects and read as themselves from every azimuth, and v4 was the
+   best-built hazard in the game from behind. v0 was the one that matched the
+   description, and the plinths v1 and v3 share with it.
+
+   The same brief said "two variants are short of the 1.6x / 0.30 target and
+   were refused with lever tables last pass; re-measure before assuming
+   which." Measured: **none of the eleven JUMPs and DUCKs is short of target**,
+   on any shot, and the two that are short are BLOCK v3 and v8. That
+   instruction is the only reason the wrong pair was not carried forward, and
+   it is worth copying into the next brief that quotes a number it did not
+   take.
+
+   What the sheet found instead was **the DUCKs**, and it found it harder than
+   the brief did: at az 180, v0, v1 and v2 photograph as ONE object -- a flat
+   bar between two flat posts -- because every feature those three own is on
+   the face they turn toward the lens at spawn. Same family as the accent-hex
+   count at entry 15: **the source is not the frame**, and a claim about what
+   an object looks like is a claim about a photograph somebody has to take.
+
+20. **The DUCK is exempt from the y half of the envelope guard, so art above
+   the bar has never been policed at all.** `fairness.js` fails `yMax > boxYMax`
+   for JUMP and BLOCK and only reports it for DUCK, and the reasoning is sound:
+   the DUCK box is the BAR, 1.41 to 1.83, and the frame carrying it legitimately
+   reaches 3.5. But the exemption is written against the whole variant's bounding
+   box, so it swallows everything -- and `duckPipeGeo` had a comment naming two
+   real overhangs it declined to fix, "the same two-hundredths v1 and v2 already
+   carry and which nothing in the toolchain reads."
+
+   Measured, there were three: v1's cap ran to 1.85 and its boarding down to
+   1.39, and v2's bands ran to 1.86 and 1.39. All are now on the number. The
+   HOLE is not closed and cannot be by the assertion in its present shape: a
+   single bounding box cannot tell the bar from the gantry. Closing it needs
+   the y extent measured over the LANE CORRIDOR only -- art inside the band the
+   ducking runner and the chase camera share -- which is a different question
+   from the one `fleetExtents` answers today.
+
+   Third time on this list of the form "a comment named a defect and nothing
+   failed": the `HAZARD_HALF` drift, the coplanar gantry braces, and now this.
+   **A guard with a documented exemption is a guard with a documented blind
+   spot, and somebody has to go and look at what grew in it.**

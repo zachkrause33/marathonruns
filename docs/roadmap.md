@@ -1930,7 +1930,7 @@ nobody measured is worse than no number at all.**
    the lorry; they want lifting to `Course.DECK_Y`. Delete `ramp.js` when the
    fleet grows a hopper.
 
-35. **The hue was never telling the three kinds apart, and the rule that said
+36. **The hue was never telling the three kinds apart, and the rule that said
    it was had stopped being true before this pass touched anything.**
 
    `world.js` carried the rule in two places, in almost the same words:
@@ -1971,7 +1971,7 @@ nobody measured is worse than no number at all.**
    time the thing it protects is rebuilt.** This one survived four rebuilds of
    the objects it was about.
 
-36. **Two defects in the new instrument, both flattering, both found by its own
+37. **Two defects in the new instrument, both flattering, both found by its own
    audit trail rather than by eye.**
 
    `tools/stride.js` shipped with six. `tools/kindread.js` was written with the
@@ -1990,7 +1990,7 @@ nobody measured is worse than no number at all.**
      that returns zeros looks like a finding.** It was caught because the tool
      records its own column bounds and mask bounding box next to every row.
 
-37. **What the cyclists were sitting on was the caution face, and the wheels
+38. **What the cyclists were sitting on was the caution face, and the wheels
    were never the problem.**
 
    The owner: *"One bicyclist at the time. The bike needs to be on the road.
@@ -2021,7 +2021,7 @@ nobody measured is worse than no number at all.**
    `f.position.set(0, ...)` -- so it can only ever sit on something centred,
    and every variant has to be built to give it somewhere to sit.
 
-38. **A thin BLOCK is not free, and the profile said so before a frame was
+39. **A thin BLOCK is not free, and the profile said so before a frame was
    shot.**
 
    The brief for this pass suggested a traffic light might IMPROVE the
@@ -2048,7 +2048,7 @@ nobody measured is worse than no number at all.**
    is the thin-BLOCK benefit the brief wanted, delivered by a short wide object
    rather than a tall thin one.
 
-39. **The unfinished item, stated rather than buried: BLOCK v9, the delivery
+40. **The unfinished item, stated rather than buried: BLOCK v9, the delivery
    moped, is the last hazard in the game that misreads its own kind.**
 
    Profile misreads went 2 of 21 to 1 of 21 across this pass -- BLOCK v2 was

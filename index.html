@@ -6368,6 +6368,48 @@ MR.Runner = (function () {
       // one continuous mass with no pinch. Dark / light / saturated reads.
       // Long enough to start inside the vest so no gap opens on a head tilt.
       { g: new THREE.CylinderGeometry(0.104, 0.122, 0.32, R_LIMB), c: P.runnerSkin, y: HY - 0.300 },
+      // The fillet under the jaw, and it is the answer to "the neck is a plain
+      // cylinder the head sits on top of".
+      //
+      // The corner is real and it is geometric: at HY - 0.244 the skull's own
+      // radius is 0.1334 and the neck's is 0.1099, so the head OVERHANGS the
+      // neck by 0.024 and the two surfaces meet in a concave crease. No sphere
+      // can fill a concave corner -- every mass this file has ever added is
+      // convex and would sit inside one -- which is why the junction survived
+      // four passes looking like a ball resting on a tube. A torus can, and
+      // this is the only torus on the character apart from the hood.
+      //
+      // It is an ARC of 200 degrees centred on the FRONT, not a ring, and that
+      // restriction is rule 1 in this file's header being obeyed rather than
+      // worked around: nothing may be added to the back of the head or to the
+      // nape, because the whole silhouette is built on the head pinching away
+      // from the shoulders and on the value ladder dark hair / lit neck / dark
+      // hood running uninterrupted down the back. The crease that reads as a
+      // fault is the one under the JAW, which is the half of the junction the
+      // start panel and the finish see; the half behind is doing a job.
+      //
+      // Sized so its outer surface lands on 0.135 against the skull's own
+      // 0.1334 -- it fills the corner and does not widen the neck by anything
+      // the eye or tools/envelope.js can find.
+      // rz then rx, and the ORDER is why the hood's note two hundred lines up
+      // spells it out: weld() composes an Euler in XYZ, so rz is the innermost
+      // rotation and slides the arc round its own ring, while rx lays the ring
+      // flat afterwards. Doing it the other way yaws a finished ring instead.
+      // The arc's midpoint sits at half its span from +X, so rz carries that
+      // to -Y, which rx = -pi/2 then maps to +Z. Get either wrong and the
+      // fillet ends up round the NAPE, which is the one place it may not be.
+      { g: new THREE.TorusGeometry(0.111, 0.024, 8, 20, Math.PI * 1.11), c: P.runnerSkin,
+        y: HY - 0.244, rx: -Math.PI / 2, rz: Math.PI * 0.945 },
+      // The sternocleidomastoids. Two ridges running from behind the ear down
+      // to the notch, which are the only muscles a neck shows at this size and
+      // the reason a neck is not a dowel. 0.022 proud of the cylinder at their
+      // widest and nowhere near its own outline: they reach x 0.083 on a neck
+      // whose radius there is 0.114, so they are pure interior form and the
+      // ramp is what draws them.
+      { g: new THREE.SphereGeometry(0.052, R_NUB, 10), c: P.runnerSkin,
+        x: -0.052, y: HY - 0.317, z: 0.078, sx: 0.60, sy: 1.70, sz: 0.55, rz: -0.16 },
+      { g: new THREE.SphereGeometry(0.052, R_NUB, 10), c: P.runnerSkin,
+        x: 0.052, y: HY - 0.317, z: 0.078, sx: 0.60, sy: 1.70, sz: 0.55, rz: 0.16 },
       { g: new THREE.SphereGeometry(0.266, R_HEAD, 24), c: P.runnerSkin, y: HY, sy: 1.06, sz: 0.97 },
       // The cap. Geometrically this is the same shell that used to be the hair
       // crown -- the fit was already right and the note below is still the
@@ -6763,8 +6805,44 @@ MR.Runner = (function () {
       // hamstring and the calf -- it gives the ramp something to shade without
       // introducing a value the silhouette has to pay for, and it keeps this
       // part off the list of lone primitives.
+      //
+      // ---- AND WHY THE ARM READ AS THREE PIECES ---------------------------
+      //
+      // The owner's word for this character was "primitive 3D shapes assembled
+      // into a human silhouette", and the arm was the clearest case: shoulder,
+      // upper arm and forearm each resolved as its own rounded object rather
+      // than as one limb. The cause is not the shapes. It is the INK.
+      //
+      // Every part on this figure is drawn twice -- fill, then the same
+      // geometry through the outline shader -- so a part boundary is not a
+      // soft join, it is a HARD BLACK LINE, and the eye counts closed outlines
+      // before it reads form. Three welds down the arm is three outlines, and
+      // three outlines is three objects however well the masses overlap.
+      //
+      // So the fix is not more geometry between the parts, it is fewer parts
+      // spanning the same distance. The deltoid below is welded into the ARM
+      // rather than into the trunk, which puts the shoulder mass and the upper
+      // arm inside ONE outline; and the forearm belly does the same for the
+      // elbow and the forearm. The vest keeps its own red deltoid on the
+      // trunk, because that is a garment and a garment is supposed to have an
+      // edge -- what it stops being is the only thing between the neck and the
+      // elbow with a line round it.
       const upper = multi([
         { g: new THREE.CapsuleGeometry(0.086, 0.095, 6, R_LIMB), c: P.runnerSkin, y: -0.122 },
+        // The deltoid, in skin, on the ARM. It emerges from under the vest's
+        // own red shoulder 0.051 lower down, which is where a singlet's
+        // shoulder seam is and where the muscle would show; and it is 0.022
+        // proud of the upper arm's capsule, which clears the 0.014 ink so the
+        // two weld cleanly rather than growing teeth.
+        //
+        // It rotates with the shoulder, which is the one thing about it that
+        // had to be measured rather than reasoned: the jump abducts this joint
+        // hard and an arm-mounted mass swings outward with it. Reaching x 0.330
+        // at rest against the trunk deltoid's 0.384, it stays inside the vest's
+        // own shoulder through the whole cycle -- see the envelope table in the
+        // report for what it did to the jump's half-width, which is the number
+        // the airborne silhouette is separated by.
+        { g: new THREE.SphereGeometry(0.108, R_LIMB, 14), c: P.runnerSkin, y: -0.058, sy: 0.86, sz: 0.92 },
         { g: new THREE.SphereGeometry(0.088, R_NUB, 12), c: P.runnerSkin, y: -0.108, z: -0.016, sx: 0.90, sy: 1.15 },
       ]);
       shoulder.add(upper);
@@ -6790,6 +6868,19 @@ MR.Runner = (function () {
         // does, because the run cycle drives the elbows LATERALLY -- they are
         // the joint the back view was built to watch.
         { g: new THREE.SphereGeometry(0.088, R_NUB, 12), c: P.runnerSkin, y: -0.012, sy: 0.92, sz: 0.96 },
+        // The forearm's belly, and it is the elbow's other half. A forearm is
+        // thickest just under the elbow and tapers to a wrist half its width;
+        // this one was a constant 0.078 tube with a ball on the end of it, so
+        // the elbow read as a knuckle in the middle of the arm rather than as
+        // the widest part of it. Overlapping the elbow ball deliberately: the
+        // two are one mass and the taper runs from there to the band.
+        //
+        // Fatter in z and barely in x -- 0.020 of relief at the back, 0.006 at
+        // the side -- which is the hamstring's argument, the calf's and the
+        // triceps'. Arm swing is almost entirely along the camera axis from
+        // astern, so relief in z is what the ramp can shade; width in x is
+        // what the jump's silhouette is measured on and it is not spent here.
+        { g: new THREE.SphereGeometry(0.098, R_NUB, 12), c: P.runnerSkin, y: -0.072, sx: 0.86, sy: 1.05 },
         // The wristband, and it is 0.098 where it used to be 0.088. That is a
         // repair, not a flourish: the mitt's old wrist ball was r=0.094 and
         // spanned the band's whole height, so the third of TRIM's three hits on
@@ -19417,35 +19508,30 @@ MR.World = (function () {
       const r = lcg(7717);
 
       // ---- the rank at the rail ------------------------------------------
+      // THE RANK AT THE RAIL is vSpectator now -- the same builder the roadside
+      // knots and the finish arena use, so a person leaning on the barrier in
+      // the last mile is the same animal as one at mile two. Tier READ: this
+      // population's head measures 1.0 px at the median and 2.2 at the best
+      // through the live chase camera, so it is all silhouette and motion.
+      //
+      // Raised arms go STRAIGHT UP and placards are centred on the body, which
+      // is the fairness constraint this object is built against: local x runs
+      // outward from 5.05 and the rank sits at 0.14, so the nearest triangle is
+      // an arm at 4.76 against a barrier face at 4.65 and a CORRIDOR_HALF of
+      // 3.75. vFigure hangs its arms from a 0.52 shoulder rather than splaying
+      // them at 0.28, so the reach came DOWN.
+      const trousers = [0x2b2f52, 0x3a4472, 0x4a3a52, 0x2f3a38, 0x5a4a3a, 0x37405e];
       const RAIL_N = 17;
       for (let i = 0; i < RAIL_N; i++) {
         const z = -TILE / 2 + 0.9 + i * ((TILE - 1.8) / (RAIL_N - 1)) + (r() - 0.5) * 0.5;
-        const x = 0.14 + (r() - 0.5) * 0.20;
-        const h = 0.90 + r() * 0.24;
-        const shirt = shirts[Math.floor(r() * shirts.length)];
-        const skin = skins[Math.floor(r() * skins.length)];
-        const ph = z * 0.53 + r() * 2.4;
-        // Legs to 0.88h so they run up inside the shirt: the wave lifts by
-        // amplitude and anything that differs from the torso's has to slide
-        // within it rather than part from it. See crowdGeo.
-        parts.push(wv(bx(0.36, 0.88 * h, 0.26, x, 0.44 * h, z, 0x2b2f52), ph, 0.85));
-        parts.push(wv(bx(0.50, 0.68 * h, 0.32, x, 0.99 * h, z, shirt), ph, 1.1));
-        parts.push(wv(bx(0.30, 0.30, 0.28, x, 1.48 * h, z, skin), ph, 1.1));
-        const k = i % 3;
-        if (k === 0) {
-          // Straight up, not splayed: a leaning arm is the one part of this
-          // object that could reach past the barrier line, and the read is in
-          // the arm being ABOVE the head, not in where its hand is.
-          parts.push(wv(bx(0.13, 0.60, 0.13, x - 0.26, 1.44 * h, z, skin), ph, 1.7));
-          parts.push(wv(bx(0.13, 0.60, 0.13, x + 0.26, 1.44 * h, z, skin), ph, 1.7));
-        } else if (k === 1) {
-          parts.push(wv(bx(0.10, 0.80, 0.10, x, 1.72 * h, z, 0x8a5a3c), ph, 1.9));
-          parts.push(wv(bx(0.50, 0.38, 0.06, x, 2.12 * h, z,
-            signs[Math.floor(r() * signs.length)]), ph, 2.2));
-        } else {
-          parts.push(wv(bx(0.13, 0.48, 0.13, x - 0.28, 1.02 * h, z, shirt), ph, 1.0));
-          parts.push(wv(bx(0.13, 0.48, 0.13, x + 0.28, 1.02 * h, z, shirt), ph, 1.0));
-        }
+        vSpectator(parts, {
+          x: 0.14 + (r() - 0.5) * 0.20, z: z,
+          r: r, shirts: shirts, trousers: trousers, signs: signs,
+          lo: 0.82, hi: 0.26, amp: 1.15, placard: 0.45,
+          // Phase off the SEAT rather than off a counter, so neighbours are a
+          // beat apart down the row instead of pumping as one object.
+          phase: z * 0.53 + r() * 2.4,
+        });
       }
 
       // ---- the seating ----------------------------------------------------
@@ -19568,6 +19654,7 @@ MR.World = (function () {
                       0xfff2e0, 0x9a7bff];
       const skins = [0xffc79a, 0xe0a173, 0xb87a4e, 0x8a5a3c];
       const flags = [0xffe45e, 0xfffdf5, 0x37d6ff, 0xff9ad5, 0xff4d5e];
+      const ftrousers = [0x2b2f52, 0x3a4472, 0x4a3a52, 0x2f3a38, 0x5a4a3a, 0x37405e];
       const r = lcg(seed);
 
       // ---- the front rail: the reason this object exists -----------------
@@ -19582,31 +19669,24 @@ MR.World = (function () {
           const n = 8;
           for (let i = 0; i < n; i++) {
             const z = -TILE / 2 + 1.4 + i * ((TILE - 2.8) / (n - 1)) + (r() - 0.5) * 0.7;
-            const h = 0.94 + r() * 0.20;
-            const shirt = shirts[Math.floor(r() * shirts.length)];
-            const skin = skins[Math.floor(r() * skins.length)];
-            const ph = z * 0.55 + row * 2.3 + r() * 2.0;
-            // Legs up inside the shirt and within 0.3 of its amplitude, so the
-            // wave cannot open daylight between a body and its own legs. This
-            // is the crowd the player is closest to in the game. See crowdGeo.
-            parts.push(wv(bx(0.36, 0.92 * h, 0.26, rx, 0.46 * h, z, 0x2b2f52), ph, 0.85));
-            parts.push(wv(bx(0.50, 0.70 * h, 0.34, rx, 1.02 * h, z, shirt), ph, 1.15));
-            parts.push(wv(bx(0.30, 0.30, 0.28, rx, 1.52 * h, z, skin), ph, 1.15));
-            // One in three has both arms over their head, one in three is
-            // waving something. A crowd where everybody does the same thing
-            // is a chorus line; the mix is what makes it a crowd.
-            const k = (i + row) % 3;
-            if (k === 0) {
-              parts.push(wv(bx(0.13, 0.62, 0.13, rx - 0.30, 1.44 * h, z, skin, 0, 0, 0.40), ph, 1.7));
-              parts.push(wv(bx(0.13, 0.62, 0.13, rx + 0.30, 1.44 * h, z, skin, 0, 0, -0.40), ph, 1.7));
-            } else if (k === 1) {
-              parts.push(wv(bx(0.10, 0.86, 0.10, rx - 0.24, 1.72 * h, z, 0x8a5a3c), ph, 1.9));
-              parts.push(wv(bx(0.62, 0.42, 0.06, rx - 0.24, 2.16 * h, z,
-                flags[Math.floor(r() * flags.length)]), ph, 2.3));
-            } else {
-              parts.push(wv(bx(0.13, 0.50, 0.13, rx - 0.30, 1.06 * h, z, shirt, 0, 0, 0.22), ph, 1.0));
-              parts.push(wv(bx(0.13, 0.50, 0.13, rx + 0.30, 1.06 * h, z, shirt, 0, 0, -0.22), ph, 1.0));
-            }
+            // THE ONLY CROWD IN THIS GAME MEASURED AT A REAL FACE SIZE, and
+            // it is still not one. tools/people.js puts the widest head in
+            // these two rows at 21.4 px with a 3.92 px eye mark -- which
+            // clears the threshold -- but the MEDIAN head in the population is
+            // 1.9 px, and 878 head pixels a frame are shared between 183
+            // visible heads. Four and a half pixels a face. The two front rows
+            // could carry eyes; the other three hundred and fifty figures they
+            // are merged into could not, and they are one geometry and one
+            // draw. Tier READ, and the front row gets its legibility from
+            // being the only rank that BRACES on the rail while everything
+            // behind it jumps.
+            const braced = (i + row) % 3 === 0;
+            vSpectator(parts, {
+              x: rx, z: z, r: r, shirts: shirts, trousers: ftrousers, signs: flags,
+              lo: 0.90, hi: 0.22, amp: 1.2, placard: 0.5,
+              act: braced ? 4 : undefined,
+              phase: z * 0.55 + row * 2.3 + r() * 2.0,
+            });
           }
         }
       }

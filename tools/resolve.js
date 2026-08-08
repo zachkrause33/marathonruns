@@ -238,6 +238,14 @@ const CANDIDATES = [
     note: 'MOVED by this tool: was median 2 px, proud of a surface already curved away',
     code: (c) => `__probe('knuckle row', elbow, new THREE.SphereGeometry(0.042, 16, 12), ${c}, { y: -0.300, z: -0.055 });`,
   },
+  {
+    name: 'brow',
+    kind: 'added',
+    anchor: '    browPivot.add(brows);',
+    note: 'heavy, on the forehead the brim lift opened -- both brows pooled',
+    code: (c) => `__probe('brow', browPivot, new THREE.CircleGeometry(0.030, 24), ${c}, { x: -0.100, z: 0.2690, sx: 1.55, sy: 0.25, rz: -0.07 });
+      __probe('brow', browPivot, new THREE.CircleGeometry(0.030, 24), ${c}, { x: 0.100, z: 0.2690, sx: 1.55, sy: 0.25, rz: 0.07 });`,
+  },
   // ---- positive controls ---------------------------------------------------
   //
   // The same geometry at the same distance from the same lens, moved clear of

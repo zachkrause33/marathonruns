@@ -85,6 +85,7 @@ function pageSample(o) {
   // right answer for a rename and the wrong one for a comparison against a
   // build that predates the pass.
   if (P.eyes) joints.push(['eyes', P.eyes]);
+  if (P.brows) joints.push(['brows', P.brows]);
   if (P.mouth) joints.push(['mouth', P.mouth]);
   P.legs.forEach(function (L, i) {
     joints.push(['leg' + i + '.hip', L.hip], ['leg' + i + '.knee', L.knee], ['leg' + i + '.ankle', L.ankle]);

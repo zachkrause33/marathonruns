@@ -1460,3 +1460,60 @@ nobody measured is worse than no number at all.**
    hand has SEPARATED, chunky fingers. Ours is a fist with a knuckle row, which
    is right for a runner's arm swing and is not what an open hand looks like.
    No open-hand pose exists in this game today.
+
+27. **The brim went up, and two correct animation terms turned out to be
+   subtracting.** Entry 25's postscript ended with a limitation reported rather
+   than built: this character had no forehead, so he could have no brows, and
+   opening one meant moving the hat -- which is his identity. The owner was
+   asked and chose to move it. Band centre HY + 0.060 -> HY + 0.102.
+
+   Two things came out of building it that generalise.
+
+   **A clearance target derived for the wrong material.** The 0.042 was derived
+   to leave "one ink width of clearance over the eye", and what shipped is
+   0.0034 at rest and a deliberate OVERLAP under load. Both halves of the target
+   were wrong once the z was settled. An ink width is what two SHADED surfaces
+   need so their outline shells do not interpenetrate, and the brow is welded
+   into a flat unlit mesh that has no ink shell -- there is nothing there to
+   grow teeth. And a brow that never touches the eye cannot furrow. Putting the
+   brow IN FRONT of the whole eye stack instead of above it took the available
+   tilt from about four degrees to nine and replaced the clearance that mattered
+   with a different one: 0.0163 to the pupil at maximum excursion.
+
+   **Two terms that were each right, and together wrong.** The pass already
+   drove the eye's aperture, because it had been written when there were no
+   brows to drive. Adding the brow raised the obvious question -- which channel
+   carries it -- and it was answered by isolating each in a patched build and
+   counting the pixels that CHANGE between effort 0 and effort 1:
+
+   | | brow alone | aperture alone | both |
+   |---|---|---|---|
+   | symmetric aperture | 11668 | 3900 | **8585** |
+   | closing from below | 10734 | 5282 | **13713** |
+
+   The first row is the finding. Both together read LESS than the brow on its
+   own: a symmetric aperture pulls the eye's top edge down and away exactly as
+   the brow arrives to meet it, so the brow lands on skin instead of on eye and
+   neither mark gets its contrast. Two defensible terms, deleting 3083 pixels of
+   each other. The fix was not smaller gains, it was a different EDGE -- the
+   aperture now closes from the bottom, the pivot translating by half the height
+   it loses so the top edge is pinned -- and the pair went from 3083 pixels
+   worse than one channel to 2979 better. A swing of 6062 pixels for one line of
+   geometry reasoning, with the gains barely touched.
+
+   **The general rule, which nothing in this repo had written down:** when two
+   terms drive the same feature, measure them TOGETHER as well as apart. Every
+   instrument here was built to ask "does this part read", and each of these two
+   passes that question on its own. "Both are good" is not a measurement.
+
+   What it cost, isolated against the build immediately before it. `low` is
+   0.0000 in all eight states, so footroom cannot have moved. Crown is 0.0000 or
+   +-0.0001 in seven of eight -- the run, jump and slide crowns the contract
+   names are untouched -- and moves only in slide-ENTER, +0.0078. Half-width is
+   0.0000 in all five states the contract separates and moves only in lean
+   (+0.0085), trip (+0.0158) and bounce (+0.0202), which are the three roll
+   states, where a band 0.042 further from the neck pivot swings a little wider.
+   Joints at polish 0: exactly 0.000e+0 on every one but the hood spring.
+
+   And the brow is 0 pixels in 48 of 48 frames through the chase camera, like
+   every other thing on this face.

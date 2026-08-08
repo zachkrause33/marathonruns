@@ -1259,3 +1259,94 @@ nobody measured is worse than no number at all.**
 
    Worth keeping because the failure was **invisible in the sheet**. The
    numbers read beautifully; only the audit knew.
+
+23. **The owner looked at our people and named different people, and that is a
+   measurement.** They asked for the "cops, taxi drivers, and other people who
+   appear as obstacles" to be improved. This game has no police and no taxi
+   drivers. What it has is race marshals, two road cyclists, a cargo-trike
+   rider, a delivery moped rider, spectators and pavement walkers.
+
+   The correction everyone reached for -- "there are no cops, they meant the
+   reference game" -- is the wrong one. The owner's reply settles it: *"This
+   paragraph above is exactly why this needs to happen. I can't even tell what
+   they are."* A misidentification is not a missing-detail report. It is a
+   testable failure, and unlike "make them more human" it has a pass mark.
+
+   So the pass was judged by **showing 1:1 crops through the live chase camera
+   to a reader with no context at all** -- no source, no docs, not even the
+   name of the game -- and asking one question: *there are people in this
+   picture, what is each one?* Before, verbatim:
+
+   - v9, the delivery moped: *"a police or official escort motorcyclist, or a
+     delivery rider."* **The owner's own misreading, reproduced independently.**
+   - v8, two road cyclists: *"Two people on motorcycles, and this one I am
+     fairly confident about... escort or outrider motorcyclists."* A bicycle
+     read as a motorbike, confidently.
+   - v3, the marshals: *"Two figures side by side on a flat trailer...
+     Stripped of the props, the two bodies themselves are just banded blocks
+     and I could equally believe they were spectators on a viewing stand."*
+   - v2, the trike's rider: *"I cannot tell what kind of person it is... a
+     stack of blocks... If I had to guess from the vehicle rather than the
+     figure, I would say a maintenance cart driver, **but that is the cart
+     talking, not the person**."*
+
+   Three things worth keeping from that:
+
+   **The props were carrying every figure that read at all.** Cones, a board, a
+   top box, a paddle. Take them away and there was no person left -- and props
+   are what the OTHER hazards have too, so they cannot distinguish anything.
+
+   **One 0.44 x 0.08 box was doing more identification work than everything
+   else on a rider combined.** The reader named it: *"unlike every other figure
+   here, the head is an actual helmet with a black visor band across it. That
+   visor is what makes it read as a person on a bike rather than a stack of
+   boxes."*
+
+   **Category errors come from the machine, not the paint.** v8 read as
+   motorcycles because its wheels were CAR wheels (a rim disc at 0.58 of the
+   radius inside a 0.10 tyre), its bars were a straight tube, and its riders
+   sat upright. A bicycle wheel is mostly air, a road bicycle has drop bars,
+   and a road cyclist is folded over them. None of that is detail; all of it is
+   shape, and all of it was cheaper than the paint arguments in the lever
+   tables above.
+
+   One thing the sheet found that nobody asked about: the reader also reported
+   *"a group of tall brown vertical slabs I genuinely cannot identify; they
+   might be people in brown, or wooden posts, or market stall frames."* They
+   are TREE TRUNKS, standing behind the aid station with their canopies
+   occluded by the street wall. Same family as entry 21 -- a part that is
+   present, correct and worth nothing -- except here the part is worth less
+   than nothing, because it reads as an unidentifiable object.
+
+24. **The instrument for this one had three defects and every one flattered the
+   measurement.** `tools/people.js` was written to answer "how big is a person,
+   in pixels, where the game actually puts them", because `framing.js` can
+   place a hazard from a claim site and nothing could place a crowd.
+
+   1. `Vector3.project` divides by w and w crosses zero at the camera plane, so
+      a head BESIDE the eye came back mirrored and enormous. It reported a
+      spectator head of **114,730 px** -- several viewports -- and reported it
+      as the BEST CASE, which is the number a decision to build a face would
+      have been taken on.
+   2. Clustering skin vertices on a 0.34 grid did not measure heads. A
+      spectator's raised arms are skin, and so is the placard pole, and the gap
+      from a 0.28 head to an arm 0.30 out is 0.10. Head, both arms and a 0.9
+      pole fused into one 41.9 px blob.
+   3. Tightening the grid to 0.10 returned **1444 heads of size 0.00 x 0.00**.
+      A box has no interior vertices: its corners are 0.28 apart, three cells,
+      and a 1-neighbour union cannot bridge them. There is no cell size that
+      works, because a grid is the wrong primitive. The split is topological
+      now -- same triangle, or same position within the same colour run -- and
+      recovers each authored box whole at any size with nothing to tune.
+
+   Fourth entry of the form "the instrument was the bug", after `stride.js`'s
+   six defects, `clarity.js`'s whole-frame edge density, and the ortho lenses
+   at entry 21.
+
+   What it then found is the whole tiering of this pass, and it is blunt: **a
+   spectator's face is 1.5 pixels wide and draws 2.3 of them.** Ninety-one head
+   pixels a frame, shared between forty visible heads, is the entire budget for
+   every face in a roadside knot. There is no eye that can go there. The four
+   hazards that are people measure 17 to 27 px of head at 8 units -- and 80 px
+   at the closest approach the game can produce -- so they get faces, and
+   everything else gets silhouette and motion.

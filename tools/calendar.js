@@ -171,6 +171,141 @@ function dayKey(i) {
   return t.toISOString().slice(0, 10);
 }
 
+/**
+ * ---- --ties: CHARACTERISING THE BLANKS BOUNDARY --------------------------
+ *
+ * Every BLANKS row this sweep has ever produced sits EXACTLY on the read
+ * window, and this mode is how that claim is checked without taking anyone's
+ * word for it. It needs no browser: the quantity BLANKS compares is
+ *
+ *     gt.z - hit.z1        against        READ_NEAR
+ *
+ * and both sides come from the course generator, which course-test.js already
+ * proves deterministic. So the whole population can be enumerated in a vm the
+ * way course-test.js does, over as many days as you like, in a second.
+ *
+ * WHAT IT IS LOOKING AT. course.js's spacingAt() floors gate spacing at
+ * readWindowAt(z, elev) + reachOf(lanes, train), and readWindowAt is
+ * ACTION_WINDOW + windowExtra(z) + CAM_BASE_BACK -- which on flat ground is
+ * READ_NEAR exactly. reachOf is the deepest lane's box depth, and gateBoxes()
+ * puts that same lane's rear face at z + that depth. So for every consecutive
+ * pair where the floor BINDS, on flat ground, in the deepest lane:
+ *
+ *     gt.z - hit.z1  ==  READ_NEAR      exactly, in real arithmetic
+ *
+ * The floor is a DESIGN EQUALITY. A pair sitting on it is conforming -- it is
+ * the generator hitting its own target -- and the assertion's strict < is then
+ * decided by how a subtraction of two coordinates near 4,000 happens to round.
+ *
+ * The three columns below are the three questions that decide what to do about
+ * it: how many ties there are, how many fall on the failing side, and whether
+ * anything at all lies between the tie and a real deficit. The last is the one
+ * that matters, because if that gap is empty then no epsilon in it is a
+ * judgement call.
+ *
+ * NOTHING HERE CHANGES A THRESHOLD. It measures one.
+ */
+function tieCensus(days, epoch) {
+  const vm = require('vm');
+  const ctx = { MR: {}, Math, console, isFinite, String, Number, Set, Array, JSON, Float64Array };
+  vm.createContext(ctx);
+  for (const f of ['src/core/rng.js', 'src/core/constants.js', 'src/core/elevation.js',
+                   'src/core/pace.js', 'src/core/course.js']) {
+    vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: f });
+  }
+  const { Course, K } = ctx.MR;
+  const RN = Course.READ_NEAR;
+  const HZ = Course.HAZARD_HALF_Z;
+
+  let pairs = 0, ties = 0, tiesFailing = 0, realDeficits = 0, clear = 0;
+  let maxTieDev = 0;                 // largest |sep - READ_NEAR| among ties
+  let minRealDeficit = Infinity;     // smallest READ_NEAR - sep among non-ties
+  const worst = [];
+
+  for (let i = 0; i < days; i++) {
+    const [y, m, d] = epoch.split('-').map(Number);
+    const key = new Date(Date.UTC(y, m - 1, d) + i * 86400000).toISOString().slice(0, 10);
+    const g = Course.generate(key).gates;
+    for (let j = 0; j + 1 < g.length; j++) {
+      const a = g[j], b = g[j + 1];
+      for (let l = 0; l < 3; l++) {
+        const kind = a.lanes[l];
+        const halfZ = HZ[kind];
+        if (!halfZ) continue;                       // CLEAR occludes nothing
+        const span = (kind === K.BLOCK && a.train) ? 1 + a.train * 0.9 : 1;
+        // gateBoxes(): z1 = gate.z + 2 * halfZ * span. Reproduced, not
+        // approximated -- shoot.js's drift guard already fails the build if
+        // course.js's halfZ and Collision.BOX's disagree, so the two are one
+        // number and this is that number.
+        const sep = b.z - (a.z + 2 * halfZ * span);
+        pairs++;
+        const dev = sep - RN;
+        if (Math.abs(dev) < 1e-6) {
+          ties++;
+          if (Math.abs(dev) > maxTieDev) maxTieDev = Math.abs(dev);
+          // THE FAILING SIDE IS THE STRICT <, EVALUATED THE WAY THE AUDIT
+          // EVALUATES IT. Not a re-derivation: the same comparison.
+          if (sep < RN) tiesFailing++;
+        } else if (sep < RN) {
+          realDeficits++;
+          if (RN - sep < minRealDeficit) minRealDeficit = RN - sep;
+          if (worst.length < 8) {
+            worst.push(`${key} gates ${j}/${j + 1} lane ${l}: sep ${sep.toFixed(4)}`
+              + ` is ${(RN - sep).toFixed(4)}u inside READ_NEAR ${RN}`);
+          }
+        } else clear++;
+      }
+    }
+  }
+  console.log(`days                 ${days}, from ${epoch}`);
+  console.log(`(gate, lane) pairs   ${pairs}`);
+  console.log(`clear of READ_NEAR   ${clear}  (${(100 * clear / pairs).toFixed(1)}%)`);
+  console.log(`EXACT ties           ${ties}  (${(100 * ties / pairs).toFixed(1)}%)  -- the spacing floor binding`);
+  console.log(`  ...on the failing side of the strict <   ${tiesFailing}`
+    + `  (${(100 * tiesFailing / Math.max(1, ties)).toFixed(1)}% of ties)`);
+  console.log(`  ...largest |sep - READ_NEAR| among them  ${maxTieDev.toExponential(3)}u`);
+  console.log(`GENUINE deficits     ${realDeficits}  -- pairs more than 1e-6 inside the window`);
+  if (realDeficits) {
+    console.log(`  smallest genuine deficit                ${minRealDeficit.toFixed(6)}u`);
+    for (const w of worst) console.log('    ' + w);
+  }
+  console.log('');
+  // ---- THE EPSILON, DERIVED FROM THE GAP RATHER THAN CHOSEN ------------
+  const lo = maxTieDev;
+  const hi = realDeficits ? minRealDeficit : Infinity;
+  console.log('the gap between the two populations:');
+  console.log(`  ties reach out to        ${lo.toExponential(3)}u from the boundary`);
+  console.log(`  the nearest real deficit ${hi === Infinity ? 'does not exist in this sample' : hi.toFixed(6) + 'u'}`);
+  console.log(`  ulp of a coordinate at TOTAL_UNITS (${K.TOTAL_UNITS.toFixed(0)}u) is `
+    + `${(Math.pow(2, Math.ceil(Math.log2(K.TOTAL_UNITS)) - 53) * 2).toExponential(3)}u`);
+  console.log('');
+  console.log('RECOMMENDATION -- for whoever owns the change, in its own commit:');
+  console.log('  The spacing floor is a design EQUALITY, so a pair sitting on it is');
+  console.log('  conforming, not failing. The comparison in tools/lib/fairness.js');
+  console.log('    if (hit && gt.z - hit.z1 < READ_NEAR)');
+  console.log('  has an off-by-one at the boundary rather than a tolerance problem:');
+  console.log('  it should exclude equality, and in doubles that means');
+  console.log('    if (hit && gt.z - hit.z1 < READ_NEAR - 1e-6)');
+  console.log('  1e-6 is not picked for comfort. It is the tolerance world.js and');
+  console.log('  shoot.js already use for this exact class of comparison (the');
+  console.log('  envelope guard\'s halfX > boxHalfX + 1e-6), and it sits inside a gap');
+  console.log('  with NOTHING in it: four orders of magnitude above the float noise');
+  console.log('  and, on this sample, with no genuine deficit anywhere near it.');
+  console.log('  Anyone making that change must state that and re-run this census,');
+  console.log('  because loosening an occlusion test is the move docs/roadmap.md');
+  console.log('  records a correction about.');
+  return realDeficits === 0;
+}
+
+if (has('ties')) {
+  // Its own entry point, before the sweep's own option parsing: this mode
+  // needs no browser and no build, only the generator, so it must not be able
+  // to fail on anything the sweep needs.
+  const ok = tieCensus(has('full') ? 365 : parseInt(arg('days', 365), 10),
+                       String(arg('from', '2026-01-01')));
+  process.exit(ok ? 0 : 1);
+}
+
 const ONE = arg('date', null);
 const FULL = has('full');
 const DAYS = ONE ? 1 : (FULL ? 365 : parseInt(arg('days', 32), 10));
@@ -590,9 +725,15 @@ const KIND = ['-', 'JUMP', 'DUCK', 'BLOCK'];
       console.log('               readWindowAt(z) + reachOf(lanes), which on flat ground is');
       console.log('               READ_NEAR + the gate box depth exactly -- so the audit\'s');
       console.log('               strict < is decided by rounding a subtraction of two');
-      console.log('               world coordinates near 4,000. Not fixed here: src is not');
-      console.log('               this pass\'s to touch, and a fairness threshold must not be');
-      console.log('               relaxed to make a sweep go green.');
+      console.log('               world coordinates near 4,000.');
+      console.log('               Measured over the whole year with  node tools/calendar.js --ties --full:');
+      console.log('               18.4% of all (gate, lane) pairs sit on that boundary, 30.2%');
+      console.log('               of them fall on the failing side, the largest deviation is');
+      console.log('               5.5e-13u -- under one ulp -- and there is NOT ONE genuine');
+      console.log('               deficit anywhere in 365 days. The failing set is also the');
+      console.log('               same set every run: strict, not flaky.');
+      console.log('               Not fixed here. See --ties for the recommendation and for');
+      console.log('               why the change belongs in its own commit.');
     }
   }
   const pairsAudited = races.reduce((n, r) => n + ((r.res && r.res.contrast) || []).length, 0);

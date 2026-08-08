@@ -166,6 +166,21 @@ MR.Collision = (function () {
    * generates the whole calendar with the ramp off and compares a hash.
    *
    *   JUMP   feet at (y + surface). On the road this is y, unchanged.
+   * ---- AND clears() IS NO LONGER THE WHOLE OF WHETHER A BLOCK IS HIT -----
+   *
+   * It is the whole of whether a BLOCK is hit AT ITS GATE LINE, which is a
+   * narrower claim than this file used to make. A BLOCK is a solid 3.9 to 17.9
+   * units deep and its FLANK is now solid too, on the owner's instruction --
+   * "a vehicle you can see is a vehicle you can hit". That test cannot live
+   * here, because it is not a question about player state at an instant: it is
+   * a question about whether the runner entered a volume from the side, which
+   * needs the step he took to get there. It lives in player.resolveDeck and it
+   * reads MR.Course.occupiedAt.
+   *
+   * The division between them is the near face. resolveDeck defers every
+   * head-on entry to resolveGates, so one solid charges one contact and the
+   * clause below still decides it. See the note above resolveDeck.
+   *
    *   BLOCK  cleared if and only if the runner is ON it -- `st.onDeck`, the
    *          player's own answer to "am I standing on this thing", set by
    *          resolveDeck. A HEIGHT comparison was the obvious way to write this

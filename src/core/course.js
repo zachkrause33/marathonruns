@@ -230,6 +230,100 @@ MR.Course = (function () {
   }
 
   /**
+   * ---- LANE OCCUPANCY, WHICH IS THE THING THIS FILE NEVER HAD -------------
+   *
+   * Every lane-reasoning part of this game reasoned AT GATE LINES: the proof,
+   * the spacing floor, the telegraph mats, the bot, and -- fatally --
+   * player.resolveGates, which is the only contact path and fires only at
+   * gate.z. A BLOCK train is ONE gate carrying up to 17.9 units of vehicle, so
+   * a player who was in a clear lane at the gate line and swerved a moment
+   * later ran the whole length of a bus with nothing to touch. Measured on the
+   * shipped generator: 4895 of 4895 trains over 365 days recorded no contact
+   * at all.
+   *
+   * The owner's decision, made after being shown that and told plainly that
+   * fixing it makes the game harder: "A vehicle you can see is a vehicle you
+   * can hit."
+   *
+   * So a lane is now occupied over a Z RANGE, said ONCE, here, in the form the
+   * collision test and the solver both read. The interval is not invented: it
+   * is [gate.z, gate.z + 2 * halfZ * span], the same nose-anchored expression
+   * reachOf uses, world.js's gateBoxes builds, ramp.js extrudes and
+   * tools/shoot.js casts. There is one solid and five files describing it,
+   * which is the only arrangement in which art cannot disagree with clearance.
+   *
+   * THE SPAN MULTIPLIER APPLIES TO EVERY BLOCK LANE IN THE GATE, not only to
+   * the lane maybeTrain picked. That is not an approximation -- it is what
+   * gateBoxes DRAWS, so it is what the player sees, and a collision volume
+   * shorter than the art it stands for is the one direction fairness cannot
+   * survive.
+   *
+   * ---- WHY solvable() STILL NEEDS NO CHANGE ------------------------------
+   *
+   * Because every span is CONTAINED IN ONE GATE INTERVAL, and that is
+   * guaranteed rather than observed. spacingAt owes the next gate
+   * readWindowAt + reachOf, and reachOf is the deepest span in the gate -- so
+   * a vehicle's far face is at least readWindowAt (25.35 units, and more on a
+   * descent) short of the next gate line. "Lane l is free at gate i" and "lane
+   * l is unoccupied from gate i to gate i+1" are therefore the SAME statement,
+   * which is exactly what the BFS has always assumed without being able to say
+   * so.
+   *
+   * What is genuinely new is crossing THROUGH an occupied lane: a path that
+   * goes lane 0 at gate i to lane 2 at gate i+1 passes through lane 1, and
+   * lane 1 may have a lorry standing in it just past gate i. The player waits
+   * for it to end and then crosses -- and the room to do that is the same
+   * readWindowAt, against the LANE_TRANSIT units two lane changes cover.
+   * validate() proves both, on every course, rather than leaving this
+   * paragraph to be trusted.
+   */
+  const LANE_TRANSIT = 1.55 * K.LANE_CHANGE_TIME * MAX_SPEED;
+
+  function buildSpans(gates, ramps) {
+    const lanes = [[], [], []];
+    const halfZ = HAZARD_HALF_Z[K.BLOCK];
+    for (let i = 0; i < gates.length; i++) {
+      const g = gates[i];
+      for (let l = 0; l < 3; l++) {
+        if (g.lanes[l] !== K.BLOCK) continue;
+        const mult = g.train ? 1 + g.train * 0.9 : 1;
+        // The ramp OBJECT, not a boolean: the two ways of leaving a roof are
+        // different events and telling them apart means knowing where the far
+        // face is. Matched on the gate line because a lane holds at most one
+        // span starting there.
+        let ride = null;
+        if (g.ramp === l && ramps) {
+          for (const r of ramps) if (r.lane === l && r.z0 === g.z) { ride = r; break; }
+        }
+        lanes[l].push({ lane: l, z0: g.z, z1: g.z + 2 * halfZ * mult, gate: i, ride });
+      }
+    }
+    return lanes;
+  }
+
+  /**
+   * The span covering (z, lane), or null.
+   *
+   * Binary search rather than a scan, and the reason is that this is now on the
+   * per-frame path: player.resolveDeck calls it for the runner's lane every
+   * frame and for both neighbours on a bounce. Spans within a lane never
+   * overlap -- see the containment argument above -- so the last span starting
+   * at or before z is the only one that can cover it.
+   */
+  function spanAt(lanes, z, lane) {
+    const list = lanes[lane];
+    if (!list || !list.length) return null;
+    let lo = 0, hi = list.length - 1, found = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (list[mid].z0 <= z) { found = mid; lo = mid + 1; } else hi = mid - 1;
+    }
+    if (found < 0) return null;
+    const s = list[found];
+    return z < s.z1 ? s : null;
+  }
+
+  /**
    * ---- THE RIDEABLE ROOF, IN NUMBERS --------------------------------------
    *
    * DECK_Y IS NOT CHOSEN. It is Collision.BOX[BLOCK].yMax, the top of the
@@ -628,9 +722,19 @@ MR.Course = (function () {
         const flat0 = r.z0 + r.run;
         const z = flat0 + (r.z1 - flat0) * 0.5;
         const fruit = rr.chance(0.55);
+        // `y` IS THE INTERFACE TO THE ART, and it is carried on the item rather
+        // than recomputed by the renderer. A roof pickup drawn at road level is
+        // drawn INSIDE the lorry -- which is what shipped, and is invisible in a
+        // diff because nothing in course space was wrong. It is height above the
+        // LOCAL ROAD, the same quantity player.surface and camera.dk are, so
+        // world.js adds it exactly where it already adds elevation.at(z).
+        //
+        // Only roof items carry it: adding a y: 0 to every road item would
+        // change the aid JSON and break the identity hash for no gain.
+        const roof = { z, lane: r.lane, y: DECK_Y, guarded: true, roof: true };
         items.push(fruit
-          ? { z, lane: r.lane, kind: 'banana', gain: K.AID_BANANA, guarded: true, roof: true }
-          : { z, lane: r.lane, kind: 'water', gain: K.AID_WATER, guarded: true, roof: true });
+          ? Object.assign(roof, { kind: 'banana', gain: K.AID_BANANA })
+          : Object.assign(roof, { kind: 'water', gain: K.AID_WATER }));
       }
     }
 
@@ -989,8 +1093,19 @@ MR.Course = (function () {
     mileMarkers.push({ mile: K.MARATHON_MILES, z: K.TOTAL_UNITS, finish: true });
 
     const aid = generateAid(key, gates, ramps);
+    const spans = buildSpans(gates, ramps);
     const course = { key, gates, aid, mileMarkers, biomes: BIOMES, length: K.TOTAL_UNITS,
-                     elevation, ramps, tally };
+                     elevation, ramps, spans, tally };
+
+    /**
+     * The vehicle standing in (z, lane), or null.
+     *
+     * THE ONE ANSWER TO "is this lane occupied here", read by the collision
+     * test, the bot and the instrument. Every BLOCK is in here, rideable or
+     * not -- a lane closed by a standing taxi is as solid as one closed by a
+     * lorry, and the game used to guard neither past its gate line.
+     */
+    course.occupiedAt = function (z, lane) { return spanAt(spans, z, lane); };
 
     /**
      * The height of the running surface at (z, lane): 0 on the road, DECK_Y on
@@ -1002,18 +1117,19 @@ MR.Course = (function () {
      * exactly one answer to "how high is the ground here" and art cannot
      * disagree with it. Same contract as MR.Collision.BOX, same reason.
      *
+     * Zero over a vehicle that is NOT rideable, and that distinction is the
+     * whole difference between a roof and a wall: occupiedAt says the lane is
+     * solid, deckAt says whether anything up there can be stood on.
+     *
      * Flat and constant-zero when no ramp was generated, which is every course
      * at RAMP = 0 -- so nothing downstream needs a null check and nothing
      * downstream changes behaviour.
      */
     course.deckAt = function (z, lane) {
-      for (let i = 0; i < ramps.length; i++) {
-        const r = ramps[i];
-        if (r.lane !== lane || z < r.z0 || z >= r.z1) continue;
-        const up = z - r.z0;
-        return up < r.run ? r.deck * (up / r.run) : r.deck;
-      }
-      return 0;
+      const s = spanAt(spans, z, lane);
+      if (!s || !s.ride) return 0;
+      const up = z - s.ride.z0;
+      return up < s.ride.run ? s.ride.deck * (up / s.ride.run) : s.ride.deck;
     };
 
     /**
@@ -1023,11 +1139,8 @@ MR.Course = (function () {
      * a fall -- and telling them apart means knowing where the front is.
      */
     course.rampAt = function (z, lane) {
-      for (let i = 0; i < ramps.length; i++) {
-        const r = ramps[i];
-        if (r.lane === lane && z >= r.z0 && z < r.z1) return r;
-      }
-      return null;
+      const s = spanAt(spans, z, lane);
+      return s ? s.ride : null;
     };
 
     // This date's places, in the order they will be run through. Carried
@@ -1113,6 +1226,33 @@ MR.Course = (function () {
           errors.push(`gate ${i}: ${(g[i].z - g[i - 1].z).toFixed(2)} behind gate ${i - 1} `
             + `needs ${need.toFixed(2)} to stay readable past it`);
         }
+        // ---- THE FLANK IS SOLID, SO THE PROOF OWES ONE MORE THING --------
+        //
+        // solvable() proves a sequence of LANES AT GATE LINES and says nothing
+        // about the ground between them, which was fine while a lane was only
+        // guarded where the plane was. It is not fine now. Two facts have to
+        // hold for every BFS edge to stay physically walkable:
+        //
+        //   1. No vehicle reaches the next gate line, or a lane the proof
+        //      called free at that gate has a lorry standing in it. This is
+        //      strictly implied by the sightline floor above -- readWindowAt is
+        //      positive -- but it is the assumption solvable() rests on and it
+        //      is worth failing loudly rather than by implication.
+        //   2. There is room to CROSS an occupied lane after its vehicle ends:
+        //      going from lane 0 to lane 2 passes through lane 1, and lane 1 is
+        //      solid for reachOf units past the gate. LANE_TRANSIT is the
+        //      ground two lane changes cover at the pace floor, derived from
+        //      K.LANE_CHANGE_TIME and changeLane's own 0.55 re-arm rather than
+        //      typed, so a retune of either moves this with it.
+        //
+        // This is the assertion that fails first if anyone lowers the sightline
+        // floor, the jump arc or the pace floor, because readWindowAt is
+        // derived from all three and this is what is left of it.
+        const clear = g[i].z - (g[i - 1].z + reachOf(g[i - 1].lanes, g[i - 1].train));
+        if (clear < LANE_TRANSIT - 1e-9) {
+          errors.push(`gate ${i - 1}: only ${clear.toFixed(2)} of clear road past its deepest `
+            + `vehicle before gate ${i}, and crossing an occupied lane needs ${LANE_TRANSIT.toFixed(2)}`);
+        }
       }
     }
     if (!solvable(g, elev)) errors.push('course has no solvable lane path');
@@ -1134,7 +1274,7 @@ MR.Course = (function () {
            // cannot drift, which is the whole point of the invariant.
            READ_NEAR: ACTION_WINDOW + K.CAM_BASE_BACK, readWindowAt,
            HAZARD_HALF_Z, reachOf,
-           DECK_Y, RAMP_RUN,
+           DECK_Y, RAMP_RUN, LANE_TRANSIT,
            elevationPlan };
 
   // Accessors rather than plain fields, so a nonsense value cannot be written

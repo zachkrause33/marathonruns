@@ -64,7 +64,10 @@ MR.Player = (function () {
       ramp: null,       // the ramp being ridden, or null
       falling: 0,       // 0..1 through a fall back to the road
       fallFrom: 0,      // the height the fall started at
-      flanked: false,   // latched while inside a vehicle, so one hit is one hit
+      // The occupancy span whose contact is already spent, or null. Holds the
+      // SPAN rather than a flag so a bounce out of one lorry and into the next
+      // is two incidents and not one -- see resolveDeck.
+      flanked: null,
       gateIdx: 0,
       aidIdx: 0,
       lastResult: null,  // 'clean' | 'hit'
@@ -83,7 +86,7 @@ MR.Player = (function () {
       s.lane = 1; s.laneFrom = 1; s.laneT = 1; s.x = 0; s.y = 0;
       s.airT = 0; s.airborne = false; s.duckT = 0; s.ducking = false;
       s.duck01 = 0; s.lean = 0; s.stumble = 0; s.bounce = 0; s.tripT = 0;
-      s.surface = 0; s.ramp = null; s.falling = 0; s.fallFrom = 0; s.flanked = false;
+      s.surface = 0; s.ramp = null; s.falling = 0; s.fallFrom = 0; s.flanked = null;
       s.gateIdx = 0; s.aidIdx = 0;
       s.lastResult = null; s.events.length = 0;
     };
@@ -188,45 +191,63 @@ MR.Player = (function () {
     };
 
     /**
-     * The second running surface: mount a ramp, ride a roof, leave one.
+     * The solid a lane is standing in: mount a ramp, ride a roof, leave one --
+     * and run into the flank of anything you did not.
      *
      * ---- WHY THIS IS CONTINUOUS WHEN EVERYTHING ELSE IS A PLANE ----------
      *
      * Every other contact in this game is a single-plane test at gate.z, and
-     * that has always been a defensible simplification because a hazard's
-     * relationship to the player does not change between gate lines: you were
-     * in its lane or you were not.
+     * that was always defended on the grounds that a hazard's relationship to
+     * the player does not change between gate lines: you were in its lane or
+     * you were not.
      *
-     * A roof breaks that, in both directions. You can leave it between gate
-     * lines by changing lane, and you can arrive at its flank between gate
-     * lines by changing lane. Neither has a gate to fire at.
+     * That defence was false for the one hazard it mattered for. A BLOCK train
+     * is ONE gate carrying up to 17.9 units of vehicle, so a player who was in
+     * a clear lane at the gate line and swerved a moment later ran the entire
+     * length of a bus with nothing to touch. Measured on the shipped generator
+     * by tools/mechanics.js: 4895 of 4895 trains over 365 days recorded no
+     * contact at all. You could run through the side of a tram.
      *
-     * SO IT ALSO EXPOSES SOMETHING THAT WAS ALREADY TRUE AND IS NOT ABOUT THE
-     * RAMP AT ALL. resolveGates is the only contact path in this file, it fires
-     * only at gate.z, and a BLOCK train is one gate carrying up to eighteen
-     * units of vehicle. A player who is in a clear lane at the gate line and
-     * then swerves into the trained lane runs the entire length of that vehicle
-     * with nothing to touch. That is a hole in the shipped game, it is
-     * measurable (tools/mechanics.js --passthrough drives the real Player
-     * through it), and this function closes it for rideable trains as a side
-     * effect of having to know where the flank is. It does not close it for
-     * ordinary ones -- that would be a difficulty change to the shipped game
-     * and is not this pass's to make.
+     * The owner was shown that, told plainly that closing it makes the game
+     * harder, and chose to close it -- "a vehicle you can see is a vehicle you
+     * can hit." So this function is now the flank test for EVERY vehicle, not
+     * only for the rideable ones, and it reads MR.Course.occupiedAt, which is
+     * the one place a lane's occupancy is stated.
+     *
+     * ---- THE NEAR FACE BELONGS TO THE GATE LINE, AND THAT IS THE WHOLE OF
+     *      HOW TWO CONTACT PATHS SHARE ONE SOLID ----------------------------
+     *
+     * resolveGates already charges for a BLOCK taken head-on, and it does more
+     * than charge: it throws the runner out of the lane and it decides whether
+     * the gate was clean. If this function also fired on the step that crosses
+     * the gate line, one wall would cost two contacts -- or worse, would bounce
+     * the runner into a free lane BEFORE resolveGates looked, turning a wall
+     * into one flank contact plus a free clean gate.
+     *
+     * The test that divides them is physical rather than procedural, so it does
+     * not depend on which resolver main.js calls first: a span's near face IS
+     * its gate line, so `unitsBefore < span.z0` means the runner arrived
+     * head-on and resolveGates owns it, and `unitsBefore >= span.z0` means the
+     * runner was already past the face and came in from the side. A mount is
+     * the one exception and has to be, because it is entered head-on and must
+     * be established before resolveGates asks the BLOCK whether it was cleared.
      *
      * @returns null, or { hit, z, why } when contact was made
      */
     s.resolveDeck = function (course, unitsBefore, unitsNow) {
-      if (!course || !course.deckAt) return null;
-      const geo = course.deckAt(unitsNow, s.lane);
-      // Over open road: the latch is spent and the next vehicle is a fresh
-      // incident. Cleared here rather than at the bounce, because the bounce
-      // does not always succeed -- see the note on it below.
-      if (geo <= 0) s.flanked = false;
+      if (!course || !course.occupiedAt) return null;
+      const span = course.occupiedAt(unitsNow, s.lane);
+      // The latch holds the SPAN, not a boolean. Over open road, or over a
+      // different vehicle, this incident is a fresh one -- and a boolean could
+      // not tell the second lorry from the first when a bounce puts the runner
+      // straight into it. Cleared here rather than at the bounce, because the
+      // bounce does not always succeed; see the note on it below.
+      if (s.flanked && s.flanked !== span) s.flanked = null;
 
       if (s.ramp) {
         // Still on the same vehicle: the roof IS the ground.
-        if (geo > 0 && course.rampAt(unitsNow, s.lane) === s.ramp) {
-          s.surface = geo;
+        if (span && span.ride === s.ramp) {
+          s.surface = course.deckAt(unitsNow, s.lane);
           s.falling = 0;
           return null;
         }
@@ -245,20 +266,25 @@ MR.Player = (function () {
         return { hit: true, z: unitsNow, why: 'fell off the side' };
       }
 
-      if (geo <= 0) return null;
+      if (!span) return null;
 
-      const r = course.rampAt(unitsNow, s.lane);
-      if (!r) return null;
-
-      // There is a vehicle here and the runner is not on top of it. Coming in
-      // over the tailgate is a mount; arriving anywhere past it is arriving at
-      // the flank, which is a wall.
-      if (unitsBefore <= r.z0 + r.run && s.falling <= 0) {
-        s.ramp = r;
-        s.surface = geo;
+      // A rideable train entered over its tailgate is a mount, whichever
+      // direction the runner came from -- head-on off the road, or sideways
+      // onto the low end of the slope. Established BEFORE the near-face test
+      // below, because the mount is the one head-on entry resolveGates must see
+      // already resolved: Collision.clears(BLOCK) asks `onDeck`, and a mount
+      // settled one step late records the runner colliding with the lorry he is
+      // visibly running up.
+      if (span.ride && unitsBefore <= span.ride.z0 + span.ride.run && s.falling <= 0) {
+        s.ramp = span.ride;
+        s.surface = course.deckAt(unitsNow, s.lane);
         s.events.push('mount');
         return null;
       }
+
+      // Head-on. The runner crossed the near face this step, which is the gate
+      // line, so this is resolveGates' contact and not ours. See the note above.
+      if (unitsBefore < span.z0) return null;
 
       // ---- ONE CONTACT PER VEHICLE, NOT ONE PER FRAME --------------------
       //
@@ -273,12 +299,14 @@ MR.Player = (function () {
       //
       // So it does what resolveGates already does for a BLOCK: pick a lane that
       // is actually free at this z, preferring the middle so a knock never puts
-      // the player somewhere they cannot recover from.
+      // the player somewhere they cannot recover from. Free is now asked of
+      // occupiedAt rather than of deckAt, which only ever answered for roofs --
+      // the old test would happily bounce the runner into the side of a taxi.
       const cands = [];
       for (const d of [-1, 1]) {
         const t = s.lane + d;
         if (t < 0 || t > 2) continue;
-        if (course.deckAt(unitsNow, t) > 0) continue;
+        if (course.occupiedAt(unitsNow, t)) continue;
         cands.push(t);
       }
       const to = cands.length
@@ -291,10 +319,10 @@ MR.Player = (function () {
         s.laneT = 0.35;
       }
       // ...and a latch as well as a bounce, because `to === s.lane` is reachable
-      // when two vehicles overlap either side. A latch cannot be defeated by
+      // when two vehicles stand either side. A latch cannot be defeated by
       // geometry; it clears the moment the runner is over open road again.
-      if (s.flanked) return null;
-      s.flanked = true;
+      if (s.flanked === span) return null;
+      s.flanked = span;
       s.stumble = 1;
       s.events.push('bounce');
       s.events.push('hit');
@@ -320,6 +348,17 @@ MR.Player = (function () {
           // lose the streak -- which is why a hit read as the game glitching
           // rather than as the runner hitting something.
           if (kind === K.BLOCK) {
+            // ---- SPEND THIS VEHICLE'S CONTACT -----------------------------
+            //
+            // The wall the runner just hit is 3.9 to 17.9 units deep and its
+            // flank is now solid, so without this the bounce is charged once
+            // here and then again by resolveDeck on the next step whenever the
+            // knock had nowhere to go -- two contacts for one lorry, in a game
+            // where one contact ends a record attempt. Latching the SPAN means
+            // whichever path fires first, the vehicle is spent until the runner
+            // is clear of it. Guarded so a course without occupancy (none now,
+            // but the headless tools construct partial ones) still resolves.
+            if (course.occupiedAt) s.flanked = course.occupiedAt(gate.z, s.lane) || null;
             // A wall you cannot clear THROWS you out of its lane. Pick the
             // side that is actually open at this gate, preferring the middle
             // so a knock never puts the player somewhere they cannot recover
@@ -371,10 +410,26 @@ MR.Player = (function () {
     /**
      * Collect any aid the player ran through this step.
      *
-     * Lane match only -- no action required and no vertical test. Aid is a
-     * reward for choosing a line, not a fourth thing to time, and a bottle you
-     * can miss by being mid-jump would make the aid lane a trap in a game
-     * where the aid lane is supposed to be the merciful option.
+     * Lane match only ON THE ROAD -- no action required and no vertical test.
+     * Aid is a reward for choosing a line, not a fourth thing to time, and a
+     * bottle you can miss by being mid-jump would make the aid lane a trap in a
+     * game where the aid lane is supposed to be the merciful option.
+     *
+     * ---- A ROOF ITEM IS NOT A ROAD ITEM AT A DIFFERENT HEIGHT --------------
+     *
+     * Lane match alone was the whole test, and with roof pickups on the course
+     * that made the ramp FREE: the item sits in the ramp's lane, so a runner at
+     * road level in that lane collected it -- from inside the lorry, without
+     * ever mounting. That is the exact opposite of the trade the roof exists to
+     * be. The reward has to be paid for by being up there, so a roof item is
+     * collected only while standing on the ramp that carries it, and a road
+     * item is not collected from a roof at all.
+     *
+     * The second half is belt and braces rather than a fix: generateAid only
+     * ever places road items in lanes that are passable at the gates either
+     * side, and a rideable train's lane is BLOCK at its gate, so no road item
+     * has ever been inside a vehicle. tools/mechanics.js checks that is still
+     * true instead of leaving it to this sentence.
      *
      * @returns array of collected items
      */
@@ -386,10 +441,14 @@ MR.Player = (function () {
         const item = aid[s.aidIdx];
         if (item.z < unitsBefore - 1e-6) { s.aidIdx++; continue; }
         s.aidIdx++;
-        if (item.lane === s.lane) {
-          out.push(item);
-          s.events.push('aid');
-        }
+        if (item.lane !== s.lane) continue;
+        // The ramp under the ITEM, not under the runner: they are the same
+        // vehicle whenever this can pay out, and asking about the item is what
+        // makes the test independent of where in the step the z landed.
+        const carrier = item.roof && course.rampAt ? course.rampAt(item.z, item.lane) : null;
+        if (item.roof ? s.ramp !== carrier || carrier === null : s.onDeck) continue;
+        out.push(item);
+        s.events.push('aid');
       }
       return out;
     };

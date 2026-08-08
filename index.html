@@ -11980,6 +11980,37 @@ MR.World = (function () {
     }
   }
 
+  /**
+   * A MUDGUARD -- an arc of slabs in the Y-Z plane, hugging a wheel that turns
+   * about x, at the full width of the tyre it covers.
+   *
+   * vArchLip above draws the same arc and is NOT this: it is 0.09 wide because
+   * it is a LIP standing proud of a flank, which is a car's wheel arch seen
+   * edge-on. A guard is a separate object sitting OVER a wheel, and on a
+   * two-wheeler it is the single most nameable thing in the rear elevation --
+   * it is what turns a dark disc under a body into a wheel with something over
+   * it. Measured on the gameplay-framing sheet: the moped's rear tyre owns 5.7%
+   * of its pixels and reads as a smudge, because there is nothing above it to
+   * say what it is.
+   *
+   * `a` runs the way vArchLip's does: 0 is straight ahead at +z, PI/2 is the
+   * crown, PI is straight astern. Both ends are open slabs rather than a capped
+   * shell, which is correct here -- a real guard is a pressing of constant
+   * section and its ends are its ends -- and every slab is a solid box, so the
+   * object is built from underneath and from either flank as well as from
+   * behind.
+   */
+  function vGuard(parts, x, cy, cz, r, w, col, a0, a1, segs, gloss) {
+    const n = segs || 7;
+    const t = 0.055;
+    for (let i = 0; i < n; i++) {
+      const a = a0 + (a1 - a0) * (i + 0.5) / n;
+      parts.push(gl(bx(w, t, (Math.abs(a1 - a0) * r * 1.16) / n,
+        x, cy + Math.sin(a) * r, cz + Math.cos(a) * r, col, -(a - Math.PI / 2)),
+      gloss === undefined ? GLOSS.paint : gloss));
+    }
+  }
+
   function vArchFlare(parts, cx, cy, cz, r, col, segs) {
     const n = segs || 9;
     const t = 0.085;
@@ -15790,7 +15821,39 @@ MR.World = (function () {
       bx(0.96, 0.06, 0.13, 0, 0.36, -0.16, CHROME),
     ]);
 
-    /** BLOCK v1: a ROAD CLOSED hoarding on a solid plinth. */
+    /**
+     * BLOCK v1: a ROAD CLOSED hoarding on a solid plinth.
+     *
+     * ============ JUDGED AS A SIGN, AND STILL SHORT ============
+     *
+     * This is the one of the ten that is not traffic, and the temptation is to
+     * exempt it: a sign IS a flat panel, its caution face is legitimately 1.70
+     * tall where every other variant's is 0.20-0.52, and it is the brightest
+     * thing in the fleet at 1.659x. But the gameplay-framing census at 8 units
+     * says what it says:
+     *
+     *   face 46.6%   trim 18.2%   cream 16.0%   body 12.6%   lamp 1.1%
+     *
+     * -- eight parts, all of them slabs, and 1.1% of the object in the only
+     * category that is a fitting rather than a mass. Every other variant in the
+     * game stands on something; this one is a board on a box.
+     *
+     * The two things it was actually missing are structural and both were
+     * measurable. **It had no frame**: the board's edge was the board, so at
+     * every distance the silhouette is a rectangle with three cream bands
+     * across it. And **it had no legs**: it is a free-standing hoarding, and a
+     * free-standing hoarding that is not braced falls over -- which is why the
+     * real thing has skids running fore and aft with ballast on them, and why
+     * it is the one variant with a genuine reason to spend the depth. It used
+     * 0.65 of an allowed 1.95, the largest unused envelope in the fleet.
+     *
+     * NOTHING HERE IS A WHEEL AND NOTHING PRETENDS TO BE A VEHICLE. The frame
+     * is galvanised, so it is pale, which is what a road-closure frame is and
+     * also what protects the luminance this variant clears its target on: it
+     * carries 1.659x against a 1.6x target with 5.4 of L in hand, so cream and
+     * its own pink do the structure and the only darks added are the skids and
+     * the lamp bases.
+     */
     const blockSignGeo = merge([
       // Chamfered, but the cream bands stay matte -- this is one of the two
       // variants the colour pass deliberately left in its real red-and-white
@@ -15808,9 +15871,67 @@ MR.World = (function () {
       gl(hcbx(2.26, 0.16, 1.14, 0, 1.50, 0, 0xfff2e0, 0.04), GLOSS.matte),
       gl(hcbx(2.26, 0.16, 1.14, 0, 2.34, 0, 0xfff2e0, 0.04), GLOSS.matte),
       gl(hcbx(2.28, 0.24, 1.20, 0, 2.58, 0, 0xd42a55, 0.05), GLOSS.paint),
-      gl(bxAt(0.30, 0.30, 0.30, -0.74, 2.64, 0, 0xffe45e), GLOSS.trim),
-      gl(bxAt(0.30, 0.30, 0.30, 0.74, 2.64, 0, 0xffe45e), GLOSS.trim),
-    ]);
+    ].concat((function () {
+      const p = [];
+      // ---- THE FRAME -----------------------------------------------------
+      // Stiles down both edges and a rail top and bottom, standing proud of the
+      // board on all four sides. The caution face is 1.49 wide at x +/-0.745
+      // and is unlit and drawn in front of everything, so the stiles sit
+      // outboard of it at 0.80 where they are the object's own edge -- which is
+      // also the only place on a sign a frame CAN be.
+      for (const sx of [-1, 1]) {
+        p.push(gl(bxAt(0.10, 2.10, 1.14, sx * 1.105, 1.46, 0, 0xfff2e0), GLOSS.chrome));
+        // Corner gussets, top and bottom, which is where a bolted frame is
+        // stiffened and what stops the stile reading as a painted line.
+        p.push(gl(bxAt(0.16, 0.16, 1.18, sx * 1.105, 2.36, 0, 0xd42a55), GLOSS.trim));
+        p.push(gl(bxAt(0.16, 0.16, 1.18, sx * 1.105, 0.56, 0, 0xd42a55), GLOSS.trim));
+        // ---- THE SKIDS, and the depth this variant finally spends ----------
+        // A free-standing hoarding stands on skids running fore and aft with
+        // ballast on them, and is braced back to the board. Without them it is
+        // a board on a box, which is what the census measured. 1.86 long
+        // against an allowed 1.95 of half-depth either way: this is the one
+        // variant with a real reason for the length.
+        p.push(gl(bxAt(0.36, 0.17, 1.86, sx * 0.76, 0.085, 0, 0x2b2f52), GLOSS.trim));
+        p.push(gl(bxAt(0.42, 0.10, 0.44, sx * 0.76, 0.22, -0.72, 0xfff2e0), GLOSS.matte));
+        p.push(gl(bxAt(0.42, 0.10, 0.44, sx * 0.76, 0.22, 0.72, 0xfff2e0), GLOSS.matte));
+        // Ballast blocks, and the brace back to the board.
+        p.push(gl(cbx(0.30, 0.26, 0.34, sx * 0.55, 0.30, -0.74, 0xd42a55, 0.04), GLOSS.paint));
+        p.push(gl(cbx(0.30, 0.26, 0.34, sx * 0.55, 0.30, 0.74, 0xd42a55, 0.04), GLOSS.paint));
+        p.push(gl(bx(0.09, 0.09, 0.734, sx * 0.55, 0.525, 0.73, 0xfff2e0, 1.09), GLOSS.chrome));
+        /**
+         * ---- THE BEACON, WHICH WAS INSIDE THE CAP ----------------------
+         *
+         * The lamps were two 0.30 cubes at x 0.535, y 2.49-2.79. The coping
+         * they sit under is 2.28 wide -- halfX 0.825 -- and runs to y 2.70. So
+         * for 0.21 of their 0.30 they were BURIED IN IT, and the census caught
+         * it as the number it is: 1.1% of the object, on the only fitting the
+         * variant had. Rebuilding them in place made it worse, 0.3%, which is
+         * how the mechanism was found rather than guessed at.
+         *
+         * They move OUTBOARD to the top corners on brackets, which is where a
+         * real hoarding hangs them and which is the only place on this object
+         * clear of the coping. x 0.92 against a box halfX of 1.12, with the
+         * dome's own 0.17 that is 1.09 -- measured with fleetExtents.
+         */
+        p.push(gl(bx(0.28, 0.09, 0.30, sx * 0.87, 2.40, 0, 0x2b2f52), GLOSS.trim));
+        p.push(gl(bx(0.11, 0.24, 0.11, sx * 0.92, 2.50, 0, 0x2b2f52), GLOSS.trim));
+        p.push(gl(cyl(0.155, 0.170, 0.20, 10, sx * 0.92, 2.68, 0, 0xffe45e), GLOSS.chrome));
+        p.push(gl(cyl(0.075, 0.075, 0.21, 8, sx * 0.92, 2.68, 0, LAMP_CORE), GLOSS.chrome));
+        p.push(gl(cyl(0.105, 0.145, 0.07, 10, sx * 0.92, 2.745, 0, 0x2b2f52), GLOSS.trim));
+      }
+      // The bottom rail and the kickboard on the plinth, which is the one
+      // horizontal a hoarding always has and the only structure that lands
+      // BELOW the caution face's own band.
+      p.push(gl(hcbx(2.30, 0.11, 1.22, 0, 0.455, 0, 0xfff2e0, 0.03), GLOSS.chrome));
+      p.push(gl(hcbx(1.90, 0.16, 1.24, 0, 0.20, 0, 0xd42a55, 0.04), GLOSS.paint));
+      // THE BACK OF A SIGN IS A BRACED FRAME, not a second sign face -- the
+      // correction already recorded for the DUCK roundel. Two stiffeners and a
+      // diagonal, on the plane the pass and the lane change both show.
+      p.push(gl(bx(0.11, 1.84, 0.10, -0.34, 1.46, 0.58, 0xfff2e0), GLOSS.chrome));
+      p.push(gl(bx(0.11, 1.84, 0.10, 0.34, 1.46, 0.58, 0xfff2e0), GLOSS.chrome));
+      p.push(gl(bx(1.10, 0.10, 0.09, 0, 1.46, 0.58, 0xfff2e0, 0, 0, 0.98), GLOSS.chrome));
+      return p;
+    })()));
 
     /**
      * BLOCK v2: A CARGO TRIKE, RIDDEN, IN A LANE. The player asked for cyclists
@@ -15858,9 +15979,13 @@ MR.World = (function () {
         // is 2.20 here, and the box is most of it -- the whole point of the
         // vehicle is that it carries something. At 1.30 of envelope the box
         // was 1.20 and the rider had to stand inside its own footprint.
-        hbx(2.02, 1.02, 1.32, 0, 0.72, -0.52, TRIKE_BODY),
-        hbx(2.10, 0.15, 1.36, 0, 1.28, -0.52, VAN_BODY),
-        hbx(2.06, 0.20, 1.38, 0, 0.20, -0.52, TRIKE_DARK),
+        //
+        // CHAMFERED NOW, like the five variants the fleet rebuild reached.
+        // These were plain hbx boxes, and at gameplay framing a square corner
+        // on a mass this large is most of what "it looks like a box" means.
+        gl(hcbx(2.02, 1.02, 1.32, 0, 0.72, -0.52, TRIKE_BODY, 0.06), GLOSS.paint),
+        gl(hcbx(2.10, 0.15, 1.36, 0, 1.28, -0.52, VAN_BODY, 0.04), GLOSS.trim),
+        gl(hcbx(2.06, 0.20, 1.38, 0, 0.20, -0.52, TRIKE_DARK, 0.04), GLOSS.trim),
         /**
          * THE RIDER, resized and revalued after a full playtest in which the
          * player reported seeing no cyclist at all.
@@ -15893,13 +16018,61 @@ MR.World = (function () {
         hbx(0.22, 0.66, 0.20, 0.62, 1.54, 0.66, 0x2b2f52, 0.40),
         hbx(0.98, 0.12, 0.12, 0, 1.26, 0.92, 0x2b2f52),
       ];
-      // Wheels. Seen from directly behind they are slabs rather than discs, so
-      // they are built as discs on an x axis and read as tyres under the box.
-      // They carry rims now, like the rest of the fleet: a trike's wheels are
-      // the only part of it below the cargo box, so if they read as three dark
-      // smudges the whole vehicle is a floating crate.
-      for (const wx of [-0.86, 0.86]) {
-        vWheel(parts, wx * LANE_FIT, 0.34, -0.52, 0.34, 0.16, 0x2b2f52, WHEEL_RIM, WHEEL_HUB);
+      /**
+       * ============ THE WHEELS OWNED ZERO PIXELS ============
+       *
+       * Measured, not suspected. `node tools/framing.js --kind BLOCK` counts
+       * what every part of a variant contributes to the real frame, and at
+       * 8 / 12 / 20 / 35 units this trike returned **wheel 0.0% at every
+       * distance**. All three were built, all three carried rims and hubs, and
+       * not one of them put a pixel on screen.
+       *
+       * The mechanism is depth, not size. The rear pair sat at x +/-0.62, which
+       * is INBOARD of a cargo box whose flanks are at +/-0.73, and at z -0.52,
+       * which is 0.66 in front of that box's own rear face at -1.18. The
+       * chase camera looks at the rear face. So the box was parked squarely
+       * between the lens and its own wheels for the whole approach, and the
+       * comment above this loop -- "a trike's wheels are the only part of it
+       * below the cargo box, so if they read as three dark smudges the whole
+       * vehicle is a floating crate" -- was exactly right about the stake and
+       * wrong about the state: they read as nothing at all.
+       *
+       * Same family as the side windows buried inside the refuse truck's
+       * bodywork, and as the trike's own cranks pedalling behind their box:
+       * built, merged, shipped, invisible. The fix is the one a real cargo
+       * trike already has -- THE REAR AXLE IS OUTBOARD OF THE LOAD BOX, wheels
+       * standing clear of the flanks on stub axles, with a guard over each. It
+       * costs 0.24 of half-width against 0.25 of headroom in MR.Collision.BOX
+       * and it is the difference between a crate on legs and a vehicle.
+       *
+       * The FRONT wheel stays where it is, under the rider and behind the box,
+       * and it is honestly occluded from astern -- that is what being behind a
+       * load box means, it is visible from every other angle, and rule 1 asks
+       * for it to be BUILT, not for it to be moved somewhere it does not go.
+       */
+      for (const sx of [-1, 1]) {
+        // 0.86 and not further. vWheel's spoke bars rotate about z, so a
+        // horizontal one reaches 0.92 x r / 2 = 0.147 in x beyond the rim face
+        // -- which is where this variant's old halfX of 0.87 came from on a
+        // wheel centred at 0.62, and which put the first outboard build at
+        // 1.153 against a box of 1.12. Measured with fleetExtents, not guessed.
+        const wx = sx * 0.86;
+        // Tyre and rim are DARK-OF-LIME and WARM, not the fleet navy and the
+        // cool pale rim. Two tyres that were invisible cost nothing in chroma;
+        // two that are visible cost 0.057 of dS on a variant whose margin over
+        // target is 0.013, and 0x2b2f52 against a lime body is precisely the
+        // straddle of the neutral axis this file's fleet header forbids.
+        vWheel(parts, wx, 0.32, -0.62, 0.32, 0.14, 0x262e10, WHEEL_RIM_WARM, WHEEL_HUB_WARM);
+        // The stub axle out to it, and a bracket down from the box floor, so
+        // the wheel is carried by something instead of floating beside a crate.
+        parts.push(gl(cyl(0.055, 0.055, 0.28, 8, sx * 0.72, 0.32, -0.62, TRIKE_DARK,
+          0, 0, Math.PI / 2), GLOSS.trim));
+        parts.push(gl(bx(0.09, 0.34, 0.13, sx * 0.69, 0.36, -0.62, TRIKE_DARK), GLOSS.trim));
+        // A guard over each, which is what a cargo trike carries and what
+        // stops an outboard wheel reading as a bare disc stuck on the side.
+        vGuard(parts, wx, 0.32, -0.62, 0.435, 0.18, TRIKE_BODY,
+          0.22 * Math.PI, 0.90 * Math.PI, 6);
+        parts.push(gl(bx(0.05, 0.30, 0.05, wx, 0.50, -0.99, TRIKE_DARK, 0.42), GLOSS.trim));
       }
       vWheel(parts, 0, 0.32, 0.88, 0.32, 0.12, 0x2b2f52, WHEEL_RIM, WHEEL_HUB);
       // The boom from the load box out to the head tube, which is what a
@@ -15917,6 +16090,36 @@ MR.World = (function () {
         parts.push(bxAt(0.11, 1.56, 0.11, sx * 0.92, 1.94, -0.52, TRIKE_BODY));
         parts.push(bxAt(0.09, 0.74, 0.58, sx * 0.92, 2.34, -0.22, PINK));
       }
+      /**
+       * ============ THE TAILBOARD ============
+       *
+       * 50.9% of this variant's pixels were the cargo box's own lime, at every
+       * distance the framing sheet samples, and the box's rear was one flat
+       * panel with a chevron on it. That number is the second half of the same
+       * finding as the wheels: the object had a mass and no structure.
+       *
+       * The caution face is 1.43 x 0.52 at y 0.36-0.88, it is unlit and it is
+       * drawn in front of everything, so a fitting inside that rectangle would
+       * simply be deleted by it. What is left is the band above the face, the
+       * band below it and the two vertical edges -- which is exactly where a
+       * real tail door carries its ironmongery, so nothing here is invented to
+       * fit round the constraint.
+       */
+      for (const sx of [-1, 1]) {
+        parts.push(gl(bx(0.07, 0.94, 0.08, sx * 0.745, 0.72, -1.19, TRIKE_DARK), GLOSS.trim));
+        parts.push(gl(bx(0.10, 0.09, 0.09, sx * 0.745, 1.10, -1.205, VAN_BODY), GLOSS.chrome));
+        parts.push(gl(bx(0.10, 0.09, 0.09, sx * 0.745, 0.34, -1.205, VAN_BODY), GLOSS.chrome));
+        // Tail lamps, which this variant had none of. Every other rear in the
+        // fleet carries a pair and a cargo trike on a road legally must.
+        parts.push(gl(cyl(0.085, 0.085, 0.09, 8, sx * 0.50, 1.03, -1.225, LAMP_RED,
+          Math.PI / 2), GLOSS.chrome));
+        parts.push(gl(cyl(0.045, 0.045, 0.12, 8, sx * 0.50, 1.03, -1.230, LAMP_CORE,
+          Math.PI / 2), GLOSS.chrome));
+      }
+      parts.push(gl(bx(1.44, 0.06, 0.07, 0, 1.16, -1.20, TRIKE_DARK), GLOSS.trim));
+      parts.push(gl(bx(0.22, 0.14, 0.09, 0, 1.03, -1.20, TRIKE_DARK), GLOSS.trim));
+      parts.push(gl(bx(0.13, 0.07, 0.10, 0, 1.03, -1.225, VAN_BODY), GLOSS.chrome));
+      parts.push(gl(bx(1.30, 0.05, 0.06, 0, 0.315, -1.20, VAN_BODY), GLOSS.chrome));
       return merge(parts);
     })();
     /**
@@ -15993,9 +16196,55 @@ MR.World = (function () {
       // it hid both hi-vis tabards and left two pale heads floating over a
       // board, which is neither a person nor a barrier. At 1.28 the pink
       // torsos read above it and the pair reads as people holding something.
-      parts.push(hbx(2.16, 0.56, 0.18, 0, 0.98, -0.54, 0xff3b6b));
-      parts.push(hbx(2.24, 0.12, 0.20, 0, 1.30, -0.54, 0xfff2e0));
-      parts.push(hbx(2.24, 0.12, 0.20, 0, 0.66, -0.54, 0xfff2e0));
+      parts.push(gl(hcbx(2.16, 0.56, 0.18, 0, 0.98, -0.54, 0xff3b6b, 0.04), GLOSS.matte));
+      parts.push(gl(hcbx(2.24, 0.12, 0.20, 0, 1.30, -0.54, 0xfff2e0, 0.03), GLOSS.matte));
+      parts.push(gl(hcbx(2.24, 0.12, 0.20, 0, 0.66, -0.54, 0xfff2e0, 0.03), GLOSS.matte));
+      /**
+       * ============ THE BARRIER GETS AN UNDERSTRUCTURE ============
+       *
+       * Measured at gameplay framing, this variant was 28.6% cream, 24.1%
+       * navy, 20.0% caution face and 12.8% pink, with NOTHING in any structural
+       * category -- no fittings at all on any of the eleven parts it was made
+       * of. Three stacked slabs and two stacks of boxes.
+       *
+       * WHERE THE STRUCTURE CAN GO IS DECIDED BY OCCLUSION, and the framing
+       * tool is what makes that computable rather than a guess. The board's
+       * screen band runs from its own bottom edge to its top rail; the pair of
+       * marshals stand 0.70 BEHIND it, and the camera looks down, so everything
+       * of them between y 0.35 and y 1.15 is behind the board for the whole
+       * approach. Anything at the BOARD'S OWN z below y 0.60, by contrast, is
+       * clear of it -- there is no parallax at the same depth. So the legs, the
+       * feet, the bottom rail and the cones are all built there, and the pair's
+       * new lower legs are built for the angles the pass shows rather than for
+       * this one.
+       *
+       * IT IS ALSO A LUMINANCE PROBLEM. This variant clears the fairness gate
+       * on luminance ALONE, at 1.365x against 1.25x, with dS 0.023 against a
+       * road at S 0.157 -- and roadmap.md records a lever table in which every
+       * chroma route was tried and every one made it worse, because you cannot
+       * saturate a white barrier band and have it still be a road closure. So
+       * the understructure is built in the two BRIGHT things this object is
+       * already made of, cream and its own pink, and the only dark added is the
+       * boots. Cones are the one saturated element and they are amber, which is
+       * on cream's side of neutral rather than opposite it.
+       */
+      for (const sx of [-1, 1]) {
+        // Legs and feet, at the board's own depth so they clear its bottom edge.
+        parts.push(gl(hbx(0.19, 0.62, 0.17, sx * 0.62, 0.31, -0.54, 0xff3b6b), GLOSS.matte));
+        parts.push(gl(hbx(0.46, 0.09, 0.62, sx * 0.62, 0.045, -0.54, 0xfff2e0), GLOSS.matte));
+        // The brace back from the foot to the board, which is what stops a
+        // free-standing barrier folding over -- and what the pass sees.
+        parts.push(gl(bx(0.09, 0.09, 0.62, sx * 0.45, 0.34, -0.28, 0xfff2e0, 0.72), GLOSS.matte));
+        // A cone at each end. The one saturated element on the object, and the
+        // thing that says ROAD CLOSED before any of the lettering resolves.
+        const cx = sx * 0.86;
+        parts.push(gl(cyl(0.055, 0.20, 0.44, 10, cx, 0.24, -0.50, 0xff8c00), GLOSS.trim));
+        parts.push(gl(cyl(0.135, 0.145, 0.09, 10, cx, 0.26, -0.50, 0xfff2e0), GLOSS.matte));
+        parts.push(gl(cbx(0.40, 0.06, 0.40, cx, 0.035, -0.50, 0xff8c00, 0.03), GLOSS.trim));
+      }
+      // The bottom rail, which is the horizontal a barrier reads by once its
+      // board is a striped rectangle and nothing else.
+      parts.push(gl(hbx(1.44, 0.10, 0.14, 0, 0.30, -0.54, 0xfff2e0), GLOSS.matte));
       /**
        * The pair, rebuilt for the same reason the trike's rider was: a player
        * who ran the whole race did not report two marshals they could not make
@@ -16016,12 +16265,28 @@ MR.World = (function () {
       for (const p of who) {
         const px = p.x * LANE_FIT;
         const y = p.h;
-        parts.push(bx(0.50, 0.86, 0.34, px, 0.43, p.z, 0x2b2f52));
+        // TWO LEGS AND BOOTS, not one navy slab 0.50 x 0.86. Only the boots
+        // and the bottom of the shins clear the board from astern; the rest is
+        // built because the pass and the lane change both show it.
+        for (const lx of [-1, 1]) {
+          parts.push(gl(bx(0.21, 0.50, 0.30, px + lx * 0.14, 0.62, p.z, 0x2b2f52), GLOSS.matte));
+          parts.push(gl(bx(0.19, 0.30, 0.27, px + lx * 0.15, 0.22, p.z + 0.02, 0x2b2f52), GLOSS.matte));
+          parts.push(gl(bx(0.23, 0.11, 0.38, px + lx * 0.15, 0.055, p.z - 0.05, 0x141a33), GLOSS.trim));
+        }
+        parts.push(gl(bx(0.52, 0.18, 0.34, px, 0.94, p.z, 0x2b2f52), GLOSS.matte));
         parts.push(bx(0.80, 0.32, 0.44, px, 1.34 + y, p.z, 0x2b2f52));
-        parts.push(bx(0.86, 0.40, 0.46, px, 1.70 + y, p.z, 0xfff2e0));
+        parts.push(gl(cbx(0.86, 0.40, 0.46, px, 1.70 + y, p.z, 0xfff2e0, 0.04), GLOSS.matte));
+        // One band across the tabard, in the object's own pink. A hi-vis with
+        // no band is a rectangle, and this is the one place on the pair that is
+        // ABOVE the board from astern and therefore always in frame.
+        parts.push(gl(bx(0.88, 0.08, 0.47, px, 1.61 + y, p.z, 0xff3b6b), GLOSS.matte));
         parts.push(bx(0.76, 0.10, 0.42, px, 1.95 + y, p.z, 0x2b2f52));
         parts.push(bx(0.54, 0.48, 0.46, px, 2.24 + y, p.z, p.skin));
-        parts.push(bx(0.62, 0.20, 0.52, px, 2.44 + y, p.z, 0xff3b6b));
+        parts.push(gl(cbx(0.62, 0.20, 0.52, px, 2.44 + y, p.z, 0xff3b6b, 0.04), GLOSS.matte));
+        // Hands ON the rail, sitting on top of it where they clear the board.
+        for (const hx of [-1, 1]) {
+          parts.push(gl(bx(0.17, 0.14, 0.20, px + hx * 0.44, 1.39, -0.50, p.skin), GLOSS.matte));
+        }
         // Arms forward onto the barrier, which is what makes them its holders
         // rather than two figures that happen to be standing behind it.
         parts.push(bx(0.19, 0.70, 0.19, px - 0.40, 1.28 + y, p.z - 0.34, 0x2b2f52, 0.62));
@@ -16590,9 +16855,56 @@ MR.World = (function () {
         parts.push(bxAt(0.08, 0.52, 0.10, X, 0.62, -0.14, p.frame));
         parts.push(bxAt(0.08, 0.12, 0.86, X, 0.56, 0.28, p.frame, -0.34));
         parts.push(bxAt(0.07, 0.62, 0.09, X, 0.66, 0.72, p.frame, 0.22));
+        /**
+         * ============ THE REAR TRIANGLE ============
+         *
+         * What a bicycle looks like from directly behind is a saddle, a post,
+         * and two pairs of thin tubes converging on a hub with a wheel between
+         * them. This variant had a seat tube, a down tube and a fork -- the
+         * DIAMOND, which is what you read a bike by from the FLANK -- and
+         * nothing at all on the axis the chase camera uses. The gameplay
+         * framing census puts 27.3% of the object in dark structure and 7.0%
+         * in wheel, and none of that structure was on the back of the machine.
+         */
+        parts.push(gl(bxAt(0.30, 0.07, 0.34, X, 1.00, -0.10, 0x2a0c16), GLOSS.trim));
+        parts.push(gl(bxAt(0.07, 0.20, 0.07, X, 0.88, -0.12, p.frame), GLOSS.chrome));
+        for (const tx of [-1, 1]) {
+          parts.push(gl(bxAt(0.06, 0.58, 0.07, X + tx * 0.09, 0.62, -0.16, p.frame, 0.13), GLOSS.chrome));
+          parts.push(gl(bxAt(0.06, 0.07, 0.52, X + tx * 0.09, 0.35, -0.02, p.frame), GLOSS.chrome));
+        }
+        // A saddle bag, the one thing a road bike carries, and the mount the
+        // rear light was previously stuck to the air behind.
+        parts.push(gl(bxAt(0.20, 0.15, 0.22, X, 0.90, -0.24, p.band), GLOSS.matte));
         parts.push(bxAt(0.34, 0.09, 0.18, X, 0.92, -0.20, 0x2a0c16));
-        // Bars, out front where the rider's hands go.
+        // Bars, out front where the rider's hands go, and the brake hoods on
+        // them -- which is where a rider's hands actually are and what makes
+        // the arms end in something.
         parts.push(bxAt(0.44, 0.07, 0.08, X, 1.02, 0.66, 0x2a0c16));
+        for (const hx of [-1, 1]) {
+          parts.push(gl(bxAt(0.09, 0.10, 0.20, X + hx * 0.19, 1.05, 0.72, p.band), GLOSS.trim));
+        }
+        /**
+         * THE RACE NUMBER, pinned to the back: rectangular and hard-edged
+         * against a saturated jersey, and the strongest single cue that these
+         * two are riding rather than standing.
+         *
+         * IT IS LEMON AND NOT WHITE, AND THAT COST A BUILD FAILURE TO LEARN
+         * AGAIN. A real race number is white, so the first build used PLATE for
+         * these and for the four pedal shoes -- 7.2% of the object in a pale
+         * NEAR-NEUTRAL. The area mean went L 91.3 / S 0.472 to L 98.7 / S
+         * 0.387: luminance up, chroma down 0.085, and dS against the middle
+         * lane fell from 0.294 to 0.209 through a gate of 0.22. **shoot.js
+         * failed the build.** That is the fleet header's own cream mechanism
+         * arriving by a third door -- after the cream bands and the glass flash
+         * -- on the one variant with no room for it, and the rule it breaks is
+         * written four hundred lines up: the pale element on a warm body is the
+         * plate and the lamp cores and nothing else.
+         *
+         * 0xfff23a is 91% of cream's luminance at eight times its chroma, which
+         * is the substitution the whole fleet already made.
+         */
+        parts.push(gl(bxAt(0.34, 0.24, 0.05, X, 1.60 + y, -0.05, LEMON), GLOSS.matte));
+        parts.push(gl(bxAt(0.36, 0.04, 0.045, X, 1.72 + y, -0.052, p.jersey), GLOSS.matte));
         // The rear light, as a disc facing the lens with a bright core, exactly
         // as the cars carry it -- red alone renders darker than the road.
         parts.push(cyl(0.09, 0.09, 0.10, 8, X * LANE_FIT, 0.80, -0.40, LAMP_RED, Math.PI / 2));
@@ -16628,13 +16940,23 @@ MR.World = (function () {
      * a quarter turn apart: two riders pedalling in lockstep read as one prop
      * mirrored, and the whole point of a pair is that it is two people.
      */
+    /**
+     * SHOES ON THE PEDALS. A knee with nothing on the end of it is a lobe, and
+     * the pale shoe is what turns the orbit into a leg going round -- it is the
+     * brightest thing on the lower half of either bike and it moves, which at
+     * gameplay framing is worth more than anything static of the same size.
+     */
     const blockRoadBikeCrankGeo = merge([
       bx(0.26, 0.34, 0.24, -0.40, 0.30, 0, 0x2a0c16),
       bx(0.28, 0.14, 0.26, -0.40, 0.45, 0.04, KIT_B),
+      gl(bx(0.21, 0.10, 0.28, -0.40, 0.28, 0.17, LEMON), GLOSS.trim),
       bx(0.26, 0.34, 0.24, -0.40, -0.30, 0, 0x2a0c16),
       bx(0.28, 0.14, 0.26, -0.40, -0.45, 0.04, KIT_B),
+      gl(bx(0.21, 0.10, 0.28, -0.40, -0.28, 0.17, LEMON), GLOSS.trim),
       bx(0.26, 0.24, 0.34, 0.40, 0, 0.30, 0x2a0c16),
+      gl(bx(0.21, 0.28, 0.10, 0.40, 0.17, 0.28, LEMON), GLOSS.trim),
       bx(0.26, 0.24, 0.34, 0.40, 0, -0.30, 0x2a0c16),
+      gl(bx(0.21, 0.28, 0.10, 0.40, 0.17, -0.28, LEMON), GLOSS.trim),
     ]);
 
     /**
@@ -16654,45 +16976,167 @@ MR.World = (function () {
      * variant is allowed to live there it should be the smallest one, and the
      * moped is it.
      */
+    /**
+     * ============ REBUILT AGAINST THE GAMEPLAY-FRAMING SHEET ============
+     *
+     * `node tools/framing.js --kind BLOCK`, which renders every variant through
+     * the LIVE chase camera at 8 / 12 / 20 / 35 units and counts what its pixels
+     * are made of. Before this pass, at 8 units:
+     *
+     *   v9 moped   66x119 px   body 57.7%  face 12.3  ink 9.7  trim 7.7
+     *                          wheel 5.7  plate 2.7  lamp 2.6  skin 1.7
+     *
+     * Against the five variants the rebuild DID reach:
+     *
+     *   v5 taxi    92x128 px   trim 34.2  body 32.5  glass 12.8  face 8.8
+     *   v7 refuse 103x148 px   body 38.3  trim 32.6  face 13.2  lamp 5.5
+     *
+     * **The built vehicles carry 30-42% of their pixels in TRIM -- the small
+     * structure: skirts, arches, bumpers, creases, brackets. The moped carried
+     * 7.7%, and one flat pink cube carried more than half the object.** That is
+     * what "a stack of boxes" measures as, and it is the whole finding.
+     *
+     * The fix is not mass, it is structure, and it is bounded by an unusually
+     * tight pair of numbers: this variant clears the luminance GATE by 0.027x
+     * and the saturation TARGET by 0.006, the narrowest margins in the fleet.
+     * So every bracket here is a DARK OF ITS OWN HUE and never a neutral, and
+     * the bright additions (indicators, hi-vis over-trousers, exhaust) are
+     * chosen to pay for the dark ones. Measured both ways before and after.
+     */
     const blockMopedGeo = (function () {
-      const parts = [
-        bx(0.36, 0.28, 0.54, 0, 0.50, 0.06, 0xd42a55),
-        bx(0.74, 0.16, 0.44, 0, 0.76, 0.10, 0x2a0c16),
-        // The cube was 0.20 taller and hid the rider it exists to carry: only
-        // 0.20 of hi-vis cleared it, so the whole thing read as a box on a wheel.
-        gl(cbx(1.52 * LANE_FIT, 0.66, 0.62, 0, 1.19, -0.52, PINK, 0.06), GLOSS.paint),
-        gl(cbx(1.60 * LANE_FIT, 0.10, 0.66, 0, 1.57, -0.52, KIT_B, 0.03), GLOSS.trim),
+      const M_DARK = 0x4a1024;      // rack, brackets, guard stays -- dark of pink
+      const M_MID = 0x8c2040;       // the deeper pink the box panels are cut in
+      const parts = [];
+
+      // ---- THE MACHINE, from the road up ---------------------------------
+      // A scooter's lower half is one moulded shell with a step-through floor,
+      // and what reads from astern is the pair of runners the rider's feet
+      // stand on standing outboard of a dark centre. There was no machine here
+      // at all before: the rider's waist sat on air above a single wheel.
+      parts.push(
+        gl(cbx(0.60, 0.11, 0.94, 0, 0.44, 0.16, PINK, 0.035), GLOSS.paint),
+        gl(bx(0.14, 0.07, 0.82, -0.33, 0.42, 0.16, M_DARK), GLOSS.trim),
+        gl(bx(0.14, 0.07, 0.82, 0.33, 0.42, 0.16, M_DARK), GLOSS.trim),
+        gl(cbx(0.42, 0.32, 0.58, 0, 0.52, 0.00, M_DARK, 0.05), GLOSS.trim),
+        gl(cbx(0.48, 0.28, 0.54, 0, 0.66, -0.10, PINK, 0.05), GLOSS.paint),
+        gl(cbx(0.78, 0.18, 0.46, 0, 0.80, 0.10, 0x2a0c16, 0.04), GLOSS.trim),
+        gl(bx(0.80, 0.05, 0.11, 0, 0.90, -0.11, KIT_B), GLOSS.chrome)
+      );
+      // The exhaust, on the right where every scooter carries it, and warm pale
+      // so the one thing sticking out of the dark side is a bright note rather
+      // than a second shadow.
+      parts.push(gl(cyl(0.078, 0.066, 0.70, 10, 0.27, 0.31, -0.12, WHEEL_RIM_WARM,
+        Math.PI / 2), GLOSS.chrome));
+      parts.push(gl(bx(0.10, 0.10, 0.09, 0.27, 0.31, -0.50, M_DARK), GLOSS.trim));
+
+      // BOTH ROAD WHEELS, and both now wear a guard. A moped is 1.9 m long,
+      // which is 1.61 here, and the pair sits at -0.36 and +0.78 with the fork
+      // raked forward from the bars to meet the front hub -- the one line that
+      // makes a two-wheeler read as a two-wheeler from the side.
+      vWheel(parts, 0, 0.31, -0.36, 0.31, 0.13, TYRE, WHEEL_RIM, WHEEL_HUB);
+      vWheel(parts, 0, 0.29, 0.78, 0.29, 0.12, TYRE, WHEEL_RIM, WHEEL_HUB);
+      vGuard(parts, 0, 0.31, -0.36, 0.435, 0.30, PINK, 0.34 * Math.PI, 0.86 * Math.PI, 6);
+      vGuard(parts, 0, 0.29, 0.78, 0.405, 0.26, PINK, 0.16 * Math.PI, 0.82 * Math.PI, 6);
+      // Guard stays, both sides of both wheels: the strut that carries a mudguard
+      // is what stops it reading as a slab floating over a tyre.
+      for (const sx of [-1, 1]) {
+        parts.push(gl(bx(0.05, 0.40, 0.05, sx * 0.17, 0.44, -0.62, M_DARK, 0.34), GLOSS.trim));
+        parts.push(gl(bx(0.05, 0.34, 0.05, sx * 0.15, 0.46, 0.94, M_DARK, -0.30), GLOSS.trim));
+      }
+      // A reflector on the rear guard, low and central, where the law puts it.
+      parts.push(gl(bx(0.16, 0.09, 0.05, 0, 0.60, -0.79, LAMP_RED), GLOSS.chrome));
+
+      // ---- THE RIDER, who now has legs -----------------------------------
+      // Two hi-vis columns either side of the rear wheel, feet on the runners.
+      // This is the strongest single cue a two-wheeler has from directly behind
+      // and the variant had none of it: the old figure was a waist, a back, a
+      // head and a helmet, ending at the saddle.
+      for (const sx of [-1, 1]) {
+        parts.push(gl(bx(0.21, 0.19, 0.44, sx * 0.27, 0.94, 0.28, 0x2a0c16, 0.34), GLOSS.matte));
+        parts.push(gl(bx(0.20, 0.46, 0.22, sx * 0.30, 0.68, 0.40, KIT_B, -0.10), GLOSS.matte));
+        parts.push(gl(bx(0.21, 0.06, 0.23, sx * 0.30, 0.80, 0.41, 0x2a0c16), GLOSS.matte));
+        parts.push(gl(bx(0.20, 0.11, 0.30, sx * 0.31, 0.50, 0.46, 0x141a33), GLOSS.trim));
+      }
+      parts.push(
         bx(0.56, 0.42, 0.34, 0, 1.14, 0.24, 0x2a0c16),
-        bx(0.68, 0.56, 0.40, 0, 1.64, 0.26, KIT_B),        // hi-vis back
-        bx(0.58, 0.10, 0.36, 0, 1.97, 0.26, 0x2a0c16),
-        bx(0.40, 0.22, 0.34, 0, 2.13, 0.28, 0xffc79a),
-        bx(0.50, 0.40, 0.44, 0, 2.32, 0.26, PINK),         // helmet 2.12-2.52
-        bx(0.44, 0.08, 0.10, 0, 2.34, 0.02, 0x141a33),
+        gl(cbx(0.70, 0.58, 0.42, 0, 1.72, 0.26, KIT_B, 0.05), GLOSS.matte),
+        // One reflective band across the hi-vis, so the back is two values and
+        // not one flat rectangle at the exact height the eye lands.
+        gl(bx(0.72, 0.07, 0.43, 0, 1.63, 0.26, 0x2a0c16), GLOSS.matte),
+        bx(0.58, 0.10, 0.36, 0, 2.05, 0.26, 0x2a0c16),
+        bx(0.40, 0.22, 0.34, 0, 2.21, 0.28, 0xffc79a),
+        gl(cbx(0.50, 0.40, 0.44, 0, 2.40, 0.26, PINK, 0.07), GLOSS.paint),
+        bx(0.44, 0.08, 0.10, 0, 2.42, 0.02, 0x141a33),
         bx(0.15, 0.48, 0.15, -0.30, 1.60, 0.42, 0x2a0c16, 0.55),
         bx(0.15, 0.48, 0.15, 0.30, 1.60, 0.42, 0x2a0c16, 0.55),
         bx(0.08, 0.26, 0.08, -0.54, 1.62, 0.54, 0x2a0c16),
         bx(0.08, 0.26, 0.08, 0.54, 1.62, 0.54, 0x2a0c16),
         bx(0.28, 0.17, 0.07, -0.62, 1.80, 0.54, KIT_B),    // mirror glass
-        bx(0.28, 0.17, 0.07, 0.62, 1.80, 0.54, KIT_B),
-        // The number plate, and it is the lowest bright thing on the vehicle --
-        // which is the job the reference gives it on every one of its four.
-        bx(0.34, 0.14, 0.06, 0, 0.72, -0.92, PLATE),
-      ];
-      // BOTH ROAD WHEELS. Same correction as the bicycles and for the same
-      // reason: a moped is 1.9 m long, which is 1.61 here, and it had 1.30 to
-      // live in with 0.62 of that taken by one tyre. The pair now sits at
-      // -0.36 and +0.78, with the fork raked forward from the bars to meet the
-      // front hub -- which is the one line that makes a two-wheeler read as a
-      // two-wheeler from the side.
-      vWheel(parts, 0, 0.31, -0.36, 0.31, 0.13, TYRE, WHEEL_RIM, WHEEL_HUB);
-      vWheel(parts, 0, 0.29, 0.78, 0.29, 0.12, TYRE, WHEEL_RIM, WHEEL_HUB);
+        bx(0.28, 0.17, 0.07, 0.62, 1.80, 0.54, KIT_B)
+      );
+
+      // ---- THE FRONT END, which rule 1 owns and which had nothing on it ----
+      // A leg shield is what tells a scooter from a motorcycle, and it is the
+      // whole of the front elevation on the real thing. Oncoming traffic and
+      // the pass both see it; the chase camera never does, and that is not an
+      // argument.
+      parts.push(
+        gl(cbx(0.64, 0.62, 0.15, 0, 0.94, 0.63, PINK, 0.06), GLOSS.paint),
+        gl(bx(0.66, 0.06, 0.16, 0, 1.24, 0.63, M_MID), GLOSS.trim),
+        gl(cyl(0.115, 0.115, 0.11, 10, 0, 1.14, 0.71, LAMP_COLD, Math.PI / 2), GLOSS.chrome),
+        gl(cyl(0.062, 0.062, 0.14, 8, 0, 1.14, 0.715, LAMP_CORE, Math.PI / 2), GLOSS.chrome),
+        gl(bx(0.09, 0.10, 0.07, -0.27, 1.16, 0.70, LAMP_AMBER), GLOSS.chrome),
+        gl(bx(0.09, 0.10, 0.07, 0.27, 1.16, 0.70, LAMP_AMBER), GLOSS.chrome)
+      );
       for (const sx of [-1, 1]) {
         parts.push(bx(0.07, 0.92, 0.09, sx * 0.13, 0.86, 0.66, 0x2a0c16, -0.24));
       }
       parts.push(bx(0.30, 0.09, 0.26, 0, 1.34, 0.60, 0x2a0c16));
-      // One rear lamp, on the centreline, built the way the cars build theirs.
+
+      // ---- THE TOP BOX, which was the whole object and is now part of it ---
+      // Same footprint to the digit -- it is the mass the silhouette and the
+      // contrast audit were both tuned against -- and it is no longer one flat
+      // panel. A rack under it, corner posts down its rear edges, a recessed
+      // upper panel with a reflective strip, a lid with a real lip and a
+      // handle. Everything is outboard of, or above, the caution face's own
+      // band at y 0.98-1.22, x +/-0.47: the face is unlit and drawn in front of
+      // everything, so a fitting inside its rectangle would simply be deleted.
+      parts.push(
+        gl(bx(0.66, 0.06, 0.52, 0, 0.95, -0.52, M_DARK), GLOSS.trim),
+        gl(bx(0.07, 0.38, 0.10, -0.24, 0.78, -0.52, M_DARK), GLOSS.trim),
+        gl(bx(0.07, 0.38, 0.10, 0.24, 0.78, -0.52, M_DARK), GLOSS.trim),
+        gl(cbx(1.52 * LANE_FIT, 0.58, 0.62, 0, 1.27, -0.52, PINK, 0.07), GLOSS.paint),
+        gl(cbx(1.60 * LANE_FIT, 0.10, 0.66, 0, 1.61, -0.52, KIT_B, 0.03), GLOSS.trim),
+        gl(cbx(1.64 * LANE_FIT, 0.045, 0.70, 0, 1.665, -0.52, KIT_B, 0.02), GLOSS.chrome),
+        gl(bx(0.86, 0.19, 0.05, 0, 1.435, -0.845, M_MID), GLOSS.paint),
+        gl(bx(0.74, 0.055, 0.045, 0, 1.435, -0.852, KIT_B), GLOSS.chrome),
+        gl(bx(0.36, 0.05, 0.07, 0, 1.54, -0.855, M_DARK), GLOSS.trim),
+        gl(bx(0.94, 0.07, 0.05, 0, 1.005, -0.845, M_DARK), GLOSS.trim)
+      );
+      for (const sx of [-1, 1]) {
+        parts.push(gl(bx(0.075, 0.56, 0.075, sx * 0.505, 1.27, -0.815, PINK), GLOSS.paint));
+      }
+
+      // ---- THE TAIL LAMPS, a cluster rather than one disc ------------------
+      // The old tail was one 0.13 lamp on the centreline, which is 7 px at 8
+      // units and 2 at 20. A cluster spans the tail instead: red in the middle
+      // where it always was, amber indicators outboard on short stalks, both
+      // bright and both saturated -- which is also how this variant pays for
+      // the dark brackets above without losing its two thin margins.
       parts.push(cyl(0.13, 0.13, 0.10, 8, 0, 0.94, -0.88, LAMP_RED, Math.PI / 2));
       parts.push(cyl(0.069, 0.069, 0.13, 8, 0, 0.94, -0.885, LAMP_CORE, Math.PI / 2));
+      for (const sx of [-1, 1]) {
+        parts.push(gl(bx(0.06, 0.05, 0.15, sx * 0.35, 0.94, -0.79, M_DARK), GLOSS.trim));
+        parts.push(gl(cyl(0.082, 0.082, 0.09, 8, sx * 0.35, 0.94, -0.885, LAMP_AMBER,
+          Math.PI / 2), GLOSS.chrome));
+        parts.push(gl(cyl(0.042, 0.042, 0.12, 8, sx * 0.35, 0.94, -0.89, LAMP_CORE,
+          Math.PI / 2), GLOSS.chrome));
+      }
+      // The number plate, on a bracket rather than stuck to the air, and it is
+      // still the lowest bright thing on the vehicle -- the job the reference
+      // gives it on every one of its four.
+      parts.push(gl(bx(0.40, 0.06, 0.07, 0, 0.80, -0.90, M_DARK), GLOSS.trim));
+      parts.push(gl(bx(0.34, 0.14, 0.06, 0, 0.72, -0.92, PLATE), GLOSS.chrome));
       return merge(parts);
     })();
 

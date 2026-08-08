@@ -9322,6 +9322,44 @@ MR.World = (function () {
     /**
      * Quayside crane, RIVERSIDE. Built with the jib toward local +x so it
      * reaches out over the water, away from the road.
+     *
+     * THE CONTAINERS USED TO STAND IN THE PLAY CORRIDOR, and nothing caught it
+     * for as long as they did because of WHICH DAY the harness photographs.
+     *
+     * This crane is a CHICAGO / RIVERSIDE mark, and tools/shoot.js runs LOW and
+     * HIDES against the DEFAULT DATE only -- one course out of 365. On that day
+     * Chicago falls late in the race and owns no RIVERSIDE leg, so the crane is
+     * never claimed and never audited. Pointed at a day where it is:
+     *
+     *   node tools/shoot.js --q "bot=1&nocount=1&date=2026-09-06&skip=46"
+     *
+     *   ! LOW   set piece / crane crosses the corridor at y=0
+     *   ! HIDES set piece / crane projects onto the JUMP in lane 0, 37.9u ahead
+     *
+     * WHAT WAS ACTUALLY OUT THERE, measured off the live scene rather than read
+     * off this source. The mesh stands at |x| = 13 with local +x toward the
+     * water, so local -x points AT THE ROAD, and the container run was authored
+     * 6.4 units long in x centred at local -8:
+     *
+     *   local x -11.2 .. -4.8   ->   world x 1.80 .. 8.20
+     *
+     * CORRIDOR_HALF is 3.75. Two of the three containers therefore stood on the
+     * outer lane, from road level to y = 5.5 -- taller than the 2.8 a BLOCK
+     * occupies -- and hid a JUMP 38 units out. A quayside crane at |x| 13 had
+     * put a solid object in the lanes.
+     *
+     * The paint made it worse rather than better: 0x37d6ff is h 192.3 deg, which
+     * is 1.7 deg off the 194 this game contracts as DUCK cyan. A cyan slab
+     * standing in a lane is not merely occlusion, it is the colour contract
+     * being spent on something that is not a gate.
+     *
+     * THE FIX IS THE STACK'S AXIS, not its existence. Containers on a quay run
+     * ALONG the quay, so they are turned to lie 6.4 deep in z and 2.7 wide in x
+     * and moved onto the landward apron behind the crane's inboard leg. Inner
+     * faces now land at world x 6.05 and 7.05 against a corridor of 3.75 --
+     * 2.3 units of margin -- and the lowest thing this mesh still puts over the
+     * corridor is the counterweight at y = 21.0, which is the counterjib doing
+     * its job twelve units above OVERHEAD_Y.
      */
     const craneGeo = (function () {
       const parts = [];
@@ -9340,11 +9378,15 @@ MR.World = (function () {
       parts.push(bx(3.4, 2.4, 3.4, -10.5, 22.2, 0, DARK));
       parts.push(bx(0.22, 9.0, 0.22, 18.0, 17.6, 0, DARK));
       parts.push(bx(1.6, 1.2, 1.6, 18.0, 12.6, 0, 0xffe45e));
-      // Containers on the quay, which is what makes it a quay.
-      const box = [0x37d6ff, 0xff9ad5, 0x59d47a];
+      // Containers on the quay, which is what makes it a quay. Long axis along
+      // z, stacked two-and-one on the landward apron; see the note above for
+      // the corridor measurement that set these x values.
+      // 0x2f6ad8 is h 219 deg -- the blue a container is actually painted,
+      // and 25 degrees clear of the DUCK cyan the old 0x37d6ff sat on top of.
+      const box = [0x2f6ad8, 0xff9ad5, 0x59d47a];
+      const CONT = [[-5.6, 1.35, -8.0], [-4.6, 1.35, -1.0], [-5.6, 4.15, -8.2]];
       for (let i = 0; i < 3; i++) {
-        parts.push(bx(6.4, 2.7, 2.7, -8 + (i % 2) * 3, 1.35 + Math.floor(i / 2) * 2.8,
-          -8 - i * 0.6, box[i]));
+        parts.push(bx(2.7, 2.7, 6.4, CONT[i][0], CONT[i][1], CONT[i][2], box[i]));
       }
       return merge(parts);
     })();

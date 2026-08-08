@@ -494,6 +494,11 @@
     get state() { return state; },
     get pace() { return pace; },
     get player() { return player; },
+    // Where this run made contact, in gate z. The finish card's chapter line
+    // is computed from it, and a list that silently disagreed with pace.hits
+    // would put a wrong city on the card with nothing to catch it -- so the
+    // harness is given the same array the card is given.
+    get hitAt() { return hitAt; },
     course, world, runner, ghost, cam, hud, audio, renderer, scene,
     begin,
     fps: () => fps,
@@ -517,7 +522,11 @@
       pace.update(step);
       player.update(step, pace.units - b);
       for (const r of player.resolveGates(course, b, pace.units)) {
-        if (r.clean) pace.onClean(); else pace.onHit();
+        // Recorded here as well as in the live loop. This fast-forward exists
+        // so tooling can photograph the game deep into a race, and a debug
+        // path that quietly drops a fact the finish card is computed from
+        // would make the card lie on exactly the runs the harness inspects.
+        if (r.clean) pace.onClean(); else { pace.onHit(); hitAt.push(r.gate.z); }
       }
       player.drainEvents();
       if (pace.finished) break;

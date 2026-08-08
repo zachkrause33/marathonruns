@@ -831,6 +831,38 @@ MR.HUD = (function () {
         n.railRoute.appendChild(span);
       }
       cache.here = undefined;
+      fitRoute();
+    }
+
+    /**
+     * Shrink the route until the longest name fits its own city.
+     *
+     * MEASURED, not guessed at, and the guess was wrong: 9px looked safe
+     * against a third of the bar and is not. At 360x780 on 2026-08-13 the
+     * generator gives AMSTERDAM 52px of a four-city bar and the label clipped
+     * to AMSTERD -- which does not read as a truncation, it reads as the game
+     * having failed to draw a word.
+     *
+     * The whole row steps down together. One name at a smaller size than its
+     * neighbours reads as a defect even when it is deliberate, and the row's
+     * height is pinned in the stylesheet, so nothing below it moves whatever
+     * this lands on -- which is what keeps footroom.js out of it.
+     */
+    function fitRoute() {
+      const spans = n.railRoute.children;
+      if (!spans.length) return;
+      const over = function () {
+        for (const s of spans) if (s.scrollWidth > s.clientWidth + 1) return true;
+        return false;
+      };
+      n.railRoute.style.fontSize = '';
+      // Four steps from the stylesheet's own size, which reaches 6px from 9
+      // and 7px from 10. Below that the row would be unreadable and the
+      // ellipsis backstop in the stylesheet is the better failure.
+      const base = parseFloat(getComputedStyle(n.railRoute).fontSize) || 9;
+      for (let i = 1; i <= 4 && over(); i++) {
+        n.railRoute.style.fontSize = Math.max(6, base - i * 0.75) + 'px';
+      }
     }
 
     /**
@@ -904,6 +936,10 @@ MR.HUD = (function () {
     }
     api.markScroll = markScroll;
     window.addEventListener('resize', markScroll);
+    // The route is fitted to a width, so it has to be refitted when the width
+    // changes -- a phone turned on its side is the common case, and the row it
+    // lands in is the one the runner stands on.
+    window.addEventListener('resize', fitRoute);
     for (const el of [n.startPanel, n.endPanel]) {
       el.addEventListener('scroll', function () {
         el.classList.toggle('canScroll',

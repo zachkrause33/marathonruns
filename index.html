@@ -15647,10 +15647,33 @@ MR.World = (function () {
       color: 0xa87bff,          // hue 265, sat 0.52, val 1.00
       transparent: true,
       vertexColors: true,       // per-vertex ALPHA only; see updateRoute
-      // Held under the rings: the paint is the connective tissue, the rings are
-      // what the eye is meant to land on. At full strength the line reads as a
-      // beam being fired down the road rather than as a marking on it.
-      opacity: 0.62,
+      /**
+       * 0.62 WAS TUNED AGAINST AN EMPTY ROAD, AND THE ROAD IS NOT EMPTY.
+       *
+       * The old note here -- "at full strength the line reads as a beam being
+       * fired down the road rather than as a marking on it" -- is about the
+       * ribbon on its own. Asked to rank what the eye lands on in a frame at
+       * 25 units, which is READ_NEAR and the distance the lane is actually
+       * chosen at, a blind reader put it SECOND of six, above the runner, and
+       * put the aid pickup it shares the road with LAST:
+       *
+       *   "yes, things on the road out-shout the hovering object at 25u,
+       *    clearly and by a lot. The violet streaks beat it decisively -- they
+       *    are bigger, more saturated, higher contrast against their
+       *    background, and there are several of them competing against one
+       *    small item."
+       *
+       * A route hint is meant to be read on the way to reading something else.
+       * The item it was drowning is the one tools/simulate.js says is worth two
+       * extra mistakes over a record attempt, so this is not a matter of taste:
+       * the hint was taking attention from the thing attention is for.
+       *
+       * The colour move that fixed the confusion made this worse and hid it --
+       * violet on dark asphalt is a bigger value break than the mint it
+       * replaced. So the hue keeps its separation from the pickups and the
+       * ribbon gives back the strength it never needed.
+       */
+      opacity: 0.38,
       depthWrite: false,
       /**
        * FOGGED, AND THIS LINE WAS BRIEFLY THE OTHER WAY ROUND.

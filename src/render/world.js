@@ -1233,7 +1233,7 @@ MR.World = (function () {
     const nor = new Float32Array(n * 3);
     const col = new Float32Array(n * 3);
     const uv = new Float32Array(n * 2);
-    const wav = anyWave ? new Float32Array(n * 2) : null;
+    const wav = anyWave ? new Float32Array(n * 3) : null;
     const gls = anyGloss ? new Float32Array(n) : null;
     let o = 0;
     for (const item of prepared) {
@@ -1250,8 +1250,9 @@ MR.World = (function () {
       }
       if (wav && item.wave) {
         for (let i = 0; i < count; i++) {
-          wav[(o + i) * 2] = item.wave[0];
-          wav[(o + i) * 2 + 1] = item.wave[1];
+          wav[(o + i) * 3] = item.wave[0];
+          wav[(o + i) * 3 + 1] = item.wave[1];
+          wav[(o + i) * 3 + 2] = item.wave[2] || 0;
         }
       }
       if (gls && item.gloss) {
@@ -1265,7 +1266,7 @@ MR.World = (function () {
     out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
     out.setAttribute('color', new THREE.BufferAttribute(col, 3));
     out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-    if (wav) out.setAttribute('aWave', new THREE.BufferAttribute(wav, 2));
+    if (wav) out.setAttribute('aWave', new THREE.BufferAttribute(wav, 3));
     if (gls) out.setAttribute('aGloss', new THREE.BufferAttribute(gls, 1));
     out.computeBoundingSphere();
     return out;
@@ -1452,11 +1453,20 @@ MR.World = (function () {
   function cbx(w, h, d, x, y, z, color, c, rx, ry, rz) {
     return part(chamferGeo(w, h, d, c === undefined ? 0.05 : c), color, x, y, z, rx, ry, rz);
   }
-  /** Tag a part as crowd flesh: `phase` staggers it, `amp` scales its move. */
-  function wv(p, phase, amp) {
-    p.wave = [phase, amp === undefined ? 1 : amp];
+  /**
+   * Tag a part as crowd flesh: phase staggers it, amp scales its move, and
+   * kind selects WHICH move -- see WAVE_BODY for the five.
+   *
+   * Phase is per FIGURE and must stay that way: the shader derives each
+   * person's own rate jitter from it, so two parts of one body with different
+   * phases are two bodies moving at two speeds. Behaviour goes in kind.
+   */
+  function wv(p, phase, amp, kind) {
+    p.wave = [phase, amp === undefined ? 1 : amp, kind || 0];
     return p;
   }
+  /** The five behaviours aWave.z selects. */
+  const CHEER = { BODY: 0, WAVE: 1, CLAP_L: 2, CLAP_R: 3, BRACED: 4 };
   /** Low-poly blob, for canopies and anything that must not read as a box. */
   function sph(r, seg, x, y, z, color) {
     return part(new THREE.SphereGeometry(r, seg || 7, Math.max(3, (seg || 7) - 2)), color, x, y, z);
@@ -4021,6 +4031,325 @@ MR.World = (function () {
   }
 
   /**
+   * ======================= THE FIGURE KIT =======================
+   *
+   * Every human being in this game except the runner and the ghost is built
+   * from this: the marshals, the cyclists, the trike's rider, the moped's, the
+   * pavement walkers, the roadside knots, the grandstands and the finish
+   * arena. One system, so a spectator and a marshal are the same animal at
+   * different distances instead of two unrelated piles of boxes.
+   *
+   * ---- THE TIERS ARE MEASURED, NOT CHOSEN --------------------------------
+   *
+   * tools/people.js projects every head in the live scene through the live
+   * chase camera and reports its real screen box, plus the pixels it actually
+   * draws once everything in front of it has been drawn. What it found:
+   *
+   *   figure                    head px       eye mark   rendered
+   *   BLOCK v3 marshals @8u     27.1 x 25.4     2.76 px      --
+   *   BLOCK v2 trike rider @8u  21.5 x 24.5     2.75 px      --
+   *   finish stand, front row   21.4 wide       3.92 px    878/frame
+   *   BLOCK v8 cyclists @8u     17.0 x 14.2     2.75 px      --
+   *   BLOCK v3 marshals @20u    13.9 x 12.8     1.42 px      --
+   *   pavement walkers          6.8 best, 1.5-4.3 median     34/frame
+   *   roadside crowd knots      10.1 best, 1.5 MEDIAN        91/frame
+   *   grandstand                2.2 best, 1.0 MEDIAN         36/frame
+   *
+   * The eye mark is a 0.055-unit feature projected at that head's own depth.
+   * Under about 1.2 px a feature lands inside one pixel and is averaged into
+   * its neighbour -- a smudge, not an eye.
+   *
+   * SO A SPECTATOR'S FACE IS 1.5 PIXELS WIDE AND DRAWS 2.3 OF THEM. Ninety-one
+   * pixels of head, shared between forty heads, is the entire budget for every
+   * face in a roadside knot. There is no eye that can be put there, and the
+   * owner's own instruction covers it: they can be much lower-detail because
+   * they are farther away. The effort goes into silhouette and motion instead,
+   * which is what survives to 90 units, and that is a better answer than a
+   * face nobody can see.
+   *
+   *   FACE   head over ~15 px: eyes, brows, nose, mouth, ears, hair. The four
+   *          hazard figures and the finish stand's front two rows.
+   *   BODY   head 5-15 px: the whole articulated figure -- neck, shoulders,
+   *          upper arm, forearm, hand, hips, thigh, shin, foot -- with hair
+   *          and ears but no facial marks. The pavement walkers.
+   *   READ   head under 5 px: head, torso, two arms, two legs, and the joints
+   *          that keep the silhouette from welding into a lump. The knots and
+   *          the stands.
+   *
+   * ---- RULE 1, AND WHY A FACE IS NOT AN EXCEPTION TO IT -------------------
+   *
+   * The head is a closed solid built on all sides: skull, back of skull, hair
+   * over the crown and down the back, and an ear on each side. The eyes, brows,
+   * nose and mouth are on the front because that is where a person's are, which
+   * is anatomy and not a detail budget. Nothing here is hollow and nothing is
+   * omitted because the chase camera starts behind: the cyclists ride AWAY from
+   * the lens and get their faces anyway, because the pass, the lane change and
+   * the finish framing all show them.
+   *
+   * ---- DRAW CALLS ---------------------------------------------------------
+   *
+   * Zero. Every figure this builds is pushed into a caller's part list and
+   * merged, so a hundred people are one submission exactly as before. What it
+   * costs is triangles, which is the resource this project has 296,000 spare
+   * of.
+   */
+  const FIG = {
+    // One dark for every facial mark. Not black: a pure black mark on a
+    // 3-band toon ramp is the only value in the frame with no shading at all
+    // and it reads as a hole punched in the head.
+    ink: 0x2a2036,
+    /**
+     * SEVEN HAIRS AND FOUR SKINS, AND THE PAIRING IS NOT RANDOM.
+     *
+     * The last two entries are grey and white, and they are what carries AGE
+     * -- the owner asked for varied age impression, and at 20 px of head there
+     * is no wrinkle available, so age is hair colour, hairline and stoop. A
+     * crowd where nobody is over thirty is a crowd that looks generated.
+     */
+    hair: [0x241a14, 0x4a2c18, 0x7a4a22, 0x141420, 0xb07838, 0x8a8496, 0xd6d0c4],
+    skin: [0xffc79a, 0xe0a173, 0xb87a4e, 0x8a5a3c],
+  };
+
+  /**
+   * A HEAD, at whatever size the caller's figure wants one.
+   *
+   * o.fz is which way the face points in the caller's own z: -1 is toward the
+   * chase camera (a marshal facing the oncoming runner), +1 is away from it (a
+   * cyclist being overtaken). Both get the same face.
+   *
+   * The variation the owner asked for is all here and all seeded by the
+   * caller: face shape through w/h/d, eye shape through eyeH, eyebrow shape
+   * through browTilt, hairstyle through style, age through the hair colour and
+   * the hairline. Two figures built with the same numbers are the same person;
+   * nothing else in this file is allowed to be.
+   */
+  function vHead(parts, o) {
+    const P = o.wrap || function (p) { return p; };
+    const w = o.w, h = o.h, d = o.d === undefined ? o.w * 0.92 : o.d;
+    const x = o.x, y = o.y, z = o.z;
+    const fz = o.fz === undefined ? -1 : o.fz;
+    const front = z + fz * d / 2;
+    const skin = o.skin, hair = o.hair;
+    const face = o.face !== false;
+    const style = (o.style || 0) % 6;
+
+    // ---- the skull ------------------------------------------------------
+    // Chamfered, because a square-cornered head is the single loudest thing
+    // that says "box with a face drawn on it" -- and the chamfer is what makes
+    // the crown read as round from the side and from behind.
+    parts.push(P(cbx(w, h, d, x, y, z, skin, Math.min(0.075, w * 0.16)), 'head'));
+    // A jaw, narrower and shorter than the skull. This is most of what face
+    // SHAPE is at twenty pixels: a wide jaw is a heavy face, a narrow one is
+    // a young one, and the caller varies it.
+    const jw = w * (o.jaw === undefined ? 0.82 : o.jaw);
+    parts.push(P(cbx(jw, h * 0.34, d * 0.90, x, y - h * 0.40, z + fz * d * 0.03, skin, 0.03), 'head'));
+
+    // ---- ears, both sides, always ---------------------------------------
+    for (const sx of [-1, 1]) {
+      parts.push(P(bx(w * 0.09, h * 0.30, d * 0.24, x + sx * (w * 0.50), y - h * 0.02,
+        z - fz * d * 0.04, skin), 'head'));
+    }
+
+    // ---- hair -----------------------------------------------------------
+    // A cap over the crown and DOWN THE BACK, so the head is built behind as
+    // well as in front. Style 5 is a receding hairline: the cap sits back off
+    // the brow and the sides are kept, which at this size is the whole of
+    // "this person is older" together with a grey from FIG.hair.
+    const recede = style === 5 ? 0.30 : 0;
+    parts.push(P(cbx(w * 1.04, h * 0.30, d * 1.05, x, y + h * 0.38,
+      z - fz * d * recede * 0.5, hair, 0.04), 'head'));
+    parts.push(P(bx(w * 1.03, h * 0.44, d * 0.20, x, y + h * 0.10,
+      z - fz * (d * 0.46), hair), 'head'));
+    if (style === 0) {
+      // A fringe across the brow.
+      parts.push(P(bx(w * 0.94, h * 0.14, d * 0.16, x, y + h * 0.27, front - fz * 0.01, hair), 'head'));
+    } else if (style === 1) {
+      // Long, down past the jaw on both sides.
+      for (const sx of [-1, 1]) {
+        parts.push(P(bx(w * 0.16, h * 0.62, d * 0.86, x + sx * (w * 0.50), y - h * 0.14, z, hair), 'head'));
+      }
+    } else if (style === 2) {
+      // A bun or a topknot.
+      parts.push(P(sph(w * 0.30, 6, x, y + h * 0.62, z - fz * d * 0.22, hair), 'head'));
+    } else if (style === 3) {
+      // Cropped: nothing but the cap, which is already there. The absence is
+      // the style, and it is what stops every head having a silhouette.
+      parts.push(P(bx(w * 0.90, h * 0.10, d * 0.90, x, y + h * 0.22, z, hair), 'head'));
+    } else if (style === 4) {
+      // A ponytail off the back -- the one style that changes the silhouette
+      // from directly astern, which is the view this game spends most of its
+      // time in.
+      parts.push(P(bx(w * 0.22, h * 0.52, d * 0.20, x, y - h * 0.02,
+        z - fz * (d * 0.62), hair), 'head'));
+    }
+
+    if (!face) return;
+
+    // ---- the face -------------------------------------------------------
+    // Everything below is authored as a fraction of the head, so one set of
+    // numbers works on a 0.28 spectator and a 0.54 marshal.
+    const eyeY = y + h * 0.06;
+    const eyeX = w * 0.21;
+    const eyeH = h * (o.eyeH === undefined ? 0.13 : o.eyeH);
+    const proud = fz * 0.006;
+    for (const sx of [-1, 1]) {
+      // The white of the eye first, then the pupil inside it. Two marks and
+      // not one, because a single dark blob at this size reads as a socket and
+      // a bright surround is what makes it read as looking at something.
+      parts.push(P(bx(w * 0.20, eyeH, 0.02, x + sx * eyeX, eyeY, front + proud, 0xf6f2e0), 'head'));
+      parts.push(P(bx(w * 0.095, eyeH * 0.86, 0.02, x + sx * (eyeX + w * 0.02), eyeY,
+        front + proud * 2, FIG.ink), 'head'));
+      // The brow. Its TILT is the whole of the expression at this size --
+      // outer-end-up reads as open, inner-end-down reads as set, and the
+      // caller rolls it. A crowd of identical brows is a crowd of one person.
+      parts.push(P(bx(w * 0.26, h * 0.075, 0.02, x + sx * eyeX, y + h * 0.20, front + proud,
+        o.brow === undefined ? hair : o.brow, 0, 0, sx * (o.browTilt || 0)), 'head'));
+    }
+    // The nose, proud of the face, with a real depth -- it is the one feature
+    // that is a SHAPE rather than a mark, and it is the one that survives to
+    // the largest angle off axis, because it is still there in profile.
+    parts.push(P(bx(w * 0.13, h * 0.24, d * 0.13, x, y - h * 0.05,
+      front + fz * (d * 0.055), skin), 'head'));
+    // The mouth. Width varies with the caller so a face can be set or open.
+    parts.push(P(bx(w * (o.mouth === undefined ? 0.30 : o.mouth), h * 0.06, 0.02,
+      x, y - h * 0.30, front + proud, FIG.ink), 'head'));
+  }
+
+  /**
+   * ONE PERSON: head, neck, shoulders, arms with elbows, hands, torso, hips,
+   * legs with knees, feet -- the list the brief asks for, at the tier the
+   * measurement allows.
+   *
+   * Poses are given as angles, in radians, and are the whole reason this is a
+   * function rather than a template. o.pose is one of the named stances at the
+   * bottom of this comment, or the caller supplies its own limb angles.
+   *
+   *   arm[0..1]   shoulder pitch, per arm. Negative swings the hand forward.
+   *   fore[0..1]  elbow bend, per arm.
+   *   leg[0..1]   hip pitch, per leg.
+   *   knee[0..1]  knee bend, per leg.
+   *   lean        torso pitch. A crouched cyclist and an upright marshal are
+   *               the same figure with a different number here.
+   *
+   * o.wrap(part, role) is applied to every part, so a caller can tag the whole
+   * figure for the crowd wave with a different amplitude on the arms than on
+   * the feet, or hand it a gloss level, or do nothing at all.
+   */
+  function vFigure(parts, o) {
+    const P = o.wrap || function (p) { return p; };
+    const S = o.h === undefined ? 1 : o.h;          // overall height scale
+    const x = o.x, z = o.z, y0 = o.y || 0;
+    const tier = o.tier === undefined ? 2 : o.tier; // 0 READ, 1 BODY, 2 FACE
+    const fz = o.fz === undefined ? -1 : o.fz;
+    const skin = o.skin, top = o.top, leg = o.legCol, shoe = o.shoe || 0x2a2230;
+    const bw = (o.build === undefined ? 1 : o.build);   // body width scale
+    const arm = o.arm || [0, 0], fore = o.fore || [0, 0];
+    const hip = o.leg || [0, 0], knee = o.knee || [0, 0];
+    const lean = o.lean || 0;
+
+    // Proportions, as fractions of standing height. These are the numbers that
+    // make a stack of boxes read as a person rather than as a snowman, and
+    // they are a real figure's: the head is a seventh of the height, the hip
+    // is at 0.52, the shoulder at 0.82.
+    const H = 1.74 * S;
+    const headW = 0.215 * S * (o.headW === undefined ? 1 : o.headW);
+    const headH = 0.235 * S * (o.headH === undefined ? 1 : o.headH);
+    const shoulderY = y0 + H * 0.815;
+    const hipY = y0 + H * 0.505;
+    const shW = 0.40 * S * bw;
+
+    // ---- legs -----------------------------------------------------------
+    // Thigh and shin as two segments about a knee, so a figure can stand
+    // mid-stride, sit, or drive a pedal. One slab of navy is not a pair of
+    // legs and never was.
+    const thighL = H * 0.26, shinL = H * 0.24;
+    for (let s = 0; s < 2; s++) {
+      const sx = s ? 1 : -1;
+      const lx = x + sx * 0.105 * S * bw;
+      const a = hip[s] || 0, b = (knee[s] || 0);
+      // Thigh, hung from the hip and pitched.
+      const tcy = hipY - Math.cos(a) * thighL / 2;
+      const tcz = z + Math.sin(a) * thighL / 2 * fz;
+      parts.push(P(bx(0.135 * S * bw, thighL, 0.165 * S, lx, tcy, tcz, leg, a * -fz), 'leg'));
+      // Knee to ankle.
+      const kx = lx, ky = hipY - Math.cos(a) * thighL, kz = z + Math.sin(a) * thighL * fz;
+      const c = a + b;
+      const scy = ky - Math.cos(c) * shinL / 2;
+      const scz = kz + Math.sin(c) * shinL / 2 * fz;
+      parts.push(P(bx(0.115 * S * bw, shinL, 0.135 * S, kx, scy, scz, o.shin || leg, c * -fz), 'leg'));
+      // Foot, flat on the ground under the ankle. A leg that ends in a shin is
+      // a peg, and the foot is what puts the figure ON the pavement.
+      const ay = ky - Math.cos(c) * shinL, az = kz + Math.sin(c) * shinL * fz;
+      // The toe points the way the figure faces, which is the only thing that
+      // tells a standing person from a person standing backwards.
+      parts.push(P(bx(0.135 * S, 0.075 * S, 0.255 * S, kx, ay + 0.032 * S,
+        az + fz * 0.055 * S, shoe), 'foot'));
+    }
+
+    // ---- hips and torso -------------------------------------------------
+    // The hips are their own block and NARROWER than the chest. That one step
+    // is most of what makes a torso read as a body: a single box from shoulder
+    // to thigh is a fridge.
+    parts.push(P(bx(shW * 0.78, H * 0.10, 0.20 * S, x, hipY + H * 0.045, z,
+      o.hipCol || leg), 'torso'));
+    const torsoH = H * 0.265;
+    const tcy = hipY + H * 0.085 + Math.cos(lean) * torsoH / 2;
+    const tcz = z + Math.sin(lean) * torsoH / 2 * fz;
+    parts.push(P(bx(shW * 0.90, torsoH, 0.215 * S, x, tcy, tcz, top, lean * -fz), 'torso'));
+    // Shoulders: a wider, shallower block on top of the chest. It is what
+    // gives the figure a yoke to hang arms from, and it is the difference
+    // between a person and a bottle.
+    const shY = shoulderY - H * 0.02;
+    const shZ = z + Math.sin(lean) * torsoH * fz;
+    parts.push(P(bx(shW, H * 0.055, 0.205 * S, x, shY, shZ, o.shoulder || top), 'torso'));
+
+    // ---- neck and head --------------------------------------------------
+    const neckY = shY + H * 0.045;
+    parts.push(P(bx(0.10 * S, H * 0.045, 0.10 * S, x, neckY, shZ, skin), 'head'));
+    const headY = neckY + H * 0.028 + headH / 2;
+    vHead(parts, {
+      w: headW, h: headH, d: headW * 0.92,
+      x: x, y: headY, z: shZ + (o.headZ || 0), fz: fz,
+      skin: skin, hair: o.hair, style: o.style, face: tier >= 2 && o.face !== false,
+      eyeH: o.eyeH, browTilt: o.browTilt, brow: o.brow, mouth: o.mouth, jaw: o.jaw,
+      wrap: P,
+    });
+
+    // ---- arms -----------------------------------------------------------
+    // Upper arm and forearm about an elbow, with a hand on the end. At tier 0
+    // the two segments are merged into one, because a 1.5 px head does not
+    // have an elbow either -- but the ARM ANGLE is kept, since that is what
+    // the silhouette is made of and it costs nothing.
+    const upperL = H * 0.185, foreL = H * 0.165;
+    for (let s = 0; s < 2; s++) {
+      const sx = s ? 1 : -1;
+      const ax = x + sx * (shW / 2 - 0.035 * S);
+      const a = arm[s] || 0;
+      const ay0 = shY + H * 0.012;
+      if (tier === 0) {
+        const L = upperL + foreL;
+        parts.push(P(bx(0.10 * S * bw, L, 0.11 * S,
+          ax, ay0 - Math.cos(a) * L / 2,
+          shZ + Math.sin(a) * L / 2 * fz, o.sleeve || top, a * -fz), 'arm'));
+        continue;
+      }
+      const ucy = ay0 - Math.cos(a) * upperL / 2;
+      const ucz = shZ + Math.sin(a) * upperL / 2 * fz;
+      parts.push(P(bx(0.098 * S * bw, upperL, 0.108 * S, ax, ucy, ucz,
+        o.sleeve || top, a * -fz), 'arm'));
+      const ex = ax, ey = ay0 - Math.cos(a) * upperL, ez = shZ + Math.sin(a) * upperL * fz;
+      const c = a + (fore[s] || 0);
+      const fcy = ey - Math.cos(c) * foreL / 2, fcz = ez + Math.sin(c) * foreL / 2 * fz;
+      parts.push(P(bx(0.088 * S * bw, foreL, 0.098 * S, ex, fcy, fcz,
+        o.cuff || o.sleeve || top, c * -fz), 'arm'));
+      // The hand. Small, and it is the thing that lets an arm END rather than
+      // stop -- and the thing a paddle, a bar or a placard is held BY.
+      const hy = ey - Math.cos(c) * foreL, hz = ez + Math.sin(c) * foreL * fz;
+      parts.push(P(bx(0.085 * S, 0.105 * S, 0.09 * S, ex, hy - 0.045 * S, hz, skin), 'hand'));
+    }
+  }
+
+  /**
    * One lane's surface: a road-length quad, laid flat on the slab and tinted
    * with a vertex colour so it multiplies whatever the biome has made the road.
    *
@@ -4111,7 +4440,73 @@ MR.World = (function () {
   // Declarations and body are kept apart because the ink shell needs the same
   // displacement and does NOT go through the three.js include pipeline, so it
   // has to supply its own `transformed`. See outlineVS in shading.js.
-  const WAVE_DECL = 'attribute vec2 aWave;\nuniform float uT;\nuniform float uZ;\nuniform float uHot;\n';
+  /**
+   * ---- FIVE THINGS A SPECTATOR CAN BE DOING, AND ONE ENVELOPE ------------
+   *
+   * The wave used to be one motion: everybody lifted and everybody swayed at
+   * one rate, staggered only by phase. A hundred people doing the same thing a
+   * beat apart is a Mexican wave and nothing else -- it is not clapping, it is
+   * not waving, and it is certainly not a crowd.
+   *
+   * aWave.z now names the behaviour. The magnitudes are DELIBERATELY
+   * UNCHANGED: every kind uses the same vertical formula and the same lateral
+   * coefficient, and what varies is RATE and DIRECTION. That is not a
+   * stylistic choice, it is what keeps tools/motion.js correct -- the tool
+   * grows every bounding box by WAVE_ENVELOPES times the baked amplitude, and
+   * docs/roadmap.md records what happened last time an envelope was inflated
+   * to cover the worst case: it reported CORRIDOR failures against finish
+   * stands that do not move laterally at all, and an assertion that fires on
+   * things that are fine gets switched off. A behaviour that needed a bigger
+   * envelope would have to pay for it in the corridor budget; none of these
+   * do, because a clap is not a bigger movement than a bounce, it is a faster
+   * one in the opposite direction.
+   *
+   *   BODY    the default. Stand up, bounce, drift.
+   *   WAVE    a raised hand or a placard, swinging half again as fast. This is
+   *           the one that reads at distance, because it is the highest and
+   *           furthest-travelling point on the figure.
+   *   CLAP_L  a forearm that swings toward the body's centre line...
+   *   CLAP_R  ...and one that swings away from it, at the same rate, so the
+   *           pair meets and parts. Two kinds rather than one because they
+   *           share a figure's phase and only the SIGN can separate them.
+   *   BRACED  leaning on the barrier. Almost no lift and a slow rock -- the
+   *           people at the front are pressed against something and the ones
+   *           behind are jumping, and a crowd where those look the same is a
+   *           crowd of one animation.
+   *
+   * ---- THE VERTICAL IS UNIFORM WITHIN A FIGURE, AND THAT IS A RULE --------
+   *
+   * The first draft of these kinds cut the clap's vertical to a third, on the
+   * reasoning that hands clap rather than pump. It is right about hands and
+   * wrong about geometry: this displaces VERTICES, so a forearm lifting by a
+   * third of what its own shoulder lifts by does not bend at the elbow, it
+   * COMES OFF. At the finish stand, where exc is pinned at the 1.55 cap, the
+   * gap would have been 0.61 world units on a figure 1.7 tall, twelve units
+   * from the lens.
+   *
+   * This is the same defect crowdGeo's own comment records paying for once
+   * already -- legs on a lower amplitude than the body opened daylight under a
+   * floating torso -- and it is the trap the brief warned about: any new
+   * vertex animation has it.
+   *
+   * So the rule is: a kind may change RATE and DIRECTION of the lateral term,
+   * and it may change the vertical only if it is applied to the WHOLE FIGURE.
+   * BRACED is per-figure and may damp the lift; WAVE and the clap pair are
+   * per-limb and touch nothing but x. Amplitude differences between parts of
+   * one body stay small and are carried by overlapping the parts.
+   *
+   * ---- AND EVERY PERSON HAS THEIR OWN CLOCK RATE -------------------------
+   *
+   * The owner asked for the timing to be offset randomly so the crowd feels
+   * organic, and phase alone does not do that: a hundred sine waves of
+   * IDENTICAL FREQUENCY re-converge, so a phase-staggered crowd drifts in and
+   * out of unison forever. The rate jitter is taken from the fractional part
+   * of the figure's own phase, which is already random and already per-figure,
+   * so it costs one fract and no extra attribute -- and because every part of
+   * one body carries the same phase, a person's head, arms and legs stay on
+   * that person's clock.
+   */
+  const WAVE_DECL = 'attribute vec3 aWave;\nuniform float uT;\nuniform float uZ;\nuniform float uHot;\n';
   const WAVE_BODY = [
     'if (aWave.y > 0.0) {',
     '  float wz = (modelMatrix * vec4(transformed, 1.0)).z - uZ;',
@@ -4121,12 +4516,27 @@ MR.World = (function () {
     '  float lead = wz > 0.0 ? 150.0 : 70.0;',
     '  float near = 1.0 - smoothstep(4.0, lead, abs(wz));',
     '  float exc = clamp(0.16 + 0.42 * uHot + near * (0.34 + 0.68 * uHot), 0.0, 1.55);',
-    '  float b = sin(uT * (4.1 + 3.4 * exc) + aWave.x);',
+    '  float jit = fract(aWave.x * 0.159154);',
+    '  float b = sin(uT * (4.1 + 3.4 * exc) * (0.80 + 0.40 * jit) + aWave.x);',
     // Two terms and they say different things. The first is standing UP -- a
     // constant lift that grows with excitement, which is what turns a seated
     // block into a crowd on its feet. The second is the jumping.
-    '  transformed.y += aWave.y * (0.30 * exc + (0.05 + 0.26 * exc) * abs(b));',
-    '  transformed.x += aWave.y * exc * 0.085 * sin(uT * 5.7 + aWave.x * 1.73);',
+    '  float vert = 0.30 * exc + (0.05 + 0.26 * exc) * abs(b);',
+    '  float lat = 1.0;',
+    '  float lrate = 5.7;',
+    '  float k = aWave.z;',
+    '  if (k > 0.5 && k < 1.5) { lrate = 8.6; }',
+    // Magnitude 1.0, like every other kind. A clap wants more travel than
+    // this and cannot have it: the lateral coefficient is what WAVE_ENVELOPES
+    // publishes and tools/motion.js grows every crowd bounding box by, so a
+    // kind that reached further would either breach the corridor unseen or
+    // force the envelope up for parts that never move that far. At the cap it
+    // is 0.132 each way, 0.26 of closing, and the hands are authored 0.30
+    // apart so that is a clap and not a twitch.
+    '  else if (k > 1.5 && k < 3.5) { lrate = 10.9; lat = k < 2.5 ? 1.0 : -1.0; }',
+    '  else if (k > 3.5) { vert *= 0.22; lrate = 2.3; }',
+    '  transformed.y += aWave.y * vert;',
+    '  transformed.x += aWave.y * exc * 0.085 * lat * sin(uT * lrate + aWave.x * 1.73);',
     '}',
   ].join('\n');
   const WAVE_CHUNK = '#include <begin_vertex>\n' + WAVE_BODY;
@@ -4264,7 +4674,10 @@ MR.World = (function () {
    */
   const WIND_REACH = Math.max(WIND_A_LEAF, WIND_A_CLOTH);
 
-  const WIND_DECL = 'attribute vec2 aWave;\nuniform float uT;\n';
+  // vec3 to match the crowd's, because merge() writes ONE aWave attribute and
+  // a geometry can only have one item size. The wind reads x and y and ignores
+  // z; a mismatch here is a silent GL type error and a black page.
+  const WIND_DECL = 'attribute vec3 aWave;\nuniform float uT;\n';
 
   function windBody(f, a) {
     return [
@@ -9341,65 +9754,130 @@ MR.World = (function () {
     });
 
     /**
-     * A knot of spectators, merged. Individual capsules read as pills and cost
-     * a draw each; eight little figures with legs, raised arms and different
-     * shirts cost the same one draw and read as a crowd.
+     * ================== A KNOT OF SPECTATORS ==================
+     *
+     * Nine people, merged into ONE DRAW. That is the whole reason this object
+     * is shaped the way it is and it is not negotiable: the crowd is the
+     * largest population of anything in the game, draw calls peak at 266
+     * against about 400, and a per-person submission would be catastrophic.
+     * Everything below costs triangles, of which there are 296,000 spare.
+     *
+     * ---- WHAT THE MEASUREMENT SAID TO BUILD, AND WHAT NOT TO --------------
+     *
+     * tools/people.js, through the live chase camera: a spectator's head in
+     * one of these knots is 1.5 px across at the median and 10.1 px at the
+     * absolute best, and the WHOLE POPULATION draws 91 head pixels a frame
+     * shared between forty visible heads -- 2.3 pixels per face. A 0.055-unit
+     * eye projects to 0.4 px at the median head. There is no face here. Not a
+     * simplified one, not a hinted one: the mark would land inside a single
+     * pixel and be averaged into its neighbour.
+     *
+     * So this figure is tier READ. Every triangle goes into the two things
+     * that DO survive to 90 units:
+     *
+     *   THE SILHOUETTE, which now separates. Head, neck, shoulders, chest,
+     *     hips, two thighs, two shins, two feet, two arms -- through vFigure,
+     *     the same builder the marshals use, at a lower tier. The old figure
+     *     was five boxes with the legs as one slab and no hips at all, and a
+     *     body with no waist is a bottle at every distance.
+     *   THE MOTION, which is what tells a crowd from a hedge. Five behaviours
+     *     now, not one: arms up, waving, clapping, jumping, and braced on the
+     *     barrier leaning at the road. See WAVE_BODY.
+     *
+     * ---- THE TIMING IS OFFSET PER PERSON, TWICE --------------------------
+     *
+     * Phase is rolled over a FULL cycle rather than stepped by 1.31 per index,
+     * and the shader takes a rate jitter off the same number, so no two people
+     * in a knot share a clock. A phase-only stagger at one frequency
+     * re-converges: the crowd drifts into unison and back out forever, which
+     * is exactly the mechanical look the owner asked to be rid of.
+     *
+     * ---- AND THE LATERAL REACH WENT DOWN -------------------------------
+     *
+     * The knots were moved out 0.35 once already because a swept arm reached
+     * x 3.70 against a CORRIDOR_HALF of 3.75. vFigure hangs its arms from a
+     * 0.40 shoulder, so a hand sits at 0.165 from the centre line where the
+     * old splayed arms sat at 0.30, and raised arms go straight up. Nothing
+     * here reaches further than what it replaces.
      */
     function crowdGeo(seed) {
       const parts = [];
       const shirts = [0xff4d5e, 0x37d6ff, 0xffe45e, 0x59d47a, 0xff9ad5, 0xfff2e0, 0xffb020, 0x9a7bff];
-      const skins = [0xffc79a, 0xe0a173, 0xb87a4e, 0x8a5a3c];
+      const trousers = [0x2b2f52, 0x3a4472, 0x4a3a52, 0x2f3a38, 0x5a4a3a, 0x37405e];
       let s = seed * 9301 + 49297;
       const r = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+      const pick = (a) => a[Math.floor(r() * a.length)];
       const signs = [0xffe45e, 0xfffdf5, 0x37d6ff, 0xff9ad5];
       for (let i = 0; i < 9; i++) {
         const x = -1.5 + (i % 3) * 1.15 + r() * 0.35;
         const z = -2.6 + Math.floor(i / 3) * 2.4 + r() * 0.9;
-        const h = 1.02 + r() * 0.26;
-        const shirt = shirts[Math.floor(r() * shirts.length)];
-        const skin = skins[Math.floor(r() * skins.length)];
-        // One phase per FIGURE. The knot used to bob as a single rigid group
-        // from JS -- nine people rising and falling in lockstep, which is the
-        // silhouette of a lift, not of a crowd. Individually phased on the
-        // GPU it costs nothing and nine people jump at nine different moments.
-        const ph = i * 1.31 + r() * 2.2;
-        // TWO LEGS, AND THEY REACH UP INSIDE THE TORSO. Two faults at the
-        // distance a knot is actually passed at -- 13 units, where a figure is
-        // 14px wide and 50px tall, not the speck this file's older comments
-        // assume. One slab of navy is not a pair of legs, and it is the only
-        // part of this figure with no articulation at all when the walkers
-        // twenty lines down already stand mid-stride.
-        //
-        // The second is the tear. The wave shader lifts by amplitude, so a
-        // 0.45 difference between legs and body opens a real gap between them
-        // -- up to 0.41 world units at full ovation, 19px at 13 units, and it
-        // is visible in a still as daylight under a floating torso. The legs
-        // now run to 0.86h, a quarter of the body's height up inside the
-        // shirt, so the differential SLIDES inside the torso instead of
-        // parting from it; and it is 0.80 rather than 0.55, which keeps the
-        // feet near the pavement without stretching the man.
-        for (const lx of [-0.13, 0.13]) {
-          parts.push(wv(bx(0.16, 0.86 * h, 0.24, x + lx, 0.43 * h, z, 0x2b2f52), ph, 0.80));
+        // Height AND build vary independently. One scalar makes a crowd of one
+        // person photocopied at different sizes; two makes tall thin people
+        // and short broad ones, which is what a crowd is.
+        const S = 0.86 + r() * 0.30;
+        const build = 0.88 + r() * 0.30;
+        const shirt = pick(shirts);
+        const skin = pick(FIG.skin);
+        const hair = pick(FIG.hair);
+        const ph = r() * 6.2832;
+        // The five behaviours, dealt round the knot rather than by i % 3, so
+        // two knots side by side are not the same nine people in the same nine
+        // moods.
+        const act = Math.floor(r() * 5);
+        // ONE AMPLITUDE PER FIGURE for everything that is body. See the rule in
+        // WAVE_BODY: a differential between two connected parts is a tear, and
+        // this file has paid for that once already. Jumpers get a big one and
+        // the braced get a small one, which is the difference between the back
+        // of a crowd and the front of it.
+        const amp = act === 3 ? 1.35 : act === 4 ? 1.0 : 0.72 + r() * 0.34;
+        const kind = act === 4 ? CHEER.BRACED : CHEER.BODY;
+        const wrap = function (p, role) {
+          // The clap is the one place a limb takes its own kind, and it is
+          // lateral-only so it cannot part from the arm it hangs off.
+          if (act === 2 && role === 'arm') return wv(p, ph, amp, p.__cl);
+          return wv(p, ph, amp, kind);
+        };
+
+        // Arms: the pose is what says which of the five this person is doing,
+        // and the pose is free -- it is the same boxes at different angles.
+        //   0 both arms straight up          3 jumping, arms up and out
+        //   1 one arm up, waving             4 braced on the barrier, leaning
+        //   2 clapping in front of the chest
+        let arm = [0, 0], fore = [0, 0], lean = 0;
+        if (act === 0) { arm = [3.05, 3.05]; fore = [0.1, -0.1]; }
+        else if (act === 1) { arm = [3.02, 0.35]; fore = [0.15, 0.5]; }
+        else if (act === 2) { arm = [1.15, 1.15]; fore = [1.15, 1.15]; }
+        else if (act === 3) { arm = [2.72, 2.72]; fore = [0.35, -0.35]; }
+        else { arm = [-1.05, -1.05]; fore = [-0.35, -0.35]; lean = 0.34; }
+
+        const before = parts.length;
+        vFigure(parts, {
+          x: x, y: 0, z: z, h: S, build: build, tier: 0, fz: -1,
+          skin: skin, hair: hair, style: Math.floor(r() * 6),
+          top: shirt, legCol: pick(trousers), shoe: 0x241f2c,
+          arm: arm, fore: fore, lean: lean,
+          // Legs apart on a jumper, feet together on someone braced: the
+          // stance is the other half of what the silhouette says.
+          leg: act === 3 ? [-0.30, 0.30] : [(r() - 0.5) * 0.22, (r() - 0.5) * 0.22],
+          knee: act === 3 ? [0.55, 0.55] : [0.05, 0.05],
+          wrap: function (p, role) { p.__role = role; return p; },
+        });
+        // Tag the two arms for the clap AFTER the fact, because vFigure builds
+        // them in order and only the pair's SIDE can separate them.
+        let armSeen = 0;
+        for (let q = before; q < parts.length; q++) {
+          if (parts[q].__role === 'arm') { parts[q].__cl = armSeen++ < 1 ? CHEER.CLAP_L : CHEER.CLAP_R; }
         }
-        parts.push(wv(bx(0.46, 0.62 * h, 0.32, x, 0.92 * h, z, shirt), ph));
-        parts.push(wv(bx(0.28, 0.28, 0.26, x, 1.38 * h, z, skin), ph));
-        parts.push(wv(bx(0.30, 0.10, 0.28, x, 1.52 * h, z, 0x3a2b46), ph));
-        // Arms up, or holding a placard -- a still crowd looks dead, and the
-        // placards are what read as "spectators" at the distance the figures
-        // themselves have collapsed to two pixels. The placard gets the
-        // biggest amplitude in the knot: it is the highest, brightest and
-        // largest thing on the figure, so it is the part whose movement
-        // survives to the distance the knot is actually read at.
-        if (i % 3 === 0) {
-          parts.push(wv(bx(0.12, 0.56, 0.12, x - 0.30, 1.22 * h, z, skin, 0, 0, 0.32), ph, 1.25));
-          parts.push(wv(bx(0.12, 0.56, 0.12, x + 0.30, 1.22 * h, z, skin, 0, 0, -0.32), ph, 1.25));
-        } else if (i % 4 === 1) {
-          parts.push(wv(bx(0.12, 0.70, 0.12, x + 0.26, 1.35 * h, z, skin), ph, 1.35));
-          parts.push(wv(bx(0.10, 0.9, 0.10, x + 0.26, 1.9 * h, z, 0x8a5a3c), ph, 1.6));
-          parts.push(wv(bx(0.86, 0.62, 0.08, x + 0.26, 2.45 * h, z, signs[Math.floor(r() * signs.length)]), ph, 1.85));
-        } else {
-          parts.push(wv(bx(0.12, 0.46, 0.12, x - 0.28, 0.92 * h, z, shirt), ph, 1.1));
-          parts.push(wv(bx(0.12, 0.46, 0.12, x + 0.28, 0.92 * h, z, shirt), ph, 1.1));
+        for (let q = before; q < parts.length; q++) wrap(parts[q], parts[q].__role);
+
+        // A placard, on one person in three, held in both raised hands. It is
+        // the highest, brightest and largest thing on the figure and therefore
+        // the part whose movement survives furthest -- and at 90 units it is
+        // the single element that says SPECTATORS rather than shrubs.
+        if (act === 0 && i % 3 === 0) {
+          const py = 1.74 * S * 1.02;
+          parts.push(wv(bx(0.075, 0.42, 0.075, x, py + 0.16, z, 0x8a5a3c), ph, amp, CHEER.WAVE));
+          parts.push(wv(bx(0.78, 0.50, 0.07, x, py + 0.56, z, pick(signs)), ph, amp, CHEER.WAVE));
         }
       }
       return merge(parts);

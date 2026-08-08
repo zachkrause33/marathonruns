@@ -535,9 +535,49 @@ Both are now settled.
   same build, aid term neutralised in the built file: **4 of 14 items collected
   → 13 of 14, with zero contacts either way.** The comeback mechanic is now
   exercised by an automated run for the first time.
-- **Chapter the session by city** — 3-4 named cities per run already exist;
-  giving each a segment clock would add resolution points to a four-minute
-  session that currently has exactly one. **OPEN**
+- ~~**Chapter the session by city**~~ — **DONE, and the proposal in it was
+  wrong.** The premise holds: 60 dates give 36 three-city and 24 four-city
+  runs, a chapter lasting 34.3 to 126.9 real seconds, mean 69.4, and one
+  setting covers over 45% of the race on 10 of 60 days. But **the segment
+  clock this item asked for measures the course, not the player** — the spread
+  is set by where `pickSettings` jittered the boundaries, and a 102-second
+  Chicago beside a 52-second Boston says nothing about the run.
+
+  Two further per-chapter verdicts were measured and refused:
+
+  - **The ghost delta per chapter is the pace ramp with a city name on it.**
+    On a FLAWLESS run across ten dates chapter one reads +97s to +134s and the
+    last reads −51s to −158s, every date, on a run heading for the record.
+    That is the six-row split table's first failure exactly, and it would have
+    printed a large positive number where a player looks for a verdict.
+  - **Elapsed-minus-flawless cancels the ramp exactly** (0.000s in every
+    chapter on a clean run over 40 dates) **and still charges the wrong
+    city**, because a broken streak is paid off for the rest of the race:
+    five contacts in Berlin billed Boston 2:45 and Chicago 0:57 for road they
+    ran clean, and on 2026-08-12 it named Sydney the worst chapter of a run
+    whose every contact was in Tokyo.
+
+  What survives is the counterfactual — re-run this race with one city's
+  contacts erased — because a city run clean scores exactly zero by
+  construction. **One line, not a table**, and that is measured too: over 60
+  bursty runs the top city holds 87% of the cost at three contacts (60/60 a
+  majority), 63% at eight (47/60), 51% at twenty (27/60), while the
+  counterfactuals go from 1.2s to 55s adrift of the plate's own total. A table
+  would print its worst self on the runs it reads worst, so the line appears
+  only when one city genuinely carried the run.
+
+  **No transient, and no live verdict.** Both were refused on the measurement
+  above: every honest per-chapter *time* is a finish-time quantity and cannot
+  be known until the tape, and the boundary is a deliberate 190-unit (~7s)
+  cross-fade, which is the wrong place for a hard card.
+
+  Shipped: the rail's static `0 / 13.1 / 26.2` becomes the day's route on the
+  same axis (the setting fractions already ARE that bar's coordinate, since
+  `TOTAL_UNITS = MARATHON_MILES * UNITS_PER_MILE`), plus boundary marks on the
+  bar; and one finish-card note, `CLEAN THROUGH BOSTON · 1:59:40`. Live HUD at
+  390×844: plate coverage 16.35% → **16.03%**, left column 204.6px unchanged,
+  words 24 → **24**, elements 60 → **62** (the boundary marks). The end card
+  gains one note and five words, and only on runs where it is true.
 - **The 110px assumption is wrong everywhere in the source.** The runner
   measures 204-211px in an ordinary chase frame. Detail removed on the old
   figure deserves re-examination — but only the parts cut for size, not the

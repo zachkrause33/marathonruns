@@ -1199,3 +1199,63 @@ nobody measured is worse than no number at all.**
    failed": the `HAZARD_HALF` drift, the coplanar gantry braces, and now this.
    **A guard with a documented exemption is a guard with a documented blind
    spot, and somebody has to go and look at what grew in it.**
+
+21. **Every instrument the fleet had was an orthographic camera the builder
+   chose.** `contrastAudit`, `fleetSheet` and `tools/orbit.js` all photograph a
+   variant through an ortho lens at an azimuth, framed so the object fills the
+   tile. That is the right instrument for an area mean and the wrong one for
+   every question about READING, and the fleet rebuild was verified on it at
+   az 0 / 45 / 90 / 135 / 180. At 45-135 the fleet is genuinely good. The game
+   never shows those angles. The owner looked at the shipped build and said
+   *"I don't see any of these adjusted."*
+
+   **Fourth time on this list of verifying at a framing the game does not
+   use** -- after the silhouette sheet that normalised ten variants to one
+   rectangle, the stride sheet posed at `dt = 0`, and the runner detail budget
+   judged at 110px on a figure that is 163-208px. The fix is a committed tool,
+   `tools/framing.js`, which snapshots the LIVE chase camera after its springs
+   settle and renders every tile through a clone of it, cropped 1:1 out of the
+   real 390x844 frame at 8 / 12 / 20 / 35 units. Scaling a tile to fill its
+   cell is the defect it was written to correct and is not an option on it.
+
+   It also counts what the pixels are MADE of, and that is what turned an
+   impression into a brief. `merge()` writes one flat colour per authored
+   part, so the merged colour attribute is already a part map: re-render with
+   those hexes replaced by category colours through the same camera with the
+   same depth test, and the counts sum to the real silhouette. What it found:
+
+   - **The five variants the rebuild reached carry 30-42% of their pixels in
+     small structure. The five it did not carried 7.7-27%**, and one flat pink
+     cube was 57.7% of the moped. The rebuild was organised around growing
+     bodies into a new 3.90 envelope, so the five that were correctly SHORT --
+     moped, trike, cyclists, marshals, hoarding -- had no growing to do and
+     silently kept their pre-rebuild construction.
+   - **The cargo trike's three wheels owned 0.0% of its pixels at every
+     distance.** All built, all rimmed, all hubbed, and the load box was parked
+     between the lens and its own axle for the whole approach. The comment
+     above that loop had named the stake exactly -- "if they read as three dark
+     smudges the whole vehicle is a floating crate" -- and was wrong about the
+     state, because nobody had counted.
+   - **The hoarding's beacons were inside its own coping**, 0.21 of their 0.30
+     buried, and rebuilding them in place made it worse (1.1% to 0.3%) before
+     the number said to move them outboard.
+
+   Same family as entry 15 and entry 19: **the source is not the frame.** The
+   new thing here is that a part can be present, correct, expensive and worth
+   exactly nothing, and only a census in the shipped projection says so.
+
+22. **A white race number failed the build.** The cyclists got numbers pinned to
+   their backs and pale shoes on their pedals -- 7.2% of the object in
+   near-neutral `PLATE`. Area mean went L 91.3 / S 0.472 to L 98.7 / S 0.387:
+   luminance UP, chroma down 0.085, and `dS` against the middle lane fell
+   through the 0.22 gate to 0.209. `shoot.js` failed it.
+
+   That is the fleet header's own cream mechanism arriving by a **third** door,
+   after the cream bands and the glass flash, on the one variant with no room
+   for it -- and the rule it broke is written four hundred lines above the
+   change: the pale element on a warm body is the plate and the lamp cores and
+   nothing else. `0xfff23a` is 91% of cream's luminance at eight times its
+   chroma and is the substitution the whole fleet already made.
+
+   Worth keeping because the failure was **invisible in the sheet**. The
+   numbers read beautifully; only the audit knew.

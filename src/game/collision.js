@@ -16,10 +16,57 @@ MR.Collision = (function () {
   const K = MR.K;
 
   // Visual extents, in world units, matching world.js geometry.
+  //
+  // ---- WHY BLOCK IS 1.95 DEEP AND NOT 0.65 ------------------------------
+  //
+  // 0.65 made the envelope 1.30 deep against a lane 1.70 wide: every vehicle
+  // in the fleet was WIDER THAN IT WAS LONG, seen from above. That is not a
+  // stylisation, it is a category error -- and it had a hard consequence the
+  // fleet rebuild ran into and could not solve from its own side: the wheels
+  // are 0.60-0.72 across, so a second axle left 0.04-0.10 between the front
+  // and rear tyre. Every "car" in this game was a tracked vehicle, because
+  // two axles did not fit.
+  //
+  // THE SCALE ARGUMENT, which is what sets the number. This world is roughly
+  // one unit to the metre VERTICALLY: the runner is 1.78 tall, and the fleet's
+  // own roof heights in MEASUREMENTS.md corroborate it -- bus 2.78 against a
+  // real 3.0-3.2, tram 2.44+pantograph 2.77 against 3.2-3.6, saloon roof 1.62
+  // against 1.45. Height has always been a real dimension here.
+  //
+  // WIDTH HAS NOT. Every BLOCK must fill the lane it blocks, so all ten
+  // variants are ~1.60 wide by contract -- a bus, a tram and a moped at the
+  // same width. Width is a gameplay constant that has been deliberately
+  // falsified, and it is the one axis a length must NOT be derived from:
+  // scaling length off width propagates the lane compression into the length
+  // and hands back a fleet that is all one size again.
+  //
+  // So length is set on the same scale as height. A saloon is 4.6 m, and at
+  // the ~0.85 compression the roof heights already show that is 3.90 -- which
+  // is halfZ 1.95, and lands the taxi at 3.90 x 1.60 = 2.44:1 in plan against
+  // a real saloon's 2.56:1. Two axles now fit with 1.17 between the tyres
+  // instead of 0.07, and the depth is measured from the same ruler the rest of
+  // the object already used.
+  //
+  // WHAT THIS COSTS, measured over 90 days rather than argued: gate count
+  // 194.8 -> 188.7, the perfect finish 1:57:52 -> 1:57:54, and the record
+  // still survives exactly one mistake unaided. It is nearly free because
+  // collision is a PLANE TEST -- see clears() -- so depth reaches only the
+  // spacing floor and the occlusion audit, never contact.
+  //
+  // ONE NUMBER PER KIND, NOT PER VARIANT, AND THAT IS A DECISION. world.js
+  // boxes every variant of a kind with this one halfZ (see gateBoxes), and
+  // tools/shoot.js's BLANKS assertion casts those boxes. A box SHORTER than
+  // the art it stands for makes BLANKS under-count occlusion and pass a gate
+  // the art really does hide -- the exact defect already in the corrections
+  // list. So this number is a CEILING the whole fleet must fit inside, and a
+  // per-variant table would have to be adopted by world.js in the same change
+  // or it makes the audit dishonest in the dangerous direction. It is not.
+  // The long vehicles get their length from the train span instead, which is
+  // what that mechanism is for: see Course.reachOf.
   const BOX = {
     [K.JUMP]: { yMin: 0.00, yMax: 0.80, halfZ: 0.52 },
     [K.DUCK]: { yMin: 1.41, yMax: 1.83, halfZ: 0.30 },
-    [K.BLOCK]: { yMin: 0.00, yMax: 2.80, halfZ: 0.65 },
+    [K.BLOCK]: { yMin: 0.00, yMax: 2.80, halfZ: 1.95 },
   };
 
   // State thresholds.

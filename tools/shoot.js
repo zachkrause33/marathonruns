@@ -279,17 +279,33 @@ const DEFAULT_SHOTS = [
       const READ_NEAR = MR.Course.READ_NEAR;
       const READ_FAR = (MR.Elevation && MR.Elevation.SIGHT_MIN) || 90;
 
-      // course.js has to hold its own copy of the deepest hazard half-depth --
+      // course.js has to hold its own copy of every hazard half-depth --
       // collision.js loads after it, and generation also runs headless in
       // course-test.js and simulate.js where collision.js is not loaded at all.
       // A duplicated constant nobody checks is how four of the five corrections
       // in docs/roadmap.md started, so it is checked here, where both files are
       // live in the same page.
-      const drift = MR.Course.HAZARD_HALF_Z !== MR.Collision.BOX[MR.K.BLOCK].halfZ
-        ? `course.js HAZARD_HALF_Z is ${MR.Course.HAZARD_HALF_Z} but `
-          + `Collision.BOX[BLOCK].halfZ is ${MR.Collision.BOX[MR.K.BLOCK].halfZ} `
-          + '-- the gate spacing floor is being derived from the wrong box'
-        : null;
+      //
+      // EVERY KIND, not just BLOCK. This guard used to compare one scalar and
+      // the spacing floor used one scalar, so the JUMP and DUCK depths were
+      // free to drift with nothing watching them. They are load-bearing now:
+      // reachOf charges a gate for its own deepest lane, so a stale DUCK depth
+      // silently under-spaces every DUCK-only gate on the course.
+      const drift = (function () {
+        const NAME = { [MR.K.JUMP]: 'JUMP', [MR.K.DUCK]: 'DUCK', [MR.K.BLOCK]: 'BLOCK' };
+        const bad = [];
+        for (const kind of [MR.K.JUMP, MR.K.DUCK, MR.K.BLOCK]) {
+          const mine = MR.Course.HAZARD_HALF_Z[kind];
+          const real = MR.Collision.BOX[kind].halfZ;
+          if (mine !== real) {
+            bad.push(`course.js HAZARD_HALF_Z[${NAME[kind]}] is ${mine} but `
+              + `Collision.BOX[${NAME[kind]}].halfZ is ${real}`);
+          }
+        }
+        return bad.length
+          ? bad.join('; ') + ' -- the gate spacing floor is being derived from the wrong box'
+          : null;
+      })();
 
       const v = new THREE.Vector3();
       const EDGES = [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4],

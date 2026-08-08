@@ -113,9 +113,9 @@ MR.Course = (function () {
   }
 
   /**
-   * The deepest hazard collision box, as a half-depth.
+   * Every hazard collision box's half-depth, by kind.
    *
-   * This is Collision.BOX[K.BLOCK].halfZ and it is written twice, which is a
+   * This is Collision.BOX[kind].halfZ and it is written twice, which is a
    * thing this file otherwise refuses to do. The reason: collision.js loads
    * AFTER this one, and course generation also runs headless in tools/
    * course-test.js and tools/simulate.js, where collision.js is not loaded at
@@ -123,29 +123,57 @@ MR.Course = (function () {
    * both proofs.
    *
    * So it is duplicated and then GUARDED: tools/shoot.js compares this against
-   * the real MR.Collision.BOX in the live page and fails the build if they ever
-   * disagree. A number nobody checks is how the last four corrections in this
-   * project started.
+   * the real MR.Collision.BOX in the live page, FOR EVERY KIND, and fails the
+   * build if any of them disagree. A number nobody checks is how the last four
+   * corrections in this project started -- and this was a scalar covering one
+   * kind while the other two went unguarded, which is the same hole one size
+   * smaller.
    */
-  const HAZARD_HALF_Z = 0.65;
+  const HAZARD_HALF_Z = {
+    [K.JUMP]: 0.52,
+    [K.DUCK]: 0.30,
+    [K.BLOCK]: 1.95,
+  };
 
   /**
    * How far a gate's geometry reaches FORWARD of its own gate line, in units.
    *
    * A hazard is not a plane at z, it is a box, and a BLOCK train is a long one:
-   * world.js builds it with span = 1 + train * 0.9 gate-spans and a rear face at
-   * halfZ * (2 * span - 1), which is 5.33 units at the longest train. That
+   * world.js builds it with span = 1 + train * 0.9 and a rear face at
+   * halfZ * (2 * span - 1), which is 15.99 units at the longest train. That
    * matters here for one reason only -- the sightline argument in readWindowAt
    * turns on WHEN THE OCCLUDER LEAVES THE LENS, and a box leaves the lens when
    * its REAR face passes it, not when its gate line does. Measuring gate line to
-   * gate line credits a train with clearing the shot up to five units early,
-   * which is 21% of the window it is being checked against.
+   * gate line credits a train with clearing the shot early, which is a large
+   * fraction of the window it is being checked against.
    *
    * The first draft of this fix did exactly that, and it made the assertion pass.
+   *
+   * ---- PER LANE, AND PER KIND, BECAUSE THAT IS WHAT THE AUDIT MEASURES ----
+   *
+   * This used to charge every gate the BLOCK depth whatever it carried. That
+   * was safe but it was not what world.js builds or what shoot.js casts:
+   * gateBoxes() gives each LANE its own box from Collision.BOX[kind], so a gate
+   * holding two JUMPs and a DUCK occludes with a 0.52 box, not a 1.95 one, and
+   * BLANKS measures it that way. Charging the deepest kind for a gate that has
+   * no BLOCK in it bought spacing nothing was asking for.
+   *
+   * Occlusion is per lane -- a hazard hides what is behind it IN ITS OWN LANE
+   * -- so the gap a gate owes the next one is set by its deepest lane, and the
+   * span multiplier applies only to a BLOCK carrying a train, exactly as
+   * gateBoxes applies it. The two now describe the same solid.
    */
-  function reachOf(train) {
-    const span = train ? 1 + train * 0.9 : 1;
-    return HAZARD_HALF_Z * (2 * span - 1);
+  function reachOf(lanes, train) {
+    let reach = 0;
+    for (let l = 0; l < 3; l++) {
+      const kind = lanes ? lanes[l] : K.BLOCK;
+      const halfZ = HAZARD_HALF_Z[kind];
+      if (!halfZ) continue;                     // CLEAR contributes nothing
+      const span = (kind === K.BLOCK && train) ? 1 + train * 0.9 : 1;
+      const r = halfZ * (2 * span - 1);
+      if (r > reach) reach = r;
+    }
+    return reach;
   }
 
   const START_GRACE = 150;   // clean runway so the first seconds read calmly
@@ -283,7 +311,7 @@ MR.Course = (function () {
     return Math.min(1, base * 0.86 + wall + home);
   }
 
-  function spacingAt(f, rnd, z, elev, train) {
+  function spacingAt(f, rnd, z, elev, lanes, train) {
     const d = difficulty(f);
     // 44 units early, tightening as difficulty rises. The floor is
     // ACTION_WINDOW itself rather than a number chosen to sit near it: the
@@ -304,12 +332,13 @@ MR.Course = (function () {
     // constant added, so a retune of the jump arc, the pace floor or the terrain
     // still moves both ends of the constraint together.
     //
-    // reachOf(train) is the gate BEHIND this gap -- how far its geometry sticks
+    // reachOf is the gate BEHIND this gap -- how far its geometry sticks
     // forward past its own gate line. The eye is clear of it only once its rear
     // face has gone by, so the gap it owes the next gate is measured from there.
-    // A standing hazard costs 0.65 of this; a four-span BLOCK train costs 5.33,
-    // and pays it rather than being waved through on its gate line.
-    return Math.max(readWindowAt(z, elev) + reachOf(train),
+    // A gate whose deepest lane is a DUCK costs 0.30 of this; a standing BLOCK
+    // costs 1.95; a four-span BLOCK train costs 15.99, and pays it rather than
+    // being waved through on its gate line.
+    return Math.max(readWindowAt(z, elev) + reachOf(lanes, train),
                     mean * rnd.range(0.84, 1.16));
   }
 
@@ -644,9 +673,11 @@ MR.Course = (function () {
       }
 
       gates.push({ z, lanes, f, train: span });
-      // The span goes in because the gap after a gate is owed by the geometry of
-      // THAT gate, and a train's is five units longer than its gate line says.
-      z += spacingAt(f, rnd, z, elevation, span);
+      // The LANES and the span both go in because the gap after a gate is owed
+      // by the geometry of THAT gate: which kinds it actually stands in the road
+      // decides how deep its deepest lane is, and a train's rear face is a long
+      // way further forward than its gate line says.
+      z += spacingAt(f, rnd, z, elevation, lanes, span);
     }
 
     const mileMarkers = [];
@@ -735,7 +766,7 @@ MR.Course = (function () {
       // The epsilon is float slop only -- spacingAt returns this quantity
       // exactly when the floor binds, which late in a course is most gates.
       if (i > 0) {
-        const need = readWindowAt(g[i - 1].z, elev) + reachOf(g[i - 1].train);
+        const need = readWindowAt(g[i - 1].z, elev) + reachOf(g[i - 1].lanes, g[i - 1].train);
         if (g[i].z - g[i - 1].z < need - 1e-9) {
           errors.push(`gate ${i}: ${(g[i].z - g[i - 1].z).toFixed(2)} behind gate ${i - 1} `
             + `needs ${need.toFixed(2)} to stay readable past it`);

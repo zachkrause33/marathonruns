@@ -7573,9 +7573,13 @@ MR.World = (function () {
         // is 2.20 here, and the box is most of it -- the whole point of the
         // vehicle is that it carries something. At 1.30 of envelope the box
         // was 1.20 and the rider had to stand inside its own footprint.
-        hbx(2.02, 1.02, 1.32, 0, 0.72, -0.52, TRIKE_BODY),
-        hbx(2.10, 0.15, 1.36, 0, 1.28, -0.52, VAN_BODY),
-        hbx(2.06, 0.20, 1.38, 0, 0.20, -0.52, TRIKE_DARK),
+        //
+        // CHAMFERED NOW, like the five variants the fleet rebuild reached.
+        // These were plain hbx boxes, and at gameplay framing a square corner
+        // on a mass this large is most of what "it looks like a box" means.
+        gl(hcbx(2.02, 1.02, 1.32, 0, 0.72, -0.52, TRIKE_BODY, 0.06), GLOSS.paint),
+        gl(hcbx(2.10, 0.15, 1.36, 0, 1.28, -0.52, VAN_BODY, 0.04), GLOSS.trim),
+        gl(hcbx(2.06, 0.20, 1.38, 0, 0.20, -0.52, TRIKE_DARK, 0.04), GLOSS.trim),
         /**
          * THE RIDER, resized and revalued after a full playtest in which the
          * player reported seeing no cyclist at all.
@@ -7608,13 +7612,61 @@ MR.World = (function () {
         hbx(0.22, 0.66, 0.20, 0.62, 1.54, 0.66, 0x2b2f52, 0.40),
         hbx(0.98, 0.12, 0.12, 0, 1.26, 0.92, 0x2b2f52),
       ];
-      // Wheels. Seen from directly behind they are slabs rather than discs, so
-      // they are built as discs on an x axis and read as tyres under the box.
-      // They carry rims now, like the rest of the fleet: a trike's wheels are
-      // the only part of it below the cargo box, so if they read as three dark
-      // smudges the whole vehicle is a floating crate.
-      for (const wx of [-0.86, 0.86]) {
-        vWheel(parts, wx * LANE_FIT, 0.34, -0.52, 0.34, 0.16, 0x2b2f52, WHEEL_RIM, WHEEL_HUB);
+      /**
+       * ============ THE WHEELS OWNED ZERO PIXELS ============
+       *
+       * Measured, not suspected. `node tools/framing.js --kind BLOCK` counts
+       * what every part of a variant contributes to the real frame, and at
+       * 8 / 12 / 20 / 35 units this trike returned **wheel 0.0% at every
+       * distance**. All three were built, all three carried rims and hubs, and
+       * not one of them put a pixel on screen.
+       *
+       * The mechanism is depth, not size. The rear pair sat at x +/-0.62, which
+       * is INBOARD of a cargo box whose flanks are at +/-0.73, and at z -0.52,
+       * which is 0.66 in front of that box's own rear face at -1.18. The
+       * chase camera looks at the rear face. So the box was parked squarely
+       * between the lens and its own wheels for the whole approach, and the
+       * comment above this loop -- "a trike's wheels are the only part of it
+       * below the cargo box, so if they read as three dark smudges the whole
+       * vehicle is a floating crate" -- was exactly right about the stake and
+       * wrong about the state: they read as nothing at all.
+       *
+       * Same family as the side windows buried inside the refuse truck's
+       * bodywork, and as the trike's own cranks pedalling behind their box:
+       * built, merged, shipped, invisible. The fix is the one a real cargo
+       * trike already has -- THE REAR AXLE IS OUTBOARD OF THE LOAD BOX, wheels
+       * standing clear of the flanks on stub axles, with a guard over each. It
+       * costs 0.24 of half-width against 0.25 of headroom in MR.Collision.BOX
+       * and it is the difference between a crate on legs and a vehicle.
+       *
+       * The FRONT wheel stays where it is, under the rider and behind the box,
+       * and it is honestly occluded from astern -- that is what being behind a
+       * load box means, it is visible from every other angle, and rule 1 asks
+       * for it to be BUILT, not for it to be moved somewhere it does not go.
+       */
+      for (const sx of [-1, 1]) {
+        // 0.86 and not further. vWheel's spoke bars rotate about z, so a
+        // horizontal one reaches 0.92 x r / 2 = 0.147 in x beyond the rim face
+        // -- which is where this variant's old halfX of 0.87 came from on a
+        // wheel centred at 0.62, and which put the first outboard build at
+        // 1.153 against a box of 1.12. Measured with fleetExtents, not guessed.
+        const wx = sx * 0.86;
+        // Tyre and rim are DARK-OF-LIME and WARM, not the fleet navy and the
+        // cool pale rim. Two tyres that were invisible cost nothing in chroma;
+        // two that are visible cost 0.057 of dS on a variant whose margin over
+        // target is 0.013, and 0x2b2f52 against a lime body is precisely the
+        // straddle of the neutral axis this file's fleet header forbids.
+        vWheel(parts, wx, 0.32, -0.62, 0.32, 0.14, 0x262e10, WHEEL_RIM_WARM, WHEEL_HUB_WARM);
+        // The stub axle out to it, and a bracket down from the box floor, so
+        // the wheel is carried by something instead of floating beside a crate.
+        parts.push(gl(cyl(0.055, 0.055, 0.28, 8, sx * 0.72, 0.32, -0.62, TRIKE_DARK,
+          0, 0, Math.PI / 2), GLOSS.trim));
+        parts.push(gl(bx(0.09, 0.34, 0.13, sx * 0.69, 0.36, -0.62, TRIKE_DARK), GLOSS.trim));
+        // A guard over each, which is what a cargo trike carries and what
+        // stops an outboard wheel reading as a bare disc stuck on the side.
+        vGuard(parts, wx, 0.32, -0.62, 0.435, 0.18, TRIKE_BODY,
+          0.22 * Math.PI, 0.90 * Math.PI, 6);
+        parts.push(gl(bx(0.05, 0.30, 0.05, wx, 0.50, -0.99, TRIKE_DARK, 0.42), GLOSS.trim));
       }
       vWheel(parts, 0, 0.32, 0.88, 0.32, 0.12, 0x2b2f52, WHEEL_RIM, WHEEL_HUB);
       // The boom from the load box out to the head tube, which is what a
@@ -7632,6 +7684,36 @@ MR.World = (function () {
         parts.push(bxAt(0.11, 1.56, 0.11, sx * 0.92, 1.94, -0.52, TRIKE_BODY));
         parts.push(bxAt(0.09, 0.74, 0.58, sx * 0.92, 2.34, -0.22, PINK));
       }
+      /**
+       * ============ THE TAILBOARD ============
+       *
+       * 50.9% of this variant's pixels were the cargo box's own lime, at every
+       * distance the framing sheet samples, and the box's rear was one flat
+       * panel with a chevron on it. That number is the second half of the same
+       * finding as the wheels: the object had a mass and no structure.
+       *
+       * The caution face is 1.43 x 0.52 at y 0.36-0.88, it is unlit and it is
+       * drawn in front of everything, so a fitting inside that rectangle would
+       * simply be deleted by it. What is left is the band above the face, the
+       * band below it and the two vertical edges -- which is exactly where a
+       * real tail door carries its ironmongery, so nothing here is invented to
+       * fit round the constraint.
+       */
+      for (const sx of [-1, 1]) {
+        parts.push(gl(bx(0.07, 0.94, 0.08, sx * 0.745, 0.72, -1.19, TRIKE_DARK), GLOSS.trim));
+        parts.push(gl(bx(0.10, 0.09, 0.09, sx * 0.745, 1.10, -1.205, VAN_BODY), GLOSS.chrome));
+        parts.push(gl(bx(0.10, 0.09, 0.09, sx * 0.745, 0.34, -1.205, VAN_BODY), GLOSS.chrome));
+        // Tail lamps, which this variant had none of. Every other rear in the
+        // fleet carries a pair and a cargo trike on a road legally must.
+        parts.push(gl(cyl(0.085, 0.085, 0.09, 8, sx * 0.50, 1.03, -1.225, LAMP_RED,
+          Math.PI / 2), GLOSS.chrome));
+        parts.push(gl(cyl(0.045, 0.045, 0.12, 8, sx * 0.50, 1.03, -1.230, LAMP_CORE,
+          Math.PI / 2), GLOSS.chrome));
+      }
+      parts.push(gl(bx(1.44, 0.06, 0.07, 0, 1.16, -1.20, TRIKE_DARK), GLOSS.trim));
+      parts.push(gl(bx(0.22, 0.14, 0.09, 0, 1.03, -1.20, TRIKE_DARK), GLOSS.trim));
+      parts.push(gl(bx(0.13, 0.07, 0.10, 0, 1.03, -1.225, VAN_BODY), GLOSS.chrome));
+      parts.push(gl(bx(1.30, 0.05, 0.06, 0, 0.315, -1.20, VAN_BODY), GLOSS.chrome));
       return merge(parts);
     })();
     /**

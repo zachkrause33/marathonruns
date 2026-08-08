@@ -430,14 +430,33 @@ added for.
 
 ## Decisions waiting on the owner
 
-- **Moving hazards.** The other reading of "passing cars" is to make the
-  obstacles drive rather than sit, as the queue in the Sonic reference does.
-  Achievable and it would look right, but a moving hazard opens and closes
-  differently from a parked one and the solvability proof would need re-running
-  against it. A gameplay change, not an art one.
-- **Forcing a CLEAR lane in a BLOCK's shadow** (R2's open lever). Would make
-  the second gate genuinely visible rather than merely fair. Costs ~14% of lane
-  slots and would nearly double the CLEAR share.
+Both are now settled.
+
+- **Moving hazards — REFUSED, by the owner.** *"Obstacles can sit. I agree with
+  that approach."* The queue in the Sonic reference stays a look, not a
+  mechanic. Not revisited.
+- **Forcing a CLEAR lane in a BLOCK's shadow — REFUSED.** R2's open lever, and
+  the owner asked for a recommendation rather than a choice. The
+  recommendation, taken:
+
+  **The fairness contract already holds by construction.** `BLANKS` proves that
+  when a gate is hidden, passing the occluder restores the read with a full
+  action window still owed. Those gates are not unfair; they are unfair-
+  LOOKING, and the difference is the whole of R2's finding.
+
+  The lever costs ~14% of lane slots and would nearly double the CLEAR share --
+  it buys visibility by removing gameplay, and a large slice of gates would
+  stop asking anything. The owner has twice called the game too easy and
+  `HIT_STREAK_KEEP` was tightened 0.25 -> 0.40 on that basis; this hands it
+  back.
+
+  And the alternative is strictly better: **the measured repetition is DUCK and
+  JUMP variant count**, not lane occupancy. Per hazard seen a DUCK repeats 3x
+  as often as a BLOCK. Spending the same effort there buys variety at zero
+  difficulty cost.
+
+  Reopen only if a playtest says the second gate reads as unfair *in play*,
+  which is a different claim from the geometry, and the geometry is settled.
 
 ## Standing, from measured reviews
 

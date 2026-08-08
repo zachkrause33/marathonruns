@@ -197,9 +197,48 @@
  * where every surge term is multiplied by zero.
  *
  *
+ * ---------------------------------------------------------------------------
+ * THE CHARACTER PASS. The owner, looking at the figure: "too simplified,
+ * mannequin-like -- primitive 3D shapes assembled into a human silhouette",
+ * and "I don't want more detail for the sake of more detail, I want better
+ * designed detail". Seven items in their order: face, eyes, anatomy, hands,
+ * clothing, secondary motion, expression. Four things came out of it that
+ * outlive the pass itself.
+ *
+ *   THE INK SHELL IS THE UNIT OF COMPOSITION. Every part here is drawn twice,
+ *     fill then the same geometry through the outline shader, so a part
+ *     boundary is a HARD BLACK LINE and the eye counts closed outlines before
+ *     it reads form. The arm read as three capsules for that reason and not
+ *     because of its shapes; the fix was fewer parts spanning the same
+ *     distance -- the deltoid onto the arm, a forearm belly over the elbow --
+ *     and not more geometry between them. The same rule cut a three-part jaw
+ *     down to one mass that tapers back into the skull before it can have an
+ *     edge of its own.
+ *   A PART IS PROUD OF THE SHAPE AT ITS OWN HEIGHT. The knuckle row was
+ *     "0.017 proud" of a mitt that had already curved away to 81% of its
+ *     section under it, and drew a MEDIAN OF TWO PIXELS. Fourth instance in
+ *     this file, after the coin of scalp, the cap peak and the wristband.
+ *   THIS CHARACTER HAS NO BROW LINE. The cap band's underside sits 0.017 into
+ *     the top of each eye, which is what wearing a cap pulled down means. The
+ *     aperture is the brow, and that is why expression drives the eye's own
+ *     scale rather than a pair of brows drawn inside a hat.
+ *   THE FACE IS NEVER SEEN IN PLAY. 0 pixels in 48 of 48 frames through the
+ *     chase camera, the start panel is a DOM dialog over that same view, and
+ *     the finish camera swings 1.6 units off the centreline but stays BEHIND
+ *     him. It is built anyway under CLAUDE.md rule 1, and where it does and
+ *     does not read is stated in the commits rather than implied.
+ *
+ * Two instruments were KEPT this time, which is a correction to the habit of
+ * measuring once and throwing the script away: tools/envelope.js holds the
+ * silhouette contract in rule 4 below to five decimals across all eight
+ * states, and tools/pose-diff.js compares every joint this file poses, by
+ * name, across two builds at any polish setting.
+ * ---------------------------------------------------------------------------
+ *
  * Pivot layout (all rotations are local X unless noted):
  *   root -> body -> hips -> thigh -> shin -> foot
- *                -> spine -> chest -> neck -> head
+ *                -> spine -> chest -> neck -> head -> eyePivot   (expression)
+ *                                                  -> mouthPivot (expression)
  *                                  -> shoulder -> upperArm -> forearm+hand
  *                                  -> hoodPivot -> hood   (springs, not posed)
  *        -> shadowPivot -> contact shadow, landing reticle

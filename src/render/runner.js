@@ -2247,10 +2247,60 @@ MR.Runner = (function () {
         //
         // Uneven on purpose: the middle knuckle is the tallest on a real fist
         // and three equal lobes read as a gear rather than as a hand.
-        { g: new THREE.SphereGeometry(0.039, R_NUB, 12), c: MITT_DK, x: -0.046, y: -0.3045, z: -0.032 },
-        { g: new THREE.SphereGeometry(0.042, R_NUB, 12), c: MITT_DK, x: 0.000, y: -0.3055, z: -0.032 },
-        { g: new THREE.SphereGeometry(0.038, R_NUB, 12), c: MITT_DK, x: 0.046, y: -0.3035, z: -0.032 },
-        { g: new THREE.CapsuleGeometry(0.041, 0.052, 4, 12), c: MITT, x: -side * 0.072, y: -0.236, z: 0.056, rx: 0.85, rz: side * 0.62 },
+        //
+        // ---- AND THEN IT WAS MEASURED ------------------------------------
+        //
+        // Everything above this line is the reasoning of the pass that built
+        // the row, and it is right about where a break should go and wrong
+        // about whether this one was there. tools/resolve.js, counting the
+        // real chase frame: the row owned a MEDIAN OF 2 PIXELS and was drawn
+        // at nothing at all in 18 of 48 frames.
+        //
+        // The fault is not the z the old note agonised over -- z was correct,
+        // -0.032 is the rear. It is the Y. At -0.3055 the row sat 0.048 below
+        // the mitt's centre, which on an ellipsoid 0.0811 tall in y is where
+        // the section has shrunk to 81% -- so the three balls were 0.017 proud
+        // of a surface that had already curved away under them, and the mitt's
+        // own belly covered the rest. A part is not proud of a shape, it is
+        // proud of the shape AT ITS OWN HEIGHT, and that is the arithmetic
+        // this file has now got wrong in four different places.
+        //
+        // Raised 0.006 and pushed back 0.023. At -0.300 and z -0.055 the row
+        // stands 0.036 proud of the mitt's rear rather than 0.017, and its
+        // lowest point is 0.006 HIGHER than it was -- so the fix costs the
+        // airborne silhouette nothing, which is the constraint that made the
+        // old pass shy of moving it in the first place.
+        { g: new THREE.SphereGeometry(0.039, R_NUB, 12), c: MITT_DK, x: -0.048, y: -0.2995, z: -0.055 },
+        { g: new THREE.SphereGeometry(0.042, R_NUB, 12), c: MITT_DK, x: 0.000, y: -0.3000, z: -0.055 },
+        { g: new THREE.SphereGeometry(0.038, R_NUB, 12), c: MITT_DK, x: 0.048, y: -0.2990, z: -0.055 },
+        // ---- the thumb ---------------------------------------------------
+        //
+        // The brief this pass was written against says the hands are mittens
+        // with no thumb. There has been a thumb on this character for four
+        // passes. It owned SEVEN PIXELS at its best and was drawn at zero in
+        // 36 of 48 frames, which is the same thing as not having one, and it
+        // is the fourth part on this figure to be argued into place and never
+        // counted.
+        //
+        // It was at z + 0.056, which is the FRONT of the hand, entirely inside
+        // a mitt whose front reaches 0.101 -- so like the lace panel it had
+        // never been drawn at all, and like the lace panel the note above it
+        // described a part doing a job it was not in a position to do.
+        //
+        // What a thumb has to do at 26 px is exactly one thing: BREAK THE
+        // OUTLINE. It cannot be a shape, it cannot be articulated, and it
+        // cannot be a value -- it can be a bump on the edge of the fist, and
+        // an edge is the only thing that survives that size. So it is moved
+        // to the rear and INBOARD, where it reaches x 0.126 against the mitt's
+        // own 0.104 and stands 0.020 proud of the rear surface at its own
+        // height. Inboard rather than outboard is the old note's argument and
+        // it survives intact: the inboard edge passes in front of the vest and
+        // the thigh, which are the two dark masses the hand crosses, while the
+        // outboard edge is already flashing against the road. It is also the
+        // side that costs the figure's half-width NOTHING, because half-width
+        // is measured from the spine and inboard is toward it.
+        { g: new THREE.CapsuleGeometry(0.041, 0.048, 4, 12), c: MITT,
+          x: -side * 0.085, y: -0.230, z: -0.040, rx: 0.30, rz: side * 0.62 },
       ]);
       elbow.add(fore);
 

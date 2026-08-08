@@ -549,7 +549,7 @@ function fairnessAudit() {
         for (const gt of gates) {
           const d = gt.z - camZ;
           if (d < READ_NEAR || d > READ_FAR) continue;
-          let seenN = 0, tight = 0, tot = 0, over = 0;
+          let seenN = 0, tight = 0, tot = 0, over = 0, tightBy = -Infinity;
           const blame = {}, blameOver = {};
           for (let i = 0; i < N; i++) {
             for (let j = 0; j < N; j++) {
@@ -589,6 +589,28 @@ function fairnessAudit() {
                 const k = ['-', 'JUMP', 'DUCK', 'BLOCK'][hit.kind] + ' lane ' + hit.lane
                   + ' at ' + (hit.z - camZ).toFixed(0) + 'u';
                 blame[k] = (blame[k] || 0) + 1;
+                // HOW FAR INSIDE THE LINE, KEPT BECAUSE THE ANSWER IS OFTEN
+                // ZERO -- and a verdict that turns on the last bit of a double
+                // is a verdict about the arithmetic, not about the game.
+                //
+                // course.js's spacingAt() floors gate spacing at
+                // readWindowAt(z) + reachOf(lanes), and readWindowAt on flat
+                // ground IS READ_NEAR. So every pair where that floor binds
+                // has gt.z - hit.z1 == READ_NEAR EXACTLY in real arithmetic,
+                // and which side of the strict < it lands on is decided by
+                // rounding a subtraction of two coordinates near 4,000. On one
+                // measured course, 47 of 186 consecutive pairs are that tie
+                // and 13 of them fell on the failing side.
+                //
+                // This is REPORTED AND NOT ACTED ON. The comparison above is
+                // the shipped rule and stays exactly as it is: relaxing a
+                // fairness threshold so a sweep goes green is the move
+                // docs/roadmap.md records as an occlusion test that passed by
+                // measuring from the wrong face. What the number does is let
+                // a reader tell a knife-edge tie from a real deficit without
+                // having to re-derive it.
+                const inside = READ_NEAR - (gt.z - hit.z1);
+                if (inside > tightBy) tightBy = inside;
               } else if (paint) {
                 // NO SELF-CLEARING CREDIT, AND THIS IS MEASURED RATHER THAN
                 // ASSUMED. Condition (1) forgives a world occluder because the
@@ -625,6 +647,10 @@ function fairnessAudit() {
           const row = {
             d: +d.toFixed(1), lane: gt.lane, kind: gt.kind,
             raw: +raw.toFixed(2), vis: +vis.toFixed(2), need: +need.toFixed(2),
+            // See the note where this is computed. Positive is inside the
+            // line; 0 (or a value at the 1e-13 scale) is the exact tie
+            // course.js's spacing floor produces by construction.
+            tightBy: tightBy === -Infinity ? null : +tightBy.toPrecision(3),
             by: Object.keys(blame).sort((a, b) => blame[b] - blame[a])[0] || '',
             over: +(over / tot).toFixed(2),
             byOver: Object.keys(blameOver).sort((a, b) => blameOver[b] - blameOver[a])[0] || '',
@@ -665,9 +691,143 @@ function fairnessAudit() {
       };
 }
 
+/**
+ * THE CORRIDOR RULE ALONE, WALKED OVER A WHOLE COURSE.
+ *
+ * fairnessAudit above answers four questions about ONE INSTANT: it needs the
+ * live camera, so it can only ever be asked about a frame somebody arranged to
+ * be at. LOW is the one of the four that does not: "nothing reaches back over
+ * the carriageway below OVERHEAD_Y" is a statement in WORLD space about the
+ * scenery, with no lens in it at all. That is why it is cheap, and it is why
+ * it can be asked about all 6,293 units of road instead of about a frame.
+ *
+ * So this streams the world forward with the draw stubbed out and asks
+ * crossings() at every step, from the gun to the tape. Nothing is rendered and
+ * nothing is simulated -- world.update(z) is the streaming call the frame loop
+ * makes, and it is the whole cost.
+ *
+ * THE PREDICATE IS THE SAME ONE, DELIBERATELY IDENTICAL, and the two are in
+ * one file so that stays true. shoot.js's LOW is
+ *
+ *     for (const e of els) if (e.yMinLocal < OY) low.push(e);
+ *
+ * and so is this. A sweep that tested a slightly different rule from the gate
+ * would be reporting on a fork of the gate, which is the failure mode this
+ * file exists to prevent.
+ *
+ * STEP, AND WHY IT IS 150. world.js spawns at VIEW = 210 ahead and releases at
+ * BEHIND = 34, so everything within 210 units of the sample point is standing
+ * when crossings() is called, and crossings() with no z bounds walks all of
+ * it. Any step at or under 210 therefore visits every object at least once;
+ * 150 leaves a 60-unit overlap so that an object straddling a sample boundary
+ * is seen whole rather than in two halves, which matters because the z filter
+ * inside crossings() is applied PER TRIANGLE and a half-seen object reports the
+ * lowest point of its half.
+ *
+ * WHAT IT DOES NOT SEE, said here rather than by not being looked at: this is
+ * a REST POSE. A part that only enters the corridor once its animation runs --
+ * a swinging jib, a train, a stop paddle -- is tools/motion.js's subject, and
+ * that file takes --date for the same reason this one exists.
+ */
+function corridorWalk(step, wantCensus) {
+  const g = window.MR && MR.game;
+  if (!g || !g.world || !g.world.crossings) return { skipped: 'world exposes no crossings()' };
+
+  // Stop the page drawing and stop it animating. main.js re-registers its own
+  // rAF from inside frame(), so replacing the function is enough to stop the
+  // loop after the frame already in flight -- and that frame will find the
+  // draw stubbed, so nothing rasterises. See tools/footroom.js, which uses the
+  // same trick for the same reason: under swiftshader the draw is the cost and
+  // the transforms are not.
+  g.renderer.render = function () { };
+  window.requestAnimationFrame = function () { return 1; };
+  // The autopilot must not resolve gates while we are teleporting the world
+  // down the course; nothing here reads pace, but a contact would fire audio
+  // and the HUD for a run that is not happening.
+  if (g.player) {
+    g.player.handle = function () { };
+    g.player.resolveGates = function () { return []; };
+    g.player.resolveAid = function () { return []; };
+  }
+
+  const OY = g.world.OVERHEAD_Y;
+  const TOTAL = MR.K.TOTAL_UNITS;
+  const S = step || 150;
+  const low = [], seen = {};
+  const census = {};
+  let samples = 0, elements = 0;
+
+  for (let z = 0; z <= TOTAL + MR.K.LANE; z += S) {
+    // Lane 1 throughout. The racing line is the only thing world.update reads
+    // the lane for, and the racing line is paint on the road -- it is exempt
+    // from crossings() by userData.notScenery, so it cannot change the answer.
+    g.world.update(z, 1);
+    // The census is a traverse of the LIVE graph, not of the crossings list.
+    // crossings() only names things that reach over the road, so a census
+    // built from it would say the sweep had covered the game when what it had
+    // covered was the game's gantries. The quayside crane that started all
+    // this stood BESIDE the road at x 1.80-8.20 -- in the corridor, but a
+    // census of overhead structure would still have listed it either way, and
+    // a prop that never crosses at all would have been invisible to it.
+    if (wantCensus) {
+      g.scene.traverseVisible(function (o) {
+        const n = o.userData && o.userData.auditName;
+        if (n) census[n] = (census[n] || 0) + 1;
+      });
+    }
+    const els = g.world.crossings();
+    samples++;
+    elements += els.length;
+    for (const e of els) {
+      if (e.yMinLocal >= OY) continue;
+      // One row per offender per place on the course. The same pooled mesh
+      // reappears every time it is claimed, so keying on the name alone would
+      // report a repeated prop once and hide how much of the road it spoils.
+      const k = e.name + '@' + Math.round(e.z0 / 24);
+      if (seen[k]) continue;
+      seen[k] = 1;
+      low.push({
+        name: e.name, yMin: +e.yMinLocal.toFixed(2), yMax: +e.yMaxLocal.toFixed(2),
+        z0: +e.z0.toFixed(1), z1: +e.z1.toFixed(1), tris: e.tris,
+        mile: +(e.z0 / MR.K.TOTAL_UNITS * MR.K.MARATHON_MILES).toFixed(2),
+        setting: g.course.settingAt(Math.min(0.99999, e.z0 / MR.K.TOTAL_UNITS)).tag,
+      });
+    }
+  }
+  return { low, samples, elements, census, step: S, overheadY: OY, total: TOTAL };
+}
+
+/**
+ * Everything the world has a name for, at this instant. Not an assertion --
+ * a coverage report, and the thing the day sample is actually sized against.
+ *
+ * The sample cannot be justified by "days" (a date is nothing but an RNG seed
+ * here -- the calendar has no structure at all, nothing in src reads a month)
+ * and it cannot be justified by settings alone (twelve of those, but what a
+ * setting DRAWS depends on which biome leg it lands on). What it can be
+ * justified against is the set of named objects the sweep has actually stood
+ * in front of, which is what this collects.
+ */
+function sceneCensus() {
+  const g = window.MR && MR.game;
+  if (!g || !g.scene) return {};
+  const out = {};
+  g.scene.traverseVisible(function (o) {
+    const n = o.userData && o.userData.auditName;
+    if (n) out[n] = (out[n] || 0) + 1;
+  });
+  return out;
+}
+
 module.exports = {
   /** The audit, as source, for page.evaluate. */
   source: fairnessAudit.toString(),
   /** An expression string that runs it in the page and returns its report. */
   call: "(" + fairnessAudit.toString() + ")()",
+  /** The world-space corridor rule over a whole course. See above. */
+  corridorSource: corridorWalk.toString(),
+  corridorCall: function (step, census) {
+    return "(" + corridorWalk.toString() + ")(" + (step || 150) + "," + (census ? 'true' : 'false') + ")";
+  },
+  censusCall: "(" + sceneCensus.toString() + ")()",
 };

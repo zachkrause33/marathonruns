@@ -1433,3 +1433,30 @@ nobody measured is worse than no number at all.**
     are refiled from the correct batch, and the two displaced frames are kept
     as `play-gates-14mi.png` and `play-gates-17mi.png` -- named for what a
     reader would see in them.
+
+   **Postscript, after the references were refiled.** The character pass was
+   built against `ss-run-01..03` because `ss-character-quality.png` turned out
+   to be a screenshot of this game. Entry 26 records the refiling; what the
+   REAL key art then said is worth adding here, because it overturns one of
+   this entry's own conclusions.
+
+   The pass wrote, into the runner's header and into a commit message, that
+   *this character has no brow line, and that is what wearing a cap pulled down
+   means* -- a limitation dressed up as an intention. Both reference characters
+   have heavy dark brows on bare forehead **below the brim**. They wear the same
+   hat and have room because the brim sits higher. The geometry claim was
+   correct (the band's underside is 0.012 into the top of the eye, so there is
+   no forehead at all); the framing was an over-claim of exactly the kind this
+   document exists to catch, and it was caught by opening a picture rather than
+   by measuring anything.
+
+   Corrected in place, with the number the next pass needs: the band's underside
+   must rise 0.042 to open a brow line. That moves the hat, the hat is the
+   character's identity, and the brief ruled identity out -- so it is reported
+   as the one item on the owner's list that cannot be delivered without a
+   decision only they can take.
+
+   The other thing the real art shows and this pass did not build: the raised
+   hand has SEPARATED, chunky fingers. Ours is a fist with a knuckle row, which
+   is right for a runner's arm swing and is not what an open hand looks like.
+   No open-hand pose exists in this game today.

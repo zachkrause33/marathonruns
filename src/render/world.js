@@ -1469,8 +1469,12 @@ MR.World = (function () {
     p.wave = [phase, amp === undefined ? 1 : amp, kind || 0];
     return p;
   }
-  /** The five behaviours aWave.z selects. */
-  const CHEER = { BODY: 0, WAVE: 1, CLAP_L: 2, CLAP_R: 3, BRACED: 4 };
+  /**
+   * The six behaviours aWave.z selects. Five of them are things a spectator
+   * does; FLAG is cloth riding in the crowd's shader so it need not cost a
+   * draw call of its own. See WAVE_BODY.
+   */
+  const CHEER = { BODY: 0, WAVE: 1, CLAP_L: 2, CLAP_R: 3, BRACED: 4, FLAG: 5 };
   /** Low-poly blob, for canopies and anything that must not read as a box. */
   function sph(r, seg, x, y, z, color) {
     return part(new THREE.SphereGeometry(r, seg || 7, Math.max(3, (seg || 7) - 2)), color, x, y, z);
@@ -4518,6 +4522,47 @@ MR.World = (function () {
    * o.r is the caller's own rng, so a knot and a stand seeded differently get
    * different people and the same knot is the same people every time.
    */
+  /**
+   * ============ PEOPLE MAY NOT WEAR THE FURNITURE'S NAVY ============
+   *
+   * One value, 0x2b2f52, appears 72 times in this file -- nearly double the
+   * next colour. It is the lamp post, the telegraph pole, the verge line, the
+   * bench leg, the aid-table leg, the overpass soffit, the footbridge, the
+   * grandstand deck and mast, the bunting catenary, the crane, the hoarding
+   * post, the jumbo truss, the mile-gantry leg, the finish-arch leg -- and it
+   * was also the first entry in every spectator's TROUSER palette, with two
+   * more near-navies (0x3a4472, 0x37405e) behind it. Half the crowd's legs
+   * were the exact value of the posts they stood between.
+   *
+   * Two independent blind readers reported the consequence in their own words
+   * without being prompted for it: "Rows of short pale posts with dark blue
+   * tops along both verges. Bollards, or the tops of a low barrier fence",
+   * and "I initially miscounted people as bollards". At distance a spectator
+   * is a bright torso over a dark block, and a verge post is a dark block of
+   * the same width and the same aspect -- so they are the same object.
+   *
+   * THE RULE, and it is the one the finish-tape posts already proved when they
+   * were lifted off this same navy because "at forty units they were not there
+   * at all": FURNITURE AND PEOPLE MAY NOT SHARE A VALUE AT THE SAME SIZE.
+   *
+   * So the crowd moves and the furniture stays. Through shadedL -- this
+   * renderer's own measured luminance, not the hex -- the old palette ran 36
+   * to 52 against street furniture at 36. The new one runs 71 to 105: every
+   * pair of legs in the game is now at least twice the rendered luminance of
+   * every post in the game, which is a separation that survives fog, distance
+   * and the two-step toon ramp. Hue does the rest of the work -- denim, warm
+   * brown, olive, plum, grey and a dull teal, none of them a cool near-black.
+   *
+   * COST: ZERO. It is authored hex on already-merged geometry, no draw calls,
+   * no triangles. It is also the one change in this pass that alters what a
+   * player can IDENTIFY rather than how alive the frame looks.
+   *
+   * Kept in ONE place because it was three copies before, and three copies of
+   * a palette drift -- which is exactly how the avenue kept a hard-coded green
+   * through two palette passes.
+   */
+  const TROUSERS = [0x4f6fb0, 0x8a5a3c, 0x6a7a4a, 0x7a5570, 0x8f8fa0, 0x3f7f8a];
+
   function vSpectator(parts, o) {
     const r = o.r;
     const pick = (a) => a[Math.floor(r() * a.length)];
@@ -4691,6 +4736,35 @@ MR.World = (function () {
    *           people at the front are pressed against something and the ones
    *           behind are jumping, and a crowd where those look the same is a
    *           crowd of one animation.
+   *   FLAG    NOT A PERSON. See below.
+   *
+   * ---- THE SIXTH KIND IS THE ONE THAT IS NOT ALIVE -----------------------
+   *
+   * A grandstand is one merged geometry under one material, and the flags on
+   * its roof are part of that geometry. Before this kind existed they had two
+   * choices and both were wrong: stand still (which is what the FINAL MILE
+   * roof flags did -- untagged, rigid, beside a stand of two hundred people
+   * bouncing), or take the crowd formula (which is what the finish stand and
+   * the finish backdrop did -- so a flag's flutter was scaled by `exc`, and
+   * `exc` is built out of uHot and the distance to the runner, which is to say
+   * THE FLAGS FLEW HARDER WHEN THE RUN WAS GOING WELL). The second is worse
+   * than the first, because it is a physical claim about cloth that is false
+   * and it is false in a way the player can feel without being able to name.
+   *
+   * The obvious fix -- split the flags out onto mats.cloth -- costs a draw
+   * call per stand, and stands are pooled one per tile down both shoulders of
+   * the FINAL MILE. Draw calls are the binding constraint in this renderer and
+   * triangles are not, so the fix goes in the shader instead: aWave.z = 5
+   * takes the SAME attribute and the SAME merged geometry and runs the cloth
+   * rates from the wind section below, with no exc term anywhere in it.
+   *
+   * It deliberately does NOT grow WAVE_ENVELOPES. The lateral term is 0.130
+   * against the crowd's 1.55 * 0.085 = 0.132 and the vertical is 0.024 against
+   * 0.543, so a flag moves strictly inside the box tools/motion.js already
+   * grows every crowd object by, and there is no z term at all for the same
+   * reason. docs/roadmap.md records what an inflated envelope cost last time:
+   * CORRIDOR failures reported against finish stands that do not move
+   * laterally, and an assertion nobody trusts is an assertion switched off.
    *
    * ---- THE VERTICAL IS UNIFORM WITHIN A FIGURE, AND THAT IS A RULE --------
    *
@@ -4726,7 +4800,19 @@ MR.World = (function () {
    */
   const WAVE_DECL = 'attribute vec3 aWave;\nuniform float uT;\nuniform float uZ;\nuniform float uHot;\n';
   const WAVE_BODY = [
-    'if (aWave.y > 0.0) {',
+    'if (aWave.y > 0.0 && aWave.z > 4.5) {',
+    // FLAG. Cloth in the same wind as mats.cloth, and nothing about a person:
+    // no exc, no uHot, no distance falloff. The rates are WIND_F_CLOTH and its
+    // gust, restated as literals only because this string is built before that
+    // constant is declared -- tools/liveness.js reads the travel off the GPU,
+    // so a drift between the two would be measured rather than argued about.
+    '  float fg = 0.62 + 0.38 * sin(uT * 2.5990 + aWave.x * 0.6);',
+    '  float fs = aWave.y * fg * sin(uT * 11.3000 + aWave.x);',
+    '  transformed.x += 0.130 * fs;',
+    // The same arc the wind uses: a flag streaming sideways drops a little as
+    // it goes over, and without this it slides rather than flies.
+    '  transformed.y -= 0.024 * abs(fs);',
+    '} else if (aWave.y > 0.0) {',
     '  float wz = (modelMatrix * vec4(transformed, 1.0)).z - uZ;',
     // Ahead of the runner the band reaches further than behind it: a crowd
     // hears you coming, and the leading edge is the half that reads as
@@ -5150,7 +5236,57 @@ MR.World = (function () {
       // dragging every tree and spectator with it. It only ever multiplies a
       // baked vertex colour, so the tints in SETTING_LOOK all sit near white:
       // this can knock a value down, never lift one.
-      edge: vtoon(2),
+      //
+      // THERE ARE TWO OF THEM NOW, AND THERE USED TO BE ONE. `edge` was a
+      // plain vtoon(2) shared by all four roadside kinds, which is why every
+      // one of them was rigid -- the barrier's sponsor banner, the hedge, the
+      // avenue, the bridge deck and the works hoarding alike. They split by
+      // WHAT MOVES ON THEM and by nothing else, and both take the identical
+      // per-setting tint in applyBiome so they stay one family of surfaces.
+      /**
+       * THE ROADSIDE TILE THAT HAS LEAVES ON IT, and it is a separate material
+       * from the cloth one for one reason: a canopy and a pennant have
+       * genuinely different natural frequencies, and running both at one rate
+       * is what makes bunting look like foliage.
+       *
+       * LIT_EDGES.hedge bakes the clipped hedge AND the avenue into the road
+       * tile's own merged geometry -- four broadleaves per tile at x 7.95, two
+       * rows of hedge the full length of every PARKLAND and RIVERSIDE tile.
+       * About a hundred avenue trees are live at once and every one of them is
+       * nearer the lens than any pooled tree that sways. Measured at the chase
+       * framing before this line existed, PARKLAND ran 0.17% of frame pixels
+       * moving with a screen full of foliage in it; the two RIVERSIDE and
+       * PARKLAND sample points were the deadest legs in the game after the
+       * bridge, and this is why.
+       *
+       * They were missed by the wind pass for the same structural reason the
+       * colour pass records about itself twenty lines into hedgeParts: the
+       * avenue is baked into the road tile rather than pooled per setting, so
+       * a pass that walks the pools never reaches it.
+       *
+       * COST: ZERO DRAW CALLS. The tile is the same one merged geometry drawn
+       * by the same one mesh; only its material differs, and only the hedge cap
+       * and the crown lobes carry an amplitude -- trunks, kerbs, benches, lamps
+       * and the verge line are untagged and stay rigid, exactly as masts and
+       * bunting wire already do. One extra shader program and 8 bytes a vertex
+       * on the hedge tile.
+       *
+       * It is NOT given to `barrier`, `rail` or `wall`, which have no foliage
+       * on them at all: their moving parts are cloth and they take the
+       * material below.
+       */
+      edgeLeaf: vwind(2, undefined, WIND_F_LEAF, WIND_A_LEAF),
+      /**
+       * The two roadside tiles whose only candidate for movement is CLOTH: the
+       * bridge deck, which has no roadside at all, and the works hoarding on
+       * THE WALL. Measured at the chase framing, THE BRIDGE ran 0.00% of frame
+       * pixels moving at both sample points -- not one swaying object, not one
+       * spectator, not one walker for 4.4 miles of race. It is a different
+       * material from edgeLeaf because a pennant at a canopy's 0.45 Hz is the
+       * defect finding 3 of the audit is about: cloth that flutters like
+       * foliage. Same zero draw calls, one more shader program.
+       */
+      edgeCloth: vwind(2, undefined, WIND_F_CLOTH, WIND_A_CLOTH),
       // HAZARDS GET A LIFTED RAMP FLOOR, and nothing else does. A hazard's
       // read face points at the camera and therefore away from the key light,
       // so on the scenery floor of 0.31 it was lit almost entirely by the blue
@@ -5986,15 +6122,49 @@ MR.World = (function () {
         for (let i = 0; i < 8; i++) {
           const z = -TILE / 2 + 1.5 + i * 3;
           parts.push(bx(0.13, 1.0, 0.13, x, 0.5, z, 0x2b2f52));
-          // Sponsor-ish colour panel between posts: reads as printed hoarding.
-          if (i % 2 === 0) parts.push(bx(0.06, 0.30, 2.6, x - sx * 0.03, 0.74, z + 1.5, 0xff3b6b));
+          /**
+           * ===== THE SPONSOR BANNER BELLIES BETWEEN ITS POSTS =====
+           *
+           * It reads as printed hoarding and it is lashed to a crowd barrier,
+           * which is a sheet under tension with two fixed ends -- so it is the
+           * one thing on this tile that has any business moving, and it is
+           * also the CLOSEST piece of scenery to the lens on both of the legs
+           * this tile serves. CITY START measured 0.9% of scenery pixels alive
+           * and it is the first thing anybody sees of this game.
+           *
+           * Three bands rather than one box: the ends are lashed to the posts
+           * and stay near-still at 0.30 while the middle takes the full
+           * WIND_A_CLOTH. A single box would translate whole and read as a
+           * board sliding along its own rail.
+           *
+           * CORRIDOR: the panel face sits at 4.57 with the barrier posts at
+           * 4.60, so its inner face is 4.54 and 0.16 of sway brings it to
+           * 4.38 -- 0.63 clear of CORRIDOR_HALF, and further out than the
+           * posts it hangs on, which cannot move at all.
+           */
+          if (i % 2 === 0) {
+            const px = x - sx * 0.03, pz = z + 1.5, pph = z * 0.43 + sx * 0.7;
+            for (const [dz, len, amp] of [[-1.0, 0.7, 0.30], [0, 1.5, 1.0], [1.0, 0.7, 0.30]]) {
+              parts.push(wv(bx(0.06, 0.30, len, px, 0.74, pz + dz, 0xff3b6b), pph, amp));
+            }
+          }
         }
         for (const lz of [-TILE / 4, TILE / 4]) {
           const lx = sx * (K.TRACK_HALF_WIDTH + 2.2);
           parts.push(bx(0.22, 6.4, 0.22, lx, 3.2, lz, 0x2b2f52));
           parts.push(bx(1.9, 0.20, 0.20, lx - sx * 0.85, 6.3, lz, 0x2b2f52));
           parts.push(bx(0.8, 0.26, 0.44, lx - sx * 1.7, 6.1, lz, 0xffe45e));
-          parts.push(bx(0.9, 1.1, 0.10, lx, 4.6, lz, sx > 0 ? 0x37d6ff : 0xff9ad5));
+          // The lamp-post banner SWINGS. It hangs off a bracket on a 6.4-unit
+          // standard, it is the most saturated thing on the CITY START verge,
+          // and it was nailed to the post. Two bands: the head is strapped to
+          // the bracket at 0.25 and the skirt takes the full cloth amplitude,
+          // so it swings from its top edge rather than translating whole. The
+          // standard is at 5.95 and the banner is 0.45 wide, so at full sway
+          // its inner edge is 5.34 -- 1.59 clear of CORRIDOR_HALF.
+          const nb = sx > 0 ? 0x37d6ff : 0xff9ad5;
+          const nph = lz * 0.51 + sx * 0.9;
+          parts.push(wv(bx(0.9, 0.40, 0.10, lx, 4.95, lz, nb), nph, 0.25));
+          parts.push(wv(bx(0.9, 0.74, 0.10, lx, 4.42, lz, nb), nph, 1.0));
         }
       }
       // THE TRAM CATENARY IS GONE, and the wires it was bought for are not.
@@ -6045,8 +6215,22 @@ MR.World = (function () {
         // ladder rather than the middle: the body is a step below the
         // avenue's darkest lobe (0x5c8028) and the cap lands on the avenue's
         // own mid lobe, which is what a sunlit hedge top is.
+        // ===== AND IT MOVES, AT THE TOP ONLY =====
+        //
+        // A clipped hedge is a dense mass on a woody frame: the body does not
+        // go anywhere and the new growth on top of it does. So the BODY stays
+        // untagged and the cap carries 0.45 of the leaf amplitude -- 0.18 of
+        // lateral travel against WIND_A_LEAF's 0.40.
+        //
+        // The amplitude is a corridor number, not a taste one. The cap's inner
+        // face sits at 5.35 - 0.81 = 4.54 against CORRIDOR_HALF 3.75, so at
+        // full leaf amplitude it would come to 4.14 and leave 0.39 -- the
+        // tightest margin any moving thing in this game would have had, on the
+        // longest continuous run of geometry beside the road. At 0.45 it comes
+        // to 4.36 and leaves 0.61. tools/motion.js CORRIDOR is what checks
+        // this rather than this comment.
         parts.push(bx(1.5, 0.78, TILE, x, 0.28, 0, 0x4a6a20));
-        parts.push(bx(1.62, 0.16, TILE, x, 0.68, 0, 0x7fa838));
+        parts.push(wv(bx(1.62, 0.16, TILE, x, 0.68, 0, 0x7fa838), x * 0.31, 0.45));
         for (let i = 0; i < 4; i++) {
           parts.push(cyl(0.10, 0.12, 0.7, 6, sx * (K.TRACK_HALF_WIDTH + 0.4), 0.35,
             -TILE / 2 + 3 + i * 6, 0xfff2e0));
@@ -6099,10 +6283,25 @@ MR.World = (function () {
             tz + 0.08 * k, 0xb0662e, 0, 0, sx * 0.30));
           parts.push(cyl(0.11 * k, 0.16 * k, 1.05 * k, 6, tx + sx * 0.22 * k, 2.20 * k,
             tz - 0.10 * k, 0xb0662e, 0, 0, -sx * 0.34));
-          parts.push(sph(1.35 * k, 7, tx, 3.05 * k, tz, LEAF[1]));
-          parts.push(sph(1.00 * k, 6, tx - sx * 1.00 * k, 2.70 * k, tz + 0.42 * k, LEAF[2]));
-          parts.push(sph(0.95 * k, 6, tx + sx * 1.02 * k, 2.80 * k, tz - 0.40 * k, LEAF[2]));
-          parts.push(sph(0.85 * k, 6, tx + sx * 0.12 * k, 3.85 * k, tz + 0.12 * k, LEAF[0]));
+          // ===== AND THE CROWN SWAYS =====
+          //
+          // The stem and both limbs above are untagged: a tree that slid at
+          // the root would be a cardboard cut-out being pushed sideways, and
+          // the whole reason a vertex wind reads as wind is that the rigid
+          // parts stay rigid. Full leaf amplitude on the lobes -- the crown's
+          // inner reach is 7.95 - 1.30 - 1.30 = 5.35, so 0.40 of sway leaves
+          // 1.20 clear of CORRIDOR_HALF, which is why this tree can afford
+          // what the hedge cap 0.8 units further in cannot.
+          //
+          // Phase is per TREE (tz and tx), not per lobe: four lobes of one
+          // crown on four phases is four bushes orbiting a stick. The shader
+          // adds its own world-position term on top, so neighbouring trees
+          // down the avenue are still a beat apart.
+          const ph = tz * 0.37 + tx * 0.11;
+          parts.push(wv(sph(1.35 * k, 7, tx, 3.05 * k, tz, LEAF[1]), ph));
+          parts.push(wv(sph(1.00 * k, 6, tx - sx * 1.00 * k, 2.70 * k, tz + 0.42 * k, LEAF[2]), ph));
+          parts.push(wv(sph(0.95 * k, 6, tx + sx * 1.02 * k, 2.80 * k, tz - 0.40 * k, LEAF[2]), ph));
+          parts.push(wv(sph(0.85 * k, 6, tx + sx * 0.12 * k, 3.85 * k, tz + 0.12 * k, LEAF[0]), ph));
         }
       }
       // PARKLAND AND RIVERSIDE GET THE OPEN SKY, and they get it outright.
@@ -6274,6 +6473,39 @@ MR.World = (function () {
         // Staggered boards, kept, but stacked on the lift instead of laid over
         // the road: the plank rhythm survives with nothing above the tarmac.
         parts.push(bx(0.10, 1.5, 5.2, wx - sx * 0.40, 7.35, sx > 0 ? -5 : 5, 0xc0a878));
+        /**
+         * ===== DEBRIS NETTING ON THE TOP LIFT =====
+         *
+         * THE WALL measured the least alive and the least saturated near band
+         * in the game -- 0.16-0.18% of frame pixels moving, near-band mean
+         * saturation 0.157 against a reference 0.41-0.51 -- on the leg whose
+         * own source calls it "a leg with no crowd and no colour", carrying
+         * miles 19, 20 and 21. At record pace that is about forty minutes of a
+         * two-hour run with a photograph beside it.
+         *
+         * Debris netting is what is actually lashed to the top lift of a real
+         * scaffold, it is a single large soft mass rather than more small
+         * hard-edged tubes, and it is the one addition here that raises
+         * saturation and liveness without raising edge density -- which is the
+         * distinction "clarity over complexity" turns on. A flat sheet has two
+         * edges; four more tubes have eight.
+         *
+         * IT DOES NOT GO OVER THE OPEN BAYS. The 4-unit gaps between the upper
+         * panels exist so the blocks and hoardings behind the wall come back
+         * through them, and that sightline is the thing that keeps this leg
+         * from being a trench. The netting runs on the TOP lift, between the
+         * 8.30 and 9.60 tubes, above everything the bays show.
+         *
+         * At |x| = 11.35 minus 0.30 it is 7.3 units outside CORRIDOR_HALF, so
+         * WIND_A_CLOTH's 0.16 is not a corridor question here at all.
+         */
+        for (const nz of [-8, 0, 8]) {
+          const nph = nz * 0.37 + sx * 1.3;
+          for (const [dz, len, amp] of [[-2.6, 1.5, 0.35], [0, 3.6, 1.0], [2.6, 1.5, 0.35]]) {
+            parts.push(wv(bx(0.09, 1.22, len, wx - sx * 0.30, 8.95, nz + dz,
+              sx > 0 ? 0x2f9f6a : 0xd8622a), nph, amp));
+          }
+        }
       }
       return merge(parts);
     })();
@@ -6312,6 +6544,41 @@ MR.World = (function () {
         parts.push(bx(0.40, 0.55, 0.40, x, 9.45, z, 0x2b2f52));
         parts.push(bx(0.56, 0.60, 0.56, x, 10.00, z, 0xffe45e));
         parts.push(bx(0.30, 0.34, 0.30, x, 10.42, z, 0x2b2f52));
+        /**
+         * ===== THE ONLY THING ON THIS LEG THAT MOVES, AND THE ONLY COLOUR ===
+         *
+         * Measured at the chase framing, THE BRIDGE was 0.00% of frame pixels
+         * moving at both sample points -- no swaying object, no crowd, no
+         * walker, over 4.4 miles. The river scrolls underneath and the ships
+         * are under way, and neither of those is on the deck: for the whole
+         * crossing, everything the player can see beside them is nailed down.
+         *
+         * A deck banner on the lamp standard is what a real crossing does with
+         * this exact problem, it is the one piece of roadside a bridge is
+         * allowed to have, and it costs NO DRAW CALL because it merges into
+         * the tile that was already being drawn.
+         *
+         * NOT BUNTING. Pennants over the road are reserved for the finish
+         * chute on purpose -- "the first pennants a player sees in a whole
+         * marathon are the ones over the chute" -- and a bridge strung with
+         * them would spend that. Nothing here crosses the carriageway.
+         *
+         * CORRIDOR. The standard is at 4.30, which is only 0.55 outside
+         * CORRIDOR_HALF, so the banner hangs OUTBOARD: centre 4.30 + 0.28,
+         * half-width 0.05, inner face 4.53, and WIND_A_CLOTH's 0.16 of sway
+         * brings it to 4.37. That is 0.62 clear, and tools/motion.js CORRIDOR
+         * is what proves it rather than this arithmetic.
+         *
+         * Three bands along its length for the reason the grandstand flags
+         * have three: one baked amplitude per part means a single box slides
+         * along its own mast instead of flying off it. The band against the
+         * standard is held to 0.30, all three share a phase.
+         */
+        const bc = sx > 0 ? 0x37d6ff : 0xff4d5e;
+        const bph = z * 0.29 + sx * 1.1;
+        for (const [dz, len, amp] of [[-0.62, 0.56, 1.0], [0, 0.72, 0.30], [0.62, 0.56, 1.0]]) {
+          parts.push(wv(bx(0.10, 2.6, len, x + sx * 0.28, 7.10, z + dz, bc), bph, amp));
+        }
         // A shorter parapet lamp between them, so the deck carries a vertical
         // every six units without four full standards a tile.
         const z2 = POLE_Z[sx > 0 ? 1 : 0];
@@ -6348,10 +6615,17 @@ MR.World = (function () {
       // One of these is shown at a time; keeping all three built means a
       // biome change is a visibility flip rather than a rebuild.
       const edges = {
-        rail: S.outlined(railGeo, mats.edge, S.INK.prop),
-        wall: S.outlined(wallGeo, mats.edge, S.INK.prop),
+        rail: S.outlined(railGeo, mats.edgeCloth, S.INK.prop),
+        wall: S.outlined(wallGeo, mats.edgeCloth, S.INK.prop),
       };
-      for (const k in LIT_EDGES) edges[k] = S.outlined(LIT_EDGES[k], mats.edge, S.INK.prop);
+      // hedge is the one edge kind with foliage on it, so it is the one that
+      // gets the wind material. Same mesh, same draw, different ramp.
+      // hedge carries foliage and takes the leaf ramp; barrier carries a
+      // sponsor banner and takes the cloth one. Same meshes, same draws.
+      for (const k in LIT_EDGES) {
+        edges[k] = S.outlined(LIT_EDGES[k],
+          k === 'hedge' ? mats.edgeLeaf : mats.edgeCloth, S.INK.prop);
+      }
       for (const k in edges) { edges[k].visible = false; t.add(edges[k]); }
       t.userData.shoulders = shoulders;
       t.userData.edges = edges;
@@ -9700,8 +9974,13 @@ MR.World = (function () {
           // Cream hi-vis over a navy uniform: the tabard is the torso, the
           // shoulders and sleeves stay dark, which is what a tabard looks like
           // and is where the object's luminance comes from.
-          top: 0xfff2e0, shoulder: 0x2b2f52, sleeve: 0x2b2f52,
-          legCol: 0x2b2f52, hipCol: 0x2b2f52, shoe: 0x141a33,
+          // A UNIFORM BLUE, NOT THE STREET FURNITURE'S NAVY. The cream tabard
+          // is what identifies a marshal, so this figure was never the one
+          // being miscounted as a bollard -- but it stood at the roadside in
+          // the exact value of the post beside it, and the rule under TROUSERS
+          // does not have an exception for objects that get away with it.
+          top: 0xfff2e0, shoulder: 0x35447e, sleeve: 0x35447e,
+          legCol: 0x35447e, hipCol: 0x35447e, shoe: 0x141a33,
           // Feet apart and planted. A marshal stands square across a lane.
           leg: [0.10, -0.10], knee: [0.04, 0.04],
           // Inner arm forward onto the rail. Outer arm either forward as well,
@@ -11834,7 +12113,9 @@ MR.World = (function () {
     function crowdGeo(seed) {
       const parts = [];
       const shirts = [0xff4d5e, 0x37d6ff, 0xffe45e, 0x59d47a, 0xff9ad5, 0xfff2e0, 0xffb020, 0x9a7bff];
-      const trousers = [0x2b2f52, 0x3a4472, 0x4a3a52, 0x2f3a38, 0x5a4a3a, 0x37405e];
+      // TROUSERS, module scope -- see the note there. These were the roadside
+      // furniture's own navy and the crowd was being read as bollards.
+      const trousers = TROUSERS;
       const signs = [0xffe45e, 0xfffdf5, 0x37d6ff, 0xff9ad5];
       let s = seed * 9301 + 49297;
       const r = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
@@ -11912,7 +12193,14 @@ MR.World = (function () {
       // 0x3fa88f is hue 166 -- a sea green, 28 degrees clear of the cyan and
       // still a coat colour a person would wear.
       const coats = [0x3f6fbf, 0x2f9f72, 0xf6f2e0, 0x7a5a9a, 0x8a5a3c, 0x3fa88f];
-      const legwear = [0x2b2f52, 0x3a3444, 0x4a4a5a, 0x5a4a3a, 0x33405e];
+      // Off the furniture navy for the same reason the spectators are -- see
+      // TROUSERS. These are the WALKERS, and they are the worst case of the
+      // confusion rather than the mildest: they drift along the pavement past
+      // the verge posts, at the same height, so a leg that shares the post's
+      // value turns a moving person into a post that seems to slide. Workwear,
+      // so they stay a step below the spectators, but every one of them is at
+      // 66-78 through shadedL against the furniture's 36.
+      const legwear = [0x4a5a8a, 0x6a5a4a, 0x5f6a72, 0x7a6a5a, 0x4f7a6a];
       let s = seed * 9301 + 49297;
       const r = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
       const pick = (a) => a[Math.floor(r() * a.length)];
@@ -12687,7 +12975,9 @@ MR.World = (function () {
       // an arm at 4.76 against a barrier face at 4.65 and a CORRIDOR_HALF of
       // 3.75. vFigure hangs its arms from a 0.52 shoulder rather than splaying
       // them at 0.28, so the reach came DOWN.
-      const trousers = [0x2b2f52, 0x3a4472, 0x4a3a52, 0x2f3a38, 0x5a4a3a, 0x37405e];
+      // TROUSERS, module scope -- see the note there. These were the roadside
+      // furniture's own navy and the crowd was being read as bollards.
+      const trousers = TROUSERS;
       const RAIL_N = 17;
       for (let i = 0; i < RAIL_N; i++) {
         const z = -TILE / 2 + 0.9 + i * ((TILE - 1.8) / (RAIL_N - 1)) + (r() - 0.5) * 0.5;
@@ -12738,7 +13028,24 @@ MR.World = (function () {
       }
       for (const z of [-TILE / 2 + 1, TILE / 2 - 1]) {
         parts.push(bx(0.28, 7.2, 0.28, 0.2, 3.6, z, 0x2b2f52));
-        parts.push(bx(0.14, 1.7, 2.3, 0.2, 6.4, z, z < 0 ? 0xff3b6b : 0x37d6ff));
+        // THE ROOF FLAGS FLY, and until now they were the only cloth in the
+        // FINAL MILE that did not: one rigid rectangle each, on the roof of a
+        // stand holding two hundred people who bounce.
+        //
+        // Three bands along the flag rather than one box, with the band ON the
+        // mast held to 0.30 of the amplitude. A single box carries ONE baked
+        // amplitude for all its vertices, so a whole-part displacement slides
+        // the banner along its own pole; banding it means the free ends bow
+        // and the middle stays on the mast. Same phase on all three
+        // deliberately -- neighbouring bands on different phases can reach
+        // opposite extremes of the swing and open daylight at the joint, which
+        // is the same defect as a forearm on a lower amplitude than its
+        // shoulder. 24 triangles a flag, no extra draw.
+        const fc = z < 0 ? 0xff3b6b : 0x37d6ff;
+        const fph = z * 0.31;
+        parts.push(wv(bx(0.14, 1.7, 0.62, 0.2, 6.4, z - 0.84, fc), fph, 1.0, CHEER.FLAG));
+        parts.push(wv(bx(0.14, 1.7, 1.20, 0.2, 6.4, z, fc), fph, 0.30, CHEER.FLAG));
+        parts.push(wv(bx(0.14, 1.7, 0.62, 0.2, 6.4, z + 0.84, fc), fph, 1.0, CHEER.FLAG));
       }
       return merge(parts);
     })();
@@ -12821,7 +13128,8 @@ MR.World = (function () {
                       0xfff2e0, 0x9a7bff];
       const skins = [0xffc79a, 0xe0a173, 0xb87a4e, 0x8a5a3c];
       const flags = [0xffe45e, 0xfffdf5, 0x37d6ff, 0xff9ad5, 0xff4d5e];
-      const ftrousers = [0x2b2f52, 0x3a4472, 0x4a3a52, 0x2f3a38, 0x5a4a3a, 0x37405e];
+      // TROUSERS, module scope -- see the note there.
+      const ftrousers = TROUSERS;
       const r = lcg(seed);
 
       // ---- the front rail: the reason this object exists -----------------
@@ -12891,8 +13199,15 @@ MR.World = (function () {
       parts.push(bx(1.5, 0.30, TILE, 8.65, 8.80, 0, 0xff3b6b));
       for (const z of [-TILE / 2 + 3, 0, TILE / 2 - 3]) {
         parts.push(bx(0.20, 3.0, 0.20, 8.65, 10.4, z, 0x2b2f52));
-        parts.push(wv(bx(0.12, 1.4, 1.8, 8.65, 11.4, z,
-          flags[Math.floor(r() * flags.length)]), z * 0.7, 0.9));
+        // CHEER.FLAG, not the default body wave. These flew on the crowd's own
+        // formula, which is scaled by exc and so by uHot -- the pennants over
+        // the finish arena fluttered harder when the run was going well. See
+        // WAVE_BODY. Banded like the grandstand's for the same reason.
+        const fc = flags[Math.floor(r() * flags.length)];
+        const fph = z * 0.7;
+        for (const [dz, len, amp] of [[-0.66, 0.50, 1.0], [0, 0.92, 0.30], [0.66, 0.50, 1.0]]) {
+          parts.push(wv(bx(0.12, 1.4, len, 8.65, 11.4, z + dz, fc), fph, amp, CHEER.FLAG));
+        }
       }
       return parts;
     }
@@ -13256,8 +13571,16 @@ MR.World = (function () {
       parts.push(bx(41, 0.35, 2.2, 0, 8.95, 1.2, 0xff3b6b));
       for (let i = -6; i <= 6; i++) {
         parts.push(bx(0.18, 2.2, 0.18, i * 3.2, 10.2, 1.2, 0x2b2f52));
-        backdropCrowd.push(wv(bx(0.10, 1.3, 1.6, i * 3.2, 11.4, 1.2,
-          shirts[Math.floor(r() * shirts.length)]), i * 1.3, 0.9));
+        // CHEER.FLAG. Thirteen pennants across the back of the finish arena
+        // that used to flutter on the crowd's body wave, i.e. harder when the
+        // run was going well and softer away from the runner. Banded in z with
+        // the mast band held to 0.30 so they fly off the pole instead of
+        // sliding along it.
+        const bf = shirts[Math.floor(r() * shirts.length)];
+        for (const [dz, len, amp] of [[-0.55, 0.50, 1.0], [0, 0.70, 0.30], [0.55, 0.50, 1.0]]) {
+          backdropCrowd.push(wv(bx(0.10, 1.3, len, i * 3.2, 11.4, 1.2 + dz, bf),
+            i * 1.3, amp, CHEER.FLAG));
+        }
       }
       // Wings, angled in. Without them the wall is a garage door; with them the
       // chute funnels and the eye is carried to the tape rather than stopped
@@ -13653,10 +13976,27 @@ MR.World = (function () {
       ];
       const yLo = Math.min.apply(null, blobs.map((b) => b[1]));
       const yHi = Math.max.apply(null, blobs.map((b) => b[1]));
+      // THE BIGGEST TREE IN THE GAME STOOD STILL while the pooled scatter
+      // trees behind it swayed, and a contradiction like that is visible in a
+      // single frame -- worse than either object alone. The canopy is tagged,
+      // the bole and the two limbs are not.
+      //
+      // Amplitude tapers with height rather than being flat, because this
+      // canopy is 4.2 units deep: the low blobs at y 12.6 are close to the
+      // limbs that carry them and the crown blob at 16.8 is the free end.
+      // 0.55 to 1.0 of WIND_A_LEAF, so the widest gap between neighbouring
+      // blobs is 0.18 against radii of 4.0 to 5.6 -- they overlap by units,
+      // so nothing can open up between them.
+      //
+      // The inner reach argument above is unaffected: the furthest any blob
+      // gets toward the road is -10.4 and an oak is never placed nearer than
+      // 15, so at full sway the canopy stops at world x 4.2, still outside
+      // CORRIDOR_HALF and 14 units up in any case.
       for (const b of blobs) {
         const t = (b[1] - yLo) / (yHi - yLo);
-        parts.push(sph(b[3], 7, b[0], b[1], b[2],
-          green[Math.min(green.length - 1, Math.floor((1 - t) * green.length))]));
+        parts.push(wv(sph(b[3], 7, b[0], b[1], b[2],
+          green[Math.min(green.length - 1, Math.floor((1 - t) * green.length))]),
+          b[0] * 0.21 + b[2] * 0.17, 0.55 + 0.45 * t));
       }
       return merge(parts);
     })();
@@ -13679,14 +14019,20 @@ MR.World = (function () {
       // blue rectangle read as a lake.
       let s = 991;
       const r = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+      // The reeds bend, and they are the one thing at a lakeside that should:
+      // a reed bed is the most wind-legible plant there is. Tagged at full
+      // leaf amplitude -- they stand 11.5 to 13.9 units out from the centre of
+      // a landmark placed at x 27, so the corridor is not in the argument.
+      // The water, the rim, the jetty, the boat and the ducks are untagged.
       for (let i = 0; i < 14; i++) {
         const a = r() * 6.3, rad = 11.5 + r() * 2.4;
-        parts.push(cone(0.55 + r() * 0.4, 1.5 + r() * 1.2, 5,
+        parts.push(wv(cone(0.55 + r() * 0.4, 1.5 + r() * 1.2, 5,
           // Reeds, half chartreuse and half olive. The green half was the
           // hedge's old 0x2f9f52 emerald -- the last true green in the
           // vegetation after the hedge took the ladder, and standing in the
           // one place a PARKLAND landmark puts foliage next to water.
-          Math.cos(a) * rad, 0.6, Math.sin(a) * rad, r() > 0.5 ? 0x7fa838 : 0x8f9a3e));
+          Math.cos(a) * rad, 0.6, Math.sin(a) * rad, r() > 0.5 ? 0x7fa838 : 0x8f9a3e),
+          a * 1.9));
       }
       parts.push(bx(2.0, 0.26, 7.0, -11.5, 0.35, 4.0, 0x8a5a3c));
       parts.push(bx(0.22, 0.8, 0.22, -10.7, 0.7, 7.0, 0x8a5a3c));
@@ -13725,6 +14071,72 @@ MR.World = (function () {
       // Floodlights on the top rail.
       for (const z of [-5.5, 0, 5.5]) {
         parts.push(bx(0.7, 0.5, 1.4, -1.1, 16.0, z, 0xffe45e));
+      }
+      /**
+       * ================= AND THE BACK OF IT, WHICH WAS NOTHING =============
+       *
+       * RULE 1. Every poster element on this object sits at x <= -0.95, in
+       * front of a 7.2 x 16.4 panel whose rear face carried NOTHING: one
+       * unbroken 0xf6f2e8 rectangle, 118 square units of blank cream, on the
+       * biggest object beside two legs of the race.
+       *
+       * This was shot rather than argued. Four azimuths through the game's own
+       * renderer and lights: the road face is the disc, bar and wedge, the two
+       * flanks are 0.7 units of edge, and the fourth is a bare slab. It is
+       * also the best candidate for what two independent blind readers
+       * reported without prompting -- "a tall flat blue slab on the right,
+       * beyond the kerb... it is featureless" -- because a pale panel lerped
+       * toward this leg's haze is exactly a flat slab, and the navy legs under
+       * it are the "dark navy base" the same note describes.
+       *
+       * WHAT IT IS NOW is what the back of a real hoarding is, and no more
+       * than that: a galvanised skin over the boards, two channels and a
+       * stiffener, a pair of raking braces, the maintenance catwalk with its
+       * handrail, and a ladder up the near post. Every member is large and
+       * there are no small ones -- "clarity over complexity" applies to the
+       * side nobody is looking for as much as to the side they are.
+       *
+       * It is also DARKER than the face, deliberately. The defect the readers
+       * hit was a bright featureless plane; a rear that competed with the
+       * poster for attention would trade one mistake for another.
+       *
+       * COST: zero draw calls -- it merges into the geometry that was already
+       * being drawn -- and about 240 triangles against a 500,000 ceiling.
+       *
+       * VALUES ARE AUTHORED FOR THE SIDE THE LIGHT IS NOT ON. The first pass
+       * used the same greys the works hoarding wears -- 0x6f6b78 skin over
+       * 0x3d3846 framing -- and photographed as one near-black rectangle,
+       * which is the SAME defect as the cream slab with the sign flipped: a
+       * large featureless plane. This face points away from the key, so it is
+       * authored two steps up and the members are separated by value rather
+       * than by hue, which is what survives the bounce being all there is.
+       */
+      const SKIN = 0xc6c0d2, FRAME = 0x6f6880, WALK = 0xdedae8;
+      // The skin over the back of the boards, standing just proud of them.
+      parts.push(bx(0.12, 7.2, 16.4, -0.09, 11.60, 0, SKIN));
+      // Two channels and a centre stiffener: the frame the boards are fixed to.
+      parts.push(bx(0.44, 0.42, 16.6, 0.13, 9.30, 0, FRAME));
+      parts.push(bx(0.44, 0.42, 16.6, 0.13, 13.90, 0, FRAME));
+      parts.push(bx(0.40, 7.20, 0.44, 0.13, 11.60, 0, FRAME));
+      // Raking braces, one each way, so the frame reads as braced rather than
+      // as a grid. They run in the y-z plane between the posts and the rails.
+      for (const sd of [-1, 1]) {
+        parts.push(bx(0.30, 0.30, 7.6, 0.16, 11.60, sd * 2.7, FRAME, sd * 0.62));
+      }
+      // The maintenance catwalk and its handrail, at the joint between the
+      // boards and the legs. A billboard is serviced from behind and this is
+      // the platform that says so.
+      parts.push(bx(1.30, 0.16, 16.4, 0.78, 8.35, 0, WALK));
+      parts.push(bx(0.10, 0.10, 16.4, 1.36, 9.25, 0, 0xffb020));
+      for (const z of [-6.4, -2.2, 2.2, 6.4]) {
+        parts.push(bx(0.10, 0.90, 0.10, 1.36, 8.85, z, FRAME));
+      }
+      // The ladder up the near post, from the ground to the catwalk.
+      for (const sd of [-1, 1]) {
+        parts.push(bx(0.10, 8.10, 0.10, 0.82, 4.25, 5.0 + sd * 0.28, FRAME));
+      }
+      for (let i = 0; i < 7; i++) {
+        parts.push(bx(0.10, 0.09, 0.56, 0.82, 1.1 + i * 1.15, 5.0, FRAME));
       }
       return merge(parts);
     })();
@@ -13767,8 +14179,12 @@ MR.World = (function () {
       clock: Pool(function () { return S.outlined(clockGeo, mats.prop, S.INK.scenery); }, group),
       crane: Pool(function () { return S.outlined(craneGeo, mats.prop, S.INK.scenery); }, group),
       ship: Pool(function () { return S.outlined(shipGeo, mats.prop, S.INK.scenery); }, group),
-      oak: Pool(function () { return S.outlined(oakGeo, mats.prop, S.INK.scenery); }, group),
-      pond: Pool(function () { return S.outlined(pondGeo, mats.prop, S.INK.scenery); }, group),
+      // mats.leaf, not mats.prop: these two are the vegetation in the landmark
+      // pool and they are the last static plants in the game. Same toon ramp,
+      // same one draw call each -- the material differs and nothing else, and
+      // every part of them that is not a leaf is untagged and does not move.
+      oak: Pool(function () { return S.outlined(oakGeo, mats.leaf, S.INK.scenery); }, group),
+      pond: Pool(function () { return S.outlined(pondGeo, mats.leaf, S.INK.scenery); }, group),
       hoarding: Pool(function () { return S.outlined(hoardingGeo, mats.prop, S.INK.scenery); }, group),
       jumbo: Pool(function () { return S.outlined(jumboGeo, mats.prop, S.INK.scenery); }, group),
     };
@@ -14502,7 +14918,8 @@ MR.World = (function () {
         mats.road.color.copy(_base.road);
         mats.shoulder.color.copy(_base.ground);
         if (mats.ground) mats.ground.color.copy(_base.ground);
-        mats.edge.color.set(0xffffff);
+        mats.edgeLeaf.color.set(0xffffff);
+        mats.edgeCloth.color.set(0xffffff);
         api.fogColor.copy(_base.fog);
         hillsMat.color.copy(mats.shoulder.color).lerp(api.fogColor, 0.45);
         state.biome = b;
@@ -14536,7 +14953,13 @@ MR.World = (function () {
       // The roadside furniture takes the setting's tint knocked toward the
       // haze, so barriers and parapets belong to the same air as everything
       // standing behind them.
-      mats.edge.color.copy(_edge.copy(_base.edge).lerp(api.fogColor, 0.10 + 0.10 * tb));
+      // Both edge materials take the SAME tint. They are two materials only
+      // because they move at two different rates, and a tint applied to one
+      // and not the other would put the avenue in different air from the kerb
+      // it stands on.
+      _edge.copy(_base.edge).lerp(api.fogColor, 0.10 + 0.10 * tb);
+      mats.edgeLeaf.color.copy(_edge);
+      mats.edgeCloth.color.copy(_edge);
 
       state.biome = b;
       state.look = BIOME_LOOK[b.name] || BIOME_LOOK['CITY START'];

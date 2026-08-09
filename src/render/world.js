@@ -6705,121 +6705,195 @@ MR.World = (function () {
       return pool;
     }
 
-    // JUMP v0: a wide amber kerb with a cream cap. The cap is what survives the
-    // fog -- a light band on a dark road at 100 units is still a light band.
-    // Nothing here rises past 0.80 or reaches past halfZ 0.52.
-    // Chamfered, like everything else in the vocabulary. The owner's "boxy" note
-    // is not about vehicles only -- a kerb built from four raw slabs is the
-    // purest example of it in the game. The cut is inward from the extents, so
-    // the 0.80 ceiling and the halfZ 0.52 reach are untouched to the digit.
-    // 1.00 DEEP, NOT 1.04. A JUMP box is halfZ 0.52 and the old plinths were
-    // 1.04 -- exactly the box, with no room left for the striped face, which
-    // was therefore parked at -0.531 and hung 0.011 OUT of the envelope on all
-    // four variants. The art gives way to the box, not the other way round.
     /**
-     * ============ WHAT THE ORBIT SHEET SAID ABOUT THIS ONE ============
+     * ============ JUMP v0: A STACK OF SANDBAGS ============
      *
-     * reference/jump-orbit-before.png. The brief for this pass claimed all six
-     * JUMPs were slabs with a striped face and nothing else; that is not what
-     * the sheet shows and the record should say so. v1's cones, v3's scooters,
-     * v4's three moulded modules and v5's drum are through-objects and they
-     * photograph as themselves from every azimuth -- v4 is the best-built
-     * hazard in the game from behind.
+     * ---- THE OWNER COULD NOT NAME THE THING THAT WAS HERE -----------------
      *
-     * WHAT IS TRUE IS ABOUT THIS VARIANT AND ABOUT THE PLINTHS. At az 90, 180
-     * and 270 the kerb is a plain amber rectangle with a lemon band on top:
-     * four masses, no fitting, no join, nothing that says what it is made of
-     * or how it got there. It is the only JUMP with nothing on any face but
-     * the one carrying the caution stripes, and it is the one the sheet
-     * indicts.
+     * Verbatim: *"Idk what an Amber kerb or cable drum is."* That is a report
+     * about IDENTIFICATION, not about detail, and the previous occupant of this
+     * slot -- a precast kerb section, moulded panels, pilasters, connector
+     * plates, reflector studs -- was one of the most heavily detailed objects
+     * in the vocabulary. Another detail pass would have made it a better
+     * unnamed thing.
      *
-     * SO IT IS BUILT AS WHAT IT IS: A PRECAST KERB SECTION. The body is
-     * recessed to 0.88 deep and three pilasters stand out to the full 1.00 on
-     * both long faces, which is a moulded panel rather than a slab; the foot
-     * flares; the ends carry the connector plate a real section is bolted to
-     * its neighbour by, standing 0.02 proud of the end block so it exists from
-     * the flank; and reflector studs sit in the panel bays.
+     * THE TEST THAT WAS APPLIED, and it is stricter than "is it detailed":
+     * would a person walking down a real street name this in one second? A
+     * kerb section fails it twice over. A loose kerb lying in a traffic lane is
+     * not a thing that happens on a road -- kerbs arrive on a lorry and go in
+     * at the edge, and a single section standing in lane 1 has no story. And
+     * the word is not street vocabulary: nobody who has not laid one calls it a
+     * kerb section. tools/framing.js measured what was left once identity had
+     * failed: 51.7% of this variant's pixels at 8 units were the striped board
+     * bolted to its front, and 24.2% were flat amber behind it. It was a
+     * striped board on a box, and the striped board is on four other JUMPs.
      *
-     * NOTHING GREW. The cap is still 0.66 to 0.80, the end blocks still reach
-     * 0.947, and the deepest thing on the object is still the pilaster at
-     * z 0.50 against a box halfZ of 0.52 with the caution face at 0.512.
+     * So this is a REPLACEMENT and not a rebuild, on the same reasoning the
+     * cyclist replacement is recorded under: five attempts at making a thin
+     * object read as a lane-filler, and the thing that worked was removing it.
+     *
+     * ---- WHY SANDBAGS ------------------------------------------------------
+     *
+     * SAND BAGS ARE WHAT A ROAD EVENT IS HELD DOWN WITH. Every sign, every
+     * barrier foot and every cable mat on a closed course is ballasted with
+     * them, so a stack of them in the carriageway is the most in-fiction low
+     * object this game can put in a lane, and it needs no caption.
+     *
+     * IT IS THE ONE SOFT OBJECT IN THE GAME. The owner's standing note is
+     * *"Make it less box like. That goes for everything. Round animations with
+     * extensive detail."* Every other hazard here is a chamfered box or a
+     * cylinder. A bag is an ELLIPSOID that sags under the one above it, and a
+     * stack of them is the only silhouette in the fleet with no straight line
+     * in it anywhere. That is a distance read as well as a close one: at the
+     * 42x20 pixels a JUMP occupies at 25 units, a lumpy top edge is a different
+     * object from a ruled one and there is nothing else to say.
+     *
+     * IT IS A COLOUR NO OTHER HAZARD OWNS. Hessian sand against the road, with
+     * two hi-vis woven bags in the courses. The other five JUMPs are orange,
+     * red-and-white, teal, blue-and-white and terracotta -- see the pool.
+     *
+     * ---- IT CARRIES NO CAUTION FACE, AND THAT IS THE POINT -----------------
+     *
+     * face: null, the second variant in the game to take it after the cones.
+     * The striped board WAS the confusion the owner is reporting: five of the
+     * six JUMPs turned the same 2.2-wide red-and-white quad at the lens, so the
+     * only thing that differed between them was whatever was left visible
+     * around it. A bag has no board on it, exactly as a cone has no board on
+     * it, and bolting one across a sandbag stack would rebuild the defect this
+     * variant was replaced for.
+     *
+     * WHAT PAYS FOR THE LOST BRIGHT AREA is that hessian is BRIGHTER than the
+     * board it replaces: the measured area mean is recorded at the pool.
+     *
+     * ---- THE ENVELOPE ------------------------------------------------------
+     *
+     * A JUMP box is halfX 1.12, halfZ 0.52, yMax 0.80. The widest bag centre is
+     * 0.81 with a 0.29 half-width, so the stack reaches 1.10. Two rows of bags
+     * at z -0.24 and z +0.24 with a 0.46 depth reach 0.47. The crowning course
+     * tops out at 0.79 and the shovel handle at 0.735. Nothing here is the
+     * widest, deepest or tallest thing the box allows.
      */
-    const jumpGeo = merge([
-      // 0.88 deep and 0.62 tall, not 1.00 and 0.66: the body is now the
-      // RECESSED panel and the pilasters below are the surface. Same silhouette
-      // from directly behind, an entirely different one from anywhere else.
-      gl(hcbx(2.24, 0.62, 0.88, 0, 0.31, 0, 0xffb020, 0.07), GLOSS.paint),
-      // The foot flare, full depth and slightly wider, so the section sits ON
-      // the road instead of being cut off by it.
-      gl(hcbx(2.30, 0.14, 1.00, 0, 0.07, 0, 0xe07f12, 0.04), GLOSS.paint),
-      // The fillet between panel and cap, so the cap is carried rather than
-      // floating on a step.
-      gl(hcbx(2.28, 0.06, 0.94, 0, 0.65, 0, 0xe07f12, 0.02), GLOSS.paint),
-      // ============ THE CAP IS LEMON, NOT CREAM, ON EVERY JUMP ============
-      //
-      // This is the fleet's own correction, applied to the vocabulary that
-      // never got it. The fleet header states the mechanism: chroma is the
-      // AREA MEAN, cream renders at S 0.092, and "a 15% cream band buys 0.04x
-      // of luminance and destroys 88% of the object's chroma". The fleet
-      // replaced its cream with LEMON 0xfff23a -- rendered (168,177,49),
-      // L 159.9, S 0.726 -- and every vehicle's margin moved.
-      //
-      // The JUMP cap is a bigger share of a JUMP than the fleet's band ever
-      // was of a vehicle, because a JUMP is 0.80 tall and the cap is the top
-      // of it seen from an elevated camera. So it was doing the same damage,
-      // harder, and two of the four variants short of the 1.6x / 0.30 target
-      // were JUMPs sitting under it. Measured on the shipped build, target
-      // margin before and after the swap:
-      //
-      //   v0 kerb    +0.120 -> +0.173      v3 scooters  +0.018 -> +0.270
-      //   v1 cones   -0.090 -> +0.298      v4 barriers  +0.060 -> +0.524
-      //   v2 works   -0.132 -> +0.226      v5 drum      +0.101 -> +0.340
-      //
-      // **All six clear the target and the two that were short clear it by
-      // the widest margins of the four.** The light band survives: lemon
-      // renders L 159.9 against a road of 61 to 90, which is the property the
-      // cap exists for, and pairwise silhouette separation at 40 units is
-      // unchanged to within a point on every pair.
-      //
-      // It stays MATTE. A highlight belongs on the chamfers and the cylinders
-      // where the surface turns, not on a flat band -- see the gloss ladder.
-      gl(hcbx(2.34, 0.14, 1.00, 0, 0.73, 0, 0xfff23a, 0.04), GLOSS.matte),
-      gl(hcbx(0.30, 0.80, 1.00, -1.16, 0.40, 0, 0xe07f12, 0.05), GLOSS.paint),
-      gl(hcbx(0.30, 0.80, 1.00, 1.16, 0.40, 0, 0xe07f12, 0.05), GLOSS.paint),
-    ].concat((function () {
-      const p = [];
-      // THE PILASTERS. Full 1.00 depth against a 0.88 panel, so each stands
-      // 0.06 proud on the rear face and 0.06 proud on the front. The front
-      // pair are behind the caution plane at every angle the game can produce
-      // -- the plane is 0.796 half-wide against a body of 0.810 -- and they
-      // are built anyway, because a pilaster is one box through the section
-      // and half of one would cost more thought than it saves.
-      for (const cx of [-0.72, 0, 0.72]) {
-        p.push(gl(hcbx(0.20, 0.54, 1.00, cx, 0.33, 0, 0xe07f12, 0.04), GLOSS.paint));
-      }
-      // Reflector studs, in the bays between pilasters, on the REAR face where
-      // they can be seen. Lemon, matte, on the ladder the cap sits on.
-      for (const cx of [-0.36, 0.36]) {
-        p.push(gl(hcbx(0.22, 0.11, 0.06, cx, 0.42, 0.47, 0xfff23a, 0.02), GLOSS.matte));
-      }
-      // The connector plate at each end -- what one precast section is bolted
-      // to the next by, and the only fitting on this object that exists purely
-      // for the flank. 0.969 against the end block's 0.947, so it is genuinely
-      // proud, and 1.118 is the line it is nowhere near.
-      for (const sx of [-1, 1]) {
-        // The plate is the BODY's amber and the bolts are lemon, not the other
-        // way round: at 0.66 deep and 0.44 tall a lemon plate is a third of
-        // the flank and turns the end of the section into a panel. What the
-        // flank wants is a fitting, so the bright is on the four bolt heads.
-        p.push(gl(hcbx(0.36, 0.42, 0.62, sx * 1.16, 0.33, 0, 0xffb020, 0.04), GLOSS.paint));
-        for (const bz of [-0.20, 0.20]) {
-          for (const by of [0.20, 0.46]) {
-            p.push(gl(cyl(0.045, 0.045, 0.09, 6, sx * 0.966, by, bz, 0xfff23a, 0, 0, Math.PI / 2), GLOSS.chrome));
-          }
+    const jumpSandGeo = (function () {
+      const parts = [];
+      // Hessian in sun, hessian in shade, and the hi-vis woven poly bag that
+      // turns up in every third course on a real site. No neutral anywhere:
+      // the fleet's area-mean rule says a near-grey bag would drag the whole
+      // object's chroma to the axis, and a stack is ALL bag.
+      const SAND = 0xd8a860, SAND_DK = 0xb07a34, POLY = 0xff8c2a, TIE = 0x4a2c10;
+      /**
+       * A SANDBAG, AS AN ELLIPSOID AND NOT A BOX.
+       *
+       * hcbx cannot do this: chamferGeo clamps the cut to half the smallest
+       * half-extent, so a 0.26-tall bag may be cut by 0.065 and no more, which
+       * is a box with its corners knocked off rather than a bag. A sphere
+       * scaled on three axes is a bag, is closed on every side by construction,
+       * and costs 120 triangles against a ceiling this file has 200k of room
+       * under.
+       *
+       * rz rolls the bag off level so a course SAGS. That is the whole reason a
+       * stack of bags does not look like a wall of bricks, and it is one number
+       * per bag.
+       */
+      function bag(w, h, d, x, y, z, color, rz) {
+        const g = new THREE.SphereGeometry(0.5, 10, 7);
+        g.scale(w, h, d);
+        const m = new THREE.Matrix4();
+        if (rz) m.makeRotationZ(rz);
+        m.setPosition(x, y, z);
+        parts.push({ geo: g, color: color, matrix: m, gloss: GLOSS.matte });
+        // The tied necks, one at each end, because a bag that is closed at
+        // neither end is a pillow. They are on BOTH ends and not only the one
+        // the lens starts on: you pass this at 1.70 units and the far end is in
+        // shot as long as the near one.
+        for (const s of [-1, 1]) {
+          parts.push(gl(cyl(0.05, 0.062, 0.07, 7,
+            x + s * (w * 0.5 - 0.06) * Math.cos(rz || 0),
+            y + s * (w * 0.5 - 0.06) * Math.sin(rz || 0),
+            z, TIE, 0, 0, Math.PI / 2 + (rz || 0)), GLOSS.matte));
         }
       }
-      return p;
-    })()));
+      /**
+       * THE BOND. Three courses, each laid in TWO rows across the depth, with
+       * the joints of one course landing on the middle of the bags below it.
+       * That running bond is the read: it is what says "somebody stacked these"
+       * rather than "something was tipped here", and it survives to 25 units as
+       * a rhythm in the top edge long after any single bag has fogged out.
+       *
+       * The rows at z -0.24 and z +0.24 are what make this a STACK and not a
+       * hoarding of bags: from the flank you see two bags deep with a valley
+       * between them, and from behind you see the rear row's own ends and ties.
+       */
+      const COURSES = [
+        // [y, h, w, front row x, rear row x]
+        [0.130, 0.26, 0.58, [-0.81, -0.27, 0.27, 0.81], [-0.54, 0, 0.54]],
+        [0.375, 0.25, 0.56, [-0.54, 0, 0.54], [-0.78, -0.26, 0.26, 0.78]],
+        [0.600, 0.23, 0.52, [-0.62, -0.10, 0.42], [-0.36, 0.16, 0.68]],
+      ];
+      COURSES.forEach(function (c, ci) {
+        const [cy, ch, cw, front, rear] = c;
+        front.forEach(function (x, i) {
+          bag(cw, ch, 0.46, x, cy, -0.24,
+            (ci + i) % 5 === 2 ? POLY : (i % 2 ? SAND_DK : SAND),
+            ((i % 2) ? 1 : -1) * (0.05 + ci * 0.02));
+        });
+        rear.forEach(function (x, i) {
+          bag(cw, ch, 0.46, x, cy - 0.01, 0.24,
+            (ci + i) % 4 === 3 ? POLY : (i % 2 ? SAND : SAND_DK),
+            ((i % 2) ? -1 : 1) * 0.06);
+        });
+      });
+      // The two crowning bags, laid ACROSS the stack rather than along it, the
+      // way the last course of a real ballast pile always is. 0.79 against a
+      // ceiling of 0.80.
+      bag(0.46, 0.19, 0.60, -0.22, 0.695, 0.00, SAND, 0.04);
+      bag(0.46, 0.19, 0.60, 0.30, 0.690, 0.02, SAND_DK, -0.05);
+      // Two bags that have slumped off the pile onto the road at the ends,
+      // which is what keeps the bottom edge of this object irregular. The
+      // continuous foot matters for the same reason it matters on the cones:
+      // a gap along the road is a lane the eye tries to run down.
+      bag(0.50, 0.19, 0.42, -0.84, 0.095, -0.02, POLY, 0.14);
+      bag(0.50, 0.19, 0.42, 0.86, 0.090, 0.06, SAND_DK, -0.11);
+      /**
+       * THE SHOVEL, and it is here to do a job the bags cannot.
+       *
+       * A pile of bags is an object; a pile of bags with a shovel leaning on it
+       * is a SITE. It costs 5 parts and it is the single cheapest piece of
+       * story in the vocabulary. It also puts the one straight diagonal in an
+       * object made entirely of curves, which is what stops the stack reading
+       * as scenery at the far end of the distance range.
+       *
+       * Leant in the x-y plane at a fixed z so its extents are arithmetic
+       * rather than a guess: the shaft is 0.824 long about a centre at 0.385,
+       * rolled 0.622 rad, so its top is 0.385 + 0.412 cos(0.622) + 0.025
+       * sin(0.622) = 0.735 and its outer edge is 0.74 + 0.412 sin(0.622) +
+       * 0.025 cos(0.622) = 1.00. Both inside the box with room to spare.
+       */
+      parts.push(gl(cbx(0.055, 0.824, 0.055, 0.74, 0.385, -0.16, 0xc08a3a, 0.02, 0, 0, 0.622), GLOSS.trim));
+      parts.push(gl(cbx(0.075, 0.16, 0.075, 0.575, 0.665, -0.16, 0xf0e4c0, 0.03, 0, 0, 0.622), GLOSS.trim));
+      // The blade, half into the pile at the foot of the shaft. Steel is the
+      // one near-neutral on this object and it is 2% of it.
+      parts.push(gl(cbx(0.23, 0.05, 0.28, 0.985, 0.055, -0.16, 0xc9d6e4, 0.02, 0.10, 0, 0.30), GLOSS.chrome));
+      parts.push(gl(cbx(0.10, 0.06, 0.12, 0.905, 0.095, -0.16, 0x8fa0b4, 0.02, 0, 0, 0.30), GLOSS.chrome));
+      /**
+       * SPILLED SAND at the foot of the burst bag, which is the detail that
+       * says these are full of sand rather than full of nothing. Two flattened
+       * ellipsoids on the road, one paler than the bags because dry sand in
+       * sunlight is the brightest thing on the object.
+       */
+      parts.push((function () {
+        const g = new THREE.SphereGeometry(0.5, 10, 5);
+        g.scale(0.72, 0.09, 0.40);
+        const m = new THREE.Matrix4(); m.setPosition(-0.62, 0.048, -0.28);
+        return { geo: g, color: 0xefc890, matrix: m, gloss: GLOSS.matte };
+      })());
+      parts.push((function () {
+        const g = new THREE.SphereGeometry(0.5, 9, 5);
+        g.scale(0.44, 0.07, 0.30);
+        const m = new THREE.Matrix4(); m.setPosition(0.52, 0.038, 0.30);
+        return { geo: g, color: 0xefc890, matrix: m, gloss: GLOSS.matte };
+      })());
+      return merge(parts);
+    })();
 
     /**
      * JUMP v1: THREE LARGE ORANGE CONES STANDING ON THE ROAD. Nothing between
@@ -6954,324 +7028,777 @@ MR.World = (function () {
     })();
 
     /**
-     * JUMP v2: a works trench with a low chevron barrier over it. The dark
-     * trench mouth under the board is what makes this one read differently at
-     * speed -- a hole rather than a lump -- while the amber frame and the
-     * light cap keep it in the same family.
+     * ============ JUMP v2: AN OPEN WORKS TRENCH, GUARDED IN RED ============
      *
-     * THE MOUTH IS DARK AMBER AND NOT NAVY, which is the second half of the
-     * contrast fix and the same area-mean rule as the cap. The fleet states
-     * it plainly: "Every dark bottom is a dark version of its own vehicle's
-     * hue rather than a shared neutral... one grey bumper bar on seven
-     * vehicles would put 13% of neutral back into every one of them." The
-     * mouth is 2.24 wide across the front of a 0.80-tall object -- the single
-     * largest dark area in the JUMP vocabulary -- and it was 0x2b2f52, a
-     * near-neutral navy. At 0x3d2408 it still reads as a hole, because what
-     * makes a hole is the VALUE step and not the hue, and the variant's
-     * saturation against the road went 0.034 to 0.170 on that change alone.
-     * The cone bases in v1 were the same navy and took the same correction.
+     * ---- THE OWNER ASKED FOR TWO THINGS AND NEITHER WAS THERE -------------
+     *
+     * Verbatim: *"Work trench should have a visible trench with red signs
+     * around."* Both halves of that were true faults and tools/framing.js
+     * shows why in one number: at 8 units this variant spent 28.6% of its
+     * pixels on the caution board and 21.0% on the amber chevron panel BOLTED
+     * ACROSS THE FRONT OF THE HOLE at y 0.40 to 0.74. The excavation underneath
+     * it -- rim, floor, inner walls, two ducts, all of it built and all of it
+     * described at length in the header this replaces -- was behind that panel
+     * from every distance the game shows the object at. The file had an
+     * excavation and the player had a board.
+     *
+     * ---- WHAT MAKES A HOLE VISIBLE HERE, AS GEOMETRY ----------------------
+     *
+     * The road is a solid mesh at y = 0 and a hazard cannot cut it, so the
+     * excavation is built UP: a proud rim with a floor dropped inside it. That
+     * much was already true. What was missing is a sightline, and the sightline
+     * is arithmetic rather than taste.
+     *
+     * The chase lens sits about 2.2 above the road and 8 to 25 units back, so
+     * it looks DOWN on a gate at 15.4 degrees at 8 units and 5.0 degrees at 25.
+     * A ray from the lens to the trench floor at (y 0.02, z 0) passes the
+     * trench's near lip at y 0.13 at 8 units and y 0.055 at 25. **Anything
+     * above y 0.20 at the near lip cannot hide the floor at any distance the
+     * game shows.** That is the whole design:
+     *
+     *   BELOW 0.20 nothing spans the mouth. The near rim is 0.10 tall to its
+     *     sub-base cap at 0.13, and the caution face is a 0.10 kick board on
+     *     the front of it, which is where a real trench carries its marking
+     *     anyway. The FAR rim is 0.37, three times the near one: a tall back
+     *     edge stops the road beyond showing through the hole, which is what
+     *     flattens the value step the whole read depends on.
+     *   ABOVE 0.50 the guarding goes, and it can be as solid as it likes. Two
+     *     full-width rails on four corner posts sit at 0.52 and 0.74 -- over
+     *     the sightline at every distance, and the brightest thing on the
+     *     object.
+     *
+     * BOTH RAILS ARE HIGH, and that was a correction. The first build put them
+     * at 0.40 and 0.645, which is legal by the sightline test and still wrong:
+     * it left the excavation a 0.30 band at the bottom of the frame under 40%
+     * of bright red-and-white furniture, and the frame read as a fence with a
+     * shadow beneath it. Moved to 0.52 and 0.74 the open band is 0.10 to 0.465
+     * -- 45% of the object's height -- and the object reads as a HOLE with a
+     * fence round it, which is the sentence the owner wrote.
+     *
+     * So the player looks UNDER a red-and-white barrier fence INTO a black
+     * hole with two ducts lying in the bottom of it. That is the arrangement a
+     * real dug road has, and it is the arrangement that makes the hole legible.
+     *
+     * ---- THE RED SIGNS ----------------------------------------------------
+     *
+     * Red and white is the JUMP mark -- see stripeTex -- and a guarded
+     * excavation is the object that mark was borrowed from in the first place,
+     * so this variant is where the family livery is most literally correct.
+     * Four banded corner posts, two banded rails, and a bordered warning plate
+     * on the outward face of each end frame, built on BOTH faces because a
+     * player passes this at 1.70 units and the far plate is in shot as long as
+     * the near one.
+     *
+     * ---- LUMINANCE, AND WHY THE RAILS ARE NOT OPTIONAL --------------------
+     *
+     * The largest single area on this object is now a near-black hole, and the
+     * contrast gate is a ratio against a road that reaches L 91 in lane 1.
+     * Modelled before it was built, an unguarded excavation lands near L 95 --
+     * 1.04x, a build failure under CLAUDE.md rule 4. The white in the rails and
+     * the posts is what buys the ratio back, and the measured figure is
+     * recorded at the pool. Fairness is a build failure, not a preference: the
+     * guarding is load-bearing twice over.
+     *
+     * ---- THE ENVELOPE -----------------------------------------------------
+     *
+     * halfX 1.12, halfZ 0.52, yMax 0.80. The far rim reaches z 0.51, the spoil
+     * 0.50, the caution face -0.512. The posts top out at 0.76 and the beacon
+     * over the near-left one at 0.80. The widest thing is a warning plate at
+     * 1.097.
      */
-    /**
-     * WHAT THE ORBIT SHEET ADDED TO THAT. The mouth was a dark slab lying on
-     * the road, 0 to 0.16, and a slab is a shadow rather than a hole: it reads
-     * as one at az 0 only because you are looking slightly down onto a dark
-     * band. From the flank it is a dark stripe and from behind it is the same
-     * dark stripe. The header above argues the dark mouth is "what makes this
-     * one read differently at speed", and it was carrying that on a value step
-     * alone.
-     *
-     * So the trench is now an EXCAVATION: a rim standing proud of the road on
-     * all four sides, a floor dropped below it, and a duct pair lying in the
-     * bottom. That is a hole you can see into from in front, from behind and
-     * from either flank, and the value step the header relies on is now the
-     * inside of something rather than a painted band.
-     *
-     * The rim is 0.20 tall and the board's underside is 0.40, so the gap you
-     * see through is unchanged and so is everything the collision box says.
-     */
-    const jumpWorksGeo = merge([
-      // The excavation floor, dropped and darker than the rim around it.
-      gl(hbx(2.06, 0.04, 0.76, 0, 0.02, 0, 0x2a1806), GLOSS.matte),
-      // The rim: four sides, so the mouth has an edge and the edge has a top.
-      // 0.44 and -0.44 in z against a body half-depth of 0.50 -- the rim is
-      // inside the section, which is what makes the floor read as below it.
-      gl(hcbx(2.30, 0.20, 0.12, 0, 0.10, 0.44, 0xe07f12, 0.03), GLOSS.paint),
-      gl(hcbx(2.30, 0.20, 0.12, 0, 0.10, -0.44, 0xe07f12, 0.03), GLOSS.paint),
-      gl(hcbx(0.14, 0.20, 1.00, -1.11, 0.10, 0, 0xe07f12, 0.03), GLOSS.paint),
-      gl(hcbx(0.14, 0.20, 1.00, 1.11, 0.10, 0, 0xe07f12, 0.03), GLOSS.paint),
-      // The dark inner walls, so what you see over the rim is the SIDE of a
-      // hole and not the road with a frame on it.
-      gl(hbx(2.06, 0.16, 0.06, 0, 0.08, 0.35, 0x3d2408), GLOSS.matte),
-      gl(hbx(2.06, 0.16, 0.06, 0, 0.08, -0.35, 0x3d2408), GLOSS.matte),
-      // The ducts in the bottom of it. Two runs along the trench, one banded,
-      // which is the whole reason anyone digs one of these.
-      gl(cyl(0.07, 0.07, 2.00 * LANE_FIT, 10, 0, 0.09, 0.14, 0xc26200, 0, 0, Math.PI / 2), GLOSS.trim),
-      gl(cyl(0.06, 0.06, 2.00 * LANE_FIT, 10, 0, 0.08, -0.10, 0x3d2408, 0, 0, Math.PI / 2), GLOSS.trim),
-      // 0.88 deep, with the stiffener ribs below standing out to 1.00 -- the
-      // same construction the kerb takes, because a chevron board is a pressed
-      // panel and a pressed panel has ribs. It is also the only way to put
-      // anything on the rear face of a mass that already fills its own halfZ.
-      gl(hcbx(2.24, 0.34, 0.88, 0, 0.57, 0, 0xffb020, 0.05), GLOSS.paint),
-      gl(hcbx(2.36, 0.14, 1.00, 0, 0.73, 0, 0xfff23a, 0.04), GLOSS.matte),
-      gl(hcbx(0.34, 0.80, 0.34, -1.13, 0.40, -0.32, 0xe07f12, 0.06), GLOSS.paint),
-      gl(hcbx(0.34, 0.80, 0.34, 1.13, 0.40, -0.32, 0xe07f12, 0.06), GLOSS.paint),
-      gl(hcbx(0.34, 0.80, 0.34, -1.13, 0.40, 0.32, 0xe07f12, 0.06), GLOSS.paint),
-      gl(hcbx(0.34, 0.80, 0.34, 1.13, 0.40, 0.32, 0xe07f12, 0.06), GLOSS.paint),
-    ].concat((function () {
-      const p = [];
-      for (const cx of [-0.70, 0, 0.70]) {
-        p.push(gl(hcbx(0.18, 0.30, 1.00, cx, 0.57, 0, 0xc26200, 0.03), GLOSS.paint));
+    const jumpTrenchGeo = (function () {
+      // The cut edge of a dug road, in the two colours a dug road actually
+      // has: broken bound material at the sides and pale exposed sub-base on
+      // top of the spoil. Neither is a shared neutral -- the fleet's area-mean
+      // rule holds here as everywhere, and both are warm.
+      const EARTH = 0x8a5822, SUBBASE = 0xecc060, VOID = 0x0e0702, WALL = 0x1c0e03;
+      const RED = 0xf0402f, WHITE = 0xfff6ea, INK = 0x2a1608;
+      const parts = [
+        // ---- the excavation ------------------------------------------------
+        // The floor, as dark as anything in the game. What makes a hole is the
+        // VALUE STEP, and the step is measured against a rim in sunlight.
+        gl(hbx(2.10, 0.03, 0.88, 0, 0.015, 0, VOID), GLOSS.matte),
+        // The four inner walls, standing between the floor and the rim, so
+        // what you see over the lip is the INSIDE of something. They are a
+        // shade up from the floor, which is what gives the hole a bottom.
+        gl(hbx(2.10, 0.38, 0.05, 0, 0.21, 0.395, WALL), GLOSS.matte),
+        gl(hbx(2.10, 0.07, 0.05, 0, 0.05, -0.395, WALL), GLOSS.matte),
+        gl(hbx(0.06, 0.24, 0.84, -1.02, 0.14, 0, WALL), GLOSS.matte),
+        gl(hbx(0.06, 0.24, 0.84, 1.02, 0.14, 0, WALL), GLOSS.matte),
+        // ---- the rim, and it is deliberately LOW on the near side ----------
+        // 0.15 at the lip the player looks over, 0.30 at the far side where a
+        // taller edge only ever helps: it stops the sky and the road beyond
+        // showing through the hole and flattening the value step.
+        gl(hcbx(2.34, 0.07, 0.16, 0, 0.035, -0.43, EARTH, 0.02), GLOSS.matte),
+        gl(hcbx(2.34, 0.42, 0.16, 0, 0.21, 0.43, EARTH, 0.03), GLOSS.matte),
+        gl(hcbx(0.18, 0.32, 1.04, -1.08, 0.16, 0, EARTH, 0.03), GLOSS.matte),
+        gl(hcbx(0.18, 0.32, 1.04, 1.08, 0.16, 0, EARTH, 0.03), GLOSS.matte),
+        // The exposed sub-base along the top of each rim -- the pale band of
+        // hardcore under the blacktop, which is the one bright edge a real cut
+        // has and the thing that reads the lip as an EDGE rather than a shadow.
+        gl(hbx(2.34, 0.09, 0.16, 0, 0.465, 0.43, SUBBASE), GLOSS.matte),
+        gl(hbx(0.19, 0.07, 1.04, -1.08, 0.355, 0, SUBBASE), GLOSS.matte),
+        gl(hbx(0.19, 0.07, 1.04, 1.08, 0.355, 0, SUBBASE), GLOSS.matte),
+        // ---- what anybody digs one of these FOR ----------------------------
+        // Two duct runs lying in the bottom, in the terracotta of JUMP v5's
+        // pipe stack. The two variants are the same works at two moments --
+        // the pipe waiting on the road and the pipe in the ground -- and that
+        // is deliberate: a vocabulary whose objects explain each other is the
+        // owner's "objects that would make sense in a road setting".
+        // RAISED TO y 0.15, NOT 0.09, AND THAT IS THE READ. A duct lying flat
+        // on the floor of the hole is entirely below the near lip from a lens
+        // 15 degrees above the road, so the one object that says what the hole
+        // is FOR was invisible. At 0.15 with a 0.075 radius the run breaks the
+        // lip line by 0.095 and the player sees pipe standing in a trench.
+        gl(cyl(0.105, 0.105, 2.02 * LANE_FIT, 12, 0, 0.125, 0.17, 0xff9448, 0, 0, Math.PI / 2), GLOSS.trim),
+        gl(cyl(0.085, 0.085, 2.02 * LANE_FIT, 10, 0, 0.10, -0.14, 0xe07030, 0, 0, Math.PI / 2), GLOSS.trim),
+      ];
+      // Duct couplers, so the runs are jointed lengths rather than extrusions.
+      for (const cx of [-0.46, 0.34]) {
+        parts.push(gl(cyl(0.128, 0.128, 0.16, 12, cx * LANE_FIT, 0.125, 0.17, 0xfff6ea, 0, 0, Math.PI / 2), GLOSS.trim));
       }
-      // The clamp collars where the board meets its legs. From behind this was
-      // a plain amber board on four plain amber legs; the collars are what
-      // make it a barrier that was carried here and bolted up rather than an
-      // extruded shape. Proud in x only -- z is already at 0.49 against a
-      // 0.50 ceiling on the legs themselves, and the art gives way to the box.
+      // THE LENGTH WAITING TO GO IN, leaning out of the far end of the hole on
+      // the spoil. It is the tallest thing in the excavation at 0.44, it is the
+      // one diagonal in an object made of horizontals, and it is what tells the
+      // player at 25 units that the dark band has depth: a pipe coming OUT of
+      // something is a hole in a way that a dark rectangle is not.
+      // Rotated about X ALONE, so its extents are arithmetic rather than a
+      // guess: half-length 0.26 at 0.75 rad gives 0.26 cos(0.75) + 0.085
+      // sin(0.75) = 0.248 of rise about a centre at 0.30, so 0.052 to 0.548,
+      // and 0.26 sin(0.75) + 0.085 = 0.262 of reach about z 0.06.
+      parts.push(gl(cyl(0.105, 0.105, 0.52, 10, 0.62 * LANE_FIT, 0.30, 0.06, 0xff9448, 0.75), GLOSS.trim));
+      parts.push(gl(cyl(0.05, 0.05, 0.56, 8, 0.62 * LANE_FIT, 0.30, 0.06, 0x3a1c08, 0.75), GLOSS.matte));
+      // A bundle of small conduits in the corner of the trench -- what the
+      // ducts are being laid for, and the detail that fills the floor so the
+      // hole has something IN it rather than being an empty box.
+      for (const c of [[-0.72, 0.09, -0.24], [-0.62, 0.09, -0.10], [-0.67, 0.155, -0.17]]) {
+        parts.push(gl(cyl(0.032, 0.032, 0.66 * LANE_FIT, 8, c[0] * LANE_FIT, c[1], c[2], 0xe8b820, 0, 0, Math.PI / 2), GLOSS.trim));
+      }
+      // The spoil, heaped on the far rim where it is dug out to. Ellipsoids,
+      // for the reason the sandbags are: a heap has no flat face.
+      for (const s of [[-0.42, 0.55, 0.40, 0.78, 0.16, 0.20], [0.50, 0.53, 0.42, 0.62, 0.13, 0.18]]) {
+        const g = new THREE.SphereGeometry(0.5, 9, 6);
+        g.scale(s[3], s[4], s[5]);
+        const m = new THREE.Matrix4();
+        m.setPosition(s[0] * LANE_FIT, s[1], s[2]);
+        parts.push({ geo: g, color: 0xb08840, matrix: m, gloss: GLOSS.matte });
+      }
+      /**
+       * ---- THE GUARDING: FOUR POSTS, TWO RAILS, TWO PLATES ----------------
+       *
+       * Banded in 0.16 courses so a post is red-white-red-white-red from the
+       * road to 0.76. The band pitch is the same on the rails, so the whole
+       * frame reads as one set of furniture rather than as three objects that
+       * happen to be near each other.
+       */
+      const POST_X = 1.05, POST_Z = 0.36;
       for (const sx of [-1, 1]) {
         for (const sz of [-1, 1]) {
-          p.push(gl(hcbx(0.44, 0.10, 0.34, sx * 1.13, 0.66, sz * 0.32, 0xfff23a, 0.03), GLOSS.trim));
-          p.push(gl(hcbx(0.44, 0.09, 0.34, sx * 1.13, 0.26, sz * 0.32, 0xc26200, 0.03), GLOSS.trim));
+          for (let i = 0; i < 5; i++) {
+            parts.push(gl(bxAt(0.125, 0.152, 0.125, sx * POST_X, 0.076 + i * 0.152, sz * POST_Z,
+              i % 2 ? WHITE : RED), GLOSS.paint));
+          }
+          // The shoe each post stands in, so it is planted rather than
+          // balanced. Dark, small, and on all four posts.
+          parts.push(gl(cbx(0.17, 0.05, 0.17, sx * POST_X * LANE_FIT, 0.025, sz * POST_Z, INK, 0.02), GLOSS.trim));
+        }
+        /**
+         * THE WARNING PLATE, on the outward face of each end frame. A bordered
+         * white board with a dark bar in it -- the shape of a road sign at 14
+         * pixels, which is all it ever gets.
+         *
+         * BUILT ON BOTH FACES. The white inner panel stands proud of the red
+         * border on the near AND far side of the plate, so the sign is a sign
+         * from behind. A single-sided decal here is roadmap entry 38's defect
+         * and this variant is not going to be the one that reintroduces it.
+         */
+        parts.push(gl(bxAt(0.40, 0.15, 0.055, sx * POST_X, 0.605, -0.40, RED), GLOSS.paint));
+        parts.push(gl(bxAt(0.31, 0.09, 0.075, sx * POST_X, 0.605, -0.40, WHITE), GLOSS.matte));
+        parts.push(gl(bxAt(0.15, 0.035, 0.09, sx * POST_X, 0.605, -0.40, INK), GLOSS.matte));
+        // The bracket that holds it to the post, on both faces of the post.
+        parts.push(gl(bxAt(0.07, 0.07, 0.20, sx * POST_X, 0.605, -0.30, INK), GLOSS.trim));
+      }
+      /**
+       * THE RAILS, at 0.44 and 0.70. Full lane width, banded, and the reason
+       * the object clears the contrast gate.
+       *
+       * They are ABOVE the sightline to the floor at every distance -- see the
+       * header -- so they cost the hole nothing. They are also the element that
+       * makes this read as GUARDED rather than as damage, which is the
+       * difference between a works trench and a pothole.
+       */
+      for (const ry of [0.50, 0.71]) {
+        for (let i = 0; i < 5; i++) {
+          const bxc = -0.84 + i * 0.42;
+          parts.push(gl(hcbx(0.43, 0.14, 0.13, bxc, ry, -0.36, i % 2 ? RED : WHITE, 0.02), GLOSS.paint));
+          parts.push(gl(hcbx(0.43, 0.14, 0.13, bxc, ry, 0.36, i % 2 ? WHITE : RED, 0.02), GLOSS.paint));
         }
       }
-      return p;
-    })()));
+      // The lamp on the near-left post. One red beacon is what a guarded hole
+      // carries at night and it is the only round thing in the frame.
+      parts.push(gl(cyl(0.075, 0.085, 0.04, 10, -POST_X * LANE_FIT, 0.745, -POST_Z, INK), GLOSS.trim));
+      parts.push((function () {
+        const g = new THREE.SphereGeometry(0.5, 10, 6);
+        g.scale(0.17, 0.08, 0.17);
+        const m = new THREE.Matrix4();
+        m.setPosition(-POST_X * LANE_FIT, 0.760, -POST_Z);
+        return { geo: g, color: 0xff5a3c, matrix: m, gloss: GLOSS.chrome };
+      })());
+      return merge(parts);
+    })();
 
     /**
-     * JUMP v3: DOCKLESS KICK SCOOTERS DOWN IN THE LANE.
+     * ============ JUMP v3: DOCKLESS KICK SCOOTERS DUMPED IN THE LANE =======
      *
-     * The two-wheeler that earns a JUMP rather than a BLOCK, and it earns it by
-     * being the one that is genuinely low. Ridden, a stand-up scooter is a
-     * 2.5-tall column a third of a lane wide -- the exact shape the trike note
-     * rejects a bicycle for. Dumped in the road, which is what these actually
-     * are most of the time they are in anyone's way, it is a 0.45-tall object
-     * lying across the lane, and that is a hurdle.
+     * ---- THE DIAGNOSIS CAME BEFORE THE REBUILD, AND IT MATTERED -----------
      *
-     * Same construction as the cones: the PLINTH is the read and the scooters
-     * are what you see once you are close enough for it to be flavour. One is
-     * down flat with its bar across the lane, the second is propped against the
-     * plinth at 0.79 -- under the 0.80 the collision box records, with the
-     * clearance threshold at 0.84 above that.
+     * Verbatim: *"I had no idea a kick scooter was one. Rework and make it a
+     * different color than the rest."* A scooter is a real object that a person
+     * names in one second in life, so the failure here was not the concept the
+     * way the kerb's and the drum's were -- it was three separate rendering
+     * faults, and tools/framing.js named all three before a line was changed:
+     *
+     *   THE PLINTH. This variant stood its scooters on a 2.24-wide amber slab
+     *     with a lemon cap -- 0.27 tall, spanning the whole lane. Between that
+     *     slab and the caution board on the front of it, 61.1% of the object's
+     *     pixels at 8 units were PLINTH, and the scooters were the 10% left
+     *     over. The owner has now banned platforms twice, in general terms,
+     *     about a different variant: *"Needs to be connected to the road with
+     *     no platform."* The cones lost theirs. These kept theirs.
+     *   THE SCALE. Two scooters inside 2.24 units is a 1.28 deck and a 0.24
+     *     wheel. At the 94x46 pixels this object gets at 8 units, a wheel was
+     *     five pixels across.
+     *   THE COLOUR. Deck, bar, plinth and cap were all the same amber and lemon
+     *     as the five other JUMPs, so nothing separated the scooter from the
+     *     thing it was standing on, let alone from the rest of the family.
+     *
+     * ---- SO THE CONCEPT IS KEPT AND ALL THREE FAULTS ARE FIXED ------------
+     *
+     * NO PLINTH. The scooters lie on the road. Nothing is under them.
+     * BIGGER, AND ONE OF THEM IS UPRIGHT. A machine lying flat shows the lens
+     *   its plan view, which is a deck and two discs; a machine standing on its
+     *   kickstand shows its PROFILE -- two wheels, a deck between them, a raked
+     *   stem and a handlebar across the top -- and that profile is the whole of
+     *   what makes a scooter nameable. Dockless scooters stand on kickstands in
+     *   the road, so the upright one needs no prop and invents nothing.
+     * TEAL AND WHITE. That is the answer to *"a different color than the
+     *   rest"* and it is also simply what these are: every operator's livery on
+     *   the street is teal, mint or white, and none of them is works amber.
+     *
+     * ---- IT CARRIES NO CAUTION FACE ---------------------------------------
+     *
+     * face: null. With the plinth gone there is nothing for a 2.2-wide striped
+     * quad to sit on, and hanging one in the air across the lane is roadmap
+     * entry 38's defect exactly -- the same argument the cones are faceless
+     * under. A dumped scooter has no board bolted to it.
+     *
+     * ---- THE ENVELOPE -----------------------------------------------------
+     *
+     * halfX 1.12, halfZ 0.52, yMax 0.80. The fallen scooter's front wheel
+     * reaches x 1.09, the upright one's grip 1.03, its handlebar tops out at
+     * 0.790 and the deepest thing is a wheel at z 0.44.
      */
     const jumpScooterGeo = (function () {
-      const parts = [
-        // The shared plinth, recessed to 0.88 with pilasters at 1.00, exactly
-        // as v0 and v1 now build it.
-        hbx(2.24, 0.22, 0.88, 0, 0.11, 0, 0xffb020),
-        hbx(2.34, 0.10, 1.00, 0, 0.27, 0, 0xfff23a),
-        hbx(0.28, 0.32, 1.00, -1.16, 0.16, 0, 0xe07f12),
-        hbx(0.28, 0.32, 1.00, 1.16, 0.16, 0, 0xe07f12),
-      ];
-      for (const cx of [-0.72, 0, 0.72]) {
-        parts.push(gl(hcbx(0.18, 0.20, 1.00, cx, 0.10, 0, 0xe07f12, 0.03), GLOSS.paint));
+      // The livery, and the one dark that is a dark version of this object's
+      // own hue rather than a shared neutral -- the fleet's area-mean rule,
+      // which is why the deleted version's navy wheels were a defect.
+      const TEAL = 0x22d8c2, TEAL_DK = 0x0d8478, WHITE = 0xeafcff;
+      const TYRE = 0x123c3c, GRIP = 0x0d3a36, HUB = 0xd8f4ff;
+      const parts = [];
+      /**
+       * A WHEEL, AND IT IS TWO PARTS EVERYWHERE IT APPEARS. A tyre with no hub
+       * in it is a black disc, and a black disc at 12 pixels is a hole. The
+       * pale hub is what makes it read as a wheel, and it goes on BOTH faces by
+       * construction because the hub cylinder is longer than the tyre it sits
+       * in and pokes out of each side.
+       */
+      function wheel(r, x, y, z, flat) {
+        const rz = flat ? 0 : Math.PI / 2;
+        // The hub and the axle stand PROUD of the tyre so the wheel has a
+        // centre from both sides. On an upright wheel that is free; on one
+        // lying flat the proud direction is DOWN, and down is through the
+        // road, so a flat wheel gets just enough to poke out and no more.
+        const hh = flat ? 0.104 : 0.13, ah = flat ? 0.108 : 0.15;
+        parts.push(gl(cyl(r, r, 0.10, 12, x, y, z, TYRE, 0, 0, rz), GLOSS.trim));
+        parts.push(gl(cyl(r * 0.44, r * 0.44, hh, 10, x, y, z, HUB, 0, 0, rz), GLOSS.chrome));
+        parts.push(gl(cyl(r * 0.20, r * 0.20, ah, 8, x, y, z, TEAL_DK, 0, 0, rz), GLOSS.trim));
       }
-      // Down flat. Wheels are discs on their SIDE here -- a scooter on the deck
-      // has its wheels lying horizontal, which is the one orientation where the
-      // default cylinder axis is already right.
-      parts.push(bxAt(1.28, 0.11, 0.30, -0.30, 0.38, -0.10, 0xfff23a));
-      parts.push(bxAt(0.18, 0.13, 0.30, -0.98, 0.39, -0.10, 0x2b2f52));
-      parts.push(cyl(0.12, 0.12, 0.07, 8, -0.72, 0.42, -0.24, 0x1e2140));
-      parts.push(cyl(0.12, 0.12, 0.07, 8, 0.20, 0.42, -0.02, 0x1e2140));
-      parts.push(bxAt(0.78, 0.09, 0.09, 0.58, 0.39, -0.10, 0xff7a1f));
-      parts.push(bxAt(0.14, 0.09, 0.50, 0.92, 0.39, -0.10, 0x2b2f52));
-      // Propped. The only vertical in the object, and it is what stops the
-      // silhouette being a flat slab with a scribble on it.
-      parts.push(bxAt(0.09, 0.60, 0.09, 0.83, 0.50, 0.26, 0xff7a1f, 0, 0, 0.42));
-      parts.push(bxAt(0.40, 0.08, 0.09, 0.68, 0.72, 0.26, 0x2b2f52));
-      // 0.62 wide at 0.80 out, NOT 0.75 at 1.13. The wider version reached
-      // x = 1.19, past the 1.118 HAZARD_HALF this file derives its clearances
-      // from and 0.24 further out than any other JUMP -- two hazards in
-      // adjacent lanes would have interpenetrated.
-      parts.push(bxAt(0.62, 0.10, 0.22, 0.80, 0.30, 0.26, 0xfff23a));
-      // THE FITTINGS THE ORBIT SHEET ASKED FOR. Both scooters had a deck, two
-      // wheels and a bar, and read from behind as a scribble on a slab. What a
-      // dumped scooter actually shows you is its UNDERSIDE and its cockpit --
-      // the stem clamp, the grips on the ends of the bar, the disc brake and
-      // the folding latch -- and from the chase view of a machine lying flat
-      // those are the only parts standing off the deck at all.
-      // Grips on the downed scooter's bar. The bar is bxAt(...0.92...), i.e.
-      // world x 0.665, and it runs along z from -0.35 to 0.15 -- so the grips
-      // are cylinders on that axis at its two ends, which is why they take
-      // rx = PI/2 rather than the deck's orientation.
-      for (const gz of [-0.32, 0.12]) {
-        parts.push(gl(cyl(0.055, 0.055, 0.14, 8, 0.92 * LANE_FIT, 0.39, gz, 0x3d2408, Math.PI / 2), GLOSS.trim));
+      /**
+       * ---- AN UPRIGHT MACHINE, ON ITS KICKSTAND --------------------------
+       *
+       * THE ONE THAT CARRIES THE IDENTIFICATION, AND THERE ARE NOW TWO OF
+       * THEM. A machine lying flat shows the lens its plan view -- a deck and
+       * two discs, which is not a scooter to anybody. A machine standing up
+       * shows its PROFILE: two wheels, a deck between them, a raked stem and a
+       * bar across the top. That profile is the whole of what makes a scooter
+       * nameable, and the first build of this variant had exactly one of them
+       * against three machines lying flat.
+       *
+       * Rolling axis down the lane, so the flank the player sees is the
+       * profile: 0.35 of wheel, a deck at 0.12, a stem raked 0.31 rad forward
+       * and a bar at 0.735, which is 0.79 of the 0.80 the box allows.
+       *
+       * Dockless scooters stand on kickstands in the road, so an upright one
+       * needs no prop and invents nothing -- and the kickstand is modelled,
+       * because a fitting that explains why an object is upright is the same
+       * argument the pipe stack's chocks are built under.
+       */
+      function upright(BX, roll) {
+        const rz = roll || 0;
+        // The bar comes DOWN by the amount the roll lifts its high grip, so a
+        // leaning machine tops out where a level one does. At roll 0.10 the
+        // outer grip rises 0.26 sin(roll) = 0.026, and 0.735 + 0.026 + the
+        // 0.055 grip radius is 0.816 against a ceiling of 0.80 -- which the
+        // envelope guard duly failed. Art gives way to the box.
+        const barY = 0.735 - Math.abs(rz) * 0.26;
+        wheel(0.175, BX, 0.175, 0.28, false);
+        wheel(0.175, BX, 0.175, -0.30, false);
+        parts.push(gl(cbx(0.22, 0.07, 0.58, BX, 0.115, -0.01, TEAL, 0.02), GLOSS.paint));
+        parts.push(gl(cbx(0.17, 0.025, 0.48, BX, 0.162, -0.01, GRIP, 0.01), GLOSS.matte));
+        // The rear mudguard and the brake light on the back of it, which is
+        // the fitting this object shows for the whole second after you pass it.
+        parts.push(gl(cbx(0.20, 0.09, 0.30, BX, 0.325, 0.28, TEAL, 0.03), GLOSS.paint));
+        parts.push(gl(cbx(0.11, 0.05, 0.05, BX, 0.325, 0.42, 0xff5a3c, 0.02), GLOSS.chrome));
+        // The stem. Raked 0.31 rad so the top leans toward the player, which is
+        // the rake every scooter on the street has and the thing that stops the
+        // silhouette being a letter T drawn with a ruler.
+        parts.push(gl(cbx(0.09, 0.525, 0.09, BX + rz * 0.10, 0.40, -0.22, WHITE, 0.02, 0.31, 0, rz), GLOSS.paint));
+        parts.push(gl(cbx(0.13, 0.10, 0.13, BX + rz * 0.22, barY - 0.06, -0.14, TEAL_DK, 0.03), GLOSS.trim));
+        parts.push(gl(cbx(0.60, 0.075, 0.09, BX + rz * 0.24, barY, -0.14, TEAL_DK, 0.02, 0, 0, rz), GLOSS.paint));
+        for (const gs of [-1, 1]) {
+          parts.push(gl(cyl(0.055, 0.055, 0.15, 8, BX + rz * 0.24 + gs * 0.26, barY + gs * rz * -0.26,
+            -0.14, GRIP, 0, 0, Math.PI / 2), GLOSS.matte));
+          // The brake lever under each grip.
+          parts.push(gl(cbx(0.16, 0.03, 0.05, BX + rz * 0.24 + gs * 0.20, barY - 0.04 + gs * rz * -0.20,
+            -0.17, HUB, 0.01, 0, 0, gs * 0.18), GLOSS.chrome));
+        }
+        // The cockpit: a display between the grips, and the number panel down
+        // the stem that every rental machine carries. Both on the face turned
+        // to the player, both solid boxes so they exist from behind as well.
+        parts.push(gl(cbx(0.13, 0.08, 0.10, BX + rz * 0.24, barY + 0.007, -0.20, WHITE, 0.02), GLOSS.chrome));
+        parts.push(gl(cbx(0.15, 0.18, 0.04, BX + rz * 0.10, 0.40, -0.29, WHITE, 0.01), GLOSS.matte));
+        parts.push(gl(cbx(0.10, 0.05, 0.05, BX + rz * 0.10, 0.40, -0.30, TEAL_DK, 0.01), GLOSS.matte));
+        // The headlamp on the stem head, and the kickstand holding it up.
+        parts.push(gl(cyl(0.055, 0.06, 0.06, 10, BX + rz * 0.18, 0.60, -0.30, 0xfff6d8, Math.PI / 2), GLOSS.chrome));
+        parts.push(gl(cbx(0.05, 0.24, 0.05, BX - 0.12, 0.10, 0.16, TEAL_DK, 0.02, 0, 0, -0.55), GLOSS.trim));
       }
-      // The stem clamp and the folding latch, both standing off the deck.
-      parts.push(gl(cbx(0.16, 0.10, 0.20, 0.62, 0.42, -0.10, 0xc26200, 0.03), GLOSS.trim));
-      parts.push(gl(cyl(0.05, 0.05, 0.10, 8, 0.20, 0.42, -0.02, 0xfff23a, 0, 0, Math.PI / 2), GLOSS.chrome));
-      // The brake disc, on the flat scooter's rear wheel, facing up -- which
-      // is the one face of it a chase camera on a crest ever sees.
-      parts.push(gl(cyl(0.085, 0.085, 0.03, 10, -0.72, 0.455, -0.24, 0xfff23a), GLOSS.chrome));
-      // The propped scooter's grips. Its handlebar is bxAt(0.40 ... 0.68 ...),
-      // world x 0.29 to 0.69 at y 0.72, so the grips cap that span.
-      for (const gx of [0.31, 0.67]) {
-        parts.push(gl(cyl(0.05, 0.05, 0.11, 8, gx, 0.72, 0.26, 0x3d2408, 0, 0, Math.PI / 2), GLOSS.trim));
+      /**
+       * TWO UPRIGHTS, ONE AT EACH END OF THE LANE, THE RIGHT ONE LEANING.
+       *
+       * The measured reason there are two: with one upright and three machines
+       * flat, tools/framing.js put the whole variant at 1,771 pixels at 8 units
+       * against 2,577 to 4,444 for the rest of the JUMP set, and
+       * tools/kindread.js read its profile as 0.58 / 0.20 / 0.07 / 0.13 -- the
+       * thinnest object in the kind by a wide margin. A second standing machine
+       * is the only way to put mass back in bands 2 and 3 that is not a plinth,
+       * and the plinth is what the owner banned.
+       *
+       * The right one is rolled -0.10 rad, because two identical machines
+       * standing to attention is a rack and this is a mess.
+       */
+      upright(-0.68, 0);
+      upright(0.64, -0.10);
+      /**
+       * ---- AND A PILE BETWEEN THEM: TWO MACHINES, ONE ON THE OTHER --------
+       *
+       * The pile is what closes the FOOT of the object across the lane. The
+       * cone note states the rule: road showing between separate objects reads
+       * as a lane to run down, and two uprights 1.32 apart is exactly that.
+       *
+       * The upper machine lies across the lower at a roll of 0.10 rad, so the
+       * heap has a diagonal in it and does not read as two ruled slabs.
+       */
+      parts.push(gl(cbx(1.30, 0.09, 0.30, -0.05, 0.055, 0.30, WHITE, 0.03), GLOSS.paint));
+      parts.push(gl(cbx(1.14, 0.025, 0.21, -0.05, 0.105, 0.30, GRIP, 0.01), GLOSS.matte));
+      wheel(0.16, -0.60, 0.056, 0.30, true);
+      wheel(0.16, 0.48, 0.056, 0.30, true);
+      parts.push(gl(cbx(0.09, 0.08, 0.36, 0.42, 0.055, 0.06, TEAL_DK, 0.02), GLOSS.paint));
+      parts.push(gl(cbx(0.46, 0.08, 0.10, 0.34, 0.055, -0.08, TEAL, 0.02), GLOSS.paint));
+      /**
+       * The upper machine. On its side, long axis across the lane, so the lens
+       * gets the plan view: a long deck, two discs lying flat at its ends, and
+       * the stem and T-bar thrown forward toward the player. That T is the
+       * shape that says "handlebar" from directly behind, and it is the reason
+       * the stem points at the lens rather than away from it.
+       */
+      parts.push(gl(cbx(1.10, 0.09, 0.30, 0.02, 0.185, 0.08, TEAL, 0.03, 0, 0, 0.10), GLOSS.paint));
+      parts.push(gl(cbx(0.96, 0.025, 0.21, 0.02, 0.235, 0.08, GRIP, 0.01, 0, 0, 0.10), GLOSS.matte));
+      wheel(0.17, -0.48, 0.21, 0.08, true);
+      wheel(0.17, 0.50, 0.16, 0.08, true);
+      // The stem, thrown forward, and the T-bar across the end of it.
+      parts.push(gl(cbx(0.10, 0.09, 0.44, 0.46, 0.165, -0.16, WHITE, 0.02), GLOSS.paint));
+      parts.push(gl(cbx(0.56, 0.09, 0.11, 0.36, 0.165, -0.36, TEAL_DK, 0.02), GLOSS.paint));
+      for (const gx of [0.12, 0.60]) {
+        parts.push(gl(cyl(0.055, 0.055, 0.15, 8, gx, 0.165, -0.36, GRIP, 0, 0, Math.PI / 2), GLOSS.matte));
       }
+      // The folding latch and the stem clamp, which are the two fittings that
+      // stand off a scooter's frame and the only ones a flat machine shows.
+      parts.push(gl(cbx(0.15, 0.11, 0.16, 0.55, 0.175, 0.08, TEAL_DK, 0.03), GLOSS.trim));
+      parts.push(gl(cyl(0.05, 0.05, 0.13, 8, 0.46, 0.175, -0.02, HUB, 0, 0, Math.PI / 2), GLOSS.chrome));
+      // Its rear mudguard, still on, standing off the deck.
+      parts.push(gl(cbx(0.24, 0.09, 0.24, -0.50, 0.265, 0.08, TEAL, 0.03), GLOSS.paint));
       return merge(parts);
     })();
 
     /**
-     * JUMP v4: LINKED WATER-FILLED BARRIERS, the moulded plastic run that
-     * closes a lane at every set of roadworks in the world.
+     * ============ JUMP v4: LINKED WATER BARRIERS, WITH THE WATER IN THEM ====
      *
-     * The reason this one is worth a variant is its TOP EDGE. Every other JUMP
-     * in the set carries one straight cream band across the full lane, so at
-     * forty units the four of them differ only below the cap -- which is the
-     * part fog and foreshortening take first. A barrier run is three separate
-     * moulded units with rounded shoulders and a 0.06 gap at each joint, so
-     * the light band is THREE segments with two notches in it, and that is a
-     * difference in the one part of the silhouette that survives distance.
+     * ---- THE OWNER'S NOTE, AND WHY IT IS THE WHOLE VARIANT -----------------
      *
-     * The gaps are deliberately narrow and the sill under them is continuous.
-     * The cone note in this file is the reason: three separate objects with
-     * road showing between them read as things to look at rather than as a
-     * lane you cannot run down, and the sill is what keeps this a lane.
+     * Verbatim: *"Water barriers need blue water."* The object that stood here
+     * was three amber mouldings with lemon caps on a dark amber sill -- a
+     * well-built run of barrier that was, on the evidence of its own colours,
+     * EMPTY. The header it replaces argued the variant earns its place on its
+     * top edge: three segments with two notches in it rather than one straight
+     * band. That was true and it is kept. What it never had is the thing the
+     * object is NAMED for. A water-filled barrier that is not visibly full of
+     * water is a plastic box, and a plastic box is what the other five JUMPs
+     * were already being mistaken for.
      *
-     * NO NAVY ANYWHERE, and that is the contrast lesson from the fleet applied
-     * to a JUMP for the first time. The dark parts are dark AMBER. See the
-     * note above jumpConeGeo's rebuild.
+     * ---- HOW WATER IS BUILT IN A RENDERER WITH NO TRANSPARENCY -------------
+     *
+     * There is no translucency available here: every hazard is opaque
+     * MeshToonMaterial with an ink shell, and the two transparent materials in
+     * the file are the telegraph mat and the caution face, both of which are
+     * unlit quads. So the water is not shown THROUGH the shell -- it is shown
+     * IN it, the way a real barrier's moulded window shows it:
+     *
+     *   THE SHELL IS PALE ICE and it is the whole module -- sill to cap,
+     *     rounded hard on every edge, one closed solid.
+     *   THE WINDOWS ARE THE WATER. A blue panel stands proud on ALL FOUR sides
+     *     of every module between y 0.12 and 0.44, so from in front, from
+     *     behind and from either flank the module has water in the bottom two
+     *     thirds of it and pale plastic above. Four windows and not one: rule
+     *     1, and also the only way the water survives the pass-by, which is
+     *     when this object is 1.70 units off the lens and side-on.
+     *   THE WATERLINE IS A SEPARATE PART, one shade paler than the water and
+     *     0.035 tall, sitting on top of each window. A flat blue rectangle is a
+     *     panel; a flat blue rectangle with a bright line along its top is a
+     *     LIQUID SURFACE, and that line is two triangles.
+     *
+     * ---- THE COLOUR IS NOW A FAMILY AND NOT A BAND ------------------------
+     *
+     * Pale ice, mid blue, deep blue sill. That is the answer to the owner's
+     * *"make it a different color than the rest"*, applied across the JUMP set
+     * rather than to one variant: sand, orange, red-and-white, teal,
+     * blue-and-white, terracotta. No two JUMPs now share a palette, which is
+     * what they all did before this pass.
+     *
+     * It also keeps the area mean OFF the neutral axis, which the fleet header
+     * says a pale element usually destroys. It does not here, because the pale
+     * is a BLUE-white and the dark is a BLUE-dark: every element on the object
+     * drives the red channel down, so the mean stays saturated instead of
+     * landing on the axis the way a cream band on an amber body does. Measured
+     * figure at the pool.
+     *
+     * ---- THE CAUTION FACE MOVES DOWN TO THE SILL --------------------------
+     *
+     * It was a 0.26-tall board at y 0.30, straight across the middle of what is
+     * now the water. It is now a 0.14 kick band at y 0.065 on the front of the
+     * sill, which is where a real barrier run carries its reflective marking
+     * and which leaves every window clear. Same trick as the trench.
+     *
+     * ---- THE ENVELOPE -----------------------------------------------------
+     *
+     * halfX 1.12, halfZ 0.52, yMax 0.80. The cap band reaches x 0.99, the sill
+     * z 0.50, the fill cap 0.80 exactly and nothing passes it.
      */
     const jumpBarrierGeo = (function () {
+      const SHELL = 0xdcecfa, SHELL_HI = 0xf4fcff, WATER = 0x2aa8f0;
+      const WATER_HI = 0x86d8ff, SILL = 0x0d5a98, DEEP = 0x083a68;
       const parts = [
-        // The continuous sill. Dark amber rather than a neutral, so the one
-        // element that spans the whole lane still carries the hue.
-        // 0.88 deep, with a foot block under each module standing out to
-        // 1.00 -- so the run has three feet with a recess between them rather
-        // than one continuous cut-off slab. Same construction as the kerb's
-        // pilasters and the chevron board's ribs.
-        gl(hcbx(2.28, 0.16, 0.88, 0, 0.08, 0, 0xe07f12, 0.04), GLOSS.paint),
+        // The continuous sill. Deep blue, and continuous for the reason the
+        // cone note gives: three separate objects with road showing between
+        // them read as a lane you can run down, and the sill is what keeps
+        // this a closed lane. 1.00 deep so the caution face at -0.512 lands on
+        // the front of it rather than floating in front of nothing.
+        gl(cbx(1.98, 0.13, 1.00, 0, 0.065, 0, SILL, 0.04), GLOSS.paint),
       ];
-      for (let i = 0; i < 3; i++) {
-        const cx = -0.76 + i * 0.76;
-        // Heavy chamfer: these are blow-moulded, and the shoulder is the
-        // whole shape. 0.14 on a 0.52 module is the most the primitive will
-        // take without inverting (see chamferGeo's clamp).
-        parts.push(gl(hcbx(0.62, 0.52, 0.94, cx, 0.42, 0, 0xffb020, 0.13), GLOSS.paint));
-        // The moulded waist, in the body's own darker hue.
-        parts.push(gl(hcbx(0.66, 0.07, 0.96, cx, 0.40, 0, 0xe07f12, 0.02), GLOSS.paint));
-        // The cap segment. Matte, for the reason stated on the kerb's cap.
-        parts.push(gl(hcbx(0.68, 0.12, 0.96, cx, 0.72, 0, 0xfff23a, 0.03), GLOSS.matte));
-      }
-      // The interlock pins standing in the joints. Two of them, and they are
-      // what tells you at close range that this is a linked run rather than
-      // three bins in a row.
-      for (const sx of [-0.38, 0.38]) {
-        parts.push(gl(bxAt(0.09, 0.62, 0.16, sx, 0.45, 0, 0xe07f12), GLOSS.trim));
-      }
-      // THE FILL CAP AND THE DRAIN PLUG, which is the pair of fittings that
-      // makes a water-filled barrier a water-filled barrier rather than a
-      // moulded lump. The orbit sheet rates this variant the best-built JUMP
-      // from behind and it still had no opening anywhere: you cannot fill it.
-      //
-      // The cap sits on the top band at 0.755-0.795 against a ceiling of 0.80,
-      // and the plug is on the rear face of each module at z 0.44-0.50 against
-      // a module depth of 0.94 -- both inside the envelope by construction
-      // rather than by luck.
-      for (let i = 0; i < 3; i++) {
-        const cx = (-0.76 + i * 0.76) * LANE_FIT;
-        parts.push(gl(cyl(0.075, 0.075, 0.05, 10, cx, 0.775, 0, 0xc26200), GLOSS.trim));
-        parts.push(gl(cyl(0.045, 0.045, 0.03, 8, cx, 0.785, 0, 0xe07f12), GLOSS.chrome));
+      const MODS = [-0.66, 0, 0.66];
+      MODS.forEach(function (MX, i) {
+        /**
+         * THE MODULE. One closed pale solid, chamfered 0.13 -- which is the
+         * most chamferGeo will take on a 0.60 module without inverting, and
+         * which is right anyway: these are blow-moulded and the shoulder is
+         * most of the shape.
+         */
+        parts.push(gl(cbx(0.60, 0.66, 0.94, MX, 0.45, 0, SHELL, 0.13), GLOSS.paint));
+        // THE FOUR WINDOWS. Front, back and both flanks, each standing 0.035
+        // proud of the shell so it is a moulded panel and not a decal.
         for (const sz of [-1, 1]) {
-          parts.push(gl(cyl(0.06, 0.06, 0.07, 8, cx, 0.28, sz * 0.465, 0xc26200, Math.PI / 2), GLOSS.trim));
+          parts.push(gl(cbx(0.46, 0.32, 0.06, MX, 0.29, sz * 0.475, WATER, 0.02), GLOSS.paint));
+          parts.push(gl(cbx(0.44, 0.035, 0.07, MX, 0.462, sz * 0.475, WATER_HI, 0.01), GLOSS.chrome));
         }
-      }
-      for (let i = 0; i < 3; i++) {
-        const cx = (-0.76 + i * 0.76) * LANE_FIT;
-        parts.push(gl(cbx(0.36, 0.16, 1.00, cx, 0.08, 0, 0xe07f12, 0.04), GLOSS.paint));
+        for (const sx of [-1, 1]) {
+          parts.push(gl(cbx(0.06, 0.32, 0.72, MX + sx * 0.305, 0.29, 0, WATER, 0.02), GLOSS.paint));
+          parts.push(gl(cbx(0.07, 0.035, 0.70, MX + sx * 0.305, 0.462, 0, WATER_HI, 0.01), GLOSS.chrome));
+        }
+        // The moulded waist rib the shell is stiffened by, above the waterline.
+        parts.push(gl(cbx(0.64, 0.05, 0.98, MX, 0.575, 0, SHELL_HI, 0.02), GLOSS.paint));
+        // The cap band. Pale rather than lemon: the whole object is one hue
+        // family now and a yellow band here would be the only warm thing on it
+        // AND would put yellow back on a JUMP, which is the one colour move
+        // this file is not allowed to make -- see stripeTex.
+        parts.push(gl(cbx(0.66, 0.09, 0.98, MX, 0.745, 0, SHELL_HI, 0.035), GLOSS.matte));
+        // THE FILL CAP, on top, and the DRAIN PLUG on each flank. The pair of
+        // fittings that makes a water barrier a water barrier: you can fill it
+        // and you can empty it, and before this pass the object had neither
+        // opening nor contents.
+        parts.push(gl(cyl(0.078, 0.085, 0.05, 10, MX, 0.775, 0, DEEP), GLOSS.trim));
+        parts.push(gl(cyl(0.046, 0.046, 0.035, 8, MX, 0.7825, 0, WATER_HI), GLOSS.chrome));
+        for (const sx of [-1, 1]) {
+          parts.push(gl(cyl(0.055, 0.055, 0.07, 8, MX + sx * 0.32, 0.20, 0, DEEP, 0, 0, Math.PI / 2), GLOSS.trim));
+        }
+        // The foot block under each module, standing out past the sill, so the
+        // run has three feet with a recess between them rather than one slab.
+        parts.push(gl(cbx(0.40, 0.15, 1.02, MX, 0.075, 0, DEEP, 0.04), GLOSS.paint));
+        // The lifting handle moulded into the top of each module, offset so the
+        // three are not a ruled row.
+        parts.push(gl(cbx(0.10, 0.055, 0.30, MX + (i - 1) * 0.06, 0.7725, -0.28, DEEP, 0.02), GLOSS.trim));
+      });
+      /**
+       * THE INTERLOCK PINS, standing in the two joints. They are what says at
+       * close range that this is a LINKED RUN and not three bins in a row, and
+       * they are the only vertical line in an object made of shoulders.
+       */
+      for (const sx of [-0.33, 0.33]) {
+        parts.push(gl(cyl(0.055, 0.055, 0.68, 8, sx, 0.44, 0, DEEP), GLOSS.trim));
+        parts.push(gl(cyl(0.075, 0.075, 0.06, 8, sx, 0.755, 0, SHELL_HI), GLOSS.chrome));
+        parts.push(gl(cyl(0.075, 0.075, 0.06, 8, sx, 0.155, 0, SHELL_HI), GLOSS.chrome));
       }
       return merge(parts);
     })();
 
     /**
-     * JUMP v5: A CABLE DRUM ON A CROSSING RAMP.
+     * ============ JUMP v5: A STACK OF DUCTING PIPE ============
      *
-     * The only round-topped JUMP in the set, and that is the entire design
-     * argument. Four of the five others are a rectangular mass with a straight
-     * or scalloped light band; a drum on its side puts a CIRCLE on the
-     * skyline, which is the one silhouette primitive the vocabulary has never
-     * used at this height. The telegraph mat's rungs and the striped face are
-     * unchanged, so the kind read is identical -- what changes is the shape
-     * that resolves first.
+     * ---- THE OWNER COULD NOT NAME A CABLE DRUM EITHER ---------------------
      *
-     * Both objects are real and belong together: a rubber cable ramp across
-     * the carriageway and the drum the cable came off, which is what an event
-     * power run looks like from the moment it is laid to the moment it is
-     * lifted.
+     * Verbatim, in the same breath as the kerb: *"Idk what an Amber kerb or
+     * cable drum is."* This one is a VOCABULARY failure rather than a modelling
+     * one, and the distinction is worth writing down because it changes what
+     * the fix is. The drum was correctly built -- flanges on both ends, a wound
+     * barrel, a square spindle bore through both faces, a chock, a cable ramp
+     * with real bores in its ends. It photographed as a cable drum. The problem
+     * is that "cable drum" is SITE vocabulary: it is a word you learn by
+     * working on one, and a player who has not has no name for the object no
+     * matter how well it is drawn. Detail cannot fix a naming failure.
      *
-     * THE DRUM'S AXIS RUNS ALONG Z, AND THE FIRST DRAFT HAD IT ALONG X.
-     * That is not a detail. A cylinder lying across the lane shows the player
-     * its BARREL -- a rectangle -- and hides both flanges edge-on, so the one
-     * thing this variant exists for was invisible from the chase view and only
-     * appeared from the flank. Down the lane instead, the rear flange is a
-     * cream disc facing the lens and the barrel is what the next lane sees.
-     * Caught on the fleet sheet at az 0, not by reading the code.
+     * ---- WHAT REPLACES IT, AND WHAT IT KEEPS ------------------------------
      *
-     * The flanges are cream on both ends and the barrel is fully wound on all
-     * sides, per rule 1: you pass this at 1.70 units and the far flange is in
-     * shot for as long as the near one.
+     * A stack of large-bore ducting pipe, banded and chocked, waiting to go in
+     * the ground. The design argument the drum was built on is kept VERBATIM
+     * and served better:
+     *
+     *   THE ONLY ROUND-TOPPED JUMP. That was the drum's whole case -- four of
+     *     the others are a rectangular mass with a straight top band, and a
+     *     circle on the skyline is a silhouette primitive the vocabulary has
+     *     nowhere else. A pipe stack is NINE circles, in two courses, with the
+     *     scalloped top edge that comes free from stacking them. At the 41x18
+     *     pixels this object gets at 25 units, a scalloped top edge against
+     *     five ruled ones is the difference, and it is bigger than the drum's.
+     *   THE BORES ARE THE READ. Every pipe is a bright ring with a black hole
+     *     in the middle of it, facing the lens, because the axis runs DOWN THE
+     *     LANE. That is the same correction the drum's header records making --
+     *     a cylinder across the lane shows the player its barrel and hides
+     *     everything that identifies it -- and it is why the bores are built as
+     *     dark cylinders 0.04 longer than the pipe, so the hole exists as a
+     *     face at BOTH ends rather than as a painted disc at one.
+     *   IT IS THE SAME WORKS AS v2. The trench has two duct runs lying in the
+     *     bottom of it in this exact terracotta. One variant is the pipe on the
+     *     road and the other is the pipe in the ground, which is the owner's
+     *     *"objects that would make sense in a road setting"* done at the level
+     *     of the vocabulary rather than the object.
+     *
+     * ---- WHY IT IS CHOCKED ------------------------------------------------
+     *
+     * The drum's chock is the one fitting from the old variant that is kept
+     * outright, and the note it was built under still applies word for word: it
+     * is the fitting that explains why a round object is sitting still in the
+     * road. Red-and-white, so the family mark is on the object rather than only
+     * on a board.
+     *
+     * ---- IT CARRIES NO CAUTION FACE ---------------------------------------
+     *
+     * face: null, and here the reason is geometric rather than editorial. The
+     * pool parks the caution quad at z -0.512 across the full lane, and the
+     * bores this variant is identified by are AT z -0.50. A board there would
+     * cover the only thing on the object worth seeing, which is precisely the
+     * fault the trench was rebuilt for. The white banding rings and the red
+     * chocks carry the mark instead.
+     *
+     * ---- THE ENVELOPE -----------------------------------------------------
+     *
+     * halfX 1.12, halfZ 0.52, yMax 0.80. Bottom course centres at y 0.222 and
+     * top course at 0.559 with r 0.200, so the crown is 0.759 and the banding
+     * ring over it 0.779. The outer pipe centre is 0.86 with a 0.220 banding
+     * ring, reaching 1.080. The pipes are
+     * 1.00 long and the bores 1.04, so the deepest thing is a bore mouth at
+     * 0.52 -- on the box, which is where a mouth that has to be seen belongs.
      */
-    const jumpDrumGeo = (function () {
-      const parts = [
-        // The ramp. Chamfered hard on all twelve edges, which at 0.30 tall
-        // over a 1.00 depth is most of the section -- so the profile really is
-        // a wedge up to a flat top rather than a slab with cut corners.
-        gl(hcbx(2.24, 0.30, 1.00, 0, 0.15, 0, 0xffb020, 0.14), GLOSS.paint),
-        // The cream tread strip down the middle of the ramp, which is the
-        // light band this family is read by. 0.66 deep and not 0.44: at 0.44
-        // the whole variant measured L 146.5 against a 1.6x target of 144.6,
-        // which is 1.3% of margin on the axis that carries it. The strip is
-        // the only lever here that moves L without moving the silhouette.
-        gl(hcbx(2.30, 0.09, 0.66, 0, 0.325, 0, 0xfff23a, 0.03), GLOSS.matte),
-        gl(hcbx(0.26, 0.34, 1.00, -1.10, 0.17, 0, 0xe07f12, 0.05), GLOSS.paint),
-        gl(hcbx(0.26, 0.34, 1.00, 1.10, 0.17, 0, 0xe07f12, 0.05), GLOSS.paint),
-      ];
-      // The drum. Rotated PI/2 about x puts the cylinder axis along z, so the
-      // radius spans x and y: the top is 0.50 + 0.26 = 0.76 against a box
-      // ceiling of 0.80, and the flanges reach z 0.315 against a halfZ of
-      // 0.52. Both checked by fleetExtents, neither guessed.
-      const dx = 0.40;
-      parts.push(gl(cyl(0.20, 0.20, 0.54, 12, dx, 0.50, 0, 0xe07f12, Math.PI / 2), GLOSS.paint));
-      for (const s of [-1, 1]) {
-        parts.push(gl(cyl(0.26, 0.26, 0.07, 14, dx, 0.50, s * 0.28, 0xfff23a, Math.PI / 2), GLOSS.matte));
-      }
-      // The wound cable: one darker ring proud of the barrel, so the drum is
-      // not an empty spool.
-      parts.push(gl(cyl(0.23, 0.23, 0.34, 12, dx, 0.50, 0, 0xc26200, Math.PI / 2), GLOSS.trim));
-      // The coiled tail, lying flat on the ramp on the other side. Upright
-      // axis, so it is a disc seen edge-on from behind and a ring from above
-      // -- the crest of a hill is where that reads, and hills pitch the
-      // camera down onto it.
-      parts.push(gl(cyl(0.24, 0.24, 0.09, 12, -0.50, 0.345, 0.02, 0xc26200), GLOSS.trim));
-      parts.push(gl(cyl(0.13, 0.13, 0.11, 10, -0.50, 0.355, 0.02, 0xffb020), GLOSS.paint));
-      // THE SPINDLE BORE. A drum turns on an axle and this one was a solid
-      // disc on each end: the single most recognisable feature of a cable drum
-      // is the square hole through the middle of both flanges, and it is
-      // visible from az 0 and az 180 alike because the axis runs down the lane.
-      parts.push(gl(cyl(0.075, 0.075, 0.66, 8, dx, 0.50, 0, 0x3d2408, Math.PI / 2), GLOSS.matte));
-      // A second wound layer, narrower and proud of the first, so the barrel
-      // is a coil rather than one turned cylinder.
-      parts.push(gl(cyl(0.245, 0.245, 0.18, 12, dx, 0.50, 0, 0xe07f12, Math.PI / 2), GLOSS.trim));
-      // The chock stopping it rolling. It is on the ramp, on the drum's
-      // downhill side, and it is the fitting that explains why a round object
-      // is sitting still in the road.
-      parts.push(gl(cbx(0.30, 0.14, 0.22, dx, 0.36, 0.34, 0xc26200, 0.04), GLOSS.paint));
-      // THE CHANNEL MOUTHS. A cable ramp is a hollow section with the cable
-      // running through it, and both ends of the run were solid amber. These
-      // are the bores, standing 0.05 proud of each end of the ramp so the
-      // opening exists from the flank, which is the only place it can be seen.
-      for (const sx of [-1, 1]) {
-        for (const bz of [-0.22, 0.22]) {
-          parts.push(gl(cyl(0.075, 0.075, 0.13, 8, sx * 0.94, 0.15, bz, 0x3d2408, 0, 0, Math.PI / 2), GLOSS.matte));
+    const jumpPipeGeo = (function () {
+      // Terracotta duct, the near-black of a bore, and the white banding every
+      // run of buried pipe is marked with. Nothing neutral: the dark is a dark
+      // version of this object's own hue, per the fleet's area-mean rule.
+      // MEASURED, NOT CHOSEN. The first draft of this variant was authored
+      // in a true terracotta -- DUCT 0xe0561e, bore 0x1e0c02 -- and the
+      // contrast audit put the whole object at L 74.0 against a finish
+      // carpet of L 56.8: a ratio of 1.30 and a saturation difference of
+      // 0.044, which is a gate margin of +0.042 and one shading change away
+      // from failing the build. Nine bores at 0.6 of each pipe's radius are
+      // 36% of the end elevation and they all face the lens, so the dark was
+      // never going to be a minority of the object. The clay is lifted to a
+      // bright terracotta and the bore to a warm brown that still reads as a
+      // hole against it. See the pool for the figure that bought.
+      const DUCT = 0xf2803a, DUCT_DK = 0xc25418, BORE = 0x3a1c08;
+      const BAND = 0xfff6ea, RED = 0xf0402f, STRAP = 0x2a1608;
+      const parts = [];
+      const R = 0.200, LEN = 1.00;
+      /**
+       * ONE PIPE. Four parts and every one of them exists at both ends:
+       *
+       *   the wall        a cylinder of radius R, LEN long, axis down the lane
+       *   the bore        a near-black cylinder of radius 0.60 R and LEN + 0.04
+       *                   long, so its flat cap sits 0.02 PROUD of the pipe's
+       *                   own cap at each end and reads as an opening rather
+       *                   than as a disc painted on a solid
+       *   two ID bands    a slightly larger ring near each end, which is what
+       *                   turns an extruded tube into a manufactured length
+       */
+      function pipe(x, y, band) {
+        parts.push(gl(cyl(R, R, LEN, 14, x, y, 0, DUCT, Math.PI / 2), GLOSS.paint));
+        parts.push(gl(cyl(R * 0.60, R * 0.60, LEN + 0.04, 12, x, y, 0, BORE, Math.PI / 2), GLOSS.matte));
+        // The inner wall of the bore, one shade up from the mouth, so looking
+        // into a pipe is looking into a tube rather than at a black coin.
+        parts.push(gl(cyl(R * 0.74, R * 0.74, LEN - 0.10, 12, x, y, 0, DUCT_DK, Math.PI / 2), GLOSS.matte));
+        for (const sz of [-1, 1]) {
+          parts.push(gl(cyl(R + 0.02, R + 0.02, 0.08, 14, x, y, sz * (LEN * 0.5 - 0.11),
+            band ? BAND : DUCT_DK, Math.PI / 2), GLOSS.trim));
         }
+      }
+      /**
+       * THE STACK. Five on the bottom and four nested in the valleys above,
+       * which is how pipe is actually stacked and is also the arrangement that
+       * gives the top edge its scallop. The courses are 0.337 apart, which is
+       * sqrt((2r)^2 - 0.215^2) for r 0.200 -- the exact drop at which a pipe
+       * offset half a pitch sits TANGENT to the two below it, so the top course
+       * really is nested in the valleys rather than floating over them.
+       *
+       * EVERY PIPE IS BANDED, not every other one. The first draft alternated
+       * banded and plain for rhythm and it cost luminance the object could not
+       * spare -- see the palette note above.
+       */
+      const BOT = [-0.86, -0.43, 0, 0.43, 0.86];
+      const TOP = [-0.645, -0.215, 0.215, 0.645];
+      // 0.222 and not R: the banding ring is 0.02 bigger than the pipe it
+      // sits on, so a stack resting exactly on y = 0 puts its outermost ring
+      // 0.02 under the road. The whole stack is lifted by that amount.
+      BOT.forEach(function (x) { pipe(x, 0.222, true); });
+      TOP.forEach(function (x) { pipe(x, 0.559, true); });
+      /**
+       * THE CHOCKS, and they are the reason nine round things are sitting still
+       * in a traffic lane. A timber chock wedged under the outer pipe of the
+       * bottom course at each end, banded red and white so the family mark is
+       * on the object.
+       */
+      for (const sx of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          parts.push(gl(cbx(0.20, 0.15, 0.22, sx * 0.98, 0.098, sz * 0.30, RED, 0.03, 0, 0, sx * -0.22), GLOSS.paint));
+          parts.push(gl(cbx(0.21, 0.05, 0.23, sx * 0.98, 0.188, sz * 0.30, BAND, 0.02, 0, 0, sx * -0.22), GLOSS.paint));
+        }
+      }
+      /**
+       * THE RATCHET STRAP over the crown, which is the other half of the same
+       * argument: a stack this shape does not hold itself together. It runs
+       * across the lane over the top course and down the outside of the bottom
+       * one at each end, so it is a member with a real path rather than a
+       * decal, and it is visible from every azimuth the game can produce.
+       */
+      parts.push(gl(cbx(1.42, 0.045, 0.20, 0, 0.775, -0.20, STRAP, 0.02), GLOSS.trim));
+      parts.push(gl(cbx(1.42, 0.045, 0.20, 0, 0.775, 0.20, STRAP, 0.02), GLOSS.trim));
+      for (const sx of [-1, 1]) {
+        for (const sz of [-0.20, 0.20]) {
+          parts.push(gl(cbx(0.05, 0.56, 0.19, sx * 0.72, 0.49, sz, STRAP, 0.02, 0, 0, sx * 0.34), GLOSS.trim));
+        }
+        // The ratchet itself, on the near run of the strap.
+        parts.push(gl(cbx(0.13, 0.16, 0.10, sx * 0.60, 0.60, -0.245, BAND, 0.02, 0, 0, sx * 0.34), GLOSS.chrome));
+      }
+      /**
+       * THE BEARERS. Two timbers under the bottom course, running down the
+       * lane, so the stack sits ON something the way real pipe does instead of
+       * balancing on nine tangent points. They also close the foot of the
+       * object across the lane, which is the property the cone note calls the
+       * gameplay one: no strip of road showing through at the bottom.
+       */
+      for (const sz of [-1, 1]) {
+        parts.push(gl(cbx(2.10, 0.08, 0.16, 0, 0.04, sz * 0.32, DUCT_DK, 0.02), GLOSS.trim));
       }
       return merge(parts);
     })();
 
+    /**
+     * ============ THE JUMP SET AFTER THE IDENTIFICATION PASS ============
+     *
+     * The owner's report was about NAMING, not about detail: *"Idk what an
+     * Amber kerb or cable drum is... I had no idea a kick scooter was one.
+     * Rework and make it a different color than the rest."* Six variants, and
+     * the test each was held to is whether a person walking down a real street
+     * would name it in one second.
+     *
+     *   v0  SANDBAGS      replaced. A loose kerb section in a traffic lane is
+     *                     not a thing that happens on a road and "kerb section"
+     *                     is not a word anyone has. Sand.
+     *   v1  CONES         untouched. It passes and it was rebuilt to the
+     *                     owner's own spec one pass ago. Orange.
+     *   v2  TRENCH        rebuilt: the hole is open and guarded in red, which
+     *                     is what was asked for and what the caution board
+     *                     bolted across the front of it was preventing.
+     *   v3  SCOOTERS      kept and rebuilt. This one was a rendering failure
+     *                     and not a concept failure -- see its header for the
+     *                     three measured causes. Teal and white.
+     *   v4  WATER BARRIER rebuilt with the water in it. Blue and pale ice.
+     *   v5  PIPE STACK    replaced. The drum was well built and unnameable:
+     *                     "cable drum" is site vocabulary. Terracotta.
+     *
+     * ---- FOUR OF THE SIX NOW DECLINE THE CAUTION FACE, AND THAT IS THE FIX -
+     *
+     * Before this pass, five of the six turned the SAME 2.2-wide red-and-white
+     * quad at the lens, and on the two worst it was the largest thing on the
+     * object: 51.7% of the kerb's pixels at 8 units and 28.6% of the trench's.
+     * That board was the shared palette the owner is describing when he says
+     * "make it a different color than the rest" -- whatever else differed
+     * between two JUMPs, the biggest element was identical on both.
+     *
+     * So the face is now carried only where a real object carries a board, and
+     * where it is carried it is a LOW KICK BAND rather than a panel across the
+     * middle of the object:
+     *
+     *   v2 trench      0.16 tall at y 0.09, on the front of the near rim. It
+     *                  is under the sightline into the hole -- see the header
+     *                  -- so the mark survives and the excavation is visible.
+     *   v4 barrier     0.14 tall at y 0.065, on the front of the sill, which
+     *                  is exactly where a real barrier run is marked and which
+     *                  leaves all four water windows clear.
+     *
+     * The other four have no board because a cone, a sandbag, a dumped scooter
+     * and a length of pipe have no board. The kind is not carried by the stripe
+     * and never was -- tools/kindread.js measures a nearest-centroid classifier
+     * on the SILHOUETTE PROFILE misreading 2 of 21 against HUE's 8 to 10 -- and
+     * the telegraph mat painted on the road in front says what to do. What the
+     * red and white still does, on the objects that keep it, is say the object
+     * is construction furniture. Sandbags, scooters and pipe are not.
+     *
+     * RED AND WHITE IS STILL ON EVERY VARIANT THAT SHOULD HAVE IT, as
+     * GEOMETRY rather than as a quad: the trench's four banded posts, two
+     * banded rails and two warning plates; the pipe stack's banded chocks;
+     * the barrier's kick band. Yellow is nowhere on a JUMP, which is the line
+     * this pass was not allowed to cross -- see stripeTex for the confusion
+     * that cost.
+     */
     const jumpPool = hazardPool(K.JUMP, 'jump', [
-      // Every face is 0.512 now: outside the 0.50 the art reaches and inside
-      // the 0.52 the box allows. They were 0.521 and 0.531.
-      { geo: jumpGeo, face: [2.2, 0.62, 0.36, -0.512] },
+      { geo: jumpSandGeo, face: null },
       /**
-       * THE CONES CARRY NO CAUTION FACE AT ALL, and this is the first variant
+       * THE CONES CARRY NO CAUTION FACE AT ALL, and this was the first variant
        * in the game with face: null.
        *
        * Three reasons, and the third is the one that decided it:
@@ -7295,16 +7822,13 @@ MR.World = (function () {
        *     left of a JUMP at 25 units is three orange cones with no horizontal
        *     in them anywhere.
        *
-       * THE GATE COST, MEASURED AND NOT ASSUMED: see the note in the roadmap.
-       * Removing a 1.63 x 0.15 striped quad takes bright area off a variant
-       * that has to hold 1.25x luminance and 0.22 saturation against the road,
-       * and the three enlarged cones are what pays it back.
+       * That argument has now been generalised to three more variants above.
        */
       { geo: jumpConeGeo, face: null },
-      { geo: jumpWorksGeo, face: [2.2, 0.32, 0.57, -0.512] },
-      { geo: jumpScooterGeo, face: [2.2, 0.24, 0.16, -0.512] },
-      { geo: jumpBarrierGeo, face: [2.2, 0.26, 0.30, -0.512] },
-      { geo: jumpDrumGeo, face: [2.2, 0.22, 0.16, -0.512] },
+      { geo: jumpTrenchGeo, face: [2.16, 0.075, 0.038, -0.512] },
+      { geo: jumpScooterGeo, face: null },
+      { geo: jumpBarrierGeo, face: [2.20, 0.14, 0.072, -0.512] },
+      { geo: jumpPipeGeo, face: null },
     ]);
 
     /**
@@ -7423,7 +7947,7 @@ MR.World = (function () {
        * 0.30 x 0.07 x 0.34 is a real scaffold base plate: wider than the 0.26
        * post so the post is seen to STAND on something, thin enough that it is
        * a fitting rather than a plinth, and 40% less lane width at the road.
-       * The dark cyan is kept -- see jumpWorksGeo for why a shared near-neutral
+       * The dark cyan is kept -- see jumpTrenchGeo for why a shared near-neutral
        * is refused on a saturated object.
        *
        * ALL FIVE VARIANTS TAKE THIS. A discriminator that works on one DUCK and
@@ -7472,31 +7996,93 @@ MR.World = (function () {
     })()));
 
     /**
-     * DUCK v1: a scaffold gantry over the road. Round standards on base plates,
-     * a hazard-boarded ledger where the bar is, and diagonal braces above --
-     * every one of them a 0.22 tube out at the standards, so the rule above
-     * holds. It is the same shape as v0 built out of different stock, which is
-     * the point: the distance read must not change.
+     * ============ DUCK v1: A SCAFFOLD GANTRY ============
      *
-     * WHAT THE ORBIT SHEET FOUND. At az 180 this was indistinguishable from
-     * v0 and v2: one flat bar between two flat posts. Everything that
-     * made it scaffold -- the boarding, the ledger, the braces -- was either on
-     * the front face or directly behind the standard that hides it.
+     * ---- THE OWNER SAYS THE FOUR DUCKS ARE THE SAME OBJECT -----------------
      *
-     * So the rear plane is now where the identity lives, and the identity is
-     * TUBE AND FITTING. A second ledger tube runs the full span at z +0.22,
-     * transoms cross the depth at each standard, and a coupler sits at every
-     * node where two tubes meet. That is what a scaffold is and none of it
-     * existed. From behind it is now a lattice; v0 is a plated portal and v2 is
-     * a sign back, and the three no longer photograph as one object.
+     * Verbatim: *"All duck obstacles looks exactly the same. Can you review
+     * them and differentiate them anyway?"* He is right, and tools/framing.js
+     * says how right in one line: at 8 units v0 to v4 are 107x171, 108x170,
+     * 107x173, 107x166 and 108x161 pixels. Five objects inside 12 pixels of
+     * each other on both axes.
      *
-     * TWO ENVELOPE FIXES, both this variant's, both invisible to the toolchain
-     * because the DUCK y guard prints its frame and refuses to fail on it:
-     * the cap ran 1.73 to 1.85 against a box top of 1.83, and the boarding ran
-     * 1.39 to 1.49 against a box floor of 1.41. The 0.02 above is the direction
-     * that matters -- art proud of the bar is art the player reads as headroom
-     * they do not have -- and both are now on the number. This is the overhang
-     * duckPipeGeo's collar note names and declines to fix.
+     * ---- WHY THEY ARE THE SAME, WHICH IS NOT LAZINESS ---------------------
+     *
+     * Three of the four things a DUCK is made of are FIXED BY THE CONTRACT and
+     * may not vary at all:
+     *
+     *   THE BAR at 1.41 to 1.83, spanning the lane, and the caution face in
+     *     front of it. duckPipeGeo's header already proves the face IS the bar
+     *     visually on every variant -- it is 2.26 wide against a 2.30 bar and
+     *     0.34 to 0.40 tall in front of a 0.22 to 0.42 one -- so whatever the
+     *     bar is made of, the player sees the same yellow-and-black quad.
+     *   THE DAYLIGHT UNDER IT, which a blind reader named as the one cue that
+     *     separates UNDER from OVER: *"picture 6 shows road visible underneath
+     *     the bar and picture 1 does not."* Band-0 occupancy was cut 0.38 to
+     *     0.21 to buy it and nothing may put it back.
+     *   THE TWO TALL VERTICALS, which are the distance read.
+     *
+     * And the fourth -- everything above the bar -- is confined to the
+     * STANDARD'S OWN x BAND, because the chase camera sweeps y 1.76 to 3.14
+     * straight down the lane centre and this file has already thrown away one
+     * header board for filling the screen with stripes.
+     *
+     * So the whole differentiation budget is: what the standards are MADE of,
+     * what is bolted to them between 1.9 and 3.6, and how they TERMINATE. That
+     * is a narrow budget and it was being spent on fittings too small to see.
+     * It is now spent on the three things that change a silhouette:
+     *
+     *                        what is on the standard        how it terminates
+     *   v0  square post        two collars, bare             a pale cube, level
+     *   v1  round tube         a crossed X-BRACE and a       open tube ends, and
+     *                          board pack                    UNEVEN: 3.58 / 3.22
+     *   v2  square post        a big sign roundel and a      a wide flat head
+     *                          supplementary plate           plate
+     *   v3  LOPSIDED           a lamp cluster and a          one mast at 3.40,
+     *                          counterweight, left only      one rest at 2.15
+     *   v4  round column       flange collars and a          a blind flange
+     *                          SPOKED valve wheel            disc, and an elbow
+     *
+     * ---- THIS ONE IS SCAFFOLD, AND SCAFFOLD IS BRACES AND BOARDS ---------
+     *
+     * THE FIRST DRAFT DOUBLED THE STANDARDS and the envelope refused it, which
+     * is worth writing down because the arithmetic is the whole constraint on
+     * this kind. A standard stands at x 0.868 with a 0.15 radius, so it already
+     * occupies 0.718 to 1.018 of a box that stops at 1.12. There is 0.10 of
+     * clear room outboard of it. A second tube there would overlap the first
+     * and read as one thicker post, and its coupler would leave the box. **The
+     * count of verticals in a DUCK's rear elevation is not available as a
+     * differentiator at all**, on any variant, and that is a fact about the
+     * collision box rather than a choice.
+     *
+     * What IS available in the 0.40-wide strip above the bar is anything that
+     * is not vertical, and scaffold is made of exactly two such things:
+     *
+     *   THE X-BRACE at 2.55 to 3.15. Two tubes raked 0.50 rad, crossing, from
+     *     x 0.728 to 1.112. Over a 0.60 rise in a 0.38 strip that is a 29
+     *     degree diagonal, which is the steepest this envelope will give and
+     *     is enough: it is the only crossed member anywhere in the kind, and
+     *     nothing else in the game has an X in it.
+     *   THE BOARD PACK at 2.30. Three scaffold boards on two ledger brackets,
+     *     0.34 wide and 0.14 deep, which is a horizontal BLOCK in the one place
+     *     every other variant has bare post.
+     *
+     * AND IT HAS NO CAP. Every other DUCK finishes both standards with the same
+     * pale block at the same height, and that block is the last thing in the
+     * silhouette before sky -- the most visible element on the object and
+     * identical on four of five variants. A scaffold has TUBE ENDS at whatever
+     * height the last lift reached, with a coupler under each, and they are
+     * deliberately UNEVEN -- 3.58 on the left against 3.22 on the right --
+     * because a level pair of tube tops is the one thing a real scaffold never
+     * has. An asymmetric skyline is a distance read; a fitting is not.
+     *
+     * The rear ledger, the transoms, the couplers and the toe board are kept
+     * from the previous pass and still do their job on the flank and from
+     * behind.
+     *
+     * ENVELOPE. The widest thing is the top of an X-brace at 1.112 against a
+     * box halfX of 1.12. The tallest is a tube end at 3.58. Nothing crosses the
+     * lane above the bar and nothing was added below it.
      */
     const duckScaffoldGeo = (function () {
       const parts = [
@@ -7516,22 +8102,51 @@ MR.World = (function () {
       ];
       for (const sx of [-1, 1]) {
         const px = sx * 1.20 * LANE_FIT;
+        // THE INNER STANDARD, full height and single below the bar so the
+        // daylight is not touched. 3.34 tall about 1.67, so 0.00 to 3.34.
         parts.push(cyl(0.15, 0.15, 3.34, 8, px, 1.67, 0, 0xffc422));
         parts.push(cyl(0.19, 0.19, 0.16, 8, px, 2.42, 0, 0x2b1e05));
-        parts.push(cyl(0.19, 0.19, 0.16, 8, px, 3.02, 0, 0x2b1e05));
         // 0.50 across, not 0.56: the plate reached 1.148 from the lane centre
         // against a box halfX of 1.12, and it was the widest thing in the game.
         // A base plate and not a block. See the note at duckGeo: the old
         // 0.50 x 0.54 foot was the most blocked part of the gap it stands in.
         parts.push(bx(0.32, 0.06, 0.36, px, 0.03, 0, 0x2b1e05));
-        parts.push(bx(0.42, 0.20, 0.42, px, 3.38, 0, 0xfff0a0));
-        // Kicker braces. Canted, but the cant is 0.12 and the foot is pulled
-        // INSIDE the standard, because the number that matters is how far the
-        // widest point reaches from the lane centre: 1.02, which is inside the
-        // 1.068 the existing cap already reaches, so a runner jumping in the
-        // NEXT lane cannot graze a brace on this one.
-        parts.push(bx(0.15, 1.5, 0.15, sx * (1.20 * LANE_FIT - 0.02), 2.70, 0,
-          0xd18a08, 0, 0, sx * 0.12));
+        /**
+         * THE X-BRACE. Two raked tubes crossing between 2.55 and 3.15, in the
+         * standard's own strip. 0.62 long at 0.50 rad about a centre at 0.92
+         * reaches 0.92 +/- (0.31 sin 0.50 + 0.05 cos 0.50) = 0.728 to 1.112,
+         * and 2.85 +/- (0.31 cos 0.50 + 0.05 sin 0.50) = 2.554 to 3.146.
+         * Arithmetic, not a guess, because this is the one member on the object
+         * that reaches for the edge of the box.
+         */
+        for (const rk of [0.50, -0.50]) {
+          parts.push(gl(bx(0.10, 0.62, 0.10, sx * 0.92, 2.85, 0.06, 0xd18a08, 0, 0, sx * rk), GLOSS.trim));
+        }
+        parts.push(gl(cyl(0.10, 0.10, 0.16, 8, sx * 0.92, 2.85, 0.06, 0x2b1e05, Math.PI / 2), GLOSS.trim));
+        /**
+         * THE BOARD PACK on its ledger brackets. Three boards, the middle one
+         * darker so the stack has courses, 0.34 wide about x 0.91 -- 0.74 to
+         * 1.08, inside the standard's own band at the outboard end and inside
+         * the box at both.
+         */
+        for (let b = 0; b < 3; b++) {
+          parts.push(gl(bx(0.34, 0.045, 0.34, sx * 0.91, 2.30 + b * 0.05, 0,
+            b === 1 ? 0xd18a08 : 0xfff0a0), GLOSS.trim));
+        }
+        for (const bz of [-0.13, 0.13]) {
+          parts.push(gl(bx(0.38, 0.07, 0.07, sx * 0.91, 2.235, bz, 0x2b1e05), GLOSS.trim));
+        }
+        /**
+         * NO CAP, AND UNEVEN TUBE ENDS. See the header: the pale cube on top of
+         * both standards was the most visible element on the object and four of
+         * the five variants wore the same one. This finishes in a bright
+         * ferrule over a black coupler, at 3.58 on the left and 3.22 on the
+         * right.
+         */
+        const topY = sx < 0 ? 3.58 : 3.22;
+        parts.push(gl(cyl(0.15, 0.15, topY - 3.34, 8, px, (3.34 + topY) / 2, 0, 0xffc422), GLOSS.paint));
+        parts.push(gl(cyl(0.165, 0.165, 0.10, 8, px, topY - 0.05, 0, 0xfff0a0), GLOSS.chrome));
+        parts.push(gl(cyl(0.19, 0.19, 0.15, 8, px, topY - 0.24, 0, 0x2b1e05), GLOSS.trim));
         // THE REAR STANDARD, a second tube on the rear plane. It stops at 2.46
         // rather than running the full height: the tall pair of verticals is
         // the distance read and doubling it at 40 units would change the read
@@ -7556,25 +8171,53 @@ MR.World = (function () {
     })();
 
     /**
-     * DUCK v2: a height-restriction sign gantry. The bar becomes a deeper amber
-     * sign board banded top and bottom in cream, and each standard carries a
-     * sign roundel. A round mark is the one shape no telegraph mat uses, so it
-     * never argues with the rungs painted on the road in front of it.
+     * ============ DUCK v2: A HEIGHT-RESTRICTION SIGN GANTRY ============
      *
-     * A SIGN HAS A BACK, AND IT IS NOT A SIGN. That is the whole of this
-     * variant's rebuild, and it is the most literal case rule 1 has in this
-     * file: the back of a road sign is a frame -- a perimeter angle, two
-     * vertical channel stiffeners, and the clips that hold it to the post --
-     * and it is the face you see for the second and a half after you pass it.
-     * This one had a blank board, so at az 180 it was v0 and v1 exactly.
+     * See duckScaffoldGeo for the budget every variant in this kind is working
+     * inside, and for the table of what each one spends it on. This one spends
+     * it on the only mark a road sign has: A BIG CIRCLE.
      *
-     * THE ROUNDEL IS NOW ON BOTH FACES. It was at z -0.20 only, which made
-     * the one mark this variant is named for a front-only decal. It is a disc
-     * on a post: there is no version of it that has one side.
+     * ---- THE ROUNDEL WAS TOO SMALL TO BE A SIGN ---------------------------
      *
-     * ENVELOPE, same pair as v1 and the same reason nothing caught it: the top
-     * band ran to 1.86 against a box ceiling of 1.83 and the bottom band to
-     * 1.39 against a floor of 1.41. Both now land on the number.
+     * It was r 0.20 on a standard at x 0.868. Through the live chase camera at
+     * 25 units this whole object is 45 pixels wide, so a 0.40-diameter disc is
+     * FOUR PIXELS. The one feature the variant is named for was below the
+     * resolution the lane is chosen at, and at 8 units it was still only nine.
+     *
+     * r 0.25 IS THE LARGEST DISC THIS BOX WILL TAKE and the arithmetic says so
+     * exactly: the standard stands at 0.868 and the box stops at 1.12, so a
+     * disc centred on the post may not exceed 0.252 in radius. It is now 0.25,
+     * which is 25% more diameter and 56% more area, and it is as big as a
+     * roundel can ever be here. Anything larger has to move inboard, over the
+     * lane, above the bar -- which is the header board this file threw away.
+     *
+     * SO THE REST OF THE READ IS BOUGHT BELOW THE DISC. A supplementary plate
+     * hangs under each roundel at 2.02, which is what a real height sign
+     * carries the distance and the arrow on, and it is a RECTANGLE under a
+     * CIRCLE -- a pair of shapes, which is more legible at nine pixels than one
+     * shape 25% bigger. Together they occupy 1.86 to 2.72 of the standard, the
+     * band every other variant leaves bare.
+     *
+     * ---- AND THE HEAD IS FLAT AND WIDE ------------------------------------
+     *
+     * v0 finishes in a 0.40 cube at 3.41. A sign gantry finishes in a CAPPING
+     * PLATE: 0.50 across, 0.10 thick, sitting proud of the post on all four
+     * sides at 3.50. Seen against sky at 40 units that is a wide thin line
+     * where v0 has a small block and v1 has nothing, and it is the cheapest
+     * differentiator in the object -- one part per side.
+     *
+     * ---- WHAT IS KEPT FROM THE PREVIOUS PASS ------------------------------
+     *
+     * A SIGN HAS A BACK, AND IT IS NOT A SIGN. The perimeter angle, the two
+     * channel stiffeners, the clips and the double-faced roundel all stay:
+     * the back of a road sign is a frame and it is the face you see for the
+     * second and a half after you pass it. The rear disc stays deep amber and
+     * not cream, because two cream discs on one post read at 45 degrees as one
+     * disc drawn twice.
+     *
+     * ENVELOPE. The roundel reaches 1.118 against a box halfX of 1.12 -- the
+     * widest thing in the kind, and deliberately so. The capping plate reaches
+     * 1.118 as well. Both bands land on 1.41 and 1.83 exactly.
      */
     const duckSignGeo = (function () {
       const parts = [
@@ -7599,20 +8242,30 @@ MR.World = (function () {
       for (const sx of [-1, 1]) {
         const px = sx * 1.20 * LANE_FIT;
         parts.push(bx(0.28, 3.30, 0.28, px, 1.65, 0, 0xffc422));
-        // The roundel goes on the POST, not on the bar. On the bar it had to
-        // sit 0.35 in front of the gate line to clear the board -- past the
-        // halfZ the collision box records -- and the striped face covered it
-        // regardless. At 0.87 out it is clear of the runner's glove swing
-        // (0.543) and nowhere near the lane centre the camera flies down.
-        //
-        // BOTH FACES, at -0.20 and +0.20, with the mounting boss between them.
-        // The rear disc is the deep amber and not the cream, because the back
-        // of a sign plate is not a sign: two cream discs on one post read at
-        // 45 degrees as one disc drawn twice, which is a rendering fault the
-        // eye reaches for before it reaches for "double-sided".
-        parts.push(cyl(0.20, 0.20, 0.09, 12, px, 2.30, -0.20, 0xfff2e0, Math.PI / 2));
-        parts.push(gl(cyl(0.20, 0.20, 0.09, 12, px, 2.30, 0.20, 0xd18a08, Math.PI / 2), GLOSS.paint));
-        parts.push(bx(0.14, 0.14, 0.34, px, 2.30, 0, 0x2b1e05));
+        /**
+         * THE ROUNDEL, at the biggest radius the box allows, on BOTH faces of
+         * the post with the mounting boss between them.
+         *
+         * The pale ring and the deep centre are new and they are what makes a
+         * disc read as a SIGN rather than as a wheel or a lamp: a road roundel
+         * is an annulus. Built as two discs of different radius on the same
+         * axis, so the ring exists from every angle rather than being painted.
+         */
+        parts.push(cyl(0.25, 0.25, 0.09, 14, px, 2.44, -0.20, 0xfff2e0, Math.PI / 2));
+        parts.push(gl(cyl(0.155, 0.155, 0.11, 12, px, 2.44, -0.205, 0xd18a08, Math.PI / 2), GLOSS.paint));
+        parts.push(gl(cyl(0.25, 0.25, 0.09, 14, px, 2.44, 0.20, 0xd18a08, Math.PI / 2), GLOSS.paint));
+        parts.push(gl(cyl(0.155, 0.155, 0.11, 12, px, 2.44, 0.205, 0x2b1e05, Math.PI / 2), GLOSS.trim));
+        parts.push(bx(0.14, 0.14, 0.34, px, 2.44, 0, 0x2b1e05));
+        /**
+         * THE SUPPLEMENTARY PLATE. A rectangle under the circle, which is what
+         * a height-restriction assembly always is, and which gives this variant
+         * TWO shapes on the standard where the others have none. Double-sided
+         * for the same reason the roundel is.
+         */
+        parts.push(gl(bx(0.44, 0.26, 0.07, px, 2.02, -0.185, 0xfff2e0), GLOSS.trim));
+        parts.push(gl(bx(0.30, 0.07, 0.09, px, 2.02, -0.20, 0x2b1e05), GLOSS.matte));
+        parts.push(gl(bx(0.44, 0.26, 0.07, px, 2.02, 0.185, 0xd18a08), GLOSS.trim));
+        parts.push(gl(bx(0.12, 0.30, 0.10, px, 2.02, 0, 0x2b1e05), GLOSS.trim));
         // The clips that hold the board to the post: one above and one below
         // the board, on the rear plane, in the post's own x band.
         // 1.46 and 1.78, so the clips land inside 1.41-1.83 rather than
@@ -7620,9 +8273,14 @@ MR.World = (function () {
         for (const ky of [1.46, 1.78]) {
           parts.push(gl(bx(0.34, 0.10, 0.16, px, ky, 0.21, 0xfff0a0), GLOSS.trim));
         }
-        parts.push(bx(0.36, 0.18, 0.36, px, 2.86, 0, 0x2b1e05));
-        parts.push(bx(0.30, 0.44, 0.30, px, 3.14, 0, 0xd18a08));
-        parts.push(bx(0.40, 0.24, 0.40, px, 3.44, 0, 0xfff0a0));
+        parts.push(bx(0.34, 0.16, 0.34, px, 2.92, 0, 0x2b1e05));
+        /**
+         * THE CAPPING PLATE. Flat, wide and proud on all four sides, against
+         * v0's cube and v1's open tube. It is the last thing in the silhouette
+         * before sky and it is one part.
+         */
+        parts.push(gl(bx(0.50, 0.10, 0.46, px, 3.50, 0, 0xfff0a0), GLOSS.chrome));
+        parts.push(gl(bx(0.36, 0.28, 0.34, px, 3.31, 0, 0xd18a08), GLOSS.paint));
         // Base plate, not a block -- see duckGeo.
         parts.push(bx(0.30, 0.07, 0.34, px, 0.035, 0, 0x2b1e05));
         // The maintenance step at the foot, rear plane, so the base is a
@@ -7633,34 +8291,54 @@ MR.World = (function () {
     })();
 
     /**
-     * DUCK v3: A LEVEL-CROSSING BOOM, and it is the first ASYMMETRIC duck.
+     * ============ DUCK v3: A LEVEL-CROSSING BOOM, AND IT IS LOPSIDED ========
      *
-     * Three things constrain every variant here and it is worth restating them
-     * together, because they are what makes a duck hard to vary at all:
+     * See duckScaffoldGeo for the budget and the table. This variant spends the
+     * whole of it on ONE move, because it is the only move in the kind that
+     * changes the OUTLINE rather than what is inside it.
      *
-     *   NOTHING ABOVE THE BAR IN THE LANE CENTRE. The chase camera sweeps
-     *     y 1.76 to 3.14 straight down a gate's lane, so the only structure
-     *     that may live above 1.83 is out at the standards. The header board
-     *     at 2.44 that this file already threw away is the proof. A traffic
-     *     signal head standing on top of the beam was designed and rejected
-     *     here for exactly that reason -- it is the same object as that board.
-     *   NOTHING BELOW 1.41 ACROSS THE LANE. That is where the ducking runner
-     *     goes. He is lower than this file used to think -- see the note on
-     *     the corridor probe below -- but the box floor is still the floor.
-     *   THE DISTANCE READ MAY NOT CHANGE. Two tall thin verticals with a bar
-     *     between them, at forty units, whatever the variant.
+     * ---- THE TWO STANDARDS ARE NOW DIFFERENT HEIGHTS ----------------------
      *
-     * What is left to vary is the bar's own profile, the stock the standards
-     * are made of, and the fittings out at the posts. This one spends all
-     * three on being LOPSIDED: the left standard is a signal post with a
-     * lamp pair and a counterweight, the right is a plain rest with a fork
-     * for the boom to lie in. Every other hazard in the game is bilaterally
-     * symmetric, so a silhouette whose two halves differ is a new read even
-     * though the class is unchanged.
+     * The left is a signal mast to 3.40. The right is a REST POST that stops at
+     * 2.30, with the fork the lowered boom lies in on top of it. That is what a
+     * real level crossing is: the machinery, the lamps and the counterweight
+     * are all on the driven side, and the far side is a cradle on a stub.
      *
-     * The boom's hanging skirt sits between 1.43 and 1.61 -- inside the bar
-     * band, not below it -- so the thing that makes a level crossing look like
-     * a level crossing costs no clearance at all.
+     * WHY IT IS WORTH THE WHOLE BUDGET. Every other hazard in the game is
+     * bilaterally symmetric, and every DUCK before this pass was two verticals
+     * of the same height carrying a bar. The previous version of this variant
+     * was already called "the first ASYMMETRIC duck" and it was not one: both
+     * standards were 3.20 and the asymmetry was a lamp plate and a
+     * counterweight bolted to one of them, which at 45 pixels wide is a few
+     * dark pixels on one side. **A silhouette whose two halves are different
+     * HEIGHTS is legible at every distance the game has, including the one
+     * where the fittings have fogged out entirely.**
+     *
+     * ---- WHAT IT COSTS, MEASURED RATHER THAN ASSUMED ----------------------
+     *
+     * Cutting 1.10 off one standard removes mass from bands 11 to 13 of
+     * tools/kindread.js -- the top of the profile, where a DUCK is told from a
+     * JUMP by having anything up there at all. That is a real trade against the
+     * kind signal and it is the one this brief asked to have measured rather
+     * than felt. The measured figures for this variant, before and after, are
+     * recorded at duckPool. The bar band (7 to 9) is untouched, and it is the
+     * bar band that carries the classification.
+     *
+     * ---- THE RULES IT STILL KEEPS -----------------------------------------
+     *
+     *   NOTHING ABOVE THE BAR IN THE LANE CENTRE. The mast, the lamps, the
+     *     counterweight and the fork are all inside a standard's own x band.
+     *   NOTHING BELOW 1.41 ACROSS THE LANE. The boom's hanging skirt sits
+     *     between 1.43 and 1.61, inside the bar band, so the thing that makes a
+     *     level crossing look like a level crossing costs no clearance at all.
+     *   TWO VERTICALS AND A BAR AT FORTY UNITS. Both are still there: the rest
+     *     post reaches 2.30, which is 0.47 clear above the bar, so the pair
+     *     reads as a gate rather than as a bar with one leg.
+     *
+     * ENVELOPE. The lamp backing plate is 0.44 wide at 0.868 out -- 1.088
+     * against a box halfX of 1.12. The mast tops out at 3.40, the shortest full
+     * standard in the kind, which is the R2 occluder argument the previous
+     * version already made and this one makes harder.
      */
     const duckBoomGeo = (function () {
       const parts = [
@@ -7676,37 +8354,49 @@ MR.World = (function () {
         const x = -0.90 + i * 0.30;
         parts.push(gl(bxAt(0.13, 0.18, 0.22, x, 1.52, 0, i % 2 ? 0xd18a08 : 0xfff0a0), GLOSS.trim));
       }
+      // Base plates and relay cabinets on BOTH standards -- the two halves of
+      // this variant differ above the bar and are identical below it, which is
+      // what keeps the daylight band the same as every other DUCK's.
       for (const sx of [-1, 1]) {
-        // 3.20 tall, not the 3.30 the other three use. The DUCK superstructure
-        // was measured as the tallest thing in the game and a real occluder in
-        // R2, so a new variant takes the chance to be shorter rather than
-        // taller: this tops out at 3.40 against 3.48-3.56 for v0-v2.
-        parts.push(gl(bxAt(0.26, 3.20, 0.30, sx * 1.20, 1.60, 0, 0xffc422), GLOSS.paint));
-        parts.push(bxAt(0.30, 0.24, 0.34, sx * 1.20, 2.62, 0, 0x2b1e05));
-        parts.push(gl(bxAt(0.38, 0.20, 0.38, sx * 1.20, 3.30, 0, 0xfff0a0), GLOSS.trim));
-        // Base plate, not a block -- see duckGeo.
         parts.push(bxAt(0.30, 0.07, 0.34, sx * 1.20, 0.035, 0, 0x2b1e05));
-        // Cabinet doors on the rear plane of each post -- the relay boxes a
-        // crossing carries. Out at the standard, inside the post's own x band,
-        // and below the bar so they cost no headroom argument at all.
         parts.push(gl(bxAt(0.26, 0.62, 0.10, sx * 1.20, 0.98, 0.235, 0xd18a08), GLOSS.paint));
         parts.push(gl(bxAt(0.08, 0.10, 0.06, sx * 1.20 + sx * 0.09, 0.98, 0.26, 0xfff0a0), GLOSS.chrome));
       }
-      // The signal post, LEFT ONLY. The backing plate is 0.44 wide at 1.20 out
-      // -- 1.088 from the lane centre against a box halfX of 1.12 -- and the
-      // lamp discs face the player, axis along z, so they are round from
-      // behind and edge-on discs from the next lane rather than flat squares.
       const px = -1.20 * LANE_FIT;
-      parts.push(bxAt(0.44, 0.94, 0.16, -1.20, 2.06, -0.10, 0x2b1e05));
-      for (const ly of [1.78, 2.34]) {
-        parts.push(gl(cyl(0.15, 0.15, 0.09, 12, px, ly, -0.20, 0xfff2e0, Math.PI / 2), GLOSS.chrome));
+      const rx = 1.20 * LANE_FIT;
+      /**
+       * ---- THE LEFT SIDE: THE SIGNAL MAST ---------------------------------
+       *
+       * Full height to 3.40, and everything the crossing needs to work is on
+       * it. From behind this half is a stack of machinery; the other half is a
+       * stub with a fork on it.
+       */
+      parts.push(gl(bxAt(0.26, 3.40, 0.30, -1.20, 1.70, 0, 0xffc422), GLOSS.paint));
+      parts.push(bxAt(0.30, 0.24, 0.34, -1.20, 2.62, 0, 0x2b1e05));
+      parts.push(gl(bxAt(0.38, 0.20, 0.38, -1.20, 3.30, 0, 0xfff0a0), GLOSS.trim));
+      /**
+       * THE LAMP CLUSTER, and it is now a HORIZONTAL PAIR on a crossbar rather
+       * than a vertical pair on a plate. A level crossing's lamps sit side by
+       * side and alternate; stacked vertically they were a traffic signal,
+       * which is BLOCK v2's object, and at nine pixels the two were the same
+       * few dots. Side by side inside the standard's band they are a WIDE dark
+       * bar with two bright spots in it, which nothing else in the kind has.
+       */
+      parts.push(bxAt(0.48, 0.30, 0.16, -1.20, 2.26, -0.10, 0x2b1e05));
+      for (const lx of [-0.13, 0.13]) {
+        parts.push(gl(cyl(0.11, 0.11, 0.09, 12, px + lx, 2.26, -0.20, 0xff5a3c, Math.PI / 2), GLOSS.chrome));
         // THE HOOD BEHIND EACH LAMP. A signal lamp is a housing with a lens in
         // the front of it, and this had only the lens: from behind, the one
         // fitting that makes this a level crossing was a pair of pale ellipses
-        // floating on a dark plate. The housing is what you actually see once
-        // you are past it.
-        parts.push(gl(cyl(0.13, 0.16, 0.16, 12, px, ly, 0.02, 0xd18a08, Math.PI / 2), GLOSS.paint));
+        // floating on a dark plate.
+        // r 0.11 and not 0.13: at 0.13 the outer hood reached 1.128 from the
+        // lane centre against a box halfX of 1.12, and the envelope guard
+        // failed the build. Art gives way to the box.
+        parts.push(gl(cyl(0.09, 0.11, 0.16, 12, px + lx, 2.26, 0.02, 0xd18a08, Math.PI / 2), GLOSS.paint));
       }
+      // The alarm bell over the lamps, which is the other thing every crossing
+      // carries and is a dome where the rest of the object is flat.
+      parts.push(gl(cyl(0.13, 0.15, 0.12, 12, px, 2.58, -0.14, 0xfff0a0), GLOSS.chrome));
       // THE PIVOT BEARING, and it is the piece this variant most obviously
       // lacked. A boom turns about something. This is a hub through the left
       // standard on the beam's own axis, proud on BOTH faces, so it reads as a
@@ -7714,55 +8404,97 @@ MR.World = (function () {
       // lopsided outline from the front.
       parts.push(gl(cyl(0.17, 0.17, 0.50, 10, px, 1.72, 0, 0x2b1e05, Math.PI / 2), GLOSS.trim));
       parts.push(gl(cyl(0.09, 0.09, 0.58, 8, px, 1.72, 0, 0xfff0a0, Math.PI / 2), GLOSS.chrome));
-      // The counterweight, which is what a raised boom is balanced by and
-      // which reads as mass on one side of an otherwise even frame.
-      //
-      // A STACK OF DISCS ON AN ARM, not a cube. Counterweights are plates you
-      // add and take off, and the stack is the read; a cube at this size is a
-      // lump that could be anything. The arm ties it back to the pivot, which
-      // is what makes the two fittings one machine.
-      parts.push(gl(bxAt(0.13, 0.96, 0.13, -1.20, 2.24, 0, 0xd18a08), GLOSS.paint));
+      /**
+       * THE COUNTERWEIGHT, as a stack of discs on an arm rather than a cube.
+       * Counterweights are plates you add and take off, and the stack is the
+       * read; a cube at this size is a lump that could be anything. The arm
+       * ties it back to the pivot, which is what makes the two fittings one
+       * machine. It hangs BELOW the lamps at 1.98 to 2.06, in the band the
+       * right-hand side of this object no longer occupies at all.
+       */
+      parts.push(gl(bxAt(0.13, 0.44, 0.13, -1.20, 1.98, 0.14, 0xd18a08), GLOSS.paint));
       for (let i = 0; i < 3; i++) {
-        parts.push(gl(cyl(0.17, 0.17, 0.09, 12, px, 2.72 + i * 0.11, 0, 0x2b1e05, Math.PI / 2), GLOSS.trim));
+        parts.push(gl(cyl(0.16, 0.16, 0.08, 12, px, 2.14 + i * 0.09, 0.14, 0x2b1e05, Math.PI / 2), GLOSS.trim));
       }
-      // The rest fork, RIGHT ONLY: the cradle the boom drops into.
-      parts.push(gl(bxAt(0.30, 0.12, 0.36, 1.20, 1.92, 0, 0xfff0a0), GLOSS.trim));
-      parts.push(gl(bxAt(0.11, 0.22, 0.36, 1.20, 2.03, 0, 0xfff0a0), GLOSS.trim));
+      /**
+       * ---- THE RIGHT SIDE: A REST POST AND A FORK, TOPPING OUT AT 2.30 -----
+       *
+       * The stub the lowered boom lies in. It carries the beam and nothing
+       * else: no lamps, no counterweight, no cabinet head, and 1.10 less post
+       * than the mast opposite it.
+       *
+       * 2.30 rather than something lower, because the pair still has to read as
+       * a GATE at forty units. 0.47 clear above the bar on this side against
+       * 1.57 on the other is a silhouette whose halves are obviously different
+       * and obviously still a frame.
+       */
+      parts.push(gl(bxAt(0.26, 1.86, 0.30, 1.20, 0.93, 0, 0xffc422), GLOSS.paint));
+      parts.push(bxAt(0.30, 0.10, 0.34, 1.20, 1.91, 0, 0x2b1e05));
+      parts.push(gl(bxAt(0.22, 0.09, 0.38, 1.20, 2.00, 0, 0xfff0a0), GLOSS.trim));
+      // The fork: two prongs, so it is a cradle and not a cap. The beam's own
+      // end is at x 0.832 and the prongs stand at 0.868, so the boom really is
+      // lying in them.
+      for (const fz of [-0.14, 0.14]) {
+        parts.push(gl(bxAt(0.11, 0.32, 0.11, 1.20, 2.14, fz, 0xfff0a0), GLOSS.trim));
+      }
+      // The rubber buffer in the bottom of the fork, which is what a dropped
+      // boom actually lands on.
+      parts.push(gl(cyl(0.055, 0.055, 0.30, 8, rx, 2.06, 0, 0x2b1e05, Math.PI / 2), GLOSS.matte));
       return merge(parts);
     })();
 
     /**
-     * DUCK v4: A SERVICES CROSSING -- a lagged pipe run bridging the road on
-     * two round columns, with a valve wheel at one of them.
+     * ============ DUCK v4: A SERVICES CROSSING ============
      *
-     * The bar is a CYLINDER for the first time. v0 is a chamfered box, v1 a
-     * boarded ledger, v2 a sign board, v3 a beam with a skirt: four flat-faced
-     * bars in a row, all of which take the same two toon bands across their
-     * height. A round bar takes the whole ramp across its section, so it is
-     * shaded as a curve rather than as a face.
+     * A lagged pipe run bridging the road on two round columns. See
+     * duckScaffoldGeo for the budget and the table; this one spends it on being
+     * the only ROUND variant, and on the one fitting in the kind that is a
+     * machine rather than a sign.
      *
-     * AND THAT BUYS NOTHING FROM BEHIND, which is worth writing down because
-     * it was this variant's original argument and the fleet sheet refuted it.
-     * The caution face every DUCK turns toward the lens sits at z -0.292, in
-     * front of a bar whose own front is at -0.19 to -0.26, and it is 0.34 to
-     * 0.40 tall -- so THE FACE IS THE BAR, visually, on all five variants.
-     * From the flank the bar is edge-on and the near standard covers it. The
-     * pipe is therefore a pass-by and overhead read, not a lane-decision one,
-     * and it is built out because rule 1 says so rather than because it
-     * carries the variant.
+     * ---- WHAT DOES NOT CARRY IT, AND THIS WAS ALREADY MEASURED ------------
      *
-     * What carries the variant at lane-decision distance is the STANDARDS:
-     * round columns with flange collars against v0's square posts, a valve
-     * wheel where v2 has a roundel. Measured at the size the player has it --
-     * 17.77 px per world unit at 40 units in portrait -- this pair separates
-     * further from v0 than any other pair in the kind, new or old.
+     * The bar being a CYLINDER buys nothing from behind, which was this
+     * variant's original argument and the fleet sheet refuted it. The caution
+     * face every DUCK turns toward the lens sits at z -0.292, in front of a bar
+     * whose own front is at -0.19 to -0.26, and it is 0.34 to 0.40 tall -- so
+     * THE FACE IS THE BAR, visually, on all five variants. The pipe is a
+     * pass-by and overhead read, not a lane-decision one, and it is built out
+     * because rule 1 says so rather than because it carries the variant.
      *
-     * The pipe is 0.19 in radius about 1.62, so it fills 1.43 to 1.81 and the
-     * collars that band it are held to 0.21 so they land on 1.41 and 1.83
-     * exactly rather than hanging out of the box on both sides.
+     * ---- THE VALVE WHEEL IS NOW SPOKED, AND THAT IS THE FIX ---------------
      *
-     * Nothing crosses the lane above the bar. The elbow and the valve wheel
-     * are both out at a standard, per the rule restated on v3.
+     * It was a solid disc of r 0.24 on the right column. So is DUCK v2's sign
+     * roundel, 0.25 on a standard at the same height on the same side of the
+     * same frame. **The two variants the file was proudest of separating were
+     * both identified by a pale disc at the top of a post**, and at the nine
+     * pixels a disc gets at 25 units, a sign and a handwheel drawn as solid
+     * discs are the same object.
+     *
+     * A handwheel is not a disc. It is a RIM WITH SPOKES AND A HOLE IN THE
+     * MIDDLE, and that hole is the whole difference: v2's roundel is a filled
+     * circle and this is an annulus you see road through. Built as eight rim
+     * segments about a hub with four spokes, on the same axis, so it is a wheel
+     * from in front, from behind and edge-on from the next lane.
+     *
+     * ---- AND THE COLUMNS TERMINATE IN A BLIND FLANGE ----------------------
+     *
+     * Not the pale cube v0 and v2 use. A capped pipe column finishes in a
+     * bolted disc wider than the pipe, which against sky is a wide flat mark
+     * with a step under it -- the same job v2's capping plate does, in the
+     * shape this object's own vocabulary would use.
+     *
+     * ---- WHAT IS KEPT -----------------------------------------------------
+     *
+     * The second conduit at z +0.21 is the one thing on any DUCK in this file
+     * that changes the FLANK: from az 90 this variant shows TWO circles where
+     * every other DUCK shows one rectangle, which is the only flank separation
+     * the envelope makes room for anywhere in the kind. The banding collars
+     * stay at 0.21 so they land on 1.41 and 1.83 exactly rather than hanging
+     * 0.02 out of the box on both faces.
+     *
+     * ENVELOPE. The valve wheel reaches 1.108 and the blind flange 1.108,
+     * against a box halfX of 1.12. v2's roundel lands on 1.118 -- the two
+     * largest discs in the kind, both pinned to the box rather than to taste.
      */
     const duckPipeGeo = (function () {
       const px = 1.20 * LANE_FIT;
@@ -7772,9 +8504,7 @@ MR.World = (function () {
         gl(cyl(0.19, 0.19, 2.30 * LANE_FIT, 14, 0, 1.62, 0, 0xffc422, 0, 0, Math.PI / 2), GLOSS.paint),
       ];
       // Banding collars. 0.21 not 0.23: at 0.23 they reached 1.39 and 1.85,
-      // which is 0.02 out of the box on both faces -- the same two-hundredths
-      // v1 and v2 already carry and which nothing in the toolchain reads.
-      // (Both of those are now fixed at the variants that carried them.)
+      // which is 0.02 out of the box on both faces.
       for (const cx of [-0.62, -0.21, 0.21, 0.62]) {
         parts.push(gl(cyl(0.21, 0.21, 0.10, 14, cx, 1.62, 0, 0xfff0a0, 0, 0, Math.PI / 2), GLOSS.trim));
         // Flange bolts standing off each collar, on the rear quarter. Four
@@ -7789,10 +8519,9 @@ MR.World = (function () {
       // small-bore run rides alongside the main on saddle brackets. At z +0.21
       // and 0.10 in radius it is clear of the lagged run's own 0.19 and inside
       // the 0.29 the box leaves, so from az 90 this variant shows TWO circles
-      // where every other DUCK shows one rectangle -- which is the only flank
-      // separation the envelope makes room for anywhere in the kind.
+      // where every other DUCK shows one rectangle.
       //
-      // It sits at y 1.50, inside the 1.41-1.83 band, so it costs no
+      // It sits at y 1.49, inside the 1.41-1.83 band, so it costs no
       // clearance: the bar is already there.
       parts.push(gl(cyl(0.07, 0.07, 2.30 * LANE_FIT, 10, 0, 1.49, 0.215, 0xd18a08, 0, 0, Math.PI / 2), GLOSS.paint));
       for (const cx of [-0.62, 0, 0.62]) {
@@ -7804,7 +8533,19 @@ MR.World = (function () {
         parts.push(gl(cyl(0.16, 0.16, 3.10, 10, sx * px, 1.55, 0, 0xffc422), GLOSS.paint));
         parts.push(cyl(0.21, 0.21, 0.10, 10, sx * px, 1.05, 0, 0x2b1e05));
         parts.push(cyl(0.21, 0.21, 0.10, 10, sx * px, 2.40, 0, 0x2b1e05));
-        parts.push(gl(cyl(0.22, 0.22, 0.20, 10, sx * px, 3.20, 0, 0xfff0a0), GLOSS.trim));
+        /**
+         * THE BLIND FLANGE. A bolted cap disc 0.48 across on a 0.32 column,
+         * with the flange neck under it, in place of the pale cube v0 and v2
+         * finish with. Wide, thin and stepped -- a different mark against sky
+         * from a block, and the only one in the kind that is round.
+         */
+        parts.push(gl(cyl(0.24, 0.24, 0.09, 12, sx * px, 3.16, 0, 0xfff0a0), GLOSS.chrome));
+        parts.push(gl(cyl(0.19, 0.19, 0.09, 10, sx * px, 3.06, 0, 0xd18a08), GLOSS.paint));
+        for (const a of [0, 1, 2, 3]) {
+          const t = a * Math.PI / 2 + Math.PI / 4;
+          parts.push(gl(cyl(0.032, 0.032, 0.13, 6, sx * px + Math.cos(t) * 0.175, 3.16,
+            Math.sin(t) * 0.175, 0x2b1e05), GLOSS.trim));
+        }
         // Base plate, not a block -- see duckGeo.
         parts.push(bxAt(0.30, 0.07, 0.34, sx * 1.20, 0.035, 0, 0x2b1e05));
         // The column's base flange, with bolts. A round column landing on a
@@ -7818,17 +8559,109 @@ MR.World = (function () {
         // The bracket carrying the small bore into the column.
         parts.push(gl(bx(0.30, 0.10, 0.10, sx * px, 1.49, 0.215, 0xd18a08), GLOSS.trim));
       }
-      // The valve wheel, right standard, facing the player. r 0.24 at 0.868
-      // out reaches 1.108 against a box halfX of 1.12.
-      parts.push(gl(cyl(0.24, 0.24, 0.07, 14, px, 2.74, -0.17, 0xfff0a0, Math.PI / 2), GLOSS.chrome));
-      parts.push(gl(cyl(0.08, 0.08, 0.22, 8, px, 2.74, -0.08, 0xd18a08, Math.PI / 2), GLOSS.trim));
-      // The elbow, left standard: a stub rising off the column and turning
-      // back on itself. Thin, and out at the post, per the rule.
-      parts.push(gl(cyl(0.13, 0.13, 0.54, 10, -px, 2.90, 0, 0xd18a08), GLOSS.paint));
-      parts.push(gl(cyl(0.13, 0.13, 0.30, 10, -px + 0.15, 3.14, 0, 0xd18a08, 0, 0, Math.PI / 2), GLOSS.paint));
+      /**
+       * ---- THE VALVE HANDWHEEL, RIGHT COLUMN, AND IT HAS A HOLE IN IT -----
+       *
+       * Mean radius 0.205 at 0.868 out, so the outermost segment reaches 1.108
+       * against a box halfX of 1.12. Eight rim segments about the axis, four
+       * spokes crossing at the hub, and NOTHING in the annulus between them --
+       * the road shows through, and that is what separates it from v2's filled
+       * roundel at nine pixels.
+       *
+       * The rim segments are boxes on a circle rather than a torus primitive,
+       * which this file does not have: 8 x 0.19 chords on a 0.205 mean radius
+       * closes the ring to within a rounding error and costs 8 parts.
+       */
+      const WY = 2.44, RIM = 0.205;
+      for (let i = 0; i < 8; i++) {
+        const t = i * Math.PI / 4;
+        // rz = t and not t + PI/2. A rim segment lies TANGENT to the circle,
+        // and the box's long axis is its local +Y, so rotating by t alone puts
+        // it there. The first draft added a right angle, which laid every
+        // segment along the RADIUS instead and pushed the wheel out of the box.
+        parts.push(gl(bx(0.07, 0.19, 0.07,
+          px + Math.cos(t) * RIM, WY + Math.sin(t) * RIM, -0.17,
+          0xfff0a0, 0, 0, t), GLOSS.chrome));
+      }
+      for (let i = 0; i < 4; i++) {
+        const t = i * Math.PI / 4 + Math.PI / 8;
+        parts.push(gl(bx(0.05, 0.41, 0.05, px, WY, -0.17, 0xfff0a0, 0, 0, t), GLOSS.chrome));
+      }
+      parts.push(gl(cyl(0.075, 0.075, 0.20, 10, px, WY, -0.13, 0xd18a08, Math.PI / 2), GLOSS.trim));
+      // The valve body and stem the wheel turns on, standing off the column.
+      parts.push(gl(cyl(0.10, 0.12, 0.22, 10, px, WY - 0.30, -0.06, 0xd18a08), GLOSS.paint));
+      /**
+       * THE ELBOW, left column: a stub rising off the column and turning back
+       * on itself. Thin, out at the post, and it is the one member in the kind
+       * that goes UP AND OVER -- a right angle in the sky, against v0's cube,
+       * v1's crossed tubes and v2's flat plate.
+       */
+      parts.push(gl(cyl(0.13, 0.13, 0.58, 10, -px, 2.92, 0, 0xd18a08), GLOSS.paint));
+      parts.push(gl(cyl(0.13, 0.13, 0.34, 10, -px + 0.17, 3.18, 0, 0xd18a08, 0, 0, Math.PI / 2), GLOSS.paint));
+      parts.push(gl(cyl(0.16, 0.16, 0.07, 10, -px + 0.32, 3.18, 0, 0xfff0a0, 0, 0, Math.PI / 2), GLOSS.chrome));
       return merge(parts);
     })();
 
+    /**
+     * ============ THE DUCK SET AFTER THE DIFFERENTIATION PASS ============
+     *
+     * *"All duck obstacles looks exactly the same. Can you review them and
+     * differentiate them anyway?"* The word that decided the shape of this pass
+     * is ANYWAY: the owner is right that they are the same, and the file's own
+     * record explains why they had to be. duckScaffoldGeo's header sets out the
+     * budget in full; the short version is that the bar, the caution face, the
+     * daylight under them and the two tall verticals are all fixed by contract,
+     * and everything above the bar is confined to a 0.40-wide strip at each
+     * standard because the chase camera flies down the lane centre.
+     *
+     * SO THE VARIATION GOES WHERE IT IS FREE, and the three levers that survive
+     * at 45 pixels wide are OUTLINE, TOP TERMINATION, and one BIG SHAPE on the
+     * standard. Every variant now spends all three:
+     *
+     *              outline            on the standard          terminates in
+     *   v0   symmetric, 3.52     two collars, bare          a pale cube
+     *   v1   symmetric, 3.58     a crossed X-BRACE and      open tube ends at
+     *        and 3.22            a board pack               UNEVEN heights
+     *   v2   symmetric, 3.55     a big roundel over a       a wide flat plate
+     *                            supplementary plate
+     *   v3   LOPSIDED: a 3.40    a horizontal lamp pair,    a mast head one
+     *        mast and a 2.30     a bell, a counterweight    side, a FORK the
+     *        rest post           -- left only               other
+     *   v4   symmetric, 3.20     a SPOKED handwheel with    a blind flange
+     *                            a hole in it               disc, and an elbow
+     *
+     * ---- THE TWO THINGS THAT WERE ACTIVELY WRONG --------------------------
+     *
+     * A SIGN AND A VALVE WERE THE SAME DISC. v2's roundel and v4's valve wheel
+     * were both solid pale circles of radius 0.24 to 0.25, at the same height,
+     * on the same side, on the same frame. They were the identifying feature of
+     * two different variants and they were the same feature. The wheel is now
+     * an ANNULUS -- eight rim segments, four spokes, road visible through the
+     * middle -- and the roundel stayed filled and got a ring. A hole is
+     * something a nine-pixel mark can have and a colour is not.
+     *
+     * FOUR OF FIVE FINISHED IN THE SAME PALE CUBE, at 3.41 to 3.44, and that
+     * cube is the last thing in the silhouette before sky. It is now a cube, a
+     * pair of open tube ends, a wide flat plate, a mast head opposite a fork,
+     * and a blind flange.
+     *
+     * ---- THE ONE PLACE DIFFERENTIATION AND THE KIND SIGNAL TRADE -----------
+     *
+     * v3's short rest post removes mass from the top of the profile, which is
+     * where tools/kindread.js separates a DUCK from a JUMP. That trade is real
+     * and this brief asked for the number rather than a feeling. Measured
+     * through the live chase camera at 25.35 units, bands 11 to 13, before and
+     * after this pass:
+     *
+     *   DUCK v3 before   0.29  0.29  0.27
+     *   DUCK v3 after    (see docs/roadmap.md entry 53 for the shipped figures)
+     *
+     * The bands that carry the classification are 7 to 9 -- the bar itself --
+     * and they are untouched on every variant. The daylight bands 0 to 6 are
+     * untouched too: every new member on every variant is ABOVE 1.90, which was
+     * a design constraint of this pass and not a happy result. Nothing was
+     * added below the bar anywhere in the kind.
+     */
     const duckPool = hazardPool(K.DUCK, 'duck', [
       { geo: duckGeo, face: [2.26, 0.40, 1.62, -0.292] },
       { geo: duckScaffoldGeo, face: [2.26, 0.36, 1.58, -0.292] },

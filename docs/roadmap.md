@@ -909,6 +909,211 @@ done._
   four occlusion tests and on contrast, and **every one runs on a single
   frame**, so the fairness harness was blind to motion by construction.
 
+## Environment liveness and clarity, re-measured 2026-08-09
+
+A measurement pass, no source touched. New instrument: **`tools/liveness.js`**,
+whose header carries its own five defects. It freezes the world, advances only
+`world.waveClock`, isolates every drawable unit in turn and reads its silhouette
+back off the GPU, so every figure below is the shipped shader's own output in
+**pixels at the chase framing** rather than a world-unit constant read out of a
+comment. Full gate green before and after (`build`, `shoot`, `course-test`,
+`simulate`); draws 163-256 against a ~400 ceiling.
+
+### First, the question that prompted this: was the environment-animation half ever done?
+
+**Yes. It was done, deliberately, and the doubt was misplaced.** The evidence is
+a four-commit pass on 2026-08-08 between 00:21 and 01:30, with its own
+instrument and its own measured rebalance:
+
+| commit | what landed |
+|---|---|
+| `1e6d22e` 00:21 | checkpoint of the interrupted agent, plus `tools/motion.js` (466 lines, new) |
+| `4dbf8a4` 00:41 | one wind for the whole world, direction taken from the cloud shader; three defects found on the way |
+| `bd3eb03` 00:56 | the ink shell taught to move with the body it wraps; **amplitude re-sized in pixels** after measuring 0.55% of pixels changing over 100 s |
+| `aa5155f` 01:30 | the finish bunting flies on `mats.cloth` |
+
+It is also already written up in this file under *Done in the visual-polish
+pass* ("One wind for the whole world", "`tools/motion.js`"). So the pass exists,
+it was measured rather than asserted, and it caught itself shipping
+"perceptually still" once.
+
+**What is true instead is narrower and more useful: the pass was scoped to the
+world as it stood at 01:30 on 2026-08-08, and roughly twenty `world.js` commits
+have landed since** -- the hazard rebuilds, the cones, the kerbside furniture,
+the tram, the aid ribbon, the one-spectator-builder refactor, the tree
+understorey, the hedge and pond-reed recolour. Nothing re-ran the animation
+question over that new scenery, and the findings below are almost entirely in
+it. This is the same structural failure the colour work already recorded about
+itself: *"the avenue is baked into the road tile rather than pooled per setting,
+so nothing that walks the tree palettes ever reaches it"* (`world.js:6037`).
+The wind pass walked the same pools the palette pass walked, and missed the same
+objects for the same reason.
+
+### What actually moves
+
+Eight points in the race, one per leg. `frame-changed` is the share of frame
+pixels that change over one full gust period with **only** the wave clock
+advancing.
+
+| skip | mile | leg | animated units | moving | frame-changed | live share of scenery px |
+|---|---|---|---|---|---|---|
+| 25 | 2.4 | CITY START | 11 | 10 | 0.66% | 0.9% |
+| 60 | 6.1 | RIVERSIDE | 16 | 16 | 1.90% | 7.5% |
+| 95 | 10.0 | THE BRIDGE | **0** | **0** | **0.00%** | 0.0% |
+| 110 | 11.7 | THE BRIDGE | **0** | **0** | **0.00%** | 0.0% |
+| 140 | 15.1 | PARKLAND | 17 | 17 | 0.38% | 2.2% |
+| 178 | 19.5 | THE WALL | 5 | 5 | 0.16% | 0.7% |
+| 200 | 22.0 | THE WALL | 5 | 5 | 0.18% | 0.4% |
+| 230 | 25.5 | FINAL MILE | 25 | 25 | 7.07% | 6.9% |
+
+Across all eight: **1029 on-screen units, 79 carry a wave material (7.7%), 78 of
+those actually move.** The amplitude work is sound -- of everything that was
+given a wave material, essentially all of it clears the perceptibility floor.
+**The problem is not amplitude. It is coverage.**
+
+**The FINAL MILE is the proof that the system works.** Bunting at 32 px
+peak-to-peak at 18.6 units, grandstands at 18 px, 7.1-8.5% of the frame alive (it varies run to run with
+what the pools have claimed). That
+is what the rest of the race is being measured against, and it is the same
+shader everywhere else.
+
+*Instrument caveat, stated because it changes one headline:* `liveness.js` sees
+vertex animation only. Freezing `performance.now` is what makes the measurement
+clean and it also switches off the cloud sheets, the telegraph strip and
+**the river ripples** (`world.js:13973`, 1.90 units/s across the deck, written
+inside `api.update`). So THE BRIDGE at 0.00% means **no moving object**, not a
+motionless frame -- the water under it is scrolling throughout. Read every
+figure here as "how much of the scenery moves".
+
+### Findings, in the order a player meets them
+
+**1. THE BRIDGE has no moving scenery of any kind, and THE WALL has almost
+none. Together, ~37% of the race.**
+THE BRIDGE (miles 8.7-13.1) and THE WALL (18.9-24.1) are 9.6 of 26.2 miles.
+
+This was checked against BOTH animation systems before being claimed, because
+`liveness.js` is blind to CPU transform animation and would have overstated it:
+
+| | vertex movers | crowd knots | walkers | verdict |
+|---|---|---|---|---|
+| skip 95 THE BRIDGE | 0 | 0 | **0** | nothing moves |
+| skip 110 THE BRIDGE | 0 | 0 | **0** | nothing moves |
+| skip 178 THE WALL | 5 | 3 | 3 | 0.16% of frame, plus 3 walkers |
+| skip 200 THE WALL | 5 | 2 | 2 | 0.18% of frame, plus 2 walkers |
+
+**THE BRIDGE is the strong finding: no swaying object, no crowd and no walker
+is live at either sample point.** The only motion in the frame is the river
+texture scrolling underneath and the clouds. THE WALL is the weaker one and
+should be quoted honestly -- it has two or three walkers drifting across the
+pavement, which `liveness.js` cannot see, on top of 0.16-0.18% of the frame.
+THE WALL is described in its own source as *"a leg with no crowd and no
+colour"* (`world.js:12875`). At record pace this stretch is roughly forty
+minutes of a two-hour run. **Cost to fix: 0 draw calls** -- see finding 2, which is
+most of the fix for THE WALL, and the bridge wants a moving object of its own
+(a boat on the river below, a gull, bunting on the parapet); one merged pooled
+object is +1 draw.
+
+**2. The two most-seen pieces of vegetation in the game cannot move.**
+`LIT_EDGES.hedge` (`world.js:6138`) bakes both the clipped hedge and **the
+avenue** -- four broadleaves per tile at x 7.95 -- into the road tile's own
+merged geometry, which is drawn with `mats.edge` (`world.js:6354`), a plain
+`vtoon(2)` with no wave chunk. `world.js` says of these exact objects: *"THIS IS
+THE TREE THE PLAYER SEES MOST"* (`:6064`) and the hedge is *"the largest
+continuous area of foliage in the game -- two rows the full length of every
+PARKLAND and RIVERSIDE tile, nearer the lens than any pooled tree"* (`:6039`).
+About a hundred avenue trees are live at once, every one nearer the camera than
+any tree that does sway, and not one of them can move. This is the single
+largest liveness defect in the game and it is why PARKLAND measures 0.38%.
+
+**Cost: 0 draw calls.** The fix is the pattern the file already uses -- swap
+`mats.edge` to `vwind(2, undefined, WIND_F_LEAF, WIND_A_LEAF)` and tag only the
+hedge cap and the crown lobes with `wv()`; everything untagged carries amplitude
+0 and stays rigid, exactly as trunks and masts already do. Same merged geometry,
+different ramp -- the precedent is `aa5155f`, which flew the bunting for no
+extra draw. One extra shader program and 8 bytes/vertex on tile geometry.
+*Corridor check, because the tree pool needed one:* the avenue crown reaches
+5.35 from centre against `CORRIDOR_HALF` 3.75, so 0.40 of sway leaves 1.20 of
+margin. The hedge body's inner face at 4.60 leaves 0.45 -- tighter, and
+`tools/motion.js` CORRIDOR should be re-run against it rather than assumed.
+
+**3. Every flag in the game flutters like a person, not like cloth.**
+The grandstand roof flags (`world.js:12061`) and the finish backdrop flags
+(`:12426`) are `wv()`-tagged parts on `mats.crowd` -- the **human-body** wave.
+They take the crowd's vertical formula (a spectator standing up and bouncing,
+`0.30*exc + (0.05 + 0.26*exc)*|sin|`) and its 5.7 rad/s lateral rock, and they
+are driven by `uHot` and `uZ`, so a flag's motion depends on **how well the run
+is going** and dies away from the runner. `mats.cloth` exists for precisely this
+(`WIND_F_CLOTH` 11.30 rad/s, 1.80 Hz) and is used at exactly one site in 15,561
+lines, the finish chute (`:12194`). **Cost: 0 draw calls** if the flags are
+split into the geometry already merged for cloth, or +1 draw per stand if not;
+the honest estimate is 0-2 draws total.
+
+**4. Static vegetation in the landmark pool.** `oak` and `pond`
+(`world.js:12937-12938`) are whole trees and fourteen reed clumps
+(`:12849`) on `mats.prop`. A named landmark oak that stands dead still
+beside pooled scatter trees that sway is worse than either alone, because the
+contradiction is visible in one frame. The aid-station pennant is explicitly
+authored *"movement-free"* (`:11435`). **Cost: 0 draw calls**, material swap,
+same argument as finding 2.
+
+**5. Clarity has regressed on the late legs and improved on the early ones.**
+Re-measured HUD-off at 620x1344, **date pinned to 2026-08-07 so the course is
+the same one the clarity pass measured** -- without that pin the comparison is
+between different legs, since the course regenerates daily.
+
+| near-band edge % | clarity pass | today | vs Subway Surfers 9.3-12.7 |
+|---|---|---|---|
+| skip 25 CITY START | 9.6 | **7.1** | below band |
+| skip 110 | 11.2 | **8.8** | below band |
+| skip 178 THE WALL | 12.9 | **19.1** | **50% above band** |
+| skip 185 THE WALL | 11.6 | **16.8** | **32% above band** |
+
+The pass brought all four inside the reference band; they have since split apart
+in both directions. The two legs that got busier are exactly the legs that
+gained the most scenery after 2026-08-08 01:30. *"Clarity over complexity"* is
+not being served at 19.1 -- that is past where the original "we are busy"
+finding sat. Saturation remains the standing gap: near-band 0.313 mean against
+Subway Surfers' 0.465, **33% below**; whole-frame 0.300 against 0.468, 36%
+below. Better than the 40-50% on record, still the largest single difference
+from the reference.
+
+**6. One navy is doing about twenty-five jobs.** `0x2b2f52` appears **72 times**
+in `world.js`, nearly double the next colour (`0xffe45e`, 40). It is worn by
+lamp and telegraph posts (`:5994`, `:6311`), the verge line (`:6018`), bench
+legs (`:6058`), **spectators' trousers and legs** (`:11004`, `:11082`,
+`:11857`, `:11893`), aid-table legs (`:11398`), the overpass soffit (`:11540`),
+footbridge parts (`:11590`), grandstand decks and masts (`:12057`), bunting
+catenary (`:12170`), the crane (`:12758`), hoarding posts (`:12880`), the jumbo
+truss and its flag masts (`:12909`), mile-banner gantry legs (`:13018`) and the
+finish arch legs (`:13075`). The file knows: `:12273` says the finish-tape posts
+began as *"the same `0x2b2f52` navy the rest of the roadside furniture wears"*
+and were changed **because at forty units they were not there at all.**
+
+This is the measured cause of the reported blind-read failures. An independent
+blind reader on `origin/blind-read-pass2` recorded, without prompting: *"Rows of
+short pale posts with dark blue tops along both verges. Bollards, or the tops of
+a low barrier fence"* (`BLIND-READ.md:135`) and *"A tall flat blue slab on the
+right, beyond the kerb. Reads as a building face or a hoarding/billboard seen
+edge-on. It is featureless"* (`:133`). A spectator at distance is a navy
+trouser-block over a shirt; a verge post is a navy block. Same value, same
+width, same vertical aspect -- so they are the same object to the eye.
+**Cost: 0 draw calls.** Vertex colour on already-merged geometry; the entire
+change is authored hex. The rule to apply is the one the tape post already
+proved: **furniture and people may not share a value at the same size.**
+
+### What I did not settle
+
+- **The "slate-blue angular slab with a dark navy base on the grass bank"** is
+  not identified with confidence. The best candidate is `hoardingGeo`
+  (`world.js:12877`), whose poster elements all sit at x <= -0.95 in front of a
+  bare `0xf6f2e8` panel whose **rear face carries nothing** -- a rule-1 concern
+  worth a frame from behind before anyone acts on it. I did not shoot that
+  frame; it should be shot rather than argued about.
+- **The scroll layer is unmeasured.** Clouds, ripples and the telegraph strip
+  need an instrument that advances `performance.now` while holding the
+  simulation. `liveness.js` cannot be that tool without giving up the isolation
+  that makes its own numbers trustworthy.
+
 ## Corrections this project has had to make to itself
 
 Kept because each cost real work, and the pattern is the lesson: **a number

@@ -687,7 +687,7 @@
     // After the camera, never before: the ghost's tag is placed against this
     // frame's lens (position, fov, aspect), and a frame of lag there shows up
     // as the tag swimming during a lane change.
-    ghost.update(dt, { pace, camera: cam.camera, playerX: player.x });
+    ghost.update(dt, { pace, camera: cam.camera, playerX: player.x, celT });
 
     // The crossover is the moment the whole ghost exists for, so it gets a
     // sound like every other beat in the race. Ghost owns the detection (it

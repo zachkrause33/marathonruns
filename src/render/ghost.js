@@ -542,7 +542,25 @@ MR.Ghost = (function () {
       const pulse = 1 + 0.55 * s.flash;
       const tan = Math.tan(cam.fov * Math.PI / 360);
 
-      tagRear.material.opacity = rear * 0.96;
+      // AND IT STANDS DOWN FOR THE CELEBRATION.
+      //
+      // This plate is parked on the camera's own basis, at a fixed corner of
+      // the frame, because there is no world position behind the lens that can
+      // be drawn. That reasoning holds for every shot this game had when it was
+      // written, and all of them look down the road from astern. The finish
+      // celebration does not: it leaves the chase and arcs round to
+      // three-quarter FRONT, and a plate pinned to a corner of THAT frame is
+      // pinned to a corner of the runner -- measured, it lands across his shin
+      // in the held shot, which is the one moment the game shows his face.
+      //
+      // A corner of the frame is only empty while the frame is pointed at the
+      // road. So the plate follows the same rule hud.celebrate already applies
+      // to the top-left column: once the camera leaves the chase, it clears
+      // out. Nothing is lost -- the rail under the road carries the same gap,
+      // in the same words, for the whole celebration, and the finish card is
+      // 3.1s behind it.
+      const standDown = 1 - smoothstep(0, 0.35, st.celT || 0);
+      tagRear.material.opacity = rear * 0.96 * standDown;
       tagRear.visible = tagRear.material.opacity > 0.02;
       if (tagRear.visible) {
         // Placed off the camera's own basis rather than in world space: there

@@ -1114,6 +1114,243 @@ proved: **furniture and people may not share a value at the same size.**
   simulation. `liveness.js` cannot be that tool without giving up the isolation
   that makes its own numbers trustworthy.
 
+## Environment liveness: what the audit asked for, built and re-measured 2026-08-09
+
+The pass the section above was written to commission. Scope was `world.js` and
+`shading.js`; `shading.js` needed no change in the end, which is itself the
+finding -- every fix below is a material swap, a `wv()` tag or authored hex.
+
+**Full gate green** (`build`, `shoot`, `course-test`, `simulate`), plus
+`calendar.js`, `kindread.js` at 1 of 21 on profile (baseline, not regressed),
+`liveness.js` and `motion.js`.
+
+### The headline
+
+| | before | after |
+|---|---|---|
+| on-screen units carrying a wave material | 81 of 1011 (8.0%) | **159 of 1009 (15.8%)** |
+| of those, actually moving | 80 | **137** |
+| live share of scenery pixels | 6.1% | **20.5%** |
+| mean frame-changed over eight legs | 1.41% | **2.78%** |
+
+Per leg, `frame-changed` -- the whole-frame diff over one gust period with only
+the wave clock advancing:
+
+| skip | leg | before | after |
+|---|---|---|---|
+| 25 | CITY START | 0.63% | **1.31%** |
+| 60 | RIVERSIDE | 1.87% | **6.00%** |
+| 95 | THE BRIDGE | **0.00%** | **0.71%** |
+| 110 | THE BRIDGE | **0.00%** | **0.61%** |
+| 140 | PARKLAND | 0.38% | **3.72%** |
+| 178 | THE WALL | 0.17% | **0.55%** |
+| 200 | THE WALL | 0.17% | **0.72%** |
+| 230 | FINAL MILE | 8.10% | **8.67%** |
+
+**Cost: 0 draw calls.** Measured leg for leg at the chase framing, before then
+after: 192/205/168/164/227/255/221/208 becomes 192/203/168/162/227/255/220/208
+-- inside the run-to-run variation of what the pools have claimed, against a
+~400 ceiling. Triangles rise by 0 to 3,900 a frame depending on the leg, and
+the heaviest frame in the sweep goes 278,639 -> 281,051 against a 500,000
+ceiling. Three extra shader programs: two wind materials for the roadside tiles
+and one extra branch in the crowd wave.
+
+That is the whole argument for doing it this way. A half-built mesh and a full
+one cost the same draw call, and a rigid material and a waving one cost the
+same draw call -- so every item below spends the abundant resource and none of
+the scarce one.
+
+### What was built
+
+1. **`mats.edge` split into `edgeLeaf` and `edgeCloth`.** One plain `vtoon(2)`
+   was shared by all four roadside tile kinds, which is the single structural
+   reason the roadside was rigid. They now split by what moves on them and by
+   nothing else, and both take the identical per-setting tint so they stay one
+   family of surfaces. `mats.edge` no longer exists.
+2. **The avenue and the hedge move** (`edgeLeaf`). The four broadleaves per
+   PARKLAND/RIVERSIDE tile take full `WIND_A_LEAF` on the crown lobes with the
+   stem and both limbs rigid; the hedge takes 0.45 of it on the CAP ONLY, with
+   the body rigid -- a corridor number, not a taste one, since the cap's inner
+   face is at 4.54 against `CORRIDOR_HALF` 3.75 and full amplitude would have
+   left the tightest margin of any moving thing in the game. This is the single
+   biggest item in the pass: PARKLAND 0.38% -> 3.72%, RIVERSIDE 1.87% -> 6.00%.
+3. **THE BRIDGE gets deck banners** (`edgeCloth`) on the parapet lamp
+   standards, hung outboard. It is the only cloth a bridge is allowed -- NOT
+   bunting, which stays reserved for the finish chute -- and it is the leg's
+   only colour. 0.00% -> 0.71%/0.61%.
+4. **The barrier tile's sponsor banner bellies between its posts, and the
+   lamp-post banner swings** (`edgeCloth`). CITY START and the FINAL MILE share
+   this tile, which is also why the obvious fix for CITY START -- street trees
+   in the verge -- is wrong: the FINAL MILE grandstands stand at x 5.05 and a
+   tile-baked tree would be inside them.
+5. **THE WALL gets debris netting on the top lift.** One large soft mass, not
+   more small tubes: it raises liveness and saturation without raising edge
+   density, which is the distinction "clarity over complexity" turns on. It
+   deliberately does not cover the open scaffold bays, whose sightline is the
+   thing keeping that leg from being a trench.
+6. **`CHEER.FLAG`, a sixth behaviour in the crowd wave.** Every flag in the
+   game either stood still (the FINAL MILE roof flags, untagged) or flew on the
+   crowd's body formula -- which is scaled by `exc`, built from `uHot`, so
+   **flags flew harder when the run was going well**. Splitting them onto
+   `mats.cloth` costs a draw call per stand and stands are pooled one per tile
+   down both shoulders, so the fix went in the shader: `aWave.z = 5` runs the
+   cloth rates on the same attribute and the same merged geometry with no
+   `exc` term. It does not grow `WAVE_ENVELOPES` -- 0.130 lateral against the
+   crowd's 0.132, 0.024 vertical against 0.543, no z term -- so `motion.js`
+   needs no re-basing and no envelope was inflated.
+7. **Flags are banded, and that is load-bearing.** A merged part carries ONE
+   baked amplitude for all its vertices, so a single-box flag translates whole
+   and slides along its own mast. Every flag here is three bands sharing a
+   phase, with the band on the mast held to 0.30. Same phase deliberately:
+   neighbouring bands on different phases reach opposite extremes and open
+   daylight at the joint, which is the forearm-comes-off defect again.
+8. **The oak and the pond reeds are on `mats.leaf`.** The biggest tree in the
+   game stood still beside pooled scatter trees that swayed.
+9. **The hoarding has a back.** See below.
+10. **The crowd is off the furniture's navy.** See below.
+
+### The hoarding: shot, not argued
+
+The audit left this open and said it needed a frame from behind. It was shot,
+four azimuths through the game's own renderer and lights, and the audit's
+suspicion was exactly right: **the rear was one unbroken 0xf6f2e8 rectangle,
+7.2 x 16.4, 118 square units of blank cream** with every poster element on the
+far side. It is now a galvanised skin, two channels and a stiffener, a pair of
+raking braces, the maintenance catwalk with its handrail and a ladder up the
+near post -- about 240 triangles, no extra draw.
+
+**And the first attempt at it was wrong in the mirror-image way.** Authored in
+the works hoarding's own greys, the new rear photographed as one near-black
+rectangle: the same featureless-plane defect with the sign flipped. This face
+points away from the key light, so it is authored two steps up and its members
+separate by VALUE rather than by hue. **A rear elevation has to be authored for
+the light it is actually in, and the only way to know is to shoot it.**
+
+### One navy doing twenty-five jobs, ended for the people
+
+`0x2b2f52` stays on the furniture -- lamp posts, gantry legs, parapets, the
+crane -- and comes off every person in the game. The rule applied is the one
+the finish-tape posts already proved: **furniture and people may not share a
+value at the same size.** Through `shadedL`, spectator legs went from 36-52
+against furniture at 36, to **71-105**; the walkers' workwear to 66-78; the
+marshal's uniform to a blue that is not the post beside it. Three duplicate
+trouser palettes became one module-scope `TROUSERS`, because three copies of a
+palette drift -- which is exactly how the avenue kept a hard-coded green
+through two palette passes. Zero draws, zero triangles, authored hex only.
+
+### Clarity: measured, and the audit's table could not be reproduced
+
+The audit reported near-band edge density split apart -- early legs at 7.1-8.8
+below the reference band and THE WALL at **19.1**, "50% above band" -- and
+concluded two legs needed more and one needed less. **Re-measured at the same
+framing, that is not what the frames say.** Near-band edge %, HUD off, 620x1344:
+
+| leg | measured | Subway Surfers band 9.3-12.7 |
+|---|---|---|
+| CITY START | 7.5 | below |
+| RIVERSIDE | 7.9 | below |
+| THE BRIDGE | 7.3 | below |
+| PARKLAND | 7.4 | below |
+| THE WALL | 6.3 / 7.9 | **lowest in the game** |
+| FINAL MILE | 11.7 | in band |
+
+No leg is above the band and THE WALL is the sparsest, not the busiest. Nothing
+in this pass reproduced 19.1 under any combination of date, boot flag or build.
+**So the decision per leg was: declutter nothing, and add only large soft
+masses.** Saturation is the real gap and it is worse in the near band than the
+whole-frame figure suggested -- 0.157 at THE WALL against a reference 0.41-0.51
+-- so every addition here is a big saturated shape (netting, banners, crowns)
+rather than more small hard-edged detail. That is also the reading of
+"prioritize clarity over complexity" this pass acted on.
+
+**Re-measured after, and the decision held.** Near-band edge density moved by
+at most 0.4 anywhere (7.4/7.4/7.3/7.8/6.3/7.6/11.7 against
+7.5/7.9/7.3/7.4/6.3/7.9/11.7), i.e. nothing got busier where the player looks.
+The gains landed where the geometry did: THE WALL's far band went 0.244 -> 0.264
+and 0.314 -> 0.321 saturation with its edge density FALLING 7.3 -> 7.1 and
+6.9 -> 6.4. **More colour and less edge in the same band is the outcome the
+"clarity over complexity" tie-breaker was supposed to produce**, and it is the
+reason the netting went on the top lift as one sheet rather than into the bays
+as more tubes. The near-band saturation gap is untouched by this pass and
+remains the largest single difference from the reference.
+
+### THE INSTRUMENT DEFECT THAT COST THE MOST TIME HERE
+
+**`?skip` is SECONDS OF SIMULATED RUNNING, not distance, and the leg it lands
+on depends on the day's course AND on the boot flags.** `liveness.js` and
+`motion.js` boot with `?bot=1`; a screenshot harness that does not gets a
+runner who takes hits, travels less far, and lands on a different leg. On this
+build, skip 178 is THE WALL at mile 19.5 with `bot=1` and PARKLAND at mile 16.3
+without it. Neither tool prints the leg it measured, so both tables' leg labels
+are attached by hand afterwards and cannot be checked.
+
+This cost an hour and produced one wrong conclusion that had to be retracted
+mid-pass ("the audit's labels are wrong" -- they were not; mine were). It is
+also the likeliest explanation for the 19.1 that could not be reproduced: a
+clarity frame shot without `bot=1`, or on a pinned date, is not the leg the
+liveness table beside it is talking about.
+
+**The fix, for whoever touches these tools next: print the leg.** Three lines
+in each tool -- read `MR.Course.biomeAt(MR.game.pace.units / MR.K.TOTAL_UNITS)`
+after boot and put the name in the row. A table that labels itself cannot be
+mislabelled, and until it does, every per-leg finding in this file's liveness
+sections is one boot flag away from being about a different leg.
+
+### A pre-existing `motion.js` failure, and it is the instrument
+
+`motion.js` reports **1 assertion failure on this build and 1 on the committed
+baseline** -- the same one, at the same place:
+
+```
+FAIL READBAND  prop / tree ndc x [-71.26,-0.13] overlaps kind 2 lane 0 at 39.7u
+```
+
+Checked against `HEAD:index.html` through `--file` before anything was claimed
+about it: the baseline gives `ndc x [-97.66,-0.13]` for the same tree at the
+same skip. **This pass did not cause it and does not fix it.**
+
+It is an artifact. NDC x is bounded by -1..1 for anything in front of the lens,
+so -71 and -97 are what a bounding-box corner BEHIND the near plane projects
+to. The tool grows every mover's AABB by its wave envelope and projects the
+eight corners without clipping, so any mover that draws alongside the camera --
+which a roadside tree does on every pass -- reports a screen rect spanning the
+whole frame and overlaps everything in it, including a gate 40 units away that
+it is nowhere near on screen.
+
+It is day-dependent, which is why the audit above recorded the gate green: it
+fires only when a tree is claimed close enough to come alongside. **The fix is
+in `motion.js`, not in `world.js`: clip the box to the near plane before
+projecting, or drop any corner with w <= 0 and skip the mover if none survive.**
+Left for whoever owns that tool; changing an assertion to make one's own pass
+look clean is the thing this file exists to prevent.
+
+### Two further limits of `liveness.js`, found by using it
+
+- **A moving part INSIDE a large merged unit reads as travel 0.00.** The tool
+  takes silhouette edges, so the sponsor banner on a road tile and the netting
+  under the wall's top scaffold tube -- both interior to their unit's outline
+  -- report p90 0.00 AND max 0.00 and are counted "inert". They are not: the
+  whole-frame diff at CITY START moved 0.63% -> 1.31% on that banner alone.
+  For merged tile geometry, `frame-changed` is the honest number and the
+  per-unit travel column is not. This is a sixth defect for the header's list.
+- **`px-area live` inflates for tiles.** It credits a unit's whole screen area
+  as live when any part of it moves, so a road tile with one moving banner
+  counts its entire 33,000 px. Read it as an upper bound.
+
+### Still open
+
+- **The scroll layer is still unmeasured** -- clouds, river ripples, the
+  telegraph strip. Unchanged from the audit, and still needs an instrument that
+  advances `performance.now` while holding the simulation.
+- **THE WALL remains the least alive leg** at 0.55-0.72%, up from 0.17% but
+  four to twelve times behind every other leg. It is a leg deliberately built
+  with no crowd; whether it should stay that way is an owner decision, not a
+  build one.
+- **THE BRIDGE at 0.61-0.71% is a floor, not a finish.** The deck banners are
+  the only thing out there that can move without inventing a roadside the leg
+  is designed not to have. A gull or a boat under the span is the next idea and
+  it costs a draw.
+
 ## Corrections this project has had to make to itself
 
 Kept because each cost real work, and the pattern is the lesson: **a number

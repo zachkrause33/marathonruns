@@ -3073,3 +3073,93 @@ nobody measured is worse than no number at all.**
    the fifteenth is scolding. It is an edge, fired at the crossing and never
    held, re-armed when the player takes an item -- the same shape `recordLost`
    and the tier cues in the same file already use.
+
+53. **Six obstacles the owner could not name, four that were the same object,
+    and a caution board that was the reason for both.** The report was
+    *"Idk what an Amber kerb or cable drum is... I had no idea a kick scooter
+    was one... All duck obstacles looks exactly the same."*
+
+    **THE JUMP SET SHARED ITS LARGEST ELEMENT AND NOBODY HAD MEASURED IT.**
+    `tools/framing.js` census, at the 8 units where identification happens:
+    **51.7% of the kerb's pixels and 28.6% of the trench's were the same
+    2.2-wide red-and-white caution quad**, and five of the six variants turned
+    it at the lens. Whatever else differed between two JUMPs, the biggest thing
+    on both was identical. That is what *"make it a different color than the
+    rest"* is describing, and no amount of modelling behind the board could fix
+    it. Four of the six now decline the face; the two that keep it wear it as a
+    low kick band under the sightline rather than as a panel across the middle.
+
+    **A HOLE NEEDS A SIGHTLINE, AND THE SIGHTLINE IS ARITHMETIC.** The trench
+    had a full excavation -- rim, floor, walls, two ducts -- built and described
+    at length, and a chevron board bolted across the front of it at y 0.40 to
+    0.74. The lens is 2.2 above the road and 8 to 25 units back, so a ray to the
+    trench floor passes the near lip at y 0.13 at 8 units and 0.055 at 25:
+    **nothing above 0.20 at the lip can hide the floor, and nothing below it may
+    span the mouth.** The guarding went to 0.50 and 0.71 and the near rim came
+    down to 0.07. The first attempt put the rails at 0.40 and 0.645, which
+    passes that test and still read as a fence with a shadow under it -- legal
+    is not the same as legible, and the open band has to be a large FRACTION of
+    the object, not merely unobstructed.
+
+    **THE CONTRAST GATE IS THE REAL CONSTRAINT ON A DARK OBJECT.** An unguarded
+    excavation models at L 95 against a lane-1 road of L 91.2 -- 1.04x, a build
+    failure under rule 4. The white in the rails and posts is what buys the
+    ratio back, so the guarding is load-bearing twice. The same trap caught the
+    pipe stack: authored in a true terracotta it measured L 74.0 and a gate
+    margin of **+0.042** against the finish carpet, one shading change from
+    failing. Nine bores at 0.6 of each pipe's radius are 36% of the end
+    elevation and they all face the lens; the dark was never going to be a
+    minority of the object. Lifted to a bright clay it sits at +0.211.
+
+    **THE SCOOTER WAS A RENDERING FAILURE, NOT A CONCEPT FAILURE, AND THE
+    DIFFERENCE CHANGED THE FIX.** A kerb section and a cable drum fail the
+    one-second test as CONCEPTS -- a loose kerb in a traffic lane is not a thing
+    that happens, and "cable drum" is site vocabulary a player has no word for
+    -- so both were replaced. A scooter is a real object everyone names in life,
+    so the failure was measurable and local: 61.1% of the variant's pixels were
+    the amber plinth it stood on, its wheels were five pixels across, and every
+    part of it was the same amber and lemon as the plinth. Diagnose before
+    replacing; the answer was different for the two cases.
+
+    **AND DELETING THE PLINTH COST MASS THAT HAD TO COME BACK AS OBJECT.**
+    With the platform gone the scooters read 0.58 / 0.20 / 0.07 / 0.13 on
+    `tools/kindread.js` against 0.83 / 0.81 / 0.29 / 0.09 on the slab, and 1,771
+    pixels at 8 units against 2,577 to 4,444 for the rest of the kind -- the
+    thinnest object in the game. What replaced it is a SECOND upright machine
+    and a second fallen one: the object is bigger because there is more object.
+
+    **THE DUCKS LOOK ALIKE BECAUSE FOUR OF THEIR FIVE PARTS ARE FIXED.** The
+    bar, the caution face in front of it, the daylight under it and the two tall
+    verticals are all contract. Everything above the bar is confined to the
+    standard's own x band because the camera sweeps y 1.76 to 3.14 down the lane
+    centre. **The first rebuild tried to double the standards and the envelope
+    refused it**: a standard sits at x 0.868 with r 0.15 against a box that
+    stops at 1.12, so a second tube overlaps the first and its coupler leaves
+    the box. *The count of verticals in a DUCK's rear elevation is not available
+    as a differentiator at all, on any variant.* What is available is OUTLINE,
+    TOP TERMINATION and one big shape on the standard, and all five now spend
+    all three. Mean pairwise profile separation over 14 bands went **0.468 to
+    0.616**, and the closest pair -- v1 and v2, which photographed as one object
+    at 0.130 -- is now **0.380**, the new minimum being v0/v3.
+
+    **TWO VARIANTS WERE IDENTIFIED BY THE SAME DISC.** v2's sign roundel and
+    v4's valve wheel were both solid pale circles of r 0.24-0.25 at the same
+    height on the same side of the same frame. The wheel is now an annulus with
+    road visible through it. **A hole is something a nine-pixel mark can have
+    and a hue is not.**
+
+    **THE TRADE, WITH THE NUMBER, BECAUSE THE BRIEF ASKED FOR IT.** v3's rest
+    post was cut from 3.20 to 2.30 to make the silhouette genuinely lopsided.
+    Bands 11-13 went **0.31 / 0.29 / 0.29 to 0.21 / 0.23 / 0.15**, which is real
+    mass removed from the top of the profile where a DUCK is told from a JUMP.
+    The classifier is unmoved: **1 of 21 misread on profile, before and after**,
+    and the only failure is BLOCK v9, which nothing in this pass touched. Bands
+    7-9 -- the bar -- are untouched on every variant, and bands 0-6 are as open
+    as they were or slightly more so, because every member added anywhere in the
+    kind is above y 1.90 by construction.
+
+    **HUE WENT 8 MISREAD TO 14, AND THAT IS THE POINT.** The JUMP set is now
+    sand, orange, red-and-white, teal, blue-and-white and terracotta. The file
+    already records that hue is not the kind channel and the profile is; this
+    pass spends the hue on saying what each object IS, which is what the owner
+    asked for, and the profile classifier is what proves it was safe.

@@ -259,6 +259,33 @@
  * name, across two builds at any polish setting.
  * ---------------------------------------------------------------------------
  *
+ * ---------------------------------------------------------------------------
+ * THE START LINE. The owner: "he is standing still and then starts running
+ * when the time goes off." Two things came out of building it that outlive it.
+ *
+ *   A HELD POSE IS NOT A STOPPED CYCLE. Damping the run to zero leaves the
+ *     knees at 0.18, the ankles at -0.16 and the trunk folded 0.26 forward --
+ *     a run with the clock paused. The standing pose is authored: weight
+ *     settled, feet wider, trunk up, a breath, and a weight shift at a fifth
+ *     of the breath's rate so the two never read as one motion. See the block
+ *     above the celebration in update().
+ *   EVERY DRIVEN CHANNEL HAS A FLOOR, AND THE FLOOR IS NOT THE BOTTOM OF THE
+ *     RANGE. `effort` is 0.30 + 0.52*sp01 + ..., so the face this rig wears at
+ *     its most relaxed is the face of a man running a 5:30 mile. Effort zero
+ *     had never been rendered because nothing in the game had ever asked for
+ *     it. The finish had already hit this and overridden the drive; the start
+ *     line hits it again, and takes the same answer. A signal assembled out of
+ *     gameplay terms describes gameplay, and the two seconds either side of a
+ *     race are not gameplay.
+ *
+ * The TRANSITION is not this pose fading out. main.js hands this file a ground
+ * speed of zero at the line, which freezes the stride phase (cadence is a power
+ * of speed), and then ramps it -- so the phase opens from a standstill and the
+ * surge signal, a differentiator that had never seen a step in this game's
+ * life, saturates and drives lean, hip extension, knee drive and toe-off for
+ * about a second and a half. The pose blend is the smallest of the three.
+ * ---------------------------------------------------------------------------
+ *
  * Pivot layout (all rotations are local X unless noted):
  *   root -> body -> hips -> thigh -> shin -> foot
  *                -> spine -> chest -> neck -> head -> eyePivot   (expression)
@@ -1878,6 +1905,13 @@ MR.Runner = (function () {
     // never happens in a real run. Same three-part shape camera.js uses, and for
     // the same reason -- see SURGE_FULL and the block in update().
     let accSp = 0, accA = 0, accPrimed = false;
+    // THE START LINE. Seconds spent standing, which is the clock the breath,
+    // the weight shift and the blink all run on. It is reset the instant the
+    // stand weight reaches zero, so a second run starts its breath where the
+    // first one did rather than wherever the previous countdown left it --
+    // this rig has one other free-running clock (the bib) and it is free
+    // running precisely because nothing ever has to reproduce it.
+    let standT = 0;
 
     // ---- head -----------------------------------------------------------
     // The neck pivot sits at the top of the trunk so head tilt rotates from
@@ -3118,7 +3152,13 @@ MR.Runner = (function () {
      * Advance the cycle and pose the skeleton.
      *
      * @param dt     real seconds
-     * @param st     { speed, airborne, air01, ducking, duck01, lean, stumble }
+     * @param st     { speed, airborne, air01, ducking, duck01, lean, stumble,
+     *                 stand, celT, joy, celSide, grade, trip, bounce }
+     *
+     * `stand` is 1 at the start line and 0 in full stride; `celT` is seconds
+     * since the tape. Both are zero for the whole race, and both are applied as
+     * overrides after the cycle has posed rather than threaded through it, so
+     * the eight play silhouettes are untouched by construction.
      */
     api.update = function (dt, st) {
       st = st || {};
@@ -3138,6 +3178,13 @@ MR.Runner = (function () {
       // climb and quickens on the descent for nothing, because cadence already
       // falls out of `speed`, and `speed` is grade-inclusive.
       const grade = st.grade || 0;
+      // THE START LINE, 1 at the line and 0 in full stride. See the block above
+      // the celebration for the pose and for why the transition is not this
+      // number alone. Read here with the rest of the state so the shadow's
+      // footstrike pulse below can see it: a body that is not landing on
+      // anything has nothing to pulse with.
+      const stand = Math.max(0, Math.min(1, st.stand || 0));
+      if (stand > 0) standT += dt; else standT = 0;
 
       // ghost.js re-materials every mesh under this rig to draw the record
       // runner as one translucent body. That is right for limbs and wrong for
@@ -3906,6 +3953,155 @@ MR.Runner = (function () {
       // back view something lateral to measure.
       root.rotation.y = slid * SLIDE_YAW;
 
+      // ---- THE START LINE: A POSE, NOT AN ABSENCE OF ONE --------------------
+      //
+      // The owner: "Before the game starts and it counts down from 3-2-1 the
+      // player is running in place. That's not realistic. Make it so he is
+      // standing still and then starts running when the time goes off."
+      //
+      // ---- WHAT "STANDING" HAD TO MEAN -------------------------------------
+      //
+      // Not the run cycle stopped. A cycle damped to zero leaves this rig with
+      // its knees at 0.18, its ankles at -0.16 and its trunk folded 0.26 rad
+      // forward -- a runner mid-stride with the clock paused, which is a
+      // mannequin holding a run. Three things separate the two, and all three
+      // are things the RIG can say and the run cycle never does:
+      //
+      //   WEIGHT SETTLED. Knees straighter than the run's (0.18 -> 0.135), feet
+      //     a little wider (splay 0.05 -> 0.075), and the trunk up out of the
+      //     racing fold (0.26 -> 0.10). The sole is kept flat by the same rule
+      //     the stride's ankle is solved against -- hip + knee + ankle sums to
+      //     zero and the shoe lies on the road -- so this pose plants without a
+      //     road clamp, and tools/envelope.js reports its lowest point within
+      //     0.001 of the run's.
+      //   A BREATH. The one motion a person standing still actually makes. It
+      //     runs on `standT` rather than on a phase integrator for the reason
+      //     the finish's does: it must not drift with frame rate. Same two
+      //     places the finish breathes in -- the chest pitches and the whole
+      //     shoulder girdle rides on the spine translation -- so there is one
+      //     breath in two joints and they cannot disagree.
+      //   A WEIGHT SHIFT. Slower than the breath and deliberately not in step
+      //     with it, because two motions on one clock read as one motion. It is
+      //     0.014 rad at the hips against 0.008 of counter-roll at the chest:
+      //     nothing you would name if you were looking for it, and the whole
+      //     difference between a person waiting and a statue of one.
+      //
+      // ---- AND THE FACE, WHICH IS THE PART THAT HAD NEVER BEEN RENDERED ----
+      //
+      // The expression block assembles everything out of `effort`, and effort
+      // has a FLOOR of 0.30 -- it is written as 0.30 + 0.52*sp01 + ... So a
+      // runner standing on the line, where effort is honestly zero, would have
+      // worn the face of a man already running a 5:30 mile: mouth part open,
+      // lower lid up, brow down. That is the same defect the finish found and
+      // fixed, in the same place, for the same reason -- the drive is right for
+      // a race and wrong either side of one -- so it takes the same answer. See
+      // `standF` in the expression block: the face is CHOSEN here, not driven.
+      //
+      // ---- IT IS AN OVERRIDE, AFTER EVERYTHING ELSE HAS POSED --------------
+      //
+      // Same construction as the celebration below, and for the same stated
+      // reason: `stand` is 0 for the whole race, so at play this block does not
+      // execute at all and every one of the eight silhouettes tools/envelope.js
+      // holds this rig to is untouched BY CONSTRUCTION rather than by argument.
+      // A ninth state threaded through forty posed joints would put a term that
+      // can only be zero into forty expressions.
+      //
+      // It sits above the celebration for the ordering the two need against
+      // each other, which is not symmetric: they can never overlap in a real
+      // run, but a tool can set both, and if it does the finish must win --
+      // celT only ever counts up from the tape and there is no way back to the
+      // line from there.
+      //
+      // ---- WHY THIS BLOCK IS NOT THE WHOLE TRANSITION ----------------------
+      //
+      // Crossfading a pose is a dissolve, and a start is an EVENT. What makes
+      // the gun read is that main.js also hands this file a ground speed that
+      // is zero at the line and ramps, which does three things no pose blend
+      // can do: `cadence` is zero while he is standing so the stride phase is
+      // FROZEN rather than turning over under a still body; the phase then
+      // opens from a standstill instead of resuming wherever the countdown left
+      // it; and the surge signal fifty lines above -- which is a differentiator
+      // and had never in this game's life seen a step -- sees 0 to 21.8 u/s and
+      // saturates, so lean, hip extension, knee drive and toe-off all come up to
+      // full for about a second and a half and decay. That is stage 3's
+      // "acceleration = temporary stronger push-off/lean" firing at the only
+      // moment in a marathon where a runner genuinely accelerates from nothing,
+      // on constants that were measured for it rather than invented here.
+      if (stand > 0) {
+        // The breath, ~14 a minute at rest. Slower than either end of the
+        // finish's (0.55 and 1.25 Hz), which is the point: that is a man who
+        // has just run a marathon and this is one who has not started.
+        const breath = Math.sin(standT * 0.24 * Math.PI * 2);
+        // ...and the shift of weight, at a fifth of that rate and out of phase
+        // with it by construction rather than by luck.
+        const sway = Math.sin(standT * 0.11 * Math.PI * 2 + 1.1);
+
+        // ---- legs: settled, square, both soles flat ----------------------
+        // Rest values lifted from the loop above rather than invented, so a
+        // retune there does not strand this pose: hip 0, knee 0.18, ankle
+        // -0.16, splay side*0.05. Straighter and wider than all four.
+        for (let i = 0; i < legs.length; i++) {
+          const L = legs[i];
+          to(L.hip, 'x', 0, stand);
+          to(L.hip, 'y', 0, stand);
+          to(L.hip, 'z', L.side * 0.075, stand);
+          to(L.knee, 'x', 0.135, stand);
+          // hip + knee + ankle = 0 is the flat sole. See the ankle solve in the
+          // leg loop, where the same identity is what plants the stride's foot.
+          to(L.ankle, 'x', -0.135, stand);
+        }
+
+        // ---- arms: hanging, loose, and NOT dead straight ------------------
+        // The finish block already had to learn this one: an arm left hanging
+        // against the ribs puts the mitt inside the hip silhouette and the
+        // figure reads as a mannequin, which is the exact word the owner used
+        // about this character. So the elbow keeps a real bend and the shoulder
+        // holds the arm a hair off the body -- daylight through the gap is what
+        // makes it an arm. The asymmetry is the sway's, not a second pose.
+        for (let i = 0; i < arms.length; i++) {
+          const A = arms[i];
+          to(A.shoulder, 'x', 0.05, stand);
+          to(A.shoulder, 'y', 0, stand);
+          to(A.shoulder, 'z', A.side * (0.17 + 0.02 * sway * A.side), stand);
+          to(A.elbow, 'x', -0.38, stand);
+        }
+
+        // ---- trunk: up out of the racing fold ----------------------------
+        // The cycle's yaw and roll are damped out first, then the held lean is
+        // taken from the run's 0.26 to 0.10 -- upright, but still a man leaning
+        // at a line and not standing in a queue.
+        to(hips, 'y', 0, stand);
+        to(chest, 'y', 0, stand);
+        to(spine, 'x', 0.10, stand);
+        to(root, 'y', 0, stand);
+        to(root, 'z', 0, stand);
+        hips.rotation.z += (sway * 0.014 - hips.rotation.z) * stand;
+        chest.rotation.z += (-sway * 0.008 - chest.rotation.z) * stand;
+        chest.rotation.x += breath * 0.024 * stand;
+        // THE BREATH IS ON THE SPINE AND NOT ON THE BODY, and that is a
+        // structural constraint rather than a preference. `body` is the parent
+        // of `hips`, so anything written to body.position.y lifts the LEGS with
+        // the trunk and takes both soles off the road; `spine` is above the
+        // pelvis and carries only the shoulder girdle, the arms and the head.
+        // The first draft of this pose sat the body at half the run's bob
+        // amplitude, reasoning that a frozen stride phase parks the trunk at
+        // the bottom of its bob -- which is true and beside the point, because
+        // the bob is a compression of a body that is landing on alternate feet
+        // and a body on both feet is not compressing at all. Measured by
+        // tools/envelope.js, that lift left the figure standing 0.0092 ABOVE
+        // the tarmac where the run plants at -0.0098. Zero here, and it plants.
+        spine.position.y += breath * 0.006 * stand;
+
+        // ---- head: level, down the road ----------------------------------
+        // The neck cancels 86% of the trunk's lean during a run so the eyeline
+        // holds down the road; with the trunk nearly upright that cancel would
+        // tip the head back and put him looking at the bunting. Set directly
+        // instead, at roughly the same eyeline the run holds.
+        to(neck, 'x', -0.05, stand);
+        to(neck, 'y', 0, stand);
+        to(neck, 'z', 0, stand);
+      }
+
       // ---- THE FINISH: THE FIRST POSE ON THIS RIG BUILT TO BE SEEN FROM THE
       // ---- FRONT -----------------------------------------------------------
       //
@@ -4506,10 +4702,44 @@ MR.Runner = (function () {
       // The gasp, on the same clock and the same rate as the chest that drives
       // it -- one breath, two places, so they cannot disagree.
       const celBreath = Math.sin((st.celT || 0) * (0.55 + 0.70 * (1 - celJoy)) * Math.PI * 2);
+      // ---- ...AND AT THE START LINE IT IS CHOSEN TOO -----------------------
+      //
+      // Exactly the argument two paragraphs up, at the other end of the race.
+      // `effort` is written 0.30 + 0.52*sp01 + 0.85*max(0,grade) + 0.55*surge,
+      // so its FLOOR is 0.30 and there is no input that can take it lower. A man
+      // standing on a start line is at effort ZERO, which is a value this
+      // expression system has never been able to express -- so left on the
+      // drive he would wait for the gun wearing the face of someone already
+      // three miles in: mouth open 17% of its travel, lower lid up, brow down.
+      //
+      // What replaces it is not a blank. A runner on a line is COMPOSED, and
+      // composure is a set of small positive choices rather than the absence of
+      // effort: the mouth shuts (the drive cannot reach 1.0, the resting scale,
+      // at any speed this game runs), the eyes come fully open, and the brow
+      // comes down a little on the LEVEL -- browTilt near zero against
+      // browLift -- which is concentration where a tilt would be strain.
+      //
+      // AND HE BLINKS. It is two lines and it is the only thing on this rig
+      // that says the character is alive while nothing else about him moves.
+      // The rate is 1 in ~4.4 s with a 0.13 s closure, which is a slow human
+      // blink rather than a nervous one, and it rides ON TOP of the aperture
+      // rather than replacing it, so it cannot be swallowed by whatever else
+      // the eye is doing. It uses the same bottom-edge closure the effort
+      // squint does -- see EYE_SEMI below -- so a blink and a squint are one
+      // mechanism and the top edge of the eye is pinned through both.
+      //
+      // Everything here is on POLISH like the rest of the block, so ?polish=0
+      // still renders the face this character had before the character pass.
+      const standF = stand;
+      const blink = standF > 0
+        ? Math.max(0, 1 - Math.abs(((standT % 4.4) - 4.0) / 0.13))
+        : 0;
 
-      const browLift = mix(-POLISH * (0.0035 * effort + 0.0030 * wince),
+      const browLift = mix(mix(-POLISH * (0.0035 * effort + 0.0030 * wince),
+        -POLISH * 0.0026, standF),
         POLISH * mix(-0.0055, 0.0090, celJoy), celF);
-      const browTilt = mix(POLISH * (0.0045 * effort + 0.0030 * wince),
+      const browTilt = mix(mix(POLISH * (0.0045 * effort + 0.0030 * wince),
+        POLISH * 0.0008, standF),
         POLISH * mix(0.0060, -0.0010, celJoy), celF);
       {
         const ba = browGeo.pos.array, br = browGeo.rest, bu = browGeo.u;
@@ -4520,8 +4750,9 @@ MR.Runner = (function () {
       }
       // Narrowing only, never widening: a toy character with eyes OPENED past
       // their drawn size reads as startled, and he is running, not surprised.
-      const eyeShut = mix(POLISH * (0.16 * effort + 0.34 * wince),
-        POLISH * mix(0.52, 0.02, celJoy), celF);
+      const eyeShut = Math.min(0.94, mix(mix(POLISH * (0.16 * effort + 0.34 * wince),
+        0, standF),
+        POLISH * mix(0.52, 0.02, celJoy), celF) + POLISH * 0.94 * blink);
       eyePivot.scale.y = 1 - eyeShut;
       // EYE_SEMI is the sclera's own half-height. Translating by half of what
       // the scale takes away holds the TOP edge on the float and spends the
@@ -4534,9 +4765,11 @@ MR.Runner = (function () {
       // to nine pixels at the face lens and a shape change rather than a size
       // change, because the lower lip travels with it and the opening between
       // them is what grows.
-      mouthPivot.scale.y = mix(1 + POLISH * (0.55 * effort + 0.30 * wince),
+      mouthPivot.scale.y = mix(mix(1 + POLISH * (0.55 * effort + 0.30 * wince),
+        1 - POLISH * 0.08, standF),
         1 + POLISH * mix(0.95 + 0.35 * celBreath, 0.70, celJoy), celF);
-      mouthPivot.scale.x = mix(1 + POLISH * (0.10 * effort + 0.22 * wince),
+      mouthPivot.scale.x = mix(mix(1 + POLISH * (0.10 * effort + 0.22 * wince),
+        1 + POLISH * 0.04, standF),
         1 + POLISH * mix(0.18, 0.52, celJoy), celF);
 
       // Ducking drops the whole body rather than only folding the spine, so
@@ -4599,7 +4832,14 @@ MR.Runner = (function () {
       // It goes the opposite way to the old duck's -- narrower and much
       // deeper, roughly the footprint of a body lying down -- and the plant
       // pulse is damped out with the bob that caused it.
-      const plant = 1 - Math.abs(Math.cos(p)) * 0.10 * (1 - air) * (1 - slid * 0.90);
+      // ...and it is damped out at the start line for the same reason it is
+      // damped out in a slide: the pulse IS the footstrike, and a body standing
+      // on both feet is not striking anything. Left in, it would have sat the
+      // blob at its tightest and darkest -- the frozen stride phase parks
+      // cos(p) at exactly 1 -- so a standing runner would have worn the shadow
+      // of the hardest footfall in the cycle, held.
+      const plant = 1 - Math.abs(Math.cos(p)) * 0.10
+        * (1 - air) * (1 - slid * 0.90) * (1 - stand);
       shadowW = (1.30 - slid * 0.18) * plant;
       shadowD = (0.96 + slid * 1.34) * plant;
       shadowA = (1 + slid * 0.48) * (2 - plant);

@@ -493,6 +493,53 @@ MR.HUD = (function () {
         <button class="cta" id="againBtn">RUN IT AGAIN</button>
       </div></div>
 
+      <!--
+        THE PAUSE BUTTON, AND WHY IT IS IN THE TOP RIGHT.
+
+        Three constraints and only one corner satisfies all three.
+
+        THE MIDDLE OF THE FRAME BELONGS TO THE ROAD, which is the rule this
+        whole readout was rebuilt around, so it is an edge or it is nothing.
+
+        IT MUST NOT SIT WHERE A SWIPE LANDS. The four game verbs are swipes
+        anywhere on the canvas, and the one input a player must never lose is
+        the lane change that avoids a hazard. A pause under the thumb is a
+        pause pressed by a mis-started swipe -- and an accidental pause during
+        a record attempt is a worse outcome than an awkward deliberate one. So
+        the awkwardness is the feature: this is the one control in the game
+        that should cost a second hand, because it is the only one that is
+        never used in a hurry.
+
+        AND NOTHING NEW AT THE BOTTOM. tools/footroom.js asserts the runner's
+        shoe clears the top of #railWrap across 96 combinations of viewport,
+        pace and state, and that gate is currently held by a plate that had to
+        give up a whole row to pass it. A 46px control anywhere along the
+        bottom edge would be measured against the same figure. The top right is
+        the one region of this HUD that is measured by nothing, because it is
+        the slot the retired #dist plate used to occupy -- which is also why
+        the offsets below are #dist's own, at every breakpoint.
+      -->
+      <button id="pauseBtn" type="button" aria-label="Pause the race">
+        <span class="pauseGlyph"></span>
+      </button>
+
+      <div class="panel hidden" id="pausePanel" role="dialog" aria-modal="true"
+           aria-labelledby="pauseTitle"><div class="panelInner">
+        <div class="date">RACE STOPPED</div>
+        <h1 id="pauseTitle">PAUSED</h1>
+        <!--
+          The panel is opaque, and that is the anti-cheat rather than the
+          styling. See the .panel override in style.css.
+        -->
+        <div class="blurb">
+          The clock, the road and the ghost are stopped together.
+          <b>Resuming counts 3 &middot; 2 &middot; 1</b> before any of them move.
+        </div>
+        <div id="pauseStat"></div>
+        <button class="cta" id="resumeBtn" type="button">RESUME</button>
+        <button class="cta alt" id="restartBtn" type="button">RESTART THIS RUN</button>
+      </div></div>
+
       <div id="count" class="hidden"><span id="countVal"></span></div>
     `;
 
@@ -519,6 +566,8 @@ MR.HUD = (function () {
       endTurn: q('endTurn'), tomorrow: q('tomorrow'), tomorrowRoute: q('tomorrowRoute'),
       againBtn: q('againBtn'),
       count: q('count'), countVal: q('countVal'),
+      pauseBtn: q('pauseBtn'), pausePanel: q('pausePanel'),
+      pauseStat: q('pauseStat'), resumeBtn: q('resumeBtn'), restartBtn: q('restartBtn'),
       perf: q('perf'),
     };
 
@@ -556,7 +605,8 @@ MR.HUD = (function () {
     // the overlay, which made the finish screen read as a rendering fault.
     function syncPanels() {
       const open = !n.startPanel.classList.contains('hidden')
-                || !n.endPanel.classList.contains('hidden');
+                || !n.endPanel.classList.contains('hidden')
+                || !n.pausePanel.classList.contains('hidden');
       root.classList.toggle('panelOpen', open);
     }
 
@@ -1210,8 +1260,52 @@ MR.HUD = (function () {
       syncPanels();
     };
 
+    /**
+     * The pause panel, on exactly the machinery the other two panels use.
+     *
+     * `syncPanels` is the whole point of routing it here rather than inventing
+     * a second overlay: the live readout steps out of the way behind ANY panel
+     * (see #ui.panelOpen in the stylesheet), and a pause screen that left the
+     * projection, the fuel gauge and the rail showing through would read as the
+     * rendering fault the panelOpen rule was written to fix.
+     *
+     * @param p  the pace model, or null. The two figures printed are the ones
+     *           the readout underneath has just been told to hide, so the panel
+     *           is not a place where the player loses sight of their race.
+     */
+    api.showPause = function (show, p) {
+      if (show && p) {
+        n.pauseStat.innerHTML =
+          plate('ELAPSED', Pace.clock(p.raceTime), 'RACE CLOCK STOPPED')
+          + plate('DISTANCE', p.miles.toFixed(2), 'OF ' + K.MARATHON_MILES.toFixed(2) + ' MI')
+          + plate('CLEAN', String(p.streak), 'GATES IN A ROW');
+      }
+      n.pausePanel.classList.toggle('hidden', !show);
+      if (show) requestAnimationFrame(markScroll);
+      syncPanels();
+    };
+
+    /**
+     * The button itself, which exists only while there is a race to stop. It is
+     * driven by main.js off the state machine rather than by this file off the
+     * panel, because the two are not the same interval: the button is gone for
+     * the whole of the resume countdown, when no panel is open and the game is
+     * not yet running.
+     */
+    api.showPauseBtn = function (on) {
+      root.classList.toggle('canPause', !!on);
+    };
+
     api.countdown = function (text) {
       n.count.classList.toggle('hidden', text === null);
+      // The count is a full-frame element and the pause panel is a full-frame
+      // element, and a resume runs both at once: the digit landed across the
+      // DISTANCE plate. So the panel empties while the count is up -- the fill
+      // stays, which is the half of it that is load-bearing, and the copy and
+      // the buttons step out of the way exactly as the live readout does behind
+      // any panel. It also removes the two buttons from under a player's thumb
+      // during the three seconds when pressing either of them would do nothing.
+      root.classList.toggle('counting', text !== null);
       if (text !== null) n.countVal.textContent = text;
     };
 
@@ -1404,6 +1498,9 @@ MR.HUD = (function () {
 
     api.onStart = function (fn) { n.startBtn.addEventListener('click', fn); };
     api.onAgain = function (fn) { n.againBtn.addEventListener('click', fn); };
+    api.onPause = function (fn) { n.pauseBtn.addEventListener('click', fn); };
+    api.onResume = function (fn) { n.resumeBtn.addEventListener('click', fn); };
+    api.onRestart = function (fn) { n.restartBtn.addEventListener('click', fn); };
     api.showPerf = function (on) { n.perf.classList.toggle('on', on); };
 
     syncPanels();

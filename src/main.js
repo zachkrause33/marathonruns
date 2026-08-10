@@ -114,8 +114,15 @@
   if (!audit.ok) console.warn('COLLISION AUDIT', audit.notes);
 
   // ---- state ------------------------------------------------------------
-  const IDLE = 0, COUNT = 1, RUN = 2, DONE = 3;
+  const IDLE = 0, COUNT = 1, RUN = 2, DONE = 3, PAUSED = 4;
   let state = IDLE;
+  // Whether the countdown now running is a RESUME rather than the start of a
+  // race. The two are the same three seconds and the same sound deliberately --
+  // this game already owns a countdown and a second one would be a second
+  // thing to learn -- but they end differently: a start releases the runner off
+  // the line, a resume takes the pause panel down.
+  let resuming = false;
+  let btnShown = false;   // edge detector for the pause button; see the loop
   let doneAt = 0;      // wall-clock at the tape, for the run-out ease
   let endTimer = 0;    // the held end card; cleared on reset so it cannot
                        // arrive over a run that has already restarted
@@ -161,6 +168,47 @@
   // already what every other part of the game indexes a gate by.
   let hitAt = [];
 
+  // ---- THE STANDING START -------------------------------------------------
+  //
+  // The owner: "Before the game starts and it counts down from 3-2-1 the player
+  // is running in place. That's not realistic. Make it so he is standing still
+  // and then starts running when the time goes off."
+  //
+  // ONE clock, 1 at the line and 0 in full stride, and it drives THREE things
+  // that arrive at different rates. That split is the whole of the transition,
+  // because a single crossfade from a held pose to a running one is a dissolve
+  // and what this moment wants is an event.
+  //
+  //   THE POSE, over the full LAUNCH. runner.js blends its standing pose out
+  //     against the cycle, smoothstepped so it leaves the line and reaches full
+  //     stride with no corner at either end.
+  //   THE STRIDE, over LAUNCH_SPEED, which is less than half as long. The ground
+  //     speed handed to the runner and the camera is this clock, not the pace
+  //     model's: cadence in runner.js is a power of speed, so zero speed FREEZES
+  //     the stride phase instead of turning it over under a motionless body, and
+  //     the phase then opens from a standstill rather than resuming wherever the
+  //     countdown left it. The legs come up to rate faster than the body comes
+  //     out of the pose, which is what an acceleration looks like and is also
+  //     the honest order: a runner's legs go first.
+  //   THE DRIVE, free. runner.js and camera.js both carry a surge signal -- a
+  //     smoothed derivative of ground speed -- and in this game's whole life
+  //     neither had ever seen a step, because pace only ever eases. A start
+  //     hands both of them 0 to 21.8 u/s. They saturate, and lean, hip
+  //     extension, knee drive, toe-off and the camera's own trail-back all come
+  //     up to full and decay over about a second and a half, on constants that
+  //     were measured for exactly this and never had a moment to fire in.
+  //
+  // WHAT IT COSTS, stated rather than hidden: pace.js starts the race at
+  // START_PACE on the frame the gun goes, so for the length of LAUNCH_SPEED the
+  // world is moving faster than the legs are turning over and the feet skate.
+  // That is a consequence of the pace model, not of this ramp -- there is no
+  // value of these two constants that makes a runner who is stationary at t=0
+  // and travelling at 21.8 u/s at t=0 not skate. LAUNCH_SPEED is short for that
+  // reason and no other.
+  let standT = 1;
+  const LAUNCH = 0.72;        // seconds for the pose to leave the line
+  const LAUNCH_SPEED = 0.34;  // ...and for the stride to reach full rate
+
   function reset() {
     clearTimeout(endTimer);
     showCard = null;
@@ -182,9 +230,16 @@
     celClock = 0;
     hitAt = [];
     runner.phase = 0;
+    standT = 1;
+    resuming = false;
+    controls.enabled = true;
     ghost.reset();
     hud.hideEnd();
+    hud.showPause(false);
+    btnShown = false;
+    hud.showPauseBtn(false);
     hud.celebrate(false);
+    audio.setPaused(false);
     world.update(0);
   }
 
@@ -192,12 +247,90 @@
     reset();
     audio.unlock();
     hud.showStart(false);
-    if (NOCOUNT) { state = RUN; hud.countdown(null); }
+    // No countdown means no start line: ?bot= and ?nocount= exist so a harness
+    // can enter the race directly, and a harness that entered it standing still
+    // would photograph and measure a launch instead of a run. Every tool in this
+    // project drives the game through one of those two, so releasing the clock
+    // here is what keeps the standing start out of every number they report.
+    if (NOCOUNT) { state = RUN; standT = 0; hud.countdown(null); }
     else { state = COUNT; countT = 0; }
+  }
+
+  // ---- PAUSE, AND WHAT IT IS NOT ALLOWED TO BE ----------------------------
+  //
+  // The owner asked for a pause button. This game is a daily time attack on a
+  // deterministic date-seeded course against a 1:59:30 ghost, and one contact
+  // ends a record attempt -- so the resource every decision in it spends is
+  // TIME TO READ THE ROAD, and a naive pause hands that resource out for free:
+  // stop on the frame a gate resolves into three lanes, study it for as long as
+  // you like, resume with the answer. Three things close that, and they are
+  // three because no one of them closes it alone.
+  //
+  //   THE PANEL IS OPAQUE. #pausePanel is a solid fill where the other two
+  //     panels are 0.9 -- see its note in style.css. You cannot study a frame
+  //     you cannot see, and this is the only one of the three that removes the
+  //     information rather than the time to use it.
+  //   THE RESUME COUNTDOWN RUNS BEHIND IT. Reusing the start's 3-2-1 was the
+  //     obvious move and it is the wrong one done the obvious way: a countdown
+  //     over a revealed, frozen world IS three more seconds of free look, and a
+  //     bigger gift than the pause itself. So the panel stays up for the whole
+  //     of it and the world reappears on the same frame it starts moving.
+  //   NO INPUT IS BUFFERED ACROSS IT. controls.enabled is false from the moment
+  //     the game is paused until the gun, and controls.js drops rather than
+  //     queues while it is false. A player who worked out the answer on a still
+  //     frame cannot pre-load the swipe; they have to see the road again first.
+  //
+  // WHAT IS LEFT, because it is worth stating and not worth hiding: a player
+  // can still THINK about a frame they had already been shown for as long as
+  // they like. Taking that back needs the race to resume some distance behind
+  // where it stopped, and a rewind means unwinding pace.units, player.gateIdx
+  // and player.aidIdx together or double-counting a gate -- which is a change to
+  // the scoring path, and this is not a pass that should be touching the
+  // scoring path. It is on the roadmap.
+  function pause() {
+    if (state !== RUN) return;
+    state = PAUSED;
+    controls.enabled = false;
+    controls.clear();
+    btnShown = false;
+    hud.showPauseBtn(false);
+    hud.showPause(true, pace);
+    audio.setPaused(true);
+  }
+
+  function resume() {
+    if (state !== PAUSED) return;
+    state = COUNT;
+    countT = 0;
+    resuming = true;
+    // The bed comes back over the countdown rather than on the frame the panel
+    // lifts. It carries no information about the road -- it is crowd and air,
+    // gated on the streak, which has not moved -- and a race that resumes in
+    // silence and then snaps to full level reads as an audio fault.
+    audio.setPaused(false);
   }
 
   hud.onStart(begin);
   hud.onAgain(begin);
+  hud.onPause(pause);
+  hud.onResume(resume);
+  hud.onRestart(begin);
+  // Escape and P, from controls.js, which keeps them out of the buffered verbs
+  // for the reasons in its own note. One key, both directions.
+  controls.onPause = function () {
+    if (state === RUN) pause();
+    else if (state === PAUSED) resume();
+  };
+  // A tab going into the background already froze this game, because rAF stops
+  // -- but it froze it SILENTLY and mid-gate, and handed the player the road
+  // back with no warning and whatever was left of their reaction time. Routing
+  // it through the same pause closes that: they come back to a panel and a
+  // countdown. Guarded on BOT because every automated run in this project drives
+  // a page a harness owns, and a harness that ever reported itself hidden would
+  // pause the run it is measuring.
+  document.addEventListener('visibilitychange', function () {
+    if (!BOT && document.visibilityState === 'hidden' && state === RUN) pause();
+  });
   // Any input during the celebration ends the hold and brings the card up now.
   // The alternative to this is a player who has seen the ending once being made
   // to sit through it on every subsequent run, which is how a celebration
@@ -385,6 +518,13 @@
 
     controls.tick(dt);
 
+    // PAUSED stops the world, not just the clock. Every integrator below is
+    // stepped with this instead of dt, so the springs, the stride phase, the
+    // hood, the ghost's tag and the celebration clock all hold where they were
+    // rather than settling while the game is stopped. pace.update is not called
+    // at all, so the race clock and the distance are frozen at their source.
+    const sdt = state === PAUSED ? 0 : dt;
+
     if (state === COUNT) {
       const prev = Math.ceil(3 - countT);
       countT += dt;
@@ -394,10 +534,36 @@
         hud.countdown(null);
         audio.countdown(true);
         state = RUN;
+        // The gun. On a resume this is the frame the world reappears AND the
+        // frame it starts moving -- the two are the same frame on purpose, so
+        // the countdown never doubles as a free look. See pause() above.
+        if (resuming) {
+          resuming = false;
+          hud.showPause(false);
+          controls.enabled = true;
+        }
       } else {
         hud.countdown(String(Math.max(1, c)));
       }
     }
+
+    // The launch, released only once the race is actually running. See standT.
+    if (state === RUN && standT > 0) standT = Math.max(0, standT - dt / LAUNCH);
+    // The pose blend, smoothstepped at both ends.
+    const stand01 = standT * standT * (3 - 2 * standT);
+    // ...and the stride ramp, which is the same clock read against a shorter
+    // window, so the legs reach full rate while the body is still coming out of
+    // the standing pose.
+    const gu = Math.min(1, (1 - standT) * (LAUNCH / LAUNCH_SPEED));
+    const launch = gu * gu * (3 - 2 * gu);
+
+    // The button exists only while there is a race to stop: not over either
+    // panel, not during either countdown, and not after the tape. Edge-detected
+    // rather than written every frame, for the reason hud.js keeps a whole
+    // `cache` object: this loop runs sixty times a second and a classList write
+    // per frame is style invalidation per frame for a class that changes four
+    // times in a race.
+    if ((state === RUN) !== btnShown) { btnShown = state === RUN; hud.showPauseBtn(btnShown); }
 
     if (state === RUN) {
       if (BOT) botThink();
@@ -616,9 +782,14 @@
     // runner kept sprinting on the spot through the entire celebration. Ease
     // the cadence out instead of cutting it: a runner who crosses a line
     // decelerates, and a stride that halts on one frame reads as a freeze.
-    const strideSpeed = state === DONE
+    // ...and at the other end of the race the same argument runs backwards:
+    // `launch` is 0 at the start line and 1 for every other frame of the game,
+    // so this is the ground speed the CHARACTER is travelling at rather than the
+    // one the pace model is charging for. The two disagree exactly twice in a
+    // race, once at each end, and both disagreements are the truth.
+    const strideSpeed = (state === DONE
       ? pace.speed() * Math.max(0, 1 - (performance.now() - doneAt) / 2200)
-      : pace.speed();
+      : pace.speed()) * launch;
 
     // Seconds since the tape, which is the celebration's clock in runner.js AND
     // in camera.js. Real time, not race time: the race clock has stopped, and
@@ -634,14 +805,20 @@
     // owns this clock too, which is what makes the framing measurable.
     if (state === DONE) celClock += raw;
     const celT = celClock;
+    // A pause during the celebration is not reachable -- the button is gone the
+    // moment the tape breaks -- so `raw` above needs no gate of its own.
 
     // The grade at the runner, -1..1 against the steepest legal one. It only
     // pitches the trunk; the stride slows on the climb and quickens on the
     // descent for free, because cadence already falls out of `speed`.
     const grade = elev.gradeNorm(pace.units);
 
-    runner.update(dt, {
+    runner.update(sdt, {
       speed: strideSpeed,
+      // 1 at the line, 0 in full stride. Zero for the whole race, which is what
+      // lets runner.js apply the standing pose as an override after the cycle
+      // has posed rather than threading a ninth state through forty joints.
+      stand: stand01,
       grade,
       air01: player.airborne ? Math.sin(Math.min(1, player.airT) * Math.PI) : 0,
       duck01: player.duck01,
@@ -670,13 +847,21 @@
     runner.group.position.set(player.x,
       player.y + player.surface + elev.at(pace.units), pace.units);
 
-    cam.update(dt, {
+    cam.update(sdt, {
       z: pace.units, x: player.x, y: player.y, surface: player.surface,
-      speed: pace.speed(),
+      // The same launch-scaled speed the runner is handed, and for the same
+      // reason: the camera's framing, its cadence-locked bob and its surge cue
+      // are all statements about how fast the runner is going, and at the start
+      // line he is going nowhere. Nothing in the framing moves for it -- both
+      // the pull-in and the look-ahead read `drive`, which is clamped at zero
+      // from START_PACE downward -- so what this actually buys is a bob that
+      // stops bobbing under a body with no footfalls, and a camera that trails
+      // back off the line when he goes.
+      speed: pace.speed() * launch,
       // The flat speed, for the top-gear latch alone. A descent must not fire
       // the gear flourish or the permanent rumble: speed you did not earn is
       // not another gear. See camera.js's header.
-      gearSpeed: pace.streakSpeed(),
+      gearSpeed: pace.streakSpeed() * launch,
       lean: player.lean, duck01: player.duck01,
       // The finish, on the same clock the runner's pose runs on. Zero for the
       // whole race, so every celebration term in camera.js is inert until the
@@ -687,7 +872,7 @@
     // After the camera, never before: the ghost's tag is placed against this
     // frame's lens (position, fov, aspect), and a frame of lag there shows up
     // as the tag swimming during a lane change.
-    ghost.update(dt, { pace, camera: cam.camera, playerX: player.x, celT });
+    ghost.update(sdt, { pace, camera: cam.camera, playerX: player.x, celT });
 
     // The crossover is the moment the whole ghost exists for, so it gets a
     // sound like every other beat in the race. Ghost owns the detection (it
@@ -733,6 +918,14 @@
     // a measurement sweep taken at whatever state the page was left in.
     get celT() { return celClock; },
     set celT(v) { celClock = Math.max(0, +v || 0); },
+    // The launch clock, and SETTABLE for exactly the reason celT is: the moment
+    // this pass has to be photographed -- at the line, at the gun, one second
+    // after -- is three quarters of a second long, and a harness that can only
+    // wait for it photographs whichever instant its own frame rate lands on.
+    // 1 is the start line, 0 is full stride.
+    get stand() { return standT; },
+    set stand(v) { standT = Math.max(0, Math.min(1, +v || 0)); },
+    pause, resume,
     course, world, runner, ghost, cam, hud, audio, renderer, scene,
     begin,
     fps: () => fps,
@@ -747,6 +940,12 @@
     // deep into the race instead of always at the start line.
     begin();
     state = RUN;
+    // ...and he is already running by definition: this branch exists to put the
+    // page deep into a race, and every one of those races began some minutes
+    // ago. Set explicitly rather than left to begin(), because ?skip= is legal
+    // without ?bot= and would otherwise open a mid-race screenshot on a runner
+    // stepping off the start line.
+    standT = 0;
     const step = 1 / 60;
     for (let t = 0; t < SKIP; t += step) {
       if (BOT) botThink();

@@ -91,6 +91,7 @@ html, body {
 #ui.panelOpen #leftCol,
 #ui.panelOpen #dist,
 #ui.panelOpen #railWrap,
+#ui.panelOpen #pauseBtn,
 #ui.panelOpen #perf {
   opacity: 0; visibility: hidden;
 }
@@ -279,6 +280,52 @@ html, body {
 #dist .val { font-size: 34px; font-weight: 500; line-height: 1; }
 #dist .unit { font-size: 12px; font-weight: 700; opacity: 0.6; margin-left: 3px; }
 #dist .sub { font-size: 10px; font-weight: 700; opacity: 0.62; margin-top: 3px; }
+
+/* ---- pause, top right ----
+ *
+ * The slot is #dist's, which is why the offsets are #dist's at every
+ * breakpoint: that plate was retired when the readout moved to the edges, and
+ * the corner has been empty since. The argument for putting the control there
+ * rather than under a thumb is in the markup comment in hud.js -- briefly, the
+ * four game verbs are swipes anywhere on the canvas, so the pause target has to
+ * be somewhere a swipe never starts, and everything along the bottom edge is
+ * measured against the runner's shoe by tools/footroom.js.
+ *
+ * 46px, matching .cta, and it does NOT shrink on phones. The CTA's own note
+ * records why that number: 43 was one pixel under the 44px tap target and a
+ * near-miss on a control that only exists to stop the game costs the whole
+ * interaction. A control that is hard to hit is worse than one that is hard to
+ * reach.
+ *
+ * Drawn in the HUD's own language rather than as an app icon: var(--ink) with a
+ * 4px accent rule down the right edge, exactly like the plate that used to
+ * stand here, so it reads as one more piece of the readout.
+ */
+#pauseBtn {
+  position: absolute; right: 14px; top: 24px;
+  display: none;
+  align-items: center; justify-content: center;
+  width: 46px; height: 46px;
+  background: var(--ink);
+  border: none; border-right: 4px solid var(--accent);
+  color: #fffdf5;
+  cursor: pointer;
+  pointer-events: auto;
+  backdrop-filter: blur(6px);
+  transition: opacity 0.22s, visibility 0.22s;
+}
+#ui.canPause #pauseBtn { display: flex; }
+#pauseBtn:active { transform: translateY(1px); }
+#pauseBtn:focus-visible { outline: 3px solid #fffdf5; outline-offset: 3px; }
+/* Two bars out of one box's own borders. The embedded face is Oswald subset to
+ * the characters this HUD prints and has no pause glyph in it, and a character
+ * borrowed from the system fallback would be the one mark on the screen in a
+ * different typeface. */
+.pauseGlyph {
+  display: block; width: 16px; height: 18px;
+  border-left: 5px solid currentColor;
+  border-right: 5px solid currentColor;
+}
 
 /* ---- aid card ----
  * Docked under the left plate, never across the middle of the screen. It used
@@ -598,6 +645,46 @@ html, body {
 }
 .panel.canScroll::after { opacity: 1; }
 
+/* ---- the pause panel ----
+ *
+ * OPAQUE, AND THAT IS THE ANTI-CHEAT RATHER THAN THE STYLING.
+ *
+ * This game is a daily time attack on a deterministic date-seeded course, one
+ * contact ends a record attempt, and the thing a player is buying with every
+ * decision is TIME TO READ THE ROAD. So a pause that leaves the frozen frame
+ * visible hands out exactly the resource the game charges for: stop on the
+ * frame a gate resolves into three lanes, study it for as long as you like,
+ * resume with the answer. The other two panels are rgba(...,0.9) because there
+ * is nothing behind them worth hiding -- the start panel covers z = 0 and the
+ * finish card covers a race that is over. This one covers a race in progress,
+ * so it covers it completely.
+ *
+ * The other half of the same rule is in main.js: the resume countdown runs
+ * BEHIND this panel and the world only reappears on the frame it starts moving
+ * again, so the 3-2-1 is not itself three seconds of free look.
+ */
+#pausePanel { background: #0a0d24; }
+/* ...and it empties for the resume count. See api.countdown in hud.js. The FILL
+ * is what closes the free look and it stays; the copy and the two buttons are
+ * furniture for three seconds in which neither button does anything. */
+#pausePanel .panelInner { transition: opacity 0.2s, visibility 0.2s; }
+#ui.counting #pausePanel .panelInner { opacity: 0; visibility: hidden; }
+#pauseStat {
+  display: flex; flex-wrap: wrap; justify-content: center;
+  align-items: stretch; gap: 7px;
+  margin-top: 16px;
+}
+/* The second action on the panel, and it must not compete with RESUME. Same
+ * geometry, no fill: the accent is reserved for the thing the player almost
+ * always wants, and restarting a run in progress is the thing they almost never
+ * do by accident. */
+.cta.alt {
+  background: none; color: var(--accent);
+  box-shadow: inset 0 0 0 2px rgba(255, 228, 94, 0.55);
+  margin-top: 10px;
+}
+#pausePanel .cta { display: block; width: 100%; max-width: 340px; margin-left: auto; margin-right: auto; }
+
 /* ---- the memory, on the start panel ----
  * Plates, in the HUD's language: a 9px label over a large tabular figure.
  * Rendered only when there is something to remember, so a first-ever visit
@@ -818,6 +905,8 @@ html, body {
   #why { font-size: 8px; margin-top: 4px; }
 
   #dist { right: 9px; top: 22px; min-width: 112px; padding: 6px 11px 7px; }
+  /* The offsets follow #dist; the 46px box does not shrink. See its own note. */
+  #pauseBtn { right: 9px; top: 22px; }
   #dist .val { font-size: 25px; }
   #dist .sub { font-size: 9px; }
 
@@ -857,6 +946,7 @@ html, body {
   .gauge { height: 9px; }
 
   #dist { right: 20px; top: 28px; min-width: 172px; padding: 10px 17px 12px; }
+  #pauseBtn { right: 20px; top: 28px; width: 52px; height: 52px; }
   #dist .val { font-size: 42px; }
   #dist .unit { font-size: 14px; }
   #dist .sub { font-size: 12px; }
@@ -1001,6 +1091,9 @@ html, body {
   #endPanel .cta { margin-top: 7px; padding: 10px; }
 
   #leftCol { top: 20px; gap: 6px; }
+  #pauseBtn { top: 20px; }
+  #pauseStat { margin-top: 8px; }
+  .cta.alt { margin-top: 6px; }
   #engine { padding: 5px 10px 6px; }
   #engine .val { font-size: 18px; }
   .gauge { margin: 4px 0 5px; }

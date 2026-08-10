@@ -156,7 +156,14 @@ function pageSweep(o) {
     const acc = { xMin: 1e9, xMax: -1e9, yMin: 1e9, yMax: -1e9, zMin: 1e9, zMax: -1e9, half: 0 };
     // Two full strides at the sweep resolution, so a term with a period of
     // half a stride is sampled at both of its peaks.
-    const cadence = 2.55 * Math.pow(st.speed / o.speedLo, 0.72);
+    // The sweep window is two strides long, so it is sized off the cadence the
+    // state would run at. The floor is for the start line and nothing else: a
+    // standing runner is handed a ground speed of ZERO, cadence is a power of
+    // speed, and 2/0 is an infinite dt that steps every spring in the rig to
+    // NaN on the first sample. 0.5 Hz gives that state a four-second window,
+    // which is the right length for the only things it has to move -- a breath
+    // at 0.24 Hz and a weight shift at 0.11.
+    const cadence = Math.max(0.5, 2.55 * Math.pow(st.speed / o.speedLo, 0.72));
     const dt = (2 / cadence) / (o.n * 2);
     for (let i = 0; i < o.n * 2; i++) {
       r.update(dt, st);
@@ -173,10 +180,33 @@ function pageSweep(o) {
   return { states: out, parts: parts.length, verts: parts.reduce(function (s, p) { return s + p.v.length / 3; }, 0) };
 }
 
-// The eight. `air01` and `duck01` are swept at their half-open values as well
-// as their full ones because that is where a new part escapes the envelope.
+// The eight, and then the two that are not play. `air01` and `duck01` are swept
+// at their half-open values as well as their full ones because that is where a
+// new part escapes the envelope.
+//
+// ---- THE START LINE IS MEASURED, AND IT IS NOT PART OF THE CONTRACT -------
+//
+// `stand` and `stand-half` are here because a pose nobody measures is a pose
+// that drifts, and because the standing start has one number that genuinely
+// matters and is invisible from any screenshot: LOW. The stride's foot is
+// planted by solving the ankle so hip + knee + ankle sums to zero, and the
+// standing pose plants itself by obeying the same identity by hand -- there is
+// no road clamp outside a slide, so a stand that got that sum wrong would float
+// or sink and only a side elevation would ever show it.
+//
+// They are NOT part of rule 4's silhouette contract and must not be read as
+// though they were. That contract exists so a player can tell a jump from a
+// slide in three frames at forty pixels; the start line is a state the player
+// is looking at while a countdown runs, with nothing to tell it apart from.
+// What is being checked here is that the figure stands ON the road and inside
+// the width the game already draws him at.
 const STATES = [
   { name: 'run', st: {} },
+  { name: 'stand', st: { stand: 1, speed: 0 } },
+  // Halfway off the line, which is where the pose blend and the stride ramp are
+  // both mid-flight and therefore where a joint can be somewhere neither end
+  // ever puts it.
+  { name: 'stand-half', st: { stand: 0.5, speed: 11 } },
   { name: 'jump-rise', st: { airborne: 1, air01: 0.42 } },
   { name: 'jump', st: { airborne: 1, air01: 1 } },
   { name: 'slide-enter', st: { ducking: 1, duck01: 0.5 } },

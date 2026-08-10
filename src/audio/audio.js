@@ -100,7 +100,7 @@ MR.Audio = (function () {
   // Every method the game may call. The silent stub is generated from this,
   // so adding a cue below can never leave the no-audio path short of one.
   const API = [
-    'unlock', 'setMuted', 'ambient', 'setIntensity',
+    'unlock', 'setMuted', 'setPaused', 'ambient', 'setIntensity',
     'footstep', 'jump', 'land', 'duck', 'hit', 'clean', 'crossover', 'aid',
     'mile', 'roar', 'finish', 'countdown',
     'aidMissed', 'recordLost', 'tier',
@@ -869,6 +869,29 @@ MR.Audio = (function () {
         }
         master.gain.setTargetAtTime(s.muted ? 0 : 0.85, ctx.currentTime, 0.2);
       } catch (e) { /* never let audio stop the game starting */ }
+    };
+
+    /**
+     * The world goes quiet while the game is paused.
+     *
+     * Not setMuted, and not a suspend of the context. `muted` is the player's
+     * own switch and a pause must not be able to leave it in a state they did
+     * not choose; suspending the context would stop the bed's loop sources
+     * dead, and a bandpassed noise loop restarted from a suspend re-enters at a
+     * different point in the buffer, which is audible as a step in the crowd.
+     * Ducking the master gain holds the whole graph exactly where it is.
+     *
+     * 0.06 rather than 0, because a paused game that is completely silent and a
+     * paused game whose audio has crashed are the same experience, and this mix
+     * already swallows every cue that throws (see the wrapper below).
+     *
+     * The way back up is slower than the way down, and it is started when the
+     * resume countdown starts rather than when the panel lifts -- so the crowd
+     * is already there when the road comes back. See resume() in main.js.
+     */
+    s.setPaused = function (on) {
+      if (s.muted) return;
+      master.gain.setTargetAtTime(on ? 0.06 : 0.85, ctx.currentTime, on ? 0.10 : 0.30);
     };
 
     s.setMuted = function (m) {

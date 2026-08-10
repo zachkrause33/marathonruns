@@ -10949,10 +10949,32 @@ MR.World = (function () {
    * The lane telegraph that lies on the road ahead of a hazard.
    *
    * The icon is a SHAPE first and a colour second: solid up-triangles for
-   * JUMP, stacked rungs for DUCK, crosses for BLOCK. At 90 units the mat is
+   * JUMP, an OPEN PORTAL for DUCK, crosses for BLOCK. At 90 units the mat is
    * about a dozen pixels tall, which is enough for shape but not for reading
    * a small hazard mesh -- which is exactly the distance the lane choice has
    * to be made at.
+   *
+   * ---- THE DUCK GLYPH WAS THREE STACKED RUNGS, AND A RUNG IS A LADDER ----
+   *
+   * A blind reader asked what the DUCK objects meant answered "UNDER, low
+   * confidence" on all five, and named the reason: *"The yellow-and-black
+   * diagonals tell me danger... They do NOT tell me over or under."* The mat is
+   * the channel this file already calls the one the race is lost by misreading,
+   * and it was not helping: three horizontal bars is a LADDER, and a ladder is
+   * a thing you climb.
+   *
+   * A MAT CANNOT DRAW AN ARROW THAT MEANS "DOWN", and that is the constraint
+   * the rungs were probably a retreat from. The mat lies flat on the road, so
+   * every direction it can draw is a direction along the road -- which is why
+   * the JUMP glyph is a RAMP PROFILE (apex away from the runner) rather than an
+   * up-arrow, and why "under" cannot be an arrow here either.
+   *
+   * What a flat mat CAN draw is the shape of the hole. The DUCK glyph is now an
+   * inverted U -- a lintel on two legs with the road showing through the middle
+   * -- which is a PORTAL YOU PASS THROUGH, and which is now literally the
+   * silhouette of the object it precedes: see duckHeader(), where the span
+   * between the standards above the bar is filled in for the same reason.
+   * Glyph and object say the same sentence.
    */
   function matTexture(kind, tint, wash) {
     const c = canvas(128, 256);
@@ -10975,9 +10997,13 @@ MR.World = (function () {
         g.moveTo(64, cy + 30); g.lineTo(108, cy - 28); g.lineTo(20, cy - 28);
         g.closePath(); g.fill();
       } else if (kind === K.DUCK) {
-        g.fillRect(20, cy - 30, 88, 15);
-        g.fillRect(20, cy - 4, 88, 15);
-        g.fillRect(20, cy + 22, 88, 15);
+        // The lintel, thick, and the two legs it stands on. The opening is
+        // 52 of the glyph's 88 -- more than half of it is the hole, because
+        // "legal is not legible" and an opening that merely exists reads as a
+        // line rather than as a way through.
+        g.fillRect(20, cy - 32, 88, 22);
+        g.fillRect(20, cy - 10, 18, 42);
+        g.fillRect(90, cy - 10, 18, 42);
       } else {
         g.lineWidth = 17; g.strokeStyle = tint; g.lineCap = 'butt';
         g.beginPath();
@@ -17386,7 +17412,23 @@ MR.World = (function () {
         // The four inner walls, standing between the floor and the rim, so
         // what you see over the lip is the INSIDE of something. They are a
         // shade up from the floor, which is what gives the hole a bottom.
-        gl(hbx(2.10, 0.38, 0.05, 0, 0.21, 0.395, WALL), GLOSS.matte),
+        //
+        // THE FAR WALL IS NOW 0.50 AND NOT 0.38, and it is the whole of what
+        // makes this variant a hole. A blind reader shown this object called it
+        // *"red-and-white boards on a low bed"* -- the guarding read and the
+        // excavation did not -- and the frame says why: between the near lip at
+        // 0.13 and the underside of the lower rail there was an aperture 0.30
+        // tall, and every pixel of it was warm mid-tone. Duct, coupler, conduit
+        // bundle, spoil and the pale sub-base band across the far rim, all of
+        // them lit, none of them dark. THE HOLE HAD NO DARK IN IT.
+        //
+        // At 0.50 the far wall fills the aperture from the top of the ducts to
+        // the rail in near-black, and it also stands taller and nearer than the
+        // far rim's pale sub-base cap, so it occludes the one bright band that
+        // used to sit exactly where the void should be. The value step this
+        // object's whole read depends on is bought by the wall being TALL
+        // rather than by anything being added.
+        gl(hbx(2.10, 0.58, 0.05, 0, 0.31, 0.395, WALL), GLOSS.matte),
         gl(hbx(2.10, 0.07, 0.05, 0, 0.05, -0.395, WALL), GLOSS.matte),
         gl(hbx(0.06, 0.24, 0.84, -1.02, 0.14, 0, WALL), GLOSS.matte),
         gl(hbx(0.06, 0.24, 0.84, 1.02, 0.14, 0, WALL), GLOSS.matte),
@@ -17415,12 +17457,17 @@ MR.World = (function () {
         // 15 degrees above the road, so the one object that says what the hole
         // is FOR was invisible. At 0.15 with a 0.075 radius the run breaks the
         // lip line by 0.095 and the player sees pipe standing in a trench.
-        gl(cyl(0.105, 0.105, 2.02 * LANE_FIT, 12, 0, 0.125, 0.17, 0xff9448, 0, 0, Math.PI / 2), GLOSS.trim),
-        gl(cyl(0.085, 0.085, 2.02 * LANE_FIT, 10, 0, 0.10, -0.14, 0xe07030, 0, 0, Math.PI / 2), GLOSS.trim),
+        // 0.105 and not 0.125: the run still breaks the near lip line by 0.08,
+        // which is all the "pipe standing in a trench" read ever needed, and
+        // the 0.04 it gives back is 0.04 more of dark wall above it. The
+        // aperture is only 0.36 tall and this object was spending a ninth of it
+        // on lit plastic that was already legible.
+        gl(cyl(0.105, 0.105, 2.02 * LANE_FIT, 12, 0, 0.105, 0.17, 0xff9448, 0, 0, Math.PI / 2), GLOSS.trim),
+        gl(cyl(0.085, 0.085, 2.02 * LANE_FIT, 10, 0, 0.085, -0.14, 0xe07030, 0, 0, Math.PI / 2), GLOSS.trim),
       ];
       // Duct couplers, so the runs are jointed lengths rather than extrusions.
       for (const cx of [-0.46, 0.34]) {
-        parts.push(gl(cyl(0.128, 0.128, 0.16, 12, cx * LANE_FIT, 0.125, 0.17, 0xfff6ea, 0, 0, Math.PI / 2), GLOSS.trim));
+        parts.push(gl(cyl(0.128, 0.128, 0.16, 12, cx * LANE_FIT, 0.105, 0.17, 0xfff6ea, 0, 0, Math.PI / 2), GLOSS.trim));
       }
       // THE LENGTH WAITING TO GO IN, leaning out of the far end of the hole on
       // the spoil. It is the tallest thing in the excavation at 0.44, it is the
@@ -17436,12 +17483,19 @@ MR.World = (function () {
       // A bundle of small conduits in the corner of the trench -- what the
       // ducts are being laid for, and the detail that fills the floor so the
       // hole has something IN it rather than being an empty box.
-      for (const c of [[-0.72, 0.09, -0.24], [-0.62, 0.09, -0.10], [-0.67, 0.155, -0.17]]) {
+      for (const c of [[-0.72, 0.07, -0.24], [-0.62, 0.07, -0.10], [-0.67, 0.135, -0.17]]) {
         parts.push(gl(cyl(0.032, 0.032, 0.66 * LANE_FIT, 8, c[0] * LANE_FIT, c[1], c[2], 0xe8b820, 0, 0, Math.PI / 2), GLOSS.trim));
       }
-      // The spoil, heaped on the far rim where it is dug out to. Ellipsoids,
-      // for the reason the sandbags are: a heap has no flat face.
-      for (const s of [[-0.42, 0.55, 0.40, 0.78, 0.16, 0.20], [0.50, 0.53, 0.42, 0.62, 0.13, 0.18]]) {
+      // The spoil, heaped on the SIDE rims and no longer across the far one.
+      // Ellipsoids, for the reason the sandbags are: a heap has no flat face.
+      //
+      // It moved because of where it sat, not because of what it was. Two pale
+      // tan heaps 0.78 and 0.62 wide, centred on the far rim at y 0.53-0.55,
+      // covered the top third of the aperture in the one value the hole cannot
+      // afford. On the side rims they still say "this was dug out", they still
+      // read from behind and from the flank, and they are outboard of the
+      // sightline into the void instead of standing in it.
+      for (const s of [[-0.90, 0.46, 0.12, 0.44, 0.17, 0.50], [0.94, 0.44, -0.08, 0.38, 0.14, 0.42]]) {
         const g = new THREE.SphereGeometry(0.5, 9, 6);
         g.scale(s[3], s[4], s[5]);
         const m = new THREE.Matrix4();
@@ -17492,11 +17546,42 @@ MR.World = (function () {
        * makes this read as GUARDED rather than as damage, which is the
        * difference between a works trench and a pothole.
        */
-      for (const ry of [0.50, 0.71]) {
+      /**
+       * ---- THE APERTURE IS THE MEASUREMENT, AND IT WAS 0.30 ---------------
+       *
+       * What a player can see of the excavation is not the height of the hole.
+       * It is the SCREEN SLOT between the top of the near rim and the underside
+       * of the near rail, and through that slot the lens sees a band of the far
+       * wall and nothing else. Both numbers below are that slot, in world y at
+       * the gate line, and the second is what the two rails cost:
+       *
+       *   near rim top      0.13
+       *   lower rail under  0.43   ->  aperture 0.30
+       *
+       * The rails then eat it a second time in the ray: from a lens 2.85 above
+       * the road and 12.35 back, the underside of the near rail at 0.43 hides
+       * everything on the far wall above y 0.27, so a 0.50 wall showed 0.11 of
+       * itself. The excavation this file describes at length was being seen
+       * through a letterbox.
+       *
+       * SO THE LOWER RAIL IS THINNED AND LIFTED, AND NEITHER IS DELETED.
+       * Deleting one is the obvious move and it is refused with a number: this
+       * variant is already the tightest hazard in the game on the contrast gate
+       * -- 1.37x luminance against lane 1 with 0.092 of margin -- and the white
+       * in the rails is what buys that ratio. 0.09 tall at 0.60 keeps both
+       * rails, keeps the banded rhythm, and opens the slot:
+       *
+       *   lower rail under  0.555  ->  aperture 0.425, and 0.247 of far wall
+       *
+       * The upper rail goes to 0.75 at 0.10 tall, so its top is 0.80 exactly --
+       * the box ceiling, which the beacon already stands on and which art is
+       * not allowed past.
+       */
+      for (const r of [[0.60, 0.09], [0.75, 0.10]]) {
         for (let i = 0; i < 5; i++) {
           const bxc = -0.84 + i * 0.42;
-          parts.push(gl(hcbx(0.43, 0.14, 0.13, bxc, ry, -0.36, i % 2 ? RED : WHITE, 0.02), GLOSS.paint));
-          parts.push(gl(hcbx(0.43, 0.14, 0.13, bxc, ry, 0.36, i % 2 ? WHITE : RED, 0.02), GLOSS.paint));
+          parts.push(gl(hcbx(0.43, r[1], 0.13, bxc, r[0], -0.36, i % 2 ? RED : WHITE, 0.02), GLOSS.paint));
+          parts.push(gl(hcbx(0.43, r[1], 0.13, bxc, r[0], 0.36, i % 2 ? WHITE : RED, 0.02), GLOSS.paint));
         }
       }
       // The lamp on the near-left post. One red beacon is what a guarded hole
@@ -17782,34 +17867,64 @@ MR.World = (function () {
       const MODS = [-0.66, 0, 0.66];
       MODS.forEach(function (MX, i) {
         /**
-         * THE MODULE. One closed pale solid, chamfered 0.13 -- which is the
-         * most chamferGeo will take on a 0.60 module without inverting, and
-         * which is right anyway: these are blow-moulded and the shoulder is
-         * most of the shape.
+         * ---- THE MODULE TAPERS NOW, AND THAT IS WHAT MAKES IT A BARRIER ----
+         *
+         * It was ONE closed pale solid, 0.60 x 0.66 x 0.94, with a 0.98-deep
+         * flat cap band across the top of it. A blind reader shown the object
+         * named it *"a skip, wheeled bin, roadworks cabinet or generator
+         * housing"* -- four different boxes, and every one of them a box with a
+         * lid. That is exactly what the geometry was: a cuboid the full depth
+         * of its own footprint, finished with a flat plate wider than itself.
+         *
+         * The one thing every water barrier on every road in the world has, and
+         * this had none of, is a TAPERED PROFILE. It is wide where it is heavy
+         * and narrow where it is not, and the silhouette from the chase camera
+         * -- which looks DOWN on the object at 5 to 15 degrees, so depth is
+         * read as roof -- is a stepped shoulder rather than a flat top.
+         *
+         * Three sections, tapering 0.94 to 0.74 to 0.54 in depth while the
+         * width barely moves, because a linked run's width is set by the
+         * interlock and only its section tapers:
+         *
+         *   THE BODY   0.12 to 0.56, full depth, and the water is in it.
+         *   THE SHOULDER 0.56 to 0.67, 0.74 deep, the step the waist rib caps.
+         *   THE TOP RAIL 0.67 to 0.77, 0.54 deep, which is the ridge a barrier
+         *     is lifted and walked along by, and NOT a lid.
+         *
+         * Nothing about the box moved: yMax was 0.79 and is 0.77, halfZ was
+         * 0.50 at the sill and is unchanged, and the widest thing is still the
+         * cap band's replacement at 0.56 against a lane of 1.98.
          */
-        parts.push(gl(cbx(0.60, 0.66, 0.94, MX, 0.45, 0, SHELL, 0.13), GLOSS.paint));
-        // THE FOUR WINDOWS. Front, back and both flanks, each standing 0.035
-        // proud of the shell so it is a moulded panel and not a decal.
+        parts.push(gl(cbx(0.60, 0.44, 0.94, MX, 0.34, 0, SHELL, 0.11), GLOSS.paint));
+        parts.push(gl(cbx(0.58, 0.12, 0.74, MX, 0.615, 0, SHELL, 0.09), GLOSS.paint));
+        parts.push(gl(cbx(0.56, 0.11, 0.54, MX, 0.715, 0, SHELL_HI, 0.08), GLOSS.matte));
+        /**
+         * THE FOUR WINDOWS. Front, back and both flanks, each standing 0.035
+         * proud of the shell so it is a moulded panel and not a decal.
+         *
+         * 0.13 to 0.49 and not 0.13 to 0.45, on a body that is now 0.44 tall
+         * rather than 0.66: the water fills 82% of the section it is in instead
+         * of 48% of a box, and the waterline lands ON the shoulder step. A
+         * barrier that is visibly full to the shoulder is full; one that is
+         * blue in the bottom half of a tall white box is a box with a stripe.
+         */
         for (const sz of [-1, 1]) {
-          parts.push(gl(cbx(0.46, 0.32, 0.06, MX, 0.29, sz * 0.475, WATER, 0.02), GLOSS.paint));
-          parts.push(gl(cbx(0.44, 0.035, 0.07, MX, 0.462, sz * 0.475, WATER_HI, 0.01), GLOSS.chrome));
+          parts.push(gl(cbx(0.50, 0.36, 0.06, MX, 0.31, sz * 0.475, WATER, 0.02), GLOSS.paint));
+          parts.push(gl(cbx(0.48, 0.035, 0.07, MX, 0.502, sz * 0.475, WATER_HI, 0.01), GLOSS.chrome));
         }
         for (const sx of [-1, 1]) {
-          parts.push(gl(cbx(0.06, 0.32, 0.72, MX + sx * 0.305, 0.29, 0, WATER, 0.02), GLOSS.paint));
-          parts.push(gl(cbx(0.07, 0.035, 0.70, MX + sx * 0.305, 0.462, 0, WATER_HI, 0.01), GLOSS.chrome));
+          parts.push(gl(cbx(0.06, 0.36, 0.72, MX + sx * 0.305, 0.31, 0, WATER, 0.02), GLOSS.paint));
+          parts.push(gl(cbx(0.07, 0.035, 0.70, MX + sx * 0.305, 0.502, 0, WATER_HI, 0.01), GLOSS.chrome));
         }
-        // The moulded waist rib the shell is stiffened by, above the waterline.
-        parts.push(gl(cbx(0.64, 0.05, 0.98, MX, 0.575, 0, SHELL_HI, 0.02), GLOSS.paint));
-        // The cap band. Pale rather than lemon: the whole object is one hue
-        // family now and a yellow band here would be the only warm thing on it
-        // AND would put yellow back on a JUMP, which is the one colour move
-        // this file is not allowed to make -- see stripeTex.
-        parts.push(gl(cbx(0.66, 0.09, 0.98, MX, 0.745, 0, SHELL_HI, 0.035), GLOSS.matte));
+        // The moulded waist rib the shell is stiffened by, on the shoulder step
+        // itself so it reads as the edge of the taper rather than as a band
+        // painted across a flat side.
+        parts.push(gl(cbx(0.62, 0.05, 0.96, MX, 0.555, 0, SHELL_HI, 0.02), GLOSS.paint));
         // THE FILL CAP, on top, and the DRAIN PLUG on each flank. The pair of
         // fittings that makes a water barrier a water barrier: you can fill it
         // and you can empty it, and before this pass the object had neither
         // opening nor contents.
-        parts.push(gl(cyl(0.078, 0.085, 0.05, 10, MX, 0.775, 0, DEEP), GLOSS.trim));
+        parts.push(gl(cyl(0.078, 0.085, 0.05, 10, MX, 0.765, 0, DEEP), GLOSS.trim));
         parts.push(gl(cyl(0.046, 0.046, 0.035, 8, MX, 0.7825, 0, WATER_HI), GLOSS.chrome));
         for (const sx of [-1, 1]) {
           parts.push(gl(cyl(0.055, 0.055, 0.07, 8, MX + sx * 0.32, 0.20, 0, DEEP, 0, 0, Math.PI / 2), GLOSS.trim));
@@ -17817,9 +17932,10 @@ MR.World = (function () {
         // The foot block under each module, standing out past the sill, so the
         // run has three feet with a recess between them rather than one slab.
         parts.push(gl(cbx(0.40, 0.15, 1.02, MX, 0.075, 0, DEEP, 0.04), GLOSS.paint));
-        // The lifting handle moulded into the top of each module, offset so the
-        // three are not a ruled row.
-        parts.push(gl(cbx(0.10, 0.055, 0.30, MX + (i - 1) * 0.06, 0.7725, -0.28, DEEP, 0.02), GLOSS.trim));
+        // The lifting handle moulded into the top rail, offset so the three are
+        // not a ruled row. z -0.18 and not -0.28: the rail is 0.54 deep now and
+        // a handle at -0.28 would have hung off the front of it.
+        parts.push(gl(cbx(0.10, 0.055, 0.26, MX + (i - 1) * 0.06, 0.745, -0.18, DEEP, 0.02), GLOSS.trim));
       });
       /**
        * THE INTERLOCK PINS, standing in the two joints. They are what says at
@@ -18101,14 +18217,42 @@ MR.World = (function () {
      * height comes from tall yellow standards rather than from anything spanning
      * the lane.
      *
-     * That distinction is not cosmetic, and it constrains every variant. The
-     * chase camera trails 5.1 units and carries 42% of the jump arc, so it
-     * sweeps y = 1.76 to 3.14 right through a gate's lane. An earlier version
-     * had a header board at 2.44 and the camera flew straight into it -- one
-     * frame of full-screen yellow-and-black stripes. ABOVE THE BAR, ONLY THIN
-     * MEMBERS,
-     * and only out at the standards, so the worst a clip can ever be is a
-     * sliver of post.
+     * ---- THE RULE THIS FILE USED TO STATE HERE WAS MEASURED AND IT IS FALSE --
+     *
+     * Verbatim, and it governed every DUCK in the game: *"The chase camera
+     * trails 5.1 units and carries 42% of the jump arc, so it sweeps y = 1.76 to
+     * 3.14 right through a gate's lane. An earlier version had a header board at
+     * 2.44 and the camera flew straight into it -- one frame of full-screen
+     * yellow-and-black stripes. ABOVE THE BAR, ONLY THIN MEMBERS, and only out
+     * at the standards."*
+     *
+     * The incident is real and the conclusion drawn from it expired. That
+     * sentence was written when K.CAM_BASE_Y was 2.05 -- src/render/camera.js
+     * still carries the note, *"At the old BASE_Y of 2.05"* -- and the resting
+     * eye is 3.10 now. Nobody re-measured, and the number went on forbidding the
+     * one thing a DUCK most needed for five passes.
+     *
+     * MEASURED, on the shipped page, over a real bot run pumped at a simulated
+     * 60fps, sampling the live lens every frame and recording its height above
+     * the road directly under it at the instant it crosses a gate plane:
+     *
+     *   lens above the road, whole run          min 2.83   max 5.74
+     *   at a DUCK gate, inside the lane column  min 2.85   median 3.47
+     *
+     * Fifty-five gate crossings, and the lens never came within a unit of the
+     * top of the bar. The claim that the camera sweeps the lane at 1.76 is off
+     * by more than the whole height of the header it was used to forbid.
+     *
+     * SO THE SPACE ABOVE THE BAR IS AVAILABLE, and this file now spends it --
+     * see duckHeader(). What survives of the old rule is its arithmetic form,
+     * restated against the number that was actually measured: NOTHING ACROSS THE
+     * LANE ABOVE 2.22, which is 0.61 below the lowest lens height ever sampled
+     * at a DUCK. Above 2.22 the old rule stands unchanged: thin members, out at
+     * the standards, so the worst a clip can ever be is a sliver of post.
+     *
+     * AND NOTHING ACROSS THE LANE BELOW 1.41, which is not a camera rule but the
+     * collision contract: MR.Collision.BOX puts the DUCK floor there, and art
+     * below it is art a legally ducked player runs through.
      */
     /**
      * ============ WHAT THE ORBIT SHEET SAID ABOUT THIS VOCABULARY ============
@@ -18159,6 +18303,111 @@ MR.World = (function () {
      *   v4  a second, smaller conduit on saddle brackets at z +0.21, with
      *       flange bolts at the collars.
      */
+    /**
+     * ============ THE CLEARANCE HEADER, AND IT IS THE WHOLE PASS ============
+     *
+     * ---- THE DEFECT, IN THE READER'S OWN WORDS ----------------------------
+     *
+     * A blind reader shown unlabelled 1:1 crops through the live chase camera
+     * at 8, 12 and 25 units, asked of every object *"must a runner go OVER it,
+     * UNDER it, or AROUND it?"*, routed every JUMP correctly and answered every
+     * one of the five DUCKs "UNDER, low confidence" with OVER live in all five:
+     *
+     *   *"Genuinely ambiguous, and I want to be loud about it. The beam sits in
+     *   the upper third of the structure with a wide open gap of clear road
+     *   visible beneath it. That gap says duck under. But a hurdle also looks
+     *   exactly like this -- a striped bar on two legs with air underneath --
+     *   and that says jump over. Nothing in the pixels gives me the absolute
+     *   height... I would not bet a run on it."*
+     *
+     * One contact ends a record attempt and a DUCK cannot be jumped -- see the
+     * DUCK clause in collision.js, which reads `surface` and deliberately not
+     * `y + surface` precisely so a plain jump cannot sail over a bar. A player
+     * who reads OVER here loses the run to something that was not their fault,
+     * which CLAUDE.md rule 4 makes a build failure rather than a preference.
+     *
+     * ---- WHY THE OBJECT COULD NOT SAY IT ---------------------------------
+     *
+     * tools/kindread.js has the mechanism, and it is one line of the table. A
+     * DUCK's occupancy from the road to 1.40 ran 0.22-0.30 and its occupancy
+     * from 2.00 to 2.80 ran 0.25-0.35. THE TOP OF A DUCK AND THE BOTTOM OF A
+     * DUCK WERE THE SAME NUMBER. Two thin posts below a bar and two thin posts
+     * above it is a shape with no preferred direction in it: whatever argument
+     * the open bottom makes for going under, the open top makes for going over,
+     * and the reader is left choosing between a hurdle and a gantry on scale
+     * alone -- which is exactly the thing it said it could not recover.
+     *
+     * A hurdle has nothing above its rail. A low bridge has a metre of
+     * structure above its soffit. That difference is the whole of the read, and
+     * it is what this puts back.
+     *
+     * ---- WHAT IT IS, AND WHY IT IS SHARED BY ALL FIVE VARIANTS ------------
+     *
+     * A CLEARANCE HEADER: the deep board every real low-clearance structure
+     * carries above the restriction, so that the ceiling is seen before it is
+     * met. It fills the whole span between the two standards from the top of
+     * the bar to 2.22, so the beam the player reads is 1.41 to 2.22 -- 0.81
+     * deep against the 0.42 it was -- and above the road there is now MASS
+     * where there used to be sky.
+     *
+     * Three members, and the order of their values is the point:
+     *
+     *   THE SOFFIT SHADOW, 1.83 to 1.89, near-black. The dark line under a
+     *     ceiling. It is what stops the header reading as a second rail bolted
+     *     over the first, and it is the top edge of the OPENING.
+     *   THE WEB, 1.89 to 2.13, in the standards' own yellow, with a stiffener
+     *     rib standing proud of BOTH faces. Plain, because the striped bar
+     *     below it has to stay the loudest single element in the frame; what
+     *     this contributes is area, not noise.
+     *   THE TOP FLANGE, 2.13 to 2.22, pale, bearing on both standards. It is
+     *     the last horizontal before the posts go on alone, and against sky it
+     *     is the line that says the structure has a top.
+     *
+     * SHARED, because a discriminator that works on one DUCK and not the other
+     * four is not a discriminator -- the same sentence the base plates were
+     * adopted under. It is also true of all five objects: the boarded lift of a
+     * scaffold, the sign panel of a gantry, the crash beam of a services
+     * bridge and the head of a level crossing are the same member.
+     *
+     * ---- THE THREE NUMBERS IT IS PINNED TO --------------------------------
+     *
+     *   TOP 2.22, against a lens measured at 2.85 at its lowest over a DUCK.
+     *     See the header above for the run that measured it.
+     *   BOTTOM 1.83, which is MR.Collision.BOX's own ceiling for the kind.
+     *     Nothing here reaches below the bar, so the daylight band that a blind
+     *     reader once named as the only cue this object had is untouched: every
+     *     member is above 1.83 and bands 0 to 6 do not move.
+     *   HALF-WIDTH 0.730 on the web and 0.745 on the flange, against standards
+     *     whose inner faces stand at 0.738. The web fills the span and the
+     *     flange bears on the posts, and neither goes near the 1.12 the
+     *     envelope guard enforces.
+     *
+     * DEPTH 0.34, against a bar of 0.52-0.56. A web is thinner than the flanges
+     * it carries, so the header is set back from the bar on both faces -- which
+     * is what a girder does, and which keeps every fitting the five variants
+     * hang on their standards at z +/-0.185 and outboard clear of it.
+     */
+    function duckHeader() {
+      const parts = [
+        // The soffit shadow. Full span, and 0.36 deep so it shows on both
+        // faces of the web rather than being a line painted on the front.
+        gl(hbx(2.06, 0.06, 0.36, 0, 1.86, 0, 0x1a1206), GLOSS.matte),
+        // The web.
+        gl(hcbx(2.02, 0.24, 0.34, 0, 2.01, 0, 0xffc422, 0.04), GLOSS.paint),
+        // The top flange, bearing on both standards.
+        gl(hcbx(2.06, 0.09, 0.40, 0, 2.175, 0, 0xfff0a0, 0.02), GLOSS.trim),
+      ];
+      // THE STIFFENER RIBS. Deeper than the web they stand on, so they exist
+      // from behind as well as in front -- rule 1, on a member that would
+      // otherwise be a flat slab with a decorated face. Three of them, at the
+      // spacing a real web is stiffened at, and in the deep amber the rest of
+      // the kind's fittings already use.
+      for (const rx of [-0.66, 0, 0.66]) {
+        parts.push(gl(hbx(0.10, 0.22, 0.44, rx, 2.01, 0, 0xd18a08), GLOSS.trim));
+      }
+      return parts;
+    }
+
     const duckGeo = merge([
       // The bar and the standards are chamfered too. A DUCK is read as a
       // silhouette at forty units, and the cut is small enough not to touch
@@ -18258,7 +18507,7 @@ MR.World = (function () {
         }
       }
       return p;
-    })()));
+    })()).concat(duckHeader()));
 
     /**
      * ============ DUCK v1: A SCAFFOLD GANTRY ============
@@ -18432,7 +18681,7 @@ MR.World = (function () {
         // The toe board, on the rear plane at the lift.
         parts.push(gl(bx(0.26, 0.20, 0.06, px, 1.95, 0.255, 0xfff0a0), GLOSS.trim));
       }
-      return merge(parts);
+      return merge(parts.concat(duckHeader()));
     })();
 
     /**
@@ -18552,7 +18801,7 @@ MR.World = (function () {
         // fitting rather than a slab seen from behind.
         parts.push(gl(bx(0.32, 0.07, 0.14, px, 0.60, 0.20, 0xd18a08), GLOSS.trim));
       }
-      return merge(parts);
+      return merge(parts.concat(duckHeader()));
     })();
 
     /**
@@ -18705,7 +18954,7 @@ MR.World = (function () {
       // The rubber buffer in the bottom of the fork, which is what a dropped
       // boom actually lands on.
       parts.push(gl(cyl(0.055, 0.055, 0.30, 8, rx, 2.06, 0, 0x2b1e05, Math.PI / 2), GLOSS.matte));
-      return merge(parts);
+      return merge(parts.concat(duckHeader()));
     })();
 
     /**
@@ -18864,7 +19113,7 @@ MR.World = (function () {
       parts.push(gl(cyl(0.13, 0.13, 0.58, 10, -px, 2.92, 0, 0xd18a08), GLOSS.paint));
       parts.push(gl(cyl(0.13, 0.13, 0.34, 10, -px + 0.17, 3.18, 0, 0xd18a08, 0, 0, Math.PI / 2), GLOSS.paint));
       parts.push(gl(cyl(0.16, 0.16, 0.07, 10, -px + 0.32, 3.18, 0, 0xfff0a0, 0, 0, Math.PI / 2), GLOSS.chrome));
-      return merge(parts);
+      return merge(parts.concat(duckHeader()));
     })();
 
     /**

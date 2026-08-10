@@ -3400,3 +3400,101 @@ nobody measured is worse than no number at all.**
     already records that hue is not the kind channel and the profile is; this
     pass spends the hue on saying what each object IS, which is what the owner
     asked for, and the profile classifier is what proves it was safe.
+
+54. **A number nobody re-measured forbade the one thing every DUCK needed. The
+    camera stopped flying at 2.05 five passes ago and the rule written against
+    it kept ruling.**
+
+    A blind reader shown unlabelled 1:1 crops through the live chase camera at
+    8, 12 and 25 units routed every JUMP correctly and answered every one of the
+    five DUCKs *"UNDER, low confidence"* with OVER live on all five. Its own
+    diagnosis is the most useful sentence in the report: *"Absolute heights of
+    anything. This is the biggest gap. Nothing in these images gives me a
+    reliable scale reference next to the objects, so every over/under/around
+    judgement I made is a judgement about proportion and silhouette, not about
+    measured clearance."* And on the mark: *"The yellow-and-black diagonals tell
+    me danger... They do NOT tell me over or under."* A DUCK cannot be jumped --
+    `collision.js` reads `surface` and deliberately not `y + surface` for
+    exactly that reason -- so reading OVER costs the run.
+
+    **THE MECHANISM WAS IN `tools/kindread.js` ALL ALONG, AS ONE LINE OF THE
+    TABLE.** A DUCK's occupancy from the road to 1.40 ran 0.22-0.30, and its
+    occupancy from 2.00 to 2.80 ran 0.25-0.35. **The top of a DUCK and the
+    bottom of a DUCK were the same number.** Two thin posts under a bar and two
+    thin posts over it is a shape with no preferred direction in it: whatever
+    the open bottom argues for going under, the open top argues equally for
+    going over. A hurdle has nothing above its rail; a low bridge has a metre of
+    structure above its soffit. Nobody had ever read the profile that way, and
+    five differentiation passes had gone by improving what the object was made
+    of rather than where its mass sat.
+
+    **WHY NOTHING HAD EVER BEEN PUT UP THERE, AND WHY THE REASON HAD EXPIRED.**
+    `world.js` stated it as law over every DUCK in the game: *"The chase camera
+    trails 5.1 units and carries 42% of the jump arc, so it sweeps y = 1.76 to
+    3.14 right through a gate's lane. An earlier version had a header board at
+    2.44 and the camera flew straight into it."* The incident is real. The
+    sentence was written when `K.CAM_BASE_Y` was **2.05**, which
+    `src/render/camera.js` still notes in passing, and the resting eye has been
+    **3.10** for a long time. Nobody re-measured, and a stale number went on
+    forbidding the one member the object most needed.
+
+    Measured on the shipped page, over a real bot run pumped at a simulated
+    60fps, sampling the live lens every frame and recording its height above the
+    road directly under it at the instant it crosses a gate plane:
+
+        lens above the road, whole run           min 2.83   max 5.74
+        at a DUCK gate, inside the lane column   min 2.85   median 3.47
+
+    Fifty-five crossings. The lens never came within a unit of the top of the
+    bar. The claim that the camera sweeps the lane at 1.76 is wrong by more than
+    the whole height of the thing it was used to forbid.
+
+    **SO ALL FIVE DUCKS GOT A CLEARANCE HEADER**, filling the whole span between
+    the standards from the top of the bar to 2.22 -- soffit shadow, web with
+    ribs, top flange -- so the beam a player reads is 1.41 to 2.22, **0.81 deep
+    against the 0.42 it was**, and there is mass above the road where there used
+    to be sky. Bands 7-10 went **0.68 / 0.89 / 0.46 / 0.25 to 0.68 / 0.90 / 0.90
+    / 0.90**, and bands 0-6 did not move at all: every member is above 1.83,
+    which is `MR.Collision.BOX`'s own ceiling for the kind, so the daylight the
+    previous pass bought is untouched. `tools/kindread.js` stays at **1 of 21**
+    misread on profile and the tightest margin IMPROVED, **-2.235 to -1.247**.
+
+    **THE RULE THAT REPLACES THE OLD ONE IS THE SAME SHAPE, PINNED TO A NUMBER
+    THAT WAS ACTUALLY TAKEN.** Nothing across the lane above **2.22** -- 0.63
+    below the lowest lens height ever sampled over a DUCK -- and nothing across
+    the lane below **1.41**, which is not a camera rule but the collision floor.
+    Above 2.22 the old rule stands unchanged: thin members, out at the
+    standards. **Re-measured after the change and the minimum is unmoved at
+    2.85.**
+
+    **AND THE MAT WAS DRAWING A LADDER.** The DUCK telegraph glyph was three
+    stacked rungs, on the channel this file itself calls the one the race is
+    lost by misreading. A rung is a thing you climb. **A flat mat cannot draw an
+    arrow that means "down"** -- every direction a floor can draw is a direction
+    along the road, which is why the JUMP glyph is a ramp profile and not an
+    up-arrow -- but it can draw the shape of the hole. It is now an inverted U
+    with road showing through the middle, which is the silhouette of the object
+    it precedes.
+
+    **WHAT A BLIND READER MEASURES THAT NO INSTRUMENT IN THIS REPO DOES.** The
+    panels are built by the same code path as `tools/framing.js` and they OMIT
+    THE TELEGRAPH MAT by construction, because `api.variantObject` hands back
+    the variant and the mat is its sibling. So every blind read this project has
+    ever run has tested the object alone. That is the harder test and worth
+    keeping -- but it is not what the player sees, and a pass that "fixes" a
+    read by strengthening the mat would not show up in it at all.
+
+    **THE TRENCH WAS BEING SEEN THROUGH A LETTERBOX, AND THE MEASUREMENT IS THE
+    APERTURE.** The reader called JUMP v2 *"red-and-white boards on a low bed"*
+    against an owner's ask for *"a visible trench"*. What a player sees of an
+    excavation is not the depth of the hole, it is the screen slot between the
+    top of the near rim and the underside of the near rail -- and through that
+    slot the ray from the lens hides everything on the far wall above y 0.27, so
+    a 0.50 wall showed **0.11 of itself**. Every pixel in the slot was warm
+    mid-tone: duct, coupler, conduit, spoil, and a pale sub-base band across the
+    far rim sitting exactly where the void should be. Aperture **0.30 to
+    0.425**, far wall visible **0.11 to 0.247**, spoil moved to the side rims,
+    ducts dropped 0.02. Deleting a rail was refused with a number: this variant
+    is the tightest hazard in the game on the contrast gate and the white in the
+    rails is what buys the ratio -- it now sits at **1.32x/+0.053**, which
+    passes and is the thinnest margin in the file.

@@ -364,12 +364,54 @@ paint — *"two gold strips side by side"*, *"which glows cyan"*, *"a magenta
 strip"*, *"cyan strip and gantry over the left lane"*. So at 32 units the mat
 is **not too faint to read**; it is read, and the answer is the same either way.
 
-### 3.5 Confidence
+### 3.5 Confidence — a one-reader effect that did not survive the second reader
 
-Reader A, at unchanged accuracy: **8 of 8 "sure" with the mat, 4 of 8 without.**
-All four of its hedged answers are NOMAT panels. That is a within-reader
-difference — the cut that killed the previous pass's result — and it is the
-only place so far where the mat does anything measurable at all.
+Reader A looked like a result: **8 of 8 "sure" with the mat, 4 of 8 without**,
+and all four of its hedged answers were NOMAT panels.
+
+**Reader B runs the other way.** It hedged five, and **four of the five are MAT
+panels**: 4 of 8 sure with the mat, 7 of 8 sure without.
+
+| reader | sure, mat ON | sure, mat OFF |
+|---|---|---|
+| A | 8/8 | 4/8 |
+| B | 4/8 | 7/8 |
+| **pooled** | **12/16** | **11/16** |
+
+**That is nothing.** Confidence is temperament, exactly as the previous pass
+found, and the lesson repeats: one reader is never enough to claim a confidence
+effect, in either direction. Had this pass stopped at reader A it would have
+reported "the mat makes readers surer" and been wrong.
+
+### 3.5b THE MAT TEACHES THE OBJECT, AND THAT IS THE ONE THING IT DEMONSTRABLY DOES
+
+Reader B, unprompted:
+
+> *"I did not use the tint to decide anything on its own; I read the objects
+> first and used the tint only as a cross-check. It agreed every time. It was,
+> however, genuinely useful for one thing: it settled the blue plastic barriers
+> and the red/white trestle barrier as **jumpable rather than dead ends**,
+> because both of those exact sprites appear gold-tinted in `f8123696` and
+> `ce3eb8d9` respectively. That let me classify the same sprites consistently
+> in the untinted pictures (`191bb0ff`, `bc22e0f5`, `7f0cce4f`)."*
+
+`f8123696` and `ce3eb8d9` are **MAT** panels. `191bb0ff`, `bc22e0f5` and
+`7f0cce4f` are **NOMAT** panels. And on one of them B wrote that its readings
+*"rest on the sprite match and on their height rather than on anything the
+image states."*
+
+**Those are the same sprites reader C read as walls, ten times over.** B took
+the mat's teaching and scored them; C refused the teaching and lost them. So
+the mat is not decoration — but the job it is doing is **teaching which low
+object is jumpable**, once, rather than answering a question at every
+encounter. After the association is made the object carries it alone.
+
+This is also a **second artefact of the within-reader design, running opposite
+to reader C's.** C's arm-mixing destroyed trust in the mat and depressed the
+MAT arm; B's arm-mixing let the mat tutor the NOMAT arm and inflated it.
+**Both known artefacts of this design bias toward the conclusion that the mat
+does nothing** — which is the direction a null result must be discounted
+against.
 
 ### 3.6 By kind, and the three new DUCKs
 

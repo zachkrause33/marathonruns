@@ -6977,10 +6977,49 @@ MR.World = (function () {
      * COST. Once per claim, not once per frame: the cache key is the mesh's
      * world translation and pitch, and a claimed hazard then sits still for two
      * hundred units. About 1.1 claims a second at race pace, 66 vertices each.
+     *
+     * ---- WHY THIS HANGS OFF updateMatrixWorld AND NOT onBeforeRender -------
+     *
+     * onBeforeRender is the obvious hook and it is the WRONG one, by one whole
+     * frame. WebGLRenderer uploads a geometry's attributes inside
+     * projectObject, during the scene traversal at the top of render(); it
+     * calls onBeforeRender later, at the draw call. So a position attribute
+     * written in onBeforeRender is marked dirty AFTER the only upload of that
+     * frame and does not reach the GPU until the next one.
+     *
+     * That was measured, not reasoned about, because it does not look like
+     * anything: the same three hazards staged at the same place, rendered
+     * twice, mat pixels in a 390x844 frame --
+     *
+     *          pass 1   pass 2
+     *   JUMP     5426    56978
+     *   DUCK        0    57399
+     *   BLOCK   57039    56866
+     *
+     * In the game a stale first frame is invisible: a hazard is claimed 210
+     * units out and then sits still for hundreds of frames. IT IS NOT
+     * INVISIBLE TO THE INSTRUMENTS. shoot.js, blindread.js, kindread.js and
+     * clarity.js all stage something and photograph it, and every one of them
+     * would have measured the mat one frame before it existed -- which is a
+     * whole class of flattering, unreproducible readings of exactly the kind
+     * rule 3 is about. The DUCK column above is that defect: a zero that means
+     * nothing except that the tool was early.
+     *
+     * updateMatrixWorld runs in scene.updateMatrixWorld() at the START of
+     * render(), before projectObject and therefore before the upload. It is
+     * also the one hook that fires for EVERY caller -- the claim site, a tool
+     * that moves a pooled group by hand, anything -- with no cooperation and
+     * nothing duplicated at the call site to go stale. Nothing outside this
+     * function needs to know the mat has to be fitted at all.
      */
     const MAT_LIFT = 0.012;
     const _matV = new THREE.Vector3();
     const _matInv = new THREE.Matrix4();
+    const _matBaseUMW = THREE.Object3D.prototype.updateMatrixWorld;
+    function matUpdateMatrixWorld(force) {
+      _matBaseUMW.call(this, force);
+      fitMatToRoad.call(this);
+    }
     function fitMatToRoad() {
       const e = this.matrixWorld.elements;
       // e[13], e[14] are the world y and z of the mat's origin; e[6] is the
@@ -7014,7 +7053,7 @@ MR.World = (function () {
       // gap under a DUCK bar -- colour at the exact spot of the hazard.
       m.position.set(0, MAT_LIFT, -7.2);
       m.renderOrder = 5;
-      m.onBeforeRender = fitMatToRoad;
+      m.updateMatrixWorld = matUpdateMatrixWorld;
       return m;
     }
 

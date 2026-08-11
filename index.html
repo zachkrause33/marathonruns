@@ -17321,11 +17321,19 @@ MR.World = (function () {
      *
      *     0.0149 * 0.25 * (16/32)  =  0.0019
      *
-     * against a lift of 0.012. The mat therefore sits between 0.010 and 0.012
-     * above the tarmac everywhere -- never under it, which is the bug, and
-     * never far enough off it to read as floating. That margin is why the
-     * segment count went to 32: at 16 the residual is 0.0037, still clear but
-     * only 3x the lift instead of 6x, and TILE or MAX_GRADE could eat it.
+     * against a lift of 0.012, and it cuts EITHER WAY -- the strip sits low
+     * across a convex joint and high across a concave one, so the band is the
+     * lift plus or minus the residual and not the lift minus it.
+     *
+     * Swept rather than asserted, over all 5918 gates of a 32-day calendar:
+     * ZERO gates with any part of the strip under the tarmac, and a gap band
+     * of 0.0104 to 0.0135 against a predicted 0.0101 to 0.0139. So the mat is
+     * never under the road, which is the bug, and never more than 13.5
+     * millimetres off it, which is far too little to read as floating.
+     *
+     * That margin is why the segment count went to 32: at 16 the residual is
+     * 0.0037, still clear of the lift but only 3x rather than 6x, and TILE or
+     * MAX_GRADE could eat it.
      *
      * Z-FIGHTING is unchanged and that is the point of quoting the band. The
      * lift is the same 0.012 that has always separated the mat from the lane
@@ -28916,6 +28924,56 @@ MR.Camera = (function () {
   const CROWD_SPAN = 0.065;   // saturates where `deep` has taken over anyway
   const CROWD_PULL = 0.20;    // fitted to the swept f-against-back curve
 
+  // ---- THE DECK FILTER MAY LAG, BUT ONLY BY WHAT THE FRAMING CAN PAY -------
+  //
+  // How far above the ground the runner is ACTUALLY standing on the eye is ever
+  // allowed to sit, in world units. See the note over s.dk for what the filter
+  // is and why it exists; this is the bound on it, and it is derived rather
+  // than chosen.
+  //
+  // s.dk is added to the eye AND to the aim, so it cannot change the pitch --
+  // that is the whole reason the deck term was written that way, and it holds.
+  // The cost of it is that the entire lag is then spent on ONE quantity: how
+  // far down the frame the runner sits. He stands on p.surface while the lens
+  // is framed for s.dk, so every unit of (s.dk - p.surface) is a unit of eye
+  // height added over his head with nothing anywhere compensating for it.
+  //
+  // Measured on the running page rather than argued -- runner held on flat
+  // road, dk offset on its own, nothing else moved. One unit of lag costs
+  // 124-133 CSS px of footroom at 390x844, 81-88 at 320x568, 96-111 at
+  // 1280x800 and 42-45 at 844x390.
+  //
+  // THE CLEARANCE IT IS SPENT OUT OF IS THE WORST INSTANT OF A DISMOUNT, NOT A
+  // SETTLED FRAME, and that distinction is worth 0.09 units. Priced against a
+  // settled sample the budget looked like (43.3 - FOOT_MARGIN) / 133 = 0.145,
+  // and 0.15 measured back at only 18.4 px of clearance -- because the settled
+  // frame is one stride phase and the dismount sweeps all of them. Priced
+  // instead against the whole event with the lag bounded to zero, the floor is
+  // 31.6 px at 390x844 at the slow end of the band, where a unit costs 120: so
+  // the budget is (31.6 - FOOT_MARGIN) / 120 = 0.063 units, and this is that
+  // rounded down. 320x568 is the next tightest and allows 0.111, so the phone
+  // in portrait sets it.
+  //
+  // ---- AND THE STEP THE SMOOTHING WAS INSURING AGAINST DOES NOT EXIST ------
+  //
+  // The note over s.dk says the filter is a little slower than the 0.50 s fall
+  // so the eye settles into the landing rather than tracking it exactly. But
+  // player.js never drops the runner off a cliff: it eases surface down as
+  // fallFrom * (1 - t*t) over FALL_TIME -- zero vertical speed at the lip,
+  // accelerating, exactly zero at the end. The discontinuity had already been
+  // removed at the source, and the filter was paying for insurance against it
+  // with the runner's feet. Traced at 390x844 through one dismount from a 2.80
+  // deck: the runner is back on the road while the eye is still 1.15 above it,
+  // and the lowest row of his shoe lands 104 px INSIDE the readout panel --
+  // which on an 844 px frame is off the bottom of the picture.
+  //
+  // What the smoothing does still earn is the UPWARD steps, which are real: a
+  // sideways mount onto the middle of a ramp sets surface from course.deckAt in
+  // a single frame. So the ease is untouched in that direction and this bound
+  // is one-sided. Off a deck p.surface is 0 and s.dk is 0, so on every frame of
+  // a race that never meets a lorry this changes nothing at all.
+  const DK_LAG = 0.06;
+
   function frameFor(aspect, bottomPx, heightPx) {
     const wide = clamp01((aspect - 0.55) / 0.80);   // 0 = phone portrait, 1 = desktop
     const deep = clamp01((aspect - 1.30) / 0.90);   // 0 = anything taller than 4:3
@@ -29011,10 +29069,18 @@ MR.Camera = (function () {
       // under the LENS (which is 4.35 back, and during a mount is still on the
       // road) would pitch the camera up at the truck for the length of the
       // tailgate and then snap. Sampling under the RUNNER means the shot rides
-      // with him, and the smoothing below is what stops the 2.80 cliff at the
-      // end of the roof from arriving as a cut -- the fall is 0.50 s and this
-      // filter is a little slower than that, so the eye settles into the
-      // landing rather than tracking it exactly.
+      // with him, and the smoothing below is what absorbs a step in the surface
+      // -- a sideways mount onto the middle of a ramp sets it in one frame.
+      //
+      // THE SENTENCE THAT USED TO END THIS PARAGRAPH WAS WRONG AND IT COST THE
+      // RUNNER HIS FEET. It read that the filter is deliberately a little
+      // slower than the 0.50 s fall, so the eye settles into the landing rather
+      // than tracking it exactly. There is no cut to settle: player.js already
+      // eases the surface down as a curve with zero vertical speed at the lip,
+      // so the only thing the extra slowness bought was an eye left hanging
+      // over a runner who had already landed. The lag is now bounded at the one
+      // place it is spent -- see DK_LAG, which is measured in the CSS pixels of
+      // footroom it costs.
       dk: 0,           // smoothed surface height under the runner
 
       mile: -1,        // last whole mile crossed
@@ -29261,7 +29327,14 @@ MR.Camera = (function () {
       // halfway through a move that never happened in a real run.
       const dkTarget = p.surface || 0;
       if (first) s.dk = dkTarget;
-      else s.dk += (dkTarget - s.dk) * (1 - Math.pow(0.004, d));
+      else {
+        s.dk += (dkTarget - s.dk) * (1 - Math.pow(0.004, d));
+        // One-sided, and Math.min for the same reason the crowd term above is a
+        // Math.max: it is IDENTICALLY the shipped line everywhere the shipped
+        // line already framed him, and can only bite while the ground is
+        // leaving from under his feet. See DK_LAG.
+        s.dk = Math.min(s.dk, dkTarget + DK_LAG);
+      }
 
       const air = clamp01((p.y || 0) / 1.2);
       const cadence = 2.55 * Math.pow(s.sp / 22, 0.72);

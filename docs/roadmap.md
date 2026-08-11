@@ -4712,3 +4712,82 @@ nobody measured is worse than no number at all.**
     against the DUCK centroid when the bands cover its whole height. It is
     still the 1 of 26 miss either way, but whoever takes v9 next should know
     that most of its margin is being lost to a ruler that stops below it.
+
+    ### THE BLIND READ: THE ROUTE IS AT CEILING AND THE NAME IS NOT
+
+    Three uncontaminated readers, created against parentless branches holding
+    images and `PROMPT.txt` and nothing else -- no source, no `CLAUDE.md`, no
+    repository -- by the three-command recipe entry 63 recorded.
+
+    | reader | set | route correct |
+    |---|---|---|
+    | C | 22 mixed panels, all three kinds, shipped crop | 21 / 22 |
+    | D | 22 mixed panels, all three kinds, shipped crop | 21 / 22 |
+    | E | 24 panels, all eight DUCKs at 8 / 12 / 25, `--art` crop | 24 / 24 |
+
+    **The three new variants are 18 of 18 on route across the two independent
+    mixed readers, at every distance, and both readers gave route confidence
+    "sure" on all nine of their panels.** Sets C and D were deliberately mixed
+    with JUMPs and BLOCKs so that UNDER was not free. **Neither miss was a new
+    variant**: reader C read `BLOCK v3` as OVER -- the exact defect entry 61
+    chased and entry 63 could not reproduce, reappearing at `skip=150` -- and
+    reader D read `JUMP v5` as AROUND.
+
+    Verbatim, reader D on `v7` at 25 units, the distance the lane is chosen at:
+
+    > *"Enlarged, the frame resolves clearly into two uprights flanking the blue
+    > track with the striped beam raised across the top and nothing filling the
+    > gap below it."*
+
+    And reader C on `v5` at 8 units:
+
+    > *"The legs are tall and set at the edges of the lane, and everything below
+    > the striped beam is open road with the blue lane marking running straight
+    > through."*
+
+    **THE NAMING TEST FAILED, AND IT FAILED FOR ALL EIGHT.** Asked what the
+    object IS, reader E called every single DUCK *"a yellow hazard-striped
+    barrier gantry"* -- v0 to v4 exactly as much as v5 to v7. Not one reader in
+    three named a ladder, a floodlight, a bridge, a scaffold, a level crossing
+    or a pipe run. The owner's *"all duck obstacles looks exactly the same"* is
+    still true at the level of the NOUN, and this pass did not change that.
+
+    What did resolve is the PARTS, and they resolved differently for every
+    variant, which is the differentiation working one level below the name:
+
+    | | reader E, unprompted, at 8 units |
+    |---|---|
+    | v1 | *"black-banded cylindrical posts (the left one mounted lower than the right)"* |
+    | v2 | *"a large round yellow disc in a grey ring on the inner face of each column"* |
+    | v3 | *"a signal mast with two round red lamps and a pale-capped yellow box"* |
+    | v4 | *"a round pale-green gear/wheel-like disc mounted on the left column"* |
+    | **v5** | *"two yellow legs each topped with a tall latticed/ladder-like post"* |
+    | **v6** | *"a pale-topped horizontal beam carrying three round pale lamps"* |
+    | **v7** | *"two yellow columns with fluted post caps and flared collars"* |
+
+    **So the honest state is: the fixed part of a DUCK is stronger than the
+    variable part, by construction.** The bar, the caution face, the two
+    verticals and now the shared clearance header are what a reader names, and
+    they are the same on all eight because the contract says so. Everything the
+    file's differentiation budget buys is seen, described accurately and
+    distinctly, and then filed under one noun. **No further DUCK variant will
+    change that, and a brief that asks for one should say so** -- the lever that
+    would is the contract, not the art.
+
+    **v6 is the weakest of the three and the reason is instructive.** What the
+    reader picked out on it was the three marker lamps on the FACE of the
+    header, not the canted floodlight heads it spends its whole budget on.
+    The 0.12 of relief across the span outreads a termination 3.2 units up, at
+    the distances the game is actually read at.
+
+    ### THE SCORER WAS WRONG FIRST, AND IT INVERTED THE ANSWER
+
+    The script that read the answer files took the first of "over", "under" or
+    "around" within 900 characters of a filename. Every answer section begins
+    *"2. Over / under / around:"*, so it scored the HEADING. It reported reader
+    D as answering OVER to all fourteen DUCKs and UNDER to every JUMP and every
+    BLOCK -- a perfect inversion, 0 of 22, on a reader who had in fact scored
+    21. **It was caught because the result was too bad to believe, which is not
+    a control.** Rule 3 is about the instrument and this one was a throwaway;
+    the parser now anchors on the section heading and the labelled line, and
+    every number above is from that.

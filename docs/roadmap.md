@@ -3629,3 +3629,101 @@ nobody measured is worse than no number at all.**
     `course.occupiedAt` is course data -- and nobody can see it through a solid
     fill, so it is a seam rather than a defect. It is the one edit that would make
     the pause total, and it belongs in world.js, which this pass did not own.
+
+57. **The near-band colour gap was in seven authored hexes, and the fairness
+    gate had never been able to see them. A palette that agrees to three
+    decimal places on one axis is a palette somebody measured on one axis.**
+
+    The bottom third of the frame ran 45% short of the Subway Surfers
+    reference on saturation and 93% short on area of vivid pixels, and five
+    passes had measured it without once diagnosing it. `docs/near-band-colour.md`
+    ablated the renderer stage by stage and exonerated all of it: unlighting the
+    ENTIRE frame moves near-band chroma by 0.010 of a 0.217 shortfall, and the
+    fog moves it by exactly zero, because `FOG_NEAR` is 60 units and the band's
+    mean depth is 5.6. The hemisphere fill and the cool bounce turned out to be
+    ADDING chroma -- the suspicion was not merely unsupported, it was backwards.
+
+    The cause was the play surface's authored palette: seven road-marking tones
+    with a maximum chroma of 0.106, and eighteen road colours at a maximum of
+    0.086, **every one of them sitting at luminance 0.391-0.393.** That last
+    figure is the whole tell. **When a palette's entire set agrees to three
+    decimal places on one axis, that is the axis somebody had a target for, and
+    the silent axis is where the defect is.** The roads were tuned to keep the
+    play surface the lightest large mass in frame, that work was done well, and
+    chroma was simply never given a number.
+
+    **And the lever was free the whole time, because the gate could not see
+    it.** `tools/shoot.js` builds its road patch from `laneBand()` on
+    `mats.road`; `paintGeo` is not in it. So the markings' chroma is
+    STRUCTURALLY independent of every hazard margin -- verified here rather than
+    taken on trust, twelve variants over four steps spanning 25x of paint
+    chroma, every margin identical to three decimals, at three legs. The tarmac
+    has no such freedom and was left alone: JUMP v5 passes on saturation
+    difference at a luminance ratio of 1.02, so lifting the centre lane eats its
+    only margin, and at k=2 a variant already fails at THE WALL.
+
+    Six of the seven tones re-saturated about their own luminance-grey, which
+    preserves linear luminance by construction, and `overRoad()` then
+    re-normalises each to the `shadedL` it always had -- so the paint ladder's
+    long list of stated ratios is still true and none of it had to be
+    re-derived. CITY START near band: S 0.186 to 0.293, chroma 0.067 to 0.130,
+    vivid 2.0% to 19.4%, for zero draw calls and zero triangles.
+
+    **The seventh tone is held, and it is the reason the guard exists.** Pushed
+    with the rest, `#9d9885` at hue 47.5 becomes a gold lane dash SIX DEGREES
+    from the JUMP telegraph mat's 41.4 -- and this project has already had to
+    move a road marking off a hue once, when the racing line collided with the
+    aid pickups at ten degrees and a blind reader could not separate them.
+    `tools/roadchroma.js --guard 25` refuses chroma to any tone within 25
+    degrees of a spoken hue, and it cost 0.006 of near-band chroma to obey,
+    because the offending tone is 3.5% of the painted area.
+
+    **Stated honestly: this closes a bit under half the gap** -- 41% of it on
+    the median leg -- and the rest is not in the palette of the surfaces we
+    have. Their play surface is a crimson train and ours is a road, 40% of our
+    near band is tarmac the gate will not let us colour, and closing the
+    remainder means putting more saturated NON-ROAD area into the bottom third,
+    which is a content change with a draw-call price and needs its own evidence.
+
+58. **The fairness gate caught the object nobody expected, and the reason was
+    the area-mean rule stated three thousand lines away.**
+
+    The owner asked for the kerbside crates and flower pots to be promoted from
+    scenery into the hazard rotation. Both were already modelled on every side,
+    so the promotion should have been almost free, and the brief predicted the
+    tight one would be **brown crates against dark tarmac.** It was not. The
+    crates cleared the gate at 1.41x to 1.55x luminance everywhere. **The
+    PLANTERS failed**: L 94.1 S 0.341 on a lane-1 road of L 88.4 S 0.156 --
+    1.06x against a 1.25x gate and 0.185 against 0.22, matching the tarmac on
+    both axes at once.
+
+    The cause was already written down, in the vehicle fleet's header: chroma is
+    measured on the AREA MEAN, so a dark near-neutral element averages a
+    saturated body straight onto the neutral axis. On the vehicles it was a 15%
+    cream band destroying 88% of an object's chroma. Here it was the planter's
+    dark foot ring and its near-neutral soil disc -- **the same defect in
+    reverse, dark instead of pale**, and compounded because a lane planter is
+    scaled to 0.58 and a body of revolution puts much of its surface in the
+    lower toon bands. **A rule written about one family of objects was true of a
+    different family and nobody had gone looking.**
+
+    Two other things worth keeping. **Art gave way to the box twice, and the
+    verge versions fit neither**: a crate stack runs to 1.6 tall and a planter's
+    planting to about 1.2 against a JUMP `yMax` of 0.80, so both were scaled
+    INTO `MR.Collision.BOX` rather than the box being asked to accommodate
+    them. And **the draw bag got better, not worse, which was measured rather
+    than assumed**: the `castGates` header warns that adding variants changes
+    the deal, so the read-window repeat rate was measured both sides over 30
+    dates -- JUMP windows containing a repeat fell from **13.7% to 7.6%** at six
+    variants to eight, with DUCK and BLOCK bit-identical. `tools/kindread.js`
+    held its profile misclassification at 1, over 23 variants instead of 21.
+
+    **And the opening was measured before it was changed, which is what found
+    the real number.** The owner asked for more obstacles at the beginning; the
+    first three miles were carrying 4.88 gates and 6.26 hazards a mile against
+    the rest of the race at 7.43 and 17.56, and miles 0 and 1 came in at 1.00
+    and 1.09 hazards per GATE -- one thing on the road, every gate, for two
+    miles. One threshold caused all of it. **The cost is stated rather than
+    buried: the record now survives 1 / 2 / 3 mistakes where it survived
+    1 / 3 / 4, on the same 17 aid items.** More obstacles is a less forgiving
+    race, and that is the trade the request contains.

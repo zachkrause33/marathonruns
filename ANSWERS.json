@@ -1,0 +1,98 @@
+{
+  "2bd4c77e.png": {
+    "lane": "middle",
+    "demands": { "left": "CLEAR", "middle": "CLEAR", "right": "OVER" },
+    "confidence": "sure",
+    "reason": "Two purple broken lines split the tarmac between the white edge lines into three lanes, and the only thing on the road is a low red-and-white striped trestle barrier sitting entirely to the right of the second broken line. It is barely knee-to-waist high on its little wooden legs, so it is a hurdle rather than a wall. Left and middle are bare tarmac all the way to the haze, and I took middle because it is the centre racing line with nothing in it."
+  },
+  "544f9e3e.png": {
+    "lane": "left",
+    "demands": { "left": "CLEAR", "middle": "AROUND", "right": "AROUND" },
+    "confidence": "fairly sure",
+    "reason": "The middle lane is a closed worksite: a striped barricade panel on legs, a traffic cone at its foot, a big red no-entry sign, and two workmen standing on the tarmac right behind the panel. Even though the panel alone is low enough to vault, the men standing behind it in the lane make it a lane you must not enter. A green refuse lorry is stopped square across the right lane and is far too tall to clear. The left lane, between the white edge line and the first broken line, is completely empty road, so that is the only way through."
+  },
+  "65c2d675.png": {
+    "lane": "middle",
+    "demands": { "left": "CLEAR", "middle": "CLEAR", "right": "OVER" },
+    "confidence": "sure",
+    "reason": "The right lane is lit up with a gold hatched strip and has a teal kick-scooter lying across it, which is a low thing you hop. The big green-capped bottle further right is past the white edge line on the kerb, so it is not in any lane. Left and middle are plain empty tarmac. I took middle as the central clear lane."
+  },
+  "6ca383f2.png": {
+    "lane": "left",
+    "demands": { "left": "CLEAR", "middle": "OVER", "right": "UNDER" },
+    "confidence": "sure",
+    "reason": "A run of blue crash-barrier blocks on a pale striped base sits across the middle lane; it is low, about knee height, so you go over it. The yellow gantry with the black-and-yellow hatched beam has both its legs straddling the right lane, with open road visible underneath, so that lane is a duck. The left lane, between the left white edge line and the first broken line, is bare all the way ahead, so I took it."
+  },
+  "7281d1c5.png": {
+    "lane": "left",
+    "demands": { "left": "CLEAR", "middle": "OVER", "right": "OVER" },
+    "confidence": "sure",
+    "reason": "Both the middle and right lanes are painted with the gold hatched glow this road uses for jumps: the middle has a green scooter dumped on it and the right has a low blue barrier unit. Both are shin-to-knee high. The left lane is empty tarmac with no glow at all, so I took the one that costs me nothing."
+  },
+  "7a103c3c.png": {
+    "lane": "left",
+    "demands": { "left": "CLEAR", "middle": "UNDER", "right": "OVER" },
+    "confidence": "sure",
+    "reason": "The yellow gantry's two legs land exactly on the two broken lines that bound the middle lane, with its hatched beam overhead and clear road beneath, and that lane glows cyan, which is the duck colour here. The right lane glows gold and carries a low red-and-white striped barrier to jump. The left lane has no glow and nothing on it, so I stayed left."
+  },
+  "85424f29.png": {
+    "lane": "right",
+    "demands": { "left": "UNDER", "middle": "OVER", "right": "CLEAR" },
+    "confidence": "sure",
+    "reason": "The gantry legs sit on the left edge line and the first broken line, so its hatched beam spans the left lane, which glows cyan for a duck; the green drinks bottle floating under it reads as a pickup, not a blocker. Three orange cones stand in the middle lane on a gold strip, low enough to jump. The right lane is dark, unlit tarmac with nothing in it, so I took it."
+  },
+  "856f4eb5.png": {
+    "lane": "left",
+    "demands": { "left": "UNDER", "middle": "OVER", "right": "UNDER" },
+    "confidence": "fairly sure",
+    "reason": "There are two separate yellow gantries with hatched beams, and their legs line up with the lane boundaries so one spans the left lane and the other spans the right lane, with a clear gap of sky between them over the middle. Sitting on the road in that middle gap is a low scattered heap of orange and tan objects, roughly knee high, which reads as something you jump. All three lanes are passable; I took the left gantry bay because ducking through open road is cleaner than clearing a loose heap. What the heap actually is was not clear to me at this resolution."
+  },
+  "9aec9b26.png": {
+    "lane": "right",
+    "demands": { "left": "AROUND", "middle": "OVER", "right": "CLEAR" },
+    "confidence": "sure",
+    "reason": "A yellow works lorry is parked square across the left lane, taller than a person, and the lane under it glows magenta, which is this road's colour for a lane you simply cannot take. The middle lane glows gold and holds a row of orange cones with some spilled material, all low enough to hurdle. The right lane is unlit empty tarmac, so I ran right."
+  },
+  "a90f61e8.png": {
+    "lane": "right",
+    "demands": { "left": "AROUND", "middle": "UNDER", "right": "CLEAR" },
+    "confidence": "sure",
+    "reason": "The back of a tall grey-and-blue bus fills the left lane and runs off the top of the frame, so there is no clearing it. The yellow gantry beside it has its legs on the two broken lines bounding the middle lane, with open road under the hatched beam, so that lane is a duck. The right lane, right of the second broken line, is empty tarmac, so I took the free lane."
+  },
+  "b242e062.png": {
+    "lane": "left",
+    "demands": { "left": "CLEAR", "middle": "OVER", "right": "OVER" },
+    "confidence": "sure",
+    "reason": "Two low obstacles sit side by side, a blue barrier unit in the middle lane and a red-and-white striped trestle in the right lane, and both lanes carry the gold hatched glow this road uses for jumps. Neither is more than knee high. The left lane is plain dark tarmac with no glow and nothing on it, so I took it rather than spend a jump."
+  },
+  "baf0f97f.png": {
+    "lane": "left",
+    "demands": { "left": "CLEAR", "middle": "AROUND", "right": "UNDER" },
+    "confidence": "sure",
+    "reason": "A blue bus is stopped dead in the middle lane, tail lights and number plate facing me, and it is far too tall to get over or under. To its right the yellow gantry straddles the right lane with its hatched beam overhead and clear road between its legs, so that one is a duck. The left lane between the white edge line and the first broken line is empty, so I took the free run."
+  },
+  "e49e2a2c.png": {
+    "lane": "middle",
+    "demands": { "left": "UNDER", "middle": "UNDER", "right": "AROUND" },
+    "confidence": "fairly sure",
+    "reason": "The yellow structure is a two-bay gantry with three legs, and those legs land on the left edge line, the first broken line and the second broken line, so the hatched beams cover the left and middle lanes with open road under both. The right lane is a worksite: a striped barricade, a red no-entry sign, workmen standing on the tarmac and a cone, backed by a works vehicle, so that lane is closed rather than jumpable. I took the middle bay. Whether the right lane is strictly a wall or just a high hurdle is the one thing I could not settle."
+  },
+  "e634c75b.png": {
+    "lane": "right",
+    "demands": { "left": "UNDER", "middle": "AROUND", "right": "CLEAR" },
+    "confidence": "sure",
+    "reason": "The left lane glows cyan and has the yellow gantry's legs planted on its two boundaries with the hatched beam overhead, so it is a duck. The middle lane glows magenta and is filled by a tall red vehicle, which is this road's marking for a lane you must not be in. The right lane has no glow and no obstacle, so I took it."
+  },
+  "f178f8f9.png": {
+    "lane": "middle",
+    "demands": { "left": "UNDER", "middle": "UNDER", "right": "OVER" },
+    "confidence": "fairly sure",
+    "reason": "The yellow gantry has three legs that fall on the left edge line and the two broken lines, so its two hatched bays cover the left and middle lanes with clear road beneath. In the right lane there is a stacked bundle of pipes or logs, two rows high and only about half a lane-width tall, which reads as a jump rather than a wall. I took the middle bay as the straightest run. The pipe stack is the one call I am least sure of, since nothing in the picture marks it as jumpable."
+  },
+  "f236c433.png": {
+    "lane": "middle",
+    "demands": { "left": "UNDER", "middle": "CLEAR", "right": "OVER" },
+    "confidence": "sure",
+    "reason": "The left lane glows cyan and the yellow gantry's legs sit on its two boundaries with the beam overhead, so that is a duck. The right lane glows gold and has a teal bicycle lying across it, a low jump. The middle lane between the two broken lines has no glow and nothing on it, so I ran straight through the middle."
+  }
+}

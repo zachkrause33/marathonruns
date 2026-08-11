@@ -8236,6 +8236,109 @@ MR.World = (function () {
      * this pass was not allowed to cross -- see stripeTex for the confusion
      * that cost.
      */
+    /**
+     * ============ JUMP v6 AND v7: THE KERBSIDE FURNITURE, PROMOTED ============
+     *
+     * The owner: *"The flower pots and some boxes are on the sidewalk. We want
+     * them to be part of the game as obstacles. Work them into the rotation to
+     * keep the obstacles fresh."*
+     *
+     * These are not new objects. crateStackParts and planterParts are the SAME
+     * two builders the verge has been using since the kerbside furniture went
+     * in, called with a scale and with the jitter switched off -- see the note
+     * at KERBSIDE FURNITURE, which already said the split was by POSITION and
+     * not by object: a road has crates on its edge and crates in its way, and
+     * they are the same crates. This is that sentence being cashed.
+     *
+     * ---- WHICH KIND EACH ONE IS, DECIDED HONESTLY -----------------------
+     *
+     * Both are JUMP, and the second half of that is the part worth defending.
+     *
+     * A PLANTER IS A JUMP and there is no argument to have: it is a knee-high
+     * pot, it has no bar to go under and no mass to go around, and mass on the
+     * road with nothing above 0.80 is the definition kindread.js measures a
+     * JUMP by.
+     *
+     * CRATES ARE A JUMP HERE BECAUSE THE BLOCK ALREADY EXISTS. blockCrateLoadGeo
+     * is a loaded pallet standing 2.80 tall and filling the lane, and it is what
+     * the failed cyclist slot became. Adding a second crate BLOCK would be
+     * building the same obstacle twice with a different seed. What the verge
+     * actually carries is a low pile a stride high, which is a different object
+     * doing a different job, and it is the one the fleet does not have.
+     *
+     * NEITHER IS A DUCK, and that is not a near miss. A DUCK is a GAP from the
+     * road to 1.41 with a bar over it, and yesterday's fix gave it mass ABOVE
+     * the bar so the profile has a direction in it. Nothing standing on the
+     * ground can be one without inventing a trestle the owner did not ask for.
+     *
+     * ---- ART GIVES WAY TO THE BOX, AS IT ALWAYS DOES --------------------
+     *
+     * MR.Collision.BOX[JUMP] is halfX 1.12, halfZ 0.52, yMax 0.80, and the
+     * verge versions fit none of it -- a crate stack runs to 1.6 tall and a
+     * planter's planting to about 1.2. So both are scaled INTO the box rather
+     * than the box being asked to accommodate them, which is rule 4: art never
+     * decides clearance. api.fleetExtents reports both against the box and
+     * tools/shoot.js fails the build if either leaves it.
+     *
+     * The planting is scaled harder than the pot it sits in (crown 0.55 against
+     * a body scale of 0.58), because the pot's reach is its rim and the
+     * planting is what decides the height. The crates keep their per-box yaw
+     * but lose the positional jitter: a random offset inside a 1.12 half-width
+     * is exactly how art starts deciding clearance one seed at a time.
+     *
+     * ---- RULE 1 ---------------------------------------------------------
+     *
+     * Both were already built on every side and stay that way. The crate's
+     * scribed diagonal is on all four faces, its rims run right round and its
+     * corner posts are on all four corners; the planter is a body of revolution
+     * with a recessed soil disc, so it is open from every angle and has no back
+     * by construction. These now stand IN the lane, where the camera banks
+     * through them at arm's length and passes them from behind, so there was
+     * never a face to leave off.
+     *
+     * ---- NO STRIPED FACE, FOR THE CONE'S REASON -------------------------
+     *
+     * face: null on both, which is what four of the six JUMPs already do. The
+     * stripe means construction furniture and neither of these is any; and the
+     * face is centred on the lane by the pool, so on a three-pot row it would
+     * hang across the gaps between the pots as a striped mat in mid-air, which
+     * is roadmap entry 38's defect exactly. Kind is carried at full strength by
+     * the telegraph mat painted on the road in front, as it is for the cones.
+     *
+     * ---- AND THE COLOUR IS WHY THEY CLEAR THE GATE ----------------------
+     *
+     * Terracotta and crate brown are warm and far off the neutral axis, and
+     * every element on both objects is on the SAME side of it -- the crate's
+     * rim and rail are a lighter and a darker brown, the planter's rim and foot
+     * a lighter and a darker terracotta. That is the area-mean rule the vehicle
+     * fleet was rebuilt around: there is no pale band on either to average the
+     * object back to grey. Measured margins are in the commit.
+     */
+    const jumpPlanterGeo = (function () {
+      const parts = [];
+      [-0.70, 0.00, 0.70].forEach(function (x, i) {
+        placeAt(parts, planterParts([], 13 + i * 37,
+          // The planting is the fleet's own, not a setting's: a hazard pool is
+          // built once and every setting spawns from it. Brighter than the
+          // verge default for the area-mean reason stated at planterParts.
+          { colors: [0x8fd24a, 0xb6e668] },
+          {
+            scale: 0.58, crown: 0.55,
+            palette: { body: 0xe8873f, light: 0xffb26a, dark: 0xc26330, soil: 0x8a5a30 },
+          }), x, 0, (i - 1) * 0.06, 0);
+      });
+      return merge(parts);
+    })();
+    const jumpCrateGeo = (function () {
+      const parts = [];
+      const AT = [-0.64, 0.02, 0.66], N = [2, 2, 1];
+      AT.forEach(function (x, i) {
+        placeAt(parts, crateStackParts([], 17 + i * 53,
+          { scale: 0.62, boxes: N[i], jitter: 0, yaw: 0.55 }), x, 0, (i - 1) * 0.05, 0);
+      });
+      return merge(parts);
+    })();
+
     const jumpPool = hazardPool(K.JUMP, 'jump', [
       { geo: jumpSandGeo, face: null },
       /**
@@ -8270,6 +8373,9 @@ MR.World = (function () {
       { geo: jumpScooterGeo, face: null },
       { geo: jumpBarrierGeo, face: [2.20, 0.14, 0.072, -0.512] },
       { geo: jumpPipeGeo, face: null },
+      // The kerbside furniture, in the lane. See the promotion note above.
+      { geo: jumpPlanterGeo, face: null },
+      { geo: jumpCrateGeo, face: null },
     ]);
 
     /**
@@ -12221,25 +12327,38 @@ MR.World = (function () {
      * posts are on all four corners. There is no face left off because a chase
      * camera "starts" behind: it goes everywhere.
      */
-    function crateStackGeo(seed) {
+    /**
+     * The stack, as PARTS rather than as a finished geometry, so the lane
+     * version and the verge version are the same object and not two objects
+     * that look alike. crateStackGeo below is this plus a merge; jumpCrateGeo
+     * is three of these laid across a lane. See the promotion note there.
+     *
+     * `opt` is what the corridor needs and the verge does not: a scale, a
+     * forced box count, and the jitter switched off, because a JUMP has 1.12
+     * of half-width to live inside and a random offset is how art starts
+     * deciding clearance.
+     */
+    function crateStackParts(parts, seed, opt) {
+      opt = opt || {};
       let s = seed;
       const r = function () { s = (s * 9301 + 49297) % 233280; return s / 233280; };
       const CRATE = 0xb07434, CRATE_DK = 0x6e4418, CRATE_LT = 0xd89a52;
-      const parts = [];
+      const sc = opt.scale || 1;
+      const jit = opt.jitter === undefined ? 1 : opt.jitter;
       // One to three boxes, stacked and jittered so a row of these down a verge
       // is not the same silhouette repeated. The stack stays under 1.6 tall:
       // these are beside the road, and anything taller starts competing with
       // the hazards for the eye at the distance the lane is chosen.
-      const n = 1 + Math.floor(r() * 2.99);
+      const n = opt.boxes || (1 + Math.floor(r() * 2.99));
       let y = 0;
       for (let i = 0; i < n; i++) {
-        const w = 0.86 - i * 0.13 + r() * 0.20;
-        const d = 0.78 - i * 0.10 + r() * 0.18;
-        const h = 0.52 - i * 0.06 + r() * 0.12;
+        const w = (0.86 - i * 0.13 + r() * 0.20) * sc;
+        const d = (0.78 - i * 0.10 + r() * 0.18) * sc;
+        const h = (0.52 - i * 0.06 + r() * 0.12) * sc;
         // Each box in the stack is offset and turned a little, which is what a
         // real stack looks like and what stops three boxes reading as one prism.
-        const ox = (r() - 0.5) * 0.16, oz = (r() - 0.5) * 0.16;
-        const yaw = (r() - 0.5) * 0.5;
+        const ox = (r() - 0.5) * 0.16 * jit, oz = (r() - 0.5) * 0.16 * jit;
+        const yaw = (r() - 0.5) * 0.5 * (opt.yaw === undefined ? 1 : opt.yaw);
         const sub = [];
         sub.push(gl(cbx(w, h, d, 0, 0, 0, CRATE, 0.05), GLOSS.matte));
         // Lid rim and foot rail, proud on all four sides -- what a crate has
@@ -12261,8 +12380,9 @@ MR.World = (function () {
         placeAt(parts, sub, ox, y + h / 2, oz, yaw);
         y += h;
       }
-      return merge(parts);
+      return parts;
     }
+    function crateStackGeo(seed) { return merge(crateStackParts([], seed)); }
 
     /**
      * A KERBSIDE PLANTER.
@@ -12284,13 +12404,40 @@ MR.World = (function () {
      * there is no angle this reads worse from. The soil and the planting are
      * inside the rim from every direction.
      */
-    function planterGeo(seed, prof) {
+    function planterParts(parts, seed, prof, opt) {
+      opt = opt || {};
       let s = seed;
       const r = function () { s = (s * 9301 + 49297) % 233280; return s / 233280; };
-      const TERRA = 0xb5623a, TERRA_DK = 0x8a4526, TERRA_LT = 0xd08055, SOIL = 0x4a3524;
-      const parts = [];
-      const h = 0.62 + r() * 0.22;
-      const rTop = 0.40 + r() * 0.10;
+      /**
+       * THE VERGE PALETTE AND THE LANE PALETTE, AND WHY THEY DIFFER.
+       *
+       * A weathered terracotta is right on the kerb and it FAILED THE FAIRNESS
+       * GATE in the corridor, which is not a matter of taste: measured by
+       * tools/shoot.js, the first lane planter rendered at L 94.1 S 0.341 on a
+       * lane-1 road of L 88.4 S 0.156 -- 1.06x luminance against a gate of
+       * 1.25x, and 0.185 of saturation against 0.22. It matched the tarmac on
+       * both axes and the build failed, correctly.
+       *
+       * The cause is the area-mean rule the vehicle fleet was rebuilt around: a
+       * pot is mostly wall, but the dark foot ring and the near-neutral SOIL
+       * disc are exactly the "15% cream band" defect in reverse -- dark warm
+       * neutrals averaging a saturated body back onto the axis. Compounded
+       * here because a lane planter is scaled to 0.58 and a rounded body puts
+       * much of its surface in the lower toon bands.
+       *
+       * So the corridor gets its own four tones, hotter and lighter on every
+       * one, and the verge keeps the weathered set exactly as it shipped. That
+       * is rule 4 doing what it is for: a hazard has to clear the gate and a
+       * scenery prop does not, and the object the player can be killed by is
+       * the one that gives way. The hue is unchanged -- this is the same
+       * terracotta with the dirt taken off it, not a different object.
+       */
+      const P = opt.palette || {};
+      const TERRA = P.body || 0xb5623a, TERRA_DK = P.dark || 0x8a4526,
+        TERRA_LT = P.light || 0xd08055, SOIL = P.soil || 0x4a3524;
+      const sc = opt.scale || 1;
+      const h = (0.62 + r() * 0.22) * sc;
+      const rTop = (0.40 + r() * 0.10) * sc;
       const rBot = rTop * 0.70;          // the taper the reference actually has
       // The wall, as three stacked frusta rather than one, so the profile can
       // curve very slightly outward instead of being a straight cone.
@@ -12309,14 +12456,19 @@ MR.World = (function () {
       // carries stone-pine greens -- the same rule the groves follow.
       const greens = (prof && prof.colors) || [0x5f9e3a, 0x86c24e];
       const lobes = 4 + Math.floor(r() * 3);
+      // The planting is scaled HARDER than the pot for the lane version. A pot
+      // is a body of revolution and its reach is its rim; the planting is what
+      // decides the height, and a JUMP has 0.80 of it. See jumpPlanterGeo.
+      const cs = opt.crown === undefined ? 1 : opt.crown;
       for (let i = 0; i < lobes; i++) {
         const a = (i / lobes) * Math.PI * 2 + r() * 0.6;
-        const rr = (0.16 + r() * 0.13);
-        parts.push(sph(rr, 6, Math.cos(a) * rTop * 0.46, h + 0.02 + r() * 0.16,
+        const rr = (0.16 + r() * 0.13) * sc * cs;
+        parts.push(sph(rr, 6, Math.cos(a) * rTop * 0.46, h + (0.02 + r() * 0.16) * sc * cs,
           Math.sin(a) * rTop * 0.46, greens[Math.floor(r() * greens.length) % greens.length]));
       }
-      return merge(parts);
+      return parts;
     }
+    function planterGeo(seed, prof) { return merge(planterParts([], seed, prof)); }
 
     // Three seeded variants of each, per setting for the planters (the planting
     // takes the setting's foliage) and setting-independent for the crates (a

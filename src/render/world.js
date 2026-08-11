@@ -6842,7 +6842,10 @@ MR.World = (function () {
      * which is precisely when the player needs to see the hazard instead.
      */
     const matGeo = (function () {
-      const g = new THREE.PlaneGeometry(1.95 * LANE_FIT, 16, 1, 16);
+      // 32 segments over the mat's 16 units, not 16. See fitMatToRoad(): the
+      // only place the fitted strip can miss the road is a segment with a tile
+      // joint inside it, and that error is proportional to the segment length.
+      const g = new THREE.PlaneGeometry(1.95 * LANE_FIT, 16, 1, 32);
       const pos = g.attributes.position;
       const col = new Float32Array(pos.count * 4);
       for (let i = 0; i < pos.count; i++) {
@@ -6854,20 +6857,164 @@ MR.World = (function () {
         col[i * 4] = 1; col[i * 4 + 1] = 1; col[i * 4 + 2] = 1; col[i * 4 + 3] = a;
       }
       g.setAttribute('color', new THREE.BufferAttribute(col, 4));
+      // Culling uses this and it is computed BEFORE the fit displaces anything,
+      // so it is padded by more than the fit can ever move a vertex (see the
+      // arithmetic in fitMatToRoad: 0.10 of profile, a hair of tile chord).
+      g.computeBoundingSphere();
+      g.boundingSphere.radius += 0.30;
       return g;
     })();
+    /**
+     * A PRISTINE COPY OF THE MAT'S VERTICES, because the fit is not idempotent.
+     *
+     * fitMatToRoad rewrites the position attribute in place. Fitting the result
+     * of the last fit would compound, and a pooled mat is re-fitted every time
+     * its group is claimed for a new gate. Every fit starts from here.
+     */
+    const matRest = Float32Array.from(matGeo.attributes.position.array);
     const matMat = {};
     matMat[K.JUMP] = new THREE.MeshBasicMaterial({ map: matTexture(K.JUMP, '#ffc23a', 'rgba(58,34,0,0.40)'), transparent: true, depthWrite: false, vertexColors: true });
     matMat[K.DUCK] = new THREE.MeshBasicMaterial({ map: matTexture(K.DUCK, '#4fdcff', 'rgba(0,36,54,0.40)'), transparent: true, depthWrite: false, vertexColors: true });
     matMat[K.BLOCK] = new THREE.MeshBasicMaterial({ map: matTexture(K.BLOCK, '#ff4f78', 'rgba(62,0,22,0.44)'), transparent: true, depthWrite: false, vertexColors: true });
 
+    /**
+     * ============ THE ROAD AS BUILT, NOT THE PROFILE IT WAS BUILT FROM =======
+     *
+     * eAt(z) is the elevation PROFILE. It is not the surface the paint lies on.
+     * The road is laid as rigid 24-unit tiles, each one set to the MIDPOINT of
+     * the profile's chord across it and pitched to that chord's angle -- see
+     * the road claim in api.update, which states outright that the tile stays
+     * rigid and only the tangent kinks at a joint. So the tarmac a player can
+     * actually see is a piecewise-linear polyline through E(tile edges), and
+     * between those edges it departs from E by the chord's sagitta:
+     *
+     *     c * TILE^2 / 8  =  6.20e-4 * 576 / 8  =  0.045 units
+     *
+     * BELOW the profile at a crest and ABOVE it in a dip. Anything that has to
+     * lie ON the road has to be fitted to THIS, and a thing fitted to E instead
+     * is 45 millimetres out in the direction that matters -- which is four
+     * times the 0.012 the mat is lifted by.
+     *
+     * That number is not a hypothesis. tools/blindread.js measures the mat's
+     * submersion against E(z) and reports at most 0.045; measured against this
+     * function instead it reaches 0.094 across a 32-day sweep, and the panels
+     * where the mat does not draw are exactly the ones this function predicts
+     * and not the ones E(z) predicts.
+     *
+     * Kept next to the mat rather than in core/elevation.js on purpose: it is a
+     * fact about how THIS FILE lays road, and elevation.js does not know TILE.
+     * If the road claim ever stops chording per tile, this goes with it.
+     */
+    function roadSurfaceY(z) {
+      const tz = Math.round(z / TILE) * TILE;
+      const y0 = eAt(tz - TILE / 2), y1 = eAt(tz + TILE / 2);
+      return (y0 + y1) * 0.5 + (z - tz) * (y1 - y0) / TILE;
+    }
+
+    /**
+     * ============ THE MAT FOLLOWS THE ROAD, PER VERTEX =======================
+     *
+     * WHAT WAS WRONG. The mat was one RIGID 16-unit plane, lifted 0.012 and
+     * pitched to the tangent at the gate. A rigid plane cannot lie on a curved
+     * surface, so the run-up left the road as soon as the road stopped being
+     * straight, and when it left downward the road drew over it: the material
+     * is depth-TESTED (only depthWrite is off), so a submerged mat is not a
+     * faint mat, it is no mat.
+     *
+     * MEASURED, at the chase camera, on 2026-01-10 at the foot of the hill at
+     * z=832 -- pixels the mat contributes to a 390x844 frame:
+     *
+     *              8u      12u      25u
+     *   flat     56639    35940     1861
+     *   -1.5%     7572     1613        0
+     *   +2.1%     4027        0      129
+     *
+     * Zero at 25 units is READ_NEAR. The instruction channel is gone at the
+     * distance the lane is chosen, which is rule 4's subject exactly.
+     *
+     * THE PREDICTOR IS CURVATURE, NOT GRADE, and that is why this was missed.
+     * The same day at its STEEPEST, -3.5%, draws the full 56722 / 45171 / 2092:
+     * near a crest the road is straight enough over 16 units and the chord sits
+     * BELOW the profile, so the mat floats and floats harmlessly. The mat dies
+     * at the FEET of a hill, where a raised cosine turns over, curvature is at
+     * its maximum and the grade is passing through zero. A brief that says
+     * "flat is fine, sloped is broken" has it backwards; across 32 days, 4.6%
+     * of gates on ground under 0.5% grade lose part of the mat and the three
+     * deepest submersions in the whole sweep are all on ground under 0.5%.
+     *
+     * HOW IT IS FIXED. Every vertex is put where the road is under it. Written
+     * through the mesh's own inverse world matrix rather than by unwinding the
+     * group's pitch by hand, so it holds for any transform a caller puts the
+     * hazard under -- including tools that stage one -- and depends on nothing
+     * about how three.js orders its render passes.
+     *
+     * IT IS STILL PAINT. Rule 1 exempts a marking on a surface from being built
+     * on all sides, and this does not change that: the mat is one strip of
+     * single-sided quads lying on the tarmac, with no back, exactly as before.
+     * What changed is that the strip now bends with the thing it is painted on.
+     * No new draw call -- same mesh, same material, same count.
+     *
+     * THE ONLY RESIDUAL, and it is bounded rather than asserted. Inside a tile
+     * the road is linear and so is the strip, so the fit there is EXACT. The
+     * one lossy case is a segment with a tile joint inside it, where the strip
+     * cuts the corner. The kink at a joint is at most c*TILE = 6.20e-4 * 24 =
+     * 0.0149 rad, and a chord across a segment of length h with the kink a
+     * fraction a along it misses by dSlope * a * (1-a) * h, worst at a = 1/2:
+     *
+     *     0.0149 * 0.25 * (16/32)  =  0.0019
+     *
+     * against a lift of 0.012. The mat therefore sits between 0.010 and 0.012
+     * above the tarmac everywhere -- never under it, which is the bug, and
+     * never far enough off it to read as floating. That margin is why the
+     * segment count went to 32: at 16 the residual is 0.0037, still clear but
+     * only 3x the lift instead of 6x, and TILE or MAX_GRADE could eat it.
+     *
+     * Z-FIGHTING is unchanged and that is the point of quoting the band. The
+     * lift is the same 0.012 that has always separated the mat from the lane
+     * dashes at 0.005-0.009, and the fit only ever makes the gap MORE uniform
+     * than the rigid plane's was.
+     *
+     * COST. Once per claim, not once per frame: the cache key is the mesh's
+     * world translation and pitch, and a claimed hazard then sits still for two
+     * hundred units. About 1.1 claims a second at race pace, 66 vertices each.
+     */
+    const MAT_LIFT = 0.012;
+    const _matV = new THREE.Vector3();
+    const _matInv = new THREE.Matrix4();
+    function fitMatToRoad() {
+      const e = this.matrixWorld.elements;
+      // e[13], e[14] are the world y and z of the mat's origin; e[6] is the
+      // pitch term. Together they are everything about the transform that can
+      // change where the road is under this strip.
+      const was = this.userData.fitKey;
+      if (was && was[0] === e[13] && was[1] === e[14] && was[2] === e[6]) return;
+      this.userData.fitKey = [e[13], e[14], e[6]];
+      _matInv.copy(this.matrixWorld).invert();
+      const pos = this.geometry.attributes.position;
+      const arr = pos.array;
+      for (let i = 0; i < pos.count; i++) {
+        const j = i * 3;
+        _matV.set(matRest[j], matRest[j + 1], matRest[j + 2]);
+        _matV.applyMatrix4(this.matrixWorld);          // where the rest pose puts it
+        _matV.y = roadSurfaceY(_matV.z) + MAT_LIFT;    // where the tarmac is under it
+        _matV.applyMatrix4(_matInv);                   // back into the mesh's frame
+        arr[j] = _matV.x; arr[j + 1] = _matV.y; arr[j + 2] = _matV.z;
+      }
+      pos.needsUpdate = true;
+    }
+
     function telegraph(kind) {
-      const m = new THREE.Mesh(matGeo, matMat[kind]);
+      // Its OWN geometry, because fitMatToRoad writes vertices and every mat on
+      // the road stands on different ground. This is the one cost of the fix
+      // and it is paid in the abundant currency: about 2.4 KB a mat, no extra
+      // draw call, no extra material, no extra texture.
+      const m = new THREE.Mesh(matGeo.clone(), matMat[kind]);
       m.rotation.x = -Math.PI / 2;
       // Runs a little past the gate line so the paint shows through the open
       // gap under a DUCK bar -- colour at the exact spot of the hazard.
-      m.position.set(0, 0.012, -7.2);
+      m.position.set(0, MAT_LIFT, -7.2);
       m.renderOrder = 5;
+      m.onBeforeRender = fitMatToRoad;
       return m;
     }
 

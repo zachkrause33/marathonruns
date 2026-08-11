@@ -4791,3 +4791,152 @@ nobody measured is worse than no number at all.**
     a control.** Rule 3 is about the instrument and this one was a throwaway;
     the parser now anchors on the section heading and the labelled line, and
     every number above is from that.
+
+66. **The telegraph mat changes no lane judgement in a real three-lane gate --
+    42 of 48 with it against 47 of 51 without, at 25.35 AND 32 units -- but the
+    reason is not that it is uninformative. Two readers decoded its colour code
+    unprompted, one used it to learn WHICH LOW OBJECTS ARE JUMPABLE and carried
+    that to the unpainted panels, and the reader who refused it read jumpable
+    hurdles as walls ten times while naming the gold paint in the same
+    sentence. The mat teaches the object once; it does not answer the question
+    at every gate.**
+
+    **BUILD EVERY ANGLE. THERE IS NO BACK OF AN OBJECT.** The mat is the one
+    thing that looks like an exception and is not, because a marking painted on
+    a surface is not an object. Nothing here licenses a half-built anything.
+
+    Diagnosis only; no file under `src/` was edited. Pinned to `388bb8c` in a
+    detached worktree. 16 real gates chosen by a mechanical rule, two distances,
+    two arms shot as twins from one page evaluation, four counterbalanced
+    uncontaminated readers on parentless branches.
+
+    ### THE PREVIOUS PASS MEASURED A FLEET THAT DID NOT CONTAIN HALF THE
+    OBJECTS IT WAS ASKED ABOUT
+
+    It pinned `b9b2170`, which is **older than `a668100`**, the commit that
+    built the access gantry, the floodlight gantry and the girder underbridge.
+    **No panel it shot could have contained a `DUCK v5`, `v6` or `v7`.** This
+    pass drew five of them mechanically. Answer: **`v5` 6/6, `v6` 6/6, `v7`
+    3/3 -- the three new DUCKs read exactly as well as the established five,
+    and DUCK overall is 39 of 39 in both arms at both distances.** `BLOCK` is
+    21 of 21 including `v9`, the low moped.
+
+    ### THE STALE ARTEFACT, WHICH WOULD HAVE MEASURED THE WRONG FLEET
+
+    `index.html` committed at the pin was 2,511,534 bytes against a 2,580,533
+    fresh build, and `shoot.js` run against it reported **23 hazard variants
+    for a fleet of 26**. Rebuilt inside the worktree before a panel was shot,
+    and that rebuild hashes to blob `b815503`, **byte-identical to the
+    `index.html` later committed as `b5d3b43`**. So the panels are the shipped
+    game, checked rather than assumed.
+
+    ### THE HEADLINE CONTROL WAS THE HARNESS CHECKED WITH ITS OWN RULER
+
+    The previous pass's end-to-end control -- twins on disk differ by exactly
+    the recorded mat count -- reproduces at 32 of 32, deviation 0 px, on an
+    independent decode. **But it passes at the harness's own per-channel
+    threshold of 6, which the harness chooses.** At threshold 0 the arms differ
+    by **24.1% more pixels**, 28,463 of them, which that control cannot see.
+
+    Settled by geometry rather than by argument. A Chebyshev distance transform
+    from the supra-threshold mask puts **every one of the 28,463 within 8 px of
+    a mat pixel**, decaying monotonically (57.2% at 1 px, 91.1% by 3 px, 100%
+    by 8 px), peak amplitude **6/255**, with **no orphan region in any of the
+    32 panels**. That is an antialiased edge and nothing else. **A threshold
+    that the instrument sets is not a control until something outside the
+    instrument says what it is hiding.**
+
+    ### THE CROP IS DRAWN AROUND THE PAINT AND NOT AROUND THE ROAD
+
+    Because the crop is the union of the object boxes and the measured mat
+    boxes, the three lanes span only **0.332 to 0.539 of the picture width**,
+    and one side is padded more than twice the other in **23 of 32 panels**.
+    Arm-identical, so it cannot bias the contrast -- but a reader who took the
+    kerb for a lane would return the truth **rotated one place**, scoring three
+    wrong demands and reading as a legibility failure.
+
+    Controlled two ways rather than hoped away: the prompt now anchors
+    lane-finding on the broken lane lines, which are separate quads from the
+    mats and **survive in the NOMAT arm**; and rotations are counted
+    separately. Result: **9 panels not exactly right, 0 of them rotations.**
+    The defect is real and it did not bite.
+
+    ### A LEAK CHANNEL NOBODY HAD CHECKED
+
+    A MAT panel compresses worse than its twin **32 times out of 32**, mean
+    26,248 bytes against 19,204, and an agent reader can run `ls`. Contained by
+    two facts: twins never share a reader's set, and within every reader's own
+    16 panels the bytes-per-crop-pixel ranges **overlap**, so no threshold on
+    file size separates the arms.
+
+    ### THE COUNTERBALANCING ITSELF CREATES TWO ARTEFACTS, AND BOTH FLATTER THE
+    NULL
+
+    This is the finding that should outlive the fade question. Within-reader
+    counterbalancing was the fix for the previous pass's between-reader
+    temperament confound. It introduces two new problems, in opposite
+    directions, **both of which push the measured mat effect toward zero**:
+
+    - **It teaches the reader that the paint is unreliable.** Reader C derived
+      the code correctly -- cyan duck, gold jump -- and then abandoned it
+      because two panels had *"no wash at all next to perfectly ordinary
+      obstacles"*. Those two panels are NOMAT panels. **A reader cannot know an
+      arm exists.** It then lost ten cells to exactly the objects the paint
+      would have settled.
+    - **It lets the mat arm tutor the nomat arm.** Reader B used the gold tint
+      on two MAT panels to settle that the blue barriers and the trestle are
+      *"jumpable rather than dead ends"*, and applied that to three NOMAT
+      panels. Its nomat score is partly borrowed from the mat.
+
+    **There is no design here that has neither problem**, and the next pass
+    should say which one it is buying rather than rediscover this.
+
+    ### THE ONE LEGIBILITY PROBLEM FOUND, AND IT IS NOT THE MAT
+
+    All ten errors in the whole test are **OVER read as AROUND, on JUMP**,
+    across five variants, at both distances, from one reader. Its language is
+    constant -- *"chest high"*, *"well above waist height"*, *"solid to the
+    ground"*. `MR.Collision.BOX` is the contract and art never decides
+    clearance, but art is all a player judges by, and **one reader in three
+    judged the art of a JUMP impassable.** That belongs to whoever owns the
+    JUMP fleet.
+
+    **It never cost a run.** Reading a JUMP as a wall makes you avoid a lane
+    you could have used, so **lane choice is 48 of 48 viable, 100% in both arms
+    at both distances.** Nobody ever picked a lane that ends a record attempt.
+
+    ### CONFIDENCE, AND THE ONE-READER TRAP SPRUNG AGAIN
+
+    Reader A alone read as a result: **8 of 8 sure with the mat, 4 of 8
+    without.** Reader B is the reverse, **4 of 8 against 7 of 8**. Pooled it is
+    12 of 16 against 11 of 16, which is nothing. **Had this pass stopped at one
+    reader it would have reported that mats make players surer and been
+    wrong**, which is precisely what the previous pass did and precisely what
+    the within-reader design exists to catch.
+
+    ### THE FADE
+
+    Paint by distance, re-measured frame-wide on the fleet of 26: **29,830 px
+    per lane at 8 u, 1,710 at `READ_NEAR` 25.35, 812 at 32, 415 at 40.** The
+    published 18x is confirmed at **17.45x**, and 8 u against 40 u is **71.8x**.
+    The `READ_NEAR` figure reproduces to the pixel against the previous pass on
+    a different build and a different gate sample.
+
+    **Fade OUT on approach, and only inside the decision distance.** The far
+    mat is *read* -- readers described it unprompted at 32 units, *"two gold
+    strips side by side"*, *"which glows cyan"* -- it simply changes no answer.
+    The spendable paint is the 94% that lives inside 25 units, where the lane
+    was chosen long ago. **The evidence argues against thinning the mat at or
+    beyond the decision distance**, because that is where the teaching happens,
+    and it argues hardest against the owner's instinct of faint-far-clear-near,
+    since near is exactly where the mat is already redundant.
+
+    ### THE LIMIT THAT MATTERS MOST, WRITTEN DOWN BEFORE THE ANSWERS LANDED
+
+    Every reader cropped panels apart, upscaled them and examined lanes
+    individually. **Unlimited time pushes BOTH arms toward ceiling and
+    compresses any mat effect toward zero**, so this design is systematically
+    biased against finding that the mat helps. A null result bounds what the
+    mat is worth to a careful reader; it cannot prove it worthless to a
+    glancing one. The attack is an exposure limit, which this harness cannot
+    currently impose.

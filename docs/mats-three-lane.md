@@ -15,6 +15,15 @@ edited.** Everything below is a measurement.
 because another agent is committing to `src/` while this runs and two arms
 rendered against different builds would not be two arms.
 
+The `index.html` committed at that pin was **stale** — 2,511,534 bytes on disk
+against a 2,580,533-byte fresh build — and `shoot.js` run against it reported
+**23 hazard variants for a fleet of 26**, which is the build from before the
+three new DUCKs. It was rebuilt inside the pinned worktree and every panel here
+was shot against that rebuild. It has since been rebuilt and committed properly
+as `b5d3b43`, and **the artifact this pass photographed is byte-identical to
+it**, blob `b815503`. So the panels are the shipped game and not a local
+variant, and that is checked rather than assumed.
+
 ---
 
 ## 0. The answer

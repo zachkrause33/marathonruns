@@ -8,31 +8,26 @@ surface has no back, because it is not an object.** The telegraph mat is
 exactly that, and this whole document is about it — but nothing here licenses a
 half-built anything.
 
-**Diagnosis only. No file under `src/` was edited to produce any number here.**
-Everything below is a measurement. The three tools are new and live in
-`tools/`.
+**Diagnosis only. No file under `src/` was read for an answer and none was
+edited.** Everything below is a measurement.
 
-**Measured against `b9b2170`**, in a detached worktree pinned to that commit,
-because two other agents were committing to `src/` while this ran and two arms
-rendered against different builds would not be two arms. The full gate passes
-on that build: `build.js` up to date, `shoot.js` **OK: all shots clean**,
-`course-test.js` **PASS 90 courses deterministic and solvable**, `simulate.js`
-**PASS pace model satisfies its stated contract**.
+**Measured against `388bb8c`**, in a detached worktree pinned to that commit,
+because another agent is committing to `src/` while this runs and two arms
+rendered against different builds would not be two arms.
 
 ---
 
 ## 0. The answer
 
-*(filled in below — see §3)*
+*(§3)*
 
 ---
 
 ## 1. The question this pass exists to close
 
 `docs/staleness-and-mats.md` found that with every mat hidden, four readers got
-**92 of 92 route judgements correct**, including 20 of 20 BLOCKs. It then wrote
-down, in its own list of what is not settled, the two limits that stop that
-being the whole answer:
+**92 of 92 route judgements correct**. It then wrote down, in its own list of
+what is not settled, the two limits that stop that being the whole answer:
 
 > **The panels are single hazards on empty road.** The game presents up to
 > three lanes at once with a hazard in each. A mat may be doing work in
@@ -41,19 +36,19 @@ being the whole answer:
 > **One distance only, and it is the friendliest one for this conclusion.**
 
 Judging one isolated object is not the player's task. The task is to **scan
-three lanes and pick one**, and the mat's own job description in `world.js` —
-the mat says WHAT TO DO, the object says WHAT IT IS — is a claim about a
-decision, not about an identification.
+three lanes and pick one**, and the mat's own job description — the mat says
+WHAT TO DO, the object says WHAT IT IS — is a claim about a decision, not about
+an identification.
 
 The decision in front of the owner is which way a distance fade should run. A
 mat is heaviest close in, where the decision is already made; the proposal is
 to fade mats **out** on approach, and the owner's counter-intuition is the
 opposite. **If the far mat measurably helps a three-lane choice, the fade runs
-out. If it does not, the mats are decoration at every distance.**
+out. If it does not, the owner's instinct is free.**
 
 ---
 
-## 2. The instrument, and the two ways it was wrong first
+## 2. The instrument
 
 | tool | what it does |
 |------|--------------|
@@ -66,9 +61,9 @@ out. If it does not, the mats are decoration at every distance.**
 Nothing about the cast is written by the tool: the occupied lanes, the kind in
 each lane, the variant, a train's span and a ramp's tail are all the course's
 and the bag's. The tool reads the staged gate back out of the scene graph and
-**checks it against `api.liveCast()` before a pixel is written** — the same
-shape as `staleness.js`'s A1 audit, and for the same reason. A gate that does
-not match what the game says is on the road fails the run. 16 of 16 agreed.
+**checks it against `api.liveCast()` before a pixel is written**. A gate that
+does not match what the game says is on the road fails the run. 16 of 16
+agreed, with zero recorded failures.
 
 The one thing the tool moves is the gate's **distance**, rigidly, re-seating on
 the elevation and re-pitching by the slope at the new z — the claim site's own
@@ -77,9 +72,6 @@ it cannot be left to wherever the sampling happened to land.
 
 ### 2.2 Gates are chosen by a rule, not by eye
 
-The previous pass caught itself choosing chroma samples by eye, "which is
-selection bias, in the flattering direction". The rule here is mechanical:
-
 > for each skip in an evenly spaced sweep through the race, take the **first
 > live gate strictly ahead of the runner**.
 
@@ -87,82 +79,145 @@ No filter on how many lanes are occupied, on which kinds appear, or on whether
 the picture is interesting. **And the skip is in race seconds, not units** —
 the unit `matshare.js` got wrong, putting nine of ten samples past the tape.
 
-What the sweep actually produced, over 16 gates:
+What the sweep produced, over 16 gates at each distance:
 
 | | |
 |---|---|
-| gates with 1 / 2 / 3 occupied lanes | 0 / 12 / 4 |
-| occupied lanes | 36 |
-| JUMP / DUCK / BLOCK | 15 / 11 / 10 |
-| CLEAR lanes | 12 |
-| BLOCK trains | 4 |
-| BLOCK variants seen | v0 ×5, v3, v5, v8 ×2, v9 |
+| gates with 1 / 2 / 3 occupied lanes | 2 / 11 / 3 |
+| occupied lanes | 33 |
+| JUMP / DUCK / BLOCK | 13 / 13 / 7 |
+| CLEAR lanes | 15 |
+| BLOCK trains | 2 |
 
-### 2.3 DEFECT 1: the crop cut two thirds of the paint out of the ON arm
+**The three new DUCKs are in it, and they were not put there by hand.** The
+mechanical draw gave `DUCK v5` ×2, `v6` ×2 and `v7` ×1 — five of the thirteen
+DUCK sightings. This matters because the previous pass pinned `b9b2170`, which
+is *older than* `a668100`, the commit that built them: **no panel that pass
+photographed could have contained a v5, v6 or v7.**
 
-The first version drew its crop from geometry — collision boxes plus the mat's
-run-up *guessed* at six units back and as wide as the box. The guess was wrong
-in both directions. Measured against the mat's real bounding box, the crop
-ended at x 308 while the paint ran to x 345, and the bottom of every mat fell
-below the crop as well.
+### 2.3 The two defects the previous pass found, and kept
 
-**Mat pixels inside the crop, per lane, at 25.35 units: 600 under the guessed
-crop, 1,872 under the measured one.** The ON arm was showing the reader about a
-third of the paint the game draws, while the OFF arm lost nothing it was not
-already missing — so the experiment would have understated the mat, **which is
-the flattering direction for the conclusion that the mat does nothing.**
+**The crop was drawn from a guess at where the mat is** — object collision
+boxes plus a run-up guessed at six units back — and the guess cut roughly two
+thirds of the paint out of the ON arm while the OFF arm lost nothing. That
+understated the mat, **which is the flattering direction for the conclusion
+that the mat does nothing.** The crop is now the union of the object box with
+the mat's *measured* box, and every panel asserts `matFullyInside` (32 of 32).
 
-The fix is to stop guessing. The mat's extent is exactly the pixels that move
-when it is hidden, so the diffs are taken first and the crop is the union of
-the object box with the mat's **measured** box. Every panel now asserts
-`matFullyInside`.
+**The two arms were shot as separate runs, on different gates.** This tool
+picks its gate by "the first gate ahead of the runner", and the runner's
+position is not reproducible across page loads — four loads at the same skip
+put it at 451.632, 451.056, 452.043 and 451.466, and two runs at the same seed
+selected the gate at z 460.4 and the gate at z 500.4. Both buffers now come out
+of **one page evaluation**.
 
-### 2.4 DEFECT 2: the two arms were shot as separate runs, on different gates
+The same fix in `blindread.js` is `--art`: **cropping a DUCK panel to the
+collision box cuts the object off**, because a DUCK terminates between 3.10 and
+3.58 while the tallest collision box is 2.80. That had been quietly weakening
+every duck read taken before it. It is kept and it is still right.
 
-`blindread.js` shoots its arms as two runs, and can, because it *moves* a
-borrowed object to an exact distance — the panel does not depend on where the
-runner is. This tool picks its gate by "the first gate ahead of the runner", so
-the panel depends on the runner's position entirely — and **the runner's
-position is not reproducible across page loads.** Four loads, same skip, same
-date:
-
-    runnerZ   451.632   451.056   452.043   451.466
-
-The race is driven from the `requestAnimationFrame` timestamp, so the settling
-time before the scene is read is real time and varies with machine load. One
-unit is enough to move the "first gate ahead" cut past a gate, and it did: two
-runs at the same seed and the same skip selected **the gate at z 460.4 and the
-gate at z 500.4** — different gates, different hazards.
-
-**Two arms shot on different gates are not two arms.** Both buffers now come
-out of one page evaluation, so the arms differ in the paint and in nothing
-else: same course, date, gate, lanes, variants, gradient, light, backdrop, crop
-rectangle and instant of wind.
-
-### 2.5 What was checked before any answer was believed
+### 2.4 What I checked before believing any of it
 
 | control | result |
 |---|---|
-| staged gate vs `api.liveCast()` | 16 of 16 gates agree, kind and variant |
-| per-lane MATCHECK — every occupied lane must lose paint | **36 of 36 lanes at both distances** |
+| staged gate vs `api.liveCast()` | 16 of 16 agree, kind and variant; 0 recorded failures |
+| per-lane MATCHECK — every occupied lane must lose paint | **33 of 33 lanes at both distances** |
 | mat's own bounding box inside the crop | 32 of 32 panels |
 | all three lane centres inside the crop | 32 of 32 panels |
 | per-lane mat masks partition the whole-panel mask | exact, gap 0 on every panel |
-| cast unchanged between the two distance shots | 0 of 16 gates re-tenanted, runnerZ drift 0.00 |
+| cast unchanged between the two distance shots | 0 of 16 re-tenanted, runnerZ drift 0.0000 |
 | **twins on disk differ by exactly the recorded mat count** | **32 of 32 pairs, deviation 0 px** |
-| stale contact-shadow artefact | 36 px, identical in both arms |
-| screen left/right order | projected, not assumed; verified against the pictures |
+| design re-derived from the master key, not taken on assertion | no problems |
+| composition identical across the four conditions | see below |
 
-The last-but-one is the end-to-end one: the written PNG files were decoded and
-diffed, and every twin pair differs by **exactly** the mat pixel count the
-harness recorded, to the pixel. A whole-panel count of "some" would have been
-satisfied by one lane's paint, which is why MATCHECK is per lane here.
+Every condition contains **exactly 16 gates, 33 occupied lanes, 13 JUMP, 13
+DUCK, 7 BLOCK, 15 clear lanes and 2 trains** — identical, not merely balanced.
 
-**Why the mat is toggled per lane.** An OFF arm in which two lanes lost their
-paint and the third never had any is not the treatment it claims to be — it is
-the control photographed in two of three lanes.
+### 2.5 THE HEADLINE CONTROL WAS THE HARNESS CHECKED WITH ITS OWN RULER
 
-### 2.6 The counterbalancing, which is what killed the last pass's result
+The twin-pair check above is the end-to-end one: the written PNG files are
+decoded and diffed, and every pair differs by exactly the mat pixel count the
+harness recorded. I reproduced it independently — a different decoder, a
+browser this audit opened itself, numbers recomputed from pixels — and got 32
+of 32, deviation 0 px.
+
+**But that check passes at the harness's own threshold, and the harness picks
+the threshold.** `lanechoice.js` calls two pixels different when a channel
+differs by more than 6. Diffing the same files at threshold 0:
+
+    changed pixels the harness records        89,738
+    changed pixels actually on disk          118,201     +24.1%
+
+So the arms differ in **28,463 pixels the control was blind to**. That residue
+is either the mat's own soft edge, which is harmless, or something else moving
+between the arms, which would wreck the experiment. It is decided by geometry,
+with a Chebyshev distance transform from the supra-threshold mask:
+
+| distance from the nearest mat pixel | residue pixels | cumulative |
+|---|---|---|
+| 1 px | 16,272 | 57.2% |
+| 2 px | 6,910 | 81.5% |
+| 3 px | 2,749 | 91.1% |
+| 4 px | 1,321 | 95.8% |
+| 5–7 px | 1,101 | 99.6% |
+| 8 px | 110 | **100.0%** |
+
+**Every one of the 28,463 pixels is within 8 px of a mat pixel, the count
+decays monotonically with distance, the peak amplitude is 6/255 on a channel,
+and there is no orphan region in any of the 32 panels.** That is an antialiased
+edge and it is nothing else. Hiding the mat changes the mat and changes nothing
+else — now for a reason rather than by assertion.
+
+### 2.6 A FRAMING DEFECT NOBODY HAD CHECKED, AND WHAT IT CAN AND CANNOT DO
+
+The crop is the union of the object boxes and the measured mat boxes, so it is
+drawn **around the paint, not around the road**. Measured as the position of
+the three lane centres within the crop:
+
+| | |
+|---|---|
+| width of the three-lane span, as a fraction of the picture | 0.332 to 0.539 |
+| panels where one side is padded more than twice the other | **23 of 32** |
+| extremes | left pad 0.162 / right pad 0.492, and 0.491 / 0.163 |
+
+On the worst panels the carriageway sits in half the frame and the rest is
+kerb, pavement, railings or water. The reader is told the picture shows three
+lanes side by side; on those panels finding them is a real task.
+
+**This cannot bias the mat contrast, because the crop rectangle is identical in
+both arms** — it is computed once per gate and both buffers come out of one
+evaluation. What it can do is add noise, and it has a specific signature: a
+reader who took the kerb for a lane would return **the truth rotated by one
+place**, which scores as three wrong demands and reads as a legibility failure
+when it is a framing failure. So two things were done rather than one:
+
+1. `PROMPT.txt` now anchors lane-finding — the road has exactly three lanes,
+   divided by broken lane lines, and anything beyond the kerb is not one of
+   them. **This is arm-neutral: the lane dashes are separate quads from the
+   mats and survive in the NOMAT arm**, confirmed on the twin pairs.
+2. Rotations are counted separately in the scoring, so a framing failure cannot
+   be banked as a mat result.
+
+### 2.7 A LEAK CHANNEL NOBODY HAD CHECKED
+
+A MAT-arm PNG compresses worse than its twin. Across all 32 pairs the MAT file
+is the larger one **32 times out of 32** — mean 26,248 bytes against 19,204.
+An agent reader can run `ls`.
+
+It is contained, and by two facts rather than one hope. Twins are never in the
+same reader's set, so the pairwise comparison is unavailable. And within each
+reader's own 16 panels, bytes per crop pixel:
+
+| reader | mat arm | nomat arm | separable? |
+|---|---|---|---|
+| a | 1.129–1.764 | 0.873–1.389 | no, ranges overlap |
+| b | 1.095–1.719 | 0.957–1.391 | no, ranges overlap |
+| c | 1.227–1.768 | 0.828–1.337 | no, ranges overlap |
+| d | 1.280–1.775 | 0.843–1.455 | no, ranges overlap |
+
+No threshold on file size separates the arms inside any reader's set.
+
+### 2.8 The counterbalancing, which is what killed the last pass's result
 
 The previous pass's confidence table appeared to say JUMP needs its mat and
 BLOCK is hurt by one. Both halves were an artefact of reading the two arms with
@@ -170,28 +225,33 @@ two *different* readers, and only a within-reader re-run killed it.
 
 So the design is a **Latin square over four conditions** — near+mat,
 near+nomat, far+mat, far+nomat — with reader *r* seeing gate *i* in condition
-`(i + r) mod 4`. `lanechoice-sets.js` asserts three properties rather than
-claiming them:
+`(i + r) mod 4`. Re-derived from the master key rather than taken from the
+tool's own assertion:
 
 1. **Every reader sees both arms and both distances in equal number** — 4
    panels in each of the 4 conditions. The mat contrast lives *inside* each
    reader, so temperament cancels.
 2. **Every gate is seen once in every condition** across the four readers, so
-   no condition is carrying an easier set of gates. Confirmed by composition:
-   all four conditions contain **exactly 36 occupied lanes, 15 JUMP, 11 DUCK,
-   10 BLOCK, 12 clear lanes and 4 trains** — identical, not merely balanced.
-3. **No reader sees the same gate twice.** This is the one the obvious design
-   gets wrong: a reader shown the same road at 25.35 and again at 32 is not
-   making an independent second judgement, and if the two looks straddled the
-   arms they would be being shown the same road with and without paint.
+   no condition carries an easier set of gates.
+3. **No reader sees the same gate twice.** A reader shown the same road at
+   25.35 and again at 32 is not making an independent second judgement, and if
+   the two looks straddled the arms they would be being shown the same road
+   with and without paint.
 
-Readers are **uncontaminated** — a session created against a parentless branch
-holding 16 panels and `PROMPT.txt` and nothing else. No source, no `CLAUDE.md`,
-no repository to leak vocabulary from. Verified: the branch tree has 17 entries
-and the commit has 0 parents. Recipe from roadmap entry 63, now implemented as
-`lanechoice-sets.js --push` rather than re-invented each pass.
+Readers are **uncontaminated** — four sessions created against parentless
+branches holding 16 panels and `PROMPT.txt` and nothing else. Verified: each
+commit has **0 parents** and each tree has **17 entries**. No source, no
+`CLAUDE.md`, no repository to leak vocabulary from. Recipe from roadmap entry
+63, implemented as `lanechoice-sets.js --push`.
 
-### 2.7 The question the readers were asked
+    lc3-reader-a  8c7f29d69f3485516549f22179290fc6c1d0e359
+    lc3-reader-b  33e5b956fa39954a8116fb1f5d3dad80dd40d79f
+    lc3-reader-c  af73a02a8ae9a8f511aa33c55aea7ffd524827f6
+    lc3-reader-d  447e90211aa6e31cc04c19eb404dccb5d680f830
+
+**Never merge them.**
+
+### 2.9 The question the readers were asked
 
 Not the identification question. The player's question:
 
@@ -207,35 +267,55 @@ in their own words.
 
 ---
 
-## 3. The result
+## 2.10 The mat is a complete colour code for the answer
 
-*(filled in from the readers)*
+This is the fact that decides what a null result would *mean*. Measured on the
+mat masks themselves at `READ_NEAR`:
+
+| kind | demand | lanes | mat px | mean RGB as drawn |
+|---|---|---|---|---|
+| JUMP | OVER | 13 | 21,549 | 125, 112, 87 — warm |
+| DUCK | UNDER | 13 | 23,193 | 87, 117, 132 — cyan |
+| BLOCK | AROUND | 7 | 14,423 | 124, 82, 103 — magenta |
+
+Three cleanly separated hues, distinguished by channel ordering rather than by
+brightness. **The mat, on its own, is a sufficient answer to question 2.** So
+if the arms score the same, the finding is not that the mat is uninformative —
+it is that **the object carries the same information, redundantly, and gets
+there first.**
 
 ---
 
-## 4. How much paint there is, by distance — re-measured
+## 3. The result
 
-The fade decision rests on a ratio, so the ratio was re-measured
-independently, frame-wide (crop-independent), over 8 gates at five distances,
-mean mat pixels per occupied lane:
+*(§3)*
 
-| distance | mat px per lane | vs `READ_NEAR` | whole gate |
+---
+
+## 4. How much paint there is, by distance — re-measured on the fleet of 26
+
+The fade decision rests on a ratio, so the ratio was re-measured independently,
+frame-wide and crop-independent, over 8 gates and 19 occupied lanes at five
+distances:
+
+| distance | mat px per occupied lane | vs `READ_NEAR` | whole gate |
 |---|---|---|---|
-| 8 u | **31,908** | **18.7×** | 71,792 |
-| 12 u | 22,579 | 13.2× | 50,804 |
-| **25.35 u (`READ_NEAR`)** | **1,710** | **1.00×** | 3,848 |
-| 32 u | 787 | 0.46× | 1,771 |
-| 40 u | 402 | 0.24× | 905 |
+| 8 u | **29,830** | **17.45×** | 70,846 |
+| 12 u | 20,757 | 12.14× | 49,299 |
+| **25.35 u (`READ_NEAR`)** | **1,710** | **1.00×** | 4,061 |
+| 32 u | 812 | 0.47× | 1,928 |
+| 40 u | 415 | 0.24× | 986 |
 
-**The published 18× figure is confirmed at 18.7×** on an independent
-measurement that counts the whole mat rather than the part that fell inside
-`blindread.js`'s crop. The absolute pixel counts in `docs/staleness-and-mats.md`
-(648 px at 25 u) are low by roughly 3× for that reason — they were counted
-inside a crop window that cut the mat off — **but the ratio the fade proposal
-rests on survives, and extends: the mat is 79× heavier at 8 u than at 40 u.**
+**The published 18× figure is confirmed at 17.45×**, and the mat is **71.8×
+heavier at 8 u than at 40 u**. The `READ_NEAR` figure of 1,710 px per lane
+reproduces to the pixel against the previous pass, which measured it on a
+*different build* (`b9b2170`, before the three new DUCKs) and a *different gate
+sample*. The absolute counts in `docs/staleness-and-mats.md` (648 px at 25 u)
+remain low by roughly 3×, because they were counted inside a crop that cut the
+mat off.
 
 ---
 
 ## 5. What is not settled
 
-*(filled in)*
+*(§5)*

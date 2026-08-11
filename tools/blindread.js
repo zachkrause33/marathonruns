@@ -178,6 +178,16 @@ const DISTS = String(arg('dist', '8,12,25')).split(',').map(Number);
 const ONLY_KIND = arg('kind', null);
 const ONLY_VAR = arg('variant', null);
 const SAMPLE = parseInt(arg('sample', 0), 10);
+/**
+ * --nomat renders the panel with the telegraph mat HIDDEN.
+ *
+ * The mat is the game's primary WHAT-TO-DO channel and this tool exists partly
+ * because an earlier version omitted it by accident. Dropping it ON PURPOSE is
+ * the only way to ask what it is worth, and the two uses must not be confused:
+ * a run without this flag is the game, and a run with it is a counterfactual.
+ * Every key file records which it was, and the panel note says so too.
+ */
+const NOMAT = !!arg('nomat', false);
 const SEED = parseInt(arg('seed', String(Date.now() % 2147483647)), 10);
 const OUT = path.resolve(String(arg('out', path.join(os.tmpdir(), 'mr-blindread'))));
 
@@ -580,6 +590,26 @@ function shoot(job) {
     for (let q = 0; q < withMat.length; q += 4) if (pixDiffers(withMat, noObj, q)) objAll++;
   }
 
+  /**
+   * WHICH OF THE TWO RENDERS BECOMES THE PANEL.
+   *
+   * --nomat writes the SECOND render -- the identical frame with the mat
+   * hidden -- so a no-mat panel and its with-mat twin differ in the paint and
+   * in nothing else: same course, same date, same gate, same gradient, same
+   * light, same backdrop, same crop rectangle. That matters more here than
+   * anywhere else this tool is used, because the question is whether removing
+   * the mat changes a reading, and any second difference between the two shots
+   * is a rival explanation for whatever the readers say.
+   *
+   * MATCHECK IS NOT RELAXED IN THIS MODE, IT IS REPURPOSED. It still requires
+   * that the game DREW a mat inside the crop. With the mat kept, that proves
+   * the panel contains the channel. With the mat dropped, it proves the panel
+   * is genuinely MISSING something -- a no-mat panel shot where no mat existed
+   * anyway is not a treatment, it is the control photographed twice, and it
+   * would silently turn a two-arm experiment into a one-arm one.
+   */
+  const panelBuf = job.nomat ? noMat : withMat;
+
   const cv = document.createElement('canvas');
   cv.width = cw; cv.height = ch;
   const cg = cv.getContext('2d');
@@ -587,7 +617,7 @@ function shoot(job) {
   for (let Y = 0; Y < ch; Y++) {
     const flip = S.h - 1 - (y0 + Y);
     const src = (flip * S.w + x0) * 4;
-    img.data.set(withMat.subarray(src, src + cw * 4), Y * cw * 4);
+    img.data.set(panelBuf.subarray(src, src + cw * 4), Y * cw * 4);
   }
   cg.putImageData(img, 0, 0);
   const png = cv.toDataURL('image/png');
@@ -655,7 +685,7 @@ function teardown() {
     for (let v = 0; v < info.counts[kind]; v++) {
       if (ONLY_VAR !== null && parseInt(ONLY_VAR, 10) !== v) continue;
       for (const d of DISTS) {
-        plan.push({ kind, variant: v, dist: d, lane: info.lane, runnerZ: info.runnerZ });
+        plan.push({ kind, variant: v, dist: d, lane: info.lane, runnerZ: info.runnerZ, nomat: NOMAT });
       }
     }
   }
@@ -721,19 +751,35 @@ function teardown() {
   fs.writeFileSync(path.join(keyDir, runid + '.json'), JSON.stringify({
     runid, seed: SEED, skip: SKIP, date: DATE, viewport: [W, H],
     fov: info.fov, lane: info.lane, dists: DISTS,
+    arm: NOMAT ? 'NOMAT -- telegraph mat hidden, NOT the shipped game' : 'SHIPPED -- mat as the game draws it',
+    nomat: NOMAT,
     panelDir, panels: key,
-    note: 'Panels include the telegraph mat, which api.variantObject omits. '
+    note: (NOMAT
+        ? 'THE MAT WAS DELIBERATELY HIDDEN IN THESE PANELS. They are a '
+          + 'counterfactual, not the game. matPx below is the paint that was '
+          + 'REMOVED from each panel, measured on the with-mat twin of the same '
+          + 'frame. '
+        : '')
+        + 'Panels include the telegraph mat, which api.variantObject omits. '
         + 'Readers run inside this repository receive CLAUDE.md; see the header '
         + 'of tools/blindread.js for what that leaks and what it invalidates.',
   }, null, 1));
 
-  console.log('BLINDREAD ' + runid);
+  console.log('BLINDREAD ' + runid + (NOMAT ? '   *** NOMAT ARM -- the mat is hidden ***' : ''));
+  if (NOMAT) {
+    console.log('  These panels are NOT the shipped game. The telegraph mat has been hidden');
+    console.log('  on purpose so the reading can be compared against a with-mat arm shot on');
+    console.log('  the same build, the same date, the same gate and the same crop.');
+  }
   console.log('  panels   ' + panelDir + '  (' + key.length + ' images + PROMPT.txt)');
   console.log('  key      ' + path.join(keyDir, runid + '.json') + '   <- do not show the reader');
   console.log('  frame    ' + W + 'x' + H + ', fov ' + info.fov + ', lane ' + info.lane
     + ', skip ' + SKIP + (DATE ? ', date ' + DATE : ''));
   console.log('');
-  console.log('  MATCHECK -- pixels the telegraph mat contributes inside each crop');
+  console.log(NOMAT
+    ? '  MATCHECK -- pixels the telegraph mat WOULD have contributed, i.e. what'
+      + '\n  each panel is missing. A zero here would mean the arm removed nothing.'
+    : '  MATCHECK -- pixels the telegraph mat contributes inside each crop');
   const byDist = {};
   for (const k of key) (byDist[k.dist] || (byDist[k.dist] = [])).push(k);
   for (const d of Object.keys(byDist).sort((a, b) => a - b)) {
@@ -793,6 +839,12 @@ function teardown() {
     process.exit(1);
   }
   if (errs.length) process.exit(1);
+  if (NOMAT) {
+    console.log('OK: every panel had a mat to lose and lost it, so this arm really is the');
+    console.log('with-mat arm minus the paint, and nothing in the panel directory names');
+    console.log('the answer' + (matLost.length ? ' -- but see MATLOST above' : '') + '.');
+    return;
+  }
   console.log('OK: every panel the game drew a mat for carries it, and nothing in the panel');
   console.log('directory names the answer'
     + (matLost.length ? ' -- but see MATLOST above before drawing any over/under conclusion' : ''));

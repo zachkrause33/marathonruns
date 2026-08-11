@@ -4242,3 +4242,143 @@ nobody measured is worse than no number at all.**
     +25.5; `deckdrop` 24/24, worst +29.2; `shoot`, `course-test`, `calendar`
     (32 days), `envelope` and `kindread` (1 of 23 on profile) all clean; and
     the record still survives **1 / 2 / 3** mistakes, unmoved.
+
+63. **The BLOCK legibility pass was stopped before it changed a line of
+    `src/render/world.js`, and everything below is measurement rather than
+    fix.** It is written out in full because entry 61 left one fairness defect
+    open and named only half of it: `BLOCK v3` reads as OVER, and BLOCK scored
+    1 of 3, so a second variant was misreading and nobody knows which. That
+    question is still open. What follows is the ground the next pass does not
+    have to re-cover.
+
+    **THE UNCONTAMINATED READER IS NOW A CHEAP INSTRUMENT, AND THAT IS THE ONE
+    THING HERE THAT IS FINISHED.** Entry 61 got its reader from "a git branch
+    containing no source and no CLAUDE.md" and did not say how, which made the
+    best instrument this project has a thing somebody re-invents each pass. It
+    is three commands and it never touches the working tree, which matters
+    because several agents share this one:
+
+        git hash-object -w <panel>          -> a blob per panel
+        git mktree < lines                  -> a tree, built by hand
+        git commit-tree <tree> -m "..."     -> a parentless commit
+        git push origin <sha>:refs/heads/<branch>
+
+    No checkout, no orphan branch, no stash, no risk to anyone else's in-flight
+    work. The reader is then a session created against that branch, which
+    contains images and `PROMPT.txt` and nothing else -- no source, no
+    `CLAUDE.md`, no repository to leak vocabulary out of.
+
+    Three branches are pushed and they are parentless; never merge them.
+
+    | branch                 | contents                                             |
+    |------------------------|------------------------------------------------------|
+    | `blindread-block-a`    | 23 panels: every variant in the game at `READ_NEAR` 25u |
+    | `blindread-block-b`    | 12 panels: all ten BLOCKs at 12u, `JUMP v3` at 8 and 12 |
+    | `blindread-block-key`  | the key for both -- **do not show a reader**          |
+
+    All of them are off `2d61123`, the fitted-mat build, and every panel
+    carries its mat (MATCHECK 12.4% to 26.9% of crop at 25u, 17.5% to 18.5% at
+    12u, nothing lost, nothing cropped).
+
+    **`BLOCK v9`, THE MOPED: THE DEFECT IS ITS FEET AND NOT ITS TOP.** It is
+    the 1 of 23 `kindread` misses on profile, and the row says where:
+
+        BLOCK v9   0.10 0.24 0.30 0.28 0.41 0.50 0.50 0.51 0.51 0.50 0.38 0.21 0.13 0.00
+        every other BLOCK, band 0        0.59 to 0.86
+        every DUCK,        bands 0 to 5  0.20 to 0.36
+
+    The moped's top is thin -- it peaks at 0.51 where a BLOCK sits at 0.75 --
+    but that is not what lands it in the DUCK cluster. **Band 0 is 0.10.** At
+    road level the object is two tyres 0.13 wide on a single track, and
+    everything else on it starts at the floor pan at y 0.44: from astern there
+    is daylight under the machine, and daylight under the machine is the
+    literal definition of the kind it is being confused with.
+
+    Modelled against the same 23-row table with the same nearest-centroid L1
+    the tool uses, **raising the bottom four bands alone flips it**, and the
+    top never has to be touched:
+
+    | change to the low four bands (y 0 to 0.80) | v9 margin |
+    |--------------------------------------------|-----------|
+    | as it ships                                | **-1.117** |
+    | to 0.50                                    | +0.619    |
+    | to 0.62                                    | +1.066    |
+    | 0.55 low, and 0.60 through bands 4 to 9    | +1.712    |
+
+    **Those four numbers are a model of the instrument and not a reading from
+    it.** They recompute the centroids off the printed table with v9's row
+    edited; they assume the other 22 rows do not move, which is true, and that
+    geometry can be built to hit a band figure, which is a guess. Re-run
+    `node tools/kindread.js` and believe that instead -- this project has a
+    long entry about numbers nobody measured.
+
+    The honest difficulty is that a two-wheeler really is narrow at the road,
+    so the mass has to come from something a delivery moped genuinely carries.
+    **`BLOCK v8` is the precedent and also the trap**: it is two bicycles, it
+    had exactly this defect, and it was fixed by loading the machines with
+    crates -- so crates are taken, and a second crate variant would put two of
+    the ten BLOCKs on the same idea.
+
+    **`JUMP v3`, THE SCOOTERS: THE NAMEABLE VIEW IS TURNED TO THE KERB.** This
+    is a source reading, not a reader's verdict, and it wants confirming -- but
+    it is precise enough to act on. The standing machines are built with their
+    ROLLING AXIS DOWN THE LANE: the wheels take `rz = Math.PI / 2` and sit at
+    z +0.28 and -0.30, the deck is 0.22 in x by 0.58 in z, and the handlebar is
+    0.60 across x. The chase camera is astern. So what it gets is the machine's
+    REAR ELEVATION -- one wheel hiding the other, a stem, a bar across the top.
+
+    The variant's own header states the case against it without noticing:
+    *"a machine standing up shows its PROFILE -- two wheels, a deck between
+    them, a raked stem and a handlebar across the top -- and that profile is
+    the whole of what makes a scooter nameable."* **That profile faces the
+    kerb.** From directly behind, a kick scooter, a bicycle and a moped are the
+    same silhouette, which is exactly the hedge the last reader gave: *"a
+    bicycle, scooter or kick-scooter lying on its side... I am genuinely not
+    confident, and I would not defend it."*
+
+    The candidate fix is a 90-degree yaw on the standing machines so the side
+    profile faces the lens, and the envelope has room for it: `JUMP` is halfX
+    1.12 and halfZ 0.52, a machine is about 1.1 long and 0.3 wide, so it fits
+    ACROSS the lane where it does not fit along it. It costs no draw calls and
+    no colour. **Not built, not measured, and the profile row would move** --
+    it is 0.50 0.42 0.13 0.26 0.09 today, the thinnest in its kind.
+
+    **`BLOCK v3`, THE MARSHALS: THE READER MEASURED THE OBJECT CORRECTLY.** Its
+    top rail is a 0.12 cream cap centred at y 1.30, so it tops out at **1.36**,
+    and the pair standing 0.70 behind it put their heads at 2.13 and their caps
+    at 2.45. The reader's *"comes up only to about waist height on the two
+    people standing directly behind it"* is not an impression, it is a correct
+    reading of the geometry, and `MR.Collision.BOX` says 2.80. The art is
+    lying and the box is right.
+
+    Three routes are already closed, which is most of the value here:
+
+    - **A portal frame with a panel slung under a top beam is DUCK v0's exact
+      silhouette**, and it is the shape that same reader called UNDER six times
+      out of six at confidence "sure". Anything that spans the lane on two legs
+      with air under it is the strongest UNDER signal in the game.
+    - **A solid ROAD CLOSED hoarding is `BLOCK v1`**, already in the fleet.
+    - **Colour cannot move.** The lever table in the variant header records
+      every chroma and luminance route being tried and every one making it
+      worse; it clears the fairness gate on luminance alone at 1.37x to 1.43x
+      with dS 0.023 against a road at S 0.157. Cream and its own pink are the
+      only bright materials available to build the fix out of.
+
+    So the fix has to put mass across the lane ABOVE the pair's heads, solid to
+    the road, in cream and pink, without a top beam on legs. It is a geometry
+    problem with three walls already built around it.
+
+    **AND THE FINDING THAT OUTLIVES ALL OF IT: `kindread` CANNOT SEE THIS
+    DEFECT.** `BLOCK v3`'s profile is
+
+        BLOCK v3   0.59 0.57 0.41 0.70 0.77 0.78 0.73 0.63 0.65 0.67 0.63 0.61 0.27 0.00
+
+    which classifies as a BLOCK comfortably and is one of the healthier rows in
+    the fleet. The variant occupies the lane from the road to 2.40 and still
+    tells a reader to jump it. **Occupancy is not a scale reference.** A human
+    figure inside the silhouette re-scales everything next to it, and no band
+    of lane-width fraction can contain that fact -- 14 numbers about where mass
+    sits cannot say whose waist it is level with. The two instruments disagree,
+    `kindread` says pass and the blind reader says a lost record, and **the
+    reader is the one that costs a run.** Neither tool is wrong; they answer
+    different questions, and only one of them is the fairness gate.

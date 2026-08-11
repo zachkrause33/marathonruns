@@ -385,6 +385,23 @@ function occupied(course, lane, z0, z1) {
  *                     lens -- the pessimistic reading of the contract) or a
  *                     number of units of clear sight (the optimistic control)
  * @param opts.seek    aid policy: 0 ignore, 1 pay an action for it
+ * @param opts.surge   SPEND policy: a predicate (i, n) over the zone's index
+ *                     and the course's zone count, or nothing to never elect.
+ *
+ *                     ---- THE BLINDNESS THIS PARAMETER ENDS ----------------
+ *
+ *                     Without it this file reported six policies finishing
+ *                     within 0.0 s of each other AFTER the pool, the guard and
+ *                     the surge zones had shipped -- and the report was
+ *                     honest, because none of its bots ever stood in a marked
+ *                     lane, so all six ran the whole course at the unsurged
+ *                     floor. An instrument that cannot see the mechanic under
+ *                     test does not return "no effect", it returns "no
+ *                     effect" INDISTINGUISHABLY from a mechanic that is
+ *                     broken, and that is worse than no number at all
+ *                     (standing rule 3). Every measurement taken between the
+ *                     zones landing and this parameter existing was of a game
+ *                     nobody was playing.
  * @param opts.aidFrom, opts.aidTo   only seek aid in this fraction of the race
  * @param opts.bias    lane tie-break
  * @param opts.miss    deliberately fluff this fraction of the ACTIONS the bot
@@ -416,8 +433,23 @@ function raceAt(course, opts) {
   const pl = Player.create();
   const ctrl = stubControls();
   const DT = 1 / 60;
-  const out = { hits: 0, gates: 0, aid: 0, gain: 0, late: 0, wrongLane: 0, flank: 0, actions: 0 };
+  const out = { hits: 0, gates: 0, aid: 0, gain: 0, late: 0, wrongLane: 0, flank: 0, actions: 0,
+                guards: 0, wasted: 0, surgeUnits: 0, zoneUnits: 0 };
   const aid = course.aid.filter((a) => !a.roof);
+
+  // ---- the spend policy, resolved once ----------------------------------
+  const zones = course.surges || [];
+  const surgeOn = new Set();
+  if (opts.surge) {
+    for (let i = 0; i < zones.length; i++) if (opts.surge(i, zones.length)) surgeOn.add(zones[i]);
+  }
+  for (const z of zones) out.zoneUnits += z.z1 - z.z0;
+  /** The marked lane to be standing in at z, or -1. Fuel is required. */
+  function surgeLaneAt(z) {
+    if (!surgeOn.size || !p || p.pool <= 0) return -1;
+    const s = course.surgeZoneAt ? course.surgeZoneAt(z) : null;
+    return s && surgeOn.has(s) ? s.lane : -1;
+  }
 
   // Where each gate becomes decidable, under the chosen sighting model.
   const seeAt = new Array(course.gates.length);
@@ -460,11 +492,21 @@ function raceAt(course, opts) {
           ? aid[ai].lane : -1;
         const cand = order0(pl.lane).concat([0, 1, 2])
           .filter((l, i, a) => l >= 0 && l <= 2 && a.indexOf(l) === i);
+        // Both ends of the road about to be run, for the same reason main.js
+        // asks both: a zone is 420-560 units against a ~25-unit gate interval,
+        // so the edges are the only place a single-point test can be wrong,
+        // and they are exactly where the election is won or lost.
+        const sLane = surgeLaneAt(units) >= 0 ? surgeLaneAt(units) : surgeLaneAt(g.z);
         let best = null, bestScore = -Infinity;
         cand.forEach(function (l, i) {
           if (g.lanes[l] === K.BLOCK) return;
           let score = (g.lanes[l] === K.CLEAR ? 100 : 0) - i;
           if (l === wantLane) score += 400;
+          // Above aid, and it is the same ordering main.js scores: a segment
+          // collected is only worth what it later buys, so detouring for a
+          // bottle out of a zone already being paid for spends the pool to
+          // fill the pool.
+          if (l === sLane) score += 500;
           if (score > bestScore) { bestScore = score; best = l; }
         });
         targetLane = best === null ? pl.lane : best;
@@ -493,24 +535,51 @@ function raceAt(course, opts) {
     }
 
     pl.handle(ctrl);
+    // ---- THE ELECTION, BEFORE THE STEP -----------------------------------
+    //
+    // Through player.resolveSurge rather than a test written here, so this
+    // harness asks the shipped question -- in a marked lane, not on a deck,
+    // with fuel -- instead of a second copy of it that can drift. Before
+    // p.update for the reason main.js gives: the surge decides which floor
+    // this step is run toward, and a step cannot be run at a pace chosen
+    // after it.
+    // And it is NOT conditioned on the policy. There is no decline in the
+    // shipped game: standing in the marked lane with fuel IS the surge,
+    // whether the runner meant it or not. The policy decides only where the
+    // bot STEERS -- so a policy that never seeks a zone still surges wherever
+    // the marked lane happened to be the lane it wanted anyway, and that
+    // coincidence is a real property of a three-lane road rather than a
+    // measurement artefact to be conditioned away.
+    if (usePace) {
+      pl.resolveSurge(course, units, p.pool > 0);
+      p.surging = !!pl.surge;
+    }
     const before = units;
     if (usePace) { p.update(DT); units = p.units; speed = p.speed(); }
     else units += speed * DT;
     const after = units;
     pl.update(DT, after - before);
 
+    // ---- A GUARDED CONTACT IS A DIFFERENT FACT FROM AN UNGUARDED ONE ------
+    //
+    // pace.onHit() returns 'guard' when a segment paid, and the two must be
+    // counted apart or the contact column reads the same for a run that was
+    // insured and one that was not -- which is precisely the difference the
+    // pool exists to create. `hits` stays the count of contacts that COST
+    // something, matching what the finish card and the streak actually saw.
+    const charge = () => (p ? p.onHit() : 'hit') === 'guard';
     const deck = pl.resolveDeck(course, before, after);
-    if (deck && deck.hit) { out.hits++; out.flank++; if (p) p.onHit(); }
+    if (deck && deck.hit) { if (charge()) out.guards++; else { out.hits++; out.flank++; } }
     for (const r of pl.resolveGates(course, before, after)) {
       out.gates++;
       if (!r.clean) {
+        if (charge()) { out.guards++; continue; }
         out.hits++;
         // Which failure was it: in the right lane and mistimed, or never got
         // to the lane at all? The two want different fixes and lumping them
         // is how a reaction problem gets misread as a spacing problem.
         if (r.lane === targetLane && isAction(r.kind)) out.late++;
         else out.wrongLane++;
-        if (p) p.onHit();
       } else if (p) p.onClean();
     }
     for (const it of pl.resolveAid(course, before, after)) {
@@ -518,7 +587,10 @@ function raceAt(course, opts) {
     }
     pl.drainEvents();
   }
-  if (p) { out.time = p.finishTime; out.streak = p.bestStreak; }
+  if (p) {
+    out.time = p.finishTime; out.streak = p.bestStreak;
+    out.surgeUnits = p.surgeUnits; out.wasted = p.wasted; out.pool = p.pool;
+  }
   return out;
 }
 
@@ -648,24 +720,43 @@ if (want('policy')) {
   console.log('  450 ms reaction latency. Motion comes from the shipped pace model, so');
   console.log('  the finish times are the game\'s own and not a replay approximation.');
   console.log('');
-  console.log('  Swept across fluff rates, because with a flawless player every policy');
-  console.log('  converges TRIVIALLY -- aid is worth zero to a clean run by construction,');
-  console.log('  so a perfect-player table would prove nothing. A policy difference, if');
-  console.log('  there is one, can only show up in a player who makes mistakes.');
+  console.log('  Swept across fluff rates. The six ORIGINAL policies differed only in');
+  console.log('  which bottles they fetched, and under the shipped game that made them');
+  console.log('  identical by construction -- aid was worth 0.00 s to a clean run, so a');
+  console.log('  perfect-player table proved nothing and the six tied at a 0.0 s spread.');
+  console.log('');
+  console.log('  They are kept, and four SPEND policies are added underneath, because the');
+  console.log('  fix for that finding was to give the bottle a second exit. A table that');
+  console.log('  only varied collection would now be measuring the input to a decision it');
+  console.log('  never makes -- which is exactly how this instrument came to report');
+  console.log('  "no strategy" about a build that had just shipped one.');
   console.log('');
   const courses = PKEYS.map((k) => Course.generate(k));
+  const nZones = courses.reduce((a, c) => a + (c.surges || []).length, 0) / courses.length;
+  console.log(`  ${nZones.toFixed(1)} surge zones a course; the marked lane is where a`);
+  console.log('  policy that ignores them still lands about a third of the time.');
+  console.log('');
   const POLICIES = [
+    // Collection policies: what the bottle is worth is now what it later buys,
+    // so these all spend nothing and are the floor the spend policies are read
+    // against rather than rivals to them.
     ['take every bottle    ', { seek: 1 }],
     ['take none            ', { seek: 0 }],
     ['early half only      ', { seek: 1, aidFrom: 0, aidTo: 0.5 }],
     ['late half only       ', { seek: 1, aidFrom: 0.5, aidTo: 1 }],
     ['safe lane (centre)   ', { seek: 0, bias: () => [1, 0, 2] }],
     ['shortest line (stay) ', { seek: 0, bias: (l) => [l, l - 1, l + 1] }],
+    // Spend policies. Same collection (take every bottle), different answer to
+    // the only question the pool asks: which road do you buy?
+    ['+ surge everything   ', { seek: 1, surge: () => true }],
+    ['+ surge the last two ', { seek: 1, surge: (i, n) => i >= n - 2 }],
+    ['+ hold one, then all ', { seek: 1, surge: (i) => i >= 1 }],
+    ['+ surge the first two', { seek: 1, surge: (i) => i < 2 }],
   ];
   for (const miss of [0, 0.06, 0.15, 0.30]) {
     console.log(`  fluffing ${(100 * miss).toFixed(0)}% of the actions asked for:`);
     console.log('');
-    console.log('    policy                  contacts   aid   gain   finish     vs record');
+    console.log('    policy                  contacts  guards   aid  surged   finish     vs record');
     const times = [];
     for (const [label, opts] of POLICIES) {
       const rs = courses.map((c) => raceAt(c, Object.assign(
@@ -674,9 +765,11 @@ if (want('policy')) {
       const ft = mean((r) => r.time);
       times.push(ft);
       const vs = ft - K.RECORD_SECONDS;
+      const surged = mean((r) => r.surgeUnits), zoneU = mean((r) => r.zoneUnits);
       console.log(`    ${label}  ${mean((r) => r.hits).toFixed(2).padStart(8)}  ` +
-                  `${mean((r) => r.aid).toFixed(1).padStart(5)}   ` +
-                  `${mean((r) => r.gain).toFixed(0).padStart(4)}   ${Pace.clock(ft)}   ` +
+                  `${mean((r) => r.guards).toFixed(2).padStart(6)}  ` +
+                  `${mean((r) => r.aid).toFixed(1).padStart(4)}   ` +
+                  `${(100 * surged / zoneU).toFixed(0).padStart(4)}%   ${Pace.clock(ft)}   ` +
                   `${(vs <= 0 ? '' : '+') + vs.toFixed(0)}s`);
     }
     const spread = Math.max.apply(null, times) - Math.min.apply(null, times);
@@ -740,6 +833,39 @@ console.log('\n=== audit: is this instrument lying to me? ===\n');
     }
   }
   console.log('  ok  course.js hazard depths agree with collision.js');
+
+  // 6. ---- CAN THIS INSTRUMENT SEE THE MECHANIC IT IS MEASURING? ----------
+  //
+  // The check that would have caught the thing that stopped this work. This
+  // file spent a whole build reporting six policies at a 0.0 s spread while
+  // the pool, the guard and the surge zones were live in the shipped page --
+  // truthfully, because not one of its bots had ever stood in a marked lane.
+  // A blind instrument does not report an error. It agrees with you.
+  //
+  // So: a bot told to surge everything must actually surge, must actually
+  // reach the surge floor, and must beat the same bot told to surge nothing.
+  // All three, because each fails differently -- a lane term that never fires
+  // fails the first, an election that never reaches Pace fails the second,
+  // and a floor swap that does nothing fails the third.
+  if (Pace.EFFORT > 0) {
+    const cs = PKEYS.slice(0, 3).map((k) => Course.generate(k));
+    const on = cs.map((c) => raceAt(c, { pace: true, react: 0.45, sight: 'guarded',
+                                         seek: 1, surge: () => true }));
+    const off = cs.map((c) => raceAt(c, { pace: true, react: 0.45, sight: 'guarded', seek: 1 }));
+    const avg = (a, f) => a.reduce((x, r) => x + f(r), 0) / a.length;
+    const su = avg(on, (r) => r.surgeUnits), zu = avg(on, (r) => r.zoneUnits);
+    if (su <= 0) {
+      bad('a bot told to surge everything elected NO surge -- this instrument is blind');
+    } else if (su < 0.4 * zu) {
+      bad(`surge-everything covered only ${(100 * su / zu).toFixed(0)}% of the marked road`);
+    } else {
+      console.log(`  ok  the bot can see the zones: surge-everything runs ` +
+        `${(100 * su / zu).toFixed(0)}% of the marked road`);
+    }
+    const gain = avg(off, (r) => r.time) - avg(on, (r) => r.time);
+    if (gain <= 1) bad(`surging is worth ${gain.toFixed(1)}s -- the floor swap is not reaching Pace`);
+    else console.log(`  ok  and it is worth something: ${gain.toFixed(1)}s over the same bot not seeking`);
+  }
 }
 
 console.log('');

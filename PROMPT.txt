@@ -1,0 +1,56 @@
+Here are some images. Each one shows a road ahead of you.
+
+The road you are running on has exactly THREE LANES side by side, divided by
+broken lane lines that run away from you into the distance. Call them LEFT,
+MIDDLE and RIGHT as you see them in the picture.
+
+Some pictures also show things beyond the edge of that road -- a kerb, a
+pavement, a verge, a barrier, railings, water, buildings, or another road.
+None of that is one of your three lanes. Find the three-lane road first, then
+answer about it.
+
+You are running down this road at speed and you must pick a lane.
+
+For each image, answer four things:
+
+  1. WHICH LANE do you take -- left, middle or right?
+  2. WHAT DOES EACH LANE DEMAND? For each of the three lanes say one of:
+     OVER (you must go over the thing in it), UNDER (you must go under it),
+     AROUND (you cannot get over or under it, you must not be in that lane),
+     or CLEAR (there is nothing in that lane).
+  3. HOW SURE ARE YOU of your lane choice: sure, fairly sure, or guessing.
+  4. WHAT DID YOU USE TO DECIDE? Say in your own words what in the picture
+     told you. If something was unclear, say what.
+
+If you genuinely cannot tell what a lane demands, write "cannot tell" for
+that lane -- that is a real answer and it is more useful than a guess
+dressed up as one.
+
+Answer the images independently. Do not assume they are the same road, and
+do not let one answer set up the next. Give your answer for every image, by
+filename.
+
+---- HOW TO WRITE YOUR ANSWER ----
+
+Write a file called ANSWERS.json in this directory, and commit it. It must be
+one JSON object whose keys are the image filenames, exactly as they appear
+here. For every image:
+
+  {
+    "abcd1234.png": {
+      "lane": "middle",
+      "demands": { "left": "AROUND", "middle": "CLEAR", "right": "OVER" },
+      "confidence": "sure",
+      "reason": "in your own words, what in the picture told you"
+    }
+  }
+
+"lane" is one of left, middle, right. Each of the three "demands" is one of
+OVER, UNDER, AROUND, CLEAR or cannot tell. "confidence" is one of sure,
+fairly sure, guessing. "reason" is free text and should be a real sentence or
+two, not a label.
+
+Include an entry for every image in this directory. Then also write your
+reasoning out in full in a file called NOTES.md -- one short paragraph per
+image is fine -- so that what you actually saw is on the record and not only
+the four labels.

@@ -297,7 +297,97 @@ there first.**
 
 ## 3. The result
 
-*(§3)*
+*(readers A and C in; B and D pending. Numbers below are two of four readers.)*
+
+### 3.1 Accuracy, per arm
+
+| reader | mat ON | mat OFF | panels fully correct |
+|---|---|---|---|
+| A | 15/15 | 18/18 | 16/16 |
+| C | 9/15 | 14/18 | 7/16 |
+
+Reader A is **33 of 33 occupied lanes, 16 of 16 panels**, in both arms and at
+both distances, with **no lane rotation anywhere** — so the framing defect of
+§2.6 did not bite.
+
+Reader C is 23 of 33, and **the mat arm is the worse one**, 60% against 78%.
+
+### 3.2 Every one of reader C's errors is the same error
+
+| truth → said | count | where |
+|---|---|---|
+| OVER → AROUND | **10 of 10** | JUMP v0, v1 ×2, v2 ×3, v4 ×3, v5 — both distances |
+
+Ten errors, one shape, one kind. Reader C read jumpable hurdles as walls.
+**Six of the ten had the mat ON**, and the JUMP mat is gold and means OVER. The
+paint was present, it was correct, and it was overruled.
+
+### 3.3 WHY IT WAS OVERRULED, WHICH IS AN ARTEFACT OF THIS EXPERIMENT
+
+Reader C derived the code correctly and then threw it away. Verbatim:
+
+> *"Several images also have a coloured 'wash' laid over a lane's tarmac —
+> cyan, gold or pink. I initially took these for signage (cyan = duck, gold =
+> jump) and it fits the first few images, but it breaks down: `9d2f0312` has a
+> gold wash ending in cones and a pink one ending in a truck, and `0f0acb83`
+> and `5500c318` have no wash at all next to perfectly ordinary obstacles. So I
+> treated the washes as lighting that merely flags 'something is in this lane'
+> and made every actual call from the object itself."*
+
+**`0f0acb83` and `5500c318` are NOMAT panels.** They are the treatment. A
+reader cannot know an arm exists, so a set in which half the hazards have paint
+and half do not is a set that teaches the reader **the paint is unreliable**,
+and this reader duly stopped using it.
+
+That is a cost of the within-reader counterbalancing — which was itself the fix
+for the previous pass's between-reader temperament confound. **The mat-ON arm
+in a counterbalanced set is read by somebody who has learned to distrust
+paint.** The previous design, all-mats-hidden, did not have this problem and
+had the temperament confound instead. There is no design here that has neither,
+and that should be said out loud rather than discovered again next pass.
+
+Reader A hit the same fork and went the other way, which is why the pair is
+worth having. Verbatim:
+
+> *"I did not rely on this alone; I identified each object on its own merits
+> first and used the glow as a cross-check. Where they were both present they
+> always agreed."*
+
+Both readers, independently, **decoded the colour code correctly from the
+pictures alone** — gold over, cyan under, magenta around. Neither needed to be
+told. And both then made the call from the object.
+
+### 3.4 The far mat is seen and used, and changes nothing
+
+Reader A's four `far+mat` panels at 32 units were all described in terms of the
+paint — *"two gold strips side by side"*, *"which glows cyan"*, *"a magenta
+strip"*, *"cyan strip and gantry over the left lane"*. So at 32 units the mat
+is **not too faint to read**; it is read, and the answer is the same either way.
+
+### 3.5 Confidence
+
+Reader A, at unchanged accuracy: **8 of 8 "sure" with the mat, 4 of 8 without.**
+All four of its hedged answers are NOMAT panels. That is a within-reader
+difference — the cut that killed the previous pass's result — and it is the
+only place so far where the mat does anything measurable at all.
+
+### 3.6 By kind, and the three new DUCKs
+
+| kind | correct |
+|---|---|
+| DUCK, established v0–v4 | **16/16** |
+| DUCK, new v5–v7 | **10/10** |
+| BLOCK, all variants incl. v9 | **14/14** |
+| JUMP | **16/26** |
+
+**The three new DUCKs read exactly as well as the five they joined** — v5 4/4,
+v6 4/4, v7 2/2, with no error by either reader in either arm at either
+distance. This is the first test that has ever contained them.
+
+**BLOCK is at ceiling, including `v9`, the moped** — the low one, the 1-of-26
+`kindread` miss, the variant with daylight under it. The height failure in this
+test runs the *other* way: not a low BLOCK mistaken for passable, but a JUMP
+mistaken for impassable.
 
 ---
 

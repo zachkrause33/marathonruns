@@ -28,17 +28,28 @@ variant, and that is checked rather than assumed.
 
 ## 0. The answer
 
-**The mat changed no answer, at either distance, on any kind.** Across three
-uncontaminated readers and 99 occupied-lane judgements the arms are
-**42/48 with the mat and 47/51 without** — the mat arm is the *worse* one, and
-the difference is one reader's temperament rather than the paint.
+**The mat changed no answer, at either distance, on any kind.** Four
+uncontaminated readers, 64 panels, **132 occupied-lane judgements split exactly
+66/66 between the arms and 33/33 between the distances**:
 
-**DUCK is 39/39 and BLOCK is 21/21, in both arms, at both distances.** Every
-error in the entire test is a JUMP read as AROUND, and they all belong to one
-reader.
+| | 25.35 u | 32 u | pooled |
+|---|---|---|---|
+| **mat ON** | 30/33 (91%) | 30/33 (91%) | **60/66 (91%)** |
+| **mat OFF** | 31/33 (94%) | 31/33 (94%) | **62/66 (94%)** |
+
+**The mat arm is the worse arm, by the same margin, at both distances.** There
+is no distance at which the paint bought anything and no sign of the effect
+growing with distance that the fade question was asked to find. The 2-cell gap
+is one reader, and it runs against the mat.
+
+**DUCK is 52/52 and BLOCK is 28/28 — every variant of both, perfect in both
+arms at both distances.** CLEAR lanes are 60/60. **Lane choice is 64/64 viable:
+nobody, in either arm, ever picked a lane that would end a record attempt.**
+Every error in the entire test is a JUMP read as AROUND, and all ten belong to
+one reader.
 
 **But "the mat does nothing" is the wrong reading of that, and the readers say
-why in their own words.** Two of the three decoded the mat's colour code
+why in their own words.** Two of the four decoded the mat's colour code
 correctly from the pictures alone, with nobody telling them. One then used it
 to settle *which low objects are jumpable* and carried that to the unpainted
 panels. The one who refused it went on to read jumpable hurdles as walls ten
@@ -66,9 +77,9 @@ mat effect toward zero. **The owner's instinct — faint far, clear near — is 
 one option this test argues against**, since near is precisely where the mat is
 already redundant.
 
-*(Three readers of four. Reader D was still running; if it lands the numbers
-above are updated rather than replaced — the design's within-reader contrast is
-complete for each of A, B and C independently.)*
+*(All four readers landed. The Latin square is complete: every reader saw 4
+panels in each of the 4 conditions, every gate appeared once in every
+condition, and no reader saw the same gate twice.)*
 
 ---
 
@@ -346,25 +357,31 @@ there first.**
 | A | 15/15 | 18/18 | **33/33** | 16/16 |
 | B | 18/18 | 15/15 | **33/33** | 16/16 |
 | C | 9/15 | 14/18 | 23/33 | 7/16 |
-| **pooled** | **42/48 (88%)** | **47/51 (92%)** | 89/99 | 39/48 |
+| D | 18/18 | 15/15 | **33/33** | 16/16 |
+| **pooled** | **60/66 (91%)** | **62/66 (94%)** | 122/132 | 55/64 |
 
 And split by distance, which is the other half of the question:
 
 | arm | 25.35 u | 32 u |
 |---|---|---|
-| mat ON | 21/24 (88%) | 21/24 (88%) |
-| mat OFF | 23/25 (92%) | 24/26 (92%) |
+| mat ON | 30/33 (91%) | 30/33 (91%) |
+| mat OFF | 31/33 (94%) | 31/33 (94%) |
 
-**The mat arm is the worse arm at both distances, by the same margin.** There
-is no distance at which the paint bought anything, and no sign of the effect
-growing with distance that the fade question was asked to find.
-
-Two of the three readers are **perfect in both arms** — 33 of 33 occupied
+**Three of the four readers are perfect in both arms** — 33 of 33 occupied
 lanes, 16 of 16 panels, with and without paint, near and far. Reader C is 23
 of 33 and its **mat arm is the worse one**, 60% against 78%.
 
-CLEAR lanes are **45/45**, 100% in both arms: nobody ever hallucinated a
-hazard into an empty lane.
+The arm totals are exactly balanced by construction — 66 cells each, 33 at
+each distance — so the 91% against 94% is a like-for-like comparison and not an
+artefact of one arm drawing easier gates. §2.4 records that the four conditions
+hold identical composition down to the variant count.
+
+CLEAR lanes are **60/60**, 100% in both arms: nobody ever hallucinated a hazard
+into an empty lane.
+
+**Lane choice is 64 of 64 viable — 16/16 in every one of the four conditions.**
+This is the only column that corresponds to a lost run under rule 4, and it is
+perfect everywhere, with and without paint, near and far.
 
 ### 3.2 Every one of reader C's errors is the same error
 
@@ -424,18 +441,23 @@ Reader A looked like a result: **8 of 8 "sure" with the mat, 4 of 8 without**,
 and all four of its hedged answers were NOMAT panels.
 
 **Reader B runs the other way.** It hedged five, and **four of the five are MAT
-panels**: 4 of 8 sure with the mat, 7 of 8 sure without.
+panels**. And with all four readers in, the split is exact:
 
-| reader | sure, mat ON | sure, mat OFF |
-|---|---|---|
-| A | 8/8 | 4/8 |
-| B | 4/8 | 7/8 |
-| **pooled** | **12/16** | **11/16** |
+| reader | sure, mat ON | sure, mat OFF | direction |
+|---|---|---|---|
+| A | 8/8 | 4/8 | mat makes it surer |
+| C | 8/8 | 5/8 | mat makes it surer |
+| B | 4/8 | 7/8 | mat makes it *less* sure |
+| D | 4/8 | 7/8 | mat makes it *less* sure |
+| **pooled** | **24/32** | **23/32** | **nothing** |
 
-**That is nothing.** Confidence is temperament, exactly as the previous pass
-found, and the lesson repeats: one reader is never enough to claim a confidence
-effect, in either direction. Had this pass stopped at reader A it would have
-reported "the mat makes readers surer" and been wrong.
+**Two readers each way, and one cell of difference in 64.** Confidence is
+temperament, exactly as the previous pass found, and the lesson repeats with a
+sharper edge: **had this pass stopped at reader A it would have reported "the
+mat makes players surer" — the previous pass's exact error — and had it stopped
+at reader B it would have reported the opposite with equal conviction.** The
+within-reader design is not what rescued this; only the *fourth* reader made
+the split unambiguous.
 
 ### 3.5b THE MAT TEACHES THE OBJECT, AND THAT IS THE ONE THING IT DEMONSTRABLY DOES
 
@@ -469,8 +491,8 @@ against.
 
 ### 3.5c The framing defect did not bite — measured, not hoped
 
-Nine panels came back not exactly right across the three readers, and **zero of
-them are a one-lane rotation of the truth**. Every miss is a single lane called
+Nine panels came back not exactly right across all four readers and 64 panels,
+and **zero of them are a one-lane rotation of the truth**. Every miss is a single lane called
 wrong in place, never the whole triple shifted. So the §2.6 crop problem — the
 one real nuisance in the design — **did not manifest**, and the lane anchor
 added to `PROMPT.txt` did its job. Readers described finding the lanes exactly
@@ -481,26 +503,39 @@ grass banks and railings outside them."*
 
 | kind | mat ON | mat OFF | total |
 |---|---|---|---|
-| DUCK | 17/17 | 22/22 | **39/39 — 100%** |
-| BLOCK | 9/9 | 12/12 | **21/21 — 100%** |
-| JUMP | 16/22 | 13/17 | 29/39 |
+| DUCK | 26/26 | 26/26 | **52/52 — 100%** |
+| BLOCK | 14/14 | 14/14 | **28/28 — 100%** |
+| JUMP | 20/26 | 22/26 | 42/52 |
 
-**DUCK and BLOCK are at ceiling in both arms at both distances. Every error in
-the entire test is a JUMP.**
+**DUCK and BLOCK are at ceiling in both arms at both distances — 13/13 and 7/7
+in every single cell of the arm × distance grid. Every error in the entire test
+is a JUMP.**
 
 Per variant, and this is what the pass was asked to check:
 
 | DUCK | mat ON | mat OFF | total |
 |---|---|---|---|
-| v0 | 2/2 | 4/4 | 6/6 |
-| v1 | 3/3 | 6/6 | 9/9 |
-| v3 | 1/1 | 2/2 | 3/3 |
-| v4 | 3/3 | 3/3 | 6/6 |
-| **v5 access gantry** | 4/4 | 2/2 | **6/6** |
-| **v6 floodlight gantry** | 3/3 | 3/3 | **6/6** |
-| **v7 girder underbridge** | 1/1 | 2/2 | **3/3** |
-| established v0–v4 | | | **24/24** |
-| **new v5–v7** | | | **15/15** |
+| v0 | 4/4 | 4/4 | 8/8 |
+| v1 | 6/6 | 6/6 | 12/12 |
+| v3 | 2/2 | 2/2 | 4/4 |
+| v4 | 4/4 | 4/4 | 8/8 |
+| **v5 access gantry** | 4/4 | 4/4 | **8/8** |
+| **v6 floodlight gantry** | 4/4 | 4/4 | **8/8** |
+| **v7 girder underbridge** | 2/2 | 2/2 | **4/4** |
+| established v0–v4 | 16/16 | 16/16 | **32/32** |
+| **new v5–v7** | **10/10** | **10/10** | **20/20** |
+
+| BLOCK | mat ON | mat OFF | total |
+|---|---|---|---|
+| v0 | 4/4 | 4/4 | 8/8 |
+| v3 | 4/4 | 4/4 | 8/8 |
+| v5 | 2/2 | 2/2 | 4/4 |
+| v7 | 2/2 | 2/2 | 4/4 |
+| **v9, the low moped** | 2/2 | 2/2 | **4/4** |
+
+**`BLOCK v3` — the variant entry 61 caught reading OVER and entry 63 could not
+reproduce — is 8 of 8 here**, in a three-lane gate, in both arms, at both
+distances. It did not reappear.
 
 **The three new DUCKs read exactly as well as the five they joined** — not one
 error by any reader, in either arm, at either distance. **This is the first
@@ -558,16 +593,22 @@ does so for cones, trestles, blue barrier blocks, pipe stacks and rubble heaps
 alike, at both distances, with and without paint.
 
 `MR.Collision.BOX` is the contract and art never decides clearance — but art is
-all a player has to judge by, and **one reader in three judged the art of a
-JUMP to be impassable**. That is a hazard-legibility problem in its own right,
-it is the only one this pass found, and it belongs to whoever owns the JUMP
-fleet rather than to the mat question.
+all a player has to judge by, and **one reader in four judged the art of a
+JUMP to be impassable**, on 10 of the 52 JUMP cells in the test. That is a
+hazard-legibility problem in its own right, it is the only one this pass found,
+and it belongs to whoever owns the JUMP fleet rather than to the mat question.
+
+The variants it lost are spread across the kind rather than concentrated in
+one: **`JUMP v0` 3/4, `v1` 6/8, `v2` 9/12, `v4` 9/12, `v5` 3/4** — and `v3`
+alone is **12/12**, untouched by any reader. So this is not one bad object; it
+is a threshold one reader put in the wrong place, and `v3` is the shape that
+never triggered it.
 
 **It never cost a run.** Every single one of reader C's ten errors is recorded
 `viable true`: reading a JUMP as a wall makes you *avoid* a lane you could have
-taken, which costs an action, not an attempt. Across all three readers so far,
-**lane choice is 48 of 48 viable — 100% in both arms at both distances**, and
-nobody ever picked a lane that ends a record attempt.
+taken, which costs an action, not an attempt. Across all four readers,
+**lane choice is 64 of 64 viable — 16/16 in every one of the four
+conditions**, and nobody ever picked a lane that ends a record attempt.
 
 ---
 

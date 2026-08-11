@@ -1,0 +1,98 @@
+{
+  "142fef1c.png": {
+    "lane": "left",
+    "demands": { "left": "CLEAR", "middle": "UNDER", "right": "OVER" },
+    "confidence": "sure",
+    "reason": "Four longitudinal markings are visible: a white edge line on the left, two broken violet lane lines, and a white edge line that runs off the bottom-right corner, so the three lanes are evenly spaced across the picture. A yellow frame with a black-and-yellow hatched crossbeam has one foot planted on each of the two violet lines, so it arches over the middle lane and the crossbeam sits well above head height - that lane is a duck-through. The right lane holds a low red-and-white striped barricade on legs with brown boards under it, about the same height as a traffic cone, sitting flat on the tarmac between the right violet line and the right edge line. The left lane is plain empty asphalt all the way to the horizon, so I take it and do not have to do anything at all."
+  },
+  "19281ab6.png": {
+    "lane": "left",
+    "demands": { "left": "CLEAR", "middle": "AROUND", "right": "AROUND" },
+    "confidence": "sure",
+    "reason": "The eye is drawn to the pink-surfaced strip, but that pink is only two lanes wide. Measuring the kerb on the far left, the two violet lane lines and the kerb on the far right gives three equal lane widths, so the third lane is the plain dark-grey one on the left that has no pink surfacing on it. The middle lane is shut by a solid red-and-white hatched barricade panel in a grey frame, roughly twice the height of the cone beside it, with a round red no-entry sign and two workmen in hi-vis standing behind it - nothing to jump or duck, you simply must not be there. The right lane is filled end to end by the back of a green lorry. The left lane is completely empty dark asphalt, with only a single orange cone sitting on the line between it and the middle lane, so that is the lane I take."
+  },
+  "25810117.png": {
+    "lane": "left",
+    "demands": { "left": "UNDER", "middle": "OVER", "right": "UNDER" },
+    "confidence": "fairly sure",
+    "reason": "The three lanes are picked out by coloured glows on the tarmac - teal, tan, teal - separated by two violet broken lines, with a white edge line outside each teal lane. There are two separate yellow gantries, not one: the left one has its feet on the left edge line and on the first violet line, and the right one has its feet on the second violet line and the right edge line, so each arches over a side lane with plenty of clearance beneath the hatched beam. The middle lane is blocked at ground level by a heap of stacked timber planks and orange boards, roughly cone height, spilling a couple of pixels into each neighbouring lane. Every lane therefore demands something. I take the left lane because ducking under a beam at that clearance is the cheapest of the three, but the right lane is genuinely equivalent - the only tie-breaker is that the plank heap spills slightly further to the right - so my lane pick is a preference rather than a forced choice."
+  },
+  "27251ac0.png": {
+    "lane": "left",
+    "demands": { "left": "CLEAR", "middle": "CLEAR", "right": "OVER" },
+    "confidence": "fairly sure",
+    "reason": "A white edge line, two broken violet lines and a second white edge line divide the carriageway into three; the black bollards and red-and-white railings on the right are on the pavement beyond the edge line and are not part of the road. The only thing on the road is a pair of teal kick-scooters standing side by side in the right lane, handlebars, stems, decks and wheels all visible, about waist high - low enough to hurdle. Left and middle are both bare asphalt. I take the left lane because it is furthest from the scooters, but the middle would do just as well, which is why I am not fully sure of the pick itself even though I am sure about what each lane demands. The green bottle-shaped object at the bottom-right corner is right on the kerb, off the carriageway."
+  },
+  "38eeeae0.png": {
+    "lane": "left",
+    "demands": { "left": "UNDER", "middle": "UNDER", "right": "AROUND" },
+    "confidence": "fairly sure",
+    "reason": "This is one wide yellow gantry with three legs, not two gantries: the legs land on the left edge line, on the first violet lane line, and on the second violet lane line, so a single hatched beam spans both the left and the middle lane and both are duck-throughs with clear road underneath. The right lane, the pink-surfaced one, is closed by a tall solid red-and-white hatched barricade panel in a frame, with a round sign and a workman above it and an orange traffic cone at its foot - that panel is roughly twice cone height and completely fills the lane, so it has to be avoided. Left and middle are interchangeable; I take the left because it is furthest from the closure and there is a small cone tucked against the middle-right lane line."
+  },
+  "69697751.png": {
+    "lane": "left",
+    "demands": { "left": "UNDER", "middle": "UNDER", "right": "OVER" },
+    "confidence": "fairly sure",
+    "reason": "The white edge line, the two broken violet lines and the far white edge line give three equal lanes; the grass bank, railings and trees on the right are past the kerb. A single wide yellow gantry has three legs, on the left edge line and on both violet lines, so its hatched beam covers the left and middle lanes together and you run under it in either. The right lane, the tan-glowing one, contains a stack of large pipes two rows deep with their open ends facing you, roughly hip-to-chest height against the lane width - a heap to be jumped rather than a wall. I take the left lane; the middle is equally good, so the specific pick is arbitrary."
+  },
+  "6d91c6c7.png": {
+    "lane": "left",
+    "demands": { "left": "CLEAR", "middle": "OVER", "right": "UNDER" },
+    "confidence": "sure",
+    "reason": "Reading across the bottom of the picture there is a white edge line at the very left, two broken violet lines, and a white edge line on the right just before the bridge parapet, giving three lanes of equal width; the railings and the green water beyond are off the road. The middle lane, the one with the tan glow, has a row of three blue crates on a pale pallet sitting across it, about cone height, so it is a jump. The right lane, the teal one, is spanned by a yellow gantry whose feet sit on the second violet line and on the right edge line, with a hatched beam high overhead. The left lane is bare asphalt with nothing on it at all, so I take it."
+  },
+  "7aba53af.png": {
+    "lane": "right",
+    "demands": { "left": "AROUND", "middle": "OVER", "right": "CLEAR" },
+    "confidence": "sure",
+    "reason": "The road bends away to the right so the vanishing point sits well right of centre and the near lanes look progressively narrower left to right, but the four markings - the pale left edge line, two broken violet lines and the white right edge line - still give three lanes. A yellow works van is parked square in the left lane with its tail overhanging the first violet line, so that lane is out. Three orange traffic cones are set out across the middle lane, the last one just clipping the second violet line; cones are low and are jumped rather than avoided. The right lane, between the second violet line and the white edge line, is open asphalt apart from that last cone touching its edge, so I take the right."
+  },
+  "8eb178fd.png": {
+    "lane": "right",
+    "demands": { "left": "AROUND", "middle": "UNDER", "right": "CLEAR" },
+    "confidence": "sure",
+    "reason": "The pink lane, the teal lane and the dark lane to their right are equally spaced between the white edge line on the left and the white edge line on the right, so those are the three. Standing in the left pink lane is a very tall grey and blue hoarding or panel with red blocks down its sides, well over head height and filling the lane, so it has to be avoided entirely. The middle teal lane is spanned by a yellow gantry with its feet on the two violet lines and a hatched beam high up, so that is a run-under. The right lane is empty tarmac out to the edge line, with only the kerb, orange handrail and crowd beyond it, so I take the right lane and do nothing."
+  },
+  "9715cc94.png": {
+    "lane": "left",
+    "demands": { "left": "CLEAR", "middle": "OVER", "right": "OVER" },
+    "confidence": "sure",
+    "reason": "White edge line, two broken violet lines, white edge line - three even lanes, with the bridge railings and the sea on the right well outside them. Two teal kick-scooters are standing across the middle lane, handlebars and decks clearly visible, and a row of three blue crates on a pale pallet fills the right lane; both are roughly cone height and sit flat on the road, so both are jumps rather than blockers. The left lane is completely empty dark asphalt for its whole length, so that is the obvious choice and I do not have to leave the ground."
+  },
+  "a578b115.png": {
+    "lane": "left",
+    "demands": { "left": "CLEAR", "middle": "AROUND", "right": "UNDER" },
+    "confidence": "sure",
+    "reason": "The pink-glowing lane and the teal-glowing lane sit between two broken violet lines, and a white edge line on each side completes three equal lanes; the crash barriers, grass and trees are beyond the kerbs. The back of a blue bus completely fills the middle pink lane and stands far taller than the lane is wide, so nothing can be done but avoid it. The right teal lane is spanned by a yellow gantry with a hatched beam, its legs on the second violet line and on the right edge line, so it is a duck-through. The left lane is bare asphalt with only a painted white dash on the surface, so I take it."
+  },
+  "b1cc1705.png": {
+    "lane": "left",
+    "demands": { "left": "CLEAR", "middle": "CLEAR", "right": "OVER" },
+    "confidence": "fairly sure",
+    "reason": "Two broken violet lines and a white edge line on each side give three lanes; the posts, verge and trees are past the kerbs. The only obstacle is in the right lane, the one picked out with a gold glow: a red-and-white striped barricade sitting on the tarmac, an open frame of two striped rails on short legs, about the same height as a traffic cone, so it is something you clear rather than something that stops you. Left and middle are both completely bare. I take the left because it is the further of the two from the barricade, but the middle would serve equally well, which is the only reason I am not fully sure of the pick."
+  },
+  "b598b487.png": {
+    "lane": "left",
+    "demands": { "left": "CLEAR", "middle": "OVER", "right": "OVER" },
+    "confidence": "sure",
+    "reason": "The white edge line on each side plus two broken violet lines give three even lanes between the kerbs and grass verges. A row of three blue crates on a pale pallet sits across the middle lane, and immediately to its right a red-and-white striped barricade with brown boards under it fills the right lane; both sit flat on the road at about cone height, so both are jumps. The left lane is untouched asphalt from the foreground right up to where the road disappears into the haze, so I take the left and stay on the ground."
+  },
+  "b70bfbb4.png": {
+    "lane": "middle",
+    "demands": { "left": "UNDER", "middle": "CLEAR", "right": "OVER" },
+    "confidence": "sure",
+    "reason": "The pale edge line on the left, the two broken violet lines and the pale edge line on the right divide the road into three; the orange handrails, kerbs and crowds are outside them. A yellow gantry with a hatched beam has its legs on the left edge line and on the first violet line, so it arches over the left lane. Two teal kick-scooters stand in the right lane, handlebars, stems, decks and wheels all clear, about waist high, so that lane is a hurdle - the outer one is standing partly on the edge line. The middle lane between the two violet lines is bare road for its whole length, so I take the middle and neither jump nor duck."
+  },
+  "c064db22.png": {
+    "lane": "right",
+    "demands": { "left": "UNDER", "middle": "OVER", "right": "CLEAR" },
+    "confidence": "sure",
+    "reason": "Two broken violet lines with a pale edge line outside each give three equal lanes; the verge, posts and trees on the right are past the kerb. A yellow gantry with a hatched beam straddles the left lane, its feet on the left edge line and on the first violet line. Three orange traffic cones are set across the middle lane, the rightmost one stopping right at the second violet line, and cones are low enough to hurdle. The right lane is clear tarmac. One thing I could not read: under the gantry, further up the left lane, there are two small flat teal-green marks - a little green rectangle and a low mint-and-white bar - which look like paint or a distant sign lying flat rather than anything standing up, and I have not counted them as an obstacle."
+  },
+  "dd2deb09.png": {
+    "lane": "right",
+    "demands": { "left": "UNDER", "middle": "AROUND", "right": "CLEAR" },
+    "confidence": "sure",
+    "reason": "The pale edge line on the left, two broken violet lines and the pale edge line on the right give three lanes; the grass bank, bollards and trees are outside them. A yellow gantry with a black-and-yellow hatched beam stands over the left lane with a leg on the left edge line and a leg on the first violet line, so that lane is a duck-through. The middle lane is taken by a red delivery motorbike loaded with a tall stack of red crates topped by a helmet-shaped box - it stands several times higher than it is wide and fills the lane, so it can only be avoided. The right lane, between the second violet line and the right edge line, is empty road all the way into the haze, so I take it."
+  }
+}

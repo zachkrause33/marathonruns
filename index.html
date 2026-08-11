@@ -16006,16 +16006,39 @@ MR.World = (function () {
      * caught it; it costs 0.006 of near-band chroma, because this tone is 3.5%
      * of the painted area.
      *
-     * BE HONEST ABOUT WHAT THIS BUYS: a bit under half the gap. The rest is not
-     * in the palette of the surfaces we have -- it is in the fact that their
-     * play surface is a crimson train and ours is a road, 40% of the band is
-     * tarmac the gate will not let us colour, and closing the remainder means
-     * putting more saturated NON-ROAD area into the bottom third at a draw-call
-     * price. That is a separate argument on separate evidence.
+     * ============ AND WHY THIS STOPS AT k = 3 AND NOT k = 5 ============
+     *
+     * IT IS A JUDGEMENT AND NOT A MEASUREMENT, WHICH IS WHY IT IS WRITTEN
+     * DOWN. k = 5 was built, measured and rendered. It passed every gate, it
+     * broke no hue, and it closed 41% of the saturation gap against k = 3's
+     * 25%. The owner looked at the frame and refused it, on the standing
+     * instruction for this whole project: *"objects that would make sense in a
+     * road setting."* Violet lane markings do not. The metric preferred k = 5
+     * and the metric was overruled.
+     *
+     * THE REASON IS WORTH MORE THAN THE DECISION. Subway Surfers gets its
+     * near-band colour from the PLAY SURFACE ITSELF -- a crimson train roof --
+     * and not from the paint lying on it. Hitting a saturation target by
+     * tinting road markings satisfies the NUMBER by a route that does not
+     * satisfy the THING THE NUMBER STANDS FOR. This project has made that
+     * mistake twice already under other names: the triangle budget, and the
+     * 110-pixel runner. A proxy optimised directly stops being a proxy.
+     *
+     * So the ladder takes the conservative step -- the markings read as road
+     * markings, slightly cooler and slightly less grey than they were -- and
+     * the honest remainder is stated rather than chased:
+     *
+     * WHAT IS LEFT, AND WHERE IT ACTUALLY IS. 40% of the near band is tarmac
+     * the fairness gate will not let us colour, and closing the rest means
+     * putting more saturated NON-ROAD area into the bottom third of the frame.
+     * That is a content change with a draw-call price and it needs its own
+     * evidence. DO NOT reach for a bigger k instead: that road has been walked
+     * to the end, and the frame at the end of it was rejected by the person
+     * this game is being built for.
      */
-    const SEAM_RAIL = overRoad(0x846fda, 1.28);
+    const SEAM_RAIL = overRoad(0x8276bc, 1.28);
     const SEAM_BEAD = overRoad(0xfff6d8, 1.50);   // HELD -- see the hue note above
-    const EDGE_LINE = overRoad(0xadb2d7, 1.80);
+    const EDGE_LINE = overRoad(0xb0b3ca, 1.80);
 
     // The kerb-notch period, and now the road-bead period too. Declared here
     // because paintGeo beats against it and is built first.
@@ -16196,7 +16219,7 @@ MR.World = (function () {
         const jz = -TILE / 2 + i * ROAD_SLAB;
         const heavy = (i % 4) === 0;
         parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, heavy ? 0.24 : 0.15),
-          overRoad(heavy ? 0x251f5a : 0x2f2965, heavy ? 0.40 : 0.50), 0, 0.004, jz, flat));
+          overRoad(heavy ? 0x26234a : 0x302d55, heavy ? 0.40 : 0.50), 0, 0.004, jz, flat));
         // And the surviving lip comes down toward the tarmac. It was 1.23x the
         // road, which on twenty full-width bars a tile made it the brightest
         // large thing in the near band after the edge lines. At 1.05x it is
@@ -16204,7 +16227,7 @@ MR.World = (function () {
         // cut -- but it no longer competes with the marking or the runner.
         if (heavy) {
           parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, 0.11),
-            overRoad(0x676782, 1.05), 0, 0.004, jz + 0.18, flat));
+            overRoad(0x686879, 1.05), 0, 0.004, jz + 0.18, flat));
         }
       }
       /**
@@ -16307,7 +16330,7 @@ MR.World = (function () {
           // shadow goes, and putting it there buys a value step for nothing.
           // Not near-black: the first pass tried that at 0.24 wide and turned
           // the carriageway into three strips separated by chasms.
-          parts.push(part(new THREE.PlaneGeometry(0.11, TILE), overRoad(0x534391, 0.80), lx + s * 0.12, 0.005, 0, flat));
+          parts.push(part(new THREE.PlaneGeometry(0.11, TILE), overRoad(0x51487c, 0.80), lx + s * 0.12, 0.005, 0, flat));
         }
         parts.push(part(new THREE.PlaneGeometry(0.15, TILE), SEAM_RAIL, lx, 0.007, 0, flat));
         beads(lx, SEAM_BEAD, 0.009);

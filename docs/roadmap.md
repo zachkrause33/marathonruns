@@ -5208,3 +5208,185 @@ it plays a whole marathon *in the real page*, per policy, and fails if the bot
 elects no surge, collects no aid, or if seeking the marked lane barely beats
 ignoring it. Every module-level harness in this project can be — and was —
 simultaneously green and blind.
+
+---
+
+## Roadmap 68 · The surge zone, painted: a reserved lane, a gantry and a countdown
+
+Section 67 closed with the one thing a player would notice first: **nothing in
+the renderer read the zone table.** The mechanic was measured, gated and live,
+and invisible. This is the paint, built to 67's contract rather than to a new
+one, and stopped mid-pass when the file was needed elsewhere — so what follows
+is what shipped, what it measured, and what is still open.
+
+**Standing rule 1 applies here and the split it makes is the whole layout.**
+The wash, the rails and the transverse bars are **markings on a surface and
+correctly have no back**. Everything that stands — the gantry, its lane plates
+and arrow, three countdown boards, two end posts — is boxes and a cone, built
+on every side, because the player passes all of it at 1.70 units with a camera
+that banks through every lane change.
+
+### Three facts, three pieces, and the split is about what can hide each
+
+67 owes the player three facts at 90 units. They are carried by three separate
+things, and the reason there are three is that **no two of them can be taken
+out by the same occluder**:
+
+| fact | carried by | what cannot hide it |
+|---|---|---|
+| **which lane** | the road paint: a green wash over the marked lane with a bright rail on each boundary, running the whole zone | nothing overhead — the camera looks down, so a gantry can never be between the lens and the tarmac |
+| **that a zone begins** | a lane-control gantry at z0: green header band across the chord, three lane plates, a white arrow on the marked one | no hazard — every member is at 9.35 and up, which is why `LOW` and `HIDES` have nothing to say about it |
+| **how far away** | three roadside boards counting 3 · 2 · 1 at 90, 60 and 30 units | it is at the verge, not in the lane, and not overhead |
+
+**Why the lane is a longitudinal mark.** This file's own Egypt-device note
+already settles it: a transverse mark is foreshortened to nothing by forty
+units, and a mark running *along* the road converges on the vanishing point and
+keeps a screen-space length however far its far end is. At 90 units a lane is
+about twelve pixels wide on a portrait frame. A badge in it would be two pixels
+tall. A 500-unit ribbon in it is a wedge running to the horizon.
+
+**Why green, and what it is not allowed to be.** Red-and-white is JUMP,
+yellow-and-black is DUCK, orange is works, and amber/cyan/pink are the
+telegraph mats. Green at 154 degrees is spoken by nothing here and is 37 degrees
+off the DUCK mat's cyan. Two devices were refused outright:
+
+- **Chevrons in the lane**, which 67's handover lists as candidate paint. A
+  forward-pointing triangle on the tarmac **is the JUMP telegraph's own glyph**,
+  and `paintGeo` already refused one for the expansion joints on that ground.
+- **A red X on the unlit plates**, which is what a real lane-control gantry
+  draws. The BLOCK mat is a pink X. An unlit plate says "not this one" without
+  borrowing a word.
+
+### The contrast decision, and the number that set it
+
+**The marked lane is a surface a hazard stands on, so it is in the fairness
+gate.** `api.contrastAudit` gained three roads — the washed lane per lane —
+built from the same function the road tile draws, so what is measured is what
+is drawn. That is the finish carpet's lesson one surface along, and 35% of the
+course being inside a zone is why it is not optional.
+
+**The wash is a DARKENING, and that is a floor rather than a taste.** Every
+hazard in this game is a bright object; the dimmest is JUMP v7 at L 88.1. Any
+surface at or below **L 70.5** therefore clears the 1.25x gate for all 26
+variants on luminance alone, whatever saturation does. The wash is authored at
+**0.68x the reference tarmac** and measures **L 61.5 / S 0.802** live — 1.44x on
+the dimmest object in the game. Lifting the road toward the hazards is the one
+direction that can take a variant under the gate, and the paint ladder's note
+says the same thing from the other side.
+
+**The rails moved to the lane boundary, and that was a measurement.** Built
+inboard of the lane first, a 0.16 rail at 1.72x fell inside the audit's
+`LANE * 0.44` sample window; at two and a half times the wash's brightness it
+was a fifth of the area and dominated the mean. The surface came back at
+**L 81.3 / S 0.74** and **eighteen** variants dropped into the 1.25-to-1.6 band
+that had held six. On the seam at ±0.88 — where the seam rail, its shadow, the
+beads and the edge line already live, and where the audit window has excluded
+markings since it was written — the surface reports the wash's own tone and
+**every tightest margin is identical to the pre-change build** (05-final,
+JUMP v2 vs lane 1, gate +0.018 before and after).
+
+An area-weighted mean of a two-tone surface is a poor model of legibility in
+the first place — a hazard against dark-with-bright-edges is easier to pick out,
+not harder. The answer was not to argue with the instrument.
+
+### What looking at the real frames changed, which arguing did not
+
+Three defects, all found on chase-camera frames at 90 and 60 units and none of
+them visible in the source:
+
+1. **The arrow was green on green.** At 60 units a plate is about eleven pixels
+   across, and a glyph one step off its own background is a texture rather than
+   a shape. The plate keeps the green — that is the blob whose *position*
+   answers "which lane" at the far end — and the glyph went white.
+2. **The plates touched.** At 1.72 wide against a 1.70 lane pitch, the three
+   read as one long board with a green end. 1.50 leaves 0.20 of sky between
+   them.
+3. **The countdown post was invisible by construction.** A navy mast with green
+   bars, standing among lamp standards and utility poles of the same navy in
+   front of a wall of trees. It became a **pale board with the count cut into
+   it** — inverted against the gantry's dark-plate-and-bright-glyph on purpose,
+   because one hangs against sky and the other stands against foliage. Same
+   rule the contrast gate applies one surface down.
+
+### The machine read: 36 of 36, after the instrument was corrected
+
+`tools/blindread.js` is the acceptance test and **it could not be run** — this
+session had no Agent tool, so no fresh reader could be shown the panels. The
+panel set exists and is portable exactly as blindread designs it: twenty
+HUD-stripped chase frames (fourteen zone approaches at 90 units across three
+dates and all three marked lanes, six controls on road with no zone within 260
+units), shuffled, hex-named, with `PROMPT.txt` beside them and the key in a
+separate directory. **Running it is the first thing the next pass should do.**
+
+What was run instead is the strictly weaker, strictly checkable question
+underneath: **is the answer in the pixels at all, and is it unambiguous?** For
+every zone on eight days, a frame at the sight distance, the three lane
+centrelines projected through the real camera onto the entry line, and every
+pixel carrying the marking's hue assigned to the nearest of them.
+
+**36 of 36 — the marked lane is the argmax every time**, with the marked lane
+carrying 0.46 to 0.65 of the marking's pixels against a floor supplied by the
+header band, which spans all three lanes because "a zone begins" is a fact about
+the road rather than about a lane.
+
+**The first run of this said 35 of 36, and the miss was the instrument.** It
+scanned the whole frame, so a teal bicycle eight units in front of the lens was
+counted as lane evidence about a line ninety units away. Cutting the scan at the
+projected entry line — everything nearer than the entry is not the marking —
+fixed it, and the frame that missed now reads its lane correctly. Rule 3, and
+the instrument flattered nothing this time only because it happened to fail in
+the honest direction.
+
+A pass here is **necessary and not sufficient**. It says the signal is present
+and lands on the right lane. It does not say a person reads it as an invitation.
+
+### Where 67 and the brief were wrong
+
+- **"How far away it is" and "how far it runs" are different facts**, and the
+  brief and 67's handover each name one of them. This build answers the first
+  with the countdown and the second with the end marking; the ambiguity is worth
+  resolving before the next pass, because they want different devices.
+- **67's candidate paint list includes chevrons**, which this file's own rule
+  forbids. See above.
+- **40% of zone entries have a mile gantry inside 95 units before them**, over
+  40 days, 175 zones; the median gap from the preceding mile marker is 118 units
+  and the **minimum is 1.3**. The mile marker cannot move — it is the mile — and
+  neither can the entry. Spanning pieces (footbridges, overpasses, archways) now
+  nudge off a zone entry as well as off a mile marker, composed rather than
+  replacing it, with the mile rule winning a tie. **Mile gantries are not
+  handled and cannot be.** In practice a further overhead object projects
+  *lower* on screen, so the two rarely overlap — verified on the worst frame
+  captured, mile 7 at 52 units in front of an entry at 90, where both read
+  cleanly — but a coincidence at a gap of 1.3 units is two gantries in the same
+  place and nothing here fixes it. This is why the paint and the boards exist.
+
+### Cost, and the gate
+
+Draw calls: **+10 at the worst frame measured** (07-wall-tall 239 → 249,
+08-level 246 → 255, 06-mobile unchanged), peak **255 against ~400**. A tile
+inside a zone costs exactly one extra draw — one mesh, one geometry, moved to
+the marked lane and scaled in z to land on the zone boundary to the unit — and
+the gantry, each board and the end marker are one each. Triangles moved under
+0.1%.
+
+`build` · `build --check` · `shoot` (all shots clean, no `LOW`/`HIDES`/`BLANKS`/
+`PAINTS`, contrast margins unchanged) · `course-test` 90 days · `simulate`
+13/50 · `calendar` 32 days clean, with `surgeGate`, `surgePost` and `surgeEnd`
+named on all 26 walked days · `kindread` 1 of 26 on profile, unchanged ·
+`footroom` 96/96 · `deckdrop` 24/24 · `mechanics --identity` bit-identical at
+flags off, which the marking gets for free because `planSurge` returns nothing
+at EFFORT 0 and nothing here draws from the seeded stream · `risk` ·
+`playthrough`. `index.html` rebuilt and **left uncommitted**.
+
+### Still open
+
+- **Run the blind read.** The panels are staged and the acceptance test is not
+  done until a fresh reader has answered the three questions.
+- **How much paint can the road carry?** The directional-mat work coming next
+  puts another marking language on the same tarmac, and the honest position
+  from this pass is that the road is close to full. The near band is already
+  39-54% merged paint mesh by edge density (`tools/inkbudget.js`), the mats own
+  three saturated hues at full strength, and this pass added a fourth surface
+  colour over a third of the course. **A directional mat should take a shape,
+  not a new colour**, and it should take it in a hue already spoken — otherwise
+  the fifth language is the one that makes the other four stop reading.

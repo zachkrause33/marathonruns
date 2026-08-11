@@ -4675,3 +4675,40 @@ nobody measured is worse than no number at all.**
     1.25x luminance or 0.22 saturation: **v5 2.31x / 0.329, v6 2.08x / 0.342,
     v7 2.16x / 0.362.** v5 clears the gate by the widest margin of any hazard in
     the game.
+
+    ### AND AN INSTRUMENT FINDING THAT WENT AGAINST THIS PASS FIRST
+
+    Scored on `kindread`'s shipped settings the new variants look like they
+    made the kind LESS varied: mean pairwise profile L1 across the five was
+    0.748 and across the eight it is 0.643, and **v6 sits 0.110 from v0, the
+    closest pair in the kind by a factor of two.**
+
+    That reading is an artefact of the ruler, and the reason is one line of the
+    tool: **`CEIL` is 2.80 and the fourteen bands stop there, while every DUCK
+    in the game terminates between 3.10 and 3.58.** So the profile channel
+    cannot see a single top termination -- not v0's cube, not v1's uneven tube
+    ends, not v2's capping plate, not v3's fork, not v4's blind flange, and not
+    v6's floodlight head. v6 and v0 are two identical posts below 2.80 and two
+    completely different objects above it, and the tool is only shown the half
+    they share. Re-run with a ruler that covers the object:
+
+    | | v0 vs v6 | mean pairwise, v0-v4 | mean pairwise, all eight |
+    |---|---|---|---|
+    | 14 bands to 2.80 (shipped) | 0.110 | 0.748 | 0.643 |
+    | 18 bands to 3.60 | **0.400** | 1.122 | **1.072** |
+
+    With the whole object in frame the eight are very nearly as separated as
+    the five were, which is the honest statement. **2.80 is the right ceiling
+    for the question `kindread` was built to ask** -- it is the tallest
+    COLLISION box, and over/under/around is a question about the box -- so this
+    is not a defect to fix so much as a boundary to quote, and any future claim
+    about DUCK differentiation must say which ceiling it was measured at. Every
+    published differentiation figure for this kind, including the 0.468 to
+    0.616 the last pass reported, was measured blind to the terminations it was
+    partly about.
+
+    One thing fell out of the taller ruler that belongs to somebody else's
+    pass: **`BLOCK v9`, the moped, goes from a margin of -1.124 to -0.192**
+    against the DUCK centroid when the bands cover its whole height. It is
+    still the 1 of 26 miss either way, but whoever takes v9 next should know
+    that most of its margin is being lost to a ruler that stops below it.

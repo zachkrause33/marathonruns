@@ -4957,7 +4957,7 @@ nobody measured is worse than no number at all.**
 
 ---
 
-## Roadmap 66 · Effort: the pool is playable, and the bots can finally see it
+## Roadmap 67 · Effort: the pool is playable, and the bots can finally see it
 
 The build the risk-reward measurement asked for, finished. `docs/risk-reward.md`
 condemned the shipped game in one number — **six distinct policies all finishing

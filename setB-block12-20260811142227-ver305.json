@@ -1,0 +1,379 @@
+{
+ "runid": "20260811142227-ver305",
+ "seed": 1899229685,
+ "skip": "150",
+ "date": null,
+ "viewport": [
+  390,
+  844
+ ],
+ "fov": 70.93,
+ "lane": 0,
+ "dists": [
+  12
+ ],
+ "panelDir": "/tmp/claude-0/-home-user-marathonruns/a1dd4c24-c59f-50cd-89c7-07c04f1176a3/scratchpad/br-b/panels/20260811142227-ver305",
+ "panels": [
+  {
+   "file": "7125f510.png",
+   "kind": "BLOCK",
+   "variant": 4,
+   "dist": 12,
+   "lane": 0,
+   "cropPx": [
+    136,
+    173
+   ],
+   "objectPx": [
+    119.2,
+    152
+   ],
+   "clipped": false,
+   "crop": [
+    113,
+    337,
+    136,
+    173
+   ],
+   "matPx": 4187,
+   "matShare": 0.178,
+   "mat": "ok",
+   "matAllPx": 43528,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    52,
+    443,
+    292,
+    843
+   ],
+   "slope": 0,
+   "matSinksAt": null,
+   "matSinksBy": 0
+  },
+  {
+   "file": "4070204b.png",
+   "kind": "BLOCK",
+   "variant": 1,
+   "dist": 12,
+   "lane": 0,
+   "cropPx": [
+    136,
+    173
+   ],
+   "objectPx": [
+    119.2,
+    152
+   ],
+   "clipped": false,
+   "crop": [
+    113,
+    337,
+    136,
+    173
+   ],
+   "matPx": 4363,
+   "matShare": 0.1854,
+   "mat": "ok",
+   "matAllPx": 43704,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    52,
+    441,
+    292,
+    843
+   ],
+   "slope": 0,
+   "matSinksAt": null,
+   "matSinksBy": 0
+  },
+  {
+   "file": "48c070bd.png",
+   "kind": "BLOCK",
+   "variant": 8,
+   "dist": 12,
+   "lane": 0,
+   "cropPx": [
+    136,
+    173
+   ],
+   "objectPx": [
+    119.2,
+    152
+   ],
+   "clipped": false,
+   "crop": [
+    113,
+    337,
+    136,
+    173
+   ],
+   "matPx": 4363,
+   "matShare": 0.1854,
+   "mat": "ok",
+   "matAllPx": 43704,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    52,
+    441,
+    292,
+    843
+   ],
+   "slope": 0,
+   "matSinksAt": null,
+   "matSinksBy": 0
+  },
+  {
+   "file": "8e45361c.png",
+   "kind": "BLOCK",
+   "variant": 6,
+   "dist": 12,
+   "lane": 0,
+   "cropPx": [
+    136,
+    173
+   ],
+   "objectPx": [
+    119.2,
+    152
+   ],
+   "clipped": false,
+   "crop": [
+    113,
+    337,
+    136,
+    173
+   ],
+   "matPx": 4183,
+   "matShare": 0.1778,
+   "mat": "ok",
+   "matAllPx": 43524,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    52,
+    443,
+    292,
+    843
+   ],
+   "slope": 0,
+   "matSinksAt": null,
+   "matSinksBy": 0
+  },
+  {
+   "file": "30644389.png",
+   "kind": "BLOCK",
+   "variant": 9,
+   "dist": 12,
+   "lane": 0,
+   "cropPx": [
+    136,
+    173
+   ],
+   "objectPx": [
+    119.2,
+    152
+   ],
+   "clipped": false,
+   "crop": [
+    113,
+    337,
+    136,
+    173
+   ],
+   "matPx": 4363,
+   "matShare": 0.1854,
+   "mat": "ok",
+   "matAllPx": 43704,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    52,
+    441,
+    292,
+    843
+   ],
+   "slope": 0,
+   "matSinksAt": null,
+   "matSinksBy": 0
+  },
+  {
+   "file": "52b35467.png",
+   "kind": "BLOCK",
+   "variant": 2,
+   "dist": 12,
+   "lane": 0,
+   "cropPx": [
+    136,
+    173
+   ],
+   "objectPx": [
+    119.2,
+    152
+   ],
+   "clipped": false,
+   "crop": [
+    113,
+    337,
+    136,
+    173
+   ],
+   "matPx": 4363,
+   "matShare": 0.1854,
+   "mat": "ok",
+   "matAllPx": 43704,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    52,
+    441,
+    292,
+    843
+   ],
+   "slope": 0,
+   "matSinksAt": null,
+   "matSinksBy": 0
+  },
+  {
+   "file": "1efc699a.png",
+   "kind": "BLOCK",
+   "variant": 3,
+   "dist": 12,
+   "lane": 0,
+   "cropPx": [
+    136,
+    173
+   ],
+   "objectPx": [
+    119.2,
+    152
+   ],
+   "clipped": false,
+   "crop": [
+    113,
+    337,
+    136,
+    173
+   ],
+   "matPx": 4363,
+   "matShare": 0.1854,
+   "mat": "ok",
+   "matAllPx": 43704,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    52,
+    441,
+    292,
+    843
+   ],
+   "slope": 0,
+   "matSinksAt": null,
+   "matSinksBy": 0
+  },
+  {
+   "file": "dd71534d.png",
+   "kind": "BLOCK",
+   "variant": 5,
+   "dist": 12,
+   "lane": 0,
+   "cropPx": [
+    136,
+    173
+   ],
+   "objectPx": [
+    119.2,
+    152
+   ],
+   "clipped": false,
+   "crop": [
+    113,
+    337,
+    136,
+    173
+   ],
+   "matPx": 4179,
+   "matShare": 0.1776,
+   "mat": "ok",
+   "matAllPx": 43520,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    52,
+    444,
+    292,
+    843
+   ],
+   "slope": 0,
+   "matSinksAt": null,
+   "matSinksBy": 0
+  },
+  {
+   "file": "0df2040f.png",
+   "kind": "BLOCK",
+   "variant": 0,
+   "dist": 12,
+   "lane": 0,
+   "cropPx": [
+    136,
+    173
+   ],
+   "objectPx": [
+    119.2,
+    152
+   ],
+   "clipped": false,
+   "crop": [
+    113,
+    337,
+    136,
+    173
+   ],
+   "matPx": 4123,
+   "matShare": 0.1752,
+   "mat": "ok",
+   "matAllPx": 43464,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    52,
+    446,
+    292,
+    843
+   ],
+   "slope": 0,
+   "matSinksAt": null,
+   "matSinksBy": 0
+  },
+  {
+   "file": "4d4ccbd3.png",
+   "kind": "BLOCK",
+   "variant": 7,
+   "dist": 12,
+   "lane": 0,
+   "cropPx": [
+    136,
+    173
+   ],
+   "objectPx": [
+    119.2,
+    152
+   ],
+   "clipped": false,
+   "crop": [
+    113,
+    337,
+    136,
+    173
+   ],
+   "matPx": 4193,
+   "matShare": 0.1782,
+   "mat": "ok",
+   "matAllPx": 43534,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    52,
+    442,
+    292,
+    843
+   ],
+   "slope": 0,
+   "matSinksAt": null,
+   "matSinksBy": 0
+  }
+ ],
+ "note": "Panels include the telegraph mat, which api.variantObject omits. Readers run inside this repository receive CLAUDE.md; see the header of tools/blindread.js for what that leaks and what it invalidates."
+}

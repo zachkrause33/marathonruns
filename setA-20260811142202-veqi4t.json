@@ -1,0 +1,847 @@
+{
+ "runid": "20260811142202-veqi4t",
+ "seed": 1899202637,
+ "skip": "150",
+ "date": null,
+ "viewport": [
+  390,
+  844
+ ],
+ "fov": 71.01,
+ "lane": 0,
+ "dists": [
+  25
+ ],
+ "panelDir": "/tmp/claude-0/-home-user-marathonruns/a1dd4c24-c59f-50cd-89c7-07c04f1176a3/scratchpad/br-a/panels/20260811142202-veqi4t",
+ "panels": [
+  {
+   "file": "72767af3.png",
+   "kind": "BLOCK",
+   "variant": 6,
+   "dist": 25,
+   "lane": 0,
+   "cropPx": [
+    63,
+    80
+   ],
+   "objectPx": [
+    55.2,
+    70.2
+   ],
+   "clipped": false,
+   "crop": [
+    152,
+    341,
+    63,
+    80
+   ],
+   "matPx": 652,
+   "matShare": 0.1294,
+   "mat": "ok",
+   "matAllPx": 1938,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    155,
+    400,
+    208,
+    456
+   ],
+   "slope": 0.00354,
+   "matSinksAt": 7,
+   "matSinksBy": -0.029
+  },
+  {
+   "file": "bbfcf6d0.png",
+   "kind": "JUMP",
+   "variant": 2,
+   "dist": 25,
+   "lane": 0,
+   "cropPx": [
+    63,
+    48
+   ],
+   "objectPx": [
+    55.2,
+    31.3
+   ],
+   "clipped": false,
+   "crop": [
+    152,
+    377,
+    63,
+    48
+   ],
+   "matPx": 773,
+   "matShare": 0.2556,
+   "mat": "ok",
+   "matAllPx": 1810,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    155,
+    402,
+    208,
+    456
+   ],
+   "slope": 0.00354,
+   "matSinksAt": 7,
+   "matSinksBy": -0.029
+  },
+  {
+   "file": "d1af9fc5.png",
+   "kind": "JUMP",
+   "variant": 5,
+   "dist": 25,
+   "lane": 0,
+   "cropPx": [
+    63,
+    48
+   ],
+   "objectPx": [
+    55.2,
+    31.3
+   ],
+   "clipped": false,
+   "crop": [
+    152,
+    377,
+    63,
+    48
+   ],
+   "matPx": 798,
+   "matShare": 0.2639,
+   "mat": "ok",
+   "matAllPx": 1835,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    155,
+    401,
+    208,
+    456
+   ],
+   "slope": 0.00354,
+   "matSinksAt": 7,
+   "matSinksBy": -0.029
+  },
+  {
+   "file": "e9e04510.png",
+   "kind": "BLOCK",
+   "variant": 1,
+   "dist": 25,
+   "lane": 0,
+   "cropPx": [
+    63,
+    80
+   ],
+   "objectPx": [
+    55.2,
+    70.2
+   ],
+   "clipped": false,
+   "crop": [
+    152,
+    341,
+    63,
+    80
+   ],
+   "matPx": 676,
+   "matShare": 0.1341,
+   "mat": "ok",
+   "matAllPx": 1962,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    155,
+    400,
+    208,
+    456
+   ],
+   "slope": 0.00354,
+   "matSinksAt": 7,
+   "matSinksBy": -0.029
+  },
+  {
+   "file": "c778980f.png",
+   "kind": "JUMP",
+   "variant": 4,
+   "dist": 25,
+   "lane": 0,
+   "cropPx": [
+    63,
+    48
+   ],
+   "objectPx": [
+    55.2,
+    31.3
+   ],
+   "clipped": false,
+   "crop": [
+    152,
+    377,
+    63,
+    48
+   ],
+   "matPx": 773,
+   "matShare": 0.2556,
+   "mat": "ok",
+   "matAllPx": 1810,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    155,
+    402,
+    208,
+    456
+   ],
+   "slope": 0.00354,
+   "matSinksAt": 7,
+   "matSinksBy": -0.029
+  },
+  {
+   "file": "7250139b.png",
+   "kind": "DUCK",
+   "variant": 3,
+   "dist": 25,
+   "lane": 0,
+   "cropPx": [
+    63,
+    58
+   ],
+   "objectPx": [
+    55.2,
+    50.9
+   ],
+   "clipped": false,
+   "crop": [
+    152,
+    362,
+    63,
+    58
+   ],
+   "matPx": 639,
+   "matShare": 0.1749,
+   "mat": "ok",
+   "matAllPx": 1815,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    155,
+    400,
+    208,
+    456
+   ],
+   "slope": 0.00354,
+   "matSinksAt": 7,
+   "matSinksBy": -0.029
+  },
+  {
+   "file": "f831b24e.png",
+   "kind": "DUCK",
+   "variant": 1,
+   "dist": 25,
+   "lane": 0,
+   "cropPx": [
+    63,
+    58
+   ],
+   "objectPx": [
+    55.2,
+    50.9
+   ],
+   "clipped": false,
+   "crop": [
+    152,
+    362,
+    63,
+    58
+   ],
+   "matPx": 638,
+   "matShare": 0.1746,
+   "mat": "ok",
+   "matAllPx": 1814,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    155,
+    400,
+    208,
+    456
+   ],
+   "slope": 0.00354,
+   "matSinksAt": 7,
+   "matSinksBy": -0.029
+  },
+  {
+   "file": "16d64479.png",
+   "kind": "BLOCK",
+   "variant": 3,
+   "dist": 25,
+   "lane": 0,
+   "cropPx": [
+    63,
+    80
+   ],
+   "objectPx": [
+    55.2,
+    70.2
+   ],
+   "clipped": false,
+   "crop": [
+    152,
+    341,
+    63,
+    80
+   ],
+   "matPx": 676,
+   "matShare": 0.1341,
+   "mat": "ok",
+   "matAllPx": 1962,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    155,
+    400,
+    208,
+    456
+   ],
+   "slope": 0.00354,
+   "matSinksAt": 7,
+   "matSinksBy": -0.029
+  },
+  {
+   "file": "effb151f.png",
+   "kind": "JUMP",
+   "variant": 1,
+   "dist": 25,
+   "lane": 0,
+   "cropPx": [
+    63,
+    48
+   ],
+   "objectPx": [
+    55.2,
+    31.3
+   ],
+   "clipped": false,
+   "crop": [
+    152,
+    377,
+    63,
+    48
+   ],
+   "matPx": 803,
+   "matShare": 0.2655,
+   "mat": "ok",
+   "matAllPx": 1840,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    155,
+    400,
+    208,
+    456
+   ],
+   "slope": 0.00354,
+   "matSinksAt": 7,
+   "matSinksBy": -0.029
+  },
+  {
+   "file": "b41f6671.png",
+   "kind": "DUCK",
+   "variant": 0,
+   "dist": 25,
+   "lane": 0,
+   "cropPx": [
+    63,
+    58
+   ],
+   "objectPx": [
+    55.2,
+    50.9
+   ],
+   "clipped": false,
+   "crop": [
+    152,
+    362,
+    63,
+    58
+   ],
+   "matPx": 639,
+   "matShare": 0.1749,
+   "mat": "ok",
+   "matAllPx": 1815,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    155,
+    400,
+    208,
+    456
+   ],
+   "slope": 0.00354,
+   "matSinksAt": 7,
+   "matSinksBy": -0.029
+  },
+  {
+   "file": "49c7c586.png",
+   "kind": "JUMP",
+   "variant": 3,
+   "dist": 25,
+   "lane": 0,
+   "cropPx": [
+    63,
+    48
+   ],
+   "objectPx": [
+    55.2,
+    31.3
+   ],
+   "clipped": false,
+   "crop": [
+    152,
+    377,
+    63,
+    48
+   ],
+   "matPx": 814,
+   "matShare": 0.2692,
+   "mat": "ok",
+   "matAllPx": 1851,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    155,
+    400,
+    208,
+    456
+   ],
+   "slope": 0.00354,
+   "matSinksAt": 7,
+   "matSinksBy": -0.029
+  },
+  {
+   "file": "d238047d.png",
+   "kind": "DUCK",
+   "variant": 4,
+   "dist": 25,
+   "lane": 0,
+   "cropPx": [
+    63,
+    58
+   ],
+   "objectPx": [
+    55.2,
+    50.9
+   ],
+   "clipped": false,
+   "crop": [
+    152,
+    362,
+    63,
+    58
+   ],
+   "matPx": 638,
+   "matShare": 0.1746,
+   "mat": "ok",
+   "matAllPx": 1814,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    155,
+    400,
+    208,
+    456
+   ],
+   "slope": 0.00354,
+   "matSinksAt": 7,
+   "matSinksBy": -0.029
+  },
+  {
+   "file": "3f8d6b73.png",
+   "kind": "BLOCK",
+   "variant": 0,
+   "dist": 25,
+   "lane": 0,
+   "cropPx": [
+    63,
+    80
+   ],
+   "objectPx": [
+    55.2,
+    70.2
+   ],
+   "clipped": false,
+   "crop": [
+    152,
+    341,
+    63,
+    80
+   ],
+   "matPx": 625,
+   "matShare": 0.124,
+   "mat": "ok",
+   "matAllPx": 1911,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    155,
+    401,
+    208,
+    456
+   ],
+   "slope": 0.00354,
+   "matSinksAt": 7,
+   "matSinksBy": -0.029
+  },
+  {
+   "file": "88de2a5b.png",
+   "kind": "BLOCK",
+   "variant": 8,
+   "dist": 25,
+   "lane": 0,
+   "cropPx": [
+    63,
+    80
+   ],
+   "objectPx": [
+    55.2,
+    70.2
+   ],
+   "clipped": false,
+   "crop": [
+    152,
+    341,
+    63,
+    80
+   ],
+   "matPx": 676,
+   "matShare": 0.1341,
+   "mat": "ok",
+   "matAllPx": 1962,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    155,
+    400,
+    208,
+    456
+   ],
+   "slope": 0.00354,
+   "matSinksAt": 7,
+   "matSinksBy": -0.029
+  },
+  {
+   "file": "bd65d4cb.png",
+   "kind": "BLOCK",
+   "variant": 7,
+   "dist": 25,
+   "lane": 0,
+   "cropPx": [
+    63,
+    80
+   ],
+   "objectPx": [
+    55.2,
+    70.2
+   ],
+   "clipped": false,
+   "crop": [
+    152,
+    341,
+    63,
+    80
+   ],
+   "matPx": 652,
+   "matShare": 0.1294,
+   "mat": "ok",
+   "matAllPx": 1938,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    155,
+    400,
+    208,
+    456
+   ],
+   "slope": 0.00354,
+   "matSinksAt": 7,
+   "matSinksBy": -0.029
+  },
+  {
+   "file": "460a7e75.png",
+   "kind": "DUCK",
+   "variant": 2,
+   "dist": 25,
+   "lane": 0,
+   "cropPx": [
+    63,
+    58
+   ],
+   "objectPx": [
+    55.2,
+    50.9
+   ],
+   "clipped": false,
+   "crop": [
+    152,
+    362,
+    63,
+    58
+   ],
+   "matPx": 639,
+   "matShare": 0.1749,
+   "mat": "ok",
+   "matAllPx": 1815,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    155,
+    400,
+    208,
+    456
+   ],
+   "slope": 0.00354,
+   "matSinksAt": 7,
+   "matSinksBy": -0.029
+  },
+  {
+   "file": "6bd41437.png",
+   "kind": "JUMP",
+   "variant": 6,
+   "dist": 25,
+   "lane": 0,
+   "cropPx": [
+    63,
+    48
+   ],
+   "objectPx": [
+    55.2,
+    31.3
+   ],
+   "clipped": false,
+   "crop": [
+    152,
+    377,
+    63,
+    48
+   ],
+   "matPx": 811,
+   "matShare": 0.2682,
+   "mat": "ok",
+   "matAllPx": 1848,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    155,
+    400,
+    208,
+    456
+   ],
+   "slope": 0.00354,
+   "matSinksAt": 7,
+   "matSinksBy": -0.029
+  },
+  {
+   "file": "c3c8cae1.png",
+   "kind": "JUMP",
+   "variant": 7,
+   "dist": 25,
+   "lane": 0,
+   "cropPx": [
+    63,
+    48
+   ],
+   "objectPx": [
+    55.2,
+    31.3
+   ],
+   "clipped": false,
+   "crop": [
+    152,
+    377,
+    63,
+    48
+   ],
+   "matPx": 801,
+   "matShare": 0.2649,
+   "mat": "ok",
+   "matAllPx": 1838,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    155,
+    401,
+    208,
+    456
+   ],
+   "slope": 0.00354,
+   "matSinksAt": 7,
+   "matSinksBy": -0.029
+  },
+  {
+   "file": "ff002c97.png",
+   "kind": "BLOCK",
+   "variant": 5,
+   "dist": 25,
+   "lane": 0,
+   "cropPx": [
+    63,
+    80
+   ],
+   "objectPx": [
+    55.2,
+    70.2
+   ],
+   "clipped": false,
+   "crop": [
+    152,
+    341,
+    63,
+    80
+   ],
+   "matPx": 649,
+   "matShare": 0.1288,
+   "mat": "ok",
+   "matAllPx": 1935,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    155,
+    401,
+    208,
+    456
+   ],
+   "slope": 0.00354,
+   "matSinksAt": 7,
+   "matSinksBy": -0.029
+  },
+  {
+   "file": "d7430cb0.png",
+   "kind": "BLOCK",
+   "variant": 2,
+   "dist": 25,
+   "lane": 0,
+   "cropPx": [
+    63,
+    80
+   ],
+   "objectPx": [
+    55.2,
+    70.2
+   ],
+   "clipped": false,
+   "crop": [
+    152,
+    341,
+    63,
+    80
+   ],
+   "matPx": 676,
+   "matShare": 0.1341,
+   "mat": "ok",
+   "matAllPx": 1962,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    155,
+    400,
+    208,
+    456
+   ],
+   "slope": 0.00354,
+   "matSinksAt": 7,
+   "matSinksBy": -0.029
+  },
+  {
+   "file": "343efd1d.png",
+   "kind": "JUMP",
+   "variant": 0,
+   "dist": 25,
+   "lane": 0,
+   "cropPx": [
+    63,
+    48
+   ],
+   "objectPx": [
+    55.2,
+    31.3
+   ],
+   "clipped": false,
+   "crop": [
+    152,
+    377,
+    63,
+    48
+   ],
+   "matPx": 801,
+   "matShare": 0.2649,
+   "mat": "ok",
+   "matAllPx": 1838,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    155,
+    401,
+    208,
+    456
+   ],
+   "slope": 0.00354,
+   "matSinksAt": 7,
+   "matSinksBy": -0.029
+  },
+  {
+   "file": "a0549ddf.png",
+   "kind": "BLOCK",
+   "variant": 9,
+   "dist": 25,
+   "lane": 0,
+   "cropPx": [
+    63,
+    80
+   ],
+   "objectPx": [
+    55.2,
+    70.2
+   ],
+   "clipped": false,
+   "crop": [
+    152,
+    341,
+    63,
+    80
+   ],
+   "matPx": 676,
+   "matShare": 0.1341,
+   "mat": "ok",
+   "matAllPx": 1962,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    155,
+    400,
+    208,
+    456
+   ],
+   "slope": 0.00354,
+   "matSinksAt": 7,
+   "matSinksBy": -0.029
+  },
+  {
+   "file": "779d389f.png",
+   "kind": "BLOCK",
+   "variant": 4,
+   "dist": 25,
+   "lane": 0,
+   "cropPx": [
+    63,
+    80
+   ],
+   "objectPx": [
+    55.2,
+    70.2
+   ],
+   "clipped": false,
+   "crop": [
+    152,
+    341,
+    63,
+    80
+   ],
+   "matPx": 649,
+   "matShare": 0.1288,
+   "mat": "ok",
+   "matAllPx": 1935,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    155,
+    401,
+    208,
+    456
+   ],
+   "slope": 0.00354,
+   "matSinksAt": 7,
+   "matSinksBy": -0.029
+  }
+ ],
+ "note": "Panels include the telegraph mat, which api.variantObject omits. Readers run inside this repository receive CLAUDE.md; see the header of tools/blindread.js for what that leaks and what it invalidates."
+}

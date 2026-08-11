@@ -1,0 +1,92 @@
+{
+ "runid": "20260811142244-vergqj",
+ "seed": 1899247483,
+ "skip": "150",
+ "date": null,
+ "viewport": [
+  390,
+  844
+ ],
+ "fov": 70.93,
+ "lane": 0,
+ "dists": [
+  8,
+  12
+ ],
+ "panelDir": "/tmp/claude-0/-home-user-marathonruns/a1dd4c24-c59f-50cd-89c7-07c04f1176a3/scratchpad/br-c/panels/20260811142244-vergqj",
+ "panels": [
+  {
+   "file": "096bdd17.png",
+   "kind": "JUMP",
+   "variant": 3,
+   "dist": 12,
+   "lane": 0,
+   "cropPx": [
+    136,
+    97
+   ],
+   "objectPx": [
+    119.2,
+    85.2
+   ],
+   "clipped": false,
+   "crop": [
+    113,
+    409,
+    136,
+    97
+   ],
+   "matPx": 3959,
+   "matShare": 0.3001,
+   "mat": "ok",
+   "matAllPx": 39776,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    52,
+    442,
+    292,
+    843
+   ],
+   "slope": 0,
+   "matSinksAt": null,
+   "matSinksBy": 0
+  },
+  {
+   "file": "4f43a1a2.png",
+   "kind": "JUMP",
+   "variant": 3,
+   "dist": 8,
+   "lane": 0,
+   "cropPx": [
+    211,
+    173
+   ],
+   "objectPx": [
+    185.1,
+    151.5
+   ],
+   "clipped": false,
+   "crop": [
+    73,
+    424,
+    211,
+    173
+   ],
+   "matPx": 11464,
+   "matShare": 0.3141,
+   "mat": "ok",
+   "matAllPx": 56290,
+   "objAllPx": null,
+   "matBoxOnFrame": [
+    52,
+    470,
+    292,
+    843
+   ],
+   "slope": 0,
+   "matSinksAt": null,
+   "matSinksBy": 0
+  }
+ ],
+ "note": "Panels include the telegraph mat, which api.variantObject omits. Readers run inside this repository receive CLAUDE.md; see the header of tools/blindread.js for what that leaks and what it invalidates."
+}

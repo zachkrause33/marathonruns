@@ -134,6 +134,59 @@ MR.Pace = (function () {
     BURN_UNITS: 140,
   };
 
+  /**
+   * ---- THE DIRECTIONAL MATS, AND WHY ONE OF THESE NUMBERS IS DERIVED ------
+   *
+   * A forward mat lifts the pace briefly; a backward mat drags it. Which mat is
+   * where, and the open-lane guarantee that makes a backward one fair, all live
+   * in course.js. What lives here is only the size of the two steps.
+   *
+   * LIFT IS NOT A CHOSEN NUMBER. It is the gap between the floor a runner
+   * outside a zone runs toward (FLOOR_BASE, 261) and K.FLOOR_PACE (254), which
+   * is the pace ACTION_WINDOW, LANE_TRANSIT and every gate spacing in this game
+   * have been cut against since the generator was written. So a lift closes
+   * exactly the gap the course has always been ready for and not one second
+   * more, and the clamp in tempoTarget makes that a hard ceiling rather than a
+   * hope: no combination of streak, hill and mat can put the pace below
+   * K.FLOOR_PACE, and only an elected surge goes below it at all.
+   *
+   * That is belt AND braces, because course.js also widens the action window
+   * over a lift mat exactly as it does over a zone -- see liftAt. The clamp is
+   * what holds if the paint is ever laid somewhere the widening did not reach.
+   *
+   * DRAG IS SWEPT, NOT DERIVED, and 21 s/mi is what the sweep chose. It is the
+   * one number in this mechanic with a free hand, because a drag only ever
+   * makes the runner SLOWER -- it widens the reaction window rather than
+   * narrowing it, so no fairness argument bounds it and only the shape of the
+   * decision does. What it has to be worth is roughly what avoiding it costs:
+   * the escape lane is guaranteed open but it frequently holds a hurdle, so
+   * declining a drag costs one action, and one action at a realistic failure
+   * rate costs a few seconds of expected time. Over the median 67-unit mark a
+   * drag at 21 s/mi costs 5.9 race seconds. Swept at 12 / 21 / 30 over the
+   * whole policy grid; the numbers are in docs/roadmap.md entry 68.
+   *
+   * APPLIED TO THE TARGET, NOT TO THE FLOOR, and that distinction is the whole
+   * difference between a mechanic and a decoration. targetPace's own curve
+   * gives d(target)/d(FLOOR) = 0.285 at streak 5 and 0.93 at streak 150, so a
+   * mat wired to the floor would be worth a third of its face value early and
+   * nearly all of it late -- which is right for the surge, where the time
+   * preference IS the strategy, and wrong here, where a mat is a local fact
+   * about a lane and should cost the same wherever it is met.
+   */
+  const TEMPO = {
+    LIFT: SURGE.FLOOR_BASE - K.FLOOR_PACE,   // 7 s/mi: 4:21 -> 4:14
+    DRAG: 21,                                // s/mi: 4:21 -> 4:42
+  };
+
+  /**
+   * The target pace, shifted by whatever the runner is standing on.
+   * @param tempo  +1 forward mat, -1 backward mat, 0 for open road.
+   */
+  function tempoTarget(base, tempo) {
+    if (EFFORT <= 0 || !tempo) return base;
+    return tempo > 0 ? Math.max(K.FLOOR_PACE, base - TEMPO.LIFT) : base + TEMPO.DRAG;
+  }
+
   /** The floor this runner is running toward right now. */
   function floorPace(surging) {
     if (EFFORT <= 0) return K.FLOOR_PACE;
@@ -204,6 +257,10 @@ MR.Pace = (function () {
       wasted: 0,         // items collected into a full pool
       surging: false,    // set by main.js from the runner's lane, read here
       surgeUnits: 0,     // world units actually run under surge
+      // ---- the mats, and they are inert at EFFORT = 0 ---------------------
+      tempo: 0,          // +1 on a forward mat, -1 on a backward one, set by main
+      liftUnits: 0,      // world units run on forward mats
+      dragUnits: 0,      // ...and on backward ones
       finished: false,
       finishTime: 0,
       splits: [],           // race-time at each completed mile
@@ -225,7 +282,15 @@ MR.Pace = (function () {
       // integration are untouched, so the pace still moves at PACE_EASE and a
       // surge is felt as a burn rather than as a teleport. At EFFORT = 0
       // floorPace() returns K.FLOOR_PACE and this is the shipped expression.
-      const tgt = targetPace(s.streak, floorPace(s.surging));
+      //
+      // ...and then the mat, which is a step on the TARGET rather than a swap
+      // of the floor. A surge and a mat cannot both be live -- course.js never
+      // lays a mat inside a zone or within SURGE_SIGHT of one -- and the clamp
+      // in tempoTarget means that even if one were laid there, the pace could
+      // not go below K.FLOOR_PACE and the fastest the game can run would still
+      // be FLOOR_SURGE exactly.
+      const tgt = tempoTarget(targetPace(s.streak, floorPace(s.surging)),
+                              s.surging ? 0 : s.tempo);
       const d = tgt - s.pace;
       const step = K.PACE_EASE * dRace;
       s.pace += Math.abs(d) <= step ? d : Math.sign(d) * step;
@@ -266,6 +331,12 @@ MR.Pace = (function () {
       // surge on the spot; the pace then eases back up under the same law,
       // which is the honest and legible failure -- the player is shown the
       // tank empty and feels the gear go.
+      // Ground run under each mat, for the report and for tools/tempo.js. Not a
+      // cost: a mat charges nothing and is free to run on. What it charges is
+      // the lane it asks you to be in.
+      if (EFFORT > 0 && s.tempo && !s.surging && dUnits > 0) {
+        if (s.tempo > 0) s.liftUnits += dUnits; else s.dragUnits += dUnits;
+      }
       if (EFFORT > 0 && s.surging && dUnits > 0) {
         s.pool -= dUnits / SURGE.BURN_UNITS;
         s.surgeUnits += dUnits;
@@ -492,7 +563,8 @@ MR.Pace = (function () {
       return Math.min(K.MARATHON_MILES, s.raceTime / K.RECORD_PACE);
     };
 
-    s.targetPace = () => targetPace(s.streak, floorPace(s.surging));
+    s.targetPace = () => tempoTarget(targetPace(s.streak, floorPace(s.surging)),
+                                     s.surging ? 0 : s.tempo);
 
     /** Whole segments in hand -- what the gauge counts and guard spends. */
     s.segments = function () { return Math.floor(s.pool); };
@@ -533,7 +605,8 @@ MR.Pace = (function () {
     return `${sign}${m}:${s.toFixed(1).padStart(4, '0')}`;
   }
 
-  const api = { create, targetPace, clock, pace, delta, SURGE, floorPace, bestFloor };
+  const api = { create, targetPace, clock, pace, delta, SURGE, TEMPO, tempoTarget,
+                floorPace, bestFloor };
 
   // Accessor rather than a plain field, so a nonsense value cannot be written
   // and the clamp lives with the flag. Same shape as MR.Course.RAMP.

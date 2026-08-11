@@ -205,14 +205,45 @@ MR.Collision = (function () {
    * front already costs the streak -- and because tools/mechanics.js proves no
    * gate ever falls inside a fall on any of the 365 days.
    */
-  function clears(kind, st) {
+  /**
+   * ---- CLEARANCE IS RELATIVE TO THE SURFACE THE HAZARD STANDS ON ---------
+   *
+   * `clears(kind, st)` asks about a hazard standing on the ROAD, and every
+   * expression in it is written against a road at y = 0. A cone on a rideable
+   * deck is the same object standing on a floor 2.80 units up, and the shipped
+   * expression gets it exactly wrong in the dangerous direction: the runner's
+   * own `surface` is 2.80 up there too, so `(y || 0) + surface >= 0.84` is true
+   * before he has left the deck at all. Every roof cone would be cleared by
+   * standing still.
+   *
+   * So the general form takes the height of the FLOOR THE HAZARD IS ON, and
+   * clears() is that form at floor zero -- literally, by calling it. There is
+   * one expression per kind in this file and there will go on being one.
+   *
+   *   JUMP   the feet, measured from the hazard's own floor. `y` is height above
+   *          the runner's surface and the two surfaces are equal on a deck, so
+   *          up there this is exactly `y >= JUMP_CLEAR_Y`: the same jump, at the
+   *          same threshold, 2.80 units higher.
+   *   DUCK   unchanged in form. `surface - floor` is what clears a bar by
+   *          standing on something above it, which on the road is the half-second
+   *          fall and on a deck would be a second deck -- neither of which the
+   *          generator produces over a bar, and both of which stay physically
+   *          honest if it ever does.
+   *   BLOCK  `onDeck` is a fact about support, not about altitude, so the floor
+   *          does not enter it. A BLOCK is never generated on a deck (see the
+   *          cone note in course.js: a deck has no sideways, so the only legal
+   *          roof hazard is one a jump answers).
+   */
+  function clearsOn(kind, st, floor) {
     if (kind === K.CLEAR) return true;
-    const surface = st.surface || 0;
+    const surface = (st.surface || 0) - (floor || 0);
     if (kind === K.BLOCK) return st.onDeck === true;
     if (kind === K.JUMP) return (st.y || 0) + surface >= JUMP_CLEAR_Y;
     if (kind === K.DUCK) return (st.duck01 || 0) >= DUCK_CLEAR || surface >= BOX[K.DUCK].yMax;
     return true;
   }
+
+  function clears(kind, st) { return clearsOn(kind, st, 0); }
 
   /**
    * Verify the state thresholds are physically honest against the visuals:
@@ -249,7 +280,7 @@ MR.Collision = (function () {
   }
 
   return {
-    BOX, clears, audit,
+    BOX, clears, clearsOn, audit,
     JUMP_CLEAR_Y, DUCK_CLEAR,
     PLAYER_STAND_TOP, PLAYER_DUCK_DROP,
   };

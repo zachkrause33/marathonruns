@@ -705,6 +705,12 @@
       if (EFFORT) {
         player.resolveSurge(course, pace.units, pace.pool > 0);
         pace.surging = !!player.surge;
+        // ...and the mat, in the same breath and for the same reason: it shifts
+        // the target this step is run toward, so it has to be read before the
+        // step and not after it. No fuel test -- a mat costs nothing to run on.
+        // What it costs is the lane, and the player has already chosen that.
+        const mat = player.resolveTempo(course, pace.units);
+        pace.tempo = mat ? mat.dir : 0;
       }
 
       const before = pace.units;
@@ -1212,6 +1218,12 @@
       if (EFFORT) {
         player.resolveSurge(course, pace.units, pace.pool > 0);
         pace.surging = !!player.surge;
+        // The mat too, in the live loop's order. A fast-forward that skipped it
+        // would report the mechanic doing nothing on exactly the runs the
+        // harness inspects -- which is the defect the note above records for
+        // the surge, one mechanic later.
+        const mat = player.resolveTempo(course, pace.units);
+        pace.tempo = mat ? mat.dir : 0;
       }
       const b = pace.units;
       pace.update(step);

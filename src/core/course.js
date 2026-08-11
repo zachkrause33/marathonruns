@@ -73,6 +73,11 @@ MR.Course = (function () {
   // that goes in the comment. It costs 1.3 gates a course.
   let NARROW = 1;
   let RAMP = 1;
+  // TEMPO: the directional mats. See the long note above planTempo.
+  let TEMPO = 1;
+  // ROOF: cones on a rideable deck, and two decks side by side to cross
+  // between. See the note above rollRoof.
+  let ROOF = 1;
 
   // A jump covers this much ground; two conflicting action gates closer than
   // this would demand being airborne and ducking at once.
@@ -171,9 +176,48 @@ MR.Course = (function () {
     return 0;
   }
 
-  function windowExtraAt(z, elev, surges) {
+  /**
+   * ---- THE ONE QUESTION THE WINDOW ACTUALLY ASKS -------------------------
+   *
+   * How many seconds per mile faster than the ordinary road may the runner be
+   * at z, because of something the ROAD said rather than something they ran?
+   *
+   * There are two such things now and they are the same shape, so they are one
+   * function rather than two clauses that have to be kept in step:
+   *
+   *   a SURGE ZONE  lifts the floor by FLOOR_BASE - FLOOR_SURGE = 17 s/mi
+   *   a LIFT MAT    lifts the TARGET by FLOOR_BASE - K.FLOOR_PACE = 7 s/mi
+   *
+   * The MAX is taken rather than the sum, and that is not an approximation: a
+   * lift mat is never generated inside a zone or within SURGE_SIGHT of one (see
+   * planTempo), and Pace.tempoTarget clamps a lift at K.FLOOR_PACE so it can
+   * never compound with a surge even if one were somehow laid there. The
+   * fastest the game can go is still exactly FLOOR_SURGE.
+   *
+   * SURGE_PAD applies to both for the same reason: a jump committed just short
+   * of a marking lands inside it.
+   */
+  function liftAt(z, surges, tempo) {
+    let lift = 0;
+    if (surgeExtraAt(z, surges)) {
+      lift = MR.Pace.SURGE.FLOOR_BASE - MR.Pace.SURGE.FLOOR_SURGE;
+    }
+    if (tempo && tempo.length) {
+      for (let i = 0; i < tempo.length; i++) {
+        const t = tempo[i];
+        if (t.dir > 0 && z >= t.z0 - SURGE_PAD && z < t.z1) {
+          const l = MR.Pace.SURGE.FLOOR_BASE - K.FLOOR_PACE;
+          if (l > lift) lift = l;
+        }
+      }
+    }
+    return lift;
+  }
+
+  function windowExtraAt(z, elev, surges, tempo) {
     const base = elev ? elev.windowExtra(z) : 0;
-    if (!surgeExtraAt(z, surges)) return base;
+    const lift = liftAt(z, surges, tempo);
+    if (!lift) return base;
     // The local pace the base window was cut for, hill included, recovered from
     // elevation's own table -- then the same hill at the surge floor.
     //
@@ -207,12 +251,12 @@ MR.Course = (function () {
     // no reaction time and costs none. What it costs is gates, which is where
     // a price belongs.
     const pace = SPAN_NUM / (base + FLAT_SPAN);
-    const surged = pace - (MR.Pace.SURGE.FLOOR_BASE - MR.Pace.SURGE.FLOOR_SURGE);
+    const surged = pace - lift;
     return Math.max(base, SPAN_NUM / surged - FLAT_SPAN);
   }
 
-  function actionWindowAt(z, elev, surges) {
-    return ACTION_WINDOW + windowExtraAt(z, elev, surges);
+  function actionWindowAt(z, elev, surges, tempo) {
+    return ACTION_WINDOW + windowExtraAt(z, elev, surges, tempo);
   }
 
   /**
@@ -256,8 +300,8 @@ MR.Course = (function () {
    * time; see tools/simulate.js, which is unchanged to the second by it because
    * pace integrates over distance and not over gates.
    */
-  function readWindowAt(z, elev, surges) {
-    return actionWindowAt(z, elev, surges) + K.CAM_BASE_BACK;
+  function readWindowAt(z, elev, surges, tempo) {
+    return actionWindowAt(z, elev, surges, tempo) + K.CAM_BASE_BACK;
   }
 
   /**
@@ -347,6 +391,143 @@ MR.Course = (function () {
     return zones;
   }
 
+  /**
+   * ---- DIRECTIONAL MATS: A SECOND MARK, NOT A SECOND MEANING -------------
+   *
+   * The owner: *"The Matts either go forward or backwards. Forward speed you up
+   * briefly and backwards slow you down briefly. If there is a backwards one,
+   * there needs to be an opening for the running to go through one of the
+   * other lanes."*
+   *
+   * THE FIRST DECISION IS WHETHER THIS RIDES ON THE TELEGRAPH MAT, AND IT DOES
+   * NOT. Three measurements say so and none of them is taste:
+   *
+   *  1. THE TELEGRAPH MAT'S COLOUR CODE IS ALREADY FULL. docs/mats-three-lane.md
+   *     §2.10 measured the mat masks at READ_NEAR: JUMP 125,112,87 warm; DUCK
+   *     87,117,132 cyan; BLOCK 124,82,103 magenta -- "three cleanly separated
+   *     hues, distinguished by channel ordering rather than by brightness", and
+   *     "the mat, on its own, is a sufficient answer" to what the lane demands.
+   *     A direction on the same object doubles that code to six. The ONLY error
+   *     mode the four-reader test found was a JUMP read as AROUND -- ten of
+   *     them, all one reader -- which is a hue confusion. Doubling the palette
+   *     attacks precisely the axis that already fails.
+   *
+   *  2. A TELEGRAPH MAT IS ON EVERY HAZARD LANE OF EVERY GATE. That is ~370 of
+   *     them on a course. The owner asked for an effect that lasts BRIEFLY; a
+   *     direction on every one of those is not a brief effect, it is a
+   *     continuous speed field with the road as its argument.
+   *
+   *  3. A TELEGRAPH MAT STANDS IN A LANE THAT ALREADY COSTS AN ACTION. Slowing
+   *     that lane as well is charging twice for one obstacle, which is a
+   *     punishment rather than a choice -- and the whole point of the backward
+   *     mat is to create a decision.
+   *
+   * So a tempo mat is its OWN painted mark, on open road, between gates, and it
+   * has one job: this lane is faster / this lane is slower. The telegraph mat
+   * keeps its single meaning and its measured one demonstrated job (teaching
+   * which low object is jumpable, §3.5b). Two marks, two vocabularies, neither
+   * overloaded.
+   *
+   * ---- THE LIFT IS A DERIVED NUMBER AND THAT IS WHAT MAKES IT FAIR --------
+   *
+   * FLOOR_BASE (261) is the pace an unsurged runner runs toward under EFFORT.
+   * K.FLOOR_PACE (254) is the pace ACTION_WINDOW, LANE_TRANSIT and every gate
+   * spacing in this file have been cut against since the generator was written.
+   * A LIFT MAT closes exactly that gap and not one second more:
+   *
+   *     LIFT = FLOOR_BASE - K.FLOOR_PACE = 7 s/mi
+   *
+   * ...and then, because the surge pass established the standard and it is the
+   * right one, the window is WIDENED for it anyway. What the player is owed is
+   * not a span in the generator's units, it is TIME, and the time they are owed
+   * is the time the ordinary road gives them: 761 ms. liftAt() therefore
+   * reports a lift mat exactly as it reports a zone, spacingAt and solvable()
+   * both read it, and a lifted stretch is spaced 0.56 units wider so the
+   * guaranteed decide window inside one is the same 761 ms as outside it. A
+   * lift buys speed. It does not buy reaction time and it does not cost any.
+   *
+   * A DRAG MAT ONLY EVER MAKES THE RUNNER SLOWER, so it widens nothing and can
+   * cost the fairness proof nothing. Its whole risk is a different one, below.
+   *
+   * ---- PLANNED IN Z BEFORE THE GATES, ASSIGNED A LANE AFTER --------------
+   *
+   * Same reason surge zones are: actionWindowAt reads the marks, spacingAt and
+   * solvable() read actionWindowAt, and the generator calls both on every gate.
+   * The ground has to exist before the road does.
+   *
+   * But a mat's LANE cannot be planned in z space, because the rules that make
+   * it fair are statements about gates -- a lift must be earned, a drag must
+   * leave an opening -- and no gate exists yet. So planning and assignment are
+   * split: planTempo draws the z ranges and the direction from the seed,
+   * assignTempo picks the lane once the gate table and the occupancy spans are
+   * built, and a mark that cannot be placed legally is DROPPED. Dropping is
+   * safe in the one direction that matters: the window was widened for a lift
+   * that then did not appear, which is spacing the course paid for and did not
+   * use.
+   *
+   * THE NUMBERS.
+   *
+   *   COUNT      10 to 14 marks planned a course.
+   *   LENGTH     46 to 88 units. At the base floor that is 1.6 to 3.0 real
+   *              seconds -- "briefly", and long enough that PACE_EASE (2.2 s/mi
+   *              per race-second, so 66 s/mi per REAL second) has settled the
+   *              new pace inside the first tenth of the mark.
+   *   WORTH      a lift over the median 67-unit mark is 67/240 * 7 = 1.95 race
+   *              seconds; a drag over the same is 5.86. Both are measured end
+   *              to end by tools/tempo.js rather than taken from this sum.
+   *   SEPARATION no two marks within TEMPO_GAP, and never within SURGE_SIGHT of
+   *              a surge zone, so no marking is ever read against another.
+   *   f RANGE    0.10 to 0.94, the same window narrowRate and the ramp use.
+   */
+  const TEMPO_LEN_MIN = 46, TEMPO_LEN_MAX = 88;
+  const TEMPO_N_MIN = 10, TEMPO_N_MAX = 14;
+  const TEMPO_F0 = 0.10, TEMPO_F1 = 0.94;
+  const TEMPO_GAP = 90;
+  // The share of marks that are BACKWARD. Under a half on purpose: the drag is
+  // the expensive half and the one that pushes the player out of a lane, and a
+  // road where most marks are punishments reads as a penalty box rather than as
+  // a set of choices.
+  const TEMPO_DRAG_SHARE = 0.45;
+  // How far short of the NEXT gate line a mat must stop. It is the telegraph
+  // mat's own run-up -- world.js lays 14 units of it on the road in front of
+  // every hazard -- so this is the distance at which tempo paint would start
+  // being read on top of gate paint. Derived from the art that exists, not
+  // chosen.
+  const TEMPO_TAIL = 14;
+
+  function planTempo(key, surges) {
+    if (!(TEMPO > 0) || !(MR.Pace.EFFORT > 0)) return [];
+    const rnd = MR.rng.stream(key, 'tempo/v1');
+    const total = K.TOTAL_UNITS;
+    const lo = TEMPO_F0 * total, hi = TEMPO_F1 * total;
+    const marks = [];
+    const want = rnd.int(TEMPO_N_MIN, TEMPO_N_MAX);
+    let guard = 0;
+    while (marks.length < want && guard++ < 900) {
+      const len = rnd.range(TEMPO_LEN_MIN, TEMPO_LEN_MAX);
+      const z0 = rnd.range(lo, hi - len);
+      const z1 = z0 + len;
+      let clash = false;
+      for (const m of marks) if (z1 + TEMPO_GAP > m.z0 && z0 - TEMPO_GAP < m.z1) { clash = true; break; }
+      // Never inside or beside a surge zone. Two reasons, and the second is the
+      // one that would have been found late: the surge entry marking has to be
+      // read from SURGE_SIGHT out and nothing may compete with it there; and a
+      // lift inside a zone would be a second lift on top of the surge, which
+      // Pace clamps away anyway but which should not be generated in the first
+      // place so that the clamp never has to be the thing protecting the proof.
+      if (!clash && surges) {
+        for (const s of surges) {
+          if (z1 + SURGE_SIGHT > s.z0 && z0 - SURGE_SIGHT < s.z1) { clash = true; break; }
+        }
+      }
+      if (clash) continue;
+      marks.push({ z0, z1, dir: rnd.chance(TEMPO_DRAG_SHARE) ? -1 : 1 });
+    }
+    marks.sort(function (a, b) { return a.z0 - b.z0; });
+    for (let i = 0; i < marks.length; i++) marks[i].n = i + 1;
+    return marks;
+  }
+
   /** The zone covering z, or null. Zones never overlap, so a scan is exact. */
   function zoneAt(surges, z) {
     if (!surges) return null;
@@ -379,7 +560,7 @@ MR.Course = (function () {
   // whole page with it. Derived on every call rather than cached, so a retune
   // of either cannot leave this stale.
   function surgeBody() {
-    return 2 * HAZARD_HALF_Z[K.BLOCK] * (1 + RAMP_SPAN_MAX * 0.9);
+    return 2 * HAZARD_HALF_Z[K.BLOCK] * (1 + rampSpanMax() * 0.9);
   }
 
   function zoneBody(surges, z) {
@@ -532,7 +713,7 @@ MR.Course = (function () {
         // face is. Matched on the gate line because a lane holds at most one
         // span starting there.
         let ride = null;
-        if (g.ramp === l && ramps) {
+        if ((g.ramp === l || g.ramp2 === l) && ramps) {
           for (const r of ramps) if (r.lane === l && r.z0 === g.z) { ride = r; break; }
         }
         lanes[l].push({ lane: l, z0: g.z, z1: g.z + 2 * halfZ * mult, gate: i, ride });
@@ -561,6 +742,142 @@ MR.Course = (function () {
     if (found < 0) return null;
     const s = list[found];
     return z < s.z1 ? s : null;
+  }
+
+  /** True when no vehicle stands anywhere in `lane` between z0 and z1. */
+  function laneFree(spans, lane, z0, z1) {
+    const list = spans[lane];
+    if (!list) return true;
+    for (let i = 0; i < list.length; i++) {
+      if (list[i].z1 > z0 && list[i].z0 < z1) return false;
+    }
+    return true;
+  }
+
+  /**
+   * ---- WHERE A TEMPO MAT MAY LIE, AND THE OPEN-LANE GUARANTEE ------------
+   *
+   * This is the whole of the fairness argument for the backward mat, and every
+   * clause of it is a condition that is CHECKED HERE at generation and CHECKED
+   * AGAIN in validate() on the finished course. Neither is a comment.
+   *
+   * BOTH DIRECTIONS OWE THE SAME TWO THINGS:
+   *
+   *   READABLE   no vehicle stands in the mat's own lane from readWindowAt
+   *              behind its near edge to its far edge. The paint is on the
+   *              road, so the only thing that can hide it is a solid in the
+   *              same lane -- and a full read window of clear sightline is the
+   *              same standard readWindowAt already holds every gate to. A
+   *              player who could not see which mat this is has been handed a
+   *              speed change outside their control, which is rule 4.
+   *   STANDABLE  the same clause does this for free: with no vehicle in the
+   *              lane over the mark, a runner who elects the lane can hold it.
+   *
+   * A FORWARD MAT MUST BE EARNED. At least one gate inside the mark demands a
+   * JUMP or a DUCK in the mat's own lane. Without that clause a lift is a free
+   * 2 seconds for running in a straight line, and the owner asked for more
+   * reward for NAVIGATING obstacles, not more reward for existing. A mark with
+   * no gate inside it, or none that asks anything of the marked lane, is
+   * dropped rather than placed free.
+   *
+   * A BACKWARD MAT MUST HAVE AN OPENING, AND THE OPENING IS CONSTRUCTED --
+   * this is the owner's own constraint and it is the reason the drag is the
+   * interesting half. Three clauses:
+   *
+   *   1. THE DRAGGED LANE IS CLEAR AT EVERY GATE INSIDE THE MARK. The drag is
+   *      the ONLY price of that lane. Laying it on top of a hurdle would charge
+   *      twice for one obstacle and give the player nothing to weigh.
+   *   2. SOME OTHER LANE IS OPEN FOR THE WHOLE MARK -- not BLOCK at any gate
+   *      inside it, and with no vehicle in it from LANE_TRANSIT before the near
+   *      edge (the ground two lane changes cover) to the far edge. So there is
+   *      always somewhere to go and always room to get there.
+   *   3. THAT LANE IS RESERVED. No later mark may drag it over the same
+   *      stretch. Without this the guarantee is order-dependent -- mark 7 could
+   *      quietly poison mark 4's escape -- and a guarantee that depends on the
+   *      order marks were placed in is not a guarantee.
+   *
+   * WHAT THE OPENING IS NOT PROMISED TO BE: empty. It may hold a JUMP or a
+   * DUCK, and that is the trade the mechanic exists to create -- eat five
+   * seconds in the slow lane, or pay one action to be in the fast one. It is
+   * the same bargain a one-lane closure already makes, and makeGate never
+   * allows a BLOCK to take the last open lane, so whatever stands in the
+   * opening is passable with the right action. tools/tempo.js reports what
+   * share of openings are CLEAR and what share demand an action, because that
+   * split is the mechanic and it should be a number rather than a hope.
+   */
+  function assignTempo(key, marks, gates, spans, elev, surges) {
+    if (!marks || !marks.length) return [];
+    const rnd = MR.rng.stream(key, 'tempo/lane/v1');
+    const out = [];
+    // Per lane: stretches already spoken for, either by a mat or reserved as
+    // some drag's guaranteed opening.
+    const taken = [[], [], []];
+    function busy(lane, z0, z1) {
+      for (const t of taken[lane]) if (t.z1 > z0 && t.z0 < z1) return true;
+      return false;
+    }
+    for (const m of marks) {
+      const read = readWindowAt(m.z0, elev, surges, marks);
+      // The gates the mark spans, and the gate that owns its far edge -- the
+      // mat must stop TEMPO_TAIL short of the next gate line so its paint never
+      // runs into that gate's telegraph run-up.
+      const inside = [];
+      let nextZ = K.TOTAL_UNITS;
+      for (let i = 0; i < gates.length; i++) {
+        if (gates[i].z >= m.z0 && gates[i].z < m.z1) inside.push(i);
+        else if (gates[i].z >= m.z1) { nextZ = gates[i].z; break; }
+      }
+      if (!inside.length) continue;            // nothing to earn, nothing to price
+      const z1 = Math.min(m.z1, nextZ - TEMPO_TAIL);
+      if (z1 - m.z0 < TEMPO_LEN_MIN * 0.5) continue;
+
+      const cands = [];
+      for (let l = 0; l < 3; l++) {
+        if (busy(l, m.z0, z1)) continue;
+        if (!laneFree(spans, l, m.z0 - read, z1)) continue;
+        let ok = true, earns = false;
+        for (const gi of inside) {
+          const h = gates[gi].lanes[l];
+          if (m.dir > 0) {
+            if (h === K.BLOCK) { ok = false; break; }
+            if (h === K.JUMP || h === K.DUCK) earns = true;
+          } else if (h !== K.CLEAR) { ok = false; break; }
+        }
+        if (!ok || (m.dir > 0 && !earns)) continue;
+        cands.push(l);
+      }
+      if (!cands.length) continue;
+      const lane = cands[Math.min(cands.length - 1, Math.floor(rnd.next() * cands.length))];
+
+      let open = -1;
+      if (m.dir < 0) {
+        const opens = [];
+        for (let l = 0; l < 3; l++) {
+          if (l === lane || busy(l, m.z0, z1)) continue;
+          if (!laneFree(spans, l, m.z0 - LANE_TRANSIT, z1)) continue;
+          let ok = true;
+          for (const gi of inside) if (gates[gi].lanes[l] === K.BLOCK) { ok = false; break; }
+          if (ok) opens.push(l);
+        }
+        if (!opens.length) continue;
+        // Prefer an opening that is CLEAR the whole way through, so the escape
+        // is free wherever the course can afford it, and fall back to one that
+        // costs an action. Ties break from the seeded stream.
+        let best = -Infinity;
+        for (const l of opens) {
+          let free = 1;
+          for (const gi of inside) if (gates[gi].lanes[l] !== K.CLEAR) { free = 0; break; }
+          const score = free * 2 + rnd.next();
+          if (score > best) { best = score; open = l; }
+        }
+        taken[open].push({ z0: m.z0, z1 });
+      }
+      const mat = { z0: m.z0, z1, dir: m.dir, lane, open, n: out.length + 1,
+                    gates: inside.slice() };
+      taken[lane].push({ z0: m.z0, z1 });
+      out.push(mat);
+    }
+    return out;
   }
 
   /**
@@ -599,6 +916,57 @@ MR.Course = (function () {
   const DECK_Y = 2.80;
   const RAMP_RUN = 6.0;
   const RAMP_SPAN_MIN = 8, RAMP_SPAN_MAX = 11;
+
+  /**
+   * ---- CONES ON THE DECK, AND WHY A CONE IS THE ONLY LEGAL ROOF HAZARD ----
+   *
+   * The owner: *"Only obstacle on the roof can be cones."* Taken as a hard
+   * constraint, and it is also the right one, for a reason worth writing down
+   * so nobody adds a second kind later.
+   *
+   * A DECK HAS NO SIDEWAYS. It is one lane wide and the runner is committed
+   * from the mouth to the dismount -- leaving sideways is a fall and costs the
+   * streak. A DUCK up there is a demand with no alternative, and a BLOCK is a
+   * wall with no alternative, which is not a decision at all and is arguably
+   * the rule 4 failure this project fails builds for. A cone is low, needs no
+   * overhead clearance, and asks for a jump the player can time. It is the only
+   * one of the three verbs that works on a surface with no escape.
+   *
+   * ---- THE DECK LAYOUT IS DERIVED, EVERY NUMBER OF IT --------------------
+   *
+   *   z0                      the gate line, the foot of the tailgate
+   *   z0 + RAMP_RUN           the top of the tailgate; deck at DECK_Y
+   *   + CONE_APPROACH         a FULL action window of flat deck before the cone
+   *   the cone                Collision.BOX[JUMP], resolved against the DECK
+   *   + CONE_LAND             the whole airborne span, so the arc finishes on
+   *                           the deck rather than in mid-air over the road
+   *   z1                      the far face; dismount
+   *
+   * CONE_APPROACH is actionWindowAt, not a chosen number: it is the same window
+   * every gate on the road owes the player, and the deck owes it too. The cone
+   * itself is visible long before the mount -- it stands at 2.80 to 3.60, above
+   * K.CAM_BASE_Y at 2.62, so no vehicle can occlude it and the read is made
+   * from the road. What the deck has to supply is the room to ACT.
+   *
+   * CONE_LAND is JUMP_TIME * MAX_SPEED, the airborne span, and it is the clause
+   * that stops the mechanic handing out free clears: a runner still airborne at
+   * the dismount arrives at the next road gate with `surface` above the DUCK
+   * bar and `y` above the JUMP block, which clears both for nothing. That is
+   * the exact exploit player.js's FALL_TIME note is about, one storey up.
+   *
+   * So a coned deck needs RAMP_RUN + ACTION_WINDOW + CONE_LAND = 46.84 units of
+   * depth, against 42.5 for the longest ramp the game ships. The span therefore
+   * goes to 13-16 (49.5 to 60.1 units) when a cone is on it, which is the honest
+   * cost of the mechanic and is charged to the course through reachOf exactly
+   * as every other vehicle length is.
+   */
+  const CONE_LAND = K.JUMP_TIME * MAX_SPEED;
+  const ROOF_SPAN_MIN = 13, ROOF_SPAN_MAX = 16;
+  // RAMP_SPAN_MAX is read by surgeBody(), which decides how far in front of a
+  // zone the marked lane is forced open. A longer rideable train means a longer
+  // body, and getting that from ONE place is what stops the two disagreeing.
+  // At ROOF = 0 it is the shipped 11 and the course is untouched.
+  function rampSpanMax() { return ROOF > 0 ? ROOF_SPAN_MAX : RAMP_SPAN_MAX; }
 
   const START_GRACE = 150;   // clean runway so the first seconds read calmly
   // Clean straight into the tape. It was 190 units -- 0.80 of a mile, about
@@ -735,7 +1103,7 @@ MR.Course = (function () {
     return Math.min(1, base * 0.86 + wall + home);
   }
 
-  function spacingAt(f, rnd, z, elev, lanes, train, surges) {
+  function spacingAt(f, rnd, z, elev, lanes, train, surges, tempo) {
     const d = difficulty(f);
     // 44 units early, tightening as difficulty rises. The floor is
     // ACTION_WINDOW itself rather than a number chosen to sit near it: the
@@ -792,11 +1160,18 @@ MR.Course = (function () {
     // that shipped (tools/mechanics.js --identity). At zero, `surges` is empty,
     // this returns `first`, and that is the old expression character for
     // character. The seeded draw is taken exactly once either way.
+    //
+    // A TEMPO MARK IS A STEP FOR EXACTLY THE SAME REASON A ZONE IS, so it goes
+    // through the same forward look and not through a wider pad. The look is
+    // taken when there are zones OR marks, and skipped when there are neither
+    // -- which is what keeps the expression character-for-character the old one
+    // at EFFORT = 0, where both lists are empty.
     const reach = reachOf(lanes, train);
-    const first = Math.max(readWindowAt(z, elev, surges) + reach,
+    const first = Math.max(readWindowAt(z, elev, surges, tempo) + reach,
                            mean * rnd.range(0.84, 1.16));
-    if (!surges || !surges.length) return first;
-    return Math.max(first, readWindowAt(z + first, elev, surges) + reach);
+    const stepped = (surges && surges.length) || (tempo && tempo.length);
+    if (!stepped) return first;
+    return Math.max(first, readWindowAt(z + first, elev, surges, tempo) + reach);
   }
 
   /** Hazard mix widens as difficulty rises. */
@@ -1157,7 +1532,14 @@ MR.Course = (function () {
         // The middle of the FLAT roof, never on the tailgate: an item on the
         // slope would be collected on the way up whatever the player decided,
         // which is not a trade.
-        const flat0 = r.z0 + r.run;
+        //
+        // ...and BEHIND THE CONE when the deck carries one, which is the road
+        // placement rule one storey up: the bottle stands behind the obstacle,
+        // in that obstacle's lane, and declining is free because the road and
+        // the paired deck are both right there. Midway between the far face of
+        // the cone's own box and the dismount, so it is never inside the cone
+        // and never hanging off the lip.
+        const flat0 = r.cone ? r.cone + 2 * HAZARD_HALF_Z[K.JUMP] : r.z0 + r.run;
         const z = flat0 + (r.z1 - flat0) * 0.5;
         const fruit = rr.chance(0.55);
         // `y` IS THE INTERFACE TO THE ART, and it is carried on the item rather
@@ -1251,7 +1633,33 @@ MR.Course = (function () {
       // can carry a point forward by up to AID_WALK gates, and pacing the next
       // one off where this one was WANTED rather than where it LANDED would let
       // two items stack up behind a single dense stretch.
-      const spacing = 620 - 400 * (z / K.TOTAL_UNITS);
+      // ---- MORE AID, AND FRONT-LOADED RATHER THAN JUST DENSER --------------
+      //
+      // The owner asked for "a few more waters and bananas", and separately for
+      // the opening to stop being boring. THE SAME CURVE ANSWERS BOTH, and the
+      // second reason is the stronger one.
+      //
+      // Under EFFORT the pool is the whole strategic layer -- guard and surge
+      // are its only two exits and aid is its only source -- so a runner with
+      // an empty pool has nothing to decide and nothing to spend. Measured on
+      // the shipped curve, the FIRST item lands at z = 420 +- and the second
+      // near 1000, so the first segment arrives around mile 1.7 and the second
+      // near mile 4. The stretch docs/staleness-and-mats.md measured as the
+      // boredom trough -- miles 3 to 7 -- is exactly the stretch where the
+      // player is carrying one segment and has never had a choice about it.
+      //
+      // 620 - 400f was steeply back-loaded on the argument that a run is rarely
+      // broken in the first mile, and that argument was written when aid was a
+      // STREAK REBATE. It repaired damage, so it belonged where the damage was.
+      // It is a POOL now. A pool is worth having before you need it, because
+      // having it is what makes the guard-or-surge question exist at all.
+      //
+      // 520 - 300f keeps the same shape -- sparser early than late -- and lifts
+      // the whole curve: ~15.9 road items against 13.7, the "few more" that was
+      // asked for, and the opening 3 miles go from 1.2 items to 2.2. The back
+      // half is barely touched (220 -> 232 at the tape), so the rescue argument
+      // the old curve was built on is intact.
+      const spacing = 520 - 300 * (z / K.TOTAL_UNITS);
       z += spacing * rnd.range(0.82, 1.18);
     }
     items.sort(function (p, q) { return p.z - q.z; });
@@ -1305,6 +1713,12 @@ MR.Course = (function () {
     // planSurge returns an empty list without drawing a number) the course
     // stream stays in phase and every gate is bit-identical.
     const surges = planSurge(key);
+    // ...and the tempo marks in the same breath and for the same reason: a LIFT
+    // mark widens the action window over its own stretch, spacingAt and
+    // solvable() both read that window, and both are called on every gate. Only
+    // the Z RANGES and the DIRECTIONS are decided here; the LANE is assigned
+    // once gates and occupancy exist. See planTempo and assignTempo.
+    const tempoPlan = planTempo(key, surges);
 
     const rnd = MR.rng.stream(key, 'course/v1');
     const gates = [];
@@ -1391,7 +1805,7 @@ MR.Course = (function () {
 
           tally.attempts++;
           const trial = gates.concat([{ z, lanes: cand, f }]);
-          if (solvable(trial, elevation, surges)) { lanes = cand; break; }
+          if (solvable(trial, elevation, surges, tempoPlan)) { lanes = cand; break; }
         }
         if (!closed) break;   // pass 0 had no closure to drop, so pass 1 is moot
       }
@@ -1410,6 +1824,8 @@ MR.Course = (function () {
 
       let span = maybeTrain(rnd, f, lanes);
       let rampLane = -1;
+      let ramp2Lane = -1;
+      let coneAt = 0;
       if (span) {
         for (let l = 0; l < 3; l++) {
           if (lanes[l] === K.BLOCK && trainUntil[l] <= idx) {
@@ -1453,6 +1869,48 @@ MR.Course = (function () {
                   && rnd.chance(0.34 * RAMP)) {
                 span = rnd.int(RAMP_SPAN_MIN, RAMP_SPAN_MAX);
                 rampLane = l;
+                // ---- A CONE ON THE DECK ------------------------------------
+                //
+                // The vehicle grows to carry it, because the layout above is
+                // derived and does not fit inside 42.5 units. Rolled BEFORE the
+                // pair below so both vehicles of a pair are the same length --
+                // gate.train is one number and buildSpans applies it to every
+                // BLOCK lane in the gate, so two paired decks abut laterally
+                // over their whole run by construction rather than by care.
+                if (ROOF > 0 && rnd.chance(0.55)) {
+                  span = rnd.int(ROOF_SPAN_MIN, ROOF_SPAN_MAX);
+                  const depth = 2 * HAZARD_HALF_Z[K.BLOCK] * (1 + span * 0.9);
+                  const cz = z + RAMP_RUN + actionWindowAt(z, elevation, surges, tempoPlan);
+                  // The arc has to finish on the deck. If it does not, there is
+                  // no cone -- never a cone with a short landing, because a
+                  // runner still airborne at the dismount clears the next road
+                  // gate for nothing whatever kind it is.
+                  if (cz + CONE_LAND <= z + depth) coneAt = cz;
+                }
+                // ---- TWO DECKS SIDE BY SIDE --------------------------------
+                //
+                // The owner: *"You can add two vehicles with ramps together so
+                // they can cross on them."* Adjacent lanes rather than in
+                // series, and that is a measurement rather than a preference --
+                // see the note on ROOF above the flag.
+                //
+                // It adds NO new lane state and no new spacing: both vehicles
+                // are BLOCK lanes this gate already had, both carry the same
+                // train span, so reachOf is unchanged and solvable() sees the
+                // gate it already proved. What is new is only that the second
+                // roof can be stood on.
+                if (ROOF > 0 && rnd.chance(0.42)) {
+                  for (let l2 = 0; l2 < 3; l2++) {
+                    if (l2 === l || lanes[l2] !== K.BLOCK || trainUntil[l2] > idx) continue;
+                    // Never the only way through: some third lane must still be
+                    // passable at this gate. makeGate's all-BLOCK guard already
+                    // guarantees it, and this says so rather than trusting it.
+                    const rest = [0, 1, 2].filter((x) => x !== l && x !== l2);
+                    if (!rest.some((o) => lanes[o] !== K.BLOCK)) continue;
+                    ramp2Lane = l2;
+                    break;
+                  }
+                }
               }
               // ---- SPAN MEANS TWO DIFFERENT THINGS, AND A RAMP SPLITS THEM --
               //
@@ -1487,8 +1945,10 @@ MR.Course = (function () {
       if (narrowClosed) gate.narrow = narrowClosed.slice();
       if (rampLane >= 0) {
         gate.ramp = rampLane;
-        ramps.push({
-          lane: rampLane,
+        if (ramp2Lane >= 0) gate.ramp2 = ramp2Lane;
+        const rideLanes = ramp2Lane >= 0 ? [rampLane, ramp2Lane] : [rampLane];
+        for (const rl of rideLanes) ramps.push({
+          lane: rl,
           z0: z,
           // The far face of the train, from the SAME expression reachOf and
           // world.js's gateBoxes use. Written once here rather than restated,
@@ -1497,6 +1957,13 @@ MR.Course = (function () {
           z1: z + 2 * HAZARD_HALF_Z[K.BLOCK] * (1 + span * 0.9),
           run: RAMP_RUN,
           deck: DECK_Y,
+          // The cone stands on the PRIMARY deck only. That is the whole of what
+          // makes a pair a decision rather than a corridor: one roof asks for a
+          // jump, the other does not, and the crossing between them is free and
+          // level because both decks are DECK_Y. A pair with a cone on each
+          // would be two corridors side by side.
+          cone: rl === rampLane ? coneAt : 0,
+          pairs: ramp2Lane >= 0,
         });
       }
       gates.push(gate);
@@ -1504,7 +1971,7 @@ MR.Course = (function () {
       // by the geometry of THAT gate: which kinds it actually stands in the road
       // decides how deep its deepest lane is, and a train's rear face is a long
       // way further forward than its gate line says.
-      z += spacingAt(f, rnd, z, elevation, lanes, span, surges);
+      z += spacingAt(f, rnd, z, elevation, lanes, span, surges, tempoPlan);
     }
 
     const mileMarkers = [];
@@ -1513,8 +1980,13 @@ MR.Course = (function () {
 
     const aid = generateAid(key, gates, ramps);
     const spans = buildSpans(gates, ramps);
+    // The lane, last, because every rule that makes a mat fair is a statement
+    // about gates and about where the vehicles ended up.
+    const tempo = assignTempo(key, tempoPlan, gates, spans, elevation, surges);
+    const tempoLanes = [[], [], []];
+    for (const m of tempo) tempoLanes[m.lane].push(m);
     const course = { key, gates, aid, mileMarkers, biomes: BIOMES, length: K.TOTAL_UNITS,
-                     elevation, ramps, spans, surges, tally };
+                     elevation, ramps, spans, surges, tempo, tempoPlan, tally };
 
     /**
      * The zone the runner is in, or null. Read by the renderer to lay the
@@ -1550,6 +2022,31 @@ MR.Course = (function () {
      * lorry, and the game used to guard neither past its gate line.
      */
     course.occupiedAt = function (z, lane) { return spanAt(spans, z, lane); };
+
+    /**
+     * The tempo mat under (z, lane), or null.
+     *
+     * Mats never overlap within a lane -- assignTempo's `taken` list is what
+     * makes that true -- so the same binary search occupancy uses is exact
+     * here. Read by player.resolveTempo every frame, by the renderer to lay the
+     * paint, and by the HUD to name what the runner is standing on.
+     */
+    course.tempoAt = function (z, lane) { return spanAt(tempoLanes, z, lane); };
+
+    /**
+     * The next mat ahead of z in ANY lane, or null. What the HUD announces, in
+     * the same shape the surge nag already uses -- the player is owed a warning
+     * that a lane is about to become slow, and the paint is the primary channel
+     * for that but not the only one.
+     */
+    course.tempoAhead = function (z, look) {
+      let best = null;
+      for (const m of tempo) {
+        if (m.z0 <= z || m.z0 > z + look) continue;
+        if (!best || m.z0 < best.z0) best = m;
+      }
+      return best;
+    };
 
     /**
      * The height of the running surface at (z, lane): 0 on the road, DECK_Y on
@@ -1610,7 +2107,7 @@ MR.Course = (function () {
    * conflicts are rejected: two gates closer than ACTION_WINDOW may not demand
    * a jump and a duck back to back on the chosen path.
    */
-  function solvable(gates, elev, surges) {
+  function solvable(gates, elev, surges, tempo) {
     if (!gates.length) return true;
     // state: set of (lane, lastAction, lastActionZ) -- collapse by lane+action.
     let states = [];
@@ -1630,10 +2127,10 @@ MR.Course = (function () {
           // already looked one airborne reach forward from there when it built
           // the table. See actionWindowAt.
           if (h !== K.CLEAR && s.act !== K.CLEAR && h !== s.act
-            && g.z - s.z < actionWindowAt(s.z, elev, surges)) continue;
+            && g.z - s.z < actionWindowAt(s.z, elev, surges, tempo)) continue;
           const act = h === K.CLEAR ? s.act : h;
           const az = h === K.CLEAR ? s.z : g.z;
-          const tag = l + ':' + act + ':' + (g.z - az < actionWindowAt(az, elev, surges) ? 1 : 0);
+          const tag = l + ':' + act + ':' + (g.z - az < actionWindowAt(az, elev, surges, tempo) ? 1 : 0);
           if (seen.has(tag)) continue;
           seen.add(tag);
           next.push({ lane: l, act, z: az });
@@ -1650,6 +2147,12 @@ MR.Course = (function () {
     const g = course.gates;
     const elev = course.elevation;
     const surges = course.surges;
+    // The PLAN, not the placed mats: the window was widened for every planned
+    // lift, whether or not a lane could be found for it, so the spacing floor
+    // this loop re-proves has to be evaluated against the same list spacingAt
+    // used. Checking against the placed list would look for a floor the
+    // generator never claimed and fail on every dropped mark.
+    const tempoPlan = course.tempoPlan;
     for (let i = 0; i < g.length; i++) {
       if (g[i].lanes.every((l) => l === K.BLOCK)) errors.push(`gate ${i}: all lanes blocked`);
       if (i > 0 && g[i].z <= g[i - 1].z) errors.push(`gate ${i}: not ordered in z`);
@@ -1666,7 +2169,7 @@ MR.Course = (function () {
       // The epsilon is float slop only -- spacingAt returns this quantity
       // exactly when the floor binds, which late in a course is most gates.
       if (i > 0) {
-        const need = readWindowAt(g[i - 1].z, elev, surges) + reachOf(g[i - 1].lanes, g[i - 1].train);
+        const need = readWindowAt(g[i - 1].z, elev, surges, tempoPlan) + reachOf(g[i - 1].lanes, g[i - 1].train);
         if (g[i].z - g[i - 1].z < need - 1e-9) {
           errors.push(`gate ${i}: ${(g[i].z - g[i - 1].z).toFixed(2)} behind gate ${i - 1} `
             + `needs ${need.toFixed(2)} to stay readable past it`);
@@ -1744,7 +2247,95 @@ MR.Course = (function () {
         }
       }
     }
-    if (!solvable(g, elev, surges)) errors.push('course has no solvable lane path');
+    // ---- THE TEMPO CONTRACT, PROVED RATHER THAN COMMENTED -----------------
+    //
+    // Five claims are made in prose above assignTempo. Every one of them is
+    // re-derived here from the FINISHED course, so course-test at 365 days and
+    // calendar at 32 re-prove them on every run. The generator makes them true;
+    // this refuses to ship a course where they are not.
+    //
+    //   1. READABLE. No vehicle in the mat's own lane from readWindowAt behind
+    //      its near edge to its far edge. This is the rule 4 clause: a speed
+    //      change the player could not see coming is a run taken for something
+    //      outside their control.
+    //   2. THE MAT ENDS BEFORE THE NEXT GATE'S TELEGRAPH RUN-UP.
+    //   3. A FORWARD MAT IS EARNED -- some gate inside it demands an action of
+    //      the marked lane.
+    //   4. A BACKWARD MAT HAS AN OPENING -- a named other lane, not BLOCK at any
+    //      gate inside the mark, with no vehicle in it from LANE_TRANSIT before
+    //      the near edge, and the dragged lane itself CLEAR throughout so the
+    //      drag is the only price.
+    //   5. NO TWO MATS SHARE A LANE OVER THE SAME GROUND, and no drag's opening
+    //      is dragged by another mat. Without 5 the guarantee in 4 would depend
+    //      on the order the marks were placed in.
+    const mats = course.tempo;
+    if (mats && mats.length) {
+      const spans = course.spans;
+      for (const m of mats) {
+        const read = readWindowAt(m.z0, elev, surges, tempoPlan);
+        if (spans && !laneFree(spans, m.lane, m.z0 - read, m.z1)) {
+          errors.push(`tempo ${m.n}: a vehicle stands in lane ${m.lane} inside the `
+            + `${read.toFixed(1)}u read window of its own paint`);
+        }
+        let earns = false, dirty = false;
+        for (let i = 0; i < g.length; i++) {
+          if (g[i].z < m.z0 || g[i].z >= m.z1) continue;
+          const h = g[i].lanes[m.lane];
+          if (h === K.JUMP || h === K.DUCK) earns = true;
+          if (h !== K.CLEAR) dirty = true;
+          if (h === K.BLOCK) errors.push(`tempo ${m.n}: gate ${i} blocks its own lane ${m.lane}`);
+          if (m.dir < 0 && m.open >= 0 && g[i].lanes[m.open] === K.BLOCK) {
+            errors.push(`tempo ${m.n}: gate ${i} blocks the opening lane ${m.open}`);
+          }
+        }
+        for (let i = 0; i < g.length; i++) {
+          if (g[i].z >= m.z1 && g[i].z < m.z1 + TEMPO_TAIL - 1e-9) {
+            errors.push(`tempo ${m.n}: ends ${(g[i].z - m.z1).toFixed(1)}u short of gate ${i}, `
+              + `inside its ${TEMPO_TAIL}u telegraph run-up`);
+          }
+        }
+        if (m.dir > 0 && !earns) errors.push(`tempo ${m.n}: a forward mat nothing has to be cleared for`);
+        if (m.dir < 0) {
+          if (m.open < 0 || m.open === m.lane) {
+            errors.push(`tempo ${m.n}: a backward mat with no opening`);
+          } else if (spans && !laneFree(spans, m.open, m.z0 - LANE_TRANSIT, m.z1)) {
+            errors.push(`tempo ${m.n}: a vehicle stands in its opening lane ${m.open}`);
+          }
+          if (dirty) errors.push(`tempo ${m.n}: a backward mat on a lane that already costs an action`);
+        }
+        for (const o of mats) {
+          if (o === m || o.z1 <= m.z0 || o.z0 >= m.z1) continue;
+          if (o.lane === m.lane) {
+            errors.push(`tempo ${m.n}: shares lane ${m.lane} with tempo ${o.n} over the same ground`);
+          }
+          if (m.dir < 0 && o.lane === m.open) {
+            errors.push(`tempo ${m.n}: tempo ${o.n} sits in its opening lane ${m.open}`);
+          }
+        }
+      }
+    }
+    // ---- AND THE ROOF CONTRACT, THE SAME WAY ------------------------------
+    //
+    // A cone is the one hazard in this game with no lane to dodge into, so the
+    // deck owes it the two things a road gate owes a hazard: a full action
+    // window to answer it in, and somewhere to land. Both are geometry, and
+    // both are checked here rather than trusted to the generator that made
+    // them.
+    if (course.ramps) {
+      for (const r of course.ramps) {
+        if (!r.cone) continue;
+        const need = r.z0 + r.run + actionWindowAt(r.z0, elev, surges, tempoPlan);
+        if (r.cone < need - 1e-9) {
+          errors.push(`ramp at ${r.z0.toFixed(0)}: cone ${(need - r.cone).toFixed(2)}u inside `
+            + 'the action window past the top of its tailgate');
+        }
+        if (r.cone + CONE_LAND > r.z1 + 1e-9) {
+          errors.push(`ramp at ${r.z0.toFixed(0)}: a jump over its cone lands `
+            + `${(r.cone + CONE_LAND - r.z1).toFixed(2)}u past the far face`);
+        }
+      }
+    }
+    if (!solvable(g, elev, surges, tempoPlan)) errors.push('course has no solvable lane path');
     // The sightline sweep. A profile that hides the road beyond a crest hides
     // the lane telegraph mats with it, which is the same class of failure
     // tools/shoot.js fails a build for when a prop occludes a hazard -- so it
@@ -1768,6 +2359,13 @@ MR.Course = (function () {
            // read the numbers from the file that enforces them rather than
            // restating them. SURGE_SIGHT is the one the art has to build to.
            SURGE_SIGHT, SURGE_LEN_MIN, SURGE_LEN_MAX, planSurge, windowExtraAt,
+           // The tempo contract, exported for the same reason: the renderer has
+           // to know how long a mat is and which way it points, and the tools
+           // have to read the lift out of the file that enforces it.
+           TEMPO_LEN_MIN, TEMPO_LEN_MAX, TEMPO_TAIL, planTempo, liftAt,
+           // The roof contract. CONE_LAND is the one the art has to respect:
+           // nothing may stand on a deck inside it.
+           CONE_LAND, ROOF_SPAN_MIN, ROOF_SPAN_MAX, rampSpanMax,
            elevationPlan };
 
   // Accessors rather than plain fields, so a nonsense value cannot be written
@@ -1779,6 +2377,14 @@ MR.Course = (function () {
   Object.defineProperty(api, 'RAMP', {
     get: function () { return RAMP; },
     set: function (v) { const n = parseFloat(v); if (isFinite(n)) RAMP = Math.max(0, Math.min(1, n)); },
+  });
+  Object.defineProperty(api, 'TEMPO', {
+    get: function () { return TEMPO; },
+    set: function (v) { const n = parseFloat(v); if (isFinite(n)) TEMPO = Math.max(0, Math.min(1, n)); },
+  });
+  Object.defineProperty(api, 'ROOF', {
+    get: function () { return ROOF; },
+    set: function (v) { const n = parseFloat(v); if (isFinite(n)) ROOF = Math.max(0, Math.min(1, n)); },
   });
 
   return api;

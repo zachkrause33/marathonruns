@@ -72,6 +72,14 @@ MR.Player = (function () {
       // the same reason `ramp` is: leaving one zone and entering another is two
       // events, and a boolean cannot tell the second from the first.
       surge: null,
+      // The tempo mat being run, or null. THE MAT OBJECT for the reason `ramp`
+      // and `surge` are objects: leaving one mat and entering another is two
+      // events, and a boolean cannot tell the second from the first.
+      mat: null,
+      // Cones already answered, by ramp. A cone is resolved off a z crossing
+      // like a gate, and without a latch a frame-rate spike would charge one
+      // cone twice -- the exact defect `resolved` was added to resolveGates for.
+      coned: null,
       gateIdx: 0,
       aidIdx: 0,
       lastResult: null,  // 'clean' | 'hit'
@@ -94,7 +102,7 @@ MR.Player = (function () {
       s.airT = 0; s.airborne = false; s.duckT = 0; s.ducking = false;
       s.duck01 = 0; s.lean = 0; s.stumble = 0; s.bounce = 0; s.tripT = 0;
       s.surface = 0; s.ramp = null; s.falling = 0; s.fallFrom = 0; s.flanked = null;
-      s.surge = null;
+      s.surge = null; s.mat = null; s.coned = null;
       s.gateIdx = 0; s.aidIdx = 0;
       s.lastResult = null; s.lastGate = null; s.events.length = 0;
     };
@@ -242,6 +250,40 @@ MR.Player = (function () {
      *
      * @returns null, or { hit, z, why } when contact was made
      */
+    /**
+     * ---- THE CONE, WHICH IS THE ONLY HAZARD A DECK MAY CARRY -------------
+     *
+     * Resolved off a z crossing, exactly as a gate is, and for the same reason:
+     * clearance is a question about player state at ONE plane, and asking it on
+     * every frame the cone is nearby would charge one cone several times over.
+     * `coned` latches the RAMP rather than a boolean, so crossing to the paired
+     * deck and back cannot re-arm the one that has already been answered.
+     *
+     * Clearance is `Collision.clearsOn(JUMP, st, deck)`: the same threshold the
+     * road uses, measured from the floor the cone is standing on. On a deck the
+     * runner's surface and the cone's floor are both Course.DECK_Y, so it is
+     * exactly `y >= JUMP_CLEAR_Y` -- the same jump, 2.80 units up.
+     *
+     * IT TRIPS, IT DOES NOT BOUNCE. A BLOCK throws the runner out of its lane
+     * because there is a lane to be thrown into; on a deck one lane wide there
+     * is nothing beside you but a two-and-a-half unit drop, and a knock that
+     * pushed the player off the roof would turn one contact into a contact plus
+     * a fall. So it is the kerb-and-bar path: you keep your lane, you keep
+     * going, and the cost is the streak and the seconds.
+     */
+    function cone(unitsBefore, unitsNow) {
+      const r = s.ramp;
+      if (!r || !r.cone || s.coned === r) return null;
+      if (unitsNow < r.cone || unitsBefore >= r.cone) return null;
+      s.coned = r;
+      if (C.clearsOn(K.JUMP, s, r.deck)) return null;
+      s.tripT = 1;
+      s.stumble = 0.75;
+      s.events.push('trip');
+      s.events.push('hit');
+      return { hit: true, z: unitsNow, why: 'clipped a cone on the roof' };
+    }
+
     s.resolveDeck = function (course, unitsBefore, unitsNow) {
       if (!course || !course.occupiedAt) return null;
       const span = course.occupiedAt(unitsNow, s.lane);
@@ -257,7 +299,34 @@ MR.Player = (function () {
         if (span && span.ride === s.ramp) {
           s.surface = course.deckAt(unitsNow, s.lane);
           s.falling = 0;
-          return null;
+          return s.ramp.cone ? cone(unitsBefore, unitsNow) : null;
+        }
+        // ---- ACROSS, RATHER THAN OFF -------------------------------------
+        //
+        // Two rideable vehicles in ADJACENT LANES at the same gate. Both carry
+        // the gate's one train span -- buildSpans applies it to every BLOCK lane
+        // in the gate -- so the two decks are the same length and both sit at
+        // Course.DECK_Y, and a crossing between them is level by construction
+        // rather than by care. There is no height term here at all and there
+        // must not be one: the moment a crossing needs to reason about a
+        // difference in deck height, two vehicles have stopped being one
+        // surface and the art has started deciding clearance.
+        //
+        // The tailgate is the one place it is not level, and the test is the
+        // same `run` the mount uses. Both ramps share a z0, so a runner past
+        // their own slope is past the other's -- this is written against the
+        // DESTINATION anyway, so a future pair with staggered mouths cannot
+        // sneak a step-up through it.
+        //
+        // A lane change at altitude is the only place in this game where the
+        // swipe the player already knows does something it can do nowhere else,
+        // which is the whole reason the pair is worth building.
+        if (span && span.ride && span.ride !== s.ramp && s.falling <= 0
+            && unitsNow >= span.ride.z0 + span.ride.run) {
+          s.ramp = span.ride;
+          s.surface = course.deckAt(unitsNow, s.lane);
+          s.events.push('cross');
+          return span.ride.cone ? cone(unitsBefore, unitsNow) : null;
         }
         // Off it. The two ways off are not the same event and must not read as
         // the same event: running off the front is a dismount the mechanic is
@@ -570,6 +639,35 @@ MR.Player = (function () {
       }
       s.surge = want;
       return want;
+    };
+
+    /**
+     * Which tempo mat the runner is standing on, or null.
+     *
+     * ---- THE SAME INPUT AS THE SURGE, WHICH IS TO SAY NONE ----------------
+     *
+     * A mat is elected by being in its lane, exactly as a surge zone is. There
+     * is no button and no new verb, and that is not economy -- every control in
+     * this game is a swipe anywhere on the canvas, so a button sits where a
+     * mis-started swipe lands. What separates a mat from a zone is that a mat
+     * costs nothing to run on: the pool is not touched, no fuel is checked, and
+     * the only thing being spent is the lane.
+     *
+     * NEVER FROM A ROOF. The paint is on the road, and a runner on a deck is
+     * two and a half units above it. course.js will not lay a mat where a
+     * vehicle stands -- laneFree over the read window is one of the conditions
+     * validate() proves -- so this is belt and braces, and it is the same guard
+     * resolveSurge makes for the same reason.
+     */
+    s.resolveTempo = function (course, unitsNow) {
+      const m = course && course.tempoAt && !s.onDeck
+        ? course.tempoAt(unitsNow, s.lane) : null;
+      if (m !== s.mat) {
+        if (m) s.events.push(m.dir > 0 ? 'lift' : 'drag');
+        else s.events.push('tempoOut');
+      }
+      s.mat = m;
+      return m;
     };
 
     s.drainEvents = function () {

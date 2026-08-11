@@ -3727,3 +3727,123 @@ nobody measured is worse than no number at all.**
     buried: the record now survives 1 / 2 / 3 mistakes where it survived
     1 / 3 / 4, on the same 17 aid items.** More obstacles is a less forgiving
     race, and that is the trade the request contains.
+
+59. **Two instruments were wrong, in opposite directions, and both were wrong
+    about the same thing: an axis-aligned box is not an object, and two frames
+    taken at different times are not the same scene.**
+
+    `tools/motion.js` failed `READBAND` on a tree at HEAD, and the failure was
+    the tool's. Its screen rect came from a world AABB, projected corner by
+    corner, with any corner behind the lens **dropped rather than clipped**.
+    That is two defects sharing one routine and they push opposite ways.
+
+    **Dropping a corner runs the arithmetic away.** A box straddling the near
+    plane keeps only the corners in front of it, and those sit a hair from the
+    plane where `ndc = x / (near * tanHalf * aspect)` has no bound. The recorded
+    symptom, **ndc x [-97.66, -0.13]**, is that division and nothing else -- a
+    point at the edge of the lens reported as a wall across the frame,
+    overlapping every gate in the read window. It also errs the FLATTERING way
+    in the other axis, because the box's true near-plane cross-section is never
+    represented at all and can reach further than any surviving corner.
+
+    **And the box was never the object.** `Box3.applyMatrix4` re-bounds a
+    rotated local box, the claim site yaws every tree at random, and the wave
+    envelope grows it again in three axes. `reallyInCorridor` already says all
+    of this and already pays for the exact test -- CORRIDOR convicts on
+    vertices -- but READBAND was still convicting on the inflated box. Measured
+    at skip 60: a tree reported ndc x **[-0.71, -0.09]** and clipped a BLOCK
+    gate whose entire rect is **[-0.10, -0.02]**, on a **0.01-wide sliver of
+    pure inflation.** A false failure is not harmless over-strictness; an
+    assertion that cries wolf on correct geometry is one somebody switches off.
+
+    `boxRect` now clips the twelve edges against `cam.near` -- read off the
+    camera, not the -0.1 that was guessed -- and `meshRect` convicts on the
+    geometry, triangle by triangle, each swept by its own per-vertex envelope.
+    **The box proposes, the geometry convicts**, which is the discipline the
+    file already applied one assertion over.
+
+    **What makes the remaining green trustworthy is that both halves are tested
+    on every run, because neither is exercised by a passing course.** A gate in
+    the read window is 25 to 90 units out, so none of its corners is clipped and
+    its answer is known: `boxRect` must reproduce the plain projection, and it
+    does, to **2.8e-17**. `meshRect` is called once per skip on the widest mover
+    in frame whether or not anything proposed -- `prop / grove` box ndc x
+    **[-1308.95, -5.46]** against geometry **[-1188.63, -10.98]**, 1.77x tighter
+    by area, with the -1309 showing the near-plane case being clipped correctly
+    rather than dropped. Without those two, a `meshRect` that returned a speck
+    would clear every future proposal and print precisely what a clean run
+    prints.
+
+    **The blind-read harness had the mirror-image defect: it was measuring the
+    weather.** `tools/blindread.js` proves each panel contains the telegraph mat
+    by rendering the frame twice, once with the mat and once without, and
+    counting pixels that differ. Its first version did not stop the clock. This
+    game animates from `performance.now()` inside `onBeforeRender`, so wind,
+    crowd and sky all moved between the two renders: it reported **38,594
+    differing pixels** on a DUCK panel with a difference bounding box of the
+    **entire frame**, which is not a 1.95-unit strip of paint. That is the
+    flattering direction -- animation noise inside the crop counts as mat
+    pixels, and a panel with no mat in it passes. `tools/motion.js` had paid for
+    this exact lesson in its own header and the new file did not read it closely
+    enough.
+
+    **With the clock stopped the control immediately found two more things, one
+    its own and one the game's.** Its own: the crop was squared up and capped at
+    the SHORT side of the viewport, so a BLOCK at 8 units -- 2.80 tall with six
+    units of mat run-up -- was cut to 390 px and lost the mat. MATCHECK failed 2
+    of 4 panels on the first run, which is the defect the harness exists to fix
+    reappearing inside the harness, caught by the control instead of by a
+    reader.
+
+    The game's, and it is the one worth acting on: **at 25 units on sloped
+    ground the telegraph mat is not drawn at all.** The mat is one rigid
+    16-unit plane lifted **0.012** above the road and pitched by the tangent
+    **at the gate**; the road follows a curved profile that climbs away from
+    that tangent behind it. At slope 0.0065 the lift is spent by 6 to 9 units
+    back and the run-up ends **0.045 below the tarmac.** Measured across
+    stretches: flat ones (skips 60, 200) carry the mat at 25 units over 17% of
+    the crop, sloped ones (skips 25 and 150, slopes -0.0117 and 0.0023) draw
+    **zero mat pixels anywhere in the frame**, and the live gates in that shot
+    stand on slope 0.01035. This is the primary WHAT TO DO channel going
+    missing at exactly READ_NEAR, the distance the lane is chosen at. It lives
+    in `src/render/world.js` and was not touched here.
+
+    So the harness now reports three states rather than one, because they are
+    three different facts: `ok`, `MATCROP` (the mat was drawn and this tool
+    cropped it out -- the harness's fault, and it fails the run), and `MATLOST`
+    (the game drew no mat anywhere -- a finding, printed with the slope and the
+    submersion depth, and not to be filed as a tool bug).
+
+    **The other two defects in the blind read were about what the reader knows
+    before they look.** The panels came from `api.variantObject`, which is
+    `assembleVariant` -- body, caution face, one moving part -- and the road
+    gets a POOLED group, which adds the mat. So the test that asks "must a
+    runner go over, under or around it" was answering with the art **minus the
+    channel world.js built to carry that exact answer**; at least one recorded
+    conclusion about over-versus-under was partly an artefact of it. The tool
+    now borrows a live pooled hazard off the road, identifies its kind by the
+    variant offset against `MR.Collision.BOX` `halfZ`, and rewrites every field
+    the claim site rewrites. **What that cost:** a dependency on the claim
+    site's contract rather than on a constructor -- variant visibility, the
+    rideable tail, the caution board and a BLOCK's body scale are duplicated
+    here and will go stale if that site grows a field -- and it can only
+    photograph kinds currently cast, since `Pool.release` takes an object out of
+    the scene graph. It got one thing back for free: every variant is built and
+    parented at pool construction, so all 23 are reachable on any borrowed
+    group.
+
+    And **readers inside this repository are handed `CLAUDE.md` before they see
+    a pixel** -- obstacle, hazard, barrier, sign, marshal, runner, ghost, chase
+    camera, and the fact that this is a running game. No tool can stop that, so
+    the header states the line instead. **It does not invalidate a failure to
+    read**: a reader given the word "marshal" who still writes "I cannot tell
+    what kind of person it is" has failed with the answer in front of them,
+    which is a strictly harder test, and every negative finding this method has
+    produced is of that shape. **It does invalidate a naming success that uses a
+    word the file supplied** -- "a barrier", "a vehicle" -- while a specific
+    noun the file never contained cannot be got from a general one and still
+    counts. It leaves over/under/around alone, except that the reader knows the
+    three answers are the three answers, so score it as a forced choice with a
+    33% floor rather than zero. Panels are written outside the repository under
+    random hex names with the key in a separate directory, because a previous
+    reader named `aid.png` as the reason the word "cup" came to mind.

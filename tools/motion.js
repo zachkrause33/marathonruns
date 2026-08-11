@@ -563,6 +563,49 @@ const SKIPS = arg('skip', null) !== null
           }
         }
       }
+      /**
+       * boxRect IS TESTED AGAINST A KNOWN ANSWER, EVERY RUN.
+       *
+       * READBAND only convicts when a box overlap is proposed, and on a green
+       * course nothing proposes -- so a boxRect that returned null, or a
+       * degenerate rect, would DISABLE the assertion and print exactly the
+       * output a passing run prints. That is the failure mode this project's
+       * corrections list is made of, and it would be invisible.
+       *
+       * A live gate in the read window is 25 to 90 units ahead, so all eight
+       * corners of its box are in front of the near plane, no edge is clipped,
+       * and the answer is therefore known: it is the plain projection of the
+       * eight corners. boxRect must reproduce it exactly. If it cannot do the
+       * easy case it is not to be believed on the hard one.
+       */
+      const bugEarly = [];
+      const selfTest = { n: 0, worst: 0 };
+      for (const gt of gates) {
+        const d = gt.z - camZ;
+        if (d < READ_NEAR || d > SIGHT_MIN) continue;
+        const mn = [gt.x - gt.halfX, gt.yMin, gt.z0], mx = [gt.x + gt.halfX, gt.yMax, gt.z1];
+        let nx0 = 1e9, nx1 = -1e9, ny0 = 1e9, ny1 = -1e9;
+        for (let i = 0; i < 8; i++) {
+          V.set(i & 1 ? mx[0] : mn[0], i & 2 ? mx[1] : mn[1], i & 4 ? mx[2] : mn[2]).project(cam);
+          nx0 = Math.min(nx0, V.x); nx1 = Math.max(nx1, V.x);
+          ny0 = Math.min(ny0, V.y); ny1 = Math.max(ny1, V.y);
+        }
+        const r = boxRect(mn, mx);
+        if (!r) { bugEarly.push('boxRect returned null for a gate ' + d.toFixed(1) + 'u ahead'); continue; }
+        if (!(r.x1 > r.x0 && r.y1 > r.y0)) {
+          bugEarly.push('boxRect returned a degenerate rect for a gate ' + d.toFixed(1) + 'u ahead');
+          continue;
+        }
+        const err = Math.max(Math.abs(r.x0 - nx0), Math.abs(r.x1 - nx1),
+                             Math.abs(r.y0 - ny0), Math.abs(r.y1 - ny1));
+        selfTest.n++;
+        selfTest.worst = Math.max(selfTest.worst, err);
+        if (err > 1e-6) {
+          bugEarly.push('boxRect disagrees with the plain projection of an unclipped gate box by '
+            + err.toExponential(2));
+        }
+      }
+
       const readBand = [];
       /**
        * THE AUDIT TRAIL FOR THE TWO-STAGE TEST, and it is not optional.
@@ -585,7 +628,7 @@ const SKIPS = arg('skip', null) !== null
        */
       let proposed = 0;
       const cleared = [];
-      const bug = [];
+      const bug = bugEarly;
       for (const gt of gates) {
         const d = gt.z - camZ;
         if (d < READ_NEAR || d > SIGHT_MIN) continue;
@@ -628,6 +671,41 @@ const SKIPS = arg('skip', null) !== null
                           boxNdc: [+mr.x0.toFixed(2), +mr.x1.toFixed(2)],
                           moverNear: +er.near.toFixed(2),
                           gateNdc: [+gr.x0.toFixed(2), +gr.x1.toFixed(2)] });
+        }
+      }
+
+      /**
+       * AND meshRect IS EXERCISED EVERY RUN TOO, on the widest mover in frame.
+       *
+       * The self-test above proves boxRect. Nothing proves meshRect on a green
+       * course, because it only runs on a proposal and a green course makes
+       * none -- so a meshRect that returned a speck would clear every future
+       * proposal and never be noticed. One call per skip, on the mover with the
+       * largest box rect, prints what the geometry does to the box it came
+       * from. A shrink of 1.0x forever is a broken exact test; a shrink of many
+       * times over is the inflation READBAND used to convict on.
+       */
+      let tightest = null;
+      {
+        let widest = null, wa = 0;
+        for (const m of movers) {
+          if (m.exempt || hazardish(m.name)) continue;
+          const r = boxRect(m.min, m.max);
+          if (!r) continue;
+          const a = (r.x1 - r.x0) * (r.y1 - r.y0);
+          if (a > wa) { wa = a; widest = { m, r }; }
+        }
+        if (widest) {
+          const er = meshRect(widest.m);
+          if (er) {
+            const ea = (er.x1 - er.x0) * (er.y1 - er.y0);
+            tightest = { name: widest.m.name,
+                         box: [+widest.r.x0.toFixed(2), +widest.r.x1.toFixed(2)],
+                         mesh: [+er.x0.toFixed(2), +er.x1.toFixed(2)],
+                         shrink: +(wa / Math.max(1e-9, ea)).toFixed(2) };
+          } else {
+            bugEarly.push(widest.m.name + ': meshRect returned nothing for the widest mover in frame');
+          }
         }
       }
 
@@ -743,7 +821,7 @@ const SKIPS = arg('skip', null) !== null
 
       performance.now = realNow;
       return { dt, camDZ: +camDZ.toFixed(2), movers: movers.length,
-               corridor, readBand, hue, report, proposed, cleared, bug,
+               corridor, readBand, hue, report, proposed, cleared, bug, selfTest, tightest,
                reclaims: Array.from(new Set(reclaims)),
                gates: gates.length };
     }, { FRAMES });
@@ -753,9 +831,20 @@ const SKIPS = arg('skip', null) !== null
     console.log('=== ' + tag + ' === ' + out.movers + ' movers over ' + out.dt.toFixed(2)
       + 's, lens travelled ' + out.camDZ + 'u, ' + out.gates + ' live gates');
     if (out.reclaims.length) console.log('    (pool re-claims ignored: ' + out.reclaims.join(', ') + ')');
-    if (out.proposed) {
+    {
+      // PRINTED EVEN AT ZERO. "Nothing proposed" and "everything the box
+      // proposed was cleared by the geometry" are different states of this
+      // instrument, and a line that only appears in one of them is a line
+      // that cannot be read.
       console.log('    (READBAND: ' + out.proposed + ' box overlaps proposed, '
-        + out.readBand.length + ' survived the geometry)');
+        + out.readBand.length + ' survived the geometry'
+        + '; boxRect self-test on ' + out.selfTest.n + ' unclipped gate boxes, worst error '
+        + out.selfTest.worst.toExponential(1) + ')');
+      if (out.tightest) {
+        console.log('      widest mover ' + out.tightest.name + ': box ndc x '
+          + JSON.stringify(out.tightest.box) + ' -> geometry ' + JSON.stringify(out.tightest.mesh)
+          + ', ' + out.tightest.shrink + 'x tighter by area');
+      }
       for (const c of (out.cleared || [])) {
         console.log('      cleared  ' + c.mover.padEnd(20) + ' vs ' + c.gate
           + ': box ndc x ' + JSON.stringify(c.boxNdc)

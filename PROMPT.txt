@@ -1,0 +1,16 @@
+Here are some images. Look at each one on its own.
+
+For each image, answer three things:
+
+  1. WHAT IS IT? Name the main object as specifically as you can.
+     "A green van" is a better answer than "a vehicle". If you genuinely
+     cannot tell, write "cannot tell" -- that is a real answer and it is
+     more useful than a guess dressed up as one.
+  2. OVER, UNDER, or AROUND? A person is running along the road toward
+     this object. Must they go over it, under it, or around it?
+  3. HOW SURE ARE YOU, on each of the two answers: sure, fairly sure, or
+     guessing.
+
+Answer the images independently. Do not assume they are the same object,
+and do not let one answer set up the next. Give your answer for every
+image, by filename.

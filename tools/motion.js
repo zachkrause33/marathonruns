@@ -410,19 +410,142 @@ const SKIPS = arg('skip', null) !== null
                         yMin: +hit.yMin.toFixed(2) });
       }
 
-      // Screen rects.
-      function rect(min, max) {
-        let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, anyFront = false;
+      /**
+       * ---- SCREEN RECTS, AND THE TWO WAYS THIS USED TO BE WRONG ------------
+       *
+       * The rect this file hands READBAND used to be built like this:
+       *
+       *     for each of the 8 corners of the world AABB
+       *       if its view z is above -0.1, SKIP IT
+       *       else project it and grow the rect
+       *
+       * Both halves of that are defects, and they push in opposite directions,
+       * so neither one is safe to leave in.
+       *
+       * 1. A CORNER DROPPED IS NOT A BOX CLIPPED. A box that straddles the
+       *    near plane -- which every roadside prop does for the second or two
+       *    it spends alongside the lens -- had its rear corners thrown away and
+       *    its rect built from whatever was left. The kept corners sit within a
+       *    hair of the near plane, where ndc = x / (near * tanHalf * aspect)
+       *    runs away: a corner 0.1 units in front of the lens and 2.4 units to
+       *    the side lands at ndc x -97. That is not a thing on screen. It is a
+       *    point at the edge of the lens reported as though it were a wall
+       *    across the frame, and it overlaps every gate in the read window.
+       *    The recorded symptom of this tool -- ndc x [-97.66, -0.13] -- is
+       *    that arithmetic and nothing else.
+       *
+       *    Dropping corners is ALSO flattering in the other axis: the true
+       *    near-plane cross-section of the box is not represented at all, so
+       *    a box whose clipped section reaches higher or wider than any of its
+       *    surviving corners is reported smaller than it is.
+       *
+       *    The fix is to CLIP rather than to drop. The box is convex, so its
+       *    image is the convex hull of the projections of (a) the corners in
+       *    front of the near plane and (b) the points where its twelve edges
+       *    cross that plane. Every one of those has w >= near, so nothing
+       *    divides by a number approaching zero.
+       *
+       *    The plane is cam.near, read off the camera. -0.1 was a guess that
+       *    happened to match a default and would have silently stopped
+       *    matching the day the lens was re-cut.
+       *
+       * 2. AN AABB IS NOT AN OBJECT, and this is the defect that actually
+       *    fires on today's course. Box3.applyMatrix4 re-bounds a rotated local
+       *    box, so for anything the claim site turns through a random yaw the
+       *    result is the AABB of an AABB; the wave envelope then grows it again
+       *    in all three axes. reallyInCorridor already says this in full and
+       *    already pays for the exact test -- CORRIDOR convicts on vertices --
+       *    but READBAND was still convicting on the inflated box. Measured at
+       *    skip 60: a PARKLAND tree reported a screen rect of ndc x
+       *    [-0.71, -0.09] and clipped a BLOCK gate whose whole rect is
+       *    [-0.10, -0.02], on a 0.01-wide sliver of pure inflation.
+       *
+       *    So the same discipline applies here: THE BOX PROPOSES, THE GEOMETRY
+       *    CONVICTS. boxRect is the cheap filter, meshRect is the verdict, and
+       *    the count of proposals the geometry threw out is printed rather than
+       *    swallowed -- a filter nobody can see is how an instrument starts
+       *    lying, which is the same sentence the re-claim filter above earned.
+       */
+      const _cn = [];
+      for (let i = 0; i < 8; i++) _cn.push(new THREE.Vector3());
+      const _p4 = new THREE.Vector4();
+      const _tmin = [0, 0, 0], _tmax = [0, 0, 0];
+
+      function boxRect(min, max) {
+        // The clip plane in VIEW z. A point exactly on it still projects, so
+        // the pad only keeps w off the floor of the divide.
+        const nz = -(cam.near + 1e-4);
         for (let i = 0; i < 8; i++) {
-          V.set(i & 1 ? max[0] : min[0], i & 2 ? max[1] : min[1], i & 4 ? max[2] : min[2]);
-          const wz = V.clone().applyMatrix4(cam.matrixWorldInverse).z;
-          if (wz > -0.1) continue;              // behind the lens
-          anyFront = true;
-          V.project(cam);
-          x0 = Math.min(x0, V.x); x1 = Math.max(x1, V.x);
-          y0 = Math.min(y0, V.y); y1 = Math.max(y1, V.y);
+          _cn[i].set(i & 1 ? max[0] : min[0], i & 2 ? max[1] : min[1], i & 4 ? max[2] : min[2])
+                .applyMatrix4(cam.matrixWorldInverse);
         }
-        return anyFront ? { x0, x1, y0, y1 } : null;
+        let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, any = false, near = -1e9;
+        function take(vx, vy, vz) {
+          _p4.set(vx, vy, vz, 1).applyMatrix4(cam.projectionMatrix);
+          const nx = _p4.x / _p4.w, ny = _p4.y / _p4.w;
+          if (!isFinite(nx) || !isFinite(ny)) return;
+          x0 = Math.min(x0, nx); x1 = Math.max(x1, nx);
+          y0 = Math.min(y0, ny); y1 = Math.max(y1, ny);
+          near = Math.max(near, vz);            // least negative == closest
+          any = true;
+        }
+        for (const c of _cn) if (c.z <= nz) take(c.x, c.y, c.z);
+        // The twelve edges, each visited once: flip one bit of a corner index
+        // upward. Only edges that CROSS the plane contribute a new point.
+        for (let i = 0; i < 8; i++) {
+          for (const bit of [1, 2, 4]) {
+            const j = i | bit;
+            if (j === i) continue;
+            const a = _cn[i], b = _cn[j];
+            if ((a.z <= nz) === (b.z <= nz)) continue;
+            const t = (nz - a.z) / (b.z - a.z);
+            take(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, nz);
+          }
+        }
+        return any ? { x0, x1, y0, y1, near: -near } : null;
+      }
+
+      /**
+       * The same rect, taken off the geometry the game actually draws.
+       *
+       * Triangle by triangle, each one as the box that contains its three
+       * vertices SWEPT by their own wave envelope -- so a shader mover is
+       * measured where the shader can put it, exactly as reallyInCorridor
+       * measures it, and the near-plane clipping above is inherited for free.
+       *
+       * A per-triangle box is still an over-estimate of a triangle, so this
+       * cannot hide a real overlap; it is simply thousands of times tighter
+       * than one box around a whole tree. Only candidates pay for it.
+       */
+      function meshRect(m) {
+        const o = objOf.get(m.uuid);
+        if (!o || !o.geometry || !o.geometry.attributes.position) return boxRect(m.min, m.max);
+        const pos = o.geometry.attributes.position;
+        const idx = o.geometry.index;
+        const env = envOf.get(m.uuid) || null;
+        const aw = env ? o.geometry.attributes.aWave : null;
+        const n = idx ? idx.count : pos.count;
+        let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, any = false, near = 1e9;
+        for (let t = 0; t + 2 < n; t += 3) {
+          _tmin[0] = _tmin[1] = _tmin[2] = 1e9;
+          _tmax[0] = _tmax[1] = _tmax[2] = -1e9;
+          for (let k = 0; k < 3; k++) {
+            const vi = idx ? idx.getX(t + k) : t + k;
+            P.set(pos.getX(vi), pos.getY(vi), pos.getZ(vi)).applyMatrix4(o.matrixWorld);
+            const a = aw ? aw.getY(vi) : 0;
+            const ex = a * (env ? env.x : 0), ey = a * (env ? env.y : 0), ez = a * (env ? env.z : 0);
+            _tmin[0] = Math.min(_tmin[0], P.x - ex); _tmax[0] = Math.max(_tmax[0], P.x + ex);
+            _tmin[1] = Math.min(_tmin[1], P.y - ey); _tmax[1] = Math.max(_tmax[1], P.y + ey);
+            _tmin[2] = Math.min(_tmin[2], P.z - ez); _tmax[2] = Math.max(_tmax[2], P.z + ez);
+          }
+          const r = boxRect(_tmin, _tmax);
+          if (!r) continue;
+          x0 = Math.min(x0, r.x0); x1 = Math.max(x1, r.x1);
+          y0 = Math.min(y0, r.y0); y1 = Math.max(y1, r.y1);
+          near = Math.min(near, r.near);
+          any = true;
+        }
+        return any ? { x0, x1, y0, y1, near } : null;
       }
 
       const gates = g.world.gateBoxes ? g.world.gateBoxes() : [];
@@ -441,22 +564,69 @@ const SKIPS = arg('skip', null) !== null
         }
       }
       const readBand = [];
+      /**
+       * THE AUDIT TRAIL FOR THE TWO-STAGE TEST, and it is not optional.
+       *
+       * An exact test that quietly returned nothing would clear every proposal
+       * and print a green run -- which is the precise shape of every defect in
+       * this project's corrections list: the instrument flattering the thing it
+       * measures. Two things guard against it and both are printed.
+       *
+       *   cleared   every proposal the geometry threw out, with BOTH rects, so
+       *             the difference between them can be looked at rather than
+       *             trusted.
+       *   bug       the containment invariant. Each triangle's swept box is a
+       *             subset of the object's swept box, and the image of a convex
+       *             set under this projection is monotone under containment --
+       *             so meshRect MUST lie inside boxRect. It must also exist
+       *             whenever boxRect does. A violation is a defect in this
+       *             file, not in the game, and it fails the run as loudly as a
+       *             real overlap would.
+       */
+      let proposed = 0;
+      const cleared = [];
+      const bug = [];
       for (const gt of gates) {
         const d = gt.z - camZ;
         if (d < READ_NEAR || d > SIGHT_MIN) continue;
-        const gr = rect([gt.x - gt.halfX, gt.yMin, gt.z0], [gt.x + gt.halfX, gt.yMax, gt.z1]);
+        const gr = boxRect([gt.x - gt.halfX, gt.yMin, gt.z0], [gt.x + gt.halfX, gt.yMax, gt.z1]);
         if (!gr) continue;
         for (const m of movers) {
           if (m.exempt || hazardish(m.name)) continue;
-          const mr = rect(m.min, m.max);
+          const mr = boxRect(m.min, m.max);
           if (!mr) continue;
           if (mr.x1 < gr.x0 || mr.x0 > gr.x1 || mr.y1 < gr.y0 || mr.y0 > gr.y1) continue;
           // Only counts if the mover is actually IN FRONT of the gate; a car
           // behind a hazard is occluded by it and cannot distract from it.
           const mz = (m.min[2] + m.max[2]) / 2;
           if (mz > gt.z) continue;
+          proposed++;
+          // THE GEOMETRY CONVICTS. See the note on meshRect: the box around a
+          // yawed, wind-swept tree is not the tree, and READBAND spent its
+          // whole life failing on the difference.
+          const er = meshRect(m);
+          if (!er) {
+            bug.push(m.name + ': boxRect returned a rect and meshRect returned none');
+            continue;
+          }
+          const EPS = 1e-3;
+          if (er.x0 < mr.x0 - EPS || er.x1 > mr.x1 + EPS
+              || er.y0 < mr.y0 - EPS || er.y1 > mr.y1 + EPS) {
+            bug.push(m.name + ': meshRect ' + [er.x0, er.x1, er.y0, er.y1].map((v) => v.toFixed(2)).join(',')
+              + ' escapes boxRect ' + [mr.x0, mr.x1, mr.y0, mr.y1].map((v) => v.toFixed(2)).join(','));
+          }
+          if (er.x1 < gr.x0 || er.x0 > gr.x1 || er.y1 < gr.y0 || er.y0 > gr.y1) {
+            cleared.push({ mover: m.name,
+                           gate: 'kind ' + gt.kind + ' lane ' + gt.lane + ' at ' + d.toFixed(1) + 'u',
+                           boxNdc: [+mr.x0.toFixed(2), +mr.x1.toFixed(2)],
+                           meshNdc: [+er.x0.toFixed(2), +er.x1.toFixed(2)],
+                           near: +er.near.toFixed(2) });
+            continue;
+          }
           readBand.push({ mover: m.name, gate: 'kind ' + gt.kind + ' lane ' + gt.lane + ' at ' + d.toFixed(1) + 'u',
-                          moverNdc: [+mr.x0.toFixed(2), +mr.x1.toFixed(2)],
+                          moverNdc: [+er.x0.toFixed(2), +er.x1.toFixed(2)],
+                          boxNdc: [+mr.x0.toFixed(2), +mr.x1.toFixed(2)],
+                          moverNear: +er.near.toFixed(2),
                           gateNdc: [+gr.x0.toFixed(2), +gr.x1.toFixed(2)] });
         }
       }
@@ -573,7 +743,7 @@ const SKIPS = arg('skip', null) !== null
 
       performance.now = realNow;
       return { dt, camDZ: +camDZ.toFixed(2), movers: movers.length,
-               corridor, readBand, hue, report,
+               corridor, readBand, hue, report, proposed, cleared, bug,
                reclaims: Array.from(new Set(reclaims)),
                gates: gates.length };
     }, { FRAMES });
@@ -583,6 +753,19 @@ const SKIPS = arg('skip', null) !== null
     console.log('=== ' + tag + ' === ' + out.movers + ' movers over ' + out.dt.toFixed(2)
       + 's, lens travelled ' + out.camDZ + 'u, ' + out.gates + ' live gates');
     if (out.reclaims.length) console.log('    (pool re-claims ignored: ' + out.reclaims.join(', ') + ')');
+    if (out.proposed) {
+      console.log('    (READBAND: ' + out.proposed + ' box overlaps proposed, '
+        + out.readBand.length + ' survived the geometry)');
+      for (const c of (out.cleared || [])) {
+        console.log('      cleared  ' + c.mover.padEnd(20) + ' vs ' + c.gate
+          + ': box ndc x ' + JSON.stringify(c.boxNdc)
+          + ' -> geometry ' + JSON.stringify(c.meshNdc) + ', nearest ' + c.near + 'u');
+      }
+    }
+    for (const b of (out.bug || [])) {
+      console.log('  FAIL INSTRUMENT  ' + b);
+      failures++;
+    }
     if (LIST || true) {
       for (const r of out.report) {
         console.log('    ' + r.name.padEnd(26) + ' x' + String(r.n).padEnd(3)
@@ -597,6 +780,7 @@ const SKIPS = arg('skip', null) !== null
     }
     for (const r of out.readBand) {
       console.log('  FAIL READBAND  ' + r.mover + ' ndc x ' + JSON.stringify(r.moverNdc)
+        + ' (nearest ' + r.moverNear + 'u, box said ' + JSON.stringify(r.boxNdc) + ')'
         + ' overlaps ' + r.gate + ' ndc x ' + JSON.stringify(r.gateNdc));
       failures++;
     }

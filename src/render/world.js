@@ -6963,11 +6963,19 @@ MR.World = (function () {
      *
      *     0.0149 * 0.25 * (16/32)  =  0.0019
      *
-     * against a lift of 0.012. The mat therefore sits between 0.010 and 0.012
-     * above the tarmac everywhere -- never under it, which is the bug, and
-     * never far enough off it to read as floating. That margin is why the
-     * segment count went to 32: at 16 the residual is 0.0037, still clear but
-     * only 3x the lift instead of 6x, and TILE or MAX_GRADE could eat it.
+     * against a lift of 0.012, and it cuts EITHER WAY -- the strip sits low
+     * across a convex joint and high across a concave one, so the band is the
+     * lift plus or minus the residual and not the lift minus it.
+     *
+     * Swept rather than asserted, over all 5918 gates of a 32-day calendar:
+     * ZERO gates with any part of the strip under the tarmac, and a gap band
+     * of 0.0104 to 0.0135 against a predicted 0.0101 to 0.0139. So the mat is
+     * never under the road, which is the bug, and never more than 13.5
+     * millimetres off it, which is far too little to read as floating.
+     *
+     * That margin is why the segment count went to 32: at 16 the residual is
+     * 0.0037, still clear of the lift but only 3x rather than 6x, and TILE or
+     * MAX_GRADE could eat it.
      *
      * Z-FIGHTING is unchanged and that is the point of quoting the band. The
      * lift is the same 0.012 that has always separated the mat from the lane

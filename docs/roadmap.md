@@ -4057,7 +4057,11 @@ nobody measured is worse than no number at all.**
     the mesh's own inverse world matrix so no caller has to cooperate. Residual
     is bounded rather than asserted: inside a tile both road and strip are
     linear so the fit is EXACT, and the only lossy case is a segment straddling
-    a tile joint, at `dSlope*h/4 = 0.0019` against a lift of 0.012. Result on
+    a tile joint, at `dSlope*h/4 = 0.0019` against a lift of 0.012 -- and that
+    is swept rather than asserted: over all **5918 gates of a 32-day calendar,
+    zero have any part of the strip under the tarmac**, with a gap band of
+    0.0104 to 0.0135. Never under the road, never more than 13.5 millimetres
+    off it. Result on
     sloped ground, mean mat pixels, and the point is the last column:
 
     |                  |  8u before |  8u after |  25u before | 25u after |

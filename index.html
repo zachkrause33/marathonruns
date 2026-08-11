@@ -2876,8 +2876,42 @@ MR.Course = (function () {
       : d < 0.58 ? 0.30
       : d < 0.80 ? 0.48
       : 0.62;
+    // ---- AND THE SECOND HAZARD ARRIVES EARLIER THAN IT DID ---------------
+    //
+    // The owner: *"Add a few more obstacles to the beginning of the game."*
+    // Measured before it was changed, over 60 days, per mile:
+    //
+    //   opening 3 miles   4.88 gates/mi   6.26 hazards/mi   1.28 hazards/gate
+    //   the rest (3-26)   7.43 gates/mi  17.56 hazards/mi   2.36 hazards/gate
+    //
+    // The opening was carrying 64% fewer hazards per mile than the rest of the
+    // race, and mile 0 and mile 1 came in at 1.00 and 1.09 hazards per gate --
+    // a road with one thing on it, every time, for two miles.
+    //
+    // The threshold below was the whole cause: at d < 0.18 every gate takes
+    // exactly one hazard, and d does not clear 0.18 until mile 2.05.
+    //
+    // WHY THE FIX IS THIS AND NOT SPACING. spacingAt() would have added gates
+    // rather than obstacles, and its mean feeds the solver's own floor -- so
+    // tightening the opening moves the proof's window at the same time and
+    // buys a fairness argument nobody asked for. The number of lanes occupied
+    // AT a gate is the thing the owner actually named, it is bounded by the
+    // same makeGate invariants as every other gate, and it does not touch the
+    // spacing the read window is derived from.
+    //
+    // WHY IT IS NOT PUSHED TO ZERO. 0.09 lands at mile 0.69, so the first
+    // two thirds of a mile still carries exactly one hazard per gate. That
+    // stretch is the one the comment on difficulty() is about -- START_GRACE
+    // plus a road that reads calmly is what lets a new player learn the lane
+    // geometry -- and it is kept. What changes is miles 1 through 3, which
+    // were coasting on a teaching argument that had stopped applying.
+    //
+    // `full` IS DELIBERATELY NOT TOUCHED. That dial is three-lane gates, which
+    // FORCE an action; it opens at mile 1.4 at 10% and it can stay there. More
+    // obstacles is what was asked for. More forced actions is a different and
+    // harsher change, and it should be argued for on its own evidence.
     const nHaz = rnd.chance(full) ? 3
-      : d < 0.18 ? 1
+      : d < 0.09 ? 1
       : d < 0.42 ? rnd.int(1, 2)
       : 2;
 
@@ -18560,6 +18594,109 @@ MR.World = (function () {
      * this pass was not allowed to cross -- see stripeTex for the confusion
      * that cost.
      */
+    /**
+     * ============ JUMP v6 AND v7: THE KERBSIDE FURNITURE, PROMOTED ============
+     *
+     * The owner: *"The flower pots and some boxes are on the sidewalk. We want
+     * them to be part of the game as obstacles. Work them into the rotation to
+     * keep the obstacles fresh."*
+     *
+     * These are not new objects. crateStackParts and planterParts are the SAME
+     * two builders the verge has been using since the kerbside furniture went
+     * in, called with a scale and with the jitter switched off -- see the note
+     * at KERBSIDE FURNITURE, which already said the split was by POSITION and
+     * not by object: a road has crates on its edge and crates in its way, and
+     * they are the same crates. This is that sentence being cashed.
+     *
+     * ---- WHICH KIND EACH ONE IS, DECIDED HONESTLY -----------------------
+     *
+     * Both are JUMP, and the second half of that is the part worth defending.
+     *
+     * A PLANTER IS A JUMP and there is no argument to have: it is a knee-high
+     * pot, it has no bar to go under and no mass to go around, and mass on the
+     * road with nothing above 0.80 is the definition kindread.js measures a
+     * JUMP by.
+     *
+     * CRATES ARE A JUMP HERE BECAUSE THE BLOCK ALREADY EXISTS. blockCrateLoadGeo
+     * is a loaded pallet standing 2.80 tall and filling the lane, and it is what
+     * the failed cyclist slot became. Adding a second crate BLOCK would be
+     * building the same obstacle twice with a different seed. What the verge
+     * actually carries is a low pile a stride high, which is a different object
+     * doing a different job, and it is the one the fleet does not have.
+     *
+     * NEITHER IS A DUCK, and that is not a near miss. A DUCK is a GAP from the
+     * road to 1.41 with a bar over it, and yesterday's fix gave it mass ABOVE
+     * the bar so the profile has a direction in it. Nothing standing on the
+     * ground can be one without inventing a trestle the owner did not ask for.
+     *
+     * ---- ART GIVES WAY TO THE BOX, AS IT ALWAYS DOES --------------------
+     *
+     * MR.Collision.BOX[JUMP] is halfX 1.12, halfZ 0.52, yMax 0.80, and the
+     * verge versions fit none of it -- a crate stack runs to 1.6 tall and a
+     * planter's planting to about 1.2. So both are scaled INTO the box rather
+     * than the box being asked to accommodate them, which is rule 4: art never
+     * decides clearance. api.fleetExtents reports both against the box and
+     * tools/shoot.js fails the build if either leaves it.
+     *
+     * The planting is scaled harder than the pot it sits in (crown 0.55 against
+     * a body scale of 0.58), because the pot's reach is its rim and the
+     * planting is what decides the height. The crates keep their per-box yaw
+     * but lose the positional jitter: a random offset inside a 1.12 half-width
+     * is exactly how art starts deciding clearance one seed at a time.
+     *
+     * ---- RULE 1 ---------------------------------------------------------
+     *
+     * Both were already built on every side and stay that way. The crate's
+     * scribed diagonal is on all four faces, its rims run right round and its
+     * corner posts are on all four corners; the planter is a body of revolution
+     * with a recessed soil disc, so it is open from every angle and has no back
+     * by construction. These now stand IN the lane, where the camera banks
+     * through them at arm's length and passes them from behind, so there was
+     * never a face to leave off.
+     *
+     * ---- NO STRIPED FACE, FOR THE CONE'S REASON -------------------------
+     *
+     * face: null on both, which is what four of the six JUMPs already do. The
+     * stripe means construction furniture and neither of these is any; and the
+     * face is centred on the lane by the pool, so on a three-pot row it would
+     * hang across the gaps between the pots as a striped mat in mid-air, which
+     * is roadmap entry 38's defect exactly. Kind is carried at full strength by
+     * the telegraph mat painted on the road in front, as it is for the cones.
+     *
+     * ---- AND THE COLOUR IS WHY THEY CLEAR THE GATE ----------------------
+     *
+     * Terracotta and crate brown are warm and far off the neutral axis, and
+     * every element on both objects is on the SAME side of it -- the crate's
+     * rim and rail are a lighter and a darker brown, the planter's rim and foot
+     * a lighter and a darker terracotta. That is the area-mean rule the vehicle
+     * fleet was rebuilt around: there is no pale band on either to average the
+     * object back to grey. Measured margins are in the commit.
+     */
+    const jumpPlanterGeo = (function () {
+      const parts = [];
+      [-0.70, 0.00, 0.70].forEach(function (x, i) {
+        placeAt(parts, planterParts([], 13 + i * 37,
+          // The planting is the fleet's own, not a setting's: a hazard pool is
+          // built once and every setting spawns from it. Brighter than the
+          // verge default for the area-mean reason stated at planterParts.
+          { colors: [0x8fd24a, 0xb6e668] },
+          {
+            scale: 0.58, crown: 0.55,
+            palette: { body: 0xe8873f, light: 0xffb26a, dark: 0xc26330, soil: 0x8a5a30 },
+          }), x, 0, (i - 1) * 0.06, 0);
+      });
+      return merge(parts);
+    })();
+    const jumpCrateGeo = (function () {
+      const parts = [];
+      const AT = [-0.64, 0.02, 0.66], N = [2, 2, 1];
+      AT.forEach(function (x, i) {
+        placeAt(parts, crateStackParts([], 17 + i * 53,
+          { scale: 0.62, boxes: N[i], jitter: 0, yaw: 0.55 }), x, 0, (i - 1) * 0.05, 0);
+      });
+      return merge(parts);
+    })();
+
     const jumpPool = hazardPool(K.JUMP, 'jump', [
       { geo: jumpSandGeo, face: null },
       /**
@@ -18594,6 +18731,9 @@ MR.World = (function () {
       { geo: jumpScooterGeo, face: null },
       { geo: jumpBarrierGeo, face: [2.20, 0.14, 0.072, -0.512] },
       { geo: jumpPipeGeo, face: null },
+      // The kerbside furniture, in the lane. See the promotion note above.
+      { geo: jumpPlanterGeo, face: null },
+      { geo: jumpCrateGeo, face: null },
     ]);
 
     /**
@@ -22545,25 +22685,38 @@ MR.World = (function () {
      * posts are on all four corners. There is no face left off because a chase
      * camera "starts" behind: it goes everywhere.
      */
-    function crateStackGeo(seed) {
+    /**
+     * The stack, as PARTS rather than as a finished geometry, so the lane
+     * version and the verge version are the same object and not two objects
+     * that look alike. crateStackGeo below is this plus a merge; jumpCrateGeo
+     * is three of these laid across a lane. See the promotion note there.
+     *
+     * `opt` is what the corridor needs and the verge does not: a scale, a
+     * forced box count, and the jitter switched off, because a JUMP has 1.12
+     * of half-width to live inside and a random offset is how art starts
+     * deciding clearance.
+     */
+    function crateStackParts(parts, seed, opt) {
+      opt = opt || {};
       let s = seed;
       const r = function () { s = (s * 9301 + 49297) % 233280; return s / 233280; };
       const CRATE = 0xb07434, CRATE_DK = 0x6e4418, CRATE_LT = 0xd89a52;
-      const parts = [];
+      const sc = opt.scale || 1;
+      const jit = opt.jitter === undefined ? 1 : opt.jitter;
       // One to three boxes, stacked and jittered so a row of these down a verge
       // is not the same silhouette repeated. The stack stays under 1.6 tall:
       // these are beside the road, and anything taller starts competing with
       // the hazards for the eye at the distance the lane is chosen.
-      const n = 1 + Math.floor(r() * 2.99);
+      const n = opt.boxes || (1 + Math.floor(r() * 2.99));
       let y = 0;
       for (let i = 0; i < n; i++) {
-        const w = 0.86 - i * 0.13 + r() * 0.20;
-        const d = 0.78 - i * 0.10 + r() * 0.18;
-        const h = 0.52 - i * 0.06 + r() * 0.12;
+        const w = (0.86 - i * 0.13 + r() * 0.20) * sc;
+        const d = (0.78 - i * 0.10 + r() * 0.18) * sc;
+        const h = (0.52 - i * 0.06 + r() * 0.12) * sc;
         // Each box in the stack is offset and turned a little, which is what a
         // real stack looks like and what stops three boxes reading as one prism.
-        const ox = (r() - 0.5) * 0.16, oz = (r() - 0.5) * 0.16;
-        const yaw = (r() - 0.5) * 0.5;
+        const ox = (r() - 0.5) * 0.16 * jit, oz = (r() - 0.5) * 0.16 * jit;
+        const yaw = (r() - 0.5) * 0.5 * (opt.yaw === undefined ? 1 : opt.yaw);
         const sub = [];
         sub.push(gl(cbx(w, h, d, 0, 0, 0, CRATE, 0.05), GLOSS.matte));
         // Lid rim and foot rail, proud on all four sides -- what a crate has
@@ -22585,8 +22738,9 @@ MR.World = (function () {
         placeAt(parts, sub, ox, y + h / 2, oz, yaw);
         y += h;
       }
-      return merge(parts);
+      return parts;
     }
+    function crateStackGeo(seed) { return merge(crateStackParts([], seed)); }
 
     /**
      * A KERBSIDE PLANTER.
@@ -22608,13 +22762,40 @@ MR.World = (function () {
      * there is no angle this reads worse from. The soil and the planting are
      * inside the rim from every direction.
      */
-    function planterGeo(seed, prof) {
+    function planterParts(parts, seed, prof, opt) {
+      opt = opt || {};
       let s = seed;
       const r = function () { s = (s * 9301 + 49297) % 233280; return s / 233280; };
-      const TERRA = 0xb5623a, TERRA_DK = 0x8a4526, TERRA_LT = 0xd08055, SOIL = 0x4a3524;
-      const parts = [];
-      const h = 0.62 + r() * 0.22;
-      const rTop = 0.40 + r() * 0.10;
+      /**
+       * THE VERGE PALETTE AND THE LANE PALETTE, AND WHY THEY DIFFER.
+       *
+       * A weathered terracotta is right on the kerb and it FAILED THE FAIRNESS
+       * GATE in the corridor, which is not a matter of taste: measured by
+       * tools/shoot.js, the first lane planter rendered at L 94.1 S 0.341 on a
+       * lane-1 road of L 88.4 S 0.156 -- 1.06x luminance against a gate of
+       * 1.25x, and 0.185 of saturation against 0.22. It matched the tarmac on
+       * both axes and the build failed, correctly.
+       *
+       * The cause is the area-mean rule the vehicle fleet was rebuilt around: a
+       * pot is mostly wall, but the dark foot ring and the near-neutral SOIL
+       * disc are exactly the "15% cream band" defect in reverse -- dark warm
+       * neutrals averaging a saturated body back onto the axis. Compounded
+       * here because a lane planter is scaled to 0.58 and a rounded body puts
+       * much of its surface in the lower toon bands.
+       *
+       * So the corridor gets its own four tones, hotter and lighter on every
+       * one, and the verge keeps the weathered set exactly as it shipped. That
+       * is rule 4 doing what it is for: a hazard has to clear the gate and a
+       * scenery prop does not, and the object the player can be killed by is
+       * the one that gives way. The hue is unchanged -- this is the same
+       * terracotta with the dirt taken off it, not a different object.
+       */
+      const P = opt.palette || {};
+      const TERRA = P.body || 0xb5623a, TERRA_DK = P.dark || 0x8a4526,
+        TERRA_LT = P.light || 0xd08055, SOIL = P.soil || 0x4a3524;
+      const sc = opt.scale || 1;
+      const h = (0.62 + r() * 0.22) * sc;
+      const rTop = (0.40 + r() * 0.10) * sc;
       const rBot = rTop * 0.70;          // the taper the reference actually has
       // The wall, as three stacked frusta rather than one, so the profile can
       // curve very slightly outward instead of being a straight cone.
@@ -22633,14 +22814,19 @@ MR.World = (function () {
       // carries stone-pine greens -- the same rule the groves follow.
       const greens = (prof && prof.colors) || [0x5f9e3a, 0x86c24e];
       const lobes = 4 + Math.floor(r() * 3);
+      // The planting is scaled HARDER than the pot for the lane version. A pot
+      // is a body of revolution and its reach is its rim; the planting is what
+      // decides the height, and a JUMP has 0.80 of it. See jumpPlanterGeo.
+      const cs = opt.crown === undefined ? 1 : opt.crown;
       for (let i = 0; i < lobes; i++) {
         const a = (i / lobes) * Math.PI * 2 + r() * 0.6;
-        const rr = (0.16 + r() * 0.13);
-        parts.push(sph(rr, 6, Math.cos(a) * rTop * 0.46, h + 0.02 + r() * 0.16,
+        const rr = (0.16 + r() * 0.13) * sc * cs;
+        parts.push(sph(rr, 6, Math.cos(a) * rTop * 0.46, h + (0.02 + r() * 0.16) * sc * cs,
           Math.sin(a) * rTop * 0.46, greens[Math.floor(r() * greens.length) % greens.length]));
       }
-      return merge(parts);
+      return parts;
     }
+    function planterGeo(seed, prof) { return merge(planterParts([], seed, prof)); }
 
     // Three seeded variants of each, per setting for the planters (the planting
     // takes the setting's foliage) and setting-independent for the crates (a
@@ -28454,14 +28640,87 @@ MR.Camera = (function () {
    * of the fix is therefore in style.css, where the readout can simply stop
    * being a fixed pixel block on a short frame. The two halves are independent
    * and neither needs to know about the other.
+   *
+   * ---- THE READOUT'S OWN CLAIM, WHICH IS THE THING ASPECT WAS STANDING IN FOR
+   *
+   * The paragraph above is right about the diagnosis and then declines the cure
+   * on the grounds of file ownership. The bill came in. Measured on the shipped
+   * build, `back` was 1.180 on EVERY portrait frame -- 320x568, 390x844,
+   * 620x1344 and 920x1363 alike -- because both ramps above saturate to zero
+   * below aspect 0.55 and 1.30. So the runner's lowest point sat at the same
+   * fraction of frame height on all four, 0.8937 in the winded state, and the
+   * whole of footroom's answer was decided by the other two terms:
+   *
+   *     clearance = (1 - f) * H  -  P
+   *
+   * f is set here and is height-blind; H is the frame; P is what the readout
+   * takes at the bottom. (1-f)*H is LINEAR IN H and P is a pixel constant with
+   * two media-query steps in it, so clearance falls as the frame gets shorter
+   * and crosses the gate at about 640px of height. Measured: 320x568 failed
+   * eleven combinations at +5.0px worst, 390x844 failed two at +10.5, and every
+   * frame taller than that passed with 60px to spare. THE DEFECT IS AT THE
+   * SHORT END AND ALWAYS WAS -- a taller viewport can never surface it, and no
+   * amount of the aspect ramps above can see it, because 320x568 (aspect 0.563)
+   * and 1280x800 (aspect 1.600) are the SAME difficulty to within 0.0003 and
+   * sit at opposite ends of the only axis this function could read.
+   *
+   * What ranks them correctly is the readout's claim as a FRACTION of the
+   * frame, (P + margin) / H, which is one number carrying H, P, every media
+   * query, the safe-area inset and any future change to the plate. main.js now
+   * measures it off the live element and hands it over. It is not a proxy for
+   * anything; it is the left-hand side of the inequality.
+   *
+   * BASE_ROOM IS MEASURED, NOT CHOSEN. 0.107 is what the base framing supplies:
+   * at back = 1.18 the winded figure's lowest point sits at f = 0.8937, so
+   * 1 - f = 0.1063 of the frame is what there is. The ramp therefore starts
+   * exactly where the framing runs out and not at a round number near it. The
+   * f-against-back curve it is fitted to was swept on the running page at three
+   * portrait heights and agrees to four decimal places across all of them,
+   * which is the evidence that f really is height-independent and this really
+   * is the whole mechanism.
+   *
+   * MAX, NOT PLUS, AND THAT IS THE WHOLE CARE IN THIS CHANGE. `deep` already
+   * pulls back on wide-and-short frames and was tuned against 844x390 and
+   * 1280x800 with numbers in the paragraphs above. Adding a second pull-back on
+   * top of it would double-count exactly the way the 13px of standoff in
+   * style.css double-counted the safe-area inset for two passes. Taking the
+   * larger of the two means the new term is IDENTICALLY ZERO wherever the old
+   * one already does the job: 1280x800 keeps back = 1.3633 and 844x390 keeps
+   * 1.708, bit for bit, and only the two frames that actually fail move.
+   *
+   * The cost is stated rather than hidden. The runner is 8.9% smaller at
+   * 320x568 and 7.6% smaller at 390x844 -- 149px to 136px and 222px to 205px
+   * crown-to-sole. It buys 24px of clearance in the worst state at both. None
+   * of it comes out of the middle of the frame, which is the one thing the HUD
+   * layout rule protects: pulling back shows MORE road, not less, and the FOV,
+   * the eye height and the aim point are all untouched.
    */
-  function frameFor(aspect) {
+  // The clearance the camera holds for itself, in CSS px, in the WORST state --
+  // which is the winded tail after a contact, because it narrows the lens by
+  // five degrees and magnifies the figure. tools/footroom.js gates at 12 (a 2px
+  // border, a 6px blur and 4px of raster slack); this is double, and the
+  // doubling is the room for a stride phase, a state or a plate revision that
+  // was not on the sweep when the ramp was fitted.
+  const FOOT_MARGIN = 24;
+  // What the base framing supplies, measured. See above -- do not round it.
+  const BASE_ROOM = 0.107;
+  const CROWD_SPAN = 0.065;   // saturates where `deep` has taken over anyway
+  const CROWD_PULL = 0.20;    // fitted to the swept f-against-back curve
+
+  function frameFor(aspect, bottomPx, heightPx) {
     const wide = clamp01((aspect - 0.55) / 0.80);   // 0 = phone portrait, 1 = desktop
     const deep = clamp01((aspect - 1.30) / 0.90);   // 0 = anything taller than 4:3
+    // Zero when main.js has nothing to hand over -- during boot, before the HUD
+    // exists, and for anything that drives this module without a page. That is
+    // the shipped behaviour before this term, so the fallback is the old code.
+    const need = (bottomPx > 0 && heightPx > 0)
+      ? (bottomPx + FOOT_MARGIN) / heightPx
+      : 0;
+    const crowd = clamp01((need - BASE_ROOM) / CROWD_SPAN);
     return {
       follow: 0.95 - 0.17 * wide,
       lookX: 0.85 - 0.30 * wide,
-      back: 1.18 + 0.55 * deep,
+      back: 1.18 + Math.max(0.55 * deep, CROWD_PULL * crowd),
       roll: 0.70 + 0.30 * wide,
     };
   }
@@ -28492,7 +28751,7 @@ MR.Camera = (function () {
    * permanent rumble spuriously. main.js therefore hands `speed` (grade-
    * inclusive) and `gearSpeed` (flat, from pace.streakSpeed) separately.
    */
-  function create(aspect) {
+  function create(aspect, bottomPx, heightPx) {
     const cam = new THREE.PerspectiveCamera(BASE_FOV, aspect, 0.1, 1200);
     const look = new THREE.Vector3();   // hoisted: this runs 60x a second
     // The course's road profile, handed over by main.js once the course
@@ -28501,7 +28760,7 @@ MR.Camera = (function () {
 
     const s = {
       camera: cam,
-      fr: frameFor(aspect),
+      fr: frameFor(aspect, bottomPx, heightPx),
       x: 0, vx: 0,     // lateral follow, sprung so a lane change whips
       roll: 0,
       fov: BASE_FOV,
@@ -29069,9 +29328,15 @@ MR.Camera = (function () {
     /** The course's road profile. Handed over by main.js once it exists. */
     s.setElevation = function (e) { elev = e || MR.Elevation.FLAT; };
 
-    s.resize = function (aspect) {
+    // `bottomPx` is what the readout has taken at the bottom of the frame, from
+    // hud.bottomClaim(). Omitted or null keeps the claim already in force rather
+    // than dropping to zero -- a resize that happens to land while the plate is
+    // mid-transition must not hand the whole crowd term back for a frame.
+    s.claim = (bottomPx > 0) ? bottomPx : 0;
+    s.resize = function (aspect, bottomPx, heightPx) {
       cam.aspect = aspect;
-      s.fr = frameFor(aspect);
+      if (bottomPx > 0) s.claim = bottomPx;
+      s.fr = frameFor(aspect, s.claim, heightPx);
       cam.updateProjectionMatrix();
     };
 
@@ -31550,6 +31815,7 @@ MR.HUD = (function () {
       engine: q('engine'), why: q('why'),
       gaugeFill: q('gaugeFill'), paceVal: q('paceVal'),
       distVal: q('distVal'),
+      railWrap: q('railWrap'),
       rail: q('rail'), railFill: q('railFill'), railGap: q('railGap'), railGhost: q('railGhost'),
       railRoute: q('railRoute'),
       gapVal: q('gapVal'), gapTrend: q('gapTrend'), gapLabel: q('gapLabel'),
@@ -32503,6 +32769,36 @@ MR.HUD = (function () {
     api.onRestart = function (fn) { n.restartBtn.addEventListener('click', fn); };
     api.showPerf = function (on) { n.perf.classList.toggle('on', on); };
 
+    /**
+     * HOW MANY PIXELS AT THE BOTTOM OF THE FRAME THIS READOUT HAS TAKEN.
+     *
+     * From the top edge of #railWrap to the bottom of the viewport, so it
+     * includes the plate, its border, and the standoff and safe-area inset
+     * underneath it. It is a MEASUREMENT AND NOT A POLICY: this file does not
+     * know or care what the number is for, and there is no threshold in it.
+     *
+     * It exists because the camera needs it. camera.js frames the runner so
+     * his feet sit at a fixed FRACTION of frame height, and this plate claims
+     * a fixed number of PIXELS -- so whether the two collide is decided by a
+     * quantity neither file could see on its own, and the camera had been
+     * guessing at it from the aspect ratio. See THE READOUT'S OWN CLAIM in
+     * camera.js for what is done with it, and tools/footroom.js for the
+     * assertion that says whether it worked.
+     *
+     * `visibility: hidden` is what takes this plate away behind a panel, not
+     * `display: none`, so the box is still laid out and this still answers
+     * while the start card is up. null is returned only if the element is
+     * genuinely unlaid-out -- in which case the camera keeps what it had,
+     * because a zero here would read as "the readout claims nothing" and
+     * quietly hand back the whole fix.
+     */
+    api.bottomClaim = function () {
+      const r = n.railWrap.getBoundingClientRect();
+      if (!(r.height > 0)) return null;
+      const claim = window.innerHeight - r.top;
+      return claim > 0 ? claim : null;
+    };
+
     syncPanels();
     return api;
   }
@@ -33409,13 +33705,47 @@ MR.HUD = (function () {
   }
 
   // ---- resize -----------------------------------------------------------
+  /**
+   * The camera is told what the readout took, because it is the only file that
+   * cannot work it out and the only one that can answer for it.
+   *
+   * camera.js frames the runner so his lowest point sits at a fixed FRACTION of
+   * frame height; #railWrap claims a fixed number of PIXELS at the bottom. Which
+   * of the two wins is decided by (P + margin) / H, and neither file can see
+   * that number on its own -- the camera had been inferring it from the aspect
+   * ratio, which ranks 320x568 and 1280x800 at opposite ends of its only axis
+   * when they are in fact the same difficulty to three decimal places. See THE
+   * READOUT'S OWN CLAIM in camera.js.
+   *
+   * MEASURED HERE, NOT EVERY FRAME. The plate's height is fixed by the
+   * stylesheet and does not move during a race -- tools/footroom.js gates that,
+   * three nowrap rules and two fixed row heights enforce it, and it was
+   * re-checked against the longest strings the game can print and against
+   * deliberate overflow: 51, 75, 81 and 54px at the four viewports, unchanged in
+   * every case. So this is read where the layout can actually change -- a
+   * resize, an orientation change, and once when the webfont settles -- and the
+   * camera holds it still in between. A framing term that re-derived itself
+   * per frame would be a camera that could creep mid-race off a HUD reflow,
+   * which is a worse defect than the one being fixed.
+   */
   function resize() {
     const w = window.innerWidth, h = window.innerHeight;
     renderer.setSize(w, h);
-    cam.resize(w / h);
+    cam.resize(w / h, hud.bottomClaim(), h);
   }
   window.addEventListener('resize', resize);
   window.addEventListener('orientationchange', () => setTimeout(resize, 120));
+  // The plate is sized in px by the stylesheet, so a late webfont cannot change
+  // its height -- but the baseline-aligned row inside it can shift a pixel or
+  // two, and this costs nothing. Guarded: document.fonts is absent on nothing
+  // this game supports, and a rejected promise here must not take the race with
+  // it.
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(resize).catch(() => { });
+  }
+  // The camera was created before the HUD existed, so the first claim it ever
+  // saw was zero. Take the real one now that there is a plate to measure.
+  resize();
 
   // ---- expose for automated inspection ----------------------------------
   // Screenshot and critic tooling drives the real game through this rather

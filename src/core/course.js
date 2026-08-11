@@ -565,8 +565,42 @@ MR.Course = (function () {
       : d < 0.58 ? 0.30
       : d < 0.80 ? 0.48
       : 0.62;
+    // ---- AND THE SECOND HAZARD ARRIVES EARLIER THAN IT DID ---------------
+    //
+    // The owner: *"Add a few more obstacles to the beginning of the game."*
+    // Measured before it was changed, over 60 days, per mile:
+    //
+    //   opening 3 miles   4.88 gates/mi   6.26 hazards/mi   1.28 hazards/gate
+    //   the rest (3-26)   7.43 gates/mi  17.56 hazards/mi   2.36 hazards/gate
+    //
+    // The opening was carrying 64% fewer hazards per mile than the rest of the
+    // race, and mile 0 and mile 1 came in at 1.00 and 1.09 hazards per gate --
+    // a road with one thing on it, every time, for two miles.
+    //
+    // The threshold below was the whole cause: at d < 0.18 every gate takes
+    // exactly one hazard, and d does not clear 0.18 until mile 2.05.
+    //
+    // WHY THE FIX IS THIS AND NOT SPACING. spacingAt() would have added gates
+    // rather than obstacles, and its mean feeds the solver's own floor -- so
+    // tightening the opening moves the proof's window at the same time and
+    // buys a fairness argument nobody asked for. The number of lanes occupied
+    // AT a gate is the thing the owner actually named, it is bounded by the
+    // same makeGate invariants as every other gate, and it does not touch the
+    // spacing the read window is derived from.
+    //
+    // WHY IT IS NOT PUSHED TO ZERO. 0.09 lands at mile 0.69, so the first
+    // two thirds of a mile still carries exactly one hazard per gate. That
+    // stretch is the one the comment on difficulty() is about -- START_GRACE
+    // plus a road that reads calmly is what lets a new player learn the lane
+    // geometry -- and it is kept. What changes is miles 1 through 3, which
+    // were coasting on a teaching argument that had stopped applying.
+    //
+    // `full` IS DELIBERATELY NOT TOUCHED. That dial is three-lane gates, which
+    // FORCE an action; it opens at mile 1.4 at 10% and it can stay there. More
+    // obstacles is what was asked for. More forced actions is a different and
+    // harsher change, and it should be argued for on its own evidence.
     const nHaz = rnd.chance(full) ? 3
-      : d < 0.18 ? 1
+      : d < 0.09 ? 1
       : d < 0.42 ? rnd.int(1, 2)
       : 2;
 

@@ -1,0 +1,23 @@
+Here are some images. Each one shows a road ahead of you, with three lanes
+side by side: LEFT, MIDDLE and RIGHT as you see them in the picture.
+
+You are running down this road at speed and you must pick a lane.
+
+For each image, answer four things:
+
+  1. WHICH LANE do you take -- left, middle or right?
+  2. WHAT DOES EACH LANE DEMAND? For each of the three lanes say one of:
+     OVER (you must go over the thing in it), UNDER (you must go under it),
+     AROUND (you cannot get over or under it, you must not be in that lane),
+     or CLEAR (there is nothing in that lane).
+  3. HOW SURE ARE YOU of your lane choice: sure, fairly sure, or guessing.
+  4. WHAT DID YOU USE TO DECIDE? Say in your own words what in the picture
+     told you. If something was unclear, say what.
+
+If you genuinely cannot tell what a lane demands, write "cannot tell" for
+that lane -- that is a real answer and it is more useful than a guess
+dressed up as one.
+
+Answer the images independently. Do not assume they are the same road, and
+do not let one answer set up the next. Give your answer for every image, by
+filename.

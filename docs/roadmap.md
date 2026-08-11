@@ -3400,3 +3400,232 @@ nobody measured is worse than no number at all.**
     already records that hue is not the kind channel and the profile is; this
     pass spends the hue on saying what each object IS, which is what the owner
     asked for, and the profile classifier is what proves it was safe.
+
+54. **A number nobody re-measured forbade the one thing every DUCK needed. The
+    camera stopped flying at 2.05 five passes ago and the rule written against
+    it kept ruling.**
+
+    A blind reader shown unlabelled 1:1 crops through the live chase camera at
+    8, 12 and 25 units routed every JUMP correctly and answered every one of the
+    five DUCKs *"UNDER, low confidence"* with OVER live on all five. Its own
+    diagnosis is the most useful sentence in the report: *"Absolute heights of
+    anything. This is the biggest gap. Nothing in these images gives me a
+    reliable scale reference next to the objects, so every over/under/around
+    judgement I made is a judgement about proportion and silhouette, not about
+    measured clearance."* And on the mark: *"The yellow-and-black diagonals tell
+    me danger... They do NOT tell me over or under."* A DUCK cannot be jumped --
+    `collision.js` reads `surface` and deliberately not `y + surface` for
+    exactly that reason -- so reading OVER costs the run.
+
+    **THE MECHANISM WAS IN `tools/kindread.js` ALL ALONG, AS ONE LINE OF THE
+    TABLE.** A DUCK's occupancy from the road to 1.40 ran 0.22-0.30, and its
+    occupancy from 2.00 to 2.80 ran 0.25-0.35. **The top of a DUCK and the
+    bottom of a DUCK were the same number.** Two thin posts under a bar and two
+    thin posts over it is a shape with no preferred direction in it: whatever
+    the open bottom argues for going under, the open top argues equally for
+    going over. A hurdle has nothing above its rail; a low bridge has a metre of
+    structure above its soffit. Nobody had ever read the profile that way, and
+    five differentiation passes had gone by improving what the object was made
+    of rather than where its mass sat.
+
+    **WHY NOTHING HAD EVER BEEN PUT UP THERE, AND WHY THE REASON HAD EXPIRED.**
+    `world.js` stated it as law over every DUCK in the game: *"The chase camera
+    trails 5.1 units and carries 42% of the jump arc, so it sweeps y = 1.76 to
+    3.14 right through a gate's lane. An earlier version had a header board at
+    2.44 and the camera flew straight into it."* The incident is real. The
+    sentence was written when `K.CAM_BASE_Y` was **2.05**, which
+    `src/render/camera.js` still notes in passing, and the resting eye has been
+    **3.10** for a long time. Nobody re-measured, and a stale number went on
+    forbidding the one member the object most needed.
+
+    Measured on the shipped page, over a real bot run pumped at a simulated
+    60fps, sampling the live lens every frame and recording its height above the
+    road directly under it at the instant it crosses a gate plane:
+
+        lens above the road, whole run           min 2.83   max 5.74
+        at a DUCK gate, inside the lane column   min 2.85   median 3.47
+
+    Fifty-five crossings. The lens never came within a unit of the top of the
+    bar. The claim that the camera sweeps the lane at 1.76 is wrong by more than
+    the whole height of the thing it was used to forbid.
+
+    **SO ALL FIVE DUCKS GOT A CLEARANCE HEADER**, filling the whole span between
+    the standards from the top of the bar to 2.22 -- soffit shadow, web with
+    ribs, top flange -- so the beam a player reads is 1.41 to 2.22, **0.81 deep
+    against the 0.42 it was**, and there is mass above the road where there used
+    to be sky. Bands 7-10 went **0.68 / 0.89 / 0.46 / 0.25 to 0.68 / 0.90 / 0.90
+    / 0.90**, and bands 0-6 did not move at all: every member is above 1.83,
+    which is `MR.Collision.BOX`'s own ceiling for the kind, so the daylight the
+    previous pass bought is untouched. `tools/kindread.js` stays at **1 of 21**
+    misread on profile and the tightest margin IMPROVED, **-2.235 to -1.247**.
+
+    **THE RULE THAT REPLACES THE OLD ONE IS THE SAME SHAPE, PINNED TO A NUMBER
+    THAT WAS ACTUALLY TAKEN.** Nothing across the lane above **2.22** -- 0.63
+    below the lowest lens height ever sampled over a DUCK -- and nothing across
+    the lane below **1.41**, which is not a camera rule but the collision floor.
+    Above 2.22 the old rule stands unchanged: thin members, out at the
+    standards. **Re-measured after the change and the minimum is unmoved at
+    2.85.**
+
+    **AND THE MAT WAS DRAWING A LADDER.** The DUCK telegraph glyph was three
+    stacked rungs, on the channel this file itself calls the one the race is
+    lost by misreading. A rung is a thing you climb. **A flat mat cannot draw an
+    arrow that means "down"** -- every direction a floor can draw is a direction
+    along the road, which is why the JUMP glyph is a ramp profile and not an
+    up-arrow -- but it can draw the shape of the hole. It is now an inverted U
+    with road showing through the middle, which is the silhouette of the object
+    it precedes.
+
+    **WHAT A BLIND READER MEASURES THAT NO INSTRUMENT IN THIS REPO DOES.** The
+    panels are built by the same code path as `tools/framing.js` and they OMIT
+    THE TELEGRAPH MAT by construction, because `api.variantObject` hands back
+    the variant and the mat is its sibling. So every blind read this project has
+    ever run has tested the object alone. That is the harder test and worth
+    keeping -- but it is not what the player sees, and a pass that "fixes" a
+    read by strengthening the mat would not show up in it at all.
+
+    **THE TRENCH WAS BEING SEEN THROUGH A LETTERBOX, AND THE MEASUREMENT IS THE
+    APERTURE.** The reader called JUMP v2 *"red-and-white boards on a low bed"*
+    against an owner's ask for *"a visible trench"*. What a player sees of an
+    excavation is not the depth of the hole, it is the screen slot between the
+    top of the near rim and the underside of the near rail -- and through that
+    slot the ray from the lens hides everything on the far wall above y 0.27, so
+    a 0.50 wall showed **0.11 of itself**. Every pixel in the slot was warm
+    mid-tone: duct, coupler, conduit, spoil, and a pale sub-base band across the
+    far rim sitting exactly where the void should be. Aperture **0.30 to
+    0.425**, far wall visible **0.11 to 0.247**, spoil moved to the side rims,
+    ducts dropped 0.02. Deleting a rail was refused with a number: this variant
+    is the tightest hazard in the game on the contrast gate and the white in the
+    rails is what buys the ratio -- it now sits at **1.32x/+0.053**, which
+    passes and is the thinnest margin in the file.
+
+55. **Every driven channel has a floor, and the floor is not the bottom of the
+    range. The start line was a state the game had never been able to express.**
+
+    The owner: *"Before the game starts and it counts down from 3-2-1 the player
+    is running in place. That's not realistic. Make it so he is standing still
+    and then starts running when the time goes off."*
+
+    The obvious build is to damp the run cycle to zero for the three seconds of
+    the countdown, and it is wrong for a reason worth keeping: **a held pose is
+    not a stopped cycle.** Damped out, this rig sits with its knees at 0.18, its
+    ankles at -0.16 and its trunk folded 0.26 rad forward -- a runner mid-stride
+    with the clock paused, which is a mannequin holding a run. The standing pose
+    is authored instead: knees straighter, feet wider, the trunk up out of the
+    racing fold, a breath at 0.24 Hz and a weight shift at 0.11 so the two never
+    read as one motion.
+
+    **THE FINDING THAT OUTLIVES THE PASS IS ON THE FACE.** The expression system
+    assembles everything out of `effort`, and effort is written
+    `0.30 + 0.52*sp01 + 0.85*max(0,grade) + 0.55*surge` -- so its FLOOR is 0.30
+    and no input can take it lower. A man standing on a start line is at effort
+    **zero**, which is a value nothing in this game had ever asked for, so left
+    on the drive he would have waited for the gun wearing the face of someone
+    three miles in: mouth open 17% of its travel, lower lid up, brow down. The
+    finish had already hit exactly this and overridden the drive; the start line
+    hits it again and takes the same answer. **A signal assembled out of
+    gameplay terms describes gameplay, and the two seconds either side of a race
+    are not gameplay.** Anything else built on `effort`, `sp01` or `surge` should
+    be read against that before it is trusted at either end of a run.
+
+    **THE TRANSITION IS THREE THINGS AT THREE RATES, AND THE POSE BLEND IS THE
+    SMALLEST OF THEM.** A crossfade from a held pose to a running one is a
+    dissolve; a start is an event. `main.js` hands the runner and the camera a
+    ground speed that is zero at the line and ramps over 0.34 s, against a 0.72 s
+    pose blend. Cadence is a power of speed, so zero speed **freezes** the stride
+    phase rather than turning it over under a motionless body, and the phase then
+    opens from a standstill instead of resuming wherever the countdown left it.
+    And the surge signal in both `runner.js` and `camera.js` -- a smoothed
+    derivative of ground speed, built for *"acceleration = temporary stronger
+    push-off/lean"* -- **had never seen a step in this game's life**, because
+    pace only ever eases. A start hands it 0 to 21.8 u/s. It saturates and drives
+    lean, hip extension, knee drive, toe-off and the camera's own trail-back for
+    about a second and a half, on constants that were measured for exactly this
+    and had never had a moment to fire in.
+
+    **WHAT IT COSTS, STATED.** `pace.js` starts the race at START_PACE on the
+    frame the gun goes, so for the length of the stride ramp the world moves
+    faster than the legs turn over and the feet skate. No pair of constants
+    removes that: a runner who is stationary at t=0 and travelling at 21.8 u/s at
+    t=0 skates by construction. The ramp is short for that reason and no other.
+    Removing it properly means the pace model accelerating off the line, which is
+    a change to the thing every finish time in the save file was measured
+    against.
+
+    **AND THE POSE IS MEASURED, NOT EYEBALLED.** `tools/envelope.js` grew two
+    rows, `stand` and `stand-half`, because the standing pose has one number that
+    no screenshot can show: **low**. The stride plants its foot by solving the
+    ankle so hip + knee + ankle sums to zero, and there is no road clamp outside
+    a slide, so a stand that got that sum wrong would float or sink and only a
+    side elevation would ever catch it. The first draft sat the body at half the
+    run's bob amplitude -- reasoning that a frozen phase parks the trunk at the
+    bottom of its bob, which is true and beside the point -- and measured
+    **+0.0092 above the tarmac** where the run plants at -0.0098. `body` is the
+    parent of `hips`: anything written to it lifts the legs with the trunk. The
+    breath is on `spine` for the same reason. It now plants at **-0.0108**, and
+    the eight play silhouettes came through the whole pass unmoved to five
+    decimals.
+
+56. **A pause button on a time attack is an information leak before it is a
+    feature, and a resume countdown over a revealed frozen world makes it
+    worse.**
+
+    The owner: *"Can we add a pause button into the game."*
+
+    This game is a daily time attack on a deterministic date-seeded course
+    against a 1:59:30 ghost, and one contact ends a record attempt -- so the
+    resource every decision in it spends is **time to read the road**. A naive
+    pause hands that resource out for free: stop on the frame a gate resolves
+    into three lanes, study it for as long as you like, resume with the answer.
+
+    The reflex answer is a resume countdown, and **done the obvious way it is a
+    bigger gift than the pause it is guarding**: a 3-2-1 over a revealed, frozen
+    world is three more seconds of free look. So the countdown runs BEHIND the
+    panel, the panel is a solid fill where the other two are `rgba(...,0.9)`, and
+    the world reappears on the same frame it starts moving again. Three
+    mechanisms, because no one of them closes it alone -- the fill removes the
+    information, the countdown removes the ambush, and `controls.enabled` going
+    false from the pause until the gun removes the pre-loaded input, since
+    `controls.js` DROPS rather than queues while it is false.
+
+    **WHAT IS LEFT IS ON THE RECORD RATHER THAN IN A COMMENT.** A player can
+    still think about a frame they had already been shown for as long as they
+    like. Taking that back needs the race to resume some distance behind where it
+    stopped, and a rewind means unwinding `pace.units`, `player.gateIdx` and
+    `player.aidIdx` together or double-counting a gate -- a change to the scoring
+    path, which a UI pass should not be making. It is the open item here.
+
+    **THE BUTTON IS IN THE TOP RIGHT, AND THE AWKWARDNESS IS THE POINT.** The
+    four game verbs are swipes anywhere on the canvas, so a pause target under a
+    thumb is a pause pressed by a mis-started swipe -- and an accidental pause
+    during a record attempt is a worse outcome than a deliberate two-handed
+    reach. This is the one control in the game that is never used in a hurry.
+    Everything along the bottom edge is measured against the runner's shoe by
+    `tools/footroom.js`, which the bottom plate already had to give up a whole
+    row to pass; the top right is the slot the retired `#dist` plate left empty
+    and is measured by nothing, which is why the offsets are `#dist`'s own at
+    every breakpoint. 46px at every width, matching `.cta` -- **a control that is
+    hard to hit is worse than one that is hard to reach.**
+
+    Two smaller things fell out of building it. A tab going into the background
+    already froze this game, because rAF stops -- but it froze it **silently and
+    mid-gate** and handed the road back with no warning; `visibilitychange` now
+    routes into the same pause, so the player comes back to a panel and a
+    countdown. And the count is a full-frame element and so is the panel, so on a
+    resume the digit landed across the DISTANCE plate: the panel now empties
+    while the count is up, keeping the fill, which is the half of it that is
+    load-bearing.
+
+    **ONE THING IS NOT STOPPED, AND IT IS NOT MAIN.JS'S TO STOP.** Every
+    integrator in the loop is stepped with 0 while paused -- the springs, the
+    stride phase, the hood, the ghost's tag -- and `pace.update` is not called at
+    all, so the race clock and the distance are frozen at their source (measured:
+    both move by exactly 0.000000 across a paused hold). `world.js` is the
+    exception: `api.update` takes `(z, playerLane)` and reads its own
+    `performance.now()`, with a comment saying so and inviting whoever next owns
+    main.js to pass a dt at both ends. So the crowd wave, the finale clock and the
+    background traffic keep running behind the panel and step forward across a
+    long pause. Nothing there is collidable -- hazards are gates keyed to z, and
+    `course.occupiedAt` is course data -- and nobody can see it through a solid
+    fill, so it is a seam rather than a defect. It is the one edit that would make
+    the pause total, and it belongs in world.js, which this pass did not own.

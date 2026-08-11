@@ -395,6 +395,15 @@
    * ?surge= is read once, here, and never per frame.
    */
   const SURGE_POL = (params.get('surge') || 'all').toLowerCase();
+  // How far ahead the HUD announces a zone. READ OFF THE ZONE, not written
+  // here: `sight` is the marking contract's legibility distance, the distance
+  // the terrain sweep already proves stays visible over every crest, and the
+  // cue and the paint must never disagree about where the commit point is.
+  // 90 only as the fallback for a course with no zones, where it is unused.
+  // See `node tools/risk.js --section zone`.
+  const SURGE_LOOK = (course.surges && course.surges.length)
+    ? course.surges[0].sight : 90;
+  let zoneToldOf = null;
   function botWantsZone(zone) {
     if (!zone || !EFFORT) return false;
     const zs = course.surges || [];
@@ -843,6 +852,34 @@
         // help that is no longer there.
         else if (e === 'surge') audio.aid(true);
         else if (e === 'surgeDry') audio.aidMissed();
+      }
+
+      // ---- THE ZONE HAS TO BE ANNOUNCED, BECAUSE NOTHING DRAWS IT YET -----
+      //
+      // The road marking is world.js's and world.js belongs to another agent
+      // (see the contract in docs/roadmap.md and `node tools/risk.js
+      // --section zone`). Until it is painted, NOTHING in the renderer reads
+      // the zone table -- so the player is being asked to commit to a bet
+      // whose terms are invisible, which is not the risk the mechanic is made
+      // of, it is a different and much worse one.
+      //
+      // So: an announcement on the toast that already exists. NOT a new HUD
+      // plate -- the owner ruled that out and was right to -- and not a new
+      // control, because a surge is still elected by the swipe. It fires once
+      // per zone at SURGE_SIGHT units out, which is the same distance the
+      // marking contract obliges the paint to be legible from, so when the
+      // paint lands this cue is saying the same thing in the same place and
+      // can be retired in one line rather than re-tuned.
+      //
+      // It names the LANE, because which lane is marked is one of the three
+      // facts the contract says must be readable before the commit point, and
+      // it is the only one a player cannot infer from anything else on screen.
+      if (EFFORT && course.surgeZoneAt) {
+        const soon = course.surgeZoneAt(pace.units + SURGE_LOOK);
+        if (soon && soon !== zoneToldOf) {
+          zoneToldOf = soon;
+          hud.toastAid('SURGE ' + soon.n, ['LEFT', 'CENTRE', 'RIGHT'][soon.lane]);
+        }
       }
 
       // Footsteps locked to the run cycle, not to a timer.

@@ -15928,9 +15928,60 @@ MR.World = (function () {
      * play surface should out-value a mark inside it, and every real road on
      * earth agrees. The bead drops a clear step below.
      */
-    const SEAM_RAIL = overRoad(0x8e8aa8, 1.28);
-    const SEAM_BEAD = overRoad(0xfff6d8, 1.50);
-    const EDGE_LINE = overRoad(0xf2f4ff, 1.80);
+    /**
+     * ============ AND THE LADDER'S HUES, WHICH ARE NOT FREE OF CHARGE ============
+     *
+     * Every tone in this ladder was a grey with a rounding error in it -- the
+     * seven authored tones of paintGeo topped out at chroma 0.106 -- and that
+     * is most of why the bottom third of our frame is 45% short of the
+     * reference on saturation. docs/near-band-colour.md ablated the lighting
+     * stage by stage to find it: unlighting the ENTIRE frame moves near-band
+     * chroma by 0.010 of a 0.217 shortfall, and the fog moves it by exactly
+     * zero, because FOG_NEAR is 60 units and this band's mean depth is 5.6. The
+     * defect was never in the renderer. It was in these hexes.
+     *
+     * WHY THE MARKINGS AND NOT THE TARMAC. The fairness gate builds its road
+     * patch from laneBand() on mats.road; paintGeo is not in it. So the paint's
+     * chroma is STRUCTURALLY independent of every hazard margin -- twelve
+     * variants, three legs, six steps, identical to three decimal places. The
+     * tarmac has no such freedom: at k = 2 a variant fails at THE WALL and at
+     * k = 3 two fail at CITY START, because JUMP v5 sits at a luminance ratio
+     * of 1.02 and has always passed on saturation difference alone. The road is
+     * capped and is deliberately left where it is.
+     *
+     * WHY THE LADDER DOES NOT MOVE. Each tone below is re-saturated about its
+     * own luminance-grey, so its LINEAR luminance is unchanged by construction,
+     * and overRoad() then re-normalises it to the same shadedL it always had.
+     * Every ratio the long note above states is therefore still true and none
+     * of it had to be re-derived. Near-band L moves under 2%, and the edge
+     * density clarity.js Sobels out of it moves with it, which is the point:
+     * more colour, the same drawing.
+     *
+     * WHY 233-252 DEGREES AND NOT ANY OTHER HUE. Six of the seven tones already
+     * sat at blue-violet, and no colour language in this game owns it -- the
+     * racing line that used to has been deleted. The mats own amber, cyan and
+     * pink and they are the device a race is lost by misreading, so the paint
+     * is not allowed anywhere near them.
+     *
+     * AND THE ONE TONE THAT IS HELD, WHICH IS THE WHOLE REASON FOR THE GUARD.
+     * SEAM_BEAD is warm -- hue 47.5 degrees. Saturated with the rest it becomes
+     * a gold lane dash SIX DEGREES from the JUMP telegraph mat's 41.4, and this
+     * project has already had to move a road marking off a hue for exactly that
+     * reason. It stays the grey-gold it is. tools/roadchroma.js --guard 25
+     * refuses chroma to any tone within 25 degrees of a spoken hue and is what
+     * caught it; it costs 0.006 of near-band chroma, because this tone is 3.5%
+     * of the painted area.
+     *
+     * BE HONEST ABOUT WHAT THIS BUYS: a bit under half the gap. The rest is not
+     * in the palette of the surfaces we have -- it is in the fact that their
+     * play surface is a crimson train and ours is a road, 40% of the band is
+     * tarmac the gate will not let us colour, and closing the remainder means
+     * putting more saturated NON-ROAD area into the bottom third at a draw-call
+     * price. That is a separate argument on separate evidence.
+     */
+    const SEAM_RAIL = overRoad(0x846fda, 1.28);
+    const SEAM_BEAD = overRoad(0xfff6d8, 1.50);   // HELD -- see the hue note above
+    const EDGE_LINE = overRoad(0xadb2d7, 1.80);
 
     // The kerb-notch period, and now the road-bead period too. Declared here
     // because paintGeo beats against it and is built first.
@@ -16111,7 +16162,7 @@ MR.World = (function () {
         const jz = -TILE / 2 + i * ROAD_SLAB;
         const heavy = (i % 4) === 0;
         parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, heavy ? 0.24 : 0.15),
-          overRoad(heavy ? 0x272636 : 0x313040, heavy ? 0.40 : 0.50), 0, 0.004, jz, flat));
+          overRoad(heavy ? 0x251f5a : 0x2f2965, heavy ? 0.40 : 0.50), 0, 0.004, jz, flat));
         // And the surviving lip comes down toward the tarmac. It was 1.23x the
         // road, which on twenty full-width bars a tile made it the brightest
         // large thing in the near band after the edge lines. At 1.05x it is
@@ -16119,7 +16170,7 @@ MR.World = (function () {
         // cut -- but it no longer competes with the marking or the runner.
         if (heavy) {
           parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, 0.11),
-            overRoad(0x7b7a81, 1.05), 0, 0.004, jz + 0.18, flat));
+            overRoad(0x676782, 1.05), 0, 0.004, jz + 0.18, flat));
         }
       }
       /**
@@ -16222,7 +16273,7 @@ MR.World = (function () {
           // shadow goes, and putting it there buys a value step for nothing.
           // Not near-black: the first pass tried that at 0.24 wide and turned
           // the carriageway into three strips separated by chasms.
-          parts.push(part(new THREE.PlaneGeometry(0.11, TILE), overRoad(0x77728f, 0.80), lx + s * 0.12, 0.005, 0, flat));
+          parts.push(part(new THREE.PlaneGeometry(0.11, TILE), overRoad(0x534391, 0.80), lx + s * 0.12, 0.005, 0, flat));
         }
         parts.push(part(new THREE.PlaneGeometry(0.15, TILE), SEAM_RAIL, lx, 0.007, 0, flat));
         beads(lx, SEAM_BEAD, 0.009);

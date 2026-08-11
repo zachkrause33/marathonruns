@@ -4900,8 +4900,8 @@ nobody measured is worse than no number at all.**
     across five variants, at both distances, from one reader in four. Its language is
     constant -- *"chest high"*, *"well above waist height"*, *"solid to the
     ground"*. `MR.Collision.BOX` is the contract and art never decides
-    clearance, but art is all a player judges by, and **one reader in three
-    judged the art of a JUMP impassable.** That belongs to whoever owns the
+    clearance, but art is all a player judges by, and **one reader in four
+    judged the art of a JUMP impassable**, on 10 of the 52 JUMP cells. That belongs to whoever owns the
     JUMP fleet.
 
     The ten losses are spread across the kind rather than concentrated:

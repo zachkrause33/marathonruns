@@ -1,0 +1,98 @@
+{
+  "041a626e.png": {
+    "lane": "right",
+    "demands": { "left": "AROUND", "middle": "UNDER", "right": "CLEAR" },
+    "confidence": "sure",
+    "reason": "The left lane is filled end to end by a tall grey slab with blue and red chequered edges that rises well above my eye line, so there is no getting over or under it. The middle lane has a yellow gantry whose legs stand exactly on the two lane lines and whose hatched beam is suspended overhead with clear road beneath, so that lane is a duck-under. The right lane, between the right-hand lane line and the solid white edge line by the kerb where the crowd is standing, is bare tarmac all the way to the vanishing point, so I take it and do nothing."
+  },
+  "05cc80b5.png": {
+    "lane": "right",
+    "demands": { "left": "AROUND", "middle": "OVER", "right": "CLEAR" },
+    "confidence": "sure",
+    "reason": "A yellow works truck is parked square in the left lane, filling it from the white edge line by the grass to the first broken lane line, and it is far too big to get past. The middle lane has a row of three traffic cones with a pale sandbag slumped over the nearest one, plus a flat white-and-teal puddle lying on the tarmac closer to me; those are all low, roughly knee-high things, so I read that lane as a hurdle rather than a wall, though I am less certain about that than about the other two. The right lane, between the second lane line and the white edge line, is empty tarmac, so I go right."
+  },
+  "061456d9.png": {
+    "lane": "left",
+    "demands": { "left": "CLEAR", "middle": "AROUND", "right": "AROUND" },
+    "confidence": "sure",
+    "reason": "The middle lane is closed off by a wheeled red-and-white striped hoarding with two workmen standing behind it and a red no-entry sign, and the right lane is filled by the back of a green lorry; neither can be jumped or ducked. The left lane, between the white edge line and the first broken line, is plain dark tarmac with only a single cone sitting on the line itself, so that is the way through. The two blocked lanes are also washed pink in the picture while the left one is not, which matches what the objects are telling me."
+  },
+  "141e54c6.png": {
+    "lane": "middle",
+    "demands": { "left": "UNDER", "middle": "UNDER", "right": "OVER" },
+    "confidence": "fairly sure",
+    "reason": "A yellow gantry with three legs planted on the left edge line and on both broken lane lines carries a hatched beam across the left and middle lanes, with open road under it, so both of those lanes are ducks. The right lane is blocked by a low orange wall of hollow blocks, only about waist to chest high with nothing overhead, so that one is a vault. No lane is free here, so I have to act whatever I choose; I take the middle because ducking a clear span feels safer than clearing a solid block wall, but the left lane is exactly as good as the middle."
+  },
+  "191bb0ff.png": {
+    "lane": "left",
+    "demands": { "left": "CLEAR", "middle": "OVER", "right": "OVER" },
+    "confidence": "sure",
+    "reason": "This is a bridge with railings and water off to the right. The middle lane has a pair of dumped teal kick-scooters lying across it, handlebars up but no higher than my waist, and the right lane has a run of blue plastic barriers with a pink stripe along the bottom, chest high at most; both look like things I could clear rather than absolute walls, though nothing in the picture confirms that for me. The left lane, between the white edge line and the first broken line, is completely empty tarmac, so I take it and avoid the question."
+  },
+  "32a1aeba.png": {
+    "lane": "middle",
+    "demands": { "left": "UNDER", "middle": "CLEAR", "right": "OVER" },
+    "confidence": "sure",
+    "reason": "The yellow gantry on the left has its two legs standing on the left edge line and on the first broken line, so its hatched beam spans just the left lane and I would have to duck through there. The right lane has a pair of teal kick-scooters left lying across it; they are low enough to hurdle rather than a solid wall, but I would rather not test it. The middle lane, between the two broken lines, is bare tarmac from the bottom of the frame right up to the haze, so I stay in the middle."
+  },
+  "3da925dd.png": {
+    "lane": "left",
+    "demands": { "left": "CLEAR", "middle": "AROUND", "right": "UNDER" },
+    "confidence": "sure",
+    "reason": "A blue bus is stopped dead in the middle lane, filling it completely from one broken line to the other, so that lane is out. The right lane has a yellow gantry with its legs on the right-hand broken line and the white edge line, and the hatched beam hangs over the lane with clear road beneath, so that is a duck. The left lane is plain tarmac. The picture also tints the bus lane pink and the gantry lane cyan and leaves the left lane untinted, which agrees with reading the left lane as the free one."
+  },
+  "41906cc6.png": {
+    "lane": "right",
+    "demands": { "left": "UNDER", "middle": "OVER", "right": "CLEAR" },
+    "confidence": "sure",
+    "reason": "The left lane runs under a yellow gantry whose legs sit on the left edge line and the first broken line; there is also a floating green-and-white drink bottle hanging in that lane and a flat puddle on the tarmac in front of it, but the beam overhead is the thing that decides it. The middle lane has three traffic cones set in a row right across it, which are low enough to hurdle. The right lane is empty tarmac apart from the last cone sitting on the line, so I take the right and keep running."
+  },
+  "4e43dee0.png": {
+    "lane": "middle",
+    "demands": { "left": "UNDER", "middle": "UNDER", "right": "AROUND" },
+    "confidence": "fairly sure",
+    "reason": "A wide yellow gantry with three legs, on the left edge line and on both broken lines, carries two hatched beam sections over the left and middle lanes, so both of those are ducks. The right lane is shut by a red-and-white striped hoarding with a workman standing behind it, a red no-entry sign and a cone at its foot, which is not something to go over or under. There is no free lane, so I duck; I pick the middle, but the left lane demands exactly the same thing and would do just as well."
+  },
+  "7f0cce4f.png": {
+    "lane": "left",
+    "demands": { "left": "CLEAR", "middle": "UNDER", "right": "OVER" },
+    "confidence": "sure",
+    "reason": "The yellow gantry's legs stand on the two broken lane lines, so its hatched beam spans only the middle lane and that lane is a duck-under. The right lane holds a low red-and-white striped trestle barrier with a brown board and a cone tucked against it, sitting on the road with nothing above it, so that reads as a vault. The left lane, between the white edge line and the first broken line, is empty tarmac the whole way, so I go left. The blue guardrail and the second road off to the left are outside my three lanes and I ignored them."
+  },
+  "bc22e0f5.png": {
+    "lane": "left",
+    "demands": { "left": "CLEAR", "middle": "OVER", "right": "OVER" },
+    "confidence": "sure",
+    "reason": "One continuous line of barriers crosses the middle and right lanes: blue plastic barriers with a pink stripe along the bottom on the middle-lane half, and a red-and-white striped trestle barrier on the right-lane half. Both are low, roughly chest height, standing on the road with nothing overhead, so they read as vaults rather than dead ends, but I would not want to find out at speed. The left lane, between the white edge line and the first broken line, is completely open tarmac, so I take it."
+  },
+  "bf062179.png": {
+    "lane": "right",
+    "demands": { "left": "UNDER", "middle": "AROUND", "right": "CLEAR" },
+    "confidence": "sure",
+    "reason": "The yellow gantry has its legs on the left edge line and the first broken line, so the hatched beam covers only the left lane and that is a duck. The middle lane has a pink delivery motorbike with a rider and a top box moving away in front of me, filling the lane; I cannot get over or under a moving bike, so that lane is out. The right lane, between the second broken line and the white edge line, is bare tarmac all the way, so I take it."
+  },
+  "ce3eb8d9.png": {
+    "lane": "middle",
+    "demands": { "left": "CLEAR", "middle": "CLEAR", "right": "OVER" },
+    "confidence": "fairly sure",
+    "reason": "Only one lane has anything in it: the right lane is crossed by a low red-and-white striped trestle barrier with a brown board, standing on the road with nothing overhead, which looks like a hurdle rather than a dead end. The left and middle lanes are both plain empty tarmac between their lines. I take the middle simply because it is central and gives me room either side; the left lane is just as free, so the choice between those two is arbitrary and that is why I am not calling it more than fairly sure."
+  },
+  "d0fcb50a.png": {
+    "lane": "left",
+    "demands": { "left": "UNDER", "middle": "OVER", "right": "UNDER" },
+    "confidence": "fairly sure",
+    "reason": "There are two separate yellow gantries here, one with legs on the left edge line and the first broken line, and one with legs on the second broken line and the right edge line, so the left and right lanes each pass under a hatched beam. The middle lane is blocked by a low heap of orange and tan rubble or sandbags piled on the road, which has to be jumped. Nothing is free, so I duck rather than jump: I take the left lane, and the right lane demands exactly the same thing."
+  },
+  "f21f97d1.png": {
+    "lane": "middle",
+    "demands": { "left": "CLEAR", "middle": "CLEAR", "right": "OVER" },
+    "confidence": "fairly sure",
+    "reason": "The right lane has a pair of abandoned teal kick-scooters lying across it and a flat green-and-white puddle on the tarmac nearer to me, plus a floating drink bottle out over the kerb line; the scooters are low enough to clear but they are the one thing in my way. The left and middle lanes are both empty tarmac. I take the middle because it is central, but the left lane is equally clear, so that part of the choice is a coin toss. The red-and-white railings and pavement on the right are outside the road."
+  },
+  "f8123696.png": {
+    "lane": "left",
+    "demands": { "left": "CLEAR", "middle": "OVER", "right": "UNDER" },
+    "confidence": "sure",
+    "reason": "The middle lane is crossed by a run of blue plastic barriers with a pink stripe along the bottom, about chest high and with open air above them, so that lane wants a jump. The right lane runs under a yellow gantry whose legs sit on the right-hand broken line and the white edge line, so that lane wants a duck. The left lane is plain dark tarmac with nothing in it at all. The picture even tints the barrier lane gold and the gantry lane cyan and leaves the left lane untinted, which fits what I take the objects to demand."
+  }
+}

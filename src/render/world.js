@@ -15794,10 +15794,23 @@ MR.World = (function () {
      */
     const SURGE_POST_X = Math.max(K.TRACK_HALF_WIDTH + 1.85, CORRIDOR_HALF + 1.75);
     const SURGE_COUNT = [90, 60, 30];       // and the bar counts are 3, 2, 1
+    // 1.50, not 1.72: the lane pitch is 1.70, so a 1.72 plate touches its
+    // neighbour and the three read as one long board with a green end. 1.50
+    // leaves 0.20 of sky between them, which at ninety units is the pixel and
+    // a half that makes three plates three.
     const SURGE_PLATE = 1.50;
-    const SURGE_PLATE_Y = 11.10;            // 10.35 to 11.85 -- above the chord
+    const SURGE_PLATE_Y = 11.20;            // 10.45 to 11.95 -- above the chord
     const SURGE_DARK = 0x232748;            // an unlit plate
     const SURGE_FRAME = 0x2b2f52;           // the same steel the mile gantry is
+    // The arrow is WHITE ON GREEN, not green on green, and the first build had
+    // it the other way. At 60 units the plate is about eleven pixels across and
+    // an arrow one step off its own background is a texture rather than a
+    // shape; at 90 units it is gone and only the plate's colour survives. So
+    // the plate keeps the green -- that is the blob whose POSITION answers
+    // "which lane" at the far end of the run-up -- and the glyph inside it goes
+    // to the brightest thing the ramp will render, which is what answers
+    // "which lane" once the plate is big enough to have an inside.
+    const SURGE_GLYPH = 0xf4fff8;
 
     const surgeGateGeo = (function () {
       const parts = [];
@@ -15806,6 +15819,11 @@ MR.World = (function () {
       for (const sx of [-1, 1]) {
         parts.push(bx(0.40, legTop, 0.40, sx * GANTRY, legTop / 2, 0, SURGE_FRAME));
         parts.push(bx(0.86, 0.30, 0.86, sx * GANTRY, 0.15, 0, 0x1b1633));
+        // A green collar on each leg, at the height the eye is already at.
+        // The truss is nine units up and a hill can pitch it out of a portrait
+        // frame; the legs cannot leave the frame, so the colour is put on them
+        // too and the gantry reads as green from the ground up.
+        parts.push(bx(0.52, 1.60, 0.52, sx * GANTRY, 3.30, 0, SURGE_GREEN));
         // A stub bracket each side at plate height, so the run of plates reads
         // as carried by the frame rather than as floating in front of it.
         parts.push(bx(0.26, 0.26, 1.40, sx * GANTRY, SURGE_PLATE_Y, 0, SURGE_FRAME));
@@ -15813,15 +15831,17 @@ MR.World = (function () {
       // Bottom chord, top chord, and a green header band between them. The
       // band is the part that says SURGE at a distance where the plates are
       // three pixels each -- one continuous green line across the road, which
-      // is the widest mark the structure can make.
+      // is the widest mark the structure can make, and at 0.62 deep it is
+      // still four pixels of it at ninety units on a portrait frame.
       parts.push(bx(GANTRY * 2 + 0.4, 0.34, 0.40, 0, chord + 0.17, 0, SURGE_FRAME));
       parts.push(bx(GANTRY * 2 + 0.4, 0.44, 0.44, 0, legTop - 0.22, 0, SURGE_FRAME));
-      parts.push(bx(GANTRY * 2 + 0.1, 0.40, 0.20, 0, chord + 0.62, -0.24, SURGE_GREEN_HI));
+      parts.push(bx(GANTRY * 2 + 0.1, 0.62, 0.24, 0, chord + 0.72, -0.26, SURGE_GREEN_HI));
       // The entry bar, across the whole carriageway: the line the zone starts
       // on. Painted, so it has no back, and it is the one mark here that every
       // lane shares -- "a zone begins" is a fact about the road, not about a
-      // lane.
-      parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, 0.62),
+      // lane. 1.20 deep, which is one ROAD_SLAB, so it beats with the joints
+      // rather than against them.
+      parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, 1.20),
         SURGE_RAIL, 0, 0.011, 0, -Math.PI / 2));
       return merge(parts);
     })();
@@ -15844,13 +15864,15 @@ MR.World = (function () {
         if (!on) continue;
         // The arrow: a cone pointing at the road and a shaft above it. Solid
         // bodies, so it is an arrow from the flank and from behind as well.
-        parts.push(bx(0.26, 0.52, 0.16, x, SURGE_PLATE_Y + 0.40, -0.20, SURGE_GREEN_HI));
-        parts.push(part(new THREE.ConeGeometry(0.50, 0.74, 10), SURGE_GREEN_HI,
-          x, SURGE_PLATE_Y - 0.23, -0.20, Math.PI));
+        parts.push(bx(0.30, 0.60, 0.18, x, SURGE_PLATE_Y + 0.44, -0.22, SURGE_GLYPH));
+        parts.push(part(new THREE.ConeGeometry(0.56, 0.82, 10), SURGE_GLYPH,
+          x, SURGE_PLATE_Y - 0.26, -0.22, Math.PI));
       }
-      // The marked lane, on the ground, at the moment of commit. Painted.
-      parts.push(part(new THREE.PlaneGeometry(LANE - 0.34, 1.30), SURGE_RAIL,
-        K.LANE_X[lane], 0.0115, 0.96, -Math.PI / 2));
+      // The marked lane, on the ground, at the moment of commit: a solid green
+      // block three units long where the wash begins, so the ribbon starts
+      // with a statement rather than fading up out of the tarmac. Painted.
+      parts.push(part(new THREE.PlaneGeometry(LANE - 0.30, 3.00), SURGE_RAIL,
+        K.LANE_X[lane], 0.0115, 2.10, -Math.PI / 2));
       return merge(parts);
     });
 
@@ -15867,18 +15889,46 @@ MR.World = (function () {
       return g;
     }, group);
 
-    // Countdown posts: 3, 2, 1 bars at 90, 60 and 30 units out.
+    /**
+     * Countdown marker boards: 3, 2, 1 bars at 90, 60 and 30 units out.
+     *
+     * A BOARD, NOT A BARE POST, and that is the first thing this piece got
+     * wrong. Built as a dark mast with green bars bolted to it, it was the
+     * same navy as every lamp standard and utility pole on this road and the
+     * count read as one green dash in a thicket of verticals. A countdown
+     * marker on a real road is a PLATE -- a flat panel held up so the marks on
+     * it have something to be marks ON -- and a pale plate is also the only
+     * thing out here that reads at a glance against a green verge, a grey
+     * pavement and a dark pole. So the bars now sit on a 1.30 x 1.66 board,
+     * and the board is what is seen; the bars are what is counted.
+     *
+     * The board faces the runner and is BUILT ON BOTH SIDES, with the count
+     * repeated on the back: the player passes it at close range and then it is
+     * behind them for the rest of the approach, and a blank rear on a sign
+     * this close is exactly the half-built object rule 1 exists to refuse.
+     */
     const surgePostPools = [1, 2, 3].map(function (n) {
       const geo = (function () {
         const parts = [];
-        parts.push(bx(0.72, 0.22, 0.72, 0, 0.11, 0, 0x1b1633));
-        parts.push(bx(0.24, 3.00, 0.24, 0, 1.50, 0, SURGE_FRAME));
-        parts.push(bx(0.34, 0.14, 0.34, 0, 3.05, 0, SURGE_FRAME));
+        parts.push(bx(0.76, 0.24, 0.76, 0, 0.12, 0, 0x1b1633));
+        parts.push(bx(0.26, 2.70, 0.26, 0, 1.35, 0, SURGE_FRAME));
+        // ---- PALE PLATE, DARK-GREEN BARS, AND THE GANTRY IS THE OTHER WAY
+        // ROUND ON PURPOSE. The gantry's plates hang against SKY, so dark
+        // plates with a bright glyph is the readable pairing up there. These
+        // stand against a green verge, a hedge and a wall of trees, and a
+        // bright green bar in front of foliage is a bar nobody can find. So
+        // the board is the pale thing -- the only pale thing on that verge --
+        // and the count is cut into it in the saturated green. Same language,
+        // inverted for its background, which is what the whole contrast gate
+        // is about one surface down.
+        parts.push(bx(1.50, 1.94, 0.24, 0, 1.73, 0, 0xf6f8fc));
+        parts.push(bx(1.66, 2.10, 0.16, 0, 1.73, 0, SURGE_FRAME));   // border
         for (let i = 0; i < n; i++) {
-          // Counted DOWN from the top, so the top bar lands at the same height
-          // on all three posts and the count is read as a stack growing
-          // shorter rather than as a post growing taller.
-          parts.push(bx(1.10, 0.26, 0.18, 0, 2.72 - i * 0.44, 0, SURGE_GREEN_HI));
+          // Counted DOWN from the top of the board, so the top bar lands at the
+          // same height on all three and the count reads as a stack growing
+          // shorter rather than as a board growing taller. Proud of the plate
+          // on BOTH faces -- one box through it, not one box on it.
+          parts.push(bx(1.10, 0.34, 0.38, 0, 2.42 - i * 0.56, 0, SURGE_GREEN));
         }
         return merge(parts);
       })();
@@ -16049,14 +16099,14 @@ MR.World = (function () {
        * is a mile marker not read. It is the same rule and the same call.
        */
       if (b.name === 'CITY START') {
-        structures.push({ z: nudgeOver(b.to - 150), kind: 'archway', side: 1, set: 0 });
+        structures.push({ z: nudgeSpan(b.to - 150), kind: 'archway', side: 1, set: 0 });
       }
       if (b.name === 'THE WALL') {
         // nudgeOver, and it was missing here. These are the only opaque decks
         // in the game and nothing kept them off the mile gantries -- the loop
         // simply stepped 168 units and landed where it landed.
         for (let z = b.from + 90; z < b.to - 40; z += 168) {
-          structures.push({ z: nudgeOver(z), kind: 'overpass', set: 0 });
+          structures.push({ z: nudgeSpan(z), kind: 'overpass', set: 0 });
         }
         // One placed by hand: you go under it and the mile 20 gantry is
         // waiting on the far side. Mile 20 is where a marathon breaks people,
@@ -16177,6 +16227,48 @@ MR.World = (function () {
         : m - MILE_SIGHT_BEFORE;
     }
 
+    /**
+     * AND KEEP THE SURGE GANTRY'S SIGHTLINE CLEAR, which is the same rule with
+     * a different number in front of it.
+     *
+     * The mile marker is owed 95 units because that is 3.6 seconds of clear
+     * approach. The surge gantry is owed SURGE_SIGHT = 90, because 90 is what
+     * the contract says the entry marking must be legible from, and 90 is
+     * Elevation.SIGHT_MIN -- the distance the terrain sweep proves stays
+     * visible over every crest. A footbridge or an overpass 40 units short of
+     * an entry line sits between the lens and the gantry for the whole of that
+     * window, and a gantry read through a deck is a gantry not read.
+     *
+     * It is composed with the mile rule rather than replacing it, because both
+     * are real and a piece can clash with both: the candidate is nudged off
+     * the mile marker, then off the zone, then off the mile marker again, up
+     * to four times. If no z satisfies both -- possible, since a mile marker
+     * and a zone entry can land within a few units of each other -- the mile
+     * rule wins, because it is the older contract and because the mile marker
+     * has nothing else carrying its message while the zone has the paint and
+     * the countdown as well.
+     */
+    function nudgeSurge(z) {
+      for (const s of surgeZones) {
+        if (z > s.z0 - s.sight && z < s.z0 + MILE_SIGHT_AFTER) {
+          return z > s.z0 - (s.sight - MILE_SIGHT_AFTER) / 2
+            ? s.z0 + MILE_SIGHT_AFTER
+            : s.z0 - s.sight;
+        }
+      }
+      return z;
+    }
+    /** Both sightline rules, applied until they agree or four tries run out. */
+    function nudgeSpan(z) {
+      let zz = nudgeOver(z);
+      for (let i = 0; i < 4; i++) {
+        const next = nudgeOver(nudgeSurge(zz));
+        if (next === zz) return zz;
+        zz = next;
+      }
+      return nudgeOver(zz);
+    }
+
     for (const b of BI) {
       // The bridge deck's landmark IS the bridge, placed above. Nothing else
       // stands out there -- there is nothing for it to stand on.
@@ -16205,7 +16297,7 @@ MR.World = (function () {
         let i = 0, side = ((si & 1) ? -1 : 1);
         for (let z = from + 55; z < to - 45; z += MARK_SPACING) {
           const e = pts[i++ % pts.length];
-          if (e.over) landmarkOver(nudgeOver(z), e.k, si);
+          if (e.over) landmarkOver(nudgeSpan(z), e.k, si);
           else {
             const sd = e.side || side;
             landmark(z, e.k, sd, e.x || LANDMARK_IN, e.y, e.rz, si);
@@ -16228,7 +16320,7 @@ MR.World = (function () {
      */
     for (let z = 300; z < K.TOTAL_UNITS - 400; z += 330) {
       if (deckLift(z) > 0.05) continue;
-      const zz = nudgeOver(z);
+      const zz = nudgeSpan(z);
       if (noBridgeSpans.some((sp) => zz > sp[0] && zz < sp[1])) continue;
       landmarkOver(zz, 'footbridge', 0);
     }

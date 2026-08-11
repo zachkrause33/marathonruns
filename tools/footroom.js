@@ -124,6 +124,7 @@ const FILE = arg('file', null);
 // way"; it is NOT a pass. The full sweep is what the gate is read from, and
 // the report prints which one it ran.
 const QUICK = !!arg('quick', false);
+const VERBOSE = !!arg('verbose', false);
 const WINDOWS = parseInt(arg('windows', QUICK ? 3 : 12), 10);
 
 // ---------------------------------------------------------------------------
@@ -208,7 +209,9 @@ function pageSetup() {
 
   const v = new THREE.Vector3();
   F.rect = g.renderer.domElement.getBoundingClientRect();
-  F.clipped = 0;
+  // Counted PER GROUP, and that is the whole point -- see the guard below.
+  F.clip = { shoe: 0, body: 0, mark: 0 };
+  F.curKey = 'mark';
 
   // Screen row of a world point, in CSS pixels. Returns null behind the lens.
   //
@@ -222,9 +225,29 @@ function pageSetup() {
   // For the figure this is dead code: the runner is BASE_BACK = 4.35 units from
   // a lens whose near plane is 0.1, so nothing on him is ever close to it. The
   // count is reported anyway, because a silent guard is how the last one hid.
+  //
+  // ---- AND IT IS COUNTED PER GROUP, BECAUSE ONE OF THEM IS NOT GATED -------
+  //
+  // This counter used to be a single number and any non-zero value failed the
+  // build. That contradicted the header two ways at once. MARK is documented
+  // there as "reported, never gated" -- it is the contact shadow, the landing
+  // reticle and the dust, decals lying on the road at the runner's feet -- and
+  // a decal at the runner's feet PASSES UNDER THE CAMERA every few seconds,
+  // which is not a defect in anything. Measured on the shipped build: all 24 of
+  // the clipped-vertex failures were in MARK, and not one was in SHOE or BODY.
+  //
+  // So the build failed for a shadow going under the lens, on a gate whose
+  // subject is the runner's feet, at exactly one pace -- which makes it read
+  // like a finding about that pace. An instrument inventing a defect is worse
+  // than one missing a defect, because someone will go and look for it.
+  //
+  // The guard is kept where it protects the answer. A dropped SHOE or BODY
+  // vertex means the lowest row of the FIGURE was computed without a point that
+  // might have been the lowest, so the gate would be UNDER-reporting -- the one
+  // failure mode this file exists to prevent. That still fails, loudly.
   const rowOf = function (cam, rect) {
     v.applyMatrix4(cam.matrixWorldInverse);
-    if (-v.z < 0.5) { F.clipped++; return null; }
+    if (-v.z < 0.5) { F.clip[F.curKey]++; return null; }
     v.applyMatrix4(cam.projectionMatrix);
     return rect.top + (1 - v.y) * 0.5 * rect.height;
   };
@@ -278,6 +301,7 @@ function pageSetup() {
     const out = {};
     for (const key in F.groups) {
       const list = F.groups[key];
+      F.curKey = key;
       let bound = -Infinity, exact = -Infinity;
       const hot = [];
       for (let i = 0; i < list.length; i++) {
@@ -335,7 +359,7 @@ function pageSweep(opt) {
 
   const N = 48;                    // samples per stride window
   const WINDOWS = opt.windows || 12;   // camera-phase offsets
-  F.clipped = 0;
+  F.clip = { shoe: 0, body: 0, mark: 0 };
   const best = { shoe: -Infinity, body: -Infinity, mark: -Infinity };
   const at = {};
   let fovLo = Infinity, fovHi = -Infinity, speedLo = Infinity, speedHi = -Infinity;
@@ -405,7 +429,7 @@ function pageSweep(opt) {
     atShoe: at.shoe, atBody: at.body,
     fov: [fovLo, fovHi], speed: [speedLo, speedHi],
     samples: samples,
-    clipped: F.clipped,
+    clip: F.clip,
     viewH: F.rect.height,
   };
 }
@@ -421,6 +445,9 @@ function pageSweep(opt) {
   const rows = [];
   let failed = false;
   const problems = [];
+  // Reported and never gated, the way MARK itself is. Kept separate from
+  // `problems` so that a thing which cannot fail the build cannot fail it.
+  const notes = [];
 
   for (const vp of VIEWPORTS) {
     if (ONLY && vp.name !== ONLY) continue;
@@ -485,7 +512,15 @@ function pageSweep(opt) {
         problems.push(`${vp.name} ${pc.name} ${st}: ${res.error || 'no finite sample'}`);
         failed = true;
       } else {
-        if (res.clipped) problems.push(`${vp.name} ${pc.name} ${st}: ${res.clipped} vertices behind the near plane`);
+        // SHOE or BODY behind the near plane means the figure's lowest row was
+        // computed with a point missing, so the gate under-reports. That fails.
+        // MARK is the ground decals and is never gated -- see rowOf().
+        const figClip = res.clip.shoe + res.clip.body;
+        if (figClip) {
+          problems.push(`${vp.name} ${pc.name} ${st}: ${figClip} FIGURE vertices behind the near plane -- this row under-reports`);
+          failed = true;
+        }
+        if (res.clip.mark) notes.push(`${vp.name} ${pc.name} ${st}: ${res.clip.mark} mark vertices under the lens (decals, not gated)`);
         const clear = res.rail - res.shoe;
         const clearBody = res.rail - res.body;
         rows.push({
@@ -509,7 +544,7 @@ function pageSweep(opt) {
   await browser.close();
 
   if (JSON_OUT) {
-    console.log(JSON.stringify({ margin: MARGIN, rows, problems, ok: !failed }, null, 1));
+    console.log(JSON.stringify({ margin: MARGIN, rows, problems, notes, ok: !failed }, null, 1));
     process.exit(failed ? 1 : 0);
   }
 
@@ -540,6 +575,8 @@ function pageSweep(opt) {
   }
   console.log(`  ${rows.length} combinations, ${rows.reduce((a, b) => a + b.samples, 0)} samples`);
   for (const p of problems) console.log('  ! ' + p);
+  if (notes.length) console.log(`  (${notes.length} mark-under-lens notes, not gated; --verbose to list)`);
+  if (VERBOSE) for (const nte of notes) console.log('  - ' + nte);
   console.log('  ' + (failed ? 'FAIL' : 'PASS'));
   process.exit(failed ? 1 : 0);
 

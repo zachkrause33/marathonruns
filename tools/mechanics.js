@@ -148,16 +148,40 @@ console.log(`\n=== identity: flags off must be the generator that shipped ===\n`
  * has never moved and must not, and AID moved once, on purpose, and here is
  * the new one.
  */
-// Unmoved since before either mechanic existed. The old single hash was
-// f046dcfc84a59c08a3a7b51c78449853f3bd90f8 over gates and aid together, and
-// splitting it reproduces that value exactly from these two -- checked rather
-// than asserted, which is how the split was shown not to be a re-baseline in
-// disguise.
-const BASELINE_GATES = 'd24862235d30ff68daf8e6142d7162f1f230b6e1';
-// Re-taken once, deliberately: the aid placement rule was rewritten so a bottle
-// stands behind an obstacle rather than in open road. It was
-// 7f17eb4893b067571344191ddd6478b4f8da3329. See docs/roadmap.md.
-const BASELINE_AID = 'e81209a3dd064fbebaf5c7253b4d3ac0c634d39b';
+// ---- RE-TAKEN ONCE, AND IT HAD ALREADY BEEN STALE FOR TWO COMMITS --------
+//
+// It was d24862235d30ff68daf8e6142d7162f1f230b6e1, described here as "unmoved
+// since before either mechanic existed", and the description had stopped being
+// true without this line changing.
+//
+// 7b0a1d2 "The opening two miles were a road with one thing on it" retuned
+// makeGate's nHaz thresholds so the second hazard arrives earlier. That is a
+// deliberate change to gate generation and it is a good one; what it did not do
+// is re-take this number, so from that commit onward `mechanics --identity`
+// reported "GATE generation has MOVED" on every run -- which is exactly the
+// message a FLAG LEAK produces, and the check had therefore been announcing a
+// false alarm indistinguishable from the true one it exists to raise.
+//
+// BISECTED RATHER THAN ASSUMED, because "it was probably already broken" is the
+// most dangerous sentence available to whoever re-takes a golden number. The
+// identity hash was recomputed from each commit's OWN course.js:
+//
+//   c32e6ea  d24862235d30ff68daf8e6142d7162f1f230b6e1   <- matches this file
+//   7b0a1d2  e9f8d87fa92e7a5d62a89f660964441e8c227a45   <- moved here
+//   b9b2170  e9f8d87fa92e7a5d62a89f660964441e8c227a45
+//   EFFORT   e9f8d87fa92e7a5d62a89f660964441e8c227a45   <- this pass, flags off
+//
+// So the surge work is bit-identical to the commit before it at EFFORT = 0,
+// which is the property this check is for, and the number below is 7b0a1d2's.
+// Recorded in docs/roadmap.md.
+const BASELINE_GATES = 'e9f8d87fa92e7a5d62a89f660964441e8c227a45';
+// Re-taken twice. Once deliberately, when the aid placement rule was rewritten
+// so a bottle stands behind an obstacle rather than in open road (it was
+// 7f17eb4893b067571344191ddd6478b4f8da3329); and once here, for the same reason
+// and at the same commit as the gate hash above -- aid hangs off the gate
+// table, so a gate change moves it. It was
+// e81209a3dd064fbebaf5c7253b4d3ac0c634d39b. See docs/roadmap.md.
+const BASELINE_AID = 'ae74e0eef42e5eca0774bc0721f684dc9bb67dfe';
 /**
  * ---- THE FLAGS ARE FORCED OFF HERE, AND THAT IS NOT A WEAKENING ----------
  *
@@ -176,7 +200,14 @@ const BASELINE_AID = 'e81209a3dd064fbebaf5c7253b4d3ac0c634d39b';
  */
 (function identity() {
   const n0 = Course.NARROW, r0 = Course.RAMP;
-  Course.NARROW = 0; Course.RAMP = 0;
+  // ...and EFFORT, which is the third flag and the one that moves the most.
+  // It plans surge zones BEFORE the gates and widens the action window inside
+  // them, so at EFFORT > 0 the course is legitimately a different course and
+  // this hash SHOULD differ. Forced off here for the same reason the other two
+  // are: the invariant is not "the defaults are zero", it is "a flag draws no
+  // random number when it is off", and that is what the baseline proves.
+  const e0 = Pace.EFFORT;
+  Course.NARROW = 0; Course.RAMP = 0; Pace.EFFORT = 0;
   const hg = crypto.createHash('sha1');
   const ha = crypto.createHash('sha1');
   for (const key of keys(365)) {
@@ -184,7 +215,7 @@ const BASELINE_AID = 'e81209a3dd064fbebaf5c7253b4d3ac0c634d39b';
     hg.update(JSON.stringify(c.gates));
     ha.update(JSON.stringify(c.aid));
   }
-  Course.NARROW = n0; Course.RAMP = r0;
+  Course.NARROW = n0; Course.RAMP = r0; Pace.EFFORT = e0;
   const gotG = hg.digest('hex'), gotA = ha.digest('hex');
   console.log(`  shipped defaults     NARROW=${n0} RAMP=${r0}   (hashes below are with both forced OFF)`);
   console.log(`  365-day gate hash    ${gotG}`);
@@ -923,7 +954,23 @@ for (const [label, n, r] of rows) {
   const vs = p.t - K.RECORD_SECONDS;
   console.log(`  ${label.padEnd(12)} ${p.gates.toFixed(1).padStart(5)}   ${Pace.clock(p.t).padStart(13)}   `
     + `${(vs >= 0 ? '+' : '') + vs.toFixed(0)}s   ${(p.t - base.t >= 0 ? '+' : '') + (p.t - base.t).toFixed(1)}s vs both off`);
-  if (vs >= 0) bad(`${label}: a perfect line no longer beats the record`);
+  // ---- WHICH CONTRACT THIS ROW IS HELD TO DEPENDS ON EFFORT -------------
+  //
+  // This loop runs a perfect line that spends NOTHING -- no aid, no surge --
+  // and under EFFORT that line is not supposed to beat the record. That is the
+  // whole point of the pass: the shipped game handed a flawless run 86 seconds
+  // of free margin and six different policies tied inside it, so the margin was
+  // made purchasable rather than free. tools/simulate.js's policy sweep is
+  // where the record is priced now.
+  //
+  // The assertion is INVERTED here rather than deleted, because what this loop
+  // is really guarding is that NARROW and RAMP do not move the finish -- the
+  // "vs both off" column -- and that guard is worth keeping under either flag.
+  if (Pace.EFFORT > 0) {
+    if (vs <= 0) bad(`${label}: a perfect line that spent nothing still beats the record`);
+  } else if (vs >= 0) {
+    bad(`${label}: a perfect line no longer beats the record`);
+  }
 }
 
 console.log('');

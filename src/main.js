@@ -11,6 +11,11 @@
  *   ?nocount=1        skip the countdown
  *   ?nosave=1         play without writing to the save
  *   ?polish=0         run the character animation with the polish terms off
+ *   ?effort=0         the game before the pool, the guard and the surge zones
+ *   ?surge=POLICY     which zones the autopilot elects: all (default), none,
+ *                     hold1, hold2, late, every2. Named to match the policies
+ *                     tools/simulate.js sweeps, so the game and the sweep are
+ *                     one model. Inert without ?bot=.
  *
  * `?polish` is the animation A/B, and it is a scalar rather than a switch so
  * the two versions can also be crossfaded to find where a term stops helping.
@@ -359,6 +364,73 @@
     seen: 0,
   };
 
+  /**
+   * ---- THE AUTOPILOT CAN SEE SURGE ZONES, AND UNTIL IT COULD, NOTHING ------
+   *
+   * This block is the single highest-risk thing in the effort build and it is
+   * worth saying why in the file rather than only in the roadmap. A surge is
+   * elected BY BEING IN THE MARKED LANE. A bot that scores lanes on CLEAR, aid
+   * and ramp -- which is every bot this project had -- therefore takes the
+   * marked lane only by coincidence, runs the whole course at the unsurged
+   * floor, and reports, truthfully and uselessly, that the mechanic changed
+   * nothing. tools/risk.js printed exactly that: six policies, spread 0.0 s,
+   * after the pool and the zones had shipped. The instrument was not wrong; it
+   * was blind, which is worse, because a blind instrument agrees with you.
+   *
+   * So the bot gets a spend policy, named to match tools/simulate.js's POLICIES
+   * so the game and the sweep are one model rather than two:
+   *
+   *   all     elect every zone while there is fuel. The default, and the same
+   *           argument the ramp term below uses: every frame this project
+   *           photographs is bot-driven, so the default line must have the
+   *           mechanic switched ON or the shot library is a picture of a game
+   *           nobody is playing.
+   *   none    never elect. The A/B partner, and NOT the same thing as
+   *           ?effort=0 -- this one still runs the wider surge-spaced course.
+   *   hold1   decline the first zone, take every one after it. The design's
+   *   hold2   claim, that the same pool spent later is worth more.
+   *   late    the back half only.
+   *   every2  alternate.
+   *
+   * ?surge= is read once, here, and never per frame.
+   */
+  const SURGE_POL = (params.get('surge') || 'all').toLowerCase();
+  function botWantsZone(zone) {
+    if (!zone || !EFFORT) return false;
+    const zs = course.surges || [];
+    const i = zs.indexOf(zone);
+    if (i < 0) return false;
+    switch (SURGE_POL) {
+      case 'none': return false;
+      case 'hold1': return i >= 1;
+      case 'hold2': return i >= 2;
+      case 'late': return i >= Math.floor(zs.length / 2);
+      case 'every2': return i % 2 === 1;
+      default: return true;
+    }
+  }
+
+  /**
+   * The marked lane the bot should be standing in over the road between here
+   * and the gate it is planning for, or -1.
+   *
+   * Both ends of that span are asked, not just the gate line. A zone is 420 to
+   * 560 units and a gate interval is around 25, so the runner is almost always
+   * deep inside a zone rather than crossing its edge -- but the edges are
+   * exactly where the election is won or lost, and a test at the gate line
+   * alone would drop the surge for the last gate-interval of every zone.
+   */
+  function botSurgeLane(gz) {
+    if (!EFFORT || !course.surgeZoneAt) return -1;
+    const here = course.surgeZoneAt(pace.units);
+    const there = course.surgeZoneAt(gz);
+    const z = botWantsZone(here) ? here : (botWantsZone(there) ? there : null);
+    // No fuel, no surge -- and no detour for one either. Standing in the marked
+    // lane on an empty tank buys nothing and can still cost an action.
+    if (!z || pace.pool <= 0) return -1;
+    return z.lane;
+  }
+
   function botThink() {
     // Advance past gates already resolved.
     while (bot.gate < course.gates.length && course.gates[bot.gate].z < pace.units - 1) {
@@ -388,19 +460,39 @@
       // playing it. A verification harness that cannot exercise a mechanic is
       // not verifying that mechanic.
       //
-      // Aid is taken on lane match alone (player.resolveAid), so wanting an
-      // item means being in its lane when z passes it. The lane commit below
-      // fires at 34 units out, comfortably before any item between here and
-      // the gate.
+      // ---- AND IT WAS READING THE WRONG RULE ------------------------------
+      //
+      // This block used to say "aid is taken on lane match alone, so wanting
+      // an item means being in its lane when z passes it", and collect every
+      // item between the runner and the gate line. Both halves went stale when
+      // aid became GUARDED (roadmap 50) and nothing re-read them:
+      //
+      //   * player.resolveAid pays a guarded item to a runner who was in
+      //     item.lane WHEN GATE item.gate RESOLVED. It is a receipt off
+      //     s.lastGate, not a lane match on the road.
+      //   * generateAid places the item at g.z + 2*halfZ + AID_SETBACK -- that
+      //     is, always PAST its own gate line, standing behind the obstacle it
+      //     hangs off. So `it.z > g.z` was true for the very item this gate
+      //     was about, and the loop broke out before ever seeing it.
+      //
+      // The bot therefore steered for items belonging to gates it had already
+      // passed and could no longer be paid for. Measured on the real page: 5
+      // of the 14 road items on today's course. Reading the shipped rule
+      // instead -- want item.lane at gate item.gate -- takes it to 12.
+      //
+      // Same expression tools/risk.js has always used (aid[ai].gate === gi),
+      // which is why that harness collected and this one did not.
       const order = [player.lane, player.lane - 1, player.lane + 1, 0, 1, 2]
         .filter((l, i, a) => l >= 0 && l <= 2 && a.indexOf(l) === i);
-      // Items still ahead of the runner and no further than this gate.
+      // The lanes that would be paid for AT THIS GATE. Roof items are excluded
+      // deliberately: they are bought by being on the deck, which the ramp term
+      // below already steers for, and wanting one on the road is wanting
+      // something that cannot be collected from there.
       const wants = [];
       for (const it of (course.aid || [])) {
-        if (it.z <= pace.units) continue;
-        if (it.z > g.z) break;
-        wants.push(it.lane);
+        if (it.gate === bot.gate && !it.roof) wants.push(it.lane);
       }
+      const surgeLane = botSurgeLane(g.z);
       let best = null, bestScore = -Infinity;
       order.forEach(function (l, i) {
         // A RIDEABLE BLOCK IS NOT A WALL TO THIS BOT. `gate.ramp` names the
@@ -427,6 +519,23 @@
         // is asking is what the roof costs, and a bot that prefers a bottle
         // would answer a different one.
         if (g.ramp === l) score += 220;
+        // ---- AND THE MARKED LANE, WHICH IS THE ELECTION ------------------
+        //
+        // 180: above aid (150), below the ramp (220). Both orderings are
+        // deliberate. Above aid, because a segment collected is only worth
+        // what it later buys and the zone IS the thing it buys -- a bot that
+        // detoured for a bottle out of a zone it had already paid to be in
+        // would be spending the pool to fill the pool. Below the ramp,
+        // because a runner on a roof is not electing anything: resolveSurge
+        // returns null on deck, so preferring the ramp here agrees with the
+        // shipped rule instead of fighting it.
+        //
+        // The marked lane is guaranteed non-BLOCK inside a zone by the surge
+        // clause in generate(), so this term can never steer into a wall --
+        // but the BLOCK filter above still runs first, so if that guarantee
+        // ever broke, the bot would decline the surge rather than crash and
+        // the failure would show up as a lost second and not a lost run.
+        if (l === surgeLane) score += 180;
         if (score > bestScore) { bestScore = score; best = l; }
       });
       if (best === null) best = player.lane;
@@ -1050,6 +1159,23 @@
       if (BOT) botThink();
       player.handle(controls);
       controls.tick(step);
+      // ---- THE FAST-FORWARD RESOLVES THE SAME FACTS THE LIVE LOOP DOES ----
+      //
+      // It did not, and the omission was invisible until the pool existed.
+      // This loop had never called resolveAid or resolveSurge, so a
+      // fast-forwarded race collected NOTHING and elected NOTHING -- which
+      // under EFFORT means every ?skip= frame in the shot library shows an
+      // empty FUEL gauge and an unsurged runner, whatever the bot did, and
+      // every tool that plays the game by skipping would have reported the
+      // mechanic doing nothing. That is the same blindness that made
+      // tools/risk.js print six policies at a 0.0 s spread, one layer down.
+      //
+      // Before pace.update, in the live loop's order and for the live loop's
+      // reason: the surge decides which floor this step runs toward.
+      if (EFFORT) {
+        player.resolveSurge(course, pace.units, pace.pool > 0);
+        pace.surging = !!player.surge;
+      }
       const b = pace.units;
       pace.update(step);
       player.update(step, pace.units - b);
@@ -1057,14 +1183,21 @@
       // that skipped this would photograph the runner standing in mid-air where
       // a roof should be, or record a mount as a collision.
       const fd = player.resolveDeck(course, b, pace.units);
-      if (fd && fd.hit) { pace.onHit(); hitAt.push(fd.z); }
+      // A guarded contact is not a hit and must not leave a hit marker: the
+      // live loop's charge() already draws that line, and the fast-forward has
+      // to draw it in the same place or a skipped race and a played one
+      // disagree about what happened.
+      if (fd && fd.hit && pace.onHit() !== 'guard') hitAt.push(fd.z);
       for (const r of player.resolveGates(course, b, pace.units)) {
         // Recorded here as well as in the live loop. This fast-forward exists
         // so tooling can photograph the game deep into a race, and a debug
         // path that quietly drops a fact the finish card is computed from
         // would make the card lie on exactly the runs the harness inspects.
-        if (r.clean) pace.onClean(); else { pace.onHit(); hitAt.push(r.gate.z); }
+        if (r.clean) pace.onClean();
+        else if (pace.onHit() !== 'guard') hitAt.push(r.gate.z);
       }
+      // And the bottles, which fill the pool that everything above spends.
+      for (const item of player.resolveAid(course, b, pace.units)) pace.onAid(item.gain);
       player.drainEvents();
       if (pace.finished) break;
     }

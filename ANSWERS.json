@@ -1,0 +1,98 @@
+{
+  "0f0acb83.png": {
+    "lane": "right",
+    "demands": { "left": "AROUND", "middle": "UNDER", "right": "CLEAR" },
+    "confidence": "sure",
+    "reason": "Two broken purple lines split the tarmac into three lanes, with a solid pale edge line at each side. The left lane is filled end to end by a tall grey panel with blue and red blocks on it, sitting flat on the road with no gap underneath, so that lane is simply shut. The yellow gantry's two legs come down exactly on the two purple lines, and its hatched cross-bar hangs well clear of the road, so the middle lane is a duck-under. The right lane is bare tarmac all the way to the vanishing point."
+  },
+  "1efba3ea.png": {
+    "lane": "middle",
+    "demands": { "left": "CLEAR", "middle": "CLEAR", "right": "OVER" },
+    "confidence": "sure",
+    "reason": "The road reads as edge line, broken purple line, broken purple line, edge line, so three lanes; the kerb, railings and red flags on the right are outside it and don't count. The right lane has a gold-lit run-up strip ending in a low turquoise frame: two uprights with a solid bar sitting on the road between them, roughly knee height, and open air above it, which is a hurdle to jump. Left and middle are both empty tarmac. I took the middle because it is clear and still leaves me an empty lane to my left if I need it."
+  },
+  "21f09ca0.png": {
+    "lane": "right",
+    "demands": { "left": "UNDER", "middle": "AROUND", "right": "CLEAR" },
+    "confidence": "sure",
+    "reason": "The yellow gantry straddles the left lane, one leg out on the left shoulder and the other on the first purple line, with its hatched bar high above a cyan-lit strip of road, so that lane is a duck-under. The middle lane has a gold strip that ends in three orange and white traffic cones spread right across it; they stand about as tall as they are wide relative to the lane and there is nothing to get under, so that lane is closed. The right lane, between the second purple line and the pale edge line, is plain dark tarmac."
+  },
+  "372ab574.png": {
+    "lane": "middle",
+    "demands": { "left": "UNDER", "middle": "CLEAR", "right": "OVER" },
+    "confidence": "sure",
+    "reason": "Four lines give three lanes. The yellow gantry's legs land on the left edge line and on the first purple line, so its hatched bar covers the left lane only, over a cyan-lit stretch of road, which is a duck-under. The right lane has a gold run-up ending in a turquoise hurdle frame, a low solid bar on the ground between two uprights with clear space above it, so that one is a jump. The middle lane is untouched tarmac from my feet to the haze, which is why I took it."
+  },
+  "437dfbdb.png": {
+    "lane": "left",
+    "demands": { "left": "CLEAR", "middle": "OVER", "right": "AROUND" },
+    "confidence": "sure",
+    "reason": "On this bridge deck the two gold-lit strips fall exactly in the middle and right lanes. The middle strip ends in a turquoise hurdle: thin uprights with a shallow bar resting on the road, low enough to clear. The right strip ends in a solid blue block with a pink and white striped skirt at road level, chest high with no opening at all, so that lane is out. The left lane, between the pale edge line and the first purple line, is dark and empty, so I took it."
+  },
+  "5500c318.png": {
+    "lane": "middle",
+    "demands": { "left": "CLEAR", "middle": "CLEAR", "right": "AROUND" },
+    "confidence": "sure",
+    "reason": "Edge line, two broken purple lines, edge line: three lanes, with grass banks and railings outside them. The only obstacle is in the right lane, a roadworks trestle with a red and white striped board and red reflector lamps, standing on legs with a solid plank low down, so there is no clean way over or under it. Left and middle are both empty. I took the middle since it is clear and I would rather not run tight against the left kerb."
+  },
+  "7095effa.png": {
+    "lane": "left",
+    "demands": { "left": "CLEAR", "middle": "UNDER", "right": "AROUND" },
+    "confidence": "sure",
+    "reason": "The camera sits left of centre but the four lines are all there. The yellow gantry's legs come down on the two purple lines, so its hatched bar covers the middle lane over a cyan-lit strip, a duck-under. The right lane has a gold strip ending in a red and white roadworks barrier on trestle legs, solid to the ground, so that lane is shut. The left lane, between the white edge line and the first purple line, is plain tarmac with nothing on it."
+  },
+  "783d01dd.png": {
+    "lane": "left",
+    "demands": { "left": "UNDER", "middle": "UNDER", "right": "AROUND" },
+    "confidence": "fairly sure",
+    "reason": "This gantry is a double one: three legs, landing on the left edge line, the first purple line and the second purple line, with one continuous hatched bar running across both bays. So the left and the middle lane are both duck-unders with the same clearance. The right lane has a red and white striped barrier panel on a stand, a traffic cone and a worker holding a stop sign, which shuts it. Left and middle are equally passable; I picked the left because it puts the most road between me and the people working in the closed lane."
+  },
+  "7c1fe1b7.png": {
+    "lane": "left",
+    "demands": { "left": "UNDER", "middle": "UNDER", "right": "AROUND" },
+    "confidence": "fairly sure",
+    "reason": "Same double gantry pattern: three yellow legs sitting on the left edge line and on both purple lines, with one hatched bar spanning two bays, so the left and middle lanes are both duck-unders. The right lane is filled by a stacked pile of brown concrete pipe sections, two rows deep with dark open ends, waist to chest high and packed solid, so there is nothing to jump or slide under. Left and middle are interchangeable here; I took the left to stay furthest from the pile."
+  },
+  "8773e6f5.png": {
+    "lane": "left",
+    "demands": { "left": "CLEAR", "middle": "AROUND", "right": "UNDER" },
+    "confidence": "sure",
+    "reason": "The blue bus fills the middle lane exactly, edge to edge between the two purple lines, with tail lights, a number plate and a striped skirt at road level, so there is no way past it in that lane. The yellow gantry is off to the right, its legs on the second purple line and on the right edge line, so its hatched bar covers the right lane as a duck-under. The left lane is empty tarmac with only its white edge dashes, so that is where I go."
+  },
+  "886babc2.png": {
+    "lane": "left",
+    "demands": { "left": "CLEAR", "middle": "AROUND", "right": "AROUND" },
+    "confidence": "sure",
+    "reason": "The middle lane is taken up by a roadworks set: a red and white striped barrier on legs, two workers, a round no-entry sign and orange cones at either end, all solid to the ground. The right lane is blocked by the back of a dark green truck that fills the lane between the second purple line and the right edge line. The left lane, from the pale edge line to the first purple line, is bare road for as far as I can see, so it is the only one I can use."
+  },
+  "9d2f0312.png": {
+    "lane": "right",
+    "demands": { "left": "AROUND", "middle": "AROUND", "right": "CLEAR" },
+    "confidence": "sure",
+    "reason": "The left lane has a pink-lit strip ending at the back of a yellow works truck, which fills the lane and has nothing to go over or under. The middle lane has a gold strip ending in a group of four orange and white cones spread across it, which closes it. The right lane, between the second purple line and the pale edge line, is plain dark tarmac with only its lane dashes, so I take the right. The grass bank, benches and trees on the left are outside the road and not one of the lanes."
+  },
+  "a3d19dc1.png": {
+    "lane": "left",
+    "demands": { "left": "CLEAR", "middle": "AROUND", "right": "AROUND" },
+    "confidence": "sure",
+    "reason": "Two gold-lit strips fall in the middle and right lanes and both end in something solid. The middle one is stopped by a blue barrier block with a pink and white striped base sitting flat on the road, chest high, no gap under it. The right one is stopped by a brown and red and white roadworks trestle with striped boards. Neither can be jumped or ducked. The left lane is unlit, empty tarmac between the white edge line and the first purple line, so that is the only lane left."
+  },
+  "b1c7eaee.png": {
+    "lane": "left",
+    "demands": { "left": "UNDER", "middle": "AROUND", "right": "UNDER" },
+    "confidence": "fairly sure",
+    "reason": "There are two separate yellow gantries here, not one wide one. The left gantry's legs sit on the left edge line and the first purple line, and the right gantry's legs sit on the second purple line and the right edge line, so the left and right lanes are each a duck-under with much the same clearance. Between them the middle lane is heaped with orange and tan blocks, which look like sandbags or spilled barriers; the pile comes up to about half the gantry clearance, too high to hurdle and with nothing to get under. The pile is the one thing I am not certain about, but either outside lane works and I took the left."
+  },
+  "c8e1250f.png": {
+    "lane": "left",
+    "demands": { "left": "CLEAR", "middle": "AROUND", "right": "UNDER" },
+    "confidence": "sure",
+    "reason": "On this bridge the middle lane is blocked by a blue barrier block with a pink and white striped base, sitting square on the road between the two purple lines, well above waist height and closed to the ground. The yellow gantry stands over the right lane, its legs on the second purple line and on the right edge line, with the hatched bar high enough to run under. The left lane is dark, unbroken tarmac, so I take it. The railings and the water beyond the right edge are not part of the road."
+  },
+  "e555cabe.png": {
+    "lane": "right",
+    "demands": { "left": "UNDER", "middle": "AROUND", "right": "CLEAR" },
+    "confidence": "sure",
+    "reason": "The yellow gantry's legs land on the left edge line and the first purple line, so its hatched bar covers the left lane over a cyan-lit strip, a duck-under. The middle lane has a pink-lit strip with a red motorbike carrying a tall box sitting on it, filling the lane, so that one is out. The right lane, past the second purple line and up to the pale edge line, is empty tarmac, so I take the right and do not have to duck or jump at all."
+  }
+}

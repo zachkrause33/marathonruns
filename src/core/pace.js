@@ -60,7 +60,11 @@ MR.Pace = (function () {
    * AID_CEILING was built to have -- the top gear is still only buyable with a
    * clean line.
    */
-  let EFFORT = 0;
+  // SHIPS AT 1, exactly as MR.Course.RAMP does, and for the reason the owner
+  // gave: the game as it stood could be beaten on a first attempt by six
+  // different lines that all finished within 0.0 seconds of each other. This IS
+  // the game now. ?effort=0 returns the other one, whole, from the same build.
+  let EFFORT = 1;
 
   const SURGE = {
     // The unsurged floor, and it is SLOWER than K.FLOOR_PACE on purpose. The

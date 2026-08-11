@@ -247,6 +247,34 @@ html, body {
       rgba(14, 18, 48, 0.55) calc(12.5% - 1px) 12.5%);
 }
 .gauge.tank .gaugeFill { opacity: 0.92; }
+/* FOUR divisions, not eight, and the number is MR.Pace.SURGE.POOL_MAX. The
+   whole point of the pool reading as segments is that a player can count what
+   they have without reading a number, and eight notches is not a count, it is
+   a texture. */
+.gauge.tank.pool {
+  background:
+    repeating-linear-gradient(90deg,
+      rgba(255, 253, 245, 0.13) 0 calc(25% - 1px),
+      rgba(14, 18, 48, 0.55) calc(25% - 1px) 25%);
+}
+/* The pace, demoted from the fill to a hairline on the same bar. Warmer and
+   thinner than the record tick so the two cannot be confused: the tick is a
+   fixed target and the hairline is you. */
+.gaugePace {
+  position: absolute; top: -2px; bottom: -2px; width: 1px;
+  background: var(--accent); opacity: 0.85;
+  box-shadow: 0 0 0 1px rgba(14, 18, 48, 0.7);
+  display: none;
+}
+.gauge.pool .gaugePace { display: block; }
+/* Surging. The tank is being spent, so it says so -- and it says so on the
+   PLATE as well as the bar, because the player's eyes are on the road and a
+   14px bar is not where a state change gets noticed. */
+#engine.surging { border-left-color: var(--ahead); }
+.gauge.tank.surging .gaugeFill { background: var(--ahead); }
+/* A guarded contact. The engine's own colour, not the loss colour: nothing was
+   lost. Short, because it is a reassurance and not an alarm. */
+#engine.guarded { border-left-color: var(--ahead); background: rgba(14, 48, 38, 0.8); }
 .gaugeFill { position: absolute; inset: 0 auto 0 0; background: var(--accent); width: 0; }
 /* Record pace as a mark on the range you are unlocking: once the fill passes
  * it, you are running faster than 1:59:30 needs. */

@@ -45,6 +45,14 @@
   // clamp themselves; see the accessors at the foot of course.js.
   if (params.has('narrow')) MR.Course.NARROW = params.get('narrow') || 1;
   if (params.has('ramp')) MR.Course.RAMP = params.get('ramp') || 1;
+  // ...and the third, which is the biggest of them. ?effort=0 returns the game
+  // exactly as it was before the pool, the guard and the surge zones existed:
+  // no zones are planned, no stream is drawn, the pace floor goes back to 4:14
+  // and the course is BIT-IDENTICAL. Read here, before Course.generate, for
+  // the same reason the other two are -- course.js asks MR.Pace.EFFORT whether
+  // to plan zones at all, so this line decides what road gets built.
+  if (params.has('effort')) MR.Pace.EFFORT = params.get('effort') || 1;
+  const EFFORT = MR.Pace.EFFORT > 0;
   // ?joy=0..1 forces the finish verdict the celebration pose blends on. Same
   // shape and same reason as ?polish: ONE build photographs both ends of the
   // gesture, and the losing version does not need a deliberately broken run to
@@ -569,6 +577,18 @@
       if (BOT) botThink();
       player.handle(controls);
 
+      // ---- THE ELECTION, AND IT HAPPENS BEFORE THE STEP -------------------
+      //
+      // Before pace.update, because the surge decides which FLOOR this step is
+      // run toward and a step cannot be run at a pace that is chosen after it.
+      // Resolved off pace.units -- where the runner is now -- and player.lane,
+      // which player.handle has already served this frame, so a swipe into the
+      // marked lane takes effect on the step the player made it.
+      if (EFFORT) {
+        player.resolveSurge(course, pace.units, pace.pool > 0);
+        pace.surging = !!player.surge;
+      }
+
       const before = pace.units;
       pace.update(dt);
       const after = pace.units;
@@ -579,13 +599,26 @@
       // the ramp's own gate line sits at the foot of its tailgate, so the mount
       // has to be established on the same step the gate resolves or the game
       // records the runner colliding with the lorry he is running up.
-      const deck = player.resolveDeck(course, before, after);
-      if (deck && deck.hit) {
-        pace.onHit();
-        hitAt.push(deck.z);
-        cam.impact(1);
+      // ---- WHAT A CONTACT COSTS IS NOW A QUESTION, NOT A CONSTANT ---------
+      //
+      // pace.onHit() returns 'guard' when a segment paid for the contact and
+      // 'hit' when nothing did, and the two must not look the same. The
+      // PHYSICAL event is identical either way -- the runner still bounces,
+      // still trips, still stumbles, and the camera still takes the impact --
+      // because a guard that swallowed the collision would read as the game
+      // failing to register it. What the guard buys is the CONSEQUENCE: the
+      // streak survives, the seconds are not added, and the engine plate does
+      // not flash broken, because nothing broke.
+      function charge(z, shake) {
+        const how = pace.onHit();
+        cam.impact(shake);
+        if (how === 'guard') { hud.flashGuard(); audio.aid(false); return; }
+        hitAt.push(z);
         hud.flashBroken();
       }
+
+      const deck = player.resolveDeck(course, before, after);
+      if (deck && deck.hit) charge(deck.z, 1);
 
       // Resolve gates crossed this step.
       const results = player.resolveGates(course, before, after);
@@ -594,10 +627,7 @@
           pace.onClean();
           audio.clean(pace.streak);
         } else {
-          pace.onHit();
-          hitAt.push(r.gate.z);
-          cam.impact(1);
-          hud.flashBroken();
+          charge(r.gate.z, 1);
         }
       }
 
@@ -605,9 +635,19 @@
       const aidIdxBefore = player.aidIdx;
       const aidTook = player.resolveAid(course, before, after);
       for (const item of aidTook) {
+        // Read the tank BEFORE the pour, so the card can tell "it went in" from
+        // "there was nowhere to put it". A wasted bottle is the price of
+        // hoarding and the player has to be told it happened, or the cap is a
+        // rule they can only learn by not noticing it.
+        const roomBefore = pace.pool < MR.Pace.SURGE.POOL_MAX;
         pace.onAid(item.gain);
         audio.aid(item.kind === 'banana');
-        if (item.kind === 'banana') hud.toastAid('FUEL', '+' + item.gain + ' STREAK');
+        if (EFFORT) {
+          hud.toastAid(roomBefore ? 'FUEL' : 'TANK FULL',
+                       roomBefore ? '+1' : 'WASTED');
+        } else if (item.kind === 'banana') {
+          hud.toastAid('FUEL', '+' + item.gain + ' STREAK');
+        }
         // Taking one proves the player has not simply stopped seeing them, so
         // the missed cue below is allowed to speak again. See its note.
         aidNagged = false;
@@ -667,6 +707,16 @@
         }
         if (face > 0 && worth >= face * 0.5) { aidNagged = true; audio.aidMissed(); }
       }
+      // ...and under EFFORT the arithmetic above is answering a question that
+      // no longer exists: onAid does not grant streak, so `paid` is always
+      // zero and the cue could never fire. What a declined bottle costs now is
+      // a SEGMENT, and it costs one exactly when there was room for it. Same
+      // once-not-every-time edge, same re-arm on a collected item.
+      if (EFFORT && player.aidIdx - aidIdxBefore > aidTook.length && !aidNagged
+          && pace.pool < MR.Pace.SURGE.POOL_MAX) {
+        aidNagged = true;
+        audio.aidMissed();
+      }
 
       // Player events -> audio.
       for (const e of player.drainEvents()) {
@@ -676,6 +726,14 @@
         else if (e === 'land') { audio.land(); cam.land(); }
         else if (e === 'duck') audio.duck();
         else if (e === 'hit') audio.hit();
+        // The surge edges. Borrowed cues rather than new ones: audio.js belongs
+        // to another pass and a sound invented from this file is a sound nobody
+        // mixed. Entering reuses the fruit pickup -- the brightest affirmative
+        // in the set, which is what spending on speed should feel like -- and
+        // running dry reuses the missed-aid cue, which is already the sound of
+        // help that is no longer there.
+        else if (e === 'surge') audio.aid(true);
+        else if (e === 'surgeDry') audio.aidMissed();
       }
 
       // Footsteps locked to the run cycle, not to a timer.

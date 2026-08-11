@@ -246,8 +246,31 @@ MR.HUD = (function () {
         -->
         <div id="engine">
           <div class="lab">FUEL</div>
+          <!--
+            THE GAUGE CARRIES THE POOL UNDER EFFORT, AND NOTHING ELSE MOVES.
+
+            The owner's constraint was explicit: no new plate. So the tank the
+            player already reads becomes the tank the player already reads --
+            same box, same label, same white record tick -- and what fills it
+            becomes the pool rather than the pace.
+
+            That leaves the pace needing somewhere to be, because the record
+            tick is meaningless without it: the tick's whole job is to be the
+            line the pace crosses. So the pace becomes a HAIRLINE that slides
+            along the same bar. Pace and record are still read against each
+            other exactly as they were -- the hairline reaches the tick at the
+            same instant the fill used to -- and the fill is freed to be the
+            one thing the player now has to decide about.
+
+            Three readings, one bar, and no two of them are the same encoding:
+            the FILL is how much you have, the HAIRLINE is how fast you are, the
+            TICK is how fast the record needs. At EFFORT = 0 the hairline is
+            hidden and the fill goes back to being the pace, which is the
+            shipped plate to the pixel.
+          -->
           <div class="gauge tank" id="paceGauge">
             <div class="gaugeFill" id="gaugeFill"></div>
+            <div class="gaugePace" id="gaugePace"></div>
             <div class="gaugeRec"></div>
           </div>
           <div class="lab" id="paceLab">PACE</div>
@@ -557,7 +580,8 @@ MR.HUD = (function () {
       clock: q('clock'),
       projCell: q('projCell'), projVal: q('projVal'), margin: q('margin'), status: q('status'),
       engine: q('engine'), why: q('why'),
-      gaugeFill: q('gaugeFill'), paceVal: q('paceVal'),
+      gaugeFill: q('gaugeFill'), gaugePace: q('gaugePace'),
+      paceGauge: q('paceGauge'), paceVal: q('paceVal'),
       distVal: q('distVal'),
       railWrap: q('railWrap'),
       rail: q('rail'), railFill: q('railFill'), railGap: q('railGap'), railGhost: q('railGhost'),
@@ -1120,8 +1144,26 @@ MR.HUD = (function () {
       // and both cross the white record tick at the same instant, which is why
       // the required-pace line and the clean count that used to sit under here
       // were removed rather than reworded. See the plate's comment above.
-      n.gaugeFill.style.width =
-        (clamp01((K.START_PACE - p.pace) / (K.START_PACE - K.FLOOR_PACE)) * 100) + '%';
+      // The pace fill, which is what the bar has always drawn. Under EFFORT it
+      // is drawn against the SURGE floor rather than K.FLOOR_PACE, because the
+      // range the gauge maps has to be the range the player can actually reach
+      // -- a bar that pinned at 100% while a surge was still buying speed would
+      // stop moving at exactly the moment the player spent something for it.
+      const lo = MR.Pace.EFFORT > 0 ? MR.Pace.SURGE.FLOOR_SURGE : K.FLOOR_PACE;
+      const pace01 = clamp01((K.START_PACE - p.pace) / (K.START_PACE - lo));
+      if (MR.Pace.EFFORT > 0) {
+        // The fill is the POOL, counted. Fractional while a surge burns, which
+        // is the whole difference between the two spends: a guard takes one
+        // segment in a single step and reads as a notch going out, a surge
+        // slides continuously down through the divisions.
+        const pool01 = clamp01(p.pool / MR.Pace.SURGE.POOL_MAX);
+        n.gaugeFill.style.width = (pool01 * 100) + '%';
+        n.gaugePace.style.left = (pace01 * 100) + '%';
+        cls(n.paceGauge, 'gaugeCls', 'gauge tank pool' + (p.surging ? ' surging' : ''));
+        cls(n.engine, 'engCls', p.surging ? 'surging' : '');
+      } else {
+        n.gaugeFill.style.width = (pace01 * 100) + '%';
+      }
       set(n.paceVal, 'pace', Pace.pace(p.pace));
       cls(n.paceVal, 'paceCls', 'val num' + (p.pace <= K.RECORD_PACE ? ' ahead' : ''));
 
@@ -1226,6 +1268,21 @@ MR.HUD = (function () {
       n.engine.classList.add('broken');
       setTimeout(() => n.engine.classList.remove('broken'), 520);
       hintUntil = performance.now() + 2200;
+    };
+
+    /**
+     * A contact a segment paid for.
+     *
+     * DELIBERATELY NOT flashBroken. The plate going red is the game saying the
+     * streak is gone and the seconds are on the clock, and neither is true
+     * here -- a guard is the one contact in this game that costs no time at
+     * all. It flashes the plate in the engine's own colour instead, which reads
+     * as the tank doing its job rather than as damage, and it does not arm the
+     * STREAK CUT hint, because nothing was cut.
+     */
+    api.flashGuard = function () {
+      n.engine.classList.add('guarded');
+      setTimeout(() => n.engine.classList.remove('guarded'), 460);
     };
 
     // ---- the aid card ----------------------------------------------------

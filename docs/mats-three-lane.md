@@ -339,16 +339,30 @@ there first.**
 
 ### 3.1 Accuracy, per arm
 
-| reader | mat ON | mat OFF | panels fully correct |
-|---|---|---|---|
-| A | 15/15 | 18/18 | 16/16 |
-| C | 9/15 | 14/18 | 7/16 |
+| reader | mat ON | mat OFF | total | panels fully correct |
+|---|---|---|---|---|
+| A | 15/15 | 18/18 | **33/33** | 16/16 |
+| B | 18/18 | 15/15 | **33/33** | 16/16 |
+| C | 9/15 | 14/18 | 23/33 | 7/16 |
+| **pooled** | **42/48 (88%)** | **47/51 (92%)** | 89/99 | 39/48 |
 
-Reader A is **33 of 33 occupied lanes, 16 of 16 panels**, in both arms and at
-both distances, with **no lane rotation anywhere** — so the framing defect of
-§2.6 did not bite.
+And split by distance, which is the other half of the question:
 
-Reader C is 23 of 33, and **the mat arm is the worse one**, 60% against 78%.
+| arm | 25.35 u | 32 u |
+|---|---|---|
+| mat ON | 21/24 (88%) | 21/24 (88%) |
+| mat OFF | 23/25 (92%) | 24/26 (92%) |
+
+**The mat arm is the worse arm at both distances, by the same margin.** There
+is no distance at which the paint bought anything, and no sign of the effect
+growing with distance that the fade question was asked to find.
+
+Two of the three readers are **perfect in both arms** — 33 of 33 occupied
+lanes, 16 of 16 panels, with and without paint, near and far. Reader C is 23
+of 33 and its **mat arm is the worse one**, 60% against 78%.
+
+CLEAR lanes are **45/45**, 100% in both arms: nobody ever hallucinated a
+hazard into an empty lane.
 
 ### 3.2 Every one of reader C's errors is the same error
 
@@ -463,16 +477,34 @@ grass banks and railings outside them."*
 
 ### 3.6 By kind, and the three new DUCKs
 
-| kind | correct |
-|---|---|
-| DUCK, established v0–v4 | **16/16** |
-| DUCK, new v5–v7 | **10/10** |
-| BLOCK, all variants incl. v9 | **14/14** |
-| JUMP | **16/26** |
+| kind | mat ON | mat OFF | total |
+|---|---|---|---|
+| DUCK | 17/17 | 22/22 | **39/39 — 100%** |
+| BLOCK | 9/9 | 12/12 | **21/21 — 100%** |
+| JUMP | 16/22 | 13/17 | 29/39 |
 
-**The three new DUCKs read exactly as well as the five they joined** — v5 4/4,
-v6 4/4, v7 2/2, with no error by either reader in either arm at either
-distance. This is the first test that has ever contained them.
+**DUCK and BLOCK are at ceiling in both arms at both distances. Every error in
+the entire test is a JUMP.**
+
+Per variant, and this is what the pass was asked to check:
+
+| DUCK | mat ON | mat OFF | total |
+|---|---|---|---|
+| v0 | 2/2 | 4/4 | 6/6 |
+| v1 | 3/3 | 6/6 | 9/9 |
+| v3 | 1/1 | 2/2 | 3/3 |
+| v4 | 3/3 | 3/3 | 6/6 |
+| **v5 access gantry** | 4/4 | 2/2 | **6/6** |
+| **v6 floodlight gantry** | 3/3 | 3/3 | **6/6** |
+| **v7 girder underbridge** | 1/1 | 2/2 | **3/3** |
+| established v0–v4 | | | **24/24** |
+| **new v5–v7** | | | **15/15** |
+
+**The three new DUCKs read exactly as well as the five they joined** — not one
+error by any reader, in either arm, at either distance. **This is the first
+test that has ever contained them**, because the previous pass pinned a commit
+older than the one that built them. Nothing here asks for a fourth pass on
+DUCK.
 
 **BLOCK is at ceiling, including `v9`, the moped** — the low one, the 1-of-26
 `kindread` miss, the variant with daylight under it. The height failure in this
@@ -597,6 +629,18 @@ inspect pixel values numerically. For the mat that cuts against a null result
 rather than for it — a reader who samples colour numerically has *more* access
 to the mat's colour code than a player does, so if such a reader gains nothing
 from the paint, a player gains no more.
+
+**THE SCORER'S PAINT-MENTION COUNTER DOES NOT MEASURE WHAT IT CLAIMS, AND ITS
+NUMBER SHOULD NOT BE QUOTED.** `lanechoice-score.js` counts answers containing
+paint-like words and reports **11/24 with the mat against 12/24 without** — an
+apparently perfect null. It is an artefact of the word list. `stripe` and
+`striped` describe the *barricades* (*"a red-and-white striped board"*), and
+`marking`/`markings` describe the **lane dashes**, which are present in both
+arms by design. So the counter fires just as often on NOMAT panels, and it
+cannot distinguish a reader talking about the mat from one talking about a
+barrier's paintwork. The qualitative reading of the notes in §3.3 and §3.5b is
+doing all the work that this column pretends to; the column should be re-cut
+against the mat's own colour vocabulary or dropped.
 
 **Nothing here tests the mat's other jobs.** The mat may be doing work this
 test does not ask about — reading the road's *speed*, marking where a gate

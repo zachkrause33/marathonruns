@@ -4111,6 +4111,42 @@ nobody measured is worse than no number at all.**
     game, and the game's would not have been provable without fixing the other
     two first.
 
+
+    **AND THEN THE BLIND READ, WHICH IS WHY ANY OF THIS MATTERED.** Twelve
+    unlabelled crops from the FIXED build, taken on the sunk ground itself
+    (2026-01-10 at skip 44, where the same panels measured 0.1% of crop before
+    this pass), shown to a reader that had **only the panels and PROMPT.txt** --
+    a git branch containing no source and no `CLAUDE.md`. That is the first
+    UNCONTAMINATED reader this test has had, so for once the specific nouns
+    count as evidence too. **10 of 12 correct: DUCK 6/6, JUMP 3/3, BLOCK 1/3.**
+
+    **Every DUCK read UNDER, and every one of them at confidence "sure"** --
+    including both panels at 25 units. Verbatim, on a DUCK at `READ_NEAR`:
+    *"A yellow portal frame spanning the road with a yellow-and-black diagonally
+    striped panel slung under its top beam -- an overhead clearance barrier ...
+    UNDER ... What it is: sure. Over/under/around: sure."* And the reason it
+    gave: *"the striped panel occupies only the upper part of the opening and
+    the tall yellow uprights frame an empty span of road below it."* Five passes
+    of "readers cannot tell a DUCK from a JUMP" ends here, and the reader also
+    named the JUMP mat as its evidence without being asked -- *"the yellow
+    chevrons point directly into its face like a run-up"*, *"the chevron arrows
+    on the strip run straight into it, so the only way past is across the top."*
+
+    **THE TWO FAILURES ARE ONE VARIANT AND THEY ARE A NEW FINDING. `BLOCK v3`
+    read as OVER at both 12 and 25 units** -- the reader would have hurdled a
+    thing it must go around, which is a contact and a lost record. Its reason is
+    a measurement, not an impression: *"the barricade's top rail comes up only
+    to about waist height on the two people standing directly behind it, and the
+    panel is solid from that edge down to a low rail near the ground, leaving
+    the top as the only clear line."* **The variant puts two human figures
+    behind a barrier and thereby supplies a ruler that says the barrier is
+    hurdlable.** BLOCK is 2.80 tall against a 2.05 jump apex, so the envelope is
+    correct and the ART is lying about it. Note also that these are the only two
+    panels whose reasoning never mentions the mat: where the reader cited the
+    paint it was right, and where it read the silhouette alone it was wrong.
+    That is the mat/object split working exactly as world.js claims, and the
+    place to fix `BLOCK v3` is the figures, not the bar.
+
     Two further things worth keeping. **A marking painted on a surface is rule
     1's one exception and it still is** -- the mat is single-sided quads with
     no back; what changed is that the strip bends with the thing it is painted

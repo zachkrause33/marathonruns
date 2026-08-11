@@ -120,7 +120,34 @@
  * the run. A harness that silently omits the thing it was built to include is
  * the exact defect being fixed, and it is not allowed to happen quietly twice.
  *
- * ---- DEFECT 3: THE FILENAME WAS A HINT ------------------------------------
+ * ---- DEFECT 3: A ZERO THAT MEANT NOTHING ---------------------------------
+ *
+ * MATCHECK reads "no pixels moved when the mat was hidden" as MATLOST -- the
+ * game drew no mat -- and printed it as a finding about src/render/world.js.
+ * It could not tell that from THIS TOOL HAVING STAGED NOTHING, and on a
+ * sixty-nine panel run it reported sixteen MATLOST panels against a build
+ * whose mats were fine. The panels were bare tarmac: no mat, and no object
+ * either.
+ *
+ * THE RACE DOES NOT STOP. Freezing performance.now above stops the wind, the
+ * crowd and the sky, and it does not stop the runner: main.js drives its frame
+ * from the requestAnimationFrame timestamp, not from performance.now. So the
+ * race advances through a run, and Pool.release does parent.remove(o) as the
+ * runner passes the gate a group was borrowed from. A released group is out of
+ * the scene graph and visible = true renders nothing.
+ *
+ * Both halves are fixed, because either alone leaves the hole open. The claim
+ * re-adds a released group and takes it back out at teardown; and every zero
+ * mat reading is now checked against an OBJECT-presence render before it is
+ * allowed to be called MATLOST. An empty panel is STAGEFAIL and fails the run,
+ * which is where a harness defect belongs.
+ *
+ * THE LESSON IS THE ONE THIS FILE ALREADY TEACHES TWICE. Both earlier defects
+ * flattered the result; this one did the opposite and manufactured a defect in
+ * somebody else's file. A control that cannot fail in its own favour is not
+ * therefore trustworthy -- it just fails in the other direction.
+ *
+ * ---- DEFECT 4: THE FILENAME WAS A HINT ------------------------------------
  *
  * A previous reader named tools/aid.png as the reason the word "cup" came to
  * mind. So panels are written OUTSIDE the repository, under random hex names,
@@ -339,6 +366,10 @@ function setup(o) {
 
   window.__BR = {
     cam: cam, groups: groups, restore: restore, hidden: hidden, rt: rt,
+    // Groups this tool put back into the scene after the pool released them.
+    // Taken out again at teardown, or the pool's free list would hold objects
+    // that are still parented and its next claim would double-add them.
+    readded: [],
     realNow: realNow,
     buf: new Uint8Array(o.w * o.h * 4),
     prevRT: g.renderer.getRenderTarget(),
@@ -373,6 +404,13 @@ function shoot(job) {
   const laneX = K.LANE_X[job.lane];
 
   // ---- place it exactly as the claim site places one ---------------------
+  //
+  // BACK INTO THE SCENE FIRST. The race is still running between panels -- see
+  // the object-presence control below for why performance.now does not stop it
+  // -- and Pool.release does parent.remove(o) once the runner is past the gate
+  // this group was borrowed from. A group that has been released is no longer
+  // in the scene graph at all, so visible = true renders nothing.
+  if (!grp.parent) { g.world.group.add(grp); S.readded.push(grp); }
   grp.visible = true;
   grp.position.set(laneX, yBase, z);
   grp.rotation.x = -Math.atan(EL.slope(z));
@@ -492,11 +530,12 @@ function shoot(job) {
   // apart -- it reported zero for both and left the diagnosis to guesswork.
   let matPx = 0, matAll = 0;
   let bx0 = 1e9, bx1 = -1e9, by0 = 1e9, by1 = -1e9;
-  function differs(q) {
-    return Math.abs(withMat[q] - noMat[q]) > 6
-        || Math.abs(withMat[q + 1] - noMat[q + 1]) > 6
-        || Math.abs(withMat[q + 2] - noMat[q + 2]) > 6;
+  function pixDiffers(a, b, q) {
+    return Math.abs(a[q] - b[q]) > 6
+        || Math.abs(a[q + 1] - b[q + 1]) > 6
+        || Math.abs(a[q + 2] - b[q + 2]) > 6;
   }
+  function differs(q) { return pixDiffers(withMat, noMat, q); }
   for (let Y = 0; Y < S.h; Y++) {
     const flip = S.h - 1 - Y;
     for (let X = 0; X < S.w; X++) {
@@ -506,6 +545,39 @@ function shoot(job) {
       if (Y < by0) by0 = Y; if (Y > by1) by1 = Y;
       if (X >= x0 && X < x0 + cw && Y >= y0 && Y < y0 + ch) matPx++;
     }
+  }
+
+  /**
+   * IS THERE ANYTHING IN THE PANEL AT ALL?
+   *
+   * MATCHECK counts the pixels that move when the mat is hidden, and reads a
+   * zero as "the game drew no mat". It cannot tell that from "this tool drew
+   * NOTHING", and the difference is the whole value of the reading: the first
+   * is a finding about the game and the second is a photograph of empty road.
+   *
+   * It happened, and it was reported as the game's fault. A borrowed pool
+   * group is a LIVE hazard on a road the race is still moving along, and
+   * Pool.release does parent.remove(o) as the runner passes it. The race does
+   * keep moving: main.js drives its frame from the requestAnimationFrame
+   * timestamp, not from performance.now, so freezing performance.now above
+   * stops the wind and the crowd and does not stop the runner. Over a
+   * sixty-nine panel run the borrowed groups were released out from under this
+   * tool one by one, and sixteen panels of bare tarmac were counted, printed
+   * and believed as MATLOST -- against a build whose mats were fine.
+   *
+   * Two changes, because either alone leaves a hole. The claim above re-adds a
+   * released group so it cannot happen; this control proves it did not, and
+   * fails the run if it ever does again. Taken only when the mat measured
+   * zero, which is the only reading this tool turns into a claim about the
+   * game, so the common path still costs two renders and not three.
+   */
+  let objAll = null;
+  if (!matAll) {
+    grp.visible = false;
+    const noObj = frame();
+    grp.visible = true;
+    objAll = 0;
+    for (let q = 0; q < withMat.length; q += 4) if (pixDiffers(withMat, noObj, q)) objAll++;
   }
 
   const cv = document.createElement('canvas');
@@ -524,7 +596,7 @@ function shoot(job) {
   g.renderer.setRenderTarget(S.prevRT);
   return {
     png: png, crop: [x0, y0, cw, ch], matPx: matPx, clipped: clipped,
-    matAll: matAll,
+    matAll: matAll, objAll: objAll,
     matBox: matAll ? [bx0, by0, bx1, by1] : null,
     slope: +EL.slope(z).toFixed(5),
     matSinksAt: sinkAt, matSinksBy: +sinkMax.toFixed(4),
@@ -544,6 +616,7 @@ function teardown() {
     if (r.ride) r.ride.visible = r.rideVis;
   }
   for (const h of S.hidden) h[0].visible = h[1];
+  for (const o of S.readded) if (o.parent) o.parent.remove(o);
   if (S.realNow) performance.now = S.realNow;
   MR.game.renderer.setRenderTarget(S.prevRT);
   S.rt.dispose();
@@ -602,6 +675,7 @@ function teardown() {
   const key = [];
   const matCrop = [];
   const matLost = [];
+  const stageFail = [];
   for (const job of chosen) {
     const r = await page.evaluate(shoot, job);
     // Neutral name: eight hex digits off the shuffle stream. It carries no
@@ -624,14 +698,18 @@ function teardown() {
      *            the game and it is reported as one -- calling it a harness
      *            failure would bury it.
      */
-    const state = r.matPx ? 'ok' : (r.matAll ? 'MATCROP' : 'MATLOST');
+    const state = r.matPx ? 'ok'
+      : r.matAll ? 'MATCROP'
+      : r.objAll === 0 ? 'STAGEFAIL'
+      : 'MATLOST';
     if (state === 'MATCROP') matCrop.push({ file, job });
+    if (state === 'STAGEFAIL') stageFail.push({ file, job });
     if (state === 'MATLOST') matLost.push({ file, job, slope: r.slope, sinkAt: r.matSinksAt, sinkBy: r.matSinksBy });
     key.push({
       file, kind: job.kind, variant: job.variant, dist: job.dist, lane: job.lane,
       cropPx: [r.crop[2], r.crop[3]], objectPx: r.boxPx, clipped: r.clipped,
       crop: r.crop, matPx: r.matPx, matShare: r.matShare, mat: state,
-      matAllPx: r.matAll, matBoxOnFrame: r.matBox,
+      matAllPx: r.matAll, objAllPx: r.objAll, matBoxOnFrame: r.matBox,
       slope: r.slope, matSinksAt: r.matSinksAt, matSinksBy: r.matSinksBy,
     });
   }
@@ -667,9 +745,17 @@ function teardown() {
       + ok.length + ' carry the mat'
       + (ok.length ? ' (' + (100 * lo).toFixed(1) + '% to ' + (100 * hi).toFixed(1) + '% of the crop)' : '')
       + (rows.filter((r) => r.mat === 'MATCROP').length ? ', ' + rows.filter((r) => r.mat === 'MATCROP').length + ' CROPPED OUT' : '')
-      + (rows.filter((r) => r.mat === 'MATLOST').length ? ', ' + rows.filter((r) => r.mat === 'MATLOST').length + ' NOT DRAWN BY THE GAME' : ''));
+      + (rows.filter((r) => r.mat === 'MATLOST').length ? ', ' + rows.filter((r) => r.mat === 'MATLOST').length + ' NOT DRAWN BY THE GAME' : '')
+      + (rows.filter((r) => r.mat === 'STAGEFAIL').length ? ', ' + rows.filter((r) => r.mat === 'STAGEFAIL').length + ' EMPTY PANELS' : ''));
   }
   console.log('');
+  if (stageFail.length) {
+    console.log('  STAGEFAIL -- ' + stageFail.length + ' of ' + key.length + ' panels contain no object');
+    console.log('    at all: hiding the whole hazard changed nothing, so there was nothing');
+    console.log('    staged to photograph and the mat reading is meaningless rather than zero.');
+    console.log('    This is the harness, not the game. See the object-presence control.');
+    console.log('');
+  }
   if (matLost.length) {
     // A FINDING, NOT A FAILURE, and the number that makes it one is printed
     // beside it. See the sink measurement in shoot().
@@ -688,6 +774,15 @@ function teardown() {
   for (const line of PROMPT) console.log('  | ' + line);
 
   if (errs.length) console.log('\n  PAGE ERRORS: ' + errs.slice(0, 4).join(' | '));
+  if (stageFail.length) {
+    console.log('\nFAIL MATCHECK: ' + stageFail.length + ' of ' + key.length
+      + ' panels were empty -- this tool staged nothing and photographed the road.');
+    console.log('A zero mat reading off an empty panel is not a finding about the game.');
+    for (const m of stageFail.slice(0, 6)) {
+      console.log('  ' + m.file + '  ' + m.job.kind + ' v' + m.job.variant + ' at ' + m.job.dist + 'u');
+    }
+    process.exit(1);
+  }
   if (matCrop.length) {
     console.log('\nFAIL MATCHECK: ' + matCrop.length + ' of ' + key.length
       + ' panels cropped out a mat the game DID draw. That is this harness omitting');

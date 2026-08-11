@@ -453,6 +453,40 @@ this experiment's own counterbalancing had taught that reader to disregard it.
 That is the strongest caveat on the recommendation below and it is stated
 before the recommendation rather than after.
 
+**And it is disregarded out loud.** Reader C names the gold paint in the very
+sentence in which it contradicts it, over and over:
+
+> *"Two gold-lit strips fall in the middle and right lanes and both end in
+> something solid... **Neither can be jumped or ducked.**"*
+
+> *"The middle lane has a gold strip ending in a group of four orange and white
+> cones spread across it, **which closes it**."*
+
+> *"The right strip ends in a solid blue block with a pink and white striped
+> skirt at road level, **chest high with no opening at all, so that lane is
+> out**."*
+
+### 3.8 THE ONE REAL LEGIBILITY PROBLEM THIS TEST FOUND IS JUMP HEIGHT
+
+Strip the mat question away and a finding is left over that nobody asked for.
+Reader C's language is consistent across all ten misses — *"chest high"*,
+*"well above waist height"*, *"waist to chest high and packed solid"*, *"solid
+to the ground"*. **It is reading JUMP obstacles as chest-high walls**, and it
+does so for cones, trestles, blue barrier blocks, pipe stacks and rubble heaps
+alike, at both distances, with and without paint.
+
+`MR.Collision.BOX` is the contract and art never decides clearance — but art is
+all a player has to judge by, and **one reader in three judged the art of a
+JUMP to be impassable**. That is a hazard-legibility problem in its own right,
+it is the only one this pass found, and it belongs to whoever owns the JUMP
+fleet rather than to the mat question.
+
+**It never cost a run.** Every single one of reader C's ten errors is recorded
+`viable true`: reading a JUMP as a wall makes you *avoid* a lane you could have
+taken, which costs an action, not an attempt. Across all three readers so far,
+**lane choice is 48 of 48 viable — 100% in both arms at both distances**, and
+nobody ever picked a lane that ends a record attempt.
+
 ---
 
 ## 4. How much paint there is, by distance — re-measured on the fleet of 26

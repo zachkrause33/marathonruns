@@ -28,7 +28,45 @@ variant, and that is checked rather than assumed.
 
 ## 0. The answer
 
-*(§3)*
+**The mat changed no answer, at either distance, on any kind.** Across three
+uncontaminated readers and 99 occupied-lane judgements the arms are
+**42/48 with the mat and 47/51 without** — the mat arm is the *worse* one, and
+the difference is one reader's temperament rather than the paint.
+
+**DUCK is 39/39 and BLOCK is 21/21, in both arms, at both distances.** Every
+error in the entire test is a JUMP read as AROUND, and they all belong to one
+reader.
+
+**But "the mat does nothing" is the wrong reading of that, and the readers say
+why in their own words.** Two of the three decoded the mat's colour code
+correctly from the pictures alone, with nobody telling them. One then used it
+to settle *which low objects are jumpable* and carried that to the unpainted
+panels. The one who refused it went on to read jumpable hurdles as walls ten
+times — **naming the gold paint in the same sentence in which he contradicted
+it.** So the mat's demonstrated job is **teaching the object, once**, not
+answering the question at every gate.
+
+**On the fade, the honest recommendation is: fade OUT on approach — but for a
+reason the proposal did not give, and only down to the decision distance.**
+
+- The far mat is **not too faint to matter**: at 32 units readers described it
+  unprompted — *"two gold strips side by side"*, *"which glows cyan"*. It is
+  read. It just changes nothing for a reader who already reads the object.
+- At `READ_NEAR` the mat is 1,710 px per lane and fully legible; at 8 units it
+  is **17.45× heavier**, and by 8 units the lane was chosen long ago.
+- So the paint that can be spent is the paint **inside 25 units**, which is
+  where 94% of it lives and where it buys the least.
+
+**What the evidence does not support is removing or thinning the mat at the
+decision distance or beyond it**, because that is where the teaching happens
+and because both known artefacts of this design (§3.3, §3.5b) push the measured
+mat effect toward zero. **The owner's instinct — faint far, clear near — is the
+one option this test argues against**, since near is precisely where the mat is
+already redundant.
+
+*(Three readers of four. Reader D was still running; if it lands the numbers
+above are updated rather than replaced — the design's within-reader contrast is
+complete for each of A, B and C independently.)*
 
 ---
 

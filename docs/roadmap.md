@@ -4013,3 +4013,106 @@ nobody measured is worse than no number at all.**
     brief about which viewports failed, how many failed, by how much, and in
     which direction -- and the fix that follows from "tall frames are cramped"
     would have pulled the camera back on the frames that had 60px to spare.
+
+61. **The telegraph mat was submerged under the road it is painted on, and
+    both the surface it was fitted to and the harness that found it were
+    wrong.** The mat is the game's primary instruction channel -- the coloured,
+    iconised paint that says OVER, UNDER or AROUND before the shape resolves --
+    and it was one RIGID 16-unit plane, lifted 0.012 and pitched to the tangent
+    at the gate. A rigid plane cannot lie on a curved surface. Where the run-up
+    left the road downward the road drew over it, because the material is
+    depth-TESTED and only `depthWrite` is off: **a submerged mat is not a faint
+    mat, it is no mat.** Measured at the chase camera, mat pixels in a 390x844
+    frame on 2026-01-10 at the foot of the hill at z=832:
+
+    |          |    8u |   12u |  25u |
+    |----------|-------|-------|------|
+    | clear    | 56639 | 35940 | 1861 |
+    | -1.5%    |  7572 |  1613 |    0 |
+    | +2.1%    |  4027 |     0 |  129 |
+
+    Zero at 25 units is `READ_NEAR`, the distance the lane is chosen at.
+
+    **THE SURFACE IS NOT THE PROFILE, AND FITTING TO THE PROFILE WOULD HAVE
+    LEFT THE BUG IN PLACE.** `elevation.js` owns `E(z)`; the road is not `E(z)`.
+    `world.js` lays rigid 24-unit tiles pitched to the CHORD of `E` across each
+    one, so the tarmac departs from the profile by up to `c*TILE^2/8 = 0.045` --
+    **four times the mat's whole lift** -- below `E` at a crest and above it in
+    a dip. `blindread.js` measured the submersion against `E(z)` and reported at
+    most 0.045; measured against the road as built it reaches **0.094** over a
+    32-day sweep, and the panels that actually lose the mat are the ones the
+    chord model predicts and not the ones the profile model predicts.
+
+    **THE PREDICTOR IS CURVATURE, NOT GRADE**, which is why five passes of
+    "blind readers cannot tell a DUCK from a JUMP" never found it. The steepest
+    ground the generator makes, -3.5%, draws the mat in FULL. The mat dies at
+    the FEET of a hill, where the raised cosine turns over, curvature is
+    maximal and the grade is passing through zero. Across 32 days, 4.6% of
+    gates on ground under 0.5% grade lose part of the mat and **the three
+    deepest submersions in the entire sweep are all on ground under 0.5%.**
+    The brief for this pass said "flat stretches carry it, sloped ones draw
+    zero", and had it backwards in both halves.
+
+    The fix fits every vertex to `roadSurfaceY(z)` + the same 0.012, through
+    the mesh's own inverse world matrix so no caller has to cooperate. Residual
+    is bounded rather than asserted: inside a tile both road and strip are
+    linear so the fit is EXACT, and the only lossy case is a segment straddling
+    a tile joint, at `dSlope*h/4 = 0.0019` against a lift of 0.012. Result on
+    sloped ground, mean mat pixels, and the point is the last column:
+
+    |                  |  8u before |  8u after |  25u before | 25u after |
+    |------------------|------------|-----------|-------------|-----------|
+    | sunk ground      |       5800 |     56951 |          69 |      2157 |
+    | already-clear    |      53430 |     52922 |        2057 |      2020 |
+
+    **A hill now reads exactly as well as the flat.** A flat control run of the
+    full blind-read harness measures 21.2%/18.4%/12.5% of crop before and
+    21.3%/18.4%/12.5% after -- unchanged -- and the sloped runs, which were
+    2.0% and 0.1% at their worst, now sit on the same numbers.
+
+    **THE HOOK WAS ONE FRAME EARLY, AND THAT IS A DEFECT IN EVERY INSTRUMENT
+    THIS PROJECT HAS.** The fit was first hung off `onBeforeRender`, which is
+    the obvious hook and the wrong one: `WebGLRenderer` uploads a geometry's
+    attributes inside `projectObject`, at the top of `render()`, and calls
+    `onBeforeRender` later at the draw call -- so an attribute written there is
+    marked dirty after the only upload of that frame. Three hazards staged at
+    one place and rendered twice: pass 1 gave `JUMP 5426 / DUCK 0 / BLOCK
+    57039`, pass 2 gave `56978 / 57399 / 56866`. **That DUCK zero is a tool
+    being early and it is indistinguishable by eye from the bug being fixed.**
+    Invisible in play, where a hazard is claimed 210 units out and sits for
+    hundreds of frames; not invisible to `shoot.js`, `blindread.js`,
+    `kindread.js` or `clarity.js`, all of which stage something and photograph
+    it once. Moved to `updateMatrixWorld`, which runs in
+    `scene.updateMatrixWorld()` before `projectObject` -- **if a geometry has
+    to be written per frame, that is the hook, and `onBeforeRender` is a trap.**
+
+    **AND THE HARNESS MANUFACTURED THE DEFECT IT REPORTED.** `blindread.js`
+    read "no pixels moved when the mat was hidden" as `MATLOST` -- the game drew
+    no mat -- and could not tell it from the tool having staged NOTHING. The
+    first run of this pass reported **16 MATLOST panels of 69, on flat ground,
+    against a build whose mats were fine**; the panels were bare tarmac, no mat
+    and no object. Freezing `performance.now` stops the wind, the crowd and the
+    sky and does NOT stop the runner, because `main.js` drives its frame from
+    the requestAnimationFrame timestamp -- so the race advances through a run
+    and `Pool.release` does `parent.remove(o)` as the runner passes each
+    borrowed gate. Fixed at both ends: the claim re-adds a released group, and
+    a zero mat reading must now survive an object-presence render before it may
+    be called MATLOST. An empty panel is `STAGEFAIL` and fails the run.
+
+    Both of this file's earlier defects flattered the result. This one did the
+    opposite and **invented a defect in somebody else's file**, which is the
+    same lesson from the other side: a control that cannot fail in its own
+    favour is not therefore trustworthy, it just fails the other way. Two of
+    the three findings in this entry are about instruments and one is about the
+    game, and the game's would not have been provable without fixing the other
+    two first.
+
+    Two further things worth keeping. **A marking painted on a surface is rule
+    1's one exception and it still is** -- the mat is single-sided quads with
+    no back; what changed is that the strip bends with the thing it is painted
+    on. And **another agent rebuilt `index.html` in this shared tree in the
+    middle of a measurement sweep**, so numbers were collected from a page that
+    did not contain the change under test. Every run afterwards was wrapped in
+    a guard that greps the built artefact for the change before and after. Rule
+    2 says verify against the running page; the corollary is to prove the
+    running page is the one you built.

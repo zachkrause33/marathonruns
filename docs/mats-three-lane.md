@@ -327,4 +327,42 @@ mat off.
 
 ## 5. What is not settled
 
-*(§5)*
+**THE READERS ARE MORE DELIBERATE THAN A PLAYER, AND THIS IS THE LIMIT THAT
+MATTERS MOST.** Every one of the four cropped panels apart, upscaled them and
+examined lanes individually — one was reading `4e43dee0_L.png`, a single lane
+of a single gate, enlarged. A player at `READ_NEAR` has a fraction of a second
+and no zoom. Unlimited time pushes **both** arms toward ceiling and therefore
+**compresses any mat effect toward zero**, so this design is systematically
+biased against finding that the mat helps. A null result here bounds how much
+the mat can be worth to a careful reader; it cannot prove the mat is worthless
+to a glancing one. That asymmetry runs against the conclusion and it is the
+first thing a future pass should attack — the obvious attack is an exposure
+limit, which this harness cannot currently impose.
+
+**The panel is not the frame.** Other gates, the runner and the ghost are taken
+off the road. That isolates the gate under test, and it removes help that is
+*not* the mat — roadmap entry 63 recorded a BLOCK whose correct answer came
+entirely from a lorry parked in an adjacent gate. So it makes the mat's job
+easier to see, not harder. But it also removes the runner, which is the
+player's own anchor for which lane he is in, and that interacts with the
+framing defect in §2.6.
+
+**The crop is drawn around the paint, not the road.** §2.6 measures it and
+§2.6 states why it cannot bias the arm contrast, but it is still the largest
+uncontrolled nuisance in the design, and the right fix is a crop cut to the
+carriageway rather than to the union of the object and its mat.
+
+**Sixteen gates is a sample of one course on one date.** The gates are drawn
+mechanically, which removes selection bias but not sampling variance, and
+`BLOCK` is the thinnest kind here at 7 occupied lanes per condition.
+
+**Readers are agents reading PNGs, not people playing.** They can and did
+inspect pixel values numerically. For the mat that cuts against a null result
+rather than for it — a reader who samples colour numerically has *more* access
+to the mat's colour code than a player does, so if such a reader gains nothing
+from the paint, a player gains no more.
+
+**Nothing here tests the mat's other jobs.** The mat may be doing work this
+test does not ask about — reading the road's *speed*, marking where a gate
+begins for timing rather than for choice, or simply looking like a road that
+has been prepared for a race. This pass measured the decision only.

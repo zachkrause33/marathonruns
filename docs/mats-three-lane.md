@@ -389,6 +389,28 @@ distance. This is the first test that has ever contained them.
 test runs the *other* way: not a low BLOCK mistaken for passable, but a JUMP
 mistaken for impassable.
 
+### 3.7 WHAT THE JUMP FAILURE ACTUALLY IS, LOOKED AT RATHER THAN INFERRED
+
+`a3d19dc1` is the panel where reader C lost two cells at once. At 32 units the
+middle lane holds a blue water-filled barrier and the right a red trestle, both
+sitting flush on the road, and **both under plainly visible gold paint that
+correctly says OVER**. The reader's own words:
+
+> *"Both are solid to the ground, neither has any clearance. The left lane is
+> the unlit one and it is empty, so it is the only lane I can actually run."*
+
+**That description is accurate. The inference is what fails.** A JUMP *is*
+solid to the ground — the thing that separates it from a BLOCK is not clearance
+underneath but **height**, and reader C was applying a rule it stated up front,
+that an obstacle "too tall to clear at running speed" must be gone around. It
+put the threshold in the wrong place and lost ten cells to it.
+
+So the one place in this entire test where the mat could have changed an
+answer, **it was present, it was correct, and it was disregarded** — because
+this experiment's own counterbalancing had taught that reader to disregard it.
+That is the strongest caveat on the recommendation below and it is stated
+before the recommendation rather than after.
+
 ---
 
 ## 4. How much paint there is, by distance — re-measured on the fleet of 26

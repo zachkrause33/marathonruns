@@ -117,6 +117,7 @@ html, body {
 #ui.panelOpen #leftCol,
 #ui.panelOpen #dist,
 #ui.panelOpen #railWrap,
+#ui.panelOpen #pauseBtn,
 #ui.panelOpen #perf {
   opacity: 0; visibility: hidden;
 }
@@ -305,6 +306,52 @@ html, body {
 #dist .val { font-size: 34px; font-weight: 500; line-height: 1; }
 #dist .unit { font-size: 12px; font-weight: 700; opacity: 0.6; margin-left: 3px; }
 #dist .sub { font-size: 10px; font-weight: 700; opacity: 0.62; margin-top: 3px; }
+
+/* ---- pause, top right ----
+ *
+ * The slot is #dist's, which is why the offsets are #dist's at every
+ * breakpoint: that plate was retired when the readout moved to the edges, and
+ * the corner has been empty since. The argument for putting the control there
+ * rather than under a thumb is in the markup comment in hud.js -- briefly, the
+ * four game verbs are swipes anywhere on the canvas, so the pause target has to
+ * be somewhere a swipe never starts, and everything along the bottom edge is
+ * measured against the runner's shoe by tools/footroom.js.
+ *
+ * 46px, matching .cta, and it does NOT shrink on phones. The CTA's own note
+ * records why that number: 43 was one pixel under the 44px tap target and a
+ * near-miss on a control that only exists to stop the game costs the whole
+ * interaction. A control that is hard to hit is worse than one that is hard to
+ * reach.
+ *
+ * Drawn in the HUD's own language rather than as an app icon: var(--ink) with a
+ * 4px accent rule down the right edge, exactly like the plate that used to
+ * stand here, so it reads as one more piece of the readout.
+ */
+#pauseBtn {
+  position: absolute; right: 14px; top: 24px;
+  display: none;
+  align-items: center; justify-content: center;
+  width: 46px; height: 46px;
+  background: var(--ink);
+  border: none; border-right: 4px solid var(--accent);
+  color: #fffdf5;
+  cursor: pointer;
+  pointer-events: auto;
+  backdrop-filter: blur(6px);
+  transition: opacity 0.22s, visibility 0.22s;
+}
+#ui.canPause #pauseBtn { display: flex; }
+#pauseBtn:active { transform: translateY(1px); }
+#pauseBtn:focus-visible { outline: 3px solid #fffdf5; outline-offset: 3px; }
+/* Two bars out of one box's own borders. The embedded face is Oswald subset to
+ * the characters this HUD prints and has no pause glyph in it, and a character
+ * borrowed from the system fallback would be the one mark on the screen in a
+ * different typeface. */
+.pauseGlyph {
+  display: block; width: 16px; height: 18px;
+  border-left: 5px solid currentColor;
+  border-right: 5px solid currentColor;
+}
 
 /* ---- aid card ----
  * Docked under the left plate, never across the middle of the screen. It used
@@ -624,6 +671,46 @@ html, body {
 }
 .panel.canScroll::after { opacity: 1; }
 
+/* ---- the pause panel ----
+ *
+ * OPAQUE, AND THAT IS THE ANTI-CHEAT RATHER THAN THE STYLING.
+ *
+ * This game is a daily time attack on a deterministic date-seeded course, one
+ * contact ends a record attempt, and the thing a player is buying with every
+ * decision is TIME TO READ THE ROAD. So a pause that leaves the frozen frame
+ * visible hands out exactly the resource the game charges for: stop on the
+ * frame a gate resolves into three lanes, study it for as long as you like,
+ * resume with the answer. The other two panels are rgba(...,0.9) because there
+ * is nothing behind them worth hiding -- the start panel covers z = 0 and the
+ * finish card covers a race that is over. This one covers a race in progress,
+ * so it covers it completely.
+ *
+ * The other half of the same rule is in main.js: the resume countdown runs
+ * BEHIND this panel and the world only reappears on the frame it starts moving
+ * again, so the 3-2-1 is not itself three seconds of free look.
+ */
+#pausePanel { background: #0a0d24; }
+/* ...and it empties for the resume count. See api.countdown in hud.js. The FILL
+ * is what closes the free look and it stays; the copy and the two buttons are
+ * furniture for three seconds in which neither button does anything. */
+#pausePanel .panelInner { transition: opacity 0.2s, visibility 0.2s; }
+#ui.counting #pausePanel .panelInner { opacity: 0; visibility: hidden; }
+#pauseStat {
+  display: flex; flex-wrap: wrap; justify-content: center;
+  align-items: stretch; gap: 7px;
+  margin-top: 16px;
+}
+/* The second action on the panel, and it must not compete with RESUME. Same
+ * geometry, no fill: the accent is reserved for the thing the player almost
+ * always wants, and restarting a run in progress is the thing they almost never
+ * do by accident. */
+.cta.alt {
+  background: none; color: var(--accent);
+  box-shadow: inset 0 0 0 2px rgba(255, 228, 94, 0.55);
+  margin-top: 10px;
+}
+#pausePanel .cta { display: block; width: 100%; max-width: 340px; margin-left: auto; margin-right: auto; }
+
 /* ---- the memory, on the start panel ----
  * Plates, in the HUD's language: a 9px label over a large tabular figure.
  * Rendered only when there is something to remember, so a first-ever visit
@@ -844,6 +931,8 @@ html, body {
   #why { font-size: 8px; margin-top: 4px; }
 
   #dist { right: 9px; top: 22px; min-width: 112px; padding: 6px 11px 7px; }
+  /* The offsets follow #dist; the 46px box does not shrink. See its own note. */
+  #pauseBtn { right: 9px; top: 22px; }
   #dist .val { font-size: 25px; }
   #dist .sub { font-size: 9px; }
 
@@ -883,6 +972,7 @@ html, body {
   .gauge { height: 9px; }
 
   #dist { right: 20px; top: 28px; min-width: 172px; padding: 10px 17px 12px; }
+  #pauseBtn { right: 20px; top: 28px; width: 52px; height: 52px; }
   #dist .val { font-size: 42px; }
   #dist .unit { font-size: 14px; }
   #dist .sub { font-size: 12px; }
@@ -1027,6 +1117,9 @@ html, body {
   #endPanel .cta { margin-top: 7px; padding: 10px; }
 
   #leftCol { top: 20px; gap: 6px; }
+  #pauseBtn { top: 20px; }
+  #pauseStat { margin-top: 8px; }
+  .cta.alt { margin-top: 6px; }
   #engine { padding: 5px 10px 6px; }
   #engine .val { font-size: 18px; }
   .gauge { margin: 4px 0 5px; }
@@ -5565,6 +5658,33 @@ MR.shading = (function () {
  * name, across two builds at any polish setting.
  * ---------------------------------------------------------------------------
  *
+ * ---------------------------------------------------------------------------
+ * THE START LINE. The owner: "he is standing still and then starts running
+ * when the time goes off." Two things came out of building it that outlive it.
+ *
+ *   A HELD POSE IS NOT A STOPPED CYCLE. Damping the run to zero leaves the
+ *     knees at 0.18, the ankles at -0.16 and the trunk folded 0.26 forward --
+ *     a run with the clock paused. The standing pose is authored: weight
+ *     settled, feet wider, trunk up, a breath, and a weight shift at a fifth
+ *     of the breath's rate so the two never read as one motion. See the block
+ *     above the celebration in update().
+ *   EVERY DRIVEN CHANNEL HAS A FLOOR, AND THE FLOOR IS NOT THE BOTTOM OF THE
+ *     RANGE. `effort` is 0.30 + 0.52*sp01 + ..., so the face this rig wears at
+ *     its most relaxed is the face of a man running a 5:30 mile. Effort zero
+ *     had never been rendered because nothing in the game had ever asked for
+ *     it. The finish had already hit this and overridden the drive; the start
+ *     line hits it again, and takes the same answer. A signal assembled out of
+ *     gameplay terms describes gameplay, and the two seconds either side of a
+ *     race are not gameplay.
+ *
+ * The TRANSITION is not this pose fading out. main.js hands this file a ground
+ * speed of zero at the line, which freezes the stride phase (cadence is a power
+ * of speed), and then ramps it -- so the phase opens from a standstill and the
+ * surge signal, a differentiator that had never seen a step in this game's
+ * life, saturates and drives lean, hip extension, knee drive and toe-off for
+ * about a second and a half. The pose blend is the smallest of the three.
+ * ---------------------------------------------------------------------------
+ *
  * Pivot layout (all rotations are local X unless noted):
  *   root -> body -> hips -> thigh -> shin -> foot
  *                -> spine -> chest -> neck -> head -> eyePivot   (expression)
@@ -7184,6 +7304,13 @@ MR.Runner = (function () {
     // never happens in a real run. Same three-part shape camera.js uses, and for
     // the same reason -- see SURGE_FULL and the block in update().
     let accSp = 0, accA = 0, accPrimed = false;
+    // THE START LINE. Seconds spent standing, which is the clock the breath,
+    // the weight shift and the blink all run on. It is reset the instant the
+    // stand weight reaches zero, so a second run starts its breath where the
+    // first one did rather than wherever the previous countdown left it --
+    // this rig has one other free-running clock (the bib) and it is free
+    // running precisely because nothing ever has to reproduce it.
+    let standT = 0;
 
     // ---- head -----------------------------------------------------------
     // The neck pivot sits at the top of the trunk so head tilt rotates from
@@ -8424,7 +8551,13 @@ MR.Runner = (function () {
      * Advance the cycle and pose the skeleton.
      *
      * @param dt     real seconds
-     * @param st     { speed, airborne, air01, ducking, duck01, lean, stumble }
+     * @param st     { speed, airborne, air01, ducking, duck01, lean, stumble,
+     *                 stand, celT, joy, celSide, grade, trip, bounce }
+     *
+     * `stand` is 1 at the start line and 0 in full stride; `celT` is seconds
+     * since the tape. Both are zero for the whole race, and both are applied as
+     * overrides after the cycle has posed rather than threaded through it, so
+     * the eight play silhouettes are untouched by construction.
      */
     api.update = function (dt, st) {
       st = st || {};
@@ -8444,6 +8577,13 @@ MR.Runner = (function () {
       // climb and quickens on the descent for nothing, because cadence already
       // falls out of `speed`, and `speed` is grade-inclusive.
       const grade = st.grade || 0;
+      // THE START LINE, 1 at the line and 0 in full stride. See the block above
+      // the celebration for the pose and for why the transition is not this
+      // number alone. Read here with the rest of the state so the shadow's
+      // footstrike pulse below can see it: a body that is not landing on
+      // anything has nothing to pulse with.
+      const stand = Math.max(0, Math.min(1, st.stand || 0));
+      if (stand > 0) standT += dt; else standT = 0;
 
       // ghost.js re-materials every mesh under this rig to draw the record
       // runner as one translucent body. That is right for limbs and wrong for
@@ -9212,6 +9352,155 @@ MR.Runner = (function () {
       // back view something lateral to measure.
       root.rotation.y = slid * SLIDE_YAW;
 
+      // ---- THE START LINE: A POSE, NOT AN ABSENCE OF ONE --------------------
+      //
+      // The owner: "Before the game starts and it counts down from 3-2-1 the
+      // player is running in place. That's not realistic. Make it so he is
+      // standing still and then starts running when the time goes off."
+      //
+      // ---- WHAT "STANDING" HAD TO MEAN -------------------------------------
+      //
+      // Not the run cycle stopped. A cycle damped to zero leaves this rig with
+      // its knees at 0.18, its ankles at -0.16 and its trunk folded 0.26 rad
+      // forward -- a runner mid-stride with the clock paused, which is a
+      // mannequin holding a run. Three things separate the two, and all three
+      // are things the RIG can say and the run cycle never does:
+      //
+      //   WEIGHT SETTLED. Knees straighter than the run's (0.18 -> 0.135), feet
+      //     a little wider (splay 0.05 -> 0.075), and the trunk up out of the
+      //     racing fold (0.26 -> 0.10). The sole is kept flat by the same rule
+      //     the stride's ankle is solved against -- hip + knee + ankle sums to
+      //     zero and the shoe lies on the road -- so this pose plants without a
+      //     road clamp, and tools/envelope.js reports its lowest point within
+      //     0.001 of the run's.
+      //   A BREATH. The one motion a person standing still actually makes. It
+      //     runs on `standT` rather than on a phase integrator for the reason
+      //     the finish's does: it must not drift with frame rate. Same two
+      //     places the finish breathes in -- the chest pitches and the whole
+      //     shoulder girdle rides on the spine translation -- so there is one
+      //     breath in two joints and they cannot disagree.
+      //   A WEIGHT SHIFT. Slower than the breath and deliberately not in step
+      //     with it, because two motions on one clock read as one motion. It is
+      //     0.014 rad at the hips against 0.008 of counter-roll at the chest:
+      //     nothing you would name if you were looking for it, and the whole
+      //     difference between a person waiting and a statue of one.
+      //
+      // ---- AND THE FACE, WHICH IS THE PART THAT HAD NEVER BEEN RENDERED ----
+      //
+      // The expression block assembles everything out of `effort`, and effort
+      // has a FLOOR of 0.30 -- it is written as 0.30 + 0.52*sp01 + ... So a
+      // runner standing on the line, where effort is honestly zero, would have
+      // worn the face of a man already running a 5:30 mile: mouth part open,
+      // lower lid up, brow down. That is the same defect the finish found and
+      // fixed, in the same place, for the same reason -- the drive is right for
+      // a race and wrong either side of one -- so it takes the same answer. See
+      // `standF` in the expression block: the face is CHOSEN here, not driven.
+      //
+      // ---- IT IS AN OVERRIDE, AFTER EVERYTHING ELSE HAS POSED --------------
+      //
+      // Same construction as the celebration below, and for the same stated
+      // reason: `stand` is 0 for the whole race, so at play this block does not
+      // execute at all and every one of the eight silhouettes tools/envelope.js
+      // holds this rig to is untouched BY CONSTRUCTION rather than by argument.
+      // A ninth state threaded through forty posed joints would put a term that
+      // can only be zero into forty expressions.
+      //
+      // It sits above the celebration for the ordering the two need against
+      // each other, which is not symmetric: they can never overlap in a real
+      // run, but a tool can set both, and if it does the finish must win --
+      // celT only ever counts up from the tape and there is no way back to the
+      // line from there.
+      //
+      // ---- WHY THIS BLOCK IS NOT THE WHOLE TRANSITION ----------------------
+      //
+      // Crossfading a pose is a dissolve, and a start is an EVENT. What makes
+      // the gun read is that main.js also hands this file a ground speed that
+      // is zero at the line and ramps, which does three things no pose blend
+      // can do: `cadence` is zero while he is standing so the stride phase is
+      // FROZEN rather than turning over under a still body; the phase then
+      // opens from a standstill instead of resuming wherever the countdown left
+      // it; and the surge signal fifty lines above -- which is a differentiator
+      // and had never in this game's life seen a step -- sees 0 to 21.8 u/s and
+      // saturates, so lean, hip extension, knee drive and toe-off all come up to
+      // full for about a second and a half and decay. That is stage 3's
+      // "acceleration = temporary stronger push-off/lean" firing at the only
+      // moment in a marathon where a runner genuinely accelerates from nothing,
+      // on constants that were measured for it rather than invented here.
+      if (stand > 0) {
+        // The breath, ~14 a minute at rest. Slower than either end of the
+        // finish's (0.55 and 1.25 Hz), which is the point: that is a man who
+        // has just run a marathon and this is one who has not started.
+        const breath = Math.sin(standT * 0.24 * Math.PI * 2);
+        // ...and the shift of weight, at a fifth of that rate and out of phase
+        // with it by construction rather than by luck.
+        const sway = Math.sin(standT * 0.11 * Math.PI * 2 + 1.1);
+
+        // ---- legs: settled, square, both soles flat ----------------------
+        // Rest values lifted from the loop above rather than invented, so a
+        // retune there does not strand this pose: hip 0, knee 0.18, ankle
+        // -0.16, splay side*0.05. Straighter and wider than all four.
+        for (let i = 0; i < legs.length; i++) {
+          const L = legs[i];
+          to(L.hip, 'x', 0, stand);
+          to(L.hip, 'y', 0, stand);
+          to(L.hip, 'z', L.side * 0.075, stand);
+          to(L.knee, 'x', 0.135, stand);
+          // hip + knee + ankle = 0 is the flat sole. See the ankle solve in the
+          // leg loop, where the same identity is what plants the stride's foot.
+          to(L.ankle, 'x', -0.135, stand);
+        }
+
+        // ---- arms: hanging, loose, and NOT dead straight ------------------
+        // The finish block already had to learn this one: an arm left hanging
+        // against the ribs puts the mitt inside the hip silhouette and the
+        // figure reads as a mannequin, which is the exact word the owner used
+        // about this character. So the elbow keeps a real bend and the shoulder
+        // holds the arm a hair off the body -- daylight through the gap is what
+        // makes it an arm. The asymmetry is the sway's, not a second pose.
+        for (let i = 0; i < arms.length; i++) {
+          const A = arms[i];
+          to(A.shoulder, 'x', 0.05, stand);
+          to(A.shoulder, 'y', 0, stand);
+          to(A.shoulder, 'z', A.side * (0.17 + 0.02 * sway * A.side), stand);
+          to(A.elbow, 'x', -0.38, stand);
+        }
+
+        // ---- trunk: up out of the racing fold ----------------------------
+        // The cycle's yaw and roll are damped out first, then the held lean is
+        // taken from the run's 0.26 to 0.10 -- upright, but still a man leaning
+        // at a line and not standing in a queue.
+        to(hips, 'y', 0, stand);
+        to(chest, 'y', 0, stand);
+        to(spine, 'x', 0.10, stand);
+        to(root, 'y', 0, stand);
+        to(root, 'z', 0, stand);
+        hips.rotation.z += (sway * 0.014 - hips.rotation.z) * stand;
+        chest.rotation.z += (-sway * 0.008 - chest.rotation.z) * stand;
+        chest.rotation.x += breath * 0.024 * stand;
+        // THE BREATH IS ON THE SPINE AND NOT ON THE BODY, and that is a
+        // structural constraint rather than a preference. `body` is the parent
+        // of `hips`, so anything written to body.position.y lifts the LEGS with
+        // the trunk and takes both soles off the road; `spine` is above the
+        // pelvis and carries only the shoulder girdle, the arms and the head.
+        // The first draft of this pose sat the body at half the run's bob
+        // amplitude, reasoning that a frozen stride phase parks the trunk at
+        // the bottom of its bob -- which is true and beside the point, because
+        // the bob is a compression of a body that is landing on alternate feet
+        // and a body on both feet is not compressing at all. Measured by
+        // tools/envelope.js, that lift left the figure standing 0.0092 ABOVE
+        // the tarmac where the run plants at -0.0098. Zero here, and it plants.
+        spine.position.y += breath * 0.006 * stand;
+
+        // ---- head: level, down the road ----------------------------------
+        // The neck cancels 86% of the trunk's lean during a run so the eyeline
+        // holds down the road; with the trunk nearly upright that cancel would
+        // tip the head back and put him looking at the bunting. Set directly
+        // instead, at roughly the same eyeline the run holds.
+        to(neck, 'x', -0.05, stand);
+        to(neck, 'y', 0, stand);
+        to(neck, 'z', 0, stand);
+      }
+
       // ---- THE FINISH: THE FIRST POSE ON THIS RIG BUILT TO BE SEEN FROM THE
       // ---- FRONT -----------------------------------------------------------
       //
@@ -9812,10 +10101,44 @@ MR.Runner = (function () {
       // The gasp, on the same clock and the same rate as the chest that drives
       // it -- one breath, two places, so they cannot disagree.
       const celBreath = Math.sin((st.celT || 0) * (0.55 + 0.70 * (1 - celJoy)) * Math.PI * 2);
+      // ---- ...AND AT THE START LINE IT IS CHOSEN TOO -----------------------
+      //
+      // Exactly the argument two paragraphs up, at the other end of the race.
+      // `effort` is written 0.30 + 0.52*sp01 + 0.85*max(0,grade) + 0.55*surge,
+      // so its FLOOR is 0.30 and there is no input that can take it lower. A man
+      // standing on a start line is at effort ZERO, which is a value this
+      // expression system has never been able to express -- so left on the
+      // drive he would wait for the gun wearing the face of someone already
+      // three miles in: mouth open 17% of its travel, lower lid up, brow down.
+      //
+      // What replaces it is not a blank. A runner on a line is COMPOSED, and
+      // composure is a set of small positive choices rather than the absence of
+      // effort: the mouth shuts (the drive cannot reach 1.0, the resting scale,
+      // at any speed this game runs), the eyes come fully open, and the brow
+      // comes down a little on the LEVEL -- browTilt near zero against
+      // browLift -- which is concentration where a tilt would be strain.
+      //
+      // AND HE BLINKS. It is two lines and it is the only thing on this rig
+      // that says the character is alive while nothing else about him moves.
+      // The rate is 1 in ~4.4 s with a 0.13 s closure, which is a slow human
+      // blink rather than a nervous one, and it rides ON TOP of the aperture
+      // rather than replacing it, so it cannot be swallowed by whatever else
+      // the eye is doing. It uses the same bottom-edge closure the effort
+      // squint does -- see EYE_SEMI below -- so a blink and a squint are one
+      // mechanism and the top edge of the eye is pinned through both.
+      //
+      // Everything here is on POLISH like the rest of the block, so ?polish=0
+      // still renders the face this character had before the character pass.
+      const standF = stand;
+      const blink = standF > 0
+        ? Math.max(0, 1 - Math.abs(((standT % 4.4) - 4.0) / 0.13))
+        : 0;
 
-      const browLift = mix(-POLISH * (0.0035 * effort + 0.0030 * wince),
+      const browLift = mix(mix(-POLISH * (0.0035 * effort + 0.0030 * wince),
+        -POLISH * 0.0026, standF),
         POLISH * mix(-0.0055, 0.0090, celJoy), celF);
-      const browTilt = mix(POLISH * (0.0045 * effort + 0.0030 * wince),
+      const browTilt = mix(mix(POLISH * (0.0045 * effort + 0.0030 * wince),
+        POLISH * 0.0008, standF),
         POLISH * mix(0.0060, -0.0010, celJoy), celF);
       {
         const ba = browGeo.pos.array, br = browGeo.rest, bu = browGeo.u;
@@ -9826,8 +10149,9 @@ MR.Runner = (function () {
       }
       // Narrowing only, never widening: a toy character with eyes OPENED past
       // their drawn size reads as startled, and he is running, not surprised.
-      const eyeShut = mix(POLISH * (0.16 * effort + 0.34 * wince),
-        POLISH * mix(0.52, 0.02, celJoy), celF);
+      const eyeShut = Math.min(0.94, mix(mix(POLISH * (0.16 * effort + 0.34 * wince),
+        0, standF),
+        POLISH * mix(0.52, 0.02, celJoy), celF) + POLISH * 0.94 * blink);
       eyePivot.scale.y = 1 - eyeShut;
       // EYE_SEMI is the sclera's own half-height. Translating by half of what
       // the scale takes away holds the TOP edge on the float and spends the
@@ -9840,9 +10164,11 @@ MR.Runner = (function () {
       // to nine pixels at the face lens and a shape change rather than a size
       // change, because the lower lip travels with it and the opening between
       // them is what grows.
-      mouthPivot.scale.y = mix(1 + POLISH * (0.55 * effort + 0.30 * wince),
+      mouthPivot.scale.y = mix(mix(1 + POLISH * (0.55 * effort + 0.30 * wince),
+        1 - POLISH * 0.08, standF),
         1 + POLISH * mix(0.95 + 0.35 * celBreath, 0.70, celJoy), celF);
-      mouthPivot.scale.x = mix(1 + POLISH * (0.10 * effort + 0.22 * wince),
+      mouthPivot.scale.x = mix(mix(1 + POLISH * (0.10 * effort + 0.22 * wince),
+        1 + POLISH * 0.04, standF),
         1 + POLISH * mix(0.18, 0.52, celJoy), celF);
 
       // Ducking drops the whole body rather than only folding the spine, so
@@ -9905,7 +10231,14 @@ MR.Runner = (function () {
       // It goes the opposite way to the old duck's -- narrower and much
       // deeper, roughly the footprint of a body lying down -- and the plant
       // pulse is damped out with the bob that caused it.
-      const plant = 1 - Math.abs(Math.cos(p)) * 0.10 * (1 - air) * (1 - slid * 0.90);
+      // ...and it is damped out at the start line for the same reason it is
+      // damped out in a slide: the pulse IS the footstrike, and a body standing
+      // on both feet is not striking anything. Left in, it would have sat the
+      // blob at its tightest and darkest -- the frozen stride phase parks
+      // cos(p) at exactly 1 -- so a standing runner would have worn the shadow
+      // of the hardest footfall in the cycle, held.
+      const plant = 1 - Math.abs(Math.cos(p)) * 0.10
+        * (1 - air) * (1 - slid * 0.90) * (1 - stand);
       shadowW = (1.30 - slid * 0.18) * plant;
       shadowD = (0.96 + slid * 1.34) * plant;
       shadowA = (1 + slid * 0.48) * (2 - plant);
@@ -10949,10 +11282,32 @@ MR.World = (function () {
    * The lane telegraph that lies on the road ahead of a hazard.
    *
    * The icon is a SHAPE first and a colour second: solid up-triangles for
-   * JUMP, stacked rungs for DUCK, crosses for BLOCK. At 90 units the mat is
+   * JUMP, an OPEN PORTAL for DUCK, crosses for BLOCK. At 90 units the mat is
    * about a dozen pixels tall, which is enough for shape but not for reading
    * a small hazard mesh -- which is exactly the distance the lane choice has
    * to be made at.
+   *
+   * ---- THE DUCK GLYPH WAS THREE STACKED RUNGS, AND A RUNG IS A LADDER ----
+   *
+   * A blind reader asked what the DUCK objects meant answered "UNDER, low
+   * confidence" on all five, and named the reason: *"The yellow-and-black
+   * diagonals tell me danger... They do NOT tell me over or under."* The mat is
+   * the channel this file already calls the one the race is lost by misreading,
+   * and it was not helping: three horizontal bars is a LADDER, and a ladder is
+   * a thing you climb.
+   *
+   * A MAT CANNOT DRAW AN ARROW THAT MEANS "DOWN", and that is the constraint
+   * the rungs were probably a retreat from. The mat lies flat on the road, so
+   * every direction it can draw is a direction along the road -- which is why
+   * the JUMP glyph is a RAMP PROFILE (apex away from the runner) rather than an
+   * up-arrow, and why "under" cannot be an arrow here either.
+   *
+   * What a flat mat CAN draw is the shape of the hole. The DUCK glyph is now an
+   * inverted U -- a lintel on two legs with the road showing through the middle
+   * -- which is a PORTAL YOU PASS THROUGH, and which is now literally the
+   * silhouette of the object it precedes: see duckHeader(), where the span
+   * between the standards above the bar is filled in for the same reason.
+   * Glyph and object say the same sentence.
    */
   function matTexture(kind, tint, wash) {
     const c = canvas(128, 256);
@@ -10975,9 +11330,13 @@ MR.World = (function () {
         g.moveTo(64, cy + 30); g.lineTo(108, cy - 28); g.lineTo(20, cy - 28);
         g.closePath(); g.fill();
       } else if (kind === K.DUCK) {
-        g.fillRect(20, cy - 30, 88, 15);
-        g.fillRect(20, cy - 4, 88, 15);
-        g.fillRect(20, cy + 22, 88, 15);
+        // The lintel, thick, and the two legs it stands on. The opening is
+        // 52 of the glyph's 88 -- more than half of it is the hole, because
+        // "legal is not legible" and an opening that merely exists reads as a
+        // line rather than as a way through.
+        g.fillRect(20, cy - 32, 88, 22);
+        g.fillRect(20, cy - 10, 18, 42);
+        g.fillRect(90, cy - 10, 18, 42);
       } else {
         g.lineWidth = 17; g.strokeStyle = tint; g.lineCap = 'butt';
         g.beginPath();
@@ -17386,7 +17745,23 @@ MR.World = (function () {
         // The four inner walls, standing between the floor and the rim, so
         // what you see over the lip is the INSIDE of something. They are a
         // shade up from the floor, which is what gives the hole a bottom.
-        gl(hbx(2.10, 0.38, 0.05, 0, 0.21, 0.395, WALL), GLOSS.matte),
+        //
+        // THE FAR WALL IS NOW 0.50 AND NOT 0.38, and it is the whole of what
+        // makes this variant a hole. A blind reader shown this object called it
+        // *"red-and-white boards on a low bed"* -- the guarding read and the
+        // excavation did not -- and the frame says why: between the near lip at
+        // 0.13 and the underside of the lower rail there was an aperture 0.30
+        // tall, and every pixel of it was warm mid-tone. Duct, coupler, conduit
+        // bundle, spoil and the pale sub-base band across the far rim, all of
+        // them lit, none of them dark. THE HOLE HAD NO DARK IN IT.
+        //
+        // At 0.50 the far wall fills the aperture from the top of the ducts to
+        // the rail in near-black, and it also stands taller and nearer than the
+        // far rim's pale sub-base cap, so it occludes the one bright band that
+        // used to sit exactly where the void should be. The value step this
+        // object's whole read depends on is bought by the wall being TALL
+        // rather than by anything being added.
+        gl(hbx(2.10, 0.58, 0.05, 0, 0.31, 0.395, WALL), GLOSS.matte),
         gl(hbx(2.10, 0.07, 0.05, 0, 0.05, -0.395, WALL), GLOSS.matte),
         gl(hbx(0.06, 0.24, 0.84, -1.02, 0.14, 0, WALL), GLOSS.matte),
         gl(hbx(0.06, 0.24, 0.84, 1.02, 0.14, 0, WALL), GLOSS.matte),
@@ -17415,12 +17790,17 @@ MR.World = (function () {
         // 15 degrees above the road, so the one object that says what the hole
         // is FOR was invisible. At 0.15 with a 0.075 radius the run breaks the
         // lip line by 0.095 and the player sees pipe standing in a trench.
-        gl(cyl(0.105, 0.105, 2.02 * LANE_FIT, 12, 0, 0.125, 0.17, 0xff9448, 0, 0, Math.PI / 2), GLOSS.trim),
-        gl(cyl(0.085, 0.085, 2.02 * LANE_FIT, 10, 0, 0.10, -0.14, 0xe07030, 0, 0, Math.PI / 2), GLOSS.trim),
+        // 0.105 and not 0.125: the run still breaks the near lip line by 0.08,
+        // which is all the "pipe standing in a trench" read ever needed, and
+        // the 0.04 it gives back is 0.04 more of dark wall above it. The
+        // aperture is only 0.36 tall and this object was spending a ninth of it
+        // on lit plastic that was already legible.
+        gl(cyl(0.105, 0.105, 2.02 * LANE_FIT, 12, 0, 0.105, 0.17, 0xff9448, 0, 0, Math.PI / 2), GLOSS.trim),
+        gl(cyl(0.085, 0.085, 2.02 * LANE_FIT, 10, 0, 0.085, -0.14, 0xe07030, 0, 0, Math.PI / 2), GLOSS.trim),
       ];
       // Duct couplers, so the runs are jointed lengths rather than extrusions.
       for (const cx of [-0.46, 0.34]) {
-        parts.push(gl(cyl(0.128, 0.128, 0.16, 12, cx * LANE_FIT, 0.125, 0.17, 0xfff6ea, 0, 0, Math.PI / 2), GLOSS.trim));
+        parts.push(gl(cyl(0.128, 0.128, 0.16, 12, cx * LANE_FIT, 0.105, 0.17, 0xfff6ea, 0, 0, Math.PI / 2), GLOSS.trim));
       }
       // THE LENGTH WAITING TO GO IN, leaning out of the far end of the hole on
       // the spoil. It is the tallest thing in the excavation at 0.44, it is the
@@ -17436,12 +17816,19 @@ MR.World = (function () {
       // A bundle of small conduits in the corner of the trench -- what the
       // ducts are being laid for, and the detail that fills the floor so the
       // hole has something IN it rather than being an empty box.
-      for (const c of [[-0.72, 0.09, -0.24], [-0.62, 0.09, -0.10], [-0.67, 0.155, -0.17]]) {
+      for (const c of [[-0.72, 0.07, -0.24], [-0.62, 0.07, -0.10], [-0.67, 0.135, -0.17]]) {
         parts.push(gl(cyl(0.032, 0.032, 0.66 * LANE_FIT, 8, c[0] * LANE_FIT, c[1], c[2], 0xe8b820, 0, 0, Math.PI / 2), GLOSS.trim));
       }
-      // The spoil, heaped on the far rim where it is dug out to. Ellipsoids,
-      // for the reason the sandbags are: a heap has no flat face.
-      for (const s of [[-0.42, 0.55, 0.40, 0.78, 0.16, 0.20], [0.50, 0.53, 0.42, 0.62, 0.13, 0.18]]) {
+      // The spoil, heaped on the SIDE rims and no longer across the far one.
+      // Ellipsoids, for the reason the sandbags are: a heap has no flat face.
+      //
+      // It moved because of where it sat, not because of what it was. Two pale
+      // tan heaps 0.78 and 0.62 wide, centred on the far rim at y 0.53-0.55,
+      // covered the top third of the aperture in the one value the hole cannot
+      // afford. On the side rims they still say "this was dug out", they still
+      // read from behind and from the flank, and they are outboard of the
+      // sightline into the void instead of standing in it.
+      for (const s of [[-0.90, 0.46, 0.12, 0.44, 0.17, 0.50], [0.94, 0.44, -0.08, 0.38, 0.14, 0.42]]) {
         const g = new THREE.SphereGeometry(0.5, 9, 6);
         g.scale(s[3], s[4], s[5]);
         const m = new THREE.Matrix4();
@@ -17492,11 +17879,42 @@ MR.World = (function () {
        * makes this read as GUARDED rather than as damage, which is the
        * difference between a works trench and a pothole.
        */
-      for (const ry of [0.50, 0.71]) {
+      /**
+       * ---- THE APERTURE IS THE MEASUREMENT, AND IT WAS 0.30 ---------------
+       *
+       * What a player can see of the excavation is not the height of the hole.
+       * It is the SCREEN SLOT between the top of the near rim and the underside
+       * of the near rail, and through that slot the lens sees a band of the far
+       * wall and nothing else. Both numbers below are that slot, in world y at
+       * the gate line, and the second is what the two rails cost:
+       *
+       *   near rim top      0.13
+       *   lower rail under  0.43   ->  aperture 0.30
+       *
+       * The rails then eat it a second time in the ray: from a lens 2.85 above
+       * the road and 12.35 back, the underside of the near rail at 0.43 hides
+       * everything on the far wall above y 0.27, so a 0.50 wall showed 0.11 of
+       * itself. The excavation this file describes at length was being seen
+       * through a letterbox.
+       *
+       * SO THE LOWER RAIL IS THINNED AND LIFTED, AND NEITHER IS DELETED.
+       * Deleting one is the obvious move and it is refused with a number: this
+       * variant is already the tightest hazard in the game on the contrast gate
+       * -- 1.37x luminance against lane 1 with 0.092 of margin -- and the white
+       * in the rails is what buys that ratio. 0.09 tall at 0.60 keeps both
+       * rails, keeps the banded rhythm, and opens the slot:
+       *
+       *   lower rail under  0.555  ->  aperture 0.425, and 0.247 of far wall
+       *
+       * The upper rail goes to 0.75 at 0.10 tall, so its top is 0.80 exactly --
+       * the box ceiling, which the beacon already stands on and which art is
+       * not allowed past.
+       */
+      for (const r of [[0.60, 0.09], [0.75, 0.10]]) {
         for (let i = 0; i < 5; i++) {
           const bxc = -0.84 + i * 0.42;
-          parts.push(gl(hcbx(0.43, 0.14, 0.13, bxc, ry, -0.36, i % 2 ? RED : WHITE, 0.02), GLOSS.paint));
-          parts.push(gl(hcbx(0.43, 0.14, 0.13, bxc, ry, 0.36, i % 2 ? WHITE : RED, 0.02), GLOSS.paint));
+          parts.push(gl(hcbx(0.43, r[1], 0.13, bxc, r[0], -0.36, i % 2 ? RED : WHITE, 0.02), GLOSS.paint));
+          parts.push(gl(hcbx(0.43, r[1], 0.13, bxc, r[0], 0.36, i % 2 ? WHITE : RED, 0.02), GLOSS.paint));
         }
       }
       // The lamp on the near-left post. One red beacon is what a guarded hole
@@ -17782,34 +18200,64 @@ MR.World = (function () {
       const MODS = [-0.66, 0, 0.66];
       MODS.forEach(function (MX, i) {
         /**
-         * THE MODULE. One closed pale solid, chamfered 0.13 -- which is the
-         * most chamferGeo will take on a 0.60 module without inverting, and
-         * which is right anyway: these are blow-moulded and the shoulder is
-         * most of the shape.
+         * ---- THE MODULE TAPERS NOW, AND THAT IS WHAT MAKES IT A BARRIER ----
+         *
+         * It was ONE closed pale solid, 0.60 x 0.66 x 0.94, with a 0.98-deep
+         * flat cap band across the top of it. A blind reader shown the object
+         * named it *"a skip, wheeled bin, roadworks cabinet or generator
+         * housing"* -- four different boxes, and every one of them a box with a
+         * lid. That is exactly what the geometry was: a cuboid the full depth
+         * of its own footprint, finished with a flat plate wider than itself.
+         *
+         * The one thing every water barrier on every road in the world has, and
+         * this had none of, is a TAPERED PROFILE. It is wide where it is heavy
+         * and narrow where it is not, and the silhouette from the chase camera
+         * -- which looks DOWN on the object at 5 to 15 degrees, so depth is
+         * read as roof -- is a stepped shoulder rather than a flat top.
+         *
+         * Three sections, tapering 0.94 to 0.74 to 0.54 in depth while the
+         * width barely moves, because a linked run's width is set by the
+         * interlock and only its section tapers:
+         *
+         *   THE BODY   0.12 to 0.56, full depth, and the water is in it.
+         *   THE SHOULDER 0.56 to 0.67, 0.74 deep, the step the waist rib caps.
+         *   THE TOP RAIL 0.67 to 0.77, 0.54 deep, which is the ridge a barrier
+         *     is lifted and walked along by, and NOT a lid.
+         *
+         * Nothing about the box moved: yMax was 0.79 and is 0.77, halfZ was
+         * 0.50 at the sill and is unchanged, and the widest thing is still the
+         * cap band's replacement at 0.56 against a lane of 1.98.
          */
-        parts.push(gl(cbx(0.60, 0.66, 0.94, MX, 0.45, 0, SHELL, 0.13), GLOSS.paint));
-        // THE FOUR WINDOWS. Front, back and both flanks, each standing 0.035
-        // proud of the shell so it is a moulded panel and not a decal.
+        parts.push(gl(cbx(0.60, 0.44, 0.94, MX, 0.34, 0, SHELL, 0.11), GLOSS.paint));
+        parts.push(gl(cbx(0.58, 0.12, 0.74, MX, 0.615, 0, SHELL, 0.09), GLOSS.paint));
+        parts.push(gl(cbx(0.56, 0.11, 0.54, MX, 0.715, 0, SHELL_HI, 0.08), GLOSS.matte));
+        /**
+         * THE FOUR WINDOWS. Front, back and both flanks, each standing 0.035
+         * proud of the shell so it is a moulded panel and not a decal.
+         *
+         * 0.13 to 0.49 and not 0.13 to 0.45, on a body that is now 0.44 tall
+         * rather than 0.66: the water fills 82% of the section it is in instead
+         * of 48% of a box, and the waterline lands ON the shoulder step. A
+         * barrier that is visibly full to the shoulder is full; one that is
+         * blue in the bottom half of a tall white box is a box with a stripe.
+         */
         for (const sz of [-1, 1]) {
-          parts.push(gl(cbx(0.46, 0.32, 0.06, MX, 0.29, sz * 0.475, WATER, 0.02), GLOSS.paint));
-          parts.push(gl(cbx(0.44, 0.035, 0.07, MX, 0.462, sz * 0.475, WATER_HI, 0.01), GLOSS.chrome));
+          parts.push(gl(cbx(0.50, 0.36, 0.06, MX, 0.31, sz * 0.475, WATER, 0.02), GLOSS.paint));
+          parts.push(gl(cbx(0.48, 0.035, 0.07, MX, 0.502, sz * 0.475, WATER_HI, 0.01), GLOSS.chrome));
         }
         for (const sx of [-1, 1]) {
-          parts.push(gl(cbx(0.06, 0.32, 0.72, MX + sx * 0.305, 0.29, 0, WATER, 0.02), GLOSS.paint));
-          parts.push(gl(cbx(0.07, 0.035, 0.70, MX + sx * 0.305, 0.462, 0, WATER_HI, 0.01), GLOSS.chrome));
+          parts.push(gl(cbx(0.06, 0.36, 0.72, MX + sx * 0.305, 0.31, 0, WATER, 0.02), GLOSS.paint));
+          parts.push(gl(cbx(0.07, 0.035, 0.70, MX + sx * 0.305, 0.502, 0, WATER_HI, 0.01), GLOSS.chrome));
         }
-        // The moulded waist rib the shell is stiffened by, above the waterline.
-        parts.push(gl(cbx(0.64, 0.05, 0.98, MX, 0.575, 0, SHELL_HI, 0.02), GLOSS.paint));
-        // The cap band. Pale rather than lemon: the whole object is one hue
-        // family now and a yellow band here would be the only warm thing on it
-        // AND would put yellow back on a JUMP, which is the one colour move
-        // this file is not allowed to make -- see stripeTex.
-        parts.push(gl(cbx(0.66, 0.09, 0.98, MX, 0.745, 0, SHELL_HI, 0.035), GLOSS.matte));
+        // The moulded waist rib the shell is stiffened by, on the shoulder step
+        // itself so it reads as the edge of the taper rather than as a band
+        // painted across a flat side.
+        parts.push(gl(cbx(0.62, 0.05, 0.96, MX, 0.555, 0, SHELL_HI, 0.02), GLOSS.paint));
         // THE FILL CAP, on top, and the DRAIN PLUG on each flank. The pair of
         // fittings that makes a water barrier a water barrier: you can fill it
         // and you can empty it, and before this pass the object had neither
         // opening nor contents.
-        parts.push(gl(cyl(0.078, 0.085, 0.05, 10, MX, 0.775, 0, DEEP), GLOSS.trim));
+        parts.push(gl(cyl(0.078, 0.085, 0.05, 10, MX, 0.765, 0, DEEP), GLOSS.trim));
         parts.push(gl(cyl(0.046, 0.046, 0.035, 8, MX, 0.7825, 0, WATER_HI), GLOSS.chrome));
         for (const sx of [-1, 1]) {
           parts.push(gl(cyl(0.055, 0.055, 0.07, 8, MX + sx * 0.32, 0.20, 0, DEEP, 0, 0, Math.PI / 2), GLOSS.trim));
@@ -17817,9 +18265,10 @@ MR.World = (function () {
         // The foot block under each module, standing out past the sill, so the
         // run has three feet with a recess between them rather than one slab.
         parts.push(gl(cbx(0.40, 0.15, 1.02, MX, 0.075, 0, DEEP, 0.04), GLOSS.paint));
-        // The lifting handle moulded into the top of each module, offset so the
-        // three are not a ruled row.
-        parts.push(gl(cbx(0.10, 0.055, 0.30, MX + (i - 1) * 0.06, 0.7725, -0.28, DEEP, 0.02), GLOSS.trim));
+        // The lifting handle moulded into the top rail, offset so the three are
+        // not a ruled row. z -0.18 and not -0.28: the rail is 0.54 deep now and
+        // a handle at -0.28 would have hung off the front of it.
+        parts.push(gl(cbx(0.10, 0.055, 0.26, MX + (i - 1) * 0.06, 0.745, -0.18, DEEP, 0.02), GLOSS.trim));
       });
       /**
        * THE INTERLOCK PINS, standing in the two joints. They are what says at
@@ -18101,14 +18550,42 @@ MR.World = (function () {
      * height comes from tall yellow standards rather than from anything spanning
      * the lane.
      *
-     * That distinction is not cosmetic, and it constrains every variant. The
-     * chase camera trails 5.1 units and carries 42% of the jump arc, so it
-     * sweeps y = 1.76 to 3.14 right through a gate's lane. An earlier version
-     * had a header board at 2.44 and the camera flew straight into it -- one
-     * frame of full-screen yellow-and-black stripes. ABOVE THE BAR, ONLY THIN
-     * MEMBERS,
-     * and only out at the standards, so the worst a clip can ever be is a
-     * sliver of post.
+     * ---- THE RULE THIS FILE USED TO STATE HERE WAS MEASURED AND IT IS FALSE --
+     *
+     * Verbatim, and it governed every DUCK in the game: *"The chase camera
+     * trails 5.1 units and carries 42% of the jump arc, so it sweeps y = 1.76 to
+     * 3.14 right through a gate's lane. An earlier version had a header board at
+     * 2.44 and the camera flew straight into it -- one frame of full-screen
+     * yellow-and-black stripes. ABOVE THE BAR, ONLY THIN MEMBERS, and only out
+     * at the standards."*
+     *
+     * The incident is real and the conclusion drawn from it expired. That
+     * sentence was written when K.CAM_BASE_Y was 2.05 -- src/render/camera.js
+     * still carries the note, *"At the old BASE_Y of 2.05"* -- and the resting
+     * eye is 3.10 now. Nobody re-measured, and the number went on forbidding the
+     * one thing a DUCK most needed for five passes.
+     *
+     * MEASURED, on the shipped page, over a real bot run pumped at a simulated
+     * 60fps, sampling the live lens every frame and recording its height above
+     * the road directly under it at the instant it crosses a gate plane:
+     *
+     *   lens above the road, whole run          min 2.83   max 5.74
+     *   at a DUCK gate, inside the lane column  min 2.85   median 3.47
+     *
+     * Fifty-five gate crossings, and the lens never came within a unit of the
+     * top of the bar. The claim that the camera sweeps the lane at 1.76 is off
+     * by more than the whole height of the header it was used to forbid.
+     *
+     * SO THE SPACE ABOVE THE BAR IS AVAILABLE, and this file now spends it --
+     * see duckHeader(). What survives of the old rule is its arithmetic form,
+     * restated against the number that was actually measured: NOTHING ACROSS THE
+     * LANE ABOVE 2.22, which is 0.61 below the lowest lens height ever sampled
+     * at a DUCK. Above 2.22 the old rule stands unchanged: thin members, out at
+     * the standards, so the worst a clip can ever be is a sliver of post.
+     *
+     * AND NOTHING ACROSS THE LANE BELOW 1.41, which is not a camera rule but the
+     * collision contract: MR.Collision.BOX puts the DUCK floor there, and art
+     * below it is art a legally ducked player runs through.
      */
     /**
      * ============ WHAT THE ORBIT SHEET SAID ABOUT THIS VOCABULARY ============
@@ -18159,6 +18636,111 @@ MR.World = (function () {
      *   v4  a second, smaller conduit on saddle brackets at z +0.21, with
      *       flange bolts at the collars.
      */
+    /**
+     * ============ THE CLEARANCE HEADER, AND IT IS THE WHOLE PASS ============
+     *
+     * ---- THE DEFECT, IN THE READER'S OWN WORDS ----------------------------
+     *
+     * A blind reader shown unlabelled 1:1 crops through the live chase camera
+     * at 8, 12 and 25 units, asked of every object *"must a runner go OVER it,
+     * UNDER it, or AROUND it?"*, routed every JUMP correctly and answered every
+     * one of the five DUCKs "UNDER, low confidence" with OVER live in all five:
+     *
+     *   *"Genuinely ambiguous, and I want to be loud about it. The beam sits in
+     *   the upper third of the structure with a wide open gap of clear road
+     *   visible beneath it. That gap says duck under. But a hurdle also looks
+     *   exactly like this -- a striped bar on two legs with air underneath --
+     *   and that says jump over. Nothing in the pixels gives me the absolute
+     *   height... I would not bet a run on it."*
+     *
+     * One contact ends a record attempt and a DUCK cannot be jumped -- see the
+     * DUCK clause in collision.js, which reads `surface` and deliberately not
+     * `y + surface` precisely so a plain jump cannot sail over a bar. A player
+     * who reads OVER here loses the run to something that was not their fault,
+     * which CLAUDE.md rule 4 makes a build failure rather than a preference.
+     *
+     * ---- WHY THE OBJECT COULD NOT SAY IT ---------------------------------
+     *
+     * tools/kindread.js has the mechanism, and it is one line of the table. A
+     * DUCK's occupancy from the road to 1.40 ran 0.22-0.30 and its occupancy
+     * from 2.00 to 2.80 ran 0.25-0.35. THE TOP OF A DUCK AND THE BOTTOM OF A
+     * DUCK WERE THE SAME NUMBER. Two thin posts below a bar and two thin posts
+     * above it is a shape with no preferred direction in it: whatever argument
+     * the open bottom makes for going under, the open top makes for going over,
+     * and the reader is left choosing between a hurdle and a gantry on scale
+     * alone -- which is exactly the thing it said it could not recover.
+     *
+     * A hurdle has nothing above its rail. A low bridge has a metre of
+     * structure above its soffit. That difference is the whole of the read, and
+     * it is what this puts back.
+     *
+     * ---- WHAT IT IS, AND WHY IT IS SHARED BY ALL FIVE VARIANTS ------------
+     *
+     * A CLEARANCE HEADER: the deep board every real low-clearance structure
+     * carries above the restriction, so that the ceiling is seen before it is
+     * met. It fills the whole span between the two standards from the top of
+     * the bar to 2.22, so the beam the player reads is 1.41 to 2.22 -- 0.81
+     * deep against the 0.42 it was -- and above the road there is now MASS
+     * where there used to be sky.
+     *
+     * Three members, and the order of their values is the point:
+     *
+     *   THE SOFFIT SHADOW, 1.83 to 1.89, near-black. The dark line under a
+     *     ceiling. It is what stops the header reading as a second rail bolted
+     *     over the first, and it is the top edge of the OPENING.
+     *   THE WEB, 1.89 to 2.13, in the standards' own yellow, with a stiffener
+     *     rib standing proud of BOTH faces. Plain, because the striped bar
+     *     below it has to stay the loudest single element in the frame; what
+     *     this contributes is area, not noise.
+     *   THE TOP FLANGE, 2.13 to 2.22, pale, bearing on both standards. It is
+     *     the last horizontal before the posts go on alone, and against sky it
+     *     is the line that says the structure has a top.
+     *
+     * SHARED, because a discriminator that works on one DUCK and not the other
+     * four is not a discriminator -- the same sentence the base plates were
+     * adopted under. It is also true of all five objects: the boarded lift of a
+     * scaffold, the sign panel of a gantry, the crash beam of a services
+     * bridge and the head of a level crossing are the same member.
+     *
+     * ---- THE THREE NUMBERS IT IS PINNED TO --------------------------------
+     *
+     *   TOP 2.22, against a lens measured at 2.85 at its lowest over a DUCK.
+     *     See the header above for the run that measured it.
+     *   BOTTOM 1.83, which is MR.Collision.BOX's own ceiling for the kind.
+     *     Nothing here reaches below the bar, so the daylight band that a blind
+     *     reader once named as the only cue this object had is untouched: every
+     *     member is above 1.83 and bands 0 to 6 do not move.
+     *   HALF-WIDTH 0.730 on the web and 0.745 on the flange, against standards
+     *     whose inner faces stand at 0.738. The web fills the span and the
+     *     flange bears on the posts, and neither goes near the 1.12 the
+     *     envelope guard enforces.
+     *
+     * DEPTH 0.34, against a bar of 0.52-0.56. A web is thinner than the flanges
+     * it carries, so the header is set back from the bar on both faces -- which
+     * is what a girder does, and which keeps every fitting the five variants
+     * hang on their standards at z +/-0.185 and outboard clear of it.
+     */
+    function duckHeader() {
+      const parts = [
+        // The soffit shadow. Full span, and 0.36 deep so it shows on both
+        // faces of the web rather than being a line painted on the front.
+        gl(hbx(2.06, 0.06, 0.36, 0, 1.86, 0, 0x1a1206), GLOSS.matte),
+        // The web.
+        gl(hcbx(2.02, 0.24, 0.34, 0, 2.01, 0, 0xffc422, 0.04), GLOSS.paint),
+        // The top flange, bearing on both standards.
+        gl(hcbx(2.06, 0.09, 0.40, 0, 2.175, 0, 0xfff0a0, 0.02), GLOSS.trim),
+      ];
+      // THE STIFFENER RIBS. Deeper than the web they stand on, so they exist
+      // from behind as well as in front -- rule 1, on a member that would
+      // otherwise be a flat slab with a decorated face. Three of them, at the
+      // spacing a real web is stiffened at, and in the deep amber the rest of
+      // the kind's fittings already use.
+      for (const rx of [-0.66, 0, 0.66]) {
+        parts.push(gl(hbx(0.10, 0.22, 0.44, rx, 2.01, 0, 0xd18a08), GLOSS.trim));
+      }
+      return parts;
+    }
+
     const duckGeo = merge([
       // The bar and the standards are chamfered too. A DUCK is read as a
       // silhouette at forty units, and the cut is small enough not to touch
@@ -18258,7 +18840,7 @@ MR.World = (function () {
         }
       }
       return p;
-    })()));
+    })()).concat(duckHeader()));
 
     /**
      * ============ DUCK v1: A SCAFFOLD GANTRY ============
@@ -18432,7 +19014,7 @@ MR.World = (function () {
         // The toe board, on the rear plane at the lift.
         parts.push(gl(bx(0.26, 0.20, 0.06, px, 1.95, 0.255, 0xfff0a0), GLOSS.trim));
       }
-      return merge(parts);
+      return merge(parts.concat(duckHeader()));
     })();
 
     /**
@@ -18552,7 +19134,7 @@ MR.World = (function () {
         // fitting rather than a slab seen from behind.
         parts.push(gl(bx(0.32, 0.07, 0.14, px, 0.60, 0.20, 0xd18a08), GLOSS.trim));
       }
-      return merge(parts);
+      return merge(parts.concat(duckHeader()));
     })();
 
     /**
@@ -18705,7 +19287,7 @@ MR.World = (function () {
       // The rubber buffer in the bottom of the fork, which is what a dropped
       // boom actually lands on.
       parts.push(gl(cyl(0.055, 0.055, 0.30, 8, rx, 2.06, 0, 0x2b1e05, Math.PI / 2), GLOSS.matte));
-      return merge(parts);
+      return merge(parts.concat(duckHeader()));
     })();
 
     /**
@@ -18864,7 +19446,7 @@ MR.World = (function () {
       parts.push(gl(cyl(0.13, 0.13, 0.58, 10, -px, 2.92, 0, 0xd18a08), GLOSS.paint));
       parts.push(gl(cyl(0.13, 0.13, 0.34, 10, -px + 0.17, 3.18, 0, 0xd18a08, 0, 0, Math.PI / 2), GLOSS.paint));
       parts.push(gl(cyl(0.16, 0.16, 0.07, 10, -px + 0.32, 3.18, 0, 0xfff0a0, 0, 0, Math.PI / 2), GLOSS.chrome));
-      return merge(parts);
+      return merge(parts.concat(duckHeader()));
     })();
 
     /**
@@ -27254,7 +27836,11 @@ MR.Ghost = (function () {
 
     /**
      * @param dt real seconds
-     * @param st { pace, camera, playerX }
+     * @param st { pace, camera, playerX, celT, stand, launch }
+     *
+     * `stand` and `launch` are the start line, handed down from main.js so the
+     * record holder leaves on the same gun as the player. See the block at
+     * body.update below.
      */
     s.update = function (dt, st) {
       const pace = st.pace;
@@ -27335,7 +27921,41 @@ MR.Ghost = (function () {
         // nearly all edge. It still dies with the body at the haze wall, which
         // is why it cannot use the shared, opaque, cached ink material.
         rim.uniforms.rimAlpha.value = Math.min(1, alpha * 1.45 + 0.10);
-        body.update(dt, { speed: SPEED });
+        // ---- IT TOES THE LINE TOO -------------------------------------------
+        //
+        // The owner, after the player was fixed: "The ghost runner also needs to
+        // stand still until it starts." Two figures on the start line, one
+        // correctly still and one still jogging, is worse than when both were
+        // wrong -- the difference is what draws the eye.
+        //
+        // Nothing is authored here. `stand` is the same pose blend and `launch`
+        // the same stride ramp main.js hands the player, off the same clock on
+        // the same frame, because the two are starting the same race on the same
+        // gun. What was worth checking rather than assuming is that a CONSTANT
+        // speed still ramps: cadence in runner.js is 2.55 * (speed / SPEED_LO)^
+        // 0.72, a power of the value it is handed and not of where that value
+        // came from, so SPEED * 0 is cadence 0 and the ghost's stride phase
+        // freezes exactly as the player's does.
+        //
+        // The two ramps are also the same SHAPE, which is the part that decides
+        // whether they look like one gun or two. The ghost runs record pace and
+        // the player starts at 5:30, so at any equal fraction of the launch the
+        // ghost's cadence is a constant 1.1449x the player's -- the ratio does
+        // not move across the ramp, so both reach their own full rate on the same
+        // frame. The 14% it keeps is the contrast this file already wants: the
+        // record's legs and the player's legs are never turning over together.
+        //
+        // The phase offset survives it. `body.phase` is seeded to 0.37 so the two
+        // do not read as one figure and its reflection; a frozen phase holds that
+        // seed through the countdown and the cycle resumes on it, so the offset
+        // costs nothing and is not re-derived here.
+        //
+        // NOTHING ABOVE OR BELOW THIS LINE MOVES. This is a rendering change:
+        // gz, gap, s.x, the crossover flash and ghostMiles are all untouched.
+        body.update(dt, {
+          speed: SPEED * (st.launch === undefined ? 1 : st.launch),
+          stand: st.stand || 0,
+        });
         // The ghost runs the same road. Its own maths is untouched -- ghostMiles
         // is raceTime / RECORD_PACE and race time is grade-neutral by
         // construction -- so this is the record holder being DRAWN on the
@@ -28438,6 +29058,15 @@ MR.Camera = (function () {
  *  - Swipe commitment. A touch resolves to a direction as soon as it passes
  *    the threshold, not on release, so a flick registers at the moment the
  *    player's thumb says it should.
+ *
+ * Pause is the one input here that is not one of those four, and it is
+ * deliberately built out of none of this machinery -- not buffered, not
+ * gateable, not a swipe. See PAUSE_KEYS. The touch half of it is a DOM button
+ * in the HUD rather than a gesture, for a reason that belongs in this file: the
+ * pointer listeners below are on the CANVAS, so a tap that lands on a button in
+ * #ui never reaches them and can never be read as the start of a lane change.
+ * A pause gesture would have had to share the screen with the swipe that ends a
+ * record attempt.
  */
 MR.Controls = (function () {
   const K = MR.K;
@@ -28455,8 +29084,14 @@ MR.Controls = (function () {
       buffer: [],           // { action, t }
       time: 0,
       lastAction: null,
+      // Gates the four buffered VERBS only, never the pause key below. Set
+      // false while the game is paused and for the whole of the resume
+      // countdown, which is what stops a player queueing the answer to a gate
+      // they studied on a frozen frame -- see main.js. Nothing is buffered
+      // while it is false, so there is nothing to serve when it comes back.
       enabled: true,
       onAny: null,          // called for the first input of a session
+      onPause: null,        // Escape / P, and it fires whatever `enabled` says
     };
 
     function push(action) {
@@ -28477,7 +29112,29 @@ MR.Controls = (function () {
       ArrowDown: DUCK, KeyS: DUCK,
     };
 
+    // Pause is a change of MODE, not one of the game's four verbs, and it is
+    // kept out of KEYS for three separate reasons rather than one: a key in
+    // that table becomes a lane change; anything routed through push() is
+    // BUFFERED, and a pause that fires up to INPUT_BUFFER seconds after it was
+    // pressed is a pause that lands in the wrong place; and push() drops
+    // everything while `enabled` is false, which is exactly the state the game
+    // is in while it is paused -- so pause would have been the one control that
+    // could not un-press itself.
+    const PAUSE_KEYS = { Escape: 1, KeyP: 1 };
+
     function onKey(e) {
+      if (PAUSE_KEYS[e.code]) {
+        // A narrower focus guard than the one below. That guard exists so Space
+        // can activate a focused BUTTON; neither Escape nor P activates
+        // anything, and swallowing them near a button would mean that clicking
+        // PAUSE with a mouse -- which leaves the pause button focused -- made
+        // the key that opened the panel unable to close it.
+        const f = e.target;
+        if (f && (f.tagName === 'INPUT' || f.tagName === 'TEXTAREA' || f.isContentEditable)) return;
+        e.preventDefault();
+        if (!e.repeat && s.onPause) s.onPause();
+        return;
+      }
       const a = KEYS[e.code];
       if (!a) return;
       // Leave the focused control alone. This listener is on `window` and used
@@ -29464,7 +30121,7 @@ MR.Audio = (function () {
   // Every method the game may call. The silent stub is generated from this,
   // so adding a cue below can never leave the no-audio path short of one.
   const API = [
-    'unlock', 'setMuted', 'ambient', 'setIntensity',
+    'unlock', 'setMuted', 'setPaused', 'ambient', 'setIntensity',
     'footstep', 'jump', 'land', 'duck', 'hit', 'clean', 'crossover', 'aid',
     'mile', 'roar', 'finish', 'countdown',
     'aidMissed', 'recordLost', 'tier',
@@ -30235,6 +30892,29 @@ MR.Audio = (function () {
       } catch (e) { /* never let audio stop the game starting */ }
     };
 
+    /**
+     * The world goes quiet while the game is paused.
+     *
+     * Not setMuted, and not a suspend of the context. `muted` is the player's
+     * own switch and a pause must not be able to leave it in a state they did
+     * not choose; suspending the context would stop the bed's loop sources
+     * dead, and a bandpassed noise loop restarted from a suspend re-enters at a
+     * different point in the buffer, which is audible as a step in the crowd.
+     * Ducking the master gain holds the whole graph exactly where it is.
+     *
+     * 0.06 rather than 0, because a paused game that is completely silent and a
+     * paused game whose audio has crashed are the same experience, and this mix
+     * already swallows every cue that throws (see the wrapper below).
+     *
+     * The way back up is slower than the way down, and it is started when the
+     * resume countdown starts rather than when the panel lifts -- so the crowd
+     * is already there when the road comes back. See resume() in main.js.
+     */
+    s.setPaused = function (on) {
+      if (s.muted) return;
+      master.gain.setTargetAtTime(on ? 0.06 : 0.85, ctx.currentTime, on ? 0.10 : 0.30);
+    };
+
     s.setMuted = function (m) {
       s.muted = m;
       master.gain.setTargetAtTime(m ? 0 : 0.85, ctx.currentTime, 0.1);
@@ -30762,6 +31442,53 @@ MR.HUD = (function () {
         <button class="cta" id="againBtn">RUN IT AGAIN</button>
       </div></div>
 
+      <!--
+        THE PAUSE BUTTON, AND WHY IT IS IN THE TOP RIGHT.
+
+        Three constraints and only one corner satisfies all three.
+
+        THE MIDDLE OF THE FRAME BELONGS TO THE ROAD, which is the rule this
+        whole readout was rebuilt around, so it is an edge or it is nothing.
+
+        IT MUST NOT SIT WHERE A SWIPE LANDS. The four game verbs are swipes
+        anywhere on the canvas, and the one input a player must never lose is
+        the lane change that avoids a hazard. A pause under the thumb is a
+        pause pressed by a mis-started swipe -- and an accidental pause during
+        a record attempt is a worse outcome than an awkward deliberate one. So
+        the awkwardness is the feature: this is the one control in the game
+        that should cost a second hand, because it is the only one that is
+        never used in a hurry.
+
+        AND NOTHING NEW AT THE BOTTOM. tools/footroom.js asserts the runner's
+        shoe clears the top of #railWrap across 96 combinations of viewport,
+        pace and state, and that gate is currently held by a plate that had to
+        give up a whole row to pass it. A 46px control anywhere along the
+        bottom edge would be measured against the same figure. The top right is
+        the one region of this HUD that is measured by nothing, because it is
+        the slot the retired #dist plate used to occupy -- which is also why
+        the offsets below are #dist's own, at every breakpoint.
+      -->
+      <button id="pauseBtn" type="button" aria-label="Pause the race">
+        <span class="pauseGlyph"></span>
+      </button>
+
+      <div class="panel hidden" id="pausePanel" role="dialog" aria-modal="true"
+           aria-labelledby="pauseTitle"><div class="panelInner">
+        <div class="date">RACE STOPPED</div>
+        <h1 id="pauseTitle">PAUSED</h1>
+        <!--
+          The panel is opaque, and that is the anti-cheat rather than the
+          styling. See the .panel override in style.css.
+        -->
+        <div class="blurb">
+          The clock, the road and the ghost are stopped together.
+          <b>Resuming counts 3 &middot; 2 &middot; 1</b> before any of them move.
+        </div>
+        <div id="pauseStat"></div>
+        <button class="cta" id="resumeBtn" type="button">RESUME</button>
+        <button class="cta alt" id="restartBtn" type="button">RESTART THIS RUN</button>
+      </div></div>
+
       <div id="count" class="hidden"><span id="countVal"></span></div>
     `;
 
@@ -30788,6 +31515,8 @@ MR.HUD = (function () {
       endTurn: q('endTurn'), tomorrow: q('tomorrow'), tomorrowRoute: q('tomorrowRoute'),
       againBtn: q('againBtn'),
       count: q('count'), countVal: q('countVal'),
+      pauseBtn: q('pauseBtn'), pausePanel: q('pausePanel'),
+      pauseStat: q('pauseStat'), resumeBtn: q('resumeBtn'), restartBtn: q('restartBtn'),
       perf: q('perf'),
     };
 
@@ -30825,7 +31554,8 @@ MR.HUD = (function () {
     // the overlay, which made the finish screen read as a rendering fault.
     function syncPanels() {
       const open = !n.startPanel.classList.contains('hidden')
-                || !n.endPanel.classList.contains('hidden');
+                || !n.endPanel.classList.contains('hidden')
+                || !n.pausePanel.classList.contains('hidden');
       root.classList.toggle('panelOpen', open);
     }
 
@@ -31479,8 +32209,52 @@ MR.HUD = (function () {
       syncPanels();
     };
 
+    /**
+     * The pause panel, on exactly the machinery the other two panels use.
+     *
+     * `syncPanels` is the whole point of routing it here rather than inventing
+     * a second overlay: the live readout steps out of the way behind ANY panel
+     * (see #ui.panelOpen in the stylesheet), and a pause screen that left the
+     * projection, the fuel gauge and the rail showing through would read as the
+     * rendering fault the panelOpen rule was written to fix.
+     *
+     * @param p  the pace model, or null. The two figures printed are the ones
+     *           the readout underneath has just been told to hide, so the panel
+     *           is not a place where the player loses sight of their race.
+     */
+    api.showPause = function (show, p) {
+      if (show && p) {
+        n.pauseStat.innerHTML =
+          plate('ELAPSED', Pace.clock(p.raceTime), 'RACE CLOCK STOPPED')
+          + plate('DISTANCE', p.miles.toFixed(2), 'OF ' + K.MARATHON_MILES.toFixed(2) + ' MI')
+          + plate('CLEAN', String(p.streak), 'GATES IN A ROW');
+      }
+      n.pausePanel.classList.toggle('hidden', !show);
+      if (show) requestAnimationFrame(markScroll);
+      syncPanels();
+    };
+
+    /**
+     * The button itself, which exists only while there is a race to stop. It is
+     * driven by main.js off the state machine rather than by this file off the
+     * panel, because the two are not the same interval: the button is gone for
+     * the whole of the resume countdown, when no panel is open and the game is
+     * not yet running.
+     */
+    api.showPauseBtn = function (on) {
+      root.classList.toggle('canPause', !!on);
+    };
+
     api.countdown = function (text) {
       n.count.classList.toggle('hidden', text === null);
+      // The count is a full-frame element and the pause panel is a full-frame
+      // element, and a resume runs both at once: the digit landed across the
+      // DISTANCE plate. So the panel empties while the count is up -- the fill
+      // stays, which is the half of it that is load-bearing, and the copy and
+      // the buttons step out of the way exactly as the live readout does behind
+      // any panel. It also removes the two buttons from under a player's thumb
+      // during the three seconds when pressing either of them would do nothing.
+      root.classList.toggle('counting', text !== null);
       if (text !== null) n.countVal.textContent = text;
     };
 
@@ -31673,6 +32447,9 @@ MR.HUD = (function () {
 
     api.onStart = function (fn) { n.startBtn.addEventListener('click', fn); };
     api.onAgain = function (fn) { n.againBtn.addEventListener('click', fn); };
+    api.onPause = function (fn) { n.pauseBtn.addEventListener('click', fn); };
+    api.onResume = function (fn) { n.resumeBtn.addEventListener('click', fn); };
+    api.onRestart = function (fn) { n.restartBtn.addEventListener('click', fn); };
     api.showPerf = function (on) { n.perf.classList.toggle('on', on); };
 
     syncPanels();
@@ -31799,8 +32576,15 @@ MR.HUD = (function () {
   if (!audit.ok) console.warn('COLLISION AUDIT', audit.notes);
 
   // ---- state ------------------------------------------------------------
-  const IDLE = 0, COUNT = 1, RUN = 2, DONE = 3;
+  const IDLE = 0, COUNT = 1, RUN = 2, DONE = 3, PAUSED = 4;
   let state = IDLE;
+  // Whether the countdown now running is a RESUME rather than the start of a
+  // race. The two are the same three seconds and the same sound deliberately --
+  // this game already owns a countdown and a second one would be a second
+  // thing to learn -- but they end differently: a start releases the runner off
+  // the line, a resume takes the pause panel down.
+  let resuming = false;
+  let btnShown = false;   // edge detector for the pause button; see the loop
   let doneAt = 0;      // wall-clock at the tape, for the run-out ease
   let endTimer = 0;    // the held end card; cleared on reset so it cannot
                        // arrive over a run that has already restarted
@@ -31846,6 +32630,47 @@ MR.HUD = (function () {
   // already what every other part of the game indexes a gate by.
   let hitAt = [];
 
+  // ---- THE STANDING START -------------------------------------------------
+  //
+  // The owner: "Before the game starts and it counts down from 3-2-1 the player
+  // is running in place. That's not realistic. Make it so he is standing still
+  // and then starts running when the time goes off."
+  //
+  // ONE clock, 1 at the line and 0 in full stride, and it drives THREE things
+  // that arrive at different rates. That split is the whole of the transition,
+  // because a single crossfade from a held pose to a running one is a dissolve
+  // and what this moment wants is an event.
+  //
+  //   THE POSE, over the full LAUNCH. runner.js blends its standing pose out
+  //     against the cycle, smoothstepped so it leaves the line and reaches full
+  //     stride with no corner at either end.
+  //   THE STRIDE, over LAUNCH_SPEED, which is less than half as long. The ground
+  //     speed handed to the runner and the camera is this clock, not the pace
+  //     model's: cadence in runner.js is a power of speed, so zero speed FREEZES
+  //     the stride phase instead of turning it over under a motionless body, and
+  //     the phase then opens from a standstill rather than resuming wherever the
+  //     countdown left it. The legs come up to rate faster than the body comes
+  //     out of the pose, which is what an acceleration looks like and is also
+  //     the honest order: a runner's legs go first.
+  //   THE DRIVE, free. runner.js and camera.js both carry a surge signal -- a
+  //     smoothed derivative of ground speed -- and in this game's whole life
+  //     neither had ever seen a step, because pace only ever eases. A start
+  //     hands both of them 0 to 21.8 u/s. They saturate, and lean, hip
+  //     extension, knee drive, toe-off and the camera's own trail-back all come
+  //     up to full and decay over about a second and a half, on constants that
+  //     were measured for exactly this and never had a moment to fire in.
+  //
+  // WHAT IT COSTS, stated rather than hidden: pace.js starts the race at
+  // START_PACE on the frame the gun goes, so for the length of LAUNCH_SPEED the
+  // world is moving faster than the legs are turning over and the feet skate.
+  // That is a consequence of the pace model, not of this ramp -- there is no
+  // value of these two constants that makes a runner who is stationary at t=0
+  // and travelling at 21.8 u/s at t=0 not skate. LAUNCH_SPEED is short for that
+  // reason and no other.
+  let standT = 1;
+  const LAUNCH = 0.72;        // seconds for the pose to leave the line
+  const LAUNCH_SPEED = 0.34;  // ...and for the stride to reach full rate
+
   function reset() {
     clearTimeout(endTimer);
     showCard = null;
@@ -31867,9 +32692,16 @@ MR.HUD = (function () {
     celClock = 0;
     hitAt = [];
     runner.phase = 0;
+    standT = 1;
+    resuming = false;
+    controls.enabled = true;
     ghost.reset();
     hud.hideEnd();
+    hud.showPause(false);
+    btnShown = false;
+    hud.showPauseBtn(false);
     hud.celebrate(false);
+    audio.setPaused(false);
     world.update(0);
   }
 
@@ -31877,12 +32709,90 @@ MR.HUD = (function () {
     reset();
     audio.unlock();
     hud.showStart(false);
-    if (NOCOUNT) { state = RUN; hud.countdown(null); }
+    // No countdown means no start line: ?bot= and ?nocount= exist so a harness
+    // can enter the race directly, and a harness that entered it standing still
+    // would photograph and measure a launch instead of a run. Every tool in this
+    // project drives the game through one of those two, so releasing the clock
+    // here is what keeps the standing start out of every number they report.
+    if (NOCOUNT) { state = RUN; standT = 0; hud.countdown(null); }
     else { state = COUNT; countT = 0; }
+  }
+
+  // ---- PAUSE, AND WHAT IT IS NOT ALLOWED TO BE ----------------------------
+  //
+  // The owner asked for a pause button. This game is a daily time attack on a
+  // deterministic date-seeded course against a 1:59:30 ghost, and one contact
+  // ends a record attempt -- so the resource every decision in it spends is
+  // TIME TO READ THE ROAD, and a naive pause hands that resource out for free:
+  // stop on the frame a gate resolves into three lanes, study it for as long as
+  // you like, resume with the answer. Three things close that, and they are
+  // three because no one of them closes it alone.
+  //
+  //   THE PANEL IS OPAQUE. #pausePanel is a solid fill where the other two
+  //     panels are 0.9 -- see its note in style.css. You cannot study a frame
+  //     you cannot see, and this is the only one of the three that removes the
+  //     information rather than the time to use it.
+  //   THE RESUME COUNTDOWN RUNS BEHIND IT. Reusing the start's 3-2-1 was the
+  //     obvious move and it is the wrong one done the obvious way: a countdown
+  //     over a revealed, frozen world IS three more seconds of free look, and a
+  //     bigger gift than the pause itself. So the panel stays up for the whole
+  //     of it and the world reappears on the same frame it starts moving.
+  //   NO INPUT IS BUFFERED ACROSS IT. controls.enabled is false from the moment
+  //     the game is paused until the gun, and controls.js drops rather than
+  //     queues while it is false. A player who worked out the answer on a still
+  //     frame cannot pre-load the swipe; they have to see the road again first.
+  //
+  // WHAT IS LEFT, because it is worth stating and not worth hiding: a player
+  // can still THINK about a frame they had already been shown for as long as
+  // they like. Taking that back needs the race to resume some distance behind
+  // where it stopped, and a rewind means unwinding pace.units, player.gateIdx
+  // and player.aidIdx together or double-counting a gate -- which is a change to
+  // the scoring path, and this is not a pass that should be touching the
+  // scoring path. It is on the roadmap.
+  function pause() {
+    if (state !== RUN) return;
+    state = PAUSED;
+    controls.enabled = false;
+    controls.clear();
+    btnShown = false;
+    hud.showPauseBtn(false);
+    hud.showPause(true, pace);
+    audio.setPaused(true);
+  }
+
+  function resume() {
+    if (state !== PAUSED) return;
+    state = COUNT;
+    countT = 0;
+    resuming = true;
+    // The bed comes back over the countdown rather than on the frame the panel
+    // lifts. It carries no information about the road -- it is crowd and air,
+    // gated on the streak, which has not moved -- and a race that resumes in
+    // silence and then snaps to full level reads as an audio fault.
+    audio.setPaused(false);
   }
 
   hud.onStart(begin);
   hud.onAgain(begin);
+  hud.onPause(pause);
+  hud.onResume(resume);
+  hud.onRestart(begin);
+  // Escape and P, from controls.js, which keeps them out of the buffered verbs
+  // for the reasons in its own note. One key, both directions.
+  controls.onPause = function () {
+    if (state === RUN) pause();
+    else if (state === PAUSED) resume();
+  };
+  // A tab going into the background already froze this game, because rAF stops
+  // -- but it froze it SILENTLY and mid-gate, and handed the player the road
+  // back with no warning and whatever was left of their reaction time. Routing
+  // it through the same pause closes that: they come back to a panel and a
+  // countdown. Guarded on BOT because every automated run in this project drives
+  // a page a harness owns, and a harness that ever reported itself hidden would
+  // pause the run it is measuring.
+  document.addEventListener('visibilitychange', function () {
+    if (!BOT && document.visibilityState === 'hidden' && state === RUN) pause();
+  });
   // Any input during the celebration ends the hold and brings the card up now.
   // The alternative to this is a player who has seen the ending once being made
   // to sit through it on every subsequent run, which is how a celebration
@@ -32070,6 +32980,13 @@ MR.HUD = (function () {
 
     controls.tick(dt);
 
+    // PAUSED stops the world, not just the clock. Every integrator below is
+    // stepped with this instead of dt, so the springs, the stride phase, the
+    // hood, the ghost's tag and the celebration clock all hold where they were
+    // rather than settling while the game is stopped. pace.update is not called
+    // at all, so the race clock and the distance are frozen at their source.
+    const sdt = state === PAUSED ? 0 : dt;
+
     if (state === COUNT) {
       const prev = Math.ceil(3 - countT);
       countT += dt;
@@ -32079,10 +32996,36 @@ MR.HUD = (function () {
         hud.countdown(null);
         audio.countdown(true);
         state = RUN;
+        // The gun. On a resume this is the frame the world reappears AND the
+        // frame it starts moving -- the two are the same frame on purpose, so
+        // the countdown never doubles as a free look. See pause() above.
+        if (resuming) {
+          resuming = false;
+          hud.showPause(false);
+          controls.enabled = true;
+        }
       } else {
         hud.countdown(String(Math.max(1, c)));
       }
     }
+
+    // The launch, released only once the race is actually running. See standT.
+    if (state === RUN && standT > 0) standT = Math.max(0, standT - dt / LAUNCH);
+    // The pose blend, smoothstepped at both ends.
+    const stand01 = standT * standT * (3 - 2 * standT);
+    // ...and the stride ramp, which is the same clock read against a shorter
+    // window, so the legs reach full rate while the body is still coming out of
+    // the standing pose.
+    const gu = Math.min(1, (1 - standT) * (LAUNCH / LAUNCH_SPEED));
+    const launch = gu * gu * (3 - 2 * gu);
+
+    // The button exists only while there is a race to stop: not over either
+    // panel, not during either countdown, and not after the tape. Edge-detected
+    // rather than written every frame, for the reason hud.js keeps a whole
+    // `cache` object: this loop runs sixty times a second and a classList write
+    // per frame is style invalidation per frame for a class that changes four
+    // times in a race.
+    if ((state === RUN) !== btnShown) { btnShown = state === RUN; hud.showPauseBtn(btnShown); }
 
     if (state === RUN) {
       if (BOT) botThink();
@@ -32301,9 +33244,14 @@ MR.HUD = (function () {
     // runner kept sprinting on the spot through the entire celebration. Ease
     // the cadence out instead of cutting it: a runner who crosses a line
     // decelerates, and a stride that halts on one frame reads as a freeze.
-    const strideSpeed = state === DONE
+    // ...and at the other end of the race the same argument runs backwards:
+    // `launch` is 0 at the start line and 1 for every other frame of the game,
+    // so this is the ground speed the CHARACTER is travelling at rather than the
+    // one the pace model is charging for. The two disagree exactly twice in a
+    // race, once at each end, and both disagreements are the truth.
+    const strideSpeed = (state === DONE
       ? pace.speed() * Math.max(0, 1 - (performance.now() - doneAt) / 2200)
-      : pace.speed();
+      : pace.speed()) * launch;
 
     // Seconds since the tape, which is the celebration's clock in runner.js AND
     // in camera.js. Real time, not race time: the race clock has stopped, and
@@ -32319,14 +33267,20 @@ MR.HUD = (function () {
     // owns this clock too, which is what makes the framing measurable.
     if (state === DONE) celClock += raw;
     const celT = celClock;
+    // A pause during the celebration is not reachable -- the button is gone the
+    // moment the tape breaks -- so `raw` above needs no gate of its own.
 
     // The grade at the runner, -1..1 against the steepest legal one. It only
     // pitches the trunk; the stride slows on the climb and quickens on the
     // descent for free, because cadence already falls out of `speed`.
     const grade = elev.gradeNorm(pace.units);
 
-    runner.update(dt, {
+    runner.update(sdt, {
       speed: strideSpeed,
+      // 1 at the line, 0 in full stride. Zero for the whole race, which is what
+      // lets runner.js apply the standing pose as an override after the cycle
+      // has posed rather than threading a ninth state through forty joints.
+      stand: stand01,
       grade,
       air01: player.airborne ? Math.sin(Math.min(1, player.airT) * Math.PI) : 0,
       duck01: player.duck01,
@@ -32355,13 +33309,21 @@ MR.HUD = (function () {
     runner.group.position.set(player.x,
       player.y + player.surface + elev.at(pace.units), pace.units);
 
-    cam.update(dt, {
+    cam.update(sdt, {
       z: pace.units, x: player.x, y: player.y, surface: player.surface,
-      speed: pace.speed(),
+      // The same launch-scaled speed the runner is handed, and for the same
+      // reason: the camera's framing, its cadence-locked bob and its surge cue
+      // are all statements about how fast the runner is going, and at the start
+      // line he is going nowhere. Nothing in the framing moves for it -- both
+      // the pull-in and the look-ahead read `drive`, which is clamped at zero
+      // from START_PACE downward -- so what this actually buys is a bob that
+      // stops bobbing under a body with no footfalls, and a camera that trails
+      // back off the line when he goes.
+      speed: pace.speed() * launch,
       // The flat speed, for the top-gear latch alone. A descent must not fire
       // the gear flourish or the permanent rumble: speed you did not earn is
       // not another gear. See camera.js's header.
-      gearSpeed: pace.streakSpeed(),
+      gearSpeed: pace.streakSpeed() * launch,
       lean: player.lean, duck01: player.duck01,
       // The finish, on the same clock the runner's pose runs on. Zero for the
       // whole race, so every celebration term in camera.js is inert until the
@@ -32372,7 +33334,14 @@ MR.HUD = (function () {
     // After the camera, never before: the ghost's tag is placed against this
     // frame's lens (position, fov, aspect), and a frame of lag there shows up
     // as the tag swimming during a lane change.
-    ghost.update(dt, { pace, camera: cam.camera, playerX: player.x, celT });
+    // The same two launch numbers the runner and the camera are handed, on the
+    // same frame: the record holder is starting the same race on the same gun,
+    // so it stands on the line and leaves it with the player rather than jogging
+    // through the countdown beside a runner who is not.
+    ghost.update(sdt, {
+      pace, camera: cam.camera, playerX: player.x, celT,
+      stand: stand01, launch,
+    });
 
     // The crossover is the moment the whole ghost exists for, so it gets a
     // sound like every other beat in the race. Ghost owns the detection (it
@@ -32418,6 +33387,14 @@ MR.HUD = (function () {
     // a measurement sweep taken at whatever state the page was left in.
     get celT() { return celClock; },
     set celT(v) { celClock = Math.max(0, +v || 0); },
+    // The launch clock, and SETTABLE for exactly the reason celT is: the moment
+    // this pass has to be photographed -- at the line, at the gun, one second
+    // after -- is three quarters of a second long, and a harness that can only
+    // wait for it photographs whichever instant its own frame rate lands on.
+    // 1 is the start line, 0 is full stride.
+    get stand() { return standT; },
+    set stand(v) { standT = Math.max(0, Math.min(1, +v || 0)); },
+    pause, resume,
     course, world, runner, ghost, cam, hud, audio, renderer, scene,
     begin,
     fps: () => fps,
@@ -32432,6 +33409,12 @@ MR.HUD = (function () {
     // deep into the race instead of always at the start line.
     begin();
     state = RUN;
+    // ...and he is already running by definition: this branch exists to put the
+    // page deep into a race, and every one of those races began some minutes
+    // ago. Set explicitly rather than left to begin(), because ?skip= is legal
+    // without ?bot= and would otherwise open a mid-race screenshot on a runner
+    // stepping off the start line.
+    standT = 0;
     const step = 1 / 60;
     for (let t = 0; t < SKIP; t += step) {
       if (BOT) botThink();

@@ -177,18 +177,37 @@ MR.Course = (function () {
     // The local pace the base window was cut for, hill included, recovered from
     // elevation's own table -- then the same hill at the surge floor.
     //
-    // THE DATUM IS K.FLOOR_PACE AND ONLY K.FLOOR_PACE. ACTION_WINDOW is cut
-    // against it, elevation's table is cut against it, and this has to be too
-    // or the two stop composing. FLOOR_BASE (the slower unsurged floor EFFORT
-    // introduces) does not appear here at all, and that is correct rather than
-    // an omission: it is SLOWER than the datum, so a runner outside a zone
-    // needs less window than the course already gives them and nothing is owed.
-    // An earlier draft of this line subtracted the base lift as well and
-    // widened the zone by 26 s/mi instead of 10 -- safe, but it would have cost
-    // gates nothing was asking for and made the measured price of a surge a
-    // lie.
+    // ---- THE DATUM IS THE FLOOR THE PLAYER RUNS AT OUTSIDE A ZONE --------
+    //
+    // This subtracted (K.FLOOR_PACE - FLOOR_SURGE) = 10 s/mi, on the argument
+    // that ACTION_WINDOW and elevation's table are both cut against
+    // K.FLOOR_PACE so this had to be as well, and that FLOOR_BASE -- being
+    // SLOWER than the datum -- owed nothing because a runner outside a zone
+    // needs less window than the course already gives them.
+    //
+    // The first half is right and the conclusion does not follow, and the
+    // measurement is unambiguous. What the player is owed is not a span in the
+    // generator's private units, it is TIME, and the time they are owed is the
+    // time the ordinary road gives them. Under EFFORT the ordinary road runs
+    // at FLOOR_BASE, so its guaranteed decide window is 761 ms. Widening for a
+    // 10 s/mi lift when the lift the player actually takes is
+    // 261 - 244 = 17 s/mi handed an elected surge 739 ms: the generator had
+    // paid for four sevenths of the speed it sold. It was fair by the SHIPPED
+    // game's 741 ms standard and 22 ms tighter than the road either side of
+    // it, which is difficulty coming out of a reaction window rather than out
+    // of the allocation -- exactly what rule 4 forbids and exactly what this
+    // mechanic was told not to do. Widen the window, do not eat it.
+    //
+    // So the lift is measured from FLOOR_BASE. K.FLOOR_PACE stays the datum
+    // that ACTION_WINDOW and elevation's table are cut against -- that part of
+    // the old argument was correct and nothing here disturbs it. Only the SIZE
+    // of the step is now the size of the step the runner takes.
+    //
+    // Measured after the change: 761 ms outside, 760 ms inside. The surge buys
+    // no reaction time and costs none. What it costs is gates, which is where
+    // a price belongs.
     const pace = SPAN_NUM / (base + FLAT_SPAN);
-    const surged = pace - (K.FLOOR_PACE - MR.Pace.SURGE.FLOOR_SURGE);
+    const surged = pace - (MR.Pace.SURGE.FLOOR_BASE - MR.Pace.SURGE.FLOOR_SURGE);
     return Math.max(base, SPAN_NUM / surged - FLAT_SPAN);
   }
 
@@ -727,8 +746,41 @@ MR.Course = (function () {
     // A gate whose deepest lane is a DUCK costs 0.30 of this; a standing BLOCK
     // costs 1.95; a four-span BLOCK train costs 15.99, and pays it rather than
     // being waved through on its gate line.
-    return Math.max(readWindowAt(z, elev, surges) + reachOf(lanes, train),
-                    mean * rnd.range(0.84, 1.16));
+    // ---- AND THE WINDOW IS OWED WHERE THE NEXT GATE LANDS, NOT HERE ------
+    //
+    // This read readWindowAt(z, ...) alone, and z is the gate BEHIND the gap.
+    // Everywhere the window varies smoothly -- elevation -- that is fine. A
+    // surge zone is a STEP: the window jumps at z0, and a gate sitting just
+    // short of the entry line with the next one landing inside was spaced for
+    // the unsurged window and answered at the surge speed.
+    //
+    // SURGE_PAD = 28 was meant to cover it and cannot: gate intervals run to
+    // 70.4 units over 60 days (median 31.4), so any interval above the pad
+    // walks straight through the boundary. Measured before this fix, the
+    // guaranteed decide window inside a zone had a FLOOR of 712 ms against a
+    // 5th percentile of 739 ms -- the tail was entirely these boundary gates,
+    // and 712 ms is tighter than anything this game has ever shipped. That is
+    // a rule 4 failure and not a difficulty setting: the player elected a
+    // surge and was handed a gate the course had not paid for.
+    //
+    // The fix is exact rather than a bigger pad. Space provisionally, then ask
+    // what the window is where that lands, and take the larger. It converges
+    // in one step and cannot oscillate: widening only ever pushes the gate
+    // FORWARD, a zone is at least 420 units against a ~70-unit maximum
+    // interval, so a gate pushed further can enter a zone and never leave one.
+    // The forward look is taken ONLY when there are zones, and that is a
+    // correctness requirement rather than a saving. Elevation's window is
+    // SMOOTH and its own table already looks 28 units ahead, so re-evaluating
+    // it here would change the spacing on hills for no reason -- and change it
+    // at EFFORT = 0, where the course must stay bit-identical to the generator
+    // that shipped (tools/mechanics.js --identity). At zero, `surges` is empty,
+    // this returns `first`, and that is the old expression character for
+    // character. The seeded draw is taken exactly once either way.
+    const reach = reachOf(lanes, train);
+    const first = Math.max(readWindowAt(z, elev, surges) + reach,
+                           mean * rnd.range(0.84, 1.16));
+    if (!surges || !surges.length) return first;
+    return Math.max(first, readWindowAt(z + first, elev, surges) + reach);
   }
 
   /** Hazard mix widens as difficulty rises. */

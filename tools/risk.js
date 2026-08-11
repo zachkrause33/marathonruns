@@ -714,6 +714,247 @@ if (want('aid')) {
 // ===========================================================================
 // policy: is there more than one winning line?
 // ===========================================================================
+// ===========================================================================
+// zone: the surge zone's marking contract, in numbers
+// ===========================================================================
+//
+// ---- THIS SECTION IS A HANDOVER, NOT AN ANALYSIS -------------------------
+//
+// Another agent builds the paint, the signage and whatever stands at the
+// entry line. Everything they need to know is a number, and every one of
+// those numbers is measured off the shipped generator here rather than
+// asserted in prose -- the same way the ramp handed over its deck height and
+// tailgate run. If a number below moves, the art is wrong the next morning
+// and this section says so before anybody paints anything.
+//
+// The one sentence the whole contract serves: THE PLAYER COMMITS BEFORE THEY
+// CAN SEE INSIDE. That is the risk the mechanic is made of, so the marking
+// must carry exactly enough to make the bet fair and not one unit more.
+if (want('zone')) {
+  console.log('\n=== zone: the surge marking contract, in numbers ===\n');
+  const cs = KEYS.map((k) => Course.generate(k));
+  const all = [];
+  for (const c of cs) for (const s of (c.surges || [])) all.push({ c, s });
+  if (!all.length) {
+    console.log('  no zones (EFFORT is off)');
+  } else {
+    const lens = all.map((x) => x.s.z1 - x.s.z0).sort((a, b) => a - b);
+    const cnt = cs.map((c) => (c.surges || []).length).sort((a, b) => a - b);
+    const SIGHT = all[0].s.sight;
+    const baseSpeed = (K.UNITS_PER_MILE * K.TIME_SCALE) / Pace.SURGE.FLOOR_BASE;
+    const surgeSpeed = (K.UNITS_PER_MILE * K.TIME_SCALE) / Pace.SURGE.FLOOR_SURGE;
+
+    console.log(`  measured over ${cs.length} days, ${all.length} zones\n`);
+    console.log('  WHERE A ZONE IS');
+    console.log(`    count            ${cnt[0]} to ${cnt[cnt.length - 1]} a course, ` +
+      `mean ${(cnt.reduce((a, b) => a + b, 0) / cnt.length).toFixed(2)}`);
+    console.log(`    length           ${lens[0].toFixed(0)} to ${lens[lens.length - 1].toFixed(0)} units, ` +
+      `median ${pctl(lens, 0.5).toFixed(0)}`);
+    console.log(`    marked road      ${(100 * lens.reduce((a, b) => a + b, 0) /
+      (cs.length * K.TOTAL_UNITS)).toFixed(1)}% of the course`);
+    const fs2 = all.map((x) => x.s.z0 / K.TOTAL_UNITS).sort((a, b) => a - b);
+    console.log(`    first entry at   ${(100 * fs2[0]).toFixed(0)}% of the race, ` +
+      `last at ${(100 * fs2[fs2.length - 1]).toFixed(0)}%`);
+    const gaps = [];
+    for (const c of cs) {
+      const z = c.surges || [];
+      for (let i = 1; i < z.length; i++) gaps.push(z[i].z0 - z[i - 1].z1);
+    }
+    gaps.sort((a, b) => a - b);
+    console.log(`    closest two      ${gaps[0].toFixed(0)} units apart, so no entry marking is`);
+    console.log(`                     ever read against another zone's paint`);
+    console.log('');
+
+    console.log('  WHAT MUST BE LEGIBLE, AND FROM HOW FAR');
+    console.log(`    sight distance   ${SIGHT} units. NOT a taste number: it is`);
+    console.log(`                     Elevation.SIGHT_MIN, the distance the terrain sweep`);
+    console.log(`                     already PROVES stays visible over every crest on`);
+    console.log(`                     every course, so a hill cannot break this by`);
+    console.log(`                     construction.`);
+    console.log(`    ...in seconds    ${(1000 * SIGHT / baseSpeed).toFixed(0)} ms of approach at the unsurged floor`);
+    console.log(`                     (${baseSpeed.toFixed(2)} u/s), ${(1000 * SIGHT / surgeSpeed).toFixed(0)} ms if already surging`);
+    console.log(`                     (${surgeSpeed.toFixed(2)} u/s)`);
+    // The last moment a lane change can start and still land before the line.
+    const laneT = K.LANE_CHANGE_TIME;
+    console.log(`    commit point     a lane change takes ${(1000 * laneT).toFixed(0)} ms, so the last`);
+    console.log(`                     one that lands by the entry line starts ` +
+      `${(laneT * baseSpeed).toFixed(1)} units out.`);
+    console.log(`                     The marking therefore owes ` +
+      `${(1000 * (SIGHT - laneT * baseSpeed) / baseSpeed).toFixed(0)} ms of READING`);
+    console.log(`                     time before the last moment to act, against a ~400-500 ms`);
+    console.log(`                     choice reaction. It is ` +
+      `${((SIGHT - laneT * baseSpeed) / (laneT * baseSpeed)).toFixed(1)}x the act itself.`);
+    console.log(`    three facts      that a zone begins; WHICH LANE is marked; how far it`);
+    console.log(`                     runs. All three at ${SIGHT} units, all three from one look.`);
+    console.log('');
+
+    console.log('  WHAT THE PLAYER CANNOT KNOW AT THE COMMIT POINT');
+    // How much of the zone is inside the sight cone at the entry line, and how
+    // many of its gates that is.
+    let gIn = 0, gTot = 0, blindFrac = [];
+    for (const { c, s } of all) {
+      const inZone = c.gates.filter((g) => g.z >= s.z0 && g.z < s.z1);
+      gTot += inZone.length;
+      gIn += inZone.filter((g) => g.z <= s.z0 + SIGHT).length;
+      blindFrac.push(1 - Math.min(1, SIGHT / (s.z1 - s.z0)));
+    }
+    blindFrac.sort((a, b) => a - b);
+    console.log(`    gates in a zone  ${(gTot / all.length).toFixed(1)} on average`);
+    console.log(`    visible at entry ${(gIn / all.length).toFixed(1)} of them ` +
+      `(${(100 * gIn / gTot).toFixed(0)}%)`);
+    console.log(`    bought blind     ${(100 * pctl(blindFrac, 0.5)).toFixed(0)}% of the zone's road is ` +
+      `past the sight line`);
+    console.log(`                     at the moment the player commits. THAT IS THE BET.`);
+    console.log('');
+
+    console.log('  WHAT THE MARKED LANE IS GUARANTEED TO BE');
+    let blockIn = 0, trainIn = 0, actIn = 0, clearIn = 0;
+    for (const { c, s } of all) {
+      for (const g of c.gates) {
+        if (g.z < s.z0 || g.z >= s.z1) continue;
+        const k = g.lanes[s.lane];
+        if (k === K.BLOCK) blockIn++;
+        else if (k === K.CLEAR) clearIn++;
+        else actIn++;
+        // `ramp` is the lane whose roof is rideable. NOT `train`, which is a
+        // SPAN MULTIPLIER and not a lane index -- comparing it to s.lane
+        // reported 993 rideable trains in marked lanes on the first run of
+        // this section, in a game whose generator provably puts zero BLOCK
+        // there. The instrument gets the same scrutiny as the work.
+        if (g.ramp === s.lane) trainIn++;
+      }
+    }
+    console.log(`    never a wall     ${blockIn} BLOCK in a marked lane over ${gTot} gates ` +
+      `(must be 0)`);
+    console.log(`    never a roof     ${trainIn} rideable trains in a marked lane (must be 0)`);
+    console.log(`    what it IS       ${(100 * clearIn / gTot).toFixed(0)}% clear, ` +
+      `${(100 * actIn / gTot).toFixed(0)}% an action you must perform`);
+    console.log(`                     So the price of the surge is that you cannot dodge --`);
+    console.log(`                     you must ACT at what is in front of you.`);
+    if (blockIn) bad(`${blockIn} BLOCK hazards stand in a marked lane`);
+    if (trainIn) bad(`${trainIn} rideable trains stand in a marked lane`);
+    console.log('');
+
+    console.log('  HOW MUCH OF IT IS A DECISION AT ALL');
+    // The marked lane is sometimes the lane a player would take anyway. That
+    // fraction is the fraction over which the paint is decoration, and it is
+    // the single most useful number the art has: the marking has to work
+    // hardest in the OTHER case, where the surge asks the player to leave a
+    // clear lane for one that demands an action.
+    let coincide = 0, contested = 0;
+    for (const { c, s } of all) {
+      for (const g of c.gates) {
+        if (g.z < s.z0 || g.z >= s.z1) continue;
+        const marked = g.lanes[s.lane];
+        const anyClear = [0, 1, 2].some((l) => l !== s.lane && g.lanes[l] === K.CLEAR);
+        if (marked === K.CLEAR) coincide++;
+        else if (anyClear) contested++;
+      }
+    }
+    console.log(`    free             ${(100 * coincide / gTot).toFixed(0)}% of in-zone gates leave the marked`);
+    console.log(`                     lane clear -- the surge costs nothing there`);
+    console.log(`    contested        ${(100 * contested / gTot).toFixed(0)}% ask the player to give up a clear`);
+    console.log(`                     lane for one that demands an action. THIS is where the`);
+    console.log(`                     marking has to be unmistakable, and it is the majority`);
+    console.log(`                     of the road bought.`);
+    console.log('');
+
+    // ---- THE FAIRNESS NUMBER, AND IT IS THE ONE THAT CAN FAIL THE BUILD --
+    //
+    // Rule 4: a hazard the player could not act on is the game taking a run
+    // for something outside their control, and that is a build failure and
+    // not a difficulty setting. A surge makes the runner faster over road
+    // that was already spaced, so the ONLY thing standing between this
+    // mechanic and a rule 4 violation is that course.js widened the spacing
+    // inside a zone by at least as much as the speed took away.
+    //
+    // Measured as the guaranteed decide window in MILLISECONDS -- the gap
+    // from a gate becoming unoccluded to its line, at the speed the runner is
+    // actually travelling there. Outside a zone that is the base floor.
+    // Inside, it is the surge floor, which is 7% faster. If the inside number
+    // is not at least as large as the outside one, an elected surge is buying
+    // a reaction window the player cannot use and the mechanic must not ship.
+    console.log('  IS AN ELECTED SURGE STILL FAIR (rule 4)');
+    const winIn = [], winOut = [];
+    for (const c of cs) {
+      const zs = c.surges || [];
+      for (let i = 1; i < c.gates.length; i++) {
+        const g = c.gates[i], prev = c.gates[i - 1];
+        const seen = prev.z + Course.reachOf(prev.lanes, prev.train) + K.CAM_BASE_BACK;
+        const gap = g.z - seen;
+        if (gap <= 0) continue;
+        const inZ = zs.some((s) => g.z >= s.z0 && g.z < s.z1);
+        (inZ ? winIn : winOut).push(1000 * gap / (inZ ? surgeSpeed : baseSpeed));
+      }
+    }
+    winIn.sort((a, b) => a - b); winOut.sort((a, b) => a - b);
+    console.log(`    outside a zone   floor ${winOut[0].toFixed(0)} ms, ` +
+      `5th ${pctl(winOut, 0.05).toFixed(0)} ms, median ${pctl(winOut, 0.5).toFixed(0)} ms  ` +
+      `(at ${baseSpeed.toFixed(1)} u/s)`);
+    console.log(`    inside, surging  floor ${winIn[0].toFixed(0)} ms, ` +
+      `5th ${pctl(winIn, 0.05).toFixed(0)} ms, median ${pctl(winIn, 0.5).toFixed(0)} ms  ` +
+      `(at ${surgeSpeed.toFixed(1)} u/s)`);
+    const dFloor = winIn[0] - winOut[0];
+    // 5 ms of tolerance, which is a twelfth of a frame and two orders below a
+    // choice reaction. It exists for float and rounding noise, not for slack:
+    // the two defects this assertion caught were 50 ms and 22 ms.
+    if (winIn[0] < winOut[0] - 5) {
+      bad(`an elected surge costs ${(-dFloor).toFixed(0)} ms off the guaranteed window ` +
+          '-- the zone widening is not paying for the speed (rule 4)');
+    } else {
+      console.log(`    verdict          the guaranteed floor is ${dFloor >= 0 ? '+' : ''}` +
+        `${dFloor.toFixed(0)} ms INSIDE a zone at the`);
+      console.log(`                     surge speed. The widening pays for the speed, so a`);
+      console.log(`                     surge buys risk the player elected and never a gate`);
+      console.log(`                     they could not act on.`);
+    }
+    console.log('');
+
+    console.log('  WHAT THE ZONE COSTS THE COURSE');
+    // ---- MATCHED CONTROL BANDS, AND THE FIRST CUT WAS CONFOUNDED --------
+    //
+    // The obvious measurement -- gates per 1000 units inside a zone against
+    // the whole rest of the course -- reported zones carrying 7.9% MORE
+    // gates, i.e. the widening making the road DENSER, which is impossible.
+    // The confound is position: gate spacing tightens monotonically through
+    // the race by design, and zones live at 15-82% of it, so "the rest of the
+    // course" is mostly the sparse opening. Exactly the defect
+    // tools/clarity.js had to be re-cut for, one instrument along.
+    //
+    // So each zone is read against a control band of ITS OWN LENGTH taken
+    // from the road immediately before and after it, which holds the
+    // difficulty ramp, the elevation and the narrow rate roughly fixed and
+    // varies only whether the window was widened.
+    let gIn2 = 0, uIn = 0, gCtl = 0, uCtl = 0;
+    for (const { c, s } of all) {
+      const len = s.z1 - s.z0;
+      const zs = c.surges || [];
+      const free = (a, b) => !zs.some((o) => b > o.z0 && a < o.z1);
+      const bands = [[s.z0 - len, s.z0], [s.z1, s.z1 + len]]
+        .filter((b) => b[0] > 0 && b[1] < K.TOTAL_UNITS && free(b[0], b[1]));
+      if (!bands.length) continue;
+      gIn2 += c.gates.filter((g) => g.z >= s.z0 && g.z < s.z1).length;
+      uIn += len;
+      for (const [a, b] of bands) {
+        gCtl += c.gates.filter((g) => g.z >= a && g.z < b).length;
+        uCtl += b - a;
+      }
+    }
+    const mi = gIn2 / uIn, mo = gCtl / uCtl;
+    console.log(`    matched control  the road of the SAME LENGTH either side of each zone,`);
+    console.log(`                     because gate spacing tightens through the race and a`);
+    console.log(`                     whole-course comparison reads that ramp, not the zone`);
+    console.log(`    gate density     ${(1000 * mo).toFixed(1)} per 1000u beside a zone, ` +
+      `${(1000 * mi).toFixed(1)} inside`);
+    console.log(`    the price        ${(100 * (1 - mi / mo)).toFixed(1)}% fewer gates in marked road.`);
+    console.log(`                     That is not a cost to be minimised, it IS the price`);
+    console.log(`                     mechanism: a surge trades gates for pace, and a clean`);
+    console.log(`                     gate is worth 3.2 s/mi at streak 5 and 0.17 s/mi at 50.`);
+    console.log(`                     Ruinous early, nearly free late -- which is the whole`);
+    console.log(`                     reason guard and surge want opposite halves of the race.`);
+  }
+}
+
 if (want('policy')) {
   console.log('\n=== policy: how many ways are there to run this course? ===\n');
   console.log('  Six policies through the real Player, Collision, Course AND Pace, with a');

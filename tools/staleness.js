@@ -94,6 +94,27 @@ function arg(n, d) {
   return i >= 0 ? (args[i + 1] && !args[i + 1].startsWith('--') ? args[i + 1] : true) : d;
 }
 
+/**
+ * --file names the built page to measure, and it defaults to index.html.
+ *
+ * IT IS NOT A CONVENIENCE. The DUCK pass that added variants v5 to v7 needed a
+ * before-and-after on the repeat gap, and the obvious way to get one -- quote
+ * the number from the last time the tool was run -- was WRONG, because a
+ * second agent had landed a course-generator change in between and turned
+ * NARROW on. The before arm and the after arm would have been two different
+ * courses, and the whole delta would have been attributed to the art.
+ *
+ * So both arms are built from the same tree minutes apart, differing only in
+ * the line under test, and both are measured here:
+ *
+ *   node tools/build.js --out before5.html   (with the new defs removed)
+ *   node tools/staleness.js --file before5.html
+ *   node tools/staleness.js
+ *
+ * Same generator, same seeds, same 30 dates, same clock. That is a twin, and
+ * a number quoted off a page nobody rebuilt is not one.
+ */
+const PAGE = String(arg('file', 'index.html'));
 const DAYS = parseInt(arg('days', '30'), 10);
 const START = String(arg('date', '2026-01-01'));
 const JSON_OUT = arg('json', null);
@@ -405,7 +426,7 @@ function shapeFreshness(shapes, skill, W) {
     process.exit(1);
   }
   const artefact = crypto.createHash('sha1')
-    .update(fs.readFileSync(path.join(ROOT, 'index.html'))).digest('hex').slice(0, 12);
+    .update(fs.readFileSync(path.join(ROOT, PAGE))).digest('hex').slice(0, 12);
 
   const browser = await chromium.launch({
     executablePath: process.env.MR_CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
@@ -416,7 +437,7 @@ function shapeFreshness(shapes, skill, W) {
   const page = await ctx.newPage();
   const errs = [];
   page.on('pageerror', function (e) { errs.push(e.message.split('\n')[0]); });
-  await page.goto('file://' + path.join(ROOT, 'index.html') + '?bot=1&skip=150');
+  await page.goto('file://' + path.join(ROOT, PAGE) + '?bot=1&skip=150');
   await page.waitForFunction(function () { return window.MR && MR.game && MR.game.ready; }, { timeout: 40000 });
   await page.waitForTimeout(2200);
 
@@ -431,7 +452,7 @@ function shapeFreshness(shapes, skill, W) {
   const a1 = await page.evaluate(auditPlanVsLive);
 
   console.log('=================== STALENESS, MEASURED ===================');
-  console.log('artefact index.html sha1 ' + artefact + '   ' + DAYS + ' dates from ' + START);
+  console.log('artefact ' + PAGE + ' sha1 ' + artefact + '   ' + DAYS + ' dates from ' + START);
   console.log('');
   console.log('---- AUDIT ----------------------------------------------');
   console.log('A1  plan vs road   ' + a1.agree + ' of ' + a1.checked

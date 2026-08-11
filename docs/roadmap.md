@@ -3630,6 +3630,25 @@ nobody measured is worse than no number at all.**
     fill, so it is a seam rather than a defect. It is the one edit that would make
     the pause total, and it belongs in world.js, which this pass did not own.
 
+    **CLOSED BY THE OWNER, WITH THE LEAK ACCEPTED AS IT STANDS.** The residual
+    above -- that a player can still think about a frame they were already
+    shown, so pausing the instant a hazard resolves buys unlimited time to plan
+    the response -- was scoped for a fix: resume the race slightly behind where
+    it stopped, unwinding `pace.units`, `player.gateIdx` and `player.aidIdx`
+    together so the player re-earns the read. The owner's decision, verbatim:
+    *"Pause button is fine. No further work needed on that."*
+
+    So it is not an open defect and not a deferred one; it is a known limit that
+    has been looked at and accepted. **Recorded rather than dropped, because the
+    next agent to notice it will otherwise cost a day rediscovering it.** The
+    argument against building it is also worth keeping: the rewind is on the
+    SCORING path, it has to move three counters in step or a gate is
+    double-counted, and `tools/simulate.js` states how many mistakes the record
+    survives (1 with no aid, 2 taking half, 3 taking all) -- a rewind that
+    desynchronised the ghost or double-counted a gate would be a far worse
+    defect than the leak it removes. **A cure that can silently change what a
+    run scored is worse than a disclosed limit on a daily time attack.**
+
 57. **The near-band colour gap was in seven authored hexes, and the fairness
     gate had never been able to see them. A palette that agrees to three
     decimal places on one axis is a palette somebody measured on one axis.**
@@ -3896,3 +3915,101 @@ nobody measured is worse than no number at all.**
     33% floor rather than zero. Panels are written outside the repository under
     random hex names with the key in a separate directory, because a previous
     reader named `aid.png` as the reason the word "cup" came to mind.
+
+60. **`footroom` was failing at the SHORT end of the viewport range, and the
+    pass was briefed as a tall-viewport defect. The decomposition is three
+    terms and only one of them was ever in the camera's hands.**
+
+    The brief reported 18 failing combinations with the shoe 145.9px inside the
+    bottom plate at 920x1363. Measured on a pure-HEAD build: **11 failing
+    combinations, none of them at 920x1363, and the shoe was never inside the
+    plate at all.** Worst case was `320x568 start hit` at **+5.0px** -- clear of
+    the panel, but short of the 12px the gate requires. 920x1363 was the most
+    comfortable portrait frame in the sweep at +59.6 worst. **The defect was at
+    the opposite end of the axis it was described on**, and every failing row
+    was at 320x568 (nine) or 390x844 (two).
+
+    The mechanism, which is one line:
+
+        clearance = (1 - f) * H - P
+
+    `f` is the runner's lowest point as a fraction of frame height, `H` is the
+    frame, `P` is what the readout takes at the bottom. **`f` is set by
+    `frameFor(aspect)` and is height-blind.** Both ramps in it saturate to zero
+    below aspect 0.55 and 1.30, so `back` measured **1.180 on every portrait
+    frame from 320x568 to 920x1363** and `f` was 0.8937 on all of them alike --
+    verified by sweeping `f` against `back` at three portrait heights, where the
+    curves agree to four decimal places. So `(1-f)*H` is LINEAR IN H while `P`
+    is a pixel constant with two media-query steps in it: clearance falls as the
+    frame gets shorter and crosses the gate near 640px of height. **A taller
+    viewport cannot surface this defect and never could.**
+
+    **AND ASPECT CANNOT RANK THE VIEWPORTS, WHICH IS WHY IT WAS THE WRONG
+    INPUT.** The difficulty of a frame is `(P + margin) / H`. For 320x568 that
+    is 0.1338 and for 1280x800 it is 0.1338 -- **the same number to three
+    decimal places, at aspects 0.563 and 1.600**, opposite ends of the only axis
+    `frameFor` could read. No tuning of an aspect ramp can serve both without
+    mis-serving something between them.
+
+    `camera.js` had already written this diagnosis down -- *"ASPECT IS A PROXY
+    HERE AND THAT IS WORTH SAYING"* -- and declined the cure because the fix
+    needed `main.js`, which that pass did not own. **The bill came in.** The
+    ownership boundary was real and the deferral was honest; what it cost was
+    that the height-sensitive half went into the stylesheet as media-query steps,
+    and a step function cannot track a linear one.
+
+    So the camera is now handed the quantity itself. `hud.bottomClaim()` reports
+    the pixels the readout took, as a measurement with no policy in it; `main.js`
+    passes it on resize, on orientation change and once when the webfont settles;
+    `frameFor` keys a third ramp on `(P + FOOT_MARGIN) / H`. **`BASE_ROOM` is
+    0.107 because that is what the base framing supplies** -- at `back` 1.18 the
+    winded figure sits at f = 0.8937, so 1 - f = 0.1063 is the room there is --
+    and the ramp therefore starts exactly where the framing runs out rather than
+    at a round number near it.
+
+    **COMBINED WITH `Math.max`, NOT `+`, AND THAT IS THE ONE PIECE OF CARE IN
+    IT.** `deep` already pulls back on wide-and-short frames and was tuned
+    against 844x390 and 1280x800. Adding a second pull-back on top would
+    double-count exactly the way the 13px of standoff in `style.css`
+    double-counted the safe-area inset for two passes. Taking the larger means
+    the new term is identically zero wherever the old one already works:
+    **1280x800 keeps `back` 1.3633 and 844x390 keeps 1.708, bit for bit**, and
+    all 64 rows on the four untouched viewports move by a mean of 0.30px, which
+    is the sweep's own noise.
+
+    Result on a build with the baseline course: **96 of 96 combinations pass,
+    worst `320x568 mid hit` at +23.6px against a design target of 24.** The
+    eleven failing rows gained a uniform +14 to +20px. The cost is stated: the
+    runner is **8.9% smaller at 320x568 and 7.6% smaller at 390x844**, 149px to
+    136px and 222px to 205px crown-to-sole. **None of it comes out of the middle
+    of the frame** -- pulling back shows more road, not less, and the FOV, the
+    eye height and the aim point are untouched.
+
+    **THE PLATE-GROWTH SUSPICION WAS CHECKED AND IS CLOSED.** Three `nowrap`
+    fixes exist because a growing string once pushed this plate up into the
+    runner, so the obvious hypothesis was that it still could. Driven through
+    the longest strings the game can print, a 32-character city name and
+    deliberate overflow, `#railWrap` measured **51.00 / 75.00 / 81.00 / 54.00px
+    at the four viewports and did not move by a hundredth in any case.** The
+    fixed row heights and the three nowraps hold. It is worth knowing which
+    suspicions are already dead.
+
+    **AND THE INSTRUMENT WAS INVENTING A DEFECT.** `footroom.js` counted
+    near-plane-clipped vertices as one number and failed the build on any
+    non-zero value -- while its own header documents MARK (the contact shadow,
+    the landing reticle, the dust) as *"reported, never gated"*. A decal at the
+    runner's feet passes under the camera every few seconds. Attributed per
+    group: **all 24 of the clipped-vertex failures were MARK and not one was
+    SHOE or BODY.** So the build failed for a shadow going under the lens, on a
+    gate whose subject is the feet, at exactly one pace -- which reads like a
+    finding about that pace, and someone would have gone looking for it. The
+    guard is kept where it protects the answer: a dropped SHOE or BODY vertex
+    means the figure's lowest row was computed without a point that might have
+    been the lowest, so the gate would UNDER-report, and that still fails.
+
+    The general form, and it is the third time this file has recorded it:
+    **when a defect is reported at one end of a range, measure the range before
+    believing the end.** The sweep took four minutes and disagreed with the
+    brief about which viewports failed, how many failed, by how much, and in
+    which direction -- and the fix that follows from "tall frames are cramped"
+    would have pulled the camera back on the frames that had 60px to spare.

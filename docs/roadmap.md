@@ -4120,3 +4120,89 @@ nobody measured is worse than no number at all.**
     a guard that greps the built artefact for the change before and after. Rule
     2 says verify against the running page; the corollary is to prove the
     running page is the one you built.
+
+62. **The runner fell out of the bottom of the frame because the camera was
+    still standing on a lorry he had already stepped off.** `footroom.js`
+    failed 21 combinations at pace `mid`, on every viewport, with the lowest
+    row of his shoe at **-104.1px** -- not near the readout plate, *below the
+    picture*. A per-commit bisect put it at `7b0a1d2`, the opening-density
+    change, and the reasonable story was that denser gates buy a longer streak,
+    a faster pace sooner, and framing that gives way under it.
+
+    **Every part of that story was wrong, and the measurements said so in the
+    first ten minutes.** `fast` -- the fastest pace the game has -- was the
+    *best* row on the board at +53.7. The pace at `mid` was unchanged by the
+    density change to within 0.06%: streak 56 and 267.87 s/mi before,
+    57 and 267.71 after. And the FOV band that had been reported as moving
+    (68.3-69.3 to 63.9-68.6) was not the camera responding to speed at all --
+    it is the *harness* freezing the streak while the runner takes a contact
+    the harness cannot see (below).
+
+    What actually happened is that the runner rides a lorry roof and steps off
+    the front. `camera.js` smooths the deck height under him into `s.dk` and
+    adds it to the eye **and** to the aim, which is deliberate and correct --
+    that is what keeps the pitch, and therefore the sightline, unchanged while
+    the whole shot rides up with the ground. The consequence nobody had priced
+    is that **all of the filter's lag is then spent on exactly one quantity:
+    how far down the frame the figure sits.** He stands on `p.surface` while
+    the lens is framed for `s.dk`, and every unit of the difference is eye
+    height added over his head with nothing anywhere compensating it. Traced at
+    390x844: he is back on the road while the eye is still **1.28 units** above
+    it, and the shoe lands 104px inside an opaque panel.
+
+    **The smoothing was insuring against a step that had already been removed
+    at the source.** The note over `s.dk` said the filter is deliberately a
+    little slower than the 0.50s fall, so the eye settles into the landing
+    rather than tracking it. There is no cut to settle into: `player.js` eases
+    the surface down as `fallFrom * (1 - t*t)`, zero vertical speed at the lip
+    and accelerating. The insurance was being paid for with the runner's feet.
+    The ease is kept for the upward steps that are real -- a sideways mount
+    onto the middle of a ramp sets the surface in one frame -- and the downward
+    lag is now bounded. `Math.min`, so it is the shipped line everywhere the
+    shipped line already worked, and identically inert on a race that never
+    meets a lorry.
+
+    **`DK_LAG` is 0.06 and the first attempt at it was 0.15, which is the part
+    worth keeping.** Priced against a *settled* frame the budget looked like
+    `(43.3 - FOOT_MARGIN) / 133 = 0.145` -- and 0.15 measured back at 18.4px
+    of clearance, not the 24 it was designed for. A settled frame is one stride
+    phase; a dismount sweeps all of them. Re-priced against the worst instant
+    of the whole event with the lag bounded to zero, the floor is 31.6px at
+    390x844 and a unit costs 120px there, so the budget is 0.063. **A constant
+    derived from the wrong sample of the right quantity is still a number
+    nobody measured.**
+
+    **THE DEFECT IS OLDER THAN THE COMMIT THAT REVEALED IT, AND THE INSTRUMENT
+    IS WHY.** The forced dismount measures **-117.6 / -128.2 / -111.3 / -73.4**
+    at `1042b5d`, the "known good" baseline the bisect was anchored on -- worse
+    at every pace than the build that was eventually reported as broken.
+    `footroom` passed it at +43.2 because pace there is set by `?skip=`, which
+    is wall-clock seconds, so *which stretch of road each row samples is
+    whatever the course generator put there*. The density change moved a
+    rideable lorry into the window `?skip=90` lands on, and a defect that had
+    been shipping for months surfaced as twenty-one failures that all pointed
+    at pace. **A tool whose subject is the runner's feet must not depend on the
+    course happening to put a lorry under them.** `tools/deckdrop.js` mounts a
+    deck, settles, steps off the front and watches the whole fall -- it cannot
+    miss the event because it causes it -- and reports on the same figure, rail
+    and projection `footroom` gates on, so the rows read side by side. It fails
+    24 of 24 on the pre-fix build and 4 of 4 on `1042b5d`.
+
+    **One instrument gap is left open deliberately, and it should be closed.**
+    `footroom` stubs `resolveGates` so that "a contact can only happen where
+    this file asks for one" -- and leaves `resolveDeck` live while also stubbing
+    `player.handle`. So the runner cannot steer, ploughs into the flank of the
+    lorry the density change added, and takes a contact anyway: that is the
+    real source of the FOV band shift, and it means the `mid run` rows were
+    quietly `hit` rows, which is the exact failure the stub above it was written
+    to prevent. It errs harsh, so it is not a false pass. The right home for
+    `deckdrop` is a fifth `STATE` inside `footroom` once that file is not being
+    edited by two agents at once.
+
+    Frames, live and unforced, at 390x844 stepping off the real lorry at
+    `?skip=89.74`: **+9.7px before, +66.4px after**, same instant, same world.
+    Through the whole fall the shoe row now holds at 700 within two pixels
+    where it used to slide 715 -> 741. Gate after: `footroom` **96/96**, worst
+    +25.5; `deckdrop` 24/24, worst +29.2; `shoot`, `course-test`, `calendar`
+    (32 days), `envelope` and `kindread` (1 of 23 on profile) all clean; and
+    the record still survives **1 / 2 / 3** mistakes, unmoved.

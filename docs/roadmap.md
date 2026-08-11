@@ -3666,8 +3666,23 @@ nobody measured is worse than no number at all.**
     preserves linear luminance by construction, and `overRoad()` then
     re-normalises each to the `shadedL` it always had -- so the paint ladder's
     long list of stated ratios is still true and none of it had to be
-    re-derived. CITY START near band: S 0.186 to 0.293, chroma 0.067 to 0.130,
-    vivid 2.0% to 19.4%, for zero draw calls and zero triangles.
+    re-derived. Measured on a frozen frame, CITY START near band: S 0.185 to
+    0.252, chroma 0.066 to 0.101, vivid 1.7% to 9.1%; THE WALL 0.318 to 0.369,
+    0.161 to 0.194, 18.1% to 29.8%. Zero draw calls and zero triangles.
+
+    **THE HEX IN THE PRESCRIPTION WAS NOT THE HEX IN THE FILE, AND A FIND-AND-
+    REPLACE WOULD HAVE HALF-WORKED, WHICH IS THE WORST OUTCOME.** The seven
+    tones a screenshot measures are OUTPUTS of `overRoad(hex, k)`, which
+    re-values an authored colour to k times the reference tarmac. The authored
+    hexes are `0x272636, 0x313040, 0x7b7a81, 0xf2f4ff, 0x77728f, 0x8e8aa8,
+    0xfff6d8`. Two of the seven -- `0x272636` and `0x313040` -- happen to pass
+    through `overRoad` unchanged and so appear in the file as themselves. **So
+    replacing the seven measured tones by search would have hit two by
+    coincidence and silently missed five**, shipped a build that compiled and
+    ran, and moved about a fifth of the intended chroma. The same family as
+    counting a source hex 43 times, and as scaling `mats.paint.color` when every
+    tone lives in the geometry's colour attribute. **When a prescription gives
+    you hexes, find them by what renders them, not by string.**
 
     **The seventh tone is held, and it is the reason the guard exists.** Pushed
     with the rest, `#9d9885` at hue 47.5 becomes a gold lane dash SIX DEGREES
@@ -3678,12 +3693,41 @@ nobody measured is worse than no number at all.**
     degrees of a spoken hue, and it cost 0.006 of near-band chroma to obey,
     because the offending tone is 3.5% of the painted area.
 
-    **Stated honestly: this closes a bit under half the gap** -- 41% of it on
-    the median leg -- and the rest is not in the palette of the surfaces we
-    have. Their play surface is a crimson train and ours is a road, 40% of our
-    near band is tarmac the gate will not let us colour, and closing the
-    remainder means putting more saturated NON-ROAD area into the bottom third,
-    which is a content change with a draw-call price and needs its own evidence.
+    **AND THEN THE OWNER OVERRULED THE METRIC, WHICH IS THE MOST IMPORTANT LINE
+    IN THIS ENTRY.** Two steps were built and measured: k = 5 closed 41% of the
+    saturation gap, k = 3 closes 24%. k = 5 passed every gate, broke no hue and
+    was better on every number. The owner looked at the frame and refused it,
+    on the standing instruction for the whole project -- *"objects that would
+    make sense in a road setting."* **Violet lane markings do not.** k = 3
+    shipped.
+
+    The reasoning is the part that must not be undone. **Subway Surfers gets its
+    near-band colour from the PLAY SURFACE ITSELF -- a crimson train roof -- and
+    not from the paint lying on it.** Hitting a saturation target by tinting
+    road markings satisfies the NUMBER by a route that does not satisfy the
+    THING THE NUMBER STANDS FOR. **This project has now made that mistake three
+    times under three names: the triangle budget, the 110-pixel runner, and
+    this.** A proxy optimised directly stops being a proxy. The general form:
+    **when a measurement is standing in for a quality, ask what would have to be
+    true of the WORLD for the number to move, and refuse the routes that move
+    the number without it.**
+
+    So: **k = 3 closes 24% of the gap, and the honest remainder is not a bigger
+    k.** 40% of the near band is tarmac the fairness gate will not let us
+    colour, and closing the rest means putting more saturated NON-ROAD area into
+    the bottom third -- a content change with a draw-call price, needing its own
+    evidence. **Do not reach for a bigger k instead. That road has been walked to
+    the end and the frame at the end of it was rejected by the person this game
+    is being built for.**
+
+    One instrument limit, found by testing it rather than by trusting it.
+    **Skips 200 and 230 are not controlled measurement points on this course.**
+    Re-shot three times on an identical build, FINAL MILE near-band S came back
+    0.345 / 0.421 / 0.401 -- the bot lands at mile 25.54 or 25.55 and the finish
+    arch and carpet swing the composition harder than any palette change. The
+    six legs whose draw AND triangle counts are identical between two builds are
+    the ones a before/after may be read from, and that test -- rather than which
+    answer looked better -- is what decided which legs are quoted above.
 
 58. **The fairness gate caught the object nobody expected, and the reason was
     the area-mean rule stated three thousand lines away.**
@@ -3725,8 +3769,13 @@ nobody measured is worse than no number at all.**
     and 1.09 hazards per GATE -- one thing on the road, every gate, for two
     miles. One threshold caused all of it. **The cost is stated rather than
     buried: the record now survives 1 / 2 / 3 mistakes where it survived
-    1 / 3 / 4, on the same 17 aid items.** More obstacles is a less forgiving
-    race, and that is the trade the request contains.
+    1 / 3 / 4, on the same 17 aid items** -- measured against a worktree at the
+    pre-change commit rather than assumed. More obstacles is a less forgiving
+    race, and that is the trade the request contains; the owner has consistently
+    wanted the game harder, so it was reported as a cost paid rather than
+    reopened. **If they ever change their mind, the dial is one number: the
+    `d < 0.09` threshold on `nHaz` in `makeGate`. It was 0.18, which lands at
+    mile 2.05; 0.09 lands at mile 0.69.** Nothing else has to move with it.
 
 59. **Two instruments were wrong, in opposite directions, and both were wrong
     about the same thing: an axis-aligned box is not an object, and two frames

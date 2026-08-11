@@ -357,14 +357,87 @@ MR.Camera = (function () {
    * of the fix is therefore in style.css, where the readout can simply stop
    * being a fixed pixel block on a short frame. The two halves are independent
    * and neither needs to know about the other.
+   *
+   * ---- THE READOUT'S OWN CLAIM, WHICH IS THE THING ASPECT WAS STANDING IN FOR
+   *
+   * The paragraph above is right about the diagnosis and then declines the cure
+   * on the grounds of file ownership. The bill came in. Measured on the shipped
+   * build, `back` was 1.180 on EVERY portrait frame -- 320x568, 390x844,
+   * 620x1344 and 920x1363 alike -- because both ramps above saturate to zero
+   * below aspect 0.55 and 1.30. So the runner's lowest point sat at the same
+   * fraction of frame height on all four, 0.8937 in the winded state, and the
+   * whole of footroom's answer was decided by the other two terms:
+   *
+   *     clearance = (1 - f) * H  -  P
+   *
+   * f is set here and is height-blind; H is the frame; P is what the readout
+   * takes at the bottom. (1-f)*H is LINEAR IN H and P is a pixel constant with
+   * two media-query steps in it, so clearance falls as the frame gets shorter
+   * and crosses the gate at about 640px of height. Measured: 320x568 failed
+   * eleven combinations at +5.0px worst, 390x844 failed two at +10.5, and every
+   * frame taller than that passed with 60px to spare. THE DEFECT IS AT THE
+   * SHORT END AND ALWAYS WAS -- a taller viewport can never surface it, and no
+   * amount of the aspect ramps above can see it, because 320x568 (aspect 0.563)
+   * and 1280x800 (aspect 1.600) are the SAME difficulty to within 0.0003 and
+   * sit at opposite ends of the only axis this function could read.
+   *
+   * What ranks them correctly is the readout's claim as a FRACTION of the
+   * frame, (P + margin) / H, which is one number carrying H, P, every media
+   * query, the safe-area inset and any future change to the plate. main.js now
+   * measures it off the live element and hands it over. It is not a proxy for
+   * anything; it is the left-hand side of the inequality.
+   *
+   * BASE_ROOM IS MEASURED, NOT CHOSEN. 0.107 is what the base framing supplies:
+   * at back = 1.18 the winded figure's lowest point sits at f = 0.8937, so
+   * 1 - f = 0.1063 of the frame is what there is. The ramp therefore starts
+   * exactly where the framing runs out and not at a round number near it. The
+   * f-against-back curve it is fitted to was swept on the running page at three
+   * portrait heights and agrees to four decimal places across all of them,
+   * which is the evidence that f really is height-independent and this really
+   * is the whole mechanism.
+   *
+   * MAX, NOT PLUS, AND THAT IS THE WHOLE CARE IN THIS CHANGE. `deep` already
+   * pulls back on wide-and-short frames and was tuned against 844x390 and
+   * 1280x800 with numbers in the paragraphs above. Adding a second pull-back on
+   * top of it would double-count exactly the way the 13px of standoff in
+   * style.css double-counted the safe-area inset for two passes. Taking the
+   * larger of the two means the new term is IDENTICALLY ZERO wherever the old
+   * one already does the job: 1280x800 keeps back = 1.3633 and 844x390 keeps
+   * 1.708, bit for bit, and only the two frames that actually fail move.
+   *
+   * The cost is stated rather than hidden. The runner is 8.9% smaller at
+   * 320x568 and 7.6% smaller at 390x844 -- 149px to 136px and 222px to 205px
+   * crown-to-sole. It buys 24px of clearance in the worst state at both. None
+   * of it comes out of the middle of the frame, which is the one thing the HUD
+   * layout rule protects: pulling back shows MORE road, not less, and the FOV,
+   * the eye height and the aim point are all untouched.
    */
-  function frameFor(aspect) {
+  // The clearance the camera holds for itself, in CSS px, in the WORST state --
+  // which is the winded tail after a contact, because it narrows the lens by
+  // five degrees and magnifies the figure. tools/footroom.js gates at 12 (a 2px
+  // border, a 6px blur and 4px of raster slack); this is double, and the
+  // doubling is the room for a stride phase, a state or a plate revision that
+  // was not on the sweep when the ramp was fitted.
+  const FOOT_MARGIN = 24;
+  // What the base framing supplies, measured. See above -- do not round it.
+  const BASE_ROOM = 0.107;
+  const CROWD_SPAN = 0.065;   // saturates where `deep` has taken over anyway
+  const CROWD_PULL = 0.20;    // fitted to the swept f-against-back curve
+
+  function frameFor(aspect, bottomPx, heightPx) {
     const wide = clamp01((aspect - 0.55) / 0.80);   // 0 = phone portrait, 1 = desktop
     const deep = clamp01((aspect - 1.30) / 0.90);   // 0 = anything taller than 4:3
+    // Zero when main.js has nothing to hand over -- during boot, before the HUD
+    // exists, and for anything that drives this module without a page. That is
+    // the shipped behaviour before this term, so the fallback is the old code.
+    const need = (bottomPx > 0 && heightPx > 0)
+      ? (bottomPx + FOOT_MARGIN) / heightPx
+      : 0;
+    const crowd = clamp01((need - BASE_ROOM) / CROWD_SPAN);
     return {
       follow: 0.95 - 0.17 * wide,
       lookX: 0.85 - 0.30 * wide,
-      back: 1.18 + 0.55 * deep,
+      back: 1.18 + Math.max(0.55 * deep, CROWD_PULL * crowd),
       roll: 0.70 + 0.30 * wide,
     };
   }
@@ -395,7 +468,7 @@ MR.Camera = (function () {
    * permanent rumble spuriously. main.js therefore hands `speed` (grade-
    * inclusive) and `gearSpeed` (flat, from pace.streakSpeed) separately.
    */
-  function create(aspect) {
+  function create(aspect, bottomPx, heightPx) {
     const cam = new THREE.PerspectiveCamera(BASE_FOV, aspect, 0.1, 1200);
     const look = new THREE.Vector3();   // hoisted: this runs 60x a second
     // The course's road profile, handed over by main.js once the course
@@ -404,7 +477,7 @@ MR.Camera = (function () {
 
     const s = {
       camera: cam,
-      fr: frameFor(aspect),
+      fr: frameFor(aspect, bottomPx, heightPx),
       x: 0, vx: 0,     // lateral follow, sprung so a lane change whips
       roll: 0,
       fov: BASE_FOV,
@@ -972,9 +1045,15 @@ MR.Camera = (function () {
     /** The course's road profile. Handed over by main.js once it exists. */
     s.setElevation = function (e) { elev = e || MR.Elevation.FLAT; };
 
-    s.resize = function (aspect) {
+    // `bottomPx` is what the readout has taken at the bottom of the frame, from
+    // hud.bottomClaim(). Omitted or null keeps the claim already in force rather
+    // than dropping to zero -- a resize that happens to land while the plate is
+    // mid-transition must not hand the whole crowd term back for a frame.
+    s.claim = (bottomPx > 0) ? bottomPx : 0;
+    s.resize = function (aspect, bottomPx, heightPx) {
       cam.aspect = aspect;
-      s.fr = frameFor(aspect);
+      if (bottomPx > 0) s.claim = bottomPx;
+      s.fr = frameFor(aspect, s.claim, heightPx);
       cam.updateProjectionMatrix();
     };
 

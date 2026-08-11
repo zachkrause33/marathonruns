@@ -896,13 +896,47 @@
   }
 
   // ---- resize -----------------------------------------------------------
+  /**
+   * The camera is told what the readout took, because it is the only file that
+   * cannot work it out and the only one that can answer for it.
+   *
+   * camera.js frames the runner so his lowest point sits at a fixed FRACTION of
+   * frame height; #railWrap claims a fixed number of PIXELS at the bottom. Which
+   * of the two wins is decided by (P + margin) / H, and neither file can see
+   * that number on its own -- the camera had been inferring it from the aspect
+   * ratio, which ranks 320x568 and 1280x800 at opposite ends of its only axis
+   * when they are in fact the same difficulty to three decimal places. See THE
+   * READOUT'S OWN CLAIM in camera.js.
+   *
+   * MEASURED HERE, NOT EVERY FRAME. The plate's height is fixed by the
+   * stylesheet and does not move during a race -- tools/footroom.js gates that,
+   * three nowrap rules and two fixed row heights enforce it, and it was
+   * re-checked against the longest strings the game can print and against
+   * deliberate overflow: 51, 75, 81 and 54px at the four viewports, unchanged in
+   * every case. So this is read where the layout can actually change -- a
+   * resize, an orientation change, and once when the webfont settles -- and the
+   * camera holds it still in between. A framing term that re-derived itself
+   * per frame would be a camera that could creep mid-race off a HUD reflow,
+   * which is a worse defect than the one being fixed.
+   */
   function resize() {
     const w = window.innerWidth, h = window.innerHeight;
     renderer.setSize(w, h);
-    cam.resize(w / h);
+    cam.resize(w / h, hud.bottomClaim(), h);
   }
   window.addEventListener('resize', resize);
   window.addEventListener('orientationchange', () => setTimeout(resize, 120));
+  // The plate is sized in px by the stylesheet, so a late webfont cannot change
+  // its height -- but the baseline-aligned row inside it can shift a pixel or
+  // two, and this costs nothing. Guarded: document.fonts is absent on nothing
+  // this game supports, and a rejected promise here must not take the race with
+  // it.
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(resize).catch(() => { });
+  }
+  // The camera was created before the HUD existed, so the first claim it ever
+  // saw was zero. Take the real one now that there is a plate to measure.
+  resize();
 
   // ---- expose for automated inspection ----------------------------------
   // Screenshot and critic tooling drives the real game through this rather

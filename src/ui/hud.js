@@ -550,6 +550,7 @@ MR.HUD = (function () {
       engine: q('engine'), why: q('why'),
       gaugeFill: q('gaugeFill'), paceVal: q('paceVal'),
       distVal: q('distVal'),
+      railWrap: q('railWrap'),
       rail: q('rail'), railFill: q('railFill'), railGap: q('railGap'), railGhost: q('railGhost'),
       railRoute: q('railRoute'),
       gapVal: q('gapVal'), gapTrend: q('gapTrend'), gapLabel: q('gapLabel'),
@@ -1502,6 +1503,36 @@ MR.HUD = (function () {
     api.onResume = function (fn) { n.resumeBtn.addEventListener('click', fn); };
     api.onRestart = function (fn) { n.restartBtn.addEventListener('click', fn); };
     api.showPerf = function (on) { n.perf.classList.toggle('on', on); };
+
+    /**
+     * HOW MANY PIXELS AT THE BOTTOM OF THE FRAME THIS READOUT HAS TAKEN.
+     *
+     * From the top edge of #railWrap to the bottom of the viewport, so it
+     * includes the plate, its border, and the standoff and safe-area inset
+     * underneath it. It is a MEASUREMENT AND NOT A POLICY: this file does not
+     * know or care what the number is for, and there is no threshold in it.
+     *
+     * It exists because the camera needs it. camera.js frames the runner so
+     * his feet sit at a fixed FRACTION of frame height, and this plate claims
+     * a fixed number of PIXELS -- so whether the two collide is decided by a
+     * quantity neither file could see on its own, and the camera had been
+     * guessing at it from the aspect ratio. See THE READOUT'S OWN CLAIM in
+     * camera.js for what is done with it, and tools/footroom.js for the
+     * assertion that says whether it worked.
+     *
+     * `visibility: hidden` is what takes this plate away behind a panel, not
+     * `display: none`, so the box is still laid out and this still answers
+     * while the start card is up. null is returned only if the element is
+     * genuinely unlaid-out -- in which case the camera keeps what it had,
+     * because a zero here would read as "the readout claims nothing" and
+     * quietly hand back the whole fix.
+     */
+    api.bottomClaim = function () {
+      const r = n.railWrap.getBoundingClientRect();
+      if (!(r.height > 0)) return null;
+      const claim = window.innerHeight - r.top;
+      return claim > 0 ? claim : null;
+    };
 
     syncPanels();
     return api;

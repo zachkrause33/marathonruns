@@ -9512,6 +9512,485 @@ MR.World = (function () {
     })();
 
     /**
+     * ============ WHY THERE ARE THREE MORE DUCKS AFTER THIS LINE ============
+     *
+     * BUILD EVERY ANGLE. THERE IS NO BACK OF AN OBJECT. Everything below is
+     * modelled on all sides -- the ladder cage is a ring and not an arc, the
+     * floodlight has a body behind its lens, the parapet is railed on both
+     * faces of the deck, and every applique on the clearance header is applied
+     * to the front face AND the rear face. A marking painted on a surface is
+     * the one exception and there are none here.
+     *
+     * ---- THE NUMBER THAT ASKED FOR THEM -----------------------------------
+     *
+     * docs/staleness-and-mats.md put a real clock on a real course and the
+     * answer was not the one the file assumed. A run is 236 seconds and 424
+     * hazard sightings against 23 objects, so every object in the game is seen
+     * about eighteen times in under four minutes. DUCK is the worst kind on
+     * every measure it took:
+     *
+     *   kind    skins   p10 gap   median gap   back-to-back same skin
+     *   JUMP      8      3.0 s      8.3 s              1.4%
+     *   DUCK      5      1.9 s      5.8 s              4.0%
+     *   BLOCK    10      1.4 s     17.8 s             16.3%
+     *
+     * And the arithmetic that reframes it: freshness over a window cannot
+     * exceed skins divided by sightings-in-window. By mile 23 the game shows
+     * 38 DUCKs every thirty seconds and owns five of them, so the ceiling on
+     * how fresh a DUCK can possibly feel there is 13%. Pool size and density
+     * are ONE constraint. The projection, which reproduced the shipped cast
+     * 12730 of 12730 before it was allowed to speak, prices the fix: two more
+     * DUCKs take the median gap from 5.8 s to 8.2 s and back-to-back repeats
+     * from 4.0% to 2.1%.
+     *
+     * IT COSTS NO DRAW CALL. Every variant of a kind is built and parented at
+     * pool construction and switched by visibility -- see hazardPool -- so the
+     * road draws exactly what it drew before. Triangles are the abundant
+     * resource and a hidden mesh renders none of them.
+     *
+     * ---- WHAT A NEW DUCK IS ALLOWED TO BE ---------------------------------
+     *
+     * duckScaffoldGeo's header is the budget and it is not restated here. The
+     * five constraints these three are built against, in the order they were
+     * paid for:
+     *
+     *   MASS ABOVE THE BAR IS WHAT SAYS GO UNDER. For five passes DUCKs were
+     *     differentiated by what they were made of and readers still could not
+     *     separate a duck bar from a hurdle, because occupancy above the bar
+     *     and below it were the same number and a shape with no direction in
+     *     it has no answer in it. All three take duckHeader() unchanged, and
+     *     all three put more mass above it.
+     *   THE DAYLIGHT UNDER THE BAR STAYS OPEN. Band-0 occupancy was cut from
+     *     0.38 to 0.21 deliberately. NOTHING new is added below 1.90 on any of
+     *     these three except the shared 0.30 x 0.07 x 0.34 base plate, which
+     *     every DUCK in the file already stands on.
+     *   THE BAR IS THE CONSTANT AND THE STRUCTURE IS THE VARIABLE. That is the
+     *     move that took mean pairwise profile distance from 0.468 to 0.616,
+     *     and it is the move these three make: the bar, the caution face and
+     *     the two verticals are the same object on all eight.
+     *   NO NEW VERTICALS. A standard sits at x 0.868 with a 0.15 radius against
+     *     a box that stops at 1.12, so a second full-height tube overlaps the
+     *     first and its coupler leaves the box. The count of verticals in a
+     *     DUCK rear elevation is not available as a differentiator on any
+     *     variant. Nothing below is a second standard: the ladder stiles stop
+     *     at 3.42 and start at 2.00, above the bar, where they cannot be read
+     *     as legs.
+     *   YELLOW AND BLACK IS THE DUCK KIND MARK. Red and white is JUMP. Every
+     *     colour below comes from the four this kind already owns.
+     *
+     * ---- AND THE THREE LEVERS THEY SPEND ----------------------------------
+     *
+     * OUTLINE, TOP TERMINATION, and one BIG SHAPE on the standard, plus one
+     * that the first five left on the table: THE FACES OF THE CLEARANCE
+     * HEADER. The header web is 0.34 deep, so z -0.29 to -0.17 in front of it
+     * and +0.17 to +0.29 behind it is 0.12 of free relief running the WHOLE
+     * SPAN, in a band where mass across the lane is already permitted. Not one
+     * of the first five variants uses it. All three of these do, on both
+     * faces, which is where a fair part of their pass-by read lives.
+     */
+
+    /**
+     * ============ DUCK v5: AN ACCESS GANTRY WITH A CAGED LADDER ============
+     *
+     * A works walkway crossing the road, with a caged access ladder up each
+     * leg. The one-second test -- would a person walking down a real street
+     * name this immediately -- is answered by the ladder rather than by the
+     * gantry: a hooped ladder cage is one of the most recognisable objects on
+     * any industrial street, and it is a shape nothing else in this game has.
+     *
+     * BOTH LEGS CARRY ONE, and that is engineering rather than symmetry for
+     * its own sake. A walkway that crosses a road has to be got off at the far
+     * end as well as got on at the near one, so a single ladder would be the
+     * detail that is wrong. It also doubles the legibility of the variant's
+     * one big shape, which at 25 units is worth more than an asymmetry that
+     * resolves to four dark pixels -- duckBoomGeo's header paid for that
+     * lesson and this variant spends the proceeds.
+     *
+     * ---- THE BIG SHAPE: A HORIZONTAL RHYTHM -------------------------------
+     *
+     * Five rungs at 0.25 spacing and three cage hoops. Every other DUCK puts
+     * ONE mark on the standard -- a roundel, a wheel, a lamp bar, a board pack
+     * -- and this one puts a REPEATING one, which is a different kind of thing
+     * to see and survives being small in a way a single small mark does not.
+     * A hoop is 0.44 across against a post of 0.30, so at the 45 pixels this
+     * object gets at 25 units the hoops are the widest marks on the standard
+     * and the rungs sit between them.
+     *
+     * THE HOOPS ARE RINGS, not arcs facing the camera. Eight tangent segments
+     * on a 0.22 radius about a centre at z -0.02, so from the flank and from
+     * behind the cage is still a cage. That is rule 1 on the one fitting where
+     * the cheap version would have been invisible from exactly the angle you
+     * pass it at.
+     *
+     * ---- THE STANDARD IS A ROLLED STEEL JOIST -----------------------------
+     *
+     * Two flanges at z +/-0.115 with a recessed web between them. v0 and v2
+     * are square posts, v1 and v4 are round; an I-section is the third profile
+     * a real gantry leg comes in, it reads from the front as two bright edges
+     * with a shadow down the middle, and from the flank it steps twice.
+     *
+     * ---- IT TERMINATES IN A HANDRAIL --------------------------------------
+     *
+     * A landing plate at 3.20 and a handrail above it: stanchion, mid rail and
+     * top rail, on BOTH sides of the deck at z +/-0.15. Against sky that is a
+     * pair of horizontal ticks over a vertical, where v0 has a cube, v1 open
+     * tube ends, v2 a flat plate, v3 a fork and v4 a blind flange. The ladder
+     * stiles run 0.22 past the landing, which is what a real ladder does and
+     * is the thing you hold on to at the top.
+     *
+     * ---- ON THE HEADER: A TOE PLATE IN FRONT, A CABLE TRAY BEHIND ---------
+     *
+     * The walkway edge in front and the services it carries behind, full span,
+     * on the 0.12 of relief each face of the header leaves. Three cables lie
+     * in the tray. From directly behind, which is 0.55 of this object's
+     * silhouette as you leave it, that tray is the whole difference between
+     * this and every other DUCK in the file.
+     *
+     * ENVELOPE. The widest thing is a cage hoop at 0.868 + 0.22 + 0.025 =
+     * 1.113 against a box halfX of 1.12. The deepest is the cable tray upstand
+     * at 0.290 against a halfZ of 0.30. The tallest is a top rail at 3.56,
+     * under v1 tube end at 3.58. Nothing new is below 1.90 but the base plate.
+     */
+    const duckWalkGeo = (function () {
+      const px = 1.20 * LANE_FIT;
+      const parts = [
+        // The bar, the constant. Same span, same band, same caution face.
+        gl(hcbx(2.30, 0.36, 0.54, 0, 1.60, 0, 0xffc422, 0.05), GLOSS.paint),
+        gl(hcbx(2.36, 0.10, 0.56, 0, 1.78, 0, 0xfff0a0, 0.03), GLOSS.trim),
+        gl(hcbx(2.36, 0.08, 0.56, 0, 1.45, 0, 0xd18a08, 0.02), GLOSS.trim),
+        // THE TOE PLATE. The upstand along the edge of a walkway deck, and it
+        // is the front face of the clearance header rather than a new member:
+        // 0.09 deep at z -0.225 stands proud of a web whose front is -0.17.
+        gl(hbx(2.06, 0.16, 0.09, 0, 1.94, -0.225, 0xfff0a0), GLOSS.trim),
+        // Its bracket feet, so the plate is bolted to something.
+        gl(hbx(0.10, 0.22, 0.13, -0.62, 1.96, -0.205, 0xd18a08), GLOSS.trim),
+        gl(hbx(0.10, 0.22, 0.13, 0.62, 1.96, -0.205, 0xd18a08), GLOSS.trim),
+        // THE CABLE TRAY, rear face, full span. Floor, outer upstand, and
+        // three cables lying in it. z 0.155 to 0.290 against a halfZ of 0.30.
+        gl(hbx(2.06, 0.05, 0.13, 0, 1.90, 0.225, 0x2b1e05), GLOSS.trim),
+        gl(hbx(2.06, 0.13, 0.035, 0, 1.965, 0.272, 0x2b1e05), GLOSS.trim),
+      ];
+      for (const cz of [0.198, 0.232, 0.262]) {
+        parts.push(gl(cyl(0.030, 0.030, 2.02 * LANE_FIT, 6, 0, 1.955, cz,
+          cz === 0.232 ? 0xd18a08 : 0xfff0a0, 0, 0, Math.PI / 2), GLOSS.trim));
+      }
+      // The tray hangers, which is what holds a tray off a girder.
+      for (const hx of [-0.66, 0, 0.66]) {
+        parts.push(gl(hbx(0.09, 0.20, 0.06, hx, 1.99, 0.205, 0xd18a08), GLOSS.trim));
+      }
+      for (const sx of [-1, 1]) {
+        const sxp = sx * px;
+        /**
+         * THE ROLLED STEEL JOIST. Flanges 0.30 wide at z +/-0.115 and a 0.12
+         * web recessed between them: 0.718 to 1.018 in x, which is the same
+         * band v0 square post stands in, and 0.16 in z against a post of 0.15.
+         */
+        for (const fz of [-0.115, 0.115]) {
+          parts.push(gl(bx(0.30, 3.20, 0.09, sxp, 1.60, fz, 0xffc422), GLOSS.paint));
+        }
+        parts.push(gl(bx(0.12, 3.20, 0.14, sxp, 1.60, 0, 0xd18a08), GLOSS.paint));
+        // Base plate, not a block -- see duckGeo. All eight variants take it.
+        parts.push(bxAt(0.30, 0.07, 0.34, sx * 1.20, 0.035, 0, 0x2b1e05));
+        // The landing plate the ladder arrives at.
+        parts.push(gl(bx(0.46, 0.08, 0.46, sxp, 3.24, 0, 0x2b1e05), GLOSS.trim));
+        /**
+         * THE HANDRAIL, on BOTH sides of the deck. A stanchion, a mid rail and
+         * a top rail per side, 0.44 long about the standard so the rails stay
+         * inside the band v2 capping plate already reaches (0.618 to 1.118).
+         */
+        for (const rz of [-0.15, 0.15]) {
+          parts.push(gl(bx(0.07, 0.30, 0.07, sxp, 3.43, rz, 0xfff0a0), GLOSS.chrome));
+          parts.push(gl(bx(0.44, 0.06, 0.07, sxp, 3.53, rz, 0xfff0a0), GLOSS.chrome));
+          parts.push(gl(bx(0.44, 0.05, 0.06, sxp, 3.38, rz, 0xd18a08), GLOSS.trim));
+        }
+        /**
+         * THE LADDER. Two stiles from 2.00 to 3.42 -- above the bar at the
+         * bottom, past the landing at the top, which is the extension a real
+         * ladder gives you to hold. Five rungs at 0.25.
+         */
+        for (const lx of [-0.14, 0.14]) {
+          parts.push(gl(bx(0.05, 1.42, 0.05, sxp + lx, 2.71, -0.20, 0xfff0a0), GLOSS.chrome));
+        }
+        for (let r = 0; r < 5; r++) {
+          parts.push(gl(bx(0.30, 0.045, 0.045, sxp, 2.12 + r * 0.25, -0.20, 0xd18a08), GLOSS.trim));
+        }
+        /**
+         * THE CAGE. Three hoops, each a closed ring of eight tangent segments
+         * on a 0.22 radius about (post, y, -0.02), and three vertical strips
+         * tying them together. A ring and not an arc: you pass this object at
+         * 1.70 units and leave it behind, so a cage that exists only from the
+         * front is a cage that is missing for most of the time it is on screen.
+         *
+         * ry = -t - PI/2 lays each segment TANGENT to the circle. A box long
+         * axis is its local +X, and rotating by t alone would lay it along the
+         * radius instead -- the same mistake duckPipeGeo valve wheel records,
+         * caught here by the same arithmetic before it reached the envelope.
+         */
+        for (const hy of [2.40, 2.78, 3.16]) {
+          for (let i = 0; i < 8; i++) {
+            const t = i * Math.PI / 4;
+            parts.push(gl(bx(0.175, 0.05, 0.05,
+              sxp + Math.cos(t) * 0.22, hy, -0.02 + Math.sin(t) * 0.22,
+              0xfff0a0, 0, -t - Math.PI / 2, 0), GLOSS.chrome));
+          }
+        }
+        for (const t of [0, Math.PI, -Math.PI / 2]) {
+          parts.push(gl(bx(0.05, 0.80, 0.05,
+            sxp + Math.cos(t) * 0.22, 2.78, -0.02 + Math.sin(t) * 0.22,
+            0xd18a08), GLOSS.trim));
+        }
+      }
+      return merge(parts.concat(duckHeader()));
+    })();
+
+    /**
+     * ============ DUCK v6: A SITE FLOODLIGHT GANTRY ============
+     *
+     * The lighting rig over a night works: a portal with a big canted
+     * floodlight head on top of each leg and a weatherproof control box on the
+     * leg below it. A floodlight is named on sight by anyone who has walked
+     * past a road being dug up after dark, and it is the only object in this
+     * kind whose identifying feature is at the VERY TOP of the silhouette
+     * rather than partway up a post.
+     *
+     * ---- THE BIG SHAPE AND THE TERMINATION ARE THE SAME PART --------------
+     *
+     * Every other DUCK spends those two levers separately: a mark on the
+     * standard and a different mark where it finishes. This one spends both on
+     * one object, which is why it can afford to make it large. The head is
+     * 0.42 x 0.30 x 0.22 on a yoke, CANTED 0.34 radians nose-down and forward,
+     * with a pale lens on the front and a hood over it. At 25 units that is a
+     * wide bright slab tilted off the vertical at the top of each post, and
+     * NOTHING ELSE IN THE GAME IS TILTED. v3 lamps are the nearest thing and
+     * they are small red lenses on a dark bar halfway up one post; these are
+     * two big cream rectangles against sky.
+     *
+     * The cant is a rotation about x of -0.34 rad, which sends the head local
+     * -Z to (0, -0.334, -0.943): down and toward the runner, which is where a
+     * works floodlight actually points. It is written as a rotation and not as
+     * an eyeballed offset because the lens, the hood and the yoke all have to
+     * land on the same plane, and three separately guessed transforms is how
+     * an assembly ends up not being one.
+     *
+     * ---- THE STANDARD TAPERS ----------------------------------------------
+     *
+     * A twelve-sided column, r 0.15 at the road to r 0.105 at the top. Two
+     * variants are square posts, two are straight round tubes and one is a
+     * lopsided pair; a column that visibly narrows as it rises is the fifth
+     * profile and it is what a lighting mast is. r 0.15 and not more: at the
+     * road the column is 0.718 to 1.018, exactly the band a 0.30 post occupies,
+     * so bands 0 and 1 -- the daylight the whole kind is pinned to -- do not
+     * move. v4 round column is r 0.16 and this is deliberately no wider.
+     *
+     * ---- ON THE HEADER: MARKER LAMPS IN FRONT, CONDUIT BEHIND -------------
+     *
+     * Three lens domes along the front face and the armoured cable that feeds
+     * the heads along the rear, on saddle clips. Both full span, both on the
+     * 0.12 of relief the header leaves, both built round rather than applied
+     * flat, because the mat is the only thing in this game that is allowed to
+     * be a painted mark.
+     *
+     * ENVELOPE. The widest thing is the lamp head at 0.868 + 0.21 = 1.078
+     * against a box halfX of 1.12. The deepest is the rear conduit at 0.295
+     * against a halfZ of 0.30. The tallest is the hood at 3.47. Nothing new is
+     * below 1.90 but the base plate.
+     */
+    const duckFloodGeo = (function () {
+      const px = 1.20 * LANE_FIT;
+      const TILT = -0.34;
+      const parts = [
+        gl(hcbx(2.30, 0.34, 0.54, 0, 1.62, 0, 0xffc422, 0.05), GLOSS.paint),
+        gl(hcbx(2.36, 0.10, 0.56, 0, 1.78, 0, 0xfff0a0, 0.03), GLOSS.trim),
+        gl(hcbx(2.30, 0.08, 0.50, 0, 1.45, 0, 0x2b1e05, 0.02), GLOSS.trim),
+        // THE ARMOURED CABLE, rear face of the header, full span.
+        gl(cyl(0.055, 0.055, 2.10 * LANE_FIT, 8, 0, 1.98, 0.235, 0x2b1e05, 0, 0, Math.PI / 2), GLOSS.trim),
+      ];
+      // The saddle clips that hold it, and a junction box at mid span.
+      for (const cx of [-0.72, -0.24, 0.24, 0.72]) {
+        parts.push(gl(hbx(0.09, 0.20, 0.07, cx, 1.98, 0.205, 0xd18a08), GLOSS.trim));
+      }
+      parts.push(gl(hbx(0.26, 0.28, 0.10, 0, 2.06, 0.245, 0xd18a08), GLOSS.paint));
+      // 0.272 and not 0.28: at 0.28 this 0.04-deep latch landed on z 0.300
+      // exactly, which is the box face itself rather than inside it. Every
+      // other DUCK stops at 0.29 and so does this. Art gives way to the box.
+      parts.push(gl(hbx(0.16, 0.06, 0.04, 0, 2.06, 0.272, 0xfff0a0), GLOSS.chrome));
+      // THE MARKER LAMPS, front face, full span. A bezel and a lens, built as
+      // solids on the z axis so they are domes from every quarter.
+      for (const cx of [-0.62, 0, 0.62]) {
+        parts.push(gl(cyl(0.10, 0.10, 0.07, 12, cx * LANE_FIT, 2.02, -0.215, 0xd18a08, Math.PI / 2), GLOSS.paint));
+        parts.push(gl(cyl(0.075, 0.075, 0.10, 12, cx * LANE_FIT, 2.02, -0.245, 0xfff0a0, Math.PI / 2), GLOSS.glass));
+      }
+      for (const sx of [-1, 1]) {
+        const sxp = sx * px;
+        // THE TAPERED COLUMN. r 0.15 at the road, r 0.105 at 3.02.
+        parts.push(gl(cyl(0.105, 0.15, 3.02, 12, sxp, 1.51, 0, 0xffc422), GLOSS.paint));
+        // Base plate, not a block -- see duckGeo.
+        parts.push(bxAt(0.30, 0.07, 0.34, sx * 1.20, 0.035, 0, 0x2b1e05));
+        /**
+         * THE CONTROL BOX. A weatherproof enclosure with a hinged door, a pair
+         * of hinges down one edge and a latch on the other, and a gland plate
+         * under it where the cable goes in. It is on the standard band at 2.32
+         * -- x 0.718 to 1.018 -- and it is a solid with a back, not a panel.
+         */
+        parts.push(gl(bx(0.30, 0.36, 0.24, sxp, 2.32, 0.02, 0x2b1e05), GLOSS.trim));
+        parts.push(gl(bx(0.25, 0.29, 0.04, sxp, 2.32, -0.115, 0xd18a08), GLOSS.paint));
+        for (const hy of [2.22, 2.42]) {
+          parts.push(gl(bx(0.05, 0.06, 0.06, sxp - sx * 0.13, hy, -0.10, 0xfff0a0), GLOSS.chrome));
+        }
+        parts.push(gl(bx(0.05, 0.10, 0.05, sxp + sx * 0.13, 2.32, -0.12, 0xfff0a0), GLOSS.chrome));
+        parts.push(gl(bx(0.20, 0.05, 0.14, sxp, 2.12, 0.02, 0xd18a08), GLOSS.trim));
+        // The drop from the box to the head, clipped to the column. A cable,
+        // not a member: r 0.03, and it starts above the bar.
+        parts.push(gl(cyl(0.030, 0.030, 0.56, 6, sxp + sx * 0.115, 2.78, 0.09, 0x2b1e05), GLOSS.trim));
+        /**
+         * THE YOKE. Two arms off a bracket at the top of the column, and the
+         * head is slung between them. Arms at x +/-0.17 about the column, so
+         * 0.673 to 1.063 against a box halfX of 1.12.
+         */
+        parts.push(gl(bx(0.30, 0.09, 0.26, sxp, 3.06, 0, 0x2b1e05), GLOSS.trim));
+        for (const ax of [-0.17, 0.17]) {
+          parts.push(gl(bx(0.05, 0.28, 0.05, sxp + ax, 3.22, 0.01, 0xd18a08), GLOSS.paint));
+        }
+        // The trunnion bolts the head turns on, proud of both arms.
+        for (const ax of [-0.19, 0.19]) {
+          parts.push(gl(cyl(0.045, 0.045, 0.06, 8, sxp + ax, 3.24, 0.01, 0xfff0a0, 0, 0, Math.PI / 2), GLOSS.chrome));
+        }
+        /**
+         * THE HEAD. A canted body, a pale lens on its front face and a hood
+         * over the top of it, all on the same 0.34 rad cant so the assembly is
+         * one machine. The offsets are the head local axes: -Z is
+         * (0, -0.334, -0.943) and +Y is (0, 0.943, -0.334).
+         */
+        parts.push(gl(bx(0.42, 0.30, 0.22, sxp, 3.24, 0.02, 0xffc422, TILT), GLOSS.paint));
+        parts.push(gl(bx(0.36, 0.24, 0.03, sxp, 3.24 - 0.040, 0.02 - 0.113, 0xfff2e0, TILT), GLOSS.glass));
+        parts.push(gl(bx(0.44, 0.05, 0.26, sxp, 3.24 + 0.160, 0.02 - 0.057, 0x2b1e05, TILT), GLOSS.trim));
+        // The lamp back and its cooling fins, because a floodlight seen from
+        // behind is a finned casting and not a blank slab.
+        for (const fy of [-0.09, 0, 0.09]) {
+          parts.push(gl(bx(0.38, 0.04, 0.05,
+            sxp, 3.24 + fy * 0.943 + 0.037, 0.02 - fy * 0.334 + 0.104,
+            0xd18a08, TILT), GLOSS.trim));
+        }
+      }
+      return merge(parts.concat(duckHeader()));
+    })();
+
+    /**
+     * ============ DUCK v7: A GIRDER UNDERBRIDGE ============
+     *
+     * The low bridge. It is the archetype the clearance header was built for
+     * -- duckHeader own header says it in one line, that a hurdle has nothing
+     * above its rail and a low bridge has a metre of structure above its
+     * soffit -- and until now the game had five things that borrow the idea
+     * and none that IS one.
+     *
+     * ---- WHAT MAKES IT A BRIDGE AND NOT A GANTRY --------------------------
+     *
+     * Three marks, in the order they resolve as you come up to it:
+     *
+     *   THE FLARED CAPITAL, and it is the big shape. Each column opens out
+     *     from r 0.14 to r 0.25 between 2.10 and 2.40 and is capped with a
+     *     square abacus plate. A cast column that trumpets out to carry a
+     *     girder is the oldest bridge detail there is, it is the only TAPER in
+     *     the kind that goes the other way from v6 mast, and unlike a roundel
+     *     or a lamp it changes the OUTLINE: at forty units this object is two
+     *     posts that get wider at the top.
+     *   THE PARAPET, and it is the termination. A sill, four balusters and a
+     *     coping rail, on both faces of the deck at z +/-0.15. Against sky
+     *     that is a repeating VERTICAL rhythm, where v5 handrail is two
+     *     horizontals and everything else is one solid mark.
+     *   THE RIVETS, and they are the near read. Two rows of eleven along the
+     *     whole span on the front face of the header AND on the rear, with a
+     *     splice plate at mid span. At 25 units they are a dotted line; at 8
+     *     units, which is where this game spends most of its screen area, they
+     *     are what tells you the beam over your head is a riveted plate girder.
+     *
+     * ---- WHAT IT IS NOT ALLOWED TO BE -------------------------------------
+     *
+     * IT HAS NO FLARED BASE, and that is a refusal with a number. The obvious
+     * move is to mirror the capital at the road, which is what a real cast
+     * column does. A base flare of r 0.24 is 0.48 across the road per column
+     * against the 0.30 base plate every other DUCK stands on, and by the
+     * arithmetic in kindread band 0 that takes the daylight occupancy under
+     * the bar from about 0.21 back toward 0.33 -- most of the way to the 0.38
+     * that was measured as eating the only cue this kind has. The daylight is
+     * worth more than the detail. It stands on the same base plate as the
+     * other seven.
+     *
+     * IT IS THE SHORTEST DUCK IN THE GAME, at 3.10 to the coping against v4
+     * 3.20, and that is on purpose: a bridge is a heavy low thing and the
+     * mass it does have is concentrated between 2.10 and 3.10 where the
+     * capital and the parapet are, rather than run up a thin post.
+     *
+     * ENVELOPE. The widest things are the capital and the coping at 1.118
+     * against a box halfX of 1.12, which is where v2 roundel already stands.
+     * The deepest is a rivet head at 0.235. Nothing new is below 1.90 but the
+     * base plate.
+     */
+    const duckBridgeGeo = (function () {
+      const px = 1.20 * LANE_FIT;
+      const parts = [
+        gl(hcbx(2.30, 0.40, 0.56, 0, 1.62, 0, 0xffc422, 0.05), GLOSS.paint),
+        gl(hcbx(2.38, 0.09, 0.58, 0, 1.785, 0, 0xfff0a0, 0.03), GLOSS.trim),
+        gl(hcbx(2.38, 0.07, 0.58, 0, 1.445, 0, 0xfff0a0, 0.02), GLOSS.trim),
+      ];
+      /**
+       * THE RIVET ROWS. Two rows of eleven on EACH face of the header, which
+       * is twice the work and is the whole of rule 1: the rear of this beam is
+       * what the player looks at for the second after they pass under it, and
+       * a riveted girder with a blank back is a stage flat.
+       */
+      for (const rz of [-0.20, 0.20]) {
+        for (const ry of [1.93, 2.11]) {
+          for (let i = 0; i < 11; i++) {
+            parts.push(gl(cyl(0.035, 0.035, 0.07, 6, (-1.00 + i * 0.20) * LANE_FIT, ry, rz,
+              0xd18a08, Math.PI / 2), GLOSS.trim));
+          }
+        }
+        // The field splice: a cover plate at mid span with its own rivets.
+        parts.push(gl(hbx(0.30, 0.36, 0.05, 0, 2.02, rz * 1.05, 0xd18a08), GLOSS.paint));
+        for (const sy of [1.88, 2.16]) {
+          for (const sxx of [-0.08, 0.08]) {
+            parts.push(gl(cyl(0.032, 0.032, 0.06, 6, sxx, sy, rz * 1.28, 0xfff0a0, Math.PI / 2), GLOSS.chrome));
+          }
+        }
+      }
+      for (const sx of [-1, 1]) {
+        const sxp = sx * px;
+        // THE COLUMN. Twelve-sided, r 0.14, 0 to 2.10 -- inside the same
+        // 0.718 to 1.018 band every other standard occupies at the road.
+        parts.push(gl(cyl(0.14, 0.145, 2.10, 12, sxp, 1.05, 0, 0xffc422), GLOSS.paint));
+        // Base plate, not a block, and no flare on it. See the header.
+        parts.push(bxAt(0.30, 0.07, 0.34, sx * 1.20, 0.035, 0, 0x2b1e05));
+        // A moulded band partway up, which is what stops a cast column being
+        // a length of pipe. Kept above 1.90 so the daylight bands do not move.
+        parts.push(gl(cyl(0.165, 0.165, 0.09, 12, sxp, 1.98, 0, 0xd18a08), GLOSS.trim));
+        /**
+         * THE FLARED CAPITAL and its abacus. r 0.14 to r 0.25 over 0.30, then
+         * a square plate. 0.868 + 0.25 = 1.118 against a box halfX of 1.12.
+         */
+        parts.push(gl(cyl(0.25, 0.14, 0.30, 12, sxp, 2.25, 0, 0xd18a08), GLOSS.paint));
+        parts.push(gl(bx(0.50, 0.09, 0.46, sxp, 2.445, 0, 0xfff0a0), GLOSS.chrome));
+        // THE BRIDGE PLATE, one on each column, on the face you come up to.
+        parts.push(gl(bx(0.24, 0.16, 0.04, sxp, 1.72, -0.235, 0xfff2e0), GLOSS.trim));
+        parts.push(gl(bx(0.17, 0.05, 0.05, sxp, 1.72, -0.255, 0x2b1e05), GLOSS.matte));
+        /**
+         * THE PARAPET. A sill across the deck, four balusters and a coping
+         * rail, on BOTH faces at z +/-0.15 -- a bridge is railed on both sides
+         * and the far one is in shot from behind for as long as the near one.
+         */
+        parts.push(gl(bx(0.46, 0.08, 0.42, sxp, 2.53, 0, 0x2b1e05), GLOSS.trim));
+        for (const rz of [-0.15, 0.15]) {
+          for (const bxo of [-0.18, -0.06, 0.06, 0.18]) {
+            parts.push(gl(bx(0.06, 0.44, 0.06, sxp + bxo, 2.79, rz, 0xffc422), GLOSS.paint));
+          }
+          parts.push(gl(bx(0.50, 0.09, 0.09, sxp, 3.055, rz, 0xfff0a0), GLOSS.chrome));
+        }
+      }
+      return merge(parts.concat(duckHeader()));
+    })();
+
+    /**
      * ============ THE DUCK SET AFTER THE DIFFERENTIATION PASS ============
      *
      * *"All duck obstacles looks exactly the same. Can you review them and
@@ -9538,6 +10017,26 @@ MR.World = (function () {
      *        rest post           -- left only               other
      *   v4   symmetric, 3.20     a SPOKED handwheel with    a blind flange
      *                            a hole in it               disc, and an elbow
+     *   v5   symmetric, 3.56     a CAGED LADDER: rungs      a landing plate and
+     *        I-section legs      and three hoops            a HANDRAIL, both
+     *                                                       sides of the deck
+     *   v6   symmetric, 3.47     a control box, and the     a big CANTED
+     *        TAPERED masts       head itself                FLOODLIGHT head on
+     *                                                       a yoke
+     *   v7   symmetric, 3.10     a FLARED CAPITAL that      a PARAPET: sill,
+     *        the shortest        opens r 0.14 to r 0.25     four balusters and
+     *                                                       a coping rail
+     *
+     * ---- AND THE FOURTH LEVER, WHICH THE FIRST FIVE LEFT ON THE TABLE -----
+     *
+     * The clearance header is 0.34 deep in a box of halfZ 0.30, so there is
+     * 0.12 of free relief in FRONT of it and 0.12 BEHIND it, running the whole
+     * span, in a band where mass across the lane is already allowed. v0 to v4
+     * use none of it. v5 puts a walkway toe plate in front and a cable tray
+     * with three cables behind; v6 puts three marker lamps in front and the
+     * armoured feed on saddle clips behind; v7 puts two rows of eleven rivets
+     * and a splice plate on BOTH faces. It is the only differentiator in this
+     * kind that is available across the lane rather than out at a standard.
      *
      * ---- THE TWO THINGS THAT WERE ACTIVELY WRONG --------------------------
      *
@@ -9577,6 +10076,9 @@ MR.World = (function () {
       { geo: duckSignGeo, face: [2.26, 0.34, 1.62, -0.292] },
       { geo: duckBoomGeo, face: [2.26, 0.38, 1.62, -0.292] },
       { geo: duckPipeGeo, face: [2.26, 0.34, 1.62, -0.292] },
+      { geo: duckWalkGeo, face: [2.26, 0.36, 1.60, -0.292] },
+      { geo: duckFloodGeo, face: [2.26, 0.34, 1.62, -0.292] },
+      { geo: duckBridgeGeo, face: [2.26, 0.38, 1.62, -0.292] },
     ]);
 
     /**

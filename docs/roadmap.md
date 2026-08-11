@@ -4244,12 +4244,54 @@ nobody measured is worse than no number at all.**
     the record still survives **1 / 2 / 3** mistakes, unmoved.
 
 63. **The BLOCK legibility pass was stopped before it changed a line of
-    `src/render/world.js`, and everything below is measurement rather than
-    fix.** It is written out in full because entry 61 left one fairness defect
-    open and named only half of it: `BLOCK v3` reads as OVER, and BLOCK scored
-    1 of 3, so a second variant was misreading and nobody knows which. That
-    question is still open. What follows is the ground the next pass does not
-    have to re-cover.
+    `src/render/world.js` -- and the read it ran first says there was nothing
+    to change. Thirty-five panels, two fresh uncontaminated readers, 35 of 35
+    correct, and `BLOCK v3` read AROUND at both distances.** The pass was
+    briefed to fix the variant entry 61 caught reading OVER and to find the
+    second BLOCK that scored against it. **Neither reproduced.** Everything
+    below is measurement rather than fix, and the first thing it measures is
+    the previous measurement.
+
+    **WHAT THE TWO READERS SAW.** Panels off `2d61123`, the fitted-mat build,
+    at the default `skip=150` with no date pinned. Set A is every variant in
+    the game at `READ_NEAR`; set B is all ten BLOCKs at 12u plus `JUMP v3`
+    close in. Neither reader had source, `CLAUDE.md` or any other panel set.
+
+    | set | panels | route correct |
+    |-----|--------|---------------|
+    | A, 25u  | 23: 10 BLOCK, 5 DUCK, 8 JUMP | **23 of 23** |
+    | B, 12u  | 10 BLOCK, plus `JUMP v3` at 8 and 12 | **12 of 12** |
+
+    Every DUCK UNDER at "sure". Every JUMP OVER. **Every BLOCK AROUND, all
+    twenty of them, at both distances.** `BLOCK v3` -- the variant this pass
+    existed to fix -- at 25 units, verbatim: *"A red-and-white striped roadwork
+    barricade, with a round red 'no entry' sign on a pole and orange traffic
+    cones at each end, and two workers in blue standing behind it ... AROUND
+    ... sure ... The barrier is a solid panel roughly chest height with no gap
+    underneath, and two full-height figures are standing immediately behind it.
+    There is nothing to duck under, and clearing it in a jump would put you
+    into the workers."*
+
+    **THAT IS THE SAME GEOMETRY, THE SAME TWO FIGURES AND THE OPPOSITE
+    CONCLUSION.** Entry 61's reader measured the rail against the pair's waist
+    and hurdled it; this one measured the pair as an obstruction standing
+    behind the rail and went round. Both are reading the figures. The ruler
+    mechanism entry 61 identified is real -- a human figure inside a silhouette
+    re-scales everything beside it -- but **which way it points is not fixed by
+    the geometry**, and one reader on three panels was not enough to say it
+    pointed at OVER.
+
+    **SO THE HONEST STATE OF THE DEFECT IS "UNREPRODUCED", NOT "FIXED" AND NOT
+    "IMAGINARY".** Two differences between the runs are uncontrolled and either
+    could carry it: entry 61 shot at `skip=44` on `2026-01-10`, deliberately on
+    the sunk ground the mat pass was about, and this run shot at the default
+    `skip=150` on no particular day -- different light, different gradient,
+    different backdrop behind the object. **The next pass on `BLOCK v3` should
+    re-shoot entry 61's exact framing before it moves a box**, because a fix
+    aimed at an unreproduced reading is a change nobody can score. What is NOT
+    in doubt is that on ordinary ground, twice, the variant reads correctly.
+
+    The rest of this entry is what the run found that nobody was looking for.
 
     **THE UNCONTAMINATED READER IS NOW A CHEAP INSTRUMENT, AND THAT IS THE ONE
     THING HERE THAT IS FINISHED.** Entry 61 got its reader from "a git branch
@@ -4319,29 +4361,71 @@ nobody measured is worse than no number at all.**
     crates -- so crates are taken, and a second crate variant would put two of
     the ten BLOCKs on the same idea.
 
-    **`JUMP v3`, THE SCOOTERS: THE NAMEABLE VIEW IS TURNED TO THE KERB.** This
-    is a source reading, not a reader's verdict, and it wants confirming -- but
-    it is precise enough to act on. The standing machines are built with their
-    ROLLING AXIS DOWN THE LANE: the wheels take `rz = Math.PI / 2` and sit at
-    z +0.28 and -0.30, the deck is 0.22 in x by 0.58 in z, and the handlebar is
-    0.60 across x. The chase camera is astern. So what it gets is the machine's
-    REAR ELEVATION -- one wheel hiding the other, a stem, a bar across the top.
+    **AND THE BLIND READ SAYS THE PROFILE NUMBER IS NOT COSMETIC: v9 PASSED AT
+    12 UNITS ON A LORRY THAT HAPPENED TO BE PARKED BEHIND IT.** It scored
+    AROUND like the other nine, and then gave its reason, verbatim: *"Two
+    things stacked in the lane: a red truck ... with a red motorcycle parked
+    right behind it, nearer the runner. The motorcycle is the thing the runner
+    meets first ... **Even though the motorcycle in front is fairly low**, the
+    truck behind it is a solid wall of vehicle, so getting over the bike just
+    puts you into the truck's tailgate."*
 
-    The variant's own header states the case against it without noticing:
-    *"a machine standing up shows its PROFILE -- two wheels, a deck between
-    them, a raked stem and a handlebar across the top -- and that profile is
-    the whole of what makes a scooter nameable."* **That profile faces the
-    kerb.** From directly behind, a kick scooter, a bicycle and a moped are the
-    same silhouette, which is exactly the hedge the last reader gave: *"a
-    bicycle, scooter or kick-scooter lying on its side... I am genuinely not
-    confident, and I would not defend it."*
+    **The moped itself was read as low enough to clear.** What supplied the
+    AROUND was a second, unrelated hazard further down the road that the crop
+    happened to contain -- scenery, not this variant, and not something the
+    course guarantees. On an empty stretch that reasoning is not available and
+    the reader is left with the object `kindread` scores at -1.117 against the
+    DUCK centroid. **This is the one place in the run where the instrument and
+    the reader agree, and it is the only BLOCK whose correct answer came from
+    outside itself.** It is the strongest candidate for the next pass -- ahead
+    of `BLOCK v3`, whose defect did not reproduce.
 
-    The candidate fix is a 90-degree yaw on the standing machines so the side
-    profile faces the lens, and the envelope has room for it: `JUMP` is halfX
-    1.12 and halfZ 0.52, a machine is about 1.1 long and 0.3 wide, so it fits
-    ACROSS the lane where it does not fit along it. It costs no draw calls and
-    no colour. **Not built, not measured, and the profile row would move** --
-    it is 0.50 0.42 0.13 0.26 0.09 today, the thinnest in its kind.
+    A second-order note from the same panel set: at 25u the reader named v9 *"a
+    red three-wheeled cargo vehicle -- tuk-tuk / cargo-trike shaped"*. **That is
+    the cargo trike the owner had removed from the game.** The route answer was
+    right, so this is identity rather than fairness, but a variant that reads
+    as the object it replaced is worth knowing about before anyone reworks it.
+
+    **`JUMP v3`, THE SCOOTERS: IT IS NAMED AT 25 UNITS AND UNNAMEABLE AT 8 AND
+    12, AND THE THING THAT BREAKS IT IS THE PILE.** This is the finding of the
+    run, because it is the reverse of what every brief on this variant has
+    assumed. At `READ_NEAR`, unprompted and uncontaminated: ***"Two teal-green
+    kick-scooters standing side by side"***, fairly sure, with the reason --
+    *"handlebars with dark grips at each end, a thin vertical stem, and a low
+    horizontal footboard just off the ground -- a scooter silhouette, twice."*
+    **The owner's "I had no idea a kick scooter was one" does not reproduce at
+    the distance the lane is chosen at.** No hedging, no bicycle, no "lying on
+    its side".
+
+    Close in it collapses, and the other reader said exactly what does it. At
+    12u: *"two upright posts at the lane edges, each with a handlebar-like
+    crossbar at the top ... with a solid horizontal teal mass bridging the gap
+    between them at about half their height. Best single description: a low
+    teal barrier or rail spanning the lane"*, identification **guessing**. At
+    8u, the same: *"either a pair of parked teal scooters/bicycles with a third
+    laid across between them, or as a low barrier rail on wheeled posts."*
+
+    **THE PILE BETWEEN THE UPRIGHTS IS READING AS A RAIL JOINING THEM.** It was
+    put there on purpose and for a good measured reason -- the header says so:
+    *"The pile is what closes the FOOT of the object across the lane ... road
+    showing between separate objects reads as a lane to run down, and two
+    uprights 1.32 apart is exactly that."* That argument is still correct and
+    the route answer it protects is still correct (OVER, both distances, both
+    readers). But at close range the two flat machines merge into one
+    horizontal bar spanning post to post, and a scooter with a rail across its
+    middle is a barrier. **The two goals are in tension and nobody had seen
+    it**: closing the foot costs the name, and it costs it at exactly the range
+    where the object is biggest and should be clearest.
+
+    So the next attempt is a shape problem, not a colour or an orientation one:
+    keep the foot closed and stop the closure reading as a continuous
+    horizontal. Break the pile's top line, or angle it, or let one machine
+    overlap an upright rather than span between them. **A yaw to put the side
+    profile at the lens was drafted here and then withdrawn** -- the 25u read
+    proves the current orientation already names the object, so turning it
+    would be a fix aimed at a defect that measurement had just closed.
+    Untouched today; profile row 0.50 0.42 0.13 0.26 0.09, the thinnest in its
+    kind.
 
     **`BLOCK v3`, THE MARSHALS: THE READER MEASURED THE OBJECT CORRECTLY.** Its
     top rail is a 0.12 cream cap centred at y 1.30, so it tops out at **1.36**,
@@ -4368,17 +4452,25 @@ nobody measured is worse than no number at all.**
     the road, in cream and pink, without a top beam on legs. It is a geometry
     problem with three walls already built around it.
 
-    **AND THE FINDING THAT OUTLIVES ALL OF IT: `kindread` CANNOT SEE THIS
-    DEFECT.** `BLOCK v3`'s profile is
+    **AND THE FINDING THAT OUTLIVES ALL OF IT: THE TWO INSTRUMENTS CAUGHT
+    DIFFERENT VARIANTS, AND EACH WAS BLIND WHERE THE OTHER SAW.**
 
         BLOCK v3   0.59 0.57 0.41 0.70 0.77 0.78 0.73 0.63 0.65 0.67 0.63 0.61 0.27 0.00
+        BLOCK v9   0.10 0.24 0.30 0.28 0.41 0.50 0.50 0.51 0.51 0.50 0.38 0.21 0.13 0.00
 
-    which classifies as a BLOCK comfortably and is one of the healthier rows in
-    the fleet. The variant occupies the lane from the road to 2.40 and still
-    tells a reader to jump it. **Occupancy is not a scale reference.** A human
-    figure inside the silhouette re-scales everything next to it, and no band
-    of lane-width fraction can contain that fact -- 14 numbers about where mass
-    sits cannot say whose waist it is level with. The two instruments disagree,
-    `kindread` says pass and the blind reader says a lost record, and **the
-    reader is the one that costs a run.** Neither tool is wrong; they answer
-    different questions, and only one of them is the fairness gate.
+    `kindread` passes `v3` comfortably and fails `v9` at -1.117. The blind read
+    is the other way round: it passed `v9` -- on a lorry parked behind it -- and
+    it was a blind read that once condemned `v3`. **Occupancy is not a scale
+    reference**: 14 numbers about where mass sits cannot say whose waist it is
+    level with, so no profile row can ever contain the figures-as-ruler effect.
+    And a reader is not an envelope: it will happily take its answer from
+    something that is not the object, which is what makes a single reader on
+    three panels the thin evidence it turned out to be here.
+
+    Neither tool is wrong and neither is sufficient. **What this run adds is
+    that the blind read needs n.** Entry 61 drew a fairness defect out of one
+    reader seeing one variant twice; twenty BLOCK panels across two readers do
+    not reproduce it. The read is still the acceptance test and still the only
+    thing that answers the owner's question -- but a single reader's sentence
+    is a hypothesis, and this project has a whole section on what happens when
+    those get built on.

@@ -60,7 +60,18 @@ MR.Course = (function () {
    * roof is one more way through on top. solvable() therefore needs no change
    * at all and is not given one -- see the note above it.
    */
-  let NARROW = 0;
+  // LANE CLOSURE IS ON. It shipped built, proved and switched off, and the
+  // case for turning it on was re-measured on today's build over all 365 days
+  // rather than taken from the document that recommended it:
+  //
+  //   NARROW=0   185.4 gates/course   0 degraded   1-lane gates  5.75%
+  //   NARROW=1   184.1 gates/course   0 degraded   1-lane gates 10.26%
+  //
+  // Zero degraded gates, zero abandoned closures, zero invalid courses, 2630
+  // closures over the calendar. The staleness document called it a tripling of
+  // one-lane decisions; measured, it is 1.78x, and the honest number is the one
+  // that goes in the comment. It costs 1.3 gates a course.
+  let NARROW = 1;
   let RAMP = 1;
 
   // A jump covers this much ground; two conflicting action gates closer than
@@ -102,8 +113,87 @@ MR.Course = (function () {
    * generate() below. Elevation reads nothing from the course, so there is no
    * cycle -- but the ordering is load-bearing and not incidental.
    */
-  function actionWindowAt(z, elev) {
-    return ACTION_WINDOW + (elev ? elev.windowExtra(z) : 0);
+  /**
+   * ---- SURGE ZONES: THE SAME MACHINERY, A DIFFERENT CAUSE -----------------
+   *
+   * A surge zone is a marked stretch of road where a runner in the marked lane
+   * runs to MR.Pace.SURGE.FLOOR_SURGE instead of FLOOR_BASE. That is a locally
+   * higher top speed, which is EXACTLY the problem the descent already posed
+   * and which Elevation.windowExtra already solved -- so this is not a new
+   * fairness argument, it is the existing one with a second cause bolted to the
+   * same bolt.
+   *
+   * THE WINDOW WIDENS. IT DOES NOT SHRINK. That is the whole of rule 4 here:
+   * difficulty comes from the allocation and from the price of a mistake, never
+   * from a gate the player could not read. Inside a zone the generator is told
+   * about the surge speed and spaces the gates for it, so the guaranteed
+   * reaction window inside a surge is 739 ms against 741 ms in the shipped
+   * game, and 764 ms everywhere outside one -- MORE forgiving by default, and
+   * the tightness is the thing the player elects.
+   *
+   * ---- AND THE EXTRA IS READ OFF ELEVATION'S OWN TABLE, NOT RE-DERIVED ----
+   *
+   * The tempting version of this function re-runs elevation's forward sliding
+   * window to find the steepest descent within one airborne reach, so it can
+   * add the grade to the surge floor. That is a second implementation of the
+   * one number the fairness proof turns on, and this project has paid for that
+   * pattern before (see HAZARD_HALF_Z, which is duplicated and then guarded).
+   *
+   * It is not necessary, because windowExtra is INVERTIBLE. Elevation stores
+   *
+   *     extra(z) = SPAN_NUM / (FLOOR_PACE + GRADE_SPM * gmin(z)) - flatSpan
+   *
+   * so the effective local pace including the hill comes straight back out:
+   *
+   *     pace(z) = SPAN_NUM / (extra(z) + flatSpan)
+   *
+   * and a surge subtracts a CONSTANT number of seconds per mile from the floor,
+   * so the surged local pace is pace(z) - (FLOOR_PACE - FLOOR_SURGE). One table,
+   * one source, and nothing to keep in step. On flat ground extra(z) is 0 and
+   * this returns 0.813 units -- the difference between a 20.66-unit airborne
+   * span at 4:04/mi and the 19.84-unit span the window was cut for -- which
+   * leaves the SAME 1.16-unit margin the flat course keeps today.
+   */
+  const SPAN_NUM = K.JUMP_TIME * K.UNITS_PER_MILE * K.TIME_SCALE;
+  const FLAT_SPAN = SPAN_NUM / K.FLOOR_PACE;
+  // How far BEHIND a zone the widening starts. A jump committed just short of
+  // the entry line lands inside the zone, and although the runner is not yet
+  // surging when they commit, the pad costs a few units and removes the need to
+  // reason about the boundary at all. Same constant elevation looks forward by.
+  const SURGE_PAD = 28;
+
+  function surgeExtraAt(z, surges) {
+    if (!surges || !surges.length) return 0;
+    for (let i = 0; i < surges.length; i++) {
+      const s = surges[i];
+      if (z >= s.z0 - SURGE_PAD && z < s.z1) return s;
+    }
+    return 0;
+  }
+
+  function windowExtraAt(z, elev, surges) {
+    const base = elev ? elev.windowExtra(z) : 0;
+    if (!surgeExtraAt(z, surges)) return base;
+    // The local pace the base window was cut for, hill included, recovered from
+    // elevation's own table -- then the same hill at the surge floor.
+    //
+    // THE DATUM IS K.FLOOR_PACE AND ONLY K.FLOOR_PACE. ACTION_WINDOW is cut
+    // against it, elevation's table is cut against it, and this has to be too
+    // or the two stop composing. FLOOR_BASE (the slower unsurged floor EFFORT
+    // introduces) does not appear here at all, and that is correct rather than
+    // an omission: it is SLOWER than the datum, so a runner outside a zone
+    // needs less window than the course already gives them and nothing is owed.
+    // An earlier draft of this line subtracted the base lift as well and
+    // widened the zone by 26 s/mi instead of 10 -- safe, but it would have cost
+    // gates nothing was asking for and made the measured price of a surge a
+    // lie.
+    const pace = SPAN_NUM / (base + FLAT_SPAN);
+    const surged = pace - (K.FLOOR_PACE - MR.Pace.SURGE.FLOOR_SURGE);
+    return Math.max(base, SPAN_NUM / surged - FLAT_SPAN);
+  }
+
+  function actionWindowAt(z, elev, surges) {
+    return ACTION_WINDOW + windowExtraAt(z, elev, surges);
   }
 
   /**
@@ -147,8 +237,123 @@ MR.Course = (function () {
    * time; see tools/simulate.js, which is unchanged to the second by it because
    * pace integrates over distance and not over gates.
    */
-  function readWindowAt(z, elev) {
-    return actionWindowAt(z, elev) + K.CAM_BASE_BACK;
+  function readWindowAt(z, elev, surges) {
+    return actionWindowAt(z, elev, surges) + K.CAM_BASE_BACK;
+  }
+
+  /**
+   * ---- WHERE THE SURGE ZONES GO, AND THE CONTRACT THEY OWE THE PLAYER -----
+   *
+   * Planned from the seed in Z SPACE, BEFORE A SINGLE GATE IS PLACED, for the
+   * identical reason elevation is: actionWindowAt reads the zones, spacingAt
+   * and solvable() both read actionWindowAt, and the generator calls both on
+   * every gate. The ground and the markings have to exist before the road does.
+   * Nothing here reads the gate table, so there is no cycle.
+   *
+   * THE NUMBERS, and they are the contract the markings must be built to:
+   *
+   *   COUNT       4 or 5 a course.
+   *   LENGTH      420 to 560 units. At the surge floor that is 14.2 to 19.0
+   *               real seconds, and at BURN_UNITS = 200 it costs 2.1 to 2.8
+   *               segments out of a pool that holds 3. One zone is very nearly
+   *               a full tank, which is what makes it a decision and not a tap.
+   *   LANE        one lane, constant for the whole zone. It is never BLOCK
+   *               inside the zone -- enforced in generate(), see the surge
+   *               clause there -- so an elected surge is always completable and
+   *               the price is that you must ACT at what is in front of you
+   *               rather than dodge into a free lane.
+   *   WINDOW      SURGE_SIGHT = 90 units. The entry marking must be legible
+   *               from that far out and it is not a taste number: it is
+   *               Elevation.SIGHT_MIN, the distance the terrain sweep already
+   *               PROVES stays visible over every crest on every course. A
+   *               contract written at 90 cannot be broken by a hill, by
+   *               construction, and Elevation.validate() is the proof.
+   *   f RANGE     0.15 to 0.90. The same window narrowRate and the ramp use,
+   *               and for the same two reasons: START_GRACE owns the opening,
+   *               and the last question of a race should not be a novelty.
+   *   SEPARATION  no two zones within SURGE_SIGHT + 60 units, so one zone's
+   *               entry marking is never read against another zone's paint.
+   *
+   * WHAT THE PLAYER CAN AND CANNOT KNOW AT THE COMMIT POINT. From 90 units out
+   * they can read that a zone begins, which lane is marked, and how long it
+   * runs. They can see roughly the first 90 units of road inside it. They
+   * CANNOT see the rest, and that is the risk the owner asked for -- a surge is
+   * bought before its contents are known. It is a fair bet, not a hidden one:
+   * every gate inside a zone individually satisfies the same read window every
+   * other gate in the game does, at the surge speed.
+   */
+  const SURGE_SIGHT = 90;
+  const SURGE_LEN_MIN = 420, SURGE_LEN_MAX = 560;
+  const SURGE_N_MIN = 4, SURGE_N_MAX = 5;
+  const SURGE_F0 = 0.15, SURGE_F1 = 0.90;
+
+  function planSurge(key) {
+    if (!(MR.Pace.EFFORT > 0)) return [];
+    const rnd = MR.rng.stream(key, 'surge/v1');
+    const total = K.TOTAL_UNITS;
+    const lo = SURGE_F0 * total, hi = SURGE_F1 * total;
+    const zones = [];
+    const want = rnd.int(SURGE_N_MIN, SURGE_N_MAX);
+    const GAP = SURGE_SIGHT + 60;
+    let guard = 0;
+    while (zones.length < want && guard++ < 400) {
+      const len = rnd.range(SURGE_LEN_MIN, SURGE_LEN_MAX);
+      const z0 = rnd.range(lo, hi - len);
+      const z1 = z0 + len;
+      let clash = false;
+      for (const s of zones) if (z1 + GAP > s.z0 && z0 - GAP < s.z1) { clash = true; break; }
+      if (clash) continue;
+      zones.push({ z0, z1, lane: rnd.int(0, 2), sight: SURGE_SIGHT });
+    }
+    zones.sort(function (a, b) { return a.z0 - b.z0; });
+    // Numbered in running order, so the marking, the HUD and the report can all
+    // name the same zone.
+    for (let i = 0; i < zones.length; i++) zones[i].n = i + 1;
+    return zones;
+  }
+
+  /** The zone covering z, or null. Zones never overlap, so a scan is exact. */
+  function zoneAt(surges, z) {
+    if (!surges) return null;
+    for (let i = 0; i < surges.length; i++) {
+      if (z >= surges[i].z0 && z < surges[i].z1) return surges[i];
+    }
+    return null;
+  }
+
+  /**
+   * The zone whose marked lane a hazard at THIS gate line could stand in, or
+   * null -- which is a different and larger question than zoneAt.
+   *
+   * A HAZARD IS NOT A PLANE AT z, IT IS A BOX, and the deepest one in the game
+   * is a rideable train: 2 * halfZ * (1 + RAMP_SPAN_MAX * 0.9) = 42.5 units of
+   * lorry, all of it FORWARD of the gate line because the box is nose-anchored.
+   * A gate two units short of an entry line with a BLOCK in the marked lane
+   * therefore stands 40 units of vehicle under the paint.
+   *
+   * The first version of the marked-lane rule tested the gate line and nothing
+   * else. It was validate()'s new surge clause that found it, on 13 of 60 days
+   * -- four of them a standing 3.9-unit BLOCK and one a 17.9-unit train -- and
+   * it is exactly the defect reachOf was written for one invariant along. So
+   * the rule is stated in the same currency the rest of this file uses: how far
+   * the geometry reaches, not where its gate line is.
+   */
+  // A function rather than a const because HAZARD_HALF_Z and RAMP_SPAN_MAX are
+  // declared further down this file, and a `const` here reads them at module
+  // evaluation time -- which throws on the temporal dead zone and takes the
+  // whole page with it. Derived on every call rather than cached, so a retune
+  // of either cannot leave this stale.
+  function surgeBody() {
+    return 2 * HAZARD_HALF_Z[K.BLOCK] * (1 + RAMP_SPAN_MAX * 0.9);
+  }
+
+  function zoneBody(surges, z) {
+    if (!surges) return null;
+    const body = surgeBody();
+    for (let i = 0; i < surges.length; i++) {
+      if (z + body > surges[i].z0 && z < surges[i].z1) return surges[i];
+    }
+    return null;
   }
 
   /**
@@ -495,7 +700,7 @@ MR.Course = (function () {
     return Math.min(1, base * 0.86 + wall + home);
   }
 
-  function spacingAt(f, rnd, z, elev, lanes, train) {
+  function spacingAt(f, rnd, z, elev, lanes, train, surges) {
     const d = difficulty(f);
     // 44 units early, tightening as difficulty rises. The floor is
     // ACTION_WINDOW itself rather than a number chosen to sit near it: the
@@ -522,7 +727,7 @@ MR.Course = (function () {
     // A gate whose deepest lane is a DUCK costs 0.30 of this; a standing BLOCK
     // costs 1.95; a four-span BLOCK train costs 15.99, and pays it rather than
     // being waved through on its gate line.
-    return Math.max(readWindowAt(z, elev) + reachOf(lanes, train),
+    return Math.max(readWindowAt(z, elev, surges) + reachOf(lanes, train),
                     mean * rnd.range(0.84, 1.16));
   }
 
@@ -1026,6 +1231,12 @@ MR.Course = (function () {
     // generator calls both on every gate -- so the ground has to exist before
     // the first gate is placed. Elevation reads nothing back from the course.
     const elevation = MR.Elevation.create(key, elevationPlan());
+    // ...and the surge zones for the same reason and in the same breath. Both
+    // are statements about the ROAD that the gates then have to answer to, and
+    // both are drawn from their own seeded stream so that at EFFORT = 0 (where
+    // planSurge returns an empty list without drawing a number) the course
+    // stream stays in phase and every gate is bit-identical.
+    const surges = planSurge(key);
 
     const rnd = MR.rng.stream(key, 'course/v1');
     const gates = [];
@@ -1091,11 +1302,28 @@ MR.Course = (function () {
               if (closed.indexOf(l) < 0 && cand[l] === K.BLOCK) cand[l] = K.CLEAR;
             }
           }
+          // ---- THE MARKED LANE IS NEVER A WALL ---------------------------
+          //
+          // Last, so it outranks the roll, the carried train and the closure
+          // alike. A surge is elected by taking the marked lane, and the one
+          // thing that must never happen is a player who bought a surge, and
+          // could not see inside it, meeting a lorry they are not allowed to
+          // pass -- that is not risk, it is the game taking a run for a fact it
+          // hid. So the marked lane holds a JUMP or a DUCK instead, drawn from
+          // the same weighted roll every other lane uses with BLOCK off the
+          // table. It stays DEMANDING; it stops being IMPASSABLE. What the
+          // player is buying is the obligation to act rather than dodge.
+          //
+          // Forcing it open can only ADD a lane path, so it cannot cost
+          // solvable() a proof, and it makes the all-BLOCK guard below
+          // unreachable for an in-zone gate rather than merely unlikely.
+          const zn = zoneBody(surges, z);
+          if (zn && cand[zn.lane] === K.BLOCK) cand[zn.lane] = rollHazard(rnd, difficulty(f), false);
           if (cand.every((l) => l === K.BLOCK)) continue;
 
           tally.attempts++;
           const trial = gates.concat([{ z, lanes: cand, f }]);
-          if (solvable(trial, elevation)) { lanes = cand; break; }
+          if (solvable(trial, elevation, surges)) { lanes = cand; break; }
         }
         if (!closed) break;   // pass 0 had no closure to drop, so pass 1 is moot
       }
@@ -1103,6 +1331,12 @@ MR.Course = (function () {
         // Degrade to a guaranteed-safe gate rather than emit something unfair.
         lanes = [K.CLEAR, K.CLEAR, K.CLEAR];
         for (let l = 0; l < 3; l++) if (idx < trainUntil[l]) lanes[l] = K.BLOCK;
+        // The degrade path owes the marked lane the same promise the retry
+        // does, and CLEAR is the right answer here rather than a rolled hazard:
+        // this gate exists because the generator gave up, and a gate it gave up
+        // on should not also be the one that asks the most.
+        const zd = zoneBody(surges, z);
+        if (zd) lanes[zd.lane] = K.CLEAR;
         tally.degraded++;
       }
 
@@ -1111,6 +1345,14 @@ MR.Course = (function () {
       if (span) {
         for (let l = 0; l < 3; l++) {
           if (lanes[l] === K.BLOCK && trainUntil[l] <= idx) {
+            // NO TRAIN CHECK IS NEEDED HERE, and that is worth saying so
+            // nobody adds one back. maybeTrain only offers a lane that is
+            // already BLOCK, and the marked-lane clause in the retry above has
+            // made the marked lane non-BLOCK for every gate within SURGE_BODY
+            // of a zone -- which is the deepest vehicle the game can build. So
+            // a train can no more start under the paint than a standing taxi
+            // can, and both facts come from ONE rule rather than two that have
+            // to be kept in step.
             // Only extend if some other lane survives the whole span.
             const others = [0, 1, 2].filter((x) => x !== l);
             if (others.some((o) => idx >= trainUntil[o])) {
@@ -1194,7 +1436,7 @@ MR.Course = (function () {
       // by the geometry of THAT gate: which kinds it actually stands in the road
       // decides how deep its deepest lane is, and a train's rear face is a long
       // way further forward than its gate line says.
-      z += spacingAt(f, rnd, z, elevation, lanes, span);
+      z += spacingAt(f, rnd, z, elevation, lanes, span, surges);
     }
 
     const mileMarkers = [];
@@ -1204,7 +1446,32 @@ MR.Course = (function () {
     const aid = generateAid(key, gates, ramps);
     const spans = buildSpans(gates, ramps);
     const course = { key, gates, aid, mileMarkers, biomes: BIOMES, length: K.TOTAL_UNITS,
-                     elevation, ramps, spans, tally };
+                     elevation, ramps, spans, surges, tally };
+
+    /**
+     * The zone the runner is in, or null. Read by the renderer to lay the
+     * marking, by the HUD to say a zone is coming, and by main.js every frame
+     * to decide whether the runner has elected the surge.
+     */
+    course.surgeZoneAt = function (z) { return zoneAt(surges, z); };
+
+    /**
+     * THE ELECTION, AND IT IS ONE LINE. A surge is on when the runner is inside
+     * a zone AND in its marked lane. There is no button, no hold and no new
+     * verb: the swipe the player already knows is the whole commitment, which
+     * is why a new control was refused -- every control in this game is a swipe
+     * anywhere on the canvas, so a button sits exactly where a mis-started
+     * swipe lands.
+     *
+     * Not on a roof: a rideable train is a different running surface and the
+     * marking is painted on the road. Trains are kept out of marked lanes at
+     * generation (see the TRAIN_LOOK clause) so this is belt and braces.
+     */
+    course.surgeAt = function (z, lane, onDeck) {
+      if (onDeck) return null;
+      const s = zoneAt(surges, z);
+      return s && s.lane === lane ? s : null;
+    };
 
     /**
      * The vehicle standing in (z, lane), or null.
@@ -1275,7 +1542,7 @@ MR.Course = (function () {
    * conflicts are rejected: two gates closer than ACTION_WINDOW may not demand
    * a jump and a duck back to back on the chosen path.
    */
-  function solvable(gates, elev) {
+  function solvable(gates, elev, surges) {
     if (!gates.length) return true;
     // state: set of (lane, lastAction, lastActionZ) -- collapse by lane+action.
     let states = [];
@@ -1295,10 +1562,10 @@ MR.Course = (function () {
           // already looked one airborne reach forward from there when it built
           // the table. See actionWindowAt.
           if (h !== K.CLEAR && s.act !== K.CLEAR && h !== s.act
-            && g.z - s.z < actionWindowAt(s.z, elev)) continue;
+            && g.z - s.z < actionWindowAt(s.z, elev, surges)) continue;
           const act = h === K.CLEAR ? s.act : h;
           const az = h === K.CLEAR ? s.z : g.z;
-          const tag = l + ':' + act + ':' + (g.z - az < actionWindowAt(az, elev) ? 1 : 0);
+          const tag = l + ':' + act + ':' + (g.z - az < actionWindowAt(az, elev, surges) ? 1 : 0);
           if (seen.has(tag)) continue;
           seen.add(tag);
           next.push({ lane: l, act, z: az });
@@ -1314,6 +1581,7 @@ MR.Course = (function () {
     const errors = [];
     const g = course.gates;
     const elev = course.elevation;
+    const surges = course.surges;
     for (let i = 0; i < g.length; i++) {
       if (g[i].lanes.every((l) => l === K.BLOCK)) errors.push(`gate ${i}: all lanes blocked`);
       if (i > 0 && g[i].z <= g[i - 1].z) errors.push(`gate ${i}: not ordered in z`);
@@ -1330,7 +1598,7 @@ MR.Course = (function () {
       // The epsilon is float slop only -- spacingAt returns this quantity
       // exactly when the floor binds, which late in a course is most gates.
       if (i > 0) {
-        const need = readWindowAt(g[i - 1].z, elev) + reachOf(g[i - 1].lanes, g[i - 1].train);
+        const need = readWindowAt(g[i - 1].z, elev, surges) + reachOf(g[i - 1].lanes, g[i - 1].train);
         if (g[i].z - g[i - 1].z < need - 1e-9) {
           errors.push(`gate ${i}: ${(g[i].z - g[i - 1].z).toFixed(2)} behind gate ${i - 1} `
             + `needs ${need.toFixed(2)} to stay readable past it`);
@@ -1364,7 +1632,51 @@ MR.Course = (function () {
         }
       }
     }
-    if (!solvable(g, elev)) errors.push('course has no solvable lane path');
+    // ---- THE SURGE CONTRACT, PROVED RATHER THAN COMMENTED -----------------
+    //
+    // Three claims are made about a zone in prose above, and prose is what
+    // rule 3 of CLAUDE.md is about. Each is checked here on every course, so
+    // course-test.js at 365 days and calendar.js re-prove them on every run
+    // instead of leaving them to the four days a policy sweep happens to use.
+    //
+    //   1. THE MARKED LANE IS PASSABLE AT EVERY GATE IN THE ZONE. A player who
+    //      bought a surge they could not see inside must never meet a wall in
+    //      the lane they bought.
+    //   2. NO VEHICLE STANDS IN IT ANYWHERE IN THE ZONE, gate line or not.
+    //      Claim 1 is about gate lines; occupiedAt is about the 3.9 to 17.9
+    //      units of solid a BLOCK really is, and the flank is contact now.
+    //   3. THE ENTRY IS READABLE. SURGE_SIGHT units of road before z0, inside
+    //      the course, so the marking has somewhere to be seen from.
+    if (surges && surges.length) {
+      const spans = course.spans;
+      for (const s of surges) {
+        if (s.z0 < SURGE_SIGHT) {
+          errors.push(`surge ${s.n}: starts at ${s.z0.toFixed(0)}, inside its own `
+            + `${SURGE_SIGHT}u sighting distance`);
+        }
+        for (let i = 0; i < g.length; i++) {
+          if (g[i].z < s.z0 || g[i].z >= s.z1) continue;
+          if (g[i].lanes[s.lane] === K.BLOCK) {
+            errors.push(`surge ${s.n}: gate ${i} blocks the marked lane ${s.lane}`);
+          }
+        }
+        if (spans) {
+          for (const sp of (spans[s.lane] || [])) {
+            if (sp.z1 > s.z0 && sp.z0 < s.z1) {
+              errors.push(`surge ${s.n}: a vehicle occupies the marked lane from `
+                + `${sp.z0.toFixed(1)} to ${sp.z1.toFixed(1)}`);
+            }
+          }
+        }
+      }
+      for (let i = 1; i < surges.length; i++) {
+        if (surges[i].z0 - surges[i - 1].z1 < SURGE_SIGHT) {
+          errors.push(`surge ${surges[i].n}: only `
+            + `${(surges[i].z0 - surges[i - 1].z1).toFixed(0)}u after surge ${surges[i - 1].n}`);
+        }
+      }
+    }
+    if (!solvable(g, elev, surges)) errors.push('course has no solvable lane path');
     // The sightline sweep. A profile that hides the road beyond a crest hides
     // the lane telegraph mats with it, which is the same class of failure
     // tools/shoot.js fails a build for when a prop occludes a hazard -- so it
@@ -1384,6 +1696,10 @@ MR.Course = (function () {
            READ_NEAR: ACTION_WINDOW + K.CAM_BASE_BACK, readWindowAt,
            HAZARD_HALF_Z, reachOf,
            DECK_Y, RAMP_RUN, LANE_TRANSIT,
+           // The surge-zone contract, exported so the renderer and the tools
+           // read the numbers from the file that enforces them rather than
+           // restating them. SURGE_SIGHT is the one the art has to build to.
+           SURGE_SIGHT, SURGE_LEN_MIN, SURGE_LEN_MAX, planSurge, windowExtraAt,
            elevationPlan };
 
   // Accessors rather than plain fields, so a nonsense value cannot be written

@@ -15,12 +15,106 @@
 MR.Pace = (function () {
   const K = MR.K;
 
-  function targetPace(streak) {
+  /**
+   * ---- EFFORT: ONE POOL, TWO SPENDS, OPPOSITE TIME PREFERENCES ------------
+   *
+   * A/B scalar on the MR.Runner.POLISH / MR.Course.RAMP pattern, and it obeys
+   * the same rule they do: AT 0 NOTHING IS TOUCHED. Every branch below sits
+   * behind a short-circuiting EFFORT > 0, no seeded stream is drawn from, and
+   * course.js reads this flag rather than keeping a second one -- so the whole
+   * mechanic is one number and tools/mechanics.js --identity can prove the
+   * course is bit-identical at zero.
+   *
+   * WHY IT EXISTS, in the one number that condemned the shipped game: six
+   * distinct policies -- take every bottle, take none, early only, late only,
+   * safe lane, shortest line -- all finish at 1:58:03, spread 0.0 seconds
+   * (docs/risk-reward.md). There is no strategy because there is no decision:
+   * speed is an OUTPUT of one binary skill event, and a system with one input
+   * and a monotone reward has exactly one optimal policy.
+   *
+   * THE SHAPE. Aid stops topping the streak up and fills a small POOL instead.
+   * The pool has two exits and they want opposite halves of the race:
+   *
+   *   GUARD  spent automatically. A contact eats one segment instead of the
+   *          streak. Worth 64 s at 20% of the race and 5 s at 99% -- the
+   *          measured cost of a contact by position, docs/risk-reward.md.
+   *
+   *   SURGE  spent by choosing a lane. Inside a marked zone the pace FLOOR
+   *          drops from EFFORT_FLOOR to SURGE_FLOOR while the runner is in the
+   *          marked lane, and the pool burns while it does.
+   *
+   * AND THE TIME PREFERENCE FALLS OUT OF THE SHIPPED CURVE RATHER THAN BEING
+   * TUNED IN. target(s) = FLOOR + gap*(0.685 e^-s/10 + 0.315 e^-s/100), so
+   * d(target)/d(FLOOR) is 0.285 at streak 5, 0.804 at streak 50 and 0.93 at
+   * streak 150. LOWERING THE FLOOR BUYS ALMOST NOTHING UNTIL THE RAMP IS
+   * SPENT. Measured end to end on real courses: one 600-unit zone is worth
+   * 19.6 s at 5% of the race and 37.1 s at 80% of it.
+   *
+   * So guard is worth most early and surge is worth most late, out of one pool
+   * that is too small to do both, and the player must decide which half of the
+   * race they are buying. That is the strategy the game did not have.
+   *
+   * SPEED STILL HAS EXACTLY ONE SOURCE. Surge does not add pace; it lowers the
+   * floor an unbroken line is running toward. A broken run is nowhere near the
+   * floor and gains almost nothing from surging, which is the same property
+   * AID_CEILING was built to have -- the top gear is still only buyable with a
+   * clean line.
+   */
+  let EFFORT = 0;
+
+  const SURGE = {
+    // The unsurged floor, and it is SLOWER than K.FLOOR_PACE on purpose. The
+    // shipped game hands a flawless run 86 seconds of free margin and six
+    // policies tie inside it; the 86 seconds have to stop being free before
+    // any allocation can matter. 262 s/mi puts a flawless no-surge run 79 s
+    // the WRONG side of the record, measured, so the record has to be bought.
+    //
+    // Costed rather than picked: on real courses each 1 s/mi of floor is worth
+    // 20.7 s of finish time, and the sweep that set this is in the report.
+    FLOOR_BASE: 262,          // 4:22 /mi
+    // The floor while surging. NOT 240: at 4:00/mi the airborne span reaches
+    // exactly ACTION_WINDOW and the invariant that stops a course demanding a
+    // jump and a slide at once is gone (docs/strategy-space.md). At 244 the
+    // span is 20.66 against a window of 21, and course.js widens the window
+    // inside a zone by exactly the difference so the SAME 1.16-unit margin the
+    // flat course keeps today holds inside a surge by construction.
+    FLOOR_SURGE: 244,         // 4:04 /mi
+    // Segments. Three, and the cap is the tension rather than a limit: ~14
+    // items are collectible on one line, so a player who never spends caps out
+    // and wastes eleven of them, and a player who surges makes room to keep
+    // collecting. Holding the pool has a real price and it is the price of the
+    // aid you can no longer store.
+    POOL_MAX: 3,
+    // One segment absorbs one contact whole.
+    GUARD_COST: 1,
+    // World units of marked-lane running per segment. A ~480-unit zone is
+    // therefore 2.4 segments, which is why the cap is 3: you enter a zone with
+    // nearly all of it and leave with nearly none.
+    BURN_UNITS: 200,
+  };
+
+  /** The floor this runner is running toward right now. */
+  function floorPace(surging) {
+    if (EFFORT <= 0) return K.FLOOR_PACE;
+    return surging ? SURGE.FLOOR_SURGE : SURGE.FLOOR_BASE;
+  }
+
+  /** The fastest pace ANY line can reach, which is what a bound must use. */
+  function bestFloor() {
+    return EFFORT > 0 ? SURGE.FLOOR_SURGE : K.FLOOR_PACE;
+  }
+
+  function targetPace(streak, floor) {
     // Two time constants. The fast term pays a weak player early; the slow
     // term is still unwinding at the finish, so late gates keep buying time
     // and a late mistake still costs something. See constants.js.
-    const gap = K.START_PACE - K.FLOOR_PACE;
-    return K.FLOOR_PACE
+    //
+    // `floor` is optional and defaults to the shipped constant, so every
+    // existing caller -- the HUD, the tools, this file's own projection --
+    // reads exactly the curve it read before unless EFFORT is on.
+    const F = floor === undefined ? floorPace(false) : floor;
+    const gap = K.START_PACE - F;
+    return F
       + gap * K.STREAK_FAST_SHARE * Math.exp(-streak / K.STREAK_FAST)
       + gap * (1 - K.STREAK_FAST_SHARE) * Math.exp(-streak / K.STREAK_SLOW);
   }
@@ -60,6 +154,15 @@ MR.Pace = (function () {
       hits: 0,
       gatesSeen: 0,
       aid: 0,
+      // ---- the pool, and it is inert at EFFORT = 0 -----------------------
+      // Every field below stays at its initial value for the whole race when
+      // the flag is off, so the finish time, the streak and the hit count are
+      // bit-identical to the shipped game.
+      pool: 0,           // segments in hand, fractional while a surge burns
+      guards: 0,         // contacts a segment absorbed
+      wasted: 0,         // items collected into a full pool
+      surging: false,    // set by main.js from the runner's lane, read here
+      surgeUnits: 0,     // world units actually run under surge
       finished: false,
       finishTime: 0,
       splits: [],           // race-time at each completed mile
@@ -75,7 +178,13 @@ MR.Pace = (function () {
       s.raceTime += dRace;
 
       // Ease pace toward the streak's target.
-      const tgt = targetPace(s.streak);
+      //
+      // THE ONLY LINE THE SURGE CHANGES. It swaps the floor the target is
+      // built on, and nothing else: the easing law, the grade term and the
+      // integration are untouched, so the pace still moves at PACE_EASE and a
+      // surge is felt as a burn rather than as a teleport. At EFFORT = 0
+      // floorPace() returns K.FLOOR_PACE and this is the shipped expression.
+      const tgt = targetPace(s.streak, floorPace(s.surging));
       const d = tgt - s.pace;
       const step = K.PACE_EASE * dRace;
       s.pace += Math.abs(d) <= step ? d : Math.sign(d) * step;
@@ -108,6 +217,19 @@ MR.Pace = (function () {
 
       const dUnits = dMiles * K.UNITS_PER_MILE;
       s.units += dUnits;
+
+      // ---- the burn -------------------------------------------------------
+      // Charged over GROUND rather than over time, so a surge costs the same
+      // whatever the hill under it is doing and a descent inside a zone cannot
+      // be used to buy the same road for less. Draining the pool ends the
+      // surge on the spot; the pace then eases back up under the same law,
+      // which is the honest and legible failure -- the player is shown the
+      // tank empty and feels the gear go.
+      if (EFFORT > 0 && s.surging && dUnits > 0) {
+        s.pool -= dUnits / SURGE.BURN_UNITS;
+        s.surgeUnits += dUnits;
+        if (s.pool <= 0) { s.pool = 0; s.surging = false; }
+      }
       return dUnits;
     };
 
@@ -117,11 +239,38 @@ MR.Pace = (function () {
       if (s.streak > s.bestStreak) s.bestStreak = s.streak;
     };
 
+    /**
+     * Contact.
+     *
+     * ---- GUARD IS SPENT HERE AND NOWHERE ELSE, AND IT TAKES NO INPUT ------
+     *
+     * The safety net cashing itself. If there is a segment in the pool it is
+     * spent and the streak is not cut and no seconds are added -- the contact
+     * still HAPPENED, and player.js still bounces, trips and stumbles for it,
+     * because a guard that also deleted the physical event would read as the
+     * collision not registering. What is bought is the consequence, not the
+     * moment.
+     *
+     * It is counted separately rather than folded into `hits`: a guarded
+     * contact is a different fact about a run from an unguarded one and the
+     * finish card, the tools and the policy sweep all need to tell them apart.
+     * `gatesSeen` still advances, because a gate was still seen -- that bound
+     * is what stops aid handing a broken run a streak it never ran for.
+     *
+     * @returns 'guard' when a segment paid for it, otherwise 'hit'.
+     */
     s.onHit = function () {
-      s.hits++;
       s.gatesSeen++;
+      if (EFFORT > 0 && s.pool >= SURGE.GUARD_COST) {
+        s.pool -= SURGE.GUARD_COST;
+        s.guards++;
+        if (s.pool <= 0) { s.pool = 0; s.surging = false; }
+        return 'guard';
+      }
+      s.hits++;
       s.streak = Math.floor(s.streak * K.HIT_STREAK_KEEP);
       s.raceTime += K.HIT_TIME_PENALTY;
+      return 'hit';
     };
 
     /**
@@ -131,6 +280,25 @@ MR.Pace = (function () {
      * great deal to a broken run and almost nothing to a clean one.
      */
     s.onAid = function (gain) {
+      // ---- UNDER EFFORT A BOTTLE IS A SEGMENT, NOT A REBATE ---------------
+      //
+      // This is the change that ends "aid is worth exactly 0.00 s to a clean
+      // run and rises with damage" -- insurance with no premium, and the
+      // reason there was nothing to decide. The bottle no longer repairs a
+      // streak; it fills a pool with two rival uses, and the pool is capped,
+      // so an item collected into a full tank is genuinely thrown away. That
+      // waste is the price of holding, and holding is now a choice.
+      //
+      // `gain` is deliberately ignored: a segment is a segment, so the gauge
+      // can be counted rather than read. What water and fruit still differ in
+      // is where the course puts them, which generateAid already decides and
+      // this pass does not touch.
+      if (EFFORT > 0) {
+        s.aid++;
+        if (s.pool >= SURGE.POOL_MAX) { s.wasted++; return; }
+        s.pool = Math.min(SURGE.POOL_MAX, s.pool + 1);
+        return;
+      }
       // Three bounds, and each one is doing a job.
       //
       //   + gain        a bottle is worth something.
@@ -237,7 +405,13 @@ MR.Pace = (function () {
         const dRace = dm * pace;
 
         // Same easing law as update(), applied over that span.
-        const tgt = targetPace(streak);
+        //
+        // AT THE UNSURGED FLOOR, DELIBERATELY. "If you stay clean" is the
+        // question this answers, and staying clean is not the same promise as
+        // spending the rest of the pool on surge -- a projection that assumed
+        // the surge would print a finish the player has not bought yet, which
+        // is the exact defect projected() was replaced for.
+        const tgt = targetPace(streak, floorPace(false));
         const d = tgt - pace;
         const step = K.PACE_EASE * dRace;
         pace += Math.abs(d) <= step ? d : Math.sign(d) * step;
@@ -261,8 +435,15 @@ MR.Pace = (function () {
       return (K.RECORD_SECONDS - s.raceTime) / left;
     };
 
+    /**
+     * bestFloor(), not K.FLOOR_PACE, and the distinction only exists under
+     * EFFORT: the fastest pace any line can reach is the SURGE floor, so a
+     * bound built on the unsurged one would call a record dead while the
+     * player still had the pool to buy it. A bound may be loose. It may not be
+     * wrong in the direction that takes a live run away.
+     */
     s.recordPossible = function () {
-      return s.needPace() > K.FLOOR_PACE;
+      return s.needPace() > bestFloor();
     };
 
     /** Where the record ghost is right now, in miles. */
@@ -270,7 +451,10 @@ MR.Pace = (function () {
       return Math.min(K.MARATHON_MILES, s.raceTime / K.RECORD_PACE);
     };
 
-    s.targetPace = () => targetPace(s.streak);
+    s.targetPace = () => targetPace(s.streak, floorPace(s.surging));
+
+    /** Whole segments in hand -- what the gauge counts and guard spends. */
+    s.segments = function () { return Math.floor(s.pool); };
 
     return s;
   }
@@ -308,5 +492,14 @@ MR.Pace = (function () {
     return `${sign}${m}:${s.toFixed(1).padStart(4, '0')}`;
   }
 
-  return { create, targetPace, clock, pace, delta };
+  const api = { create, targetPace, clock, pace, delta, SURGE, floorPace, bestFloor };
+
+  // Accessor rather than a plain field, so a nonsense value cannot be written
+  // and the clamp lives with the flag. Same shape as MR.Course.RAMP.
+  Object.defineProperty(api, 'EFFORT', {
+    get: function () { return EFFORT; },
+    set: function (v) { const n = parseFloat(v); if (isFinite(n)) EFFORT = Math.max(0, Math.min(1, n)); },
+  });
+
+  return api;
 })();

@@ -65,13 +65,29 @@ MR.Pace = (function () {
   const SURGE = {
     // The unsurged floor, and it is SLOWER than K.FLOOR_PACE on purpose. The
     // shipped game hands a flawless run 86 seconds of free margin and six
-    // policies tie inside it; the 86 seconds have to stop being free before
-    // any allocation can matter. 262 s/mi puts a flawless no-surge run 79 s
-    // the WRONG side of the record, measured, so the record has to be bought.
+    // policies tie inside it; the 86 seconds have to stop being free before any
+    // allocation can matter. At 261 a flawless line that spends NOTHING
+    // finishes 2:00:26 -- 56 s the wrong side of the record -- so the record
+    // has to be bought rather than merely survived.
     //
-    // Costed rather than picked: on real courses each 1 s/mi of floor is worth
-    // 20.7 s of finish time, and the sweep that set this is in the report.
-    FLOOR_BASE: 262,          // 4:22 /mi
+    // SWEPT, NOT PICKED. Each 1 s/mi of floor is worth 20.7 s of finish time on
+    // real courses, and the three candidates were run through the whole
+    // policy x skill grid (10 policies x 5 skills x 8 dates x 14 seeds, worst
+    // standard error 7.0 s):
+    //
+    //   262   3 of 50 cells beat the record ( 6%) -- only a FLAWLESS run that
+    //         surged everything got under, so the allocation had one answer and
+    //         the record was a lottery on execution.
+    //   261  13 of 50 (26%), first-attempt 5 of 20 (25%). Non-spending policies
+    //         never get under at any skill; every spending policy is within 30 s
+    //         of the line; the worst spending policy (EARLY) is 17 s behind the
+    //         best (LATE) at equal skill.
+    //   260  28 of 50 (56%), and seven of ten policies beat it at perfect. The
+    //         allocation stops being a decision because nearly everything wins.
+    //
+    // 261 is the value at which BOTH halves of the owner's sentence hold: a
+    // stranger does not walk it, and more than one line gets there.
+    FLOOR_BASE: 261,          // 4:22 /mi
     // The floor while surging. NOT 240: at 4:00/mi the airborne span reaches
     // exactly ACTION_WINDOW and the invariant that stops a course demanding a
     // jump and a slide at once is gone (docs/strategy-space.md). At 244 the
@@ -79,18 +95,39 @@ MR.Pace = (function () {
     // inside a zone by exactly the difference so the SAME 1.16-unit margin the
     // flat course keeps today holds inside a surge by construction.
     FLOOR_SURGE: 244,         // 4:04 /mi
-    // Segments. Three, and the cap is the tension rather than a limit: ~14
-    // items are collectible on one line, so a player who never spends caps out
-    // and wastes eleven of them, and a player who surges makes room to keep
-    // collecting. Holding the pool has a real price and it is the price of the
-    // aid you can no longer store.
-    POOL_MAX: 3,
+    // Segments. FOUR, and it is set by the longest zone rather than chosen:
+    // SURGE_LEN_MAX is 560 units and BURN_UNITS is 140, so a full tank is
+    // exactly one maximum-length zone. A smaller cap would make the longest
+    // zones unbuyable however well a player had allocated, which is a cap
+    // secretly editing the course.
+    POOL_MAX: 4,
     // One segment absorbs one contact whole.
     GUARD_COST: 1,
-    // World units of marked-lane running per segment. A ~480-unit zone is
-    // therefore 2.4 segments, which is why the cap is 3: you enter a zone with
-    // nearly all of it and leave with nearly none.
-    BURN_UNITS: 200,
+    // ---- THE ONE NUMBER THAT DECIDES WHETHER THERE IS AN ALLOCATION -------
+    //
+    // World units of marked-lane running per segment. It is set by making the
+    // pool BIND, and the first value it was given did not:
+    //
+    //   zones on a course      2205 units
+    //   collectible road aid   13.7 items, i.e. 13.7 segments
+    //
+    //   1 per 200u   surging EVERY zone costs 11.0 segments -- a 2.7 surplus,
+    //                so the pool never binds, "surge everything" is affordable
+    //                AND leaves change for guard, and it dominates every
+    //                selective policy. Measured: BLIND beat the record at 4 of
+    //                5 skill levels and every learned policy lost. One optimal
+    //                policy again, one level up.
+    //   1 per 140u   surging every zone costs 15.7 segments against 13.7. You
+    //                can afford about seven eighths of the road, and only by
+    //                spending the guard. Now WHICH zones you buy is the
+    //                decision, and because lowering the floor is worth 0.285x
+    //                at streak 5 and 0.93x at streak 150, the late ones are
+    //                worth nearly twice the early ones.
+    //
+    // So 140, and the surplus is deliberately negative. A player cannot buy
+    // the whole course and cannot insure the whole course, and the pool is
+    // filled by the one thing that already costs an action to reach.
+    BURN_UNITS: 140,
   };
 
   /** The floor this runner is running toward right now. */

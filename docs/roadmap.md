@@ -4793,7 +4793,8 @@ nobody measured is worse than no number at all.**
     every number above is from that.
 
 66. **The telegraph mat changes no lane judgement in a real three-lane gate --
-    42 of 48 with it against 47 of 51 without, at 25.35 AND 32 units -- but the
+    60 of 66 with it against 62 of 66 without, identical at 25.35 AND 32
+    units -- but the
     reason is not that it is uninformative. Two readers decoded its colour code
     unprompted, one used it to learn WHICH LOW OBJECTS ARE JUMPABLE and carried
     that to the unpainted panels, and the reader who refused it read jumpable
@@ -4817,9 +4818,11 @@ nobody measured is worse than no number at all.**
     built the access gantry, the floodlight gantry and the girder underbridge.
     **No panel it shot could have contained a `DUCK v5`, `v6` or `v7`.** This
     pass drew five of them mechanically. Answer: **`v5` 6/6, `v6` 6/6, `v7`
-    3/3 -- the three new DUCKs read exactly as well as the established five,
-    and DUCK overall is 39 of 39 in both arms at both distances.** `BLOCK` is
-    21 of 21 including `v9`, the low moped.
+    4/4 -- the three new DUCKs read exactly as well as the established five,
+    20 of 20 against 32 of 32, and DUCK overall is 52 of 52 in both arms at
+    both distances.** `BLOCK` is 28 of 28, every variant including `v9` the low
+    moped, and `BLOCK v3` -- the variant entry 61 caught reading OVER -- is 8
+    of 8.
 
     ### THE STALE ARTEFACT, WHICH WOULD HAVE MEASURED THE WRONG FLEET
 
@@ -4858,8 +4861,8 @@ nobody measured is worse than no number at all.**
     Controlled two ways rather than hoped away: the prompt now anchors
     lane-finding on the broken lane lines, which are separate quads from the
     mats and **survive in the NOMAT arm**; and rotations are counted
-    separately. Result: **9 panels not exactly right, 0 of them rotations.**
-    The defect is real and it did not bite.
+    separately. Result over all 64 panels: **9 not exactly right, 0 of them
+    rotations.** The defect is real and it did not bite.
 
     ### A LEAK CHANNEL NOBODY HAD CHECKED
 
@@ -4894,25 +4897,36 @@ nobody measured is worse than no number at all.**
     ### THE ONE LEGIBILITY PROBLEM FOUND, AND IT IS NOT THE MAT
 
     All ten errors in the whole test are **OVER read as AROUND, on JUMP**,
-    across five variants, at both distances, from one reader. Its language is
+    across five variants, at both distances, from one reader in four. Its language is
     constant -- *"chest high"*, *"well above waist height"*, *"solid to the
     ground"*. `MR.Collision.BOX` is the contract and art never decides
     clearance, but art is all a player judges by, and **one reader in three
     judged the art of a JUMP impassable.** That belongs to whoever owns the
     JUMP fleet.
 
+    The ten losses are spread across the kind rather than concentrated:
+    `v0` 3/4, `v1` 6/8, `v2` 9/12, `v4` 9/12, `v5` 3/4 -- and **`v3` alone is
+    12 of 12**, untouched by any reader. So it is a threshold put in the wrong
+    place, not one bad object, and `v3` is the shape that never triggered it.
+
     **It never cost a run.** Reading a JUMP as a wall makes you avoid a lane
-    you could have used, so **lane choice is 48 of 48 viable, 100% in both arms
-    at both distances.** Nobody ever picked a lane that ends a record attempt.
+    you could have used, so **lane choice is 64 of 64 viable, 16 of 16 in every
+    one of the four conditions.** Nobody ever picked a lane that ends a record
+    attempt, in either arm, at either distance.
 
     ### CONFIDENCE, AND THE ONE-READER TRAP SPRUNG AGAIN
 
     Reader A alone read as a result: **8 of 8 sure with the mat, 4 of 8
-    without.** Reader B is the reverse, **4 of 8 against 7 of 8**. Pooled it is
-    12 of 16 against 11 of 16, which is nothing. **Had this pass stopped at one
-    reader it would have reported that mats make players surer and been
-    wrong**, which is precisely what the previous pass did and precisely what
-    the within-reader design exists to catch.
+    without.** With all four in it splits **two readers each way** -- A and C
+    surer with the mat, B and D surer without -- and pools to **24 of 32
+    against 23 of 32**, one cell of difference in 64.
+
+    **Stopping at reader A would have reported that mats make players surer,
+    which is the previous pass's exact error. Stopping at reader B would have
+    reported the opposite with equal conviction.** Within-reader
+    counterbalancing did not rescue this on its own; it took the FOURTH reader
+    to make the split unambiguous. Two readers is not a control for
+    temperament, it is a coin.
 
     ### THE FADE
 

@@ -42,9 +42,9 @@ why in their own words.** Two of the three decoded the mat's colour code
 correctly from the pictures alone, with nobody telling them. One then used it
 to settle *which low objects are jumpable* and carried that to the unpainted
 panels. The one who refused it went on to read jumpable hurdles as walls ten
-times — **naming the gold paint in the same sentence in which he contradicted
-it.** So the mat's demonstrated job is **teaching the object, once**, not
-answering the question at every gate.
+times — **naming the gold paint in the same sentence in which it contradicted
+that paint.** So the mat's demonstrated job is **teaching the object, once**,
+not answering the question at every gate.
 
 **On the fade, the honest recommendation is: fade OUT on approach — but for a
 reason the proposal did not give, and only down to the decision distance.**
@@ -54,8 +54,10 @@ reason the proposal did not give, and only down to the decision distance.**
   read. It just changes nothing for a reader who already reads the object.
 - At `READ_NEAR` the mat is 1,710 px per lane and fully legible; at 8 units it
   is **17.45× heavier**, and by 8 units the lane was chosen long ago.
-- So the paint that can be spent is the paint **inside 25 units**, which is
-  where 94% of it lives and where it buys the least.
+- So the paint that can be spent is the paint **inside 25 units**. Put
+  precisely: of the mat pixels drawn for one lane at 8 u and at `READ_NEAR`
+  together, **94.6% of them are drawn at 8 u** (29,830 of 31,540) — and that is
+  the share that buys the least, because the lane was chosen at `READ_NEAR`.
 
 **What the evidence does not support is removing or thinning the mat at the
 decision distance or beyond it**, because that is where the teaching happens

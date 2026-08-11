@@ -273,6 +273,34 @@ html, body {
       rgba(14, 18, 48, 0.55) calc(12.5% - 1px) 12.5%);
 }
 .gauge.tank .gaugeFill { opacity: 0.92; }
+/* FOUR divisions, not eight, and the number is MR.Pace.SURGE.POOL_MAX. The
+   whole point of the pool reading as segments is that a player can count what
+   they have without reading a number, and eight notches is not a count, it is
+   a texture. */
+.gauge.tank.pool {
+  background:
+    repeating-linear-gradient(90deg,
+      rgba(255, 253, 245, 0.13) 0 calc(25% - 1px),
+      rgba(14, 18, 48, 0.55) calc(25% - 1px) 25%);
+}
+/* The pace, demoted from the fill to a hairline on the same bar. Warmer and
+   thinner than the record tick so the two cannot be confused: the tick is a
+   fixed target and the hairline is you. */
+.gaugePace {
+  position: absolute; top: -2px; bottom: -2px; width: 1px;
+  background: var(--accent); opacity: 0.85;
+  box-shadow: 0 0 0 1px rgba(14, 18, 48, 0.7);
+  display: none;
+}
+.gauge.pool .gaugePace { display: block; }
+/* Surging. The tank is being spent, so it says so -- and it says so on the
+   PLATE as well as the bar, because the player's eyes are on the road and a
+   14px bar is not where a state change gets noticed. */
+#engine.surging { border-left-color: var(--ahead); }
+.gauge.tank.surging .gaugeFill { background: var(--ahead); }
+/* A guarded contact. The engine's own colour, not the loss colour: nothing was
+   lost. Short, because it is a reassurance and not an alarm. */
+#engine.guarded { border-left-color: var(--ahead); background: rgba(14, 48, 38, 0.8); }
 .gaugeFill { position: absolute; inset: 0 auto 0 0; background: var(--accent); width: 0; }
 /* Record pace as a mark on the range you are unlocking: once the fill passes
  * it, you are running faster than 1:59:30 needs. */
@@ -2005,12 +2033,147 @@ MR.Elevation = (function () {
 MR.Pace = (function () {
   const K = MR.K;
 
-  function targetPace(streak) {
+  /**
+   * ---- EFFORT: ONE POOL, TWO SPENDS, OPPOSITE TIME PREFERENCES ------------
+   *
+   * A/B scalar on the MR.Runner.POLISH / MR.Course.RAMP pattern, and it obeys
+   * the same rule they do: AT 0 NOTHING IS TOUCHED. Every branch below sits
+   * behind a short-circuiting EFFORT > 0, no seeded stream is drawn from, and
+   * course.js reads this flag rather than keeping a second one -- so the whole
+   * mechanic is one number and tools/mechanics.js --identity can prove the
+   * course is bit-identical at zero.
+   *
+   * WHY IT EXISTS, in the one number that condemned the shipped game: six
+   * distinct policies -- take every bottle, take none, early only, late only,
+   * safe lane, shortest line -- all finish at 1:58:03, spread 0.0 seconds
+   * (docs/risk-reward.md). There is no strategy because there is no decision:
+   * speed is an OUTPUT of one binary skill event, and a system with one input
+   * and a monotone reward has exactly one optimal policy.
+   *
+   * THE SHAPE. Aid stops topping the streak up and fills a small POOL instead.
+   * The pool has two exits and they want opposite halves of the race:
+   *
+   *   GUARD  spent automatically. A contact eats one segment instead of the
+   *          streak. Worth 64 s at 20% of the race and 5 s at 99% -- the
+   *          measured cost of a contact by position, docs/risk-reward.md.
+   *
+   *   SURGE  spent by choosing a lane. Inside a marked zone the pace FLOOR
+   *          drops from EFFORT_FLOOR to SURGE_FLOOR while the runner is in the
+   *          marked lane, and the pool burns while it does.
+   *
+   * AND THE TIME PREFERENCE FALLS OUT OF THE SHIPPED CURVE RATHER THAN BEING
+   * TUNED IN. target(s) = FLOOR + gap*(0.685 e^-s/10 + 0.315 e^-s/100), so
+   * d(target)/d(FLOOR) is 0.285 at streak 5, 0.804 at streak 50 and 0.93 at
+   * streak 150. LOWERING THE FLOOR BUYS ALMOST NOTHING UNTIL THE RAMP IS
+   * SPENT. Measured end to end on real courses: one 600-unit zone is worth
+   * 19.6 s at 5% of the race and 37.1 s at 80% of it.
+   *
+   * So guard is worth most early and surge is worth most late, out of one pool
+   * that is too small to do both, and the player must decide which half of the
+   * race they are buying. That is the strategy the game did not have.
+   *
+   * SPEED STILL HAS EXACTLY ONE SOURCE. Surge does not add pace; it lowers the
+   * floor an unbroken line is running toward. A broken run is nowhere near the
+   * floor and gains almost nothing from surging, which is the same property
+   * AID_CEILING was built to have -- the top gear is still only buyable with a
+   * clean line.
+   */
+  // SHIPS AT 1, exactly as MR.Course.RAMP does, and for the reason the owner
+  // gave: the game as it stood could be beaten on a first attempt by six
+  // different lines that all finished within 0.0 seconds of each other. This IS
+  // the game now. ?effort=0 returns the other one, whole, from the same build.
+  let EFFORT = 1;
+
+  const SURGE = {
+    // The unsurged floor, and it is SLOWER than K.FLOOR_PACE on purpose. The
+    // shipped game hands a flawless run 86 seconds of free margin and six
+    // policies tie inside it; the 86 seconds have to stop being free before any
+    // allocation can matter. At 261 a flawless line that spends NOTHING
+    // finishes 2:00:26 -- 56 s the wrong side of the record -- so the record
+    // has to be bought rather than merely survived.
+    //
+    // SWEPT, NOT PICKED. Each 1 s/mi of floor is worth 20.7 s of finish time on
+    // real courses, and the three candidates were run through the whole
+    // policy x skill grid (10 policies x 5 skills x 8 dates x 14 seeds, worst
+    // standard error 7.0 s):
+    //
+    //   262   3 of 50 cells beat the record ( 6%) -- only a FLAWLESS run that
+    //         surged everything got under, so the allocation had one answer and
+    //         the record was a lottery on execution.
+    //   261  13 of 50 (26%), first-attempt 5 of 20 (25%). Non-spending policies
+    //         never get under at any skill; every spending policy is within 30 s
+    //         of the line; the worst spending policy (EARLY) is 17 s behind the
+    //         best (LATE) at equal skill.
+    //   260  28 of 50 (56%), and seven of ten policies beat it at perfect. The
+    //         allocation stops being a decision because nearly everything wins.
+    //
+    // 261 is the value at which BOTH halves of the owner's sentence hold: a
+    // stranger does not walk it, and more than one line gets there.
+    FLOOR_BASE: 261,          // 4:22 /mi
+    // The floor while surging. NOT 240: at 4:00/mi the airborne span reaches
+    // exactly ACTION_WINDOW and the invariant that stops a course demanding a
+    // jump and a slide at once is gone (docs/strategy-space.md). At 244 the
+    // span is 20.66 against a window of 21, and course.js widens the window
+    // inside a zone by exactly the difference so the SAME 1.16-unit margin the
+    // flat course keeps today holds inside a surge by construction.
+    FLOOR_SURGE: 244,         // 4:04 /mi
+    // Segments. FOUR, and it is set by the longest zone rather than chosen:
+    // SURGE_LEN_MAX is 560 units and BURN_UNITS is 140, so a full tank is
+    // exactly one maximum-length zone. A smaller cap would make the longest
+    // zones unbuyable however well a player had allocated, which is a cap
+    // secretly editing the course.
+    POOL_MAX: 4,
+    // One segment absorbs one contact whole.
+    GUARD_COST: 1,
+    // ---- THE ONE NUMBER THAT DECIDES WHETHER THERE IS AN ALLOCATION -------
+    //
+    // World units of marked-lane running per segment. It is set by making the
+    // pool BIND, and the first value it was given did not:
+    //
+    //   zones on a course      2205 units
+    //   collectible road aid   13.7 items, i.e. 13.7 segments
+    //
+    //   1 per 200u   surging EVERY zone costs 11.0 segments -- a 2.7 surplus,
+    //                so the pool never binds, "surge everything" is affordable
+    //                AND leaves change for guard, and it dominates every
+    //                selective policy. Measured: BLIND beat the record at 4 of
+    //                5 skill levels and every learned policy lost. One optimal
+    //                policy again, one level up.
+    //   1 per 140u   surging every zone costs 15.7 segments against 13.7. You
+    //                can afford about seven eighths of the road, and only by
+    //                spending the guard. Now WHICH zones you buy is the
+    //                decision, and because lowering the floor is worth 0.285x
+    //                at streak 5 and 0.93x at streak 150, the late ones are
+    //                worth nearly twice the early ones.
+    //
+    // So 140, and the surplus is deliberately negative. A player cannot buy
+    // the whole course and cannot insure the whole course, and the pool is
+    // filled by the one thing that already costs an action to reach.
+    BURN_UNITS: 140,
+  };
+
+  /** The floor this runner is running toward right now. */
+  function floorPace(surging) {
+    if (EFFORT <= 0) return K.FLOOR_PACE;
+    return surging ? SURGE.FLOOR_SURGE : SURGE.FLOOR_BASE;
+  }
+
+  /** The fastest pace ANY line can reach, which is what a bound must use. */
+  function bestFloor() {
+    return EFFORT > 0 ? SURGE.FLOOR_SURGE : K.FLOOR_PACE;
+  }
+
+  function targetPace(streak, floor) {
     // Two time constants. The fast term pays a weak player early; the slow
     // term is still unwinding at the finish, so late gates keep buying time
     // and a late mistake still costs something. See constants.js.
-    const gap = K.START_PACE - K.FLOOR_PACE;
-    return K.FLOOR_PACE
+    //
+    // `floor` is optional and defaults to the shipped constant, so every
+    // existing caller -- the HUD, the tools, this file's own projection --
+    // reads exactly the curve it read before unless EFFORT is on.
+    const F = floor === undefined ? floorPace(false) : floor;
+    const gap = K.START_PACE - F;
+    return F
       + gap * K.STREAK_FAST_SHARE * Math.exp(-streak / K.STREAK_FAST)
       + gap * (1 - K.STREAK_FAST_SHARE) * Math.exp(-streak / K.STREAK_SLOW);
   }
@@ -2050,6 +2213,15 @@ MR.Pace = (function () {
       hits: 0,
       gatesSeen: 0,
       aid: 0,
+      // ---- the pool, and it is inert at EFFORT = 0 -----------------------
+      // Every field below stays at its initial value for the whole race when
+      // the flag is off, so the finish time, the streak and the hit count are
+      // bit-identical to the shipped game.
+      pool: 0,           // segments in hand, fractional while a surge burns
+      guards: 0,         // contacts a segment absorbed
+      wasted: 0,         // items collected into a full pool
+      surging: false,    // set by main.js from the runner's lane, read here
+      surgeUnits: 0,     // world units actually run under surge
       finished: false,
       finishTime: 0,
       splits: [],           // race-time at each completed mile
@@ -2065,7 +2237,13 @@ MR.Pace = (function () {
       s.raceTime += dRace;
 
       // Ease pace toward the streak's target.
-      const tgt = targetPace(s.streak);
+      //
+      // THE ONLY LINE THE SURGE CHANGES. It swaps the floor the target is
+      // built on, and nothing else: the easing law, the grade term and the
+      // integration are untouched, so the pace still moves at PACE_EASE and a
+      // surge is felt as a burn rather than as a teleport. At EFFORT = 0
+      // floorPace() returns K.FLOOR_PACE and this is the shipped expression.
+      const tgt = targetPace(s.streak, floorPace(s.surging));
       const d = tgt - s.pace;
       const step = K.PACE_EASE * dRace;
       s.pace += Math.abs(d) <= step ? d : Math.sign(d) * step;
@@ -2098,6 +2276,19 @@ MR.Pace = (function () {
 
       const dUnits = dMiles * K.UNITS_PER_MILE;
       s.units += dUnits;
+
+      // ---- the burn -------------------------------------------------------
+      // Charged over GROUND rather than over time, so a surge costs the same
+      // whatever the hill under it is doing and a descent inside a zone cannot
+      // be used to buy the same road for less. Draining the pool ends the
+      // surge on the spot; the pace then eases back up under the same law,
+      // which is the honest and legible failure -- the player is shown the
+      // tank empty and feels the gear go.
+      if (EFFORT > 0 && s.surging && dUnits > 0) {
+        s.pool -= dUnits / SURGE.BURN_UNITS;
+        s.surgeUnits += dUnits;
+        if (s.pool <= 0) { s.pool = 0; s.surging = false; }
+      }
       return dUnits;
     };
 
@@ -2107,11 +2298,38 @@ MR.Pace = (function () {
       if (s.streak > s.bestStreak) s.bestStreak = s.streak;
     };
 
+    /**
+     * Contact.
+     *
+     * ---- GUARD IS SPENT HERE AND NOWHERE ELSE, AND IT TAKES NO INPUT ------
+     *
+     * The safety net cashing itself. If there is a segment in the pool it is
+     * spent and the streak is not cut and no seconds are added -- the contact
+     * still HAPPENED, and player.js still bounces, trips and stumbles for it,
+     * because a guard that also deleted the physical event would read as the
+     * collision not registering. What is bought is the consequence, not the
+     * moment.
+     *
+     * It is counted separately rather than folded into `hits`: a guarded
+     * contact is a different fact about a run from an unguarded one and the
+     * finish card, the tools and the policy sweep all need to tell them apart.
+     * `gatesSeen` still advances, because a gate was still seen -- that bound
+     * is what stops aid handing a broken run a streak it never ran for.
+     *
+     * @returns 'guard' when a segment paid for it, otherwise 'hit'.
+     */
     s.onHit = function () {
-      s.hits++;
       s.gatesSeen++;
+      if (EFFORT > 0 && s.pool >= SURGE.GUARD_COST) {
+        s.pool -= SURGE.GUARD_COST;
+        s.guards++;
+        if (s.pool <= 0) { s.pool = 0; s.surging = false; }
+        return 'guard';
+      }
+      s.hits++;
       s.streak = Math.floor(s.streak * K.HIT_STREAK_KEEP);
       s.raceTime += K.HIT_TIME_PENALTY;
+      return 'hit';
     };
 
     /**
@@ -2121,6 +2339,25 @@ MR.Pace = (function () {
      * great deal to a broken run and almost nothing to a clean one.
      */
     s.onAid = function (gain) {
+      // ---- UNDER EFFORT A BOTTLE IS A SEGMENT, NOT A REBATE ---------------
+      //
+      // This is the change that ends "aid is worth exactly 0.00 s to a clean
+      // run and rises with damage" -- insurance with no premium, and the
+      // reason there was nothing to decide. The bottle no longer repairs a
+      // streak; it fills a pool with two rival uses, and the pool is capped,
+      // so an item collected into a full tank is genuinely thrown away. That
+      // waste is the price of holding, and holding is now a choice.
+      //
+      // `gain` is deliberately ignored: a segment is a segment, so the gauge
+      // can be counted rather than read. What water and fruit still differ in
+      // is where the course puts them, which generateAid already decides and
+      // this pass does not touch.
+      if (EFFORT > 0) {
+        s.aid++;
+        if (s.pool >= SURGE.POOL_MAX) { s.wasted++; return; }
+        s.pool = Math.min(SURGE.POOL_MAX, s.pool + 1);
+        return;
+      }
       // Three bounds, and each one is doing a job.
       //
       //   + gain        a bottle is worth something.
@@ -2227,7 +2464,13 @@ MR.Pace = (function () {
         const dRace = dm * pace;
 
         // Same easing law as update(), applied over that span.
-        const tgt = targetPace(streak);
+        //
+        // AT THE UNSURGED FLOOR, DELIBERATELY. "If you stay clean" is the
+        // question this answers, and staying clean is not the same promise as
+        // spending the rest of the pool on surge -- a projection that assumed
+        // the surge would print a finish the player has not bought yet, which
+        // is the exact defect projected() was replaced for.
+        const tgt = targetPace(streak, floorPace(false));
         const d = tgt - pace;
         const step = K.PACE_EASE * dRace;
         pace += Math.abs(d) <= step ? d : Math.sign(d) * step;
@@ -2251,8 +2494,15 @@ MR.Pace = (function () {
       return (K.RECORD_SECONDS - s.raceTime) / left;
     };
 
+    /**
+     * bestFloor(), not K.FLOOR_PACE, and the distinction only exists under
+     * EFFORT: the fastest pace any line can reach is the SURGE floor, so a
+     * bound built on the unsurged one would call a record dead while the
+     * player still had the pool to buy it. A bound may be loose. It may not be
+     * wrong in the direction that takes a live run away.
+     */
     s.recordPossible = function () {
-      return s.needPace() > K.FLOOR_PACE;
+      return s.needPace() > bestFloor();
     };
 
     /** Where the record ghost is right now, in miles. */
@@ -2260,7 +2510,10 @@ MR.Pace = (function () {
       return Math.min(K.MARATHON_MILES, s.raceTime / K.RECORD_PACE);
     };
 
-    s.targetPace = () => targetPace(s.streak);
+    s.targetPace = () => targetPace(s.streak, floorPace(s.surging));
+
+    /** Whole segments in hand -- what the gauge counts and guard spends. */
+    s.segments = function () { return Math.floor(s.pool); };
 
     return s;
   }
@@ -2298,7 +2551,16 @@ MR.Pace = (function () {
     return `${sign}${m}:${s.toFixed(1).padStart(4, '0')}`;
   }
 
-  return { create, targetPace, clock, pace, delta };
+  const api = { create, targetPace, clock, pace, delta, SURGE, floorPace, bestFloor };
+
+  // Accessor rather than a plain field, so a nonsense value cannot be written
+  // and the clamp lives with the flag. Same shape as MR.Course.RAMP.
+  Object.defineProperty(api, 'EFFORT', {
+    get: function () { return EFFORT; },
+    set: function (v) { const n = parseFloat(v); if (isFinite(n)) EFFORT = Math.max(0, Math.min(1, n)); },
+  });
+
+  return api;
 })();
 
 /* ==================== src/core/course.js ==================== */
@@ -2364,7 +2626,18 @@ MR.Course = (function () {
    * roof is one more way through on top. solvable() therefore needs no change
    * at all and is not given one -- see the note above it.
    */
-  let NARROW = 0;
+  // LANE CLOSURE IS ON. It shipped built, proved and switched off, and the
+  // case for turning it on was re-measured on today's build over all 365 days
+  // rather than taken from the document that recommended it:
+  //
+  //   NARROW=0   185.4 gates/course   0 degraded   1-lane gates  5.75%
+  //   NARROW=1   184.1 gates/course   0 degraded   1-lane gates 10.26%
+  //
+  // Zero degraded gates, zero abandoned closures, zero invalid courses, 2630
+  // closures over the calendar. The staleness document called it a tripling of
+  // one-lane decisions; measured, it is 1.78x, and the honest number is the one
+  // that goes in the comment. It costs 1.3 gates a course.
+  let NARROW = 1;
   let RAMP = 1;
 
   // A jump covers this much ground; two conflicting action gates closer than
@@ -2406,8 +2679,87 @@ MR.Course = (function () {
    * generate() below. Elevation reads nothing from the course, so there is no
    * cycle -- but the ordering is load-bearing and not incidental.
    */
-  function actionWindowAt(z, elev) {
-    return ACTION_WINDOW + (elev ? elev.windowExtra(z) : 0);
+  /**
+   * ---- SURGE ZONES: THE SAME MACHINERY, A DIFFERENT CAUSE -----------------
+   *
+   * A surge zone is a marked stretch of road where a runner in the marked lane
+   * runs to MR.Pace.SURGE.FLOOR_SURGE instead of FLOOR_BASE. That is a locally
+   * higher top speed, which is EXACTLY the problem the descent already posed
+   * and which Elevation.windowExtra already solved -- so this is not a new
+   * fairness argument, it is the existing one with a second cause bolted to the
+   * same bolt.
+   *
+   * THE WINDOW WIDENS. IT DOES NOT SHRINK. That is the whole of rule 4 here:
+   * difficulty comes from the allocation and from the price of a mistake, never
+   * from a gate the player could not read. Inside a zone the generator is told
+   * about the surge speed and spaces the gates for it, so the guaranteed
+   * reaction window inside a surge is 739 ms against 741 ms in the shipped
+   * game, and 764 ms everywhere outside one -- MORE forgiving by default, and
+   * the tightness is the thing the player elects.
+   *
+   * ---- AND THE EXTRA IS READ OFF ELEVATION'S OWN TABLE, NOT RE-DERIVED ----
+   *
+   * The tempting version of this function re-runs elevation's forward sliding
+   * window to find the steepest descent within one airborne reach, so it can
+   * add the grade to the surge floor. That is a second implementation of the
+   * one number the fairness proof turns on, and this project has paid for that
+   * pattern before (see HAZARD_HALF_Z, which is duplicated and then guarded).
+   *
+   * It is not necessary, because windowExtra is INVERTIBLE. Elevation stores
+   *
+   *     extra(z) = SPAN_NUM / (FLOOR_PACE + GRADE_SPM * gmin(z)) - flatSpan
+   *
+   * so the effective local pace including the hill comes straight back out:
+   *
+   *     pace(z) = SPAN_NUM / (extra(z) + flatSpan)
+   *
+   * and a surge subtracts a CONSTANT number of seconds per mile from the floor,
+   * so the surged local pace is pace(z) - (FLOOR_PACE - FLOOR_SURGE). One table,
+   * one source, and nothing to keep in step. On flat ground extra(z) is 0 and
+   * this returns 0.813 units -- the difference between a 20.66-unit airborne
+   * span at 4:04/mi and the 19.84-unit span the window was cut for -- which
+   * leaves the SAME 1.16-unit margin the flat course keeps today.
+   */
+  const SPAN_NUM = K.JUMP_TIME * K.UNITS_PER_MILE * K.TIME_SCALE;
+  const FLAT_SPAN = SPAN_NUM / K.FLOOR_PACE;
+  // How far BEHIND a zone the widening starts. A jump committed just short of
+  // the entry line lands inside the zone, and although the runner is not yet
+  // surging when they commit, the pad costs a few units and removes the need to
+  // reason about the boundary at all. Same constant elevation looks forward by.
+  const SURGE_PAD = 28;
+
+  function surgeExtraAt(z, surges) {
+    if (!surges || !surges.length) return 0;
+    for (let i = 0; i < surges.length; i++) {
+      const s = surges[i];
+      if (z >= s.z0 - SURGE_PAD && z < s.z1) return s;
+    }
+    return 0;
+  }
+
+  function windowExtraAt(z, elev, surges) {
+    const base = elev ? elev.windowExtra(z) : 0;
+    if (!surgeExtraAt(z, surges)) return base;
+    // The local pace the base window was cut for, hill included, recovered from
+    // elevation's own table -- then the same hill at the surge floor.
+    //
+    // THE DATUM IS K.FLOOR_PACE AND ONLY K.FLOOR_PACE. ACTION_WINDOW is cut
+    // against it, elevation's table is cut against it, and this has to be too
+    // or the two stop composing. FLOOR_BASE (the slower unsurged floor EFFORT
+    // introduces) does not appear here at all, and that is correct rather than
+    // an omission: it is SLOWER than the datum, so a runner outside a zone
+    // needs less window than the course already gives them and nothing is owed.
+    // An earlier draft of this line subtracted the base lift as well and
+    // widened the zone by 26 s/mi instead of 10 -- safe, but it would have cost
+    // gates nothing was asking for and made the measured price of a surge a
+    // lie.
+    const pace = SPAN_NUM / (base + FLAT_SPAN);
+    const surged = pace - (K.FLOOR_PACE - MR.Pace.SURGE.FLOOR_SURGE);
+    return Math.max(base, SPAN_NUM / surged - FLAT_SPAN);
+  }
+
+  function actionWindowAt(z, elev, surges) {
+    return ACTION_WINDOW + windowExtraAt(z, elev, surges);
   }
 
   /**
@@ -2451,8 +2803,123 @@ MR.Course = (function () {
    * time; see tools/simulate.js, which is unchanged to the second by it because
    * pace integrates over distance and not over gates.
    */
-  function readWindowAt(z, elev) {
-    return actionWindowAt(z, elev) + K.CAM_BASE_BACK;
+  function readWindowAt(z, elev, surges) {
+    return actionWindowAt(z, elev, surges) + K.CAM_BASE_BACK;
+  }
+
+  /**
+   * ---- WHERE THE SURGE ZONES GO, AND THE CONTRACT THEY OWE THE PLAYER -----
+   *
+   * Planned from the seed in Z SPACE, BEFORE A SINGLE GATE IS PLACED, for the
+   * identical reason elevation is: actionWindowAt reads the zones, spacingAt
+   * and solvable() both read actionWindowAt, and the generator calls both on
+   * every gate. The ground and the markings have to exist before the road does.
+   * Nothing here reads the gate table, so there is no cycle.
+   *
+   * THE NUMBERS, and they are the contract the markings must be built to:
+   *
+   *   COUNT       4 or 5 a course.
+   *   LENGTH      420 to 560 units. At the surge floor that is 14.2 to 19.0
+   *               real seconds, and at BURN_UNITS = 200 it costs 2.1 to 2.8
+   *               segments out of a pool that holds 3. One zone is very nearly
+   *               a full tank, which is what makes it a decision and not a tap.
+   *   LANE        one lane, constant for the whole zone. It is never BLOCK
+   *               inside the zone -- enforced in generate(), see the surge
+   *               clause there -- so an elected surge is always completable and
+   *               the price is that you must ACT at what is in front of you
+   *               rather than dodge into a free lane.
+   *   WINDOW      SURGE_SIGHT = 90 units. The entry marking must be legible
+   *               from that far out and it is not a taste number: it is
+   *               Elevation.SIGHT_MIN, the distance the terrain sweep already
+   *               PROVES stays visible over every crest on every course. A
+   *               contract written at 90 cannot be broken by a hill, by
+   *               construction, and Elevation.validate() is the proof.
+   *   f RANGE     0.15 to 0.90. The same window narrowRate and the ramp use,
+   *               and for the same two reasons: START_GRACE owns the opening,
+   *               and the last question of a race should not be a novelty.
+   *   SEPARATION  no two zones within SURGE_SIGHT + 60 units, so one zone's
+   *               entry marking is never read against another zone's paint.
+   *
+   * WHAT THE PLAYER CAN AND CANNOT KNOW AT THE COMMIT POINT. From 90 units out
+   * they can read that a zone begins, which lane is marked, and how long it
+   * runs. They can see roughly the first 90 units of road inside it. They
+   * CANNOT see the rest, and that is the risk the owner asked for -- a surge is
+   * bought before its contents are known. It is a fair bet, not a hidden one:
+   * every gate inside a zone individually satisfies the same read window every
+   * other gate in the game does, at the surge speed.
+   */
+  const SURGE_SIGHT = 90;
+  const SURGE_LEN_MIN = 420, SURGE_LEN_MAX = 560;
+  const SURGE_N_MIN = 4, SURGE_N_MAX = 5;
+  const SURGE_F0 = 0.15, SURGE_F1 = 0.90;
+
+  function planSurge(key) {
+    if (!(MR.Pace.EFFORT > 0)) return [];
+    const rnd = MR.rng.stream(key, 'surge/v1');
+    const total = K.TOTAL_UNITS;
+    const lo = SURGE_F0 * total, hi = SURGE_F1 * total;
+    const zones = [];
+    const want = rnd.int(SURGE_N_MIN, SURGE_N_MAX);
+    const GAP = SURGE_SIGHT + 60;
+    let guard = 0;
+    while (zones.length < want && guard++ < 400) {
+      const len = rnd.range(SURGE_LEN_MIN, SURGE_LEN_MAX);
+      const z0 = rnd.range(lo, hi - len);
+      const z1 = z0 + len;
+      let clash = false;
+      for (const s of zones) if (z1 + GAP > s.z0 && z0 - GAP < s.z1) { clash = true; break; }
+      if (clash) continue;
+      zones.push({ z0, z1, lane: rnd.int(0, 2), sight: SURGE_SIGHT });
+    }
+    zones.sort(function (a, b) { return a.z0 - b.z0; });
+    // Numbered in running order, so the marking, the HUD and the report can all
+    // name the same zone.
+    for (let i = 0; i < zones.length; i++) zones[i].n = i + 1;
+    return zones;
+  }
+
+  /** The zone covering z, or null. Zones never overlap, so a scan is exact. */
+  function zoneAt(surges, z) {
+    if (!surges) return null;
+    for (let i = 0; i < surges.length; i++) {
+      if (z >= surges[i].z0 && z < surges[i].z1) return surges[i];
+    }
+    return null;
+  }
+
+  /**
+   * The zone whose marked lane a hazard at THIS gate line could stand in, or
+   * null -- which is a different and larger question than zoneAt.
+   *
+   * A HAZARD IS NOT A PLANE AT z, IT IS A BOX, and the deepest one in the game
+   * is a rideable train: 2 * halfZ * (1 + RAMP_SPAN_MAX * 0.9) = 42.5 units of
+   * lorry, all of it FORWARD of the gate line because the box is nose-anchored.
+   * A gate two units short of an entry line with a BLOCK in the marked lane
+   * therefore stands 40 units of vehicle under the paint.
+   *
+   * The first version of the marked-lane rule tested the gate line and nothing
+   * else. It was validate()'s new surge clause that found it, on 13 of 60 days
+   * -- four of them a standing 3.9-unit BLOCK and one a 17.9-unit train -- and
+   * it is exactly the defect reachOf was written for one invariant along. So
+   * the rule is stated in the same currency the rest of this file uses: how far
+   * the geometry reaches, not where its gate line is.
+   */
+  // A function rather than a const because HAZARD_HALF_Z and RAMP_SPAN_MAX are
+  // declared further down this file, and a `const` here reads them at module
+  // evaluation time -- which throws on the temporal dead zone and takes the
+  // whole page with it. Derived on every call rather than cached, so a retune
+  // of either cannot leave this stale.
+  function surgeBody() {
+    return 2 * HAZARD_HALF_Z[K.BLOCK] * (1 + RAMP_SPAN_MAX * 0.9);
+  }
+
+  function zoneBody(surges, z) {
+    if (!surges) return null;
+    const body = surgeBody();
+    for (let i = 0; i < surges.length; i++) {
+      if (z + body > surges[i].z0 && z < surges[i].z1) return surges[i];
+    }
+    return null;
   }
 
   /**
@@ -2799,7 +3266,7 @@ MR.Course = (function () {
     return Math.min(1, base * 0.86 + wall + home);
   }
 
-  function spacingAt(f, rnd, z, elev, lanes, train) {
+  function spacingAt(f, rnd, z, elev, lanes, train, surges) {
     const d = difficulty(f);
     // 44 units early, tightening as difficulty rises. The floor is
     // ACTION_WINDOW itself rather than a number chosen to sit near it: the
@@ -2826,7 +3293,7 @@ MR.Course = (function () {
     // A gate whose deepest lane is a DUCK costs 0.30 of this; a standing BLOCK
     // costs 1.95; a four-span BLOCK train costs 15.99, and pays it rather than
     // being waved through on its gate line.
-    return Math.max(readWindowAt(z, elev) + reachOf(lanes, train),
+    return Math.max(readWindowAt(z, elev, surges) + reachOf(lanes, train),
                     mean * rnd.range(0.84, 1.16));
   }
 
@@ -3330,6 +3797,12 @@ MR.Course = (function () {
     // generator calls both on every gate -- so the ground has to exist before
     // the first gate is placed. Elevation reads nothing back from the course.
     const elevation = MR.Elevation.create(key, elevationPlan());
+    // ...and the surge zones for the same reason and in the same breath. Both
+    // are statements about the ROAD that the gates then have to answer to, and
+    // both are drawn from their own seeded stream so that at EFFORT = 0 (where
+    // planSurge returns an empty list without drawing a number) the course
+    // stream stays in phase and every gate is bit-identical.
+    const surges = planSurge(key);
 
     const rnd = MR.rng.stream(key, 'course/v1');
     const gates = [];
@@ -3395,11 +3868,28 @@ MR.Course = (function () {
               if (closed.indexOf(l) < 0 && cand[l] === K.BLOCK) cand[l] = K.CLEAR;
             }
           }
+          // ---- THE MARKED LANE IS NEVER A WALL ---------------------------
+          //
+          // Last, so it outranks the roll, the carried train and the closure
+          // alike. A surge is elected by taking the marked lane, and the one
+          // thing that must never happen is a player who bought a surge, and
+          // could not see inside it, meeting a lorry they are not allowed to
+          // pass -- that is not risk, it is the game taking a run for a fact it
+          // hid. So the marked lane holds a JUMP or a DUCK instead, drawn from
+          // the same weighted roll every other lane uses with BLOCK off the
+          // table. It stays DEMANDING; it stops being IMPASSABLE. What the
+          // player is buying is the obligation to act rather than dodge.
+          //
+          // Forcing it open can only ADD a lane path, so it cannot cost
+          // solvable() a proof, and it makes the all-BLOCK guard below
+          // unreachable for an in-zone gate rather than merely unlikely.
+          const zn = zoneBody(surges, z);
+          if (zn && cand[zn.lane] === K.BLOCK) cand[zn.lane] = rollHazard(rnd, difficulty(f), false);
           if (cand.every((l) => l === K.BLOCK)) continue;
 
           tally.attempts++;
           const trial = gates.concat([{ z, lanes: cand, f }]);
-          if (solvable(trial, elevation)) { lanes = cand; break; }
+          if (solvable(trial, elevation, surges)) { lanes = cand; break; }
         }
         if (!closed) break;   // pass 0 had no closure to drop, so pass 1 is moot
       }
@@ -3407,6 +3897,12 @@ MR.Course = (function () {
         // Degrade to a guaranteed-safe gate rather than emit something unfair.
         lanes = [K.CLEAR, K.CLEAR, K.CLEAR];
         for (let l = 0; l < 3; l++) if (idx < trainUntil[l]) lanes[l] = K.BLOCK;
+        // The degrade path owes the marked lane the same promise the retry
+        // does, and CLEAR is the right answer here rather than a rolled hazard:
+        // this gate exists because the generator gave up, and a gate it gave up
+        // on should not also be the one that asks the most.
+        const zd = zoneBody(surges, z);
+        if (zd) lanes[zd.lane] = K.CLEAR;
         tally.degraded++;
       }
 
@@ -3415,6 +3911,14 @@ MR.Course = (function () {
       if (span) {
         for (let l = 0; l < 3; l++) {
           if (lanes[l] === K.BLOCK && trainUntil[l] <= idx) {
+            // NO TRAIN CHECK IS NEEDED HERE, and that is worth saying so
+            // nobody adds one back. maybeTrain only offers a lane that is
+            // already BLOCK, and the marked-lane clause in the retry above has
+            // made the marked lane non-BLOCK for every gate within SURGE_BODY
+            // of a zone -- which is the deepest vehicle the game can build. So
+            // a train can no more start under the paint than a standing taxi
+            // can, and both facts come from ONE rule rather than two that have
+            // to be kept in step.
             // Only extend if some other lane survives the whole span.
             const others = [0, 1, 2].filter((x) => x !== l);
             if (others.some((o) => idx >= trainUntil[o])) {
@@ -3498,7 +4002,7 @@ MR.Course = (function () {
       // by the geometry of THAT gate: which kinds it actually stands in the road
       // decides how deep its deepest lane is, and a train's rear face is a long
       // way further forward than its gate line says.
-      z += spacingAt(f, rnd, z, elevation, lanes, span);
+      z += spacingAt(f, rnd, z, elevation, lanes, span, surges);
     }
 
     const mileMarkers = [];
@@ -3508,7 +4012,32 @@ MR.Course = (function () {
     const aid = generateAid(key, gates, ramps);
     const spans = buildSpans(gates, ramps);
     const course = { key, gates, aid, mileMarkers, biomes: BIOMES, length: K.TOTAL_UNITS,
-                     elevation, ramps, spans, tally };
+                     elevation, ramps, spans, surges, tally };
+
+    /**
+     * The zone the runner is in, or null. Read by the renderer to lay the
+     * marking, by the HUD to say a zone is coming, and by main.js every frame
+     * to decide whether the runner has elected the surge.
+     */
+    course.surgeZoneAt = function (z) { return zoneAt(surges, z); };
+
+    /**
+     * THE ELECTION, AND IT IS ONE LINE. A surge is on when the runner is inside
+     * a zone AND in its marked lane. There is no button, no hold and no new
+     * verb: the swipe the player already knows is the whole commitment, which
+     * is why a new control was refused -- every control in this game is a swipe
+     * anywhere on the canvas, so a button sits exactly where a mis-started
+     * swipe lands.
+     *
+     * Not on a roof: a rideable train is a different running surface and the
+     * marking is painted on the road. Trains are kept out of marked lanes at
+     * generation (see the TRAIN_LOOK clause) so this is belt and braces.
+     */
+    course.surgeAt = function (z, lane, onDeck) {
+      if (onDeck) return null;
+      const s = zoneAt(surges, z);
+      return s && s.lane === lane ? s : null;
+    };
 
     /**
      * The vehicle standing in (z, lane), or null.
@@ -3579,7 +4108,7 @@ MR.Course = (function () {
    * conflicts are rejected: two gates closer than ACTION_WINDOW may not demand
    * a jump and a duck back to back on the chosen path.
    */
-  function solvable(gates, elev) {
+  function solvable(gates, elev, surges) {
     if (!gates.length) return true;
     // state: set of (lane, lastAction, lastActionZ) -- collapse by lane+action.
     let states = [];
@@ -3599,10 +4128,10 @@ MR.Course = (function () {
           // already looked one airborne reach forward from there when it built
           // the table. See actionWindowAt.
           if (h !== K.CLEAR && s.act !== K.CLEAR && h !== s.act
-            && g.z - s.z < actionWindowAt(s.z, elev)) continue;
+            && g.z - s.z < actionWindowAt(s.z, elev, surges)) continue;
           const act = h === K.CLEAR ? s.act : h;
           const az = h === K.CLEAR ? s.z : g.z;
-          const tag = l + ':' + act + ':' + (g.z - az < actionWindowAt(az, elev) ? 1 : 0);
+          const tag = l + ':' + act + ':' + (g.z - az < actionWindowAt(az, elev, surges) ? 1 : 0);
           if (seen.has(tag)) continue;
           seen.add(tag);
           next.push({ lane: l, act, z: az });
@@ -3618,6 +4147,7 @@ MR.Course = (function () {
     const errors = [];
     const g = course.gates;
     const elev = course.elevation;
+    const surges = course.surges;
     for (let i = 0; i < g.length; i++) {
       if (g[i].lanes.every((l) => l === K.BLOCK)) errors.push(`gate ${i}: all lanes blocked`);
       if (i > 0 && g[i].z <= g[i - 1].z) errors.push(`gate ${i}: not ordered in z`);
@@ -3634,7 +4164,7 @@ MR.Course = (function () {
       // The epsilon is float slop only -- spacingAt returns this quantity
       // exactly when the floor binds, which late in a course is most gates.
       if (i > 0) {
-        const need = readWindowAt(g[i - 1].z, elev) + reachOf(g[i - 1].lanes, g[i - 1].train);
+        const need = readWindowAt(g[i - 1].z, elev, surges) + reachOf(g[i - 1].lanes, g[i - 1].train);
         if (g[i].z - g[i - 1].z < need - 1e-9) {
           errors.push(`gate ${i}: ${(g[i].z - g[i - 1].z).toFixed(2)} behind gate ${i - 1} `
             + `needs ${need.toFixed(2)} to stay readable past it`);
@@ -3668,7 +4198,51 @@ MR.Course = (function () {
         }
       }
     }
-    if (!solvable(g, elev)) errors.push('course has no solvable lane path');
+    // ---- THE SURGE CONTRACT, PROVED RATHER THAN COMMENTED -----------------
+    //
+    // Three claims are made about a zone in prose above, and prose is what
+    // rule 3 of CLAUDE.md is about. Each is checked here on every course, so
+    // course-test.js at 365 days and calendar.js re-prove them on every run
+    // instead of leaving them to the four days a policy sweep happens to use.
+    //
+    //   1. THE MARKED LANE IS PASSABLE AT EVERY GATE IN THE ZONE. A player who
+    //      bought a surge they could not see inside must never meet a wall in
+    //      the lane they bought.
+    //   2. NO VEHICLE STANDS IN IT ANYWHERE IN THE ZONE, gate line or not.
+    //      Claim 1 is about gate lines; occupiedAt is about the 3.9 to 17.9
+    //      units of solid a BLOCK really is, and the flank is contact now.
+    //   3. THE ENTRY IS READABLE. SURGE_SIGHT units of road before z0, inside
+    //      the course, so the marking has somewhere to be seen from.
+    if (surges && surges.length) {
+      const spans = course.spans;
+      for (const s of surges) {
+        if (s.z0 < SURGE_SIGHT) {
+          errors.push(`surge ${s.n}: starts at ${s.z0.toFixed(0)}, inside its own `
+            + `${SURGE_SIGHT}u sighting distance`);
+        }
+        for (let i = 0; i < g.length; i++) {
+          if (g[i].z < s.z0 || g[i].z >= s.z1) continue;
+          if (g[i].lanes[s.lane] === K.BLOCK) {
+            errors.push(`surge ${s.n}: gate ${i} blocks the marked lane ${s.lane}`);
+          }
+        }
+        if (spans) {
+          for (const sp of (spans[s.lane] || [])) {
+            if (sp.z1 > s.z0 && sp.z0 < s.z1) {
+              errors.push(`surge ${s.n}: a vehicle occupies the marked lane from `
+                + `${sp.z0.toFixed(1)} to ${sp.z1.toFixed(1)}`);
+            }
+          }
+        }
+      }
+      for (let i = 1; i < surges.length; i++) {
+        if (surges[i].z0 - surges[i - 1].z1 < SURGE_SIGHT) {
+          errors.push(`surge ${surges[i].n}: only `
+            + `${(surges[i].z0 - surges[i - 1].z1).toFixed(0)}u after surge ${surges[i - 1].n}`);
+        }
+      }
+    }
+    if (!solvable(g, elev, surges)) errors.push('course has no solvable lane path');
     // The sightline sweep. A profile that hides the road beyond a crest hides
     // the lane telegraph mats with it, which is the same class of failure
     // tools/shoot.js fails a build for when a prop occludes a hazard -- so it
@@ -3688,6 +4262,10 @@ MR.Course = (function () {
            READ_NEAR: ACTION_WINDOW + K.CAM_BASE_BACK, readWindowAt,
            HAZARD_HALF_Z, reachOf,
            DECK_Y, RAMP_RUN, LANE_TRANSIT,
+           // The surge-zone contract, exported so the renderer and the tools
+           // read the numbers from the file that enforces them rather than
+           // restating them. SURGE_SIGHT is the one the art has to build to.
+           SURGE_SIGHT, SURGE_LEN_MIN, SURGE_LEN_MAX, planSurge, windowExtraAt,
            elevationPlan };
 
   // Accessors rather than plain fields, so a nonsense value cannot be written
@@ -19863,6 +20441,485 @@ MR.World = (function () {
     })();
 
     /**
+     * ============ WHY THERE ARE THREE MORE DUCKS AFTER THIS LINE ============
+     *
+     * BUILD EVERY ANGLE. THERE IS NO BACK OF AN OBJECT. Everything below is
+     * modelled on all sides -- the ladder cage is a ring and not an arc, the
+     * floodlight has a body behind its lens, the parapet is railed on both
+     * faces of the deck, and every applique on the clearance header is applied
+     * to the front face AND the rear face. A marking painted on a surface is
+     * the one exception and there are none here.
+     *
+     * ---- THE NUMBER THAT ASKED FOR THEM -----------------------------------
+     *
+     * docs/staleness-and-mats.md put a real clock on a real course and the
+     * answer was not the one the file assumed. A run is 236 seconds and 424
+     * hazard sightings against 23 objects, so every object in the game is seen
+     * about eighteen times in under four minutes. DUCK is the worst kind on
+     * every measure it took:
+     *
+     *   kind    skins   p10 gap   median gap   back-to-back same skin
+     *   JUMP      8      3.0 s      8.3 s              1.4%
+     *   DUCK      5      1.9 s      5.8 s              4.0%
+     *   BLOCK    10      1.4 s     17.8 s             16.3%
+     *
+     * And the arithmetic that reframes it: freshness over a window cannot
+     * exceed skins divided by sightings-in-window. By mile 23 the game shows
+     * 38 DUCKs every thirty seconds and owns five of them, so the ceiling on
+     * how fresh a DUCK can possibly feel there is 13%. Pool size and density
+     * are ONE constraint. The projection, which reproduced the shipped cast
+     * 12730 of 12730 before it was allowed to speak, prices the fix: two more
+     * DUCKs take the median gap from 5.8 s to 8.2 s and back-to-back repeats
+     * from 4.0% to 2.1%.
+     *
+     * IT COSTS NO DRAW CALL. Every variant of a kind is built and parented at
+     * pool construction and switched by visibility -- see hazardPool -- so the
+     * road draws exactly what it drew before. Triangles are the abundant
+     * resource and a hidden mesh renders none of them.
+     *
+     * ---- WHAT A NEW DUCK IS ALLOWED TO BE ---------------------------------
+     *
+     * duckScaffoldGeo's header is the budget and it is not restated here. The
+     * five constraints these three are built against, in the order they were
+     * paid for:
+     *
+     *   MASS ABOVE THE BAR IS WHAT SAYS GO UNDER. For five passes DUCKs were
+     *     differentiated by what they were made of and readers still could not
+     *     separate a duck bar from a hurdle, because occupancy above the bar
+     *     and below it were the same number and a shape with no direction in
+     *     it has no answer in it. All three take duckHeader() unchanged, and
+     *     all three put more mass above it.
+     *   THE DAYLIGHT UNDER THE BAR STAYS OPEN. Band-0 occupancy was cut from
+     *     0.38 to 0.21 deliberately. NOTHING new is added below 1.90 on any of
+     *     these three except the shared 0.30 x 0.07 x 0.34 base plate, which
+     *     every DUCK in the file already stands on.
+     *   THE BAR IS THE CONSTANT AND THE STRUCTURE IS THE VARIABLE. That is the
+     *     move that took mean pairwise profile distance from 0.468 to 0.616,
+     *     and it is the move these three make: the bar, the caution face and
+     *     the two verticals are the same object on all eight.
+     *   NO NEW VERTICALS. A standard sits at x 0.868 with a 0.15 radius against
+     *     a box that stops at 1.12, so a second full-height tube overlaps the
+     *     first and its coupler leaves the box. The count of verticals in a
+     *     DUCK rear elevation is not available as a differentiator on any
+     *     variant. Nothing below is a second standard: the ladder stiles stop
+     *     at 3.42 and start at 2.00, above the bar, where they cannot be read
+     *     as legs.
+     *   YELLOW AND BLACK IS THE DUCK KIND MARK. Red and white is JUMP. Every
+     *     colour below comes from the four this kind already owns.
+     *
+     * ---- AND THE THREE LEVERS THEY SPEND ----------------------------------
+     *
+     * OUTLINE, TOP TERMINATION, and one BIG SHAPE on the standard, plus one
+     * that the first five left on the table: THE FACES OF THE CLEARANCE
+     * HEADER. The header web is 0.34 deep, so z -0.29 to -0.17 in front of it
+     * and +0.17 to +0.29 behind it is 0.12 of free relief running the WHOLE
+     * SPAN, in a band where mass across the lane is already permitted. Not one
+     * of the first five variants uses it. All three of these do, on both
+     * faces, which is where a fair part of their pass-by read lives.
+     */
+
+    /**
+     * ============ DUCK v5: AN ACCESS GANTRY WITH A CAGED LADDER ============
+     *
+     * A works walkway crossing the road, with a caged access ladder up each
+     * leg. The one-second test -- would a person walking down a real street
+     * name this immediately -- is answered by the ladder rather than by the
+     * gantry: a hooped ladder cage is one of the most recognisable objects on
+     * any industrial street, and it is a shape nothing else in this game has.
+     *
+     * BOTH LEGS CARRY ONE, and that is engineering rather than symmetry for
+     * its own sake. A walkway that crosses a road has to be got off at the far
+     * end as well as got on at the near one, so a single ladder would be the
+     * detail that is wrong. It also doubles the legibility of the variant's
+     * one big shape, which at 25 units is worth more than an asymmetry that
+     * resolves to four dark pixels -- duckBoomGeo's header paid for that
+     * lesson and this variant spends the proceeds.
+     *
+     * ---- THE BIG SHAPE: A HORIZONTAL RHYTHM -------------------------------
+     *
+     * Five rungs at 0.25 spacing and three cage hoops. Every other DUCK puts
+     * ONE mark on the standard -- a roundel, a wheel, a lamp bar, a board pack
+     * -- and this one puts a REPEATING one, which is a different kind of thing
+     * to see and survives being small in a way a single small mark does not.
+     * A hoop is 0.44 across against a post of 0.30, so at the 45 pixels this
+     * object gets at 25 units the hoops are the widest marks on the standard
+     * and the rungs sit between them.
+     *
+     * THE HOOPS ARE RINGS, not arcs facing the camera. Eight tangent segments
+     * on a 0.22 radius about a centre at z -0.02, so from the flank and from
+     * behind the cage is still a cage. That is rule 1 on the one fitting where
+     * the cheap version would have been invisible from exactly the angle you
+     * pass it at.
+     *
+     * ---- THE STANDARD IS A ROLLED STEEL JOIST -----------------------------
+     *
+     * Two flanges at z +/-0.115 with a recessed web between them. v0 and v2
+     * are square posts, v1 and v4 are round; an I-section is the third profile
+     * a real gantry leg comes in, it reads from the front as two bright edges
+     * with a shadow down the middle, and from the flank it steps twice.
+     *
+     * ---- IT TERMINATES IN A HANDRAIL --------------------------------------
+     *
+     * A landing plate at 3.20 and a handrail above it: stanchion, mid rail and
+     * top rail, on BOTH sides of the deck at z +/-0.15. Against sky that is a
+     * pair of horizontal ticks over a vertical, where v0 has a cube, v1 open
+     * tube ends, v2 a flat plate, v3 a fork and v4 a blind flange. The ladder
+     * stiles run 0.22 past the landing, which is what a real ladder does and
+     * is the thing you hold on to at the top.
+     *
+     * ---- ON THE HEADER: A TOE PLATE IN FRONT, A CABLE TRAY BEHIND ---------
+     *
+     * The walkway edge in front and the services it carries behind, full span,
+     * on the 0.12 of relief each face of the header leaves. Three cables lie
+     * in the tray. From directly behind, which is 0.55 of this object's
+     * silhouette as you leave it, that tray is the whole difference between
+     * this and every other DUCK in the file.
+     *
+     * ENVELOPE. The widest thing is a cage hoop at 0.868 + 0.22 + 0.025 =
+     * 1.113 against a box halfX of 1.12. The deepest is the cable tray upstand
+     * at 0.290 against a halfZ of 0.30. The tallest is a top rail at 3.56,
+     * under v1 tube end at 3.58. Nothing new is below 1.90 but the base plate.
+     */
+    const duckWalkGeo = (function () {
+      const px = 1.20 * LANE_FIT;
+      const parts = [
+        // The bar, the constant. Same span, same band, same caution face.
+        gl(hcbx(2.30, 0.36, 0.54, 0, 1.60, 0, 0xffc422, 0.05), GLOSS.paint),
+        gl(hcbx(2.36, 0.10, 0.56, 0, 1.78, 0, 0xfff0a0, 0.03), GLOSS.trim),
+        gl(hcbx(2.36, 0.08, 0.56, 0, 1.45, 0, 0xd18a08, 0.02), GLOSS.trim),
+        // THE TOE PLATE. The upstand along the edge of a walkway deck, and it
+        // is the front face of the clearance header rather than a new member:
+        // 0.09 deep at z -0.225 stands proud of a web whose front is -0.17.
+        gl(hbx(2.06, 0.16, 0.09, 0, 1.94, -0.225, 0xfff0a0), GLOSS.trim),
+        // Its bracket feet, so the plate is bolted to something.
+        gl(hbx(0.10, 0.22, 0.13, -0.62, 1.96, -0.205, 0xd18a08), GLOSS.trim),
+        gl(hbx(0.10, 0.22, 0.13, 0.62, 1.96, -0.205, 0xd18a08), GLOSS.trim),
+        // THE CABLE TRAY, rear face, full span. Floor, outer upstand, and
+        // three cables lying in it. z 0.155 to 0.290 against a halfZ of 0.30.
+        gl(hbx(2.06, 0.05, 0.13, 0, 1.90, 0.225, 0x2b1e05), GLOSS.trim),
+        gl(hbx(2.06, 0.13, 0.035, 0, 1.965, 0.272, 0x2b1e05), GLOSS.trim),
+      ];
+      for (const cz of [0.198, 0.232, 0.262]) {
+        parts.push(gl(cyl(0.030, 0.030, 2.02 * LANE_FIT, 6, 0, 1.955, cz,
+          cz === 0.232 ? 0xd18a08 : 0xfff0a0, 0, 0, Math.PI / 2), GLOSS.trim));
+      }
+      // The tray hangers, which is what holds a tray off a girder.
+      for (const hx of [-0.66, 0, 0.66]) {
+        parts.push(gl(hbx(0.09, 0.20, 0.06, hx, 1.99, 0.205, 0xd18a08), GLOSS.trim));
+      }
+      for (const sx of [-1, 1]) {
+        const sxp = sx * px;
+        /**
+         * THE ROLLED STEEL JOIST. Flanges 0.30 wide at z +/-0.115 and a 0.12
+         * web recessed between them: 0.718 to 1.018 in x, which is the same
+         * band v0 square post stands in, and 0.16 in z against a post of 0.15.
+         */
+        for (const fz of [-0.115, 0.115]) {
+          parts.push(gl(bx(0.30, 3.20, 0.09, sxp, 1.60, fz, 0xffc422), GLOSS.paint));
+        }
+        parts.push(gl(bx(0.12, 3.20, 0.14, sxp, 1.60, 0, 0xd18a08), GLOSS.paint));
+        // Base plate, not a block -- see duckGeo. All eight variants take it.
+        parts.push(bxAt(0.30, 0.07, 0.34, sx * 1.20, 0.035, 0, 0x2b1e05));
+        // The landing plate the ladder arrives at.
+        parts.push(gl(bx(0.46, 0.08, 0.46, sxp, 3.24, 0, 0x2b1e05), GLOSS.trim));
+        /**
+         * THE HANDRAIL, on BOTH sides of the deck. A stanchion, a mid rail and
+         * a top rail per side, 0.44 long about the standard so the rails stay
+         * inside the band v2 capping plate already reaches (0.618 to 1.118).
+         */
+        for (const rz of [-0.15, 0.15]) {
+          parts.push(gl(bx(0.07, 0.30, 0.07, sxp, 3.43, rz, 0xfff0a0), GLOSS.chrome));
+          parts.push(gl(bx(0.44, 0.06, 0.07, sxp, 3.53, rz, 0xfff0a0), GLOSS.chrome));
+          parts.push(gl(bx(0.44, 0.05, 0.06, sxp, 3.38, rz, 0xd18a08), GLOSS.trim));
+        }
+        /**
+         * THE LADDER. Two stiles from 2.00 to 3.42 -- above the bar at the
+         * bottom, past the landing at the top, which is the extension a real
+         * ladder gives you to hold. Five rungs at 0.25.
+         */
+        for (const lx of [-0.14, 0.14]) {
+          parts.push(gl(bx(0.05, 1.42, 0.05, sxp + lx, 2.71, -0.20, 0xfff0a0), GLOSS.chrome));
+        }
+        for (let r = 0; r < 5; r++) {
+          parts.push(gl(bx(0.30, 0.045, 0.045, sxp, 2.12 + r * 0.25, -0.20, 0xd18a08), GLOSS.trim));
+        }
+        /**
+         * THE CAGE. Three hoops, each a closed ring of eight tangent segments
+         * on a 0.22 radius about (post, y, -0.02), and three vertical strips
+         * tying them together. A ring and not an arc: you pass this object at
+         * 1.70 units and leave it behind, so a cage that exists only from the
+         * front is a cage that is missing for most of the time it is on screen.
+         *
+         * ry = -t - PI/2 lays each segment TANGENT to the circle. A box long
+         * axis is its local +X, and rotating by t alone would lay it along the
+         * radius instead -- the same mistake duckPipeGeo valve wheel records,
+         * caught here by the same arithmetic before it reached the envelope.
+         */
+        for (const hy of [2.40, 2.78, 3.16]) {
+          for (let i = 0; i < 8; i++) {
+            const t = i * Math.PI / 4;
+            parts.push(gl(bx(0.175, 0.05, 0.05,
+              sxp + Math.cos(t) * 0.22, hy, -0.02 + Math.sin(t) * 0.22,
+              0xfff0a0, 0, -t - Math.PI / 2, 0), GLOSS.chrome));
+          }
+        }
+        for (const t of [0, Math.PI, -Math.PI / 2]) {
+          parts.push(gl(bx(0.05, 0.80, 0.05,
+            sxp + Math.cos(t) * 0.22, 2.78, -0.02 + Math.sin(t) * 0.22,
+            0xd18a08), GLOSS.trim));
+        }
+      }
+      return merge(parts.concat(duckHeader()));
+    })();
+
+    /**
+     * ============ DUCK v6: A SITE FLOODLIGHT GANTRY ============
+     *
+     * The lighting rig over a night works: a portal with a big canted
+     * floodlight head on top of each leg and a weatherproof control box on the
+     * leg below it. A floodlight is named on sight by anyone who has walked
+     * past a road being dug up after dark, and it is the only object in this
+     * kind whose identifying feature is at the VERY TOP of the silhouette
+     * rather than partway up a post.
+     *
+     * ---- THE BIG SHAPE AND THE TERMINATION ARE THE SAME PART --------------
+     *
+     * Every other DUCK spends those two levers separately: a mark on the
+     * standard and a different mark where it finishes. This one spends both on
+     * one object, which is why it can afford to make it large. The head is
+     * 0.42 x 0.30 x 0.22 on a yoke, CANTED 0.34 radians nose-down and forward,
+     * with a pale lens on the front and a hood over it. At 25 units that is a
+     * wide bright slab tilted off the vertical at the top of each post, and
+     * NOTHING ELSE IN THE GAME IS TILTED. v3 lamps are the nearest thing and
+     * they are small red lenses on a dark bar halfway up one post; these are
+     * two big cream rectangles against sky.
+     *
+     * The cant is a rotation about x of -0.34 rad, which sends the head local
+     * -Z to (0, -0.334, -0.943): down and toward the runner, which is where a
+     * works floodlight actually points. It is written as a rotation and not as
+     * an eyeballed offset because the lens, the hood and the yoke all have to
+     * land on the same plane, and three separately guessed transforms is how
+     * an assembly ends up not being one.
+     *
+     * ---- THE STANDARD TAPERS ----------------------------------------------
+     *
+     * A twelve-sided column, r 0.15 at the road to r 0.105 at the top. Two
+     * variants are square posts, two are straight round tubes and one is a
+     * lopsided pair; a column that visibly narrows as it rises is the fifth
+     * profile and it is what a lighting mast is. r 0.15 and not more: at the
+     * road the column is 0.718 to 1.018, exactly the band a 0.30 post occupies,
+     * so bands 0 and 1 -- the daylight the whole kind is pinned to -- do not
+     * move. v4 round column is r 0.16 and this is deliberately no wider.
+     *
+     * ---- ON THE HEADER: MARKER LAMPS IN FRONT, CONDUIT BEHIND -------------
+     *
+     * Three lens domes along the front face and the armoured cable that feeds
+     * the heads along the rear, on saddle clips. Both full span, both on the
+     * 0.12 of relief the header leaves, both built round rather than applied
+     * flat, because the mat is the only thing in this game that is allowed to
+     * be a painted mark.
+     *
+     * ENVELOPE. The widest thing is the lamp head at 0.868 + 0.21 = 1.078
+     * against a box halfX of 1.12. The deepest is the rear conduit at 0.295
+     * against a halfZ of 0.30. The tallest is the hood at 3.47. Nothing new is
+     * below 1.90 but the base plate.
+     */
+    const duckFloodGeo = (function () {
+      const px = 1.20 * LANE_FIT;
+      const TILT = -0.34;
+      const parts = [
+        gl(hcbx(2.30, 0.34, 0.54, 0, 1.62, 0, 0xffc422, 0.05), GLOSS.paint),
+        gl(hcbx(2.36, 0.10, 0.56, 0, 1.78, 0, 0xfff0a0, 0.03), GLOSS.trim),
+        gl(hcbx(2.30, 0.08, 0.50, 0, 1.45, 0, 0x2b1e05, 0.02), GLOSS.trim),
+        // THE ARMOURED CABLE, rear face of the header, full span.
+        gl(cyl(0.055, 0.055, 2.10 * LANE_FIT, 8, 0, 1.98, 0.235, 0x2b1e05, 0, 0, Math.PI / 2), GLOSS.trim),
+      ];
+      // The saddle clips that hold it, and a junction box at mid span.
+      for (const cx of [-0.72, -0.24, 0.24, 0.72]) {
+        parts.push(gl(hbx(0.09, 0.20, 0.07, cx, 1.98, 0.205, 0xd18a08), GLOSS.trim));
+      }
+      parts.push(gl(hbx(0.26, 0.28, 0.10, 0, 2.06, 0.245, 0xd18a08), GLOSS.paint));
+      // 0.272 and not 0.28: at 0.28 this 0.04-deep latch landed on z 0.300
+      // exactly, which is the box face itself rather than inside it. Every
+      // other DUCK stops at 0.29 and so does this. Art gives way to the box.
+      parts.push(gl(hbx(0.16, 0.06, 0.04, 0, 2.06, 0.272, 0xfff0a0), GLOSS.chrome));
+      // THE MARKER LAMPS, front face, full span. A bezel and a lens, built as
+      // solids on the z axis so they are domes from every quarter.
+      for (const cx of [-0.62, 0, 0.62]) {
+        parts.push(gl(cyl(0.10, 0.10, 0.07, 12, cx * LANE_FIT, 2.02, -0.215, 0xd18a08, Math.PI / 2), GLOSS.paint));
+        parts.push(gl(cyl(0.075, 0.075, 0.10, 12, cx * LANE_FIT, 2.02, -0.245, 0xfff0a0, Math.PI / 2), GLOSS.glass));
+      }
+      for (const sx of [-1, 1]) {
+        const sxp = sx * px;
+        // THE TAPERED COLUMN. r 0.15 at the road, r 0.105 at 3.02.
+        parts.push(gl(cyl(0.105, 0.15, 3.02, 12, sxp, 1.51, 0, 0xffc422), GLOSS.paint));
+        // Base plate, not a block -- see duckGeo.
+        parts.push(bxAt(0.30, 0.07, 0.34, sx * 1.20, 0.035, 0, 0x2b1e05));
+        /**
+         * THE CONTROL BOX. A weatherproof enclosure with a hinged door, a pair
+         * of hinges down one edge and a latch on the other, and a gland plate
+         * under it where the cable goes in. It is on the standard band at 2.32
+         * -- x 0.718 to 1.018 -- and it is a solid with a back, not a panel.
+         */
+        parts.push(gl(bx(0.30, 0.36, 0.24, sxp, 2.32, 0.02, 0x2b1e05), GLOSS.trim));
+        parts.push(gl(bx(0.25, 0.29, 0.04, sxp, 2.32, -0.115, 0xd18a08), GLOSS.paint));
+        for (const hy of [2.22, 2.42]) {
+          parts.push(gl(bx(0.05, 0.06, 0.06, sxp - sx * 0.13, hy, -0.10, 0xfff0a0), GLOSS.chrome));
+        }
+        parts.push(gl(bx(0.05, 0.10, 0.05, sxp + sx * 0.13, 2.32, -0.12, 0xfff0a0), GLOSS.chrome));
+        parts.push(gl(bx(0.20, 0.05, 0.14, sxp, 2.12, 0.02, 0xd18a08), GLOSS.trim));
+        // The drop from the box to the head, clipped to the column. A cable,
+        // not a member: r 0.03, and it starts above the bar.
+        parts.push(gl(cyl(0.030, 0.030, 0.56, 6, sxp + sx * 0.115, 2.78, 0.09, 0x2b1e05), GLOSS.trim));
+        /**
+         * THE YOKE. Two arms off a bracket at the top of the column, and the
+         * head is slung between them. Arms at x +/-0.17 about the column, so
+         * 0.673 to 1.063 against a box halfX of 1.12.
+         */
+        parts.push(gl(bx(0.30, 0.09, 0.26, sxp, 3.06, 0, 0x2b1e05), GLOSS.trim));
+        for (const ax of [-0.17, 0.17]) {
+          parts.push(gl(bx(0.05, 0.28, 0.05, sxp + ax, 3.22, 0.01, 0xd18a08), GLOSS.paint));
+        }
+        // The trunnion bolts the head turns on, proud of both arms.
+        for (const ax of [-0.19, 0.19]) {
+          parts.push(gl(cyl(0.045, 0.045, 0.06, 8, sxp + ax, 3.24, 0.01, 0xfff0a0, 0, 0, Math.PI / 2), GLOSS.chrome));
+        }
+        /**
+         * THE HEAD. A canted body, a pale lens on its front face and a hood
+         * over the top of it, all on the same 0.34 rad cant so the assembly is
+         * one machine. The offsets are the head local axes: -Z is
+         * (0, -0.334, -0.943) and +Y is (0, 0.943, -0.334).
+         */
+        parts.push(gl(bx(0.42, 0.30, 0.22, sxp, 3.24, 0.02, 0xffc422, TILT), GLOSS.paint));
+        parts.push(gl(bx(0.36, 0.24, 0.03, sxp, 3.24 - 0.040, 0.02 - 0.113, 0xfff2e0, TILT), GLOSS.glass));
+        parts.push(gl(bx(0.44, 0.05, 0.26, sxp, 3.24 + 0.160, 0.02 - 0.057, 0x2b1e05, TILT), GLOSS.trim));
+        // The lamp back and its cooling fins, because a floodlight seen from
+        // behind is a finned casting and not a blank slab.
+        for (const fy of [-0.09, 0, 0.09]) {
+          parts.push(gl(bx(0.38, 0.04, 0.05,
+            sxp, 3.24 + fy * 0.943 + 0.037, 0.02 - fy * 0.334 + 0.104,
+            0xd18a08, TILT), GLOSS.trim));
+        }
+      }
+      return merge(parts.concat(duckHeader()));
+    })();
+
+    /**
+     * ============ DUCK v7: A GIRDER UNDERBRIDGE ============
+     *
+     * The low bridge. It is the archetype the clearance header was built for
+     * -- duckHeader own header says it in one line, that a hurdle has nothing
+     * above its rail and a low bridge has a metre of structure above its
+     * soffit -- and until now the game had five things that borrow the idea
+     * and none that IS one.
+     *
+     * ---- WHAT MAKES IT A BRIDGE AND NOT A GANTRY --------------------------
+     *
+     * Three marks, in the order they resolve as you come up to it:
+     *
+     *   THE FLARED CAPITAL, and it is the big shape. Each column opens out
+     *     from r 0.14 to r 0.25 between 2.10 and 2.40 and is capped with a
+     *     square abacus plate. A cast column that trumpets out to carry a
+     *     girder is the oldest bridge detail there is, it is the only TAPER in
+     *     the kind that goes the other way from v6 mast, and unlike a roundel
+     *     or a lamp it changes the OUTLINE: at forty units this object is two
+     *     posts that get wider at the top.
+     *   THE PARAPET, and it is the termination. A sill, four balusters and a
+     *     coping rail, on both faces of the deck at z +/-0.15. Against sky
+     *     that is a repeating VERTICAL rhythm, where v5 handrail is two
+     *     horizontals and everything else is one solid mark.
+     *   THE RIVETS, and they are the near read. Two rows of eleven along the
+     *     whole span on the front face of the header AND on the rear, with a
+     *     splice plate at mid span. At 25 units they are a dotted line; at 8
+     *     units, which is where this game spends most of its screen area, they
+     *     are what tells you the beam over your head is a riveted plate girder.
+     *
+     * ---- WHAT IT IS NOT ALLOWED TO BE -------------------------------------
+     *
+     * IT HAS NO FLARED BASE, and that is a refusal with a number. The obvious
+     * move is to mirror the capital at the road, which is what a real cast
+     * column does. A base flare of r 0.24 is 0.48 across the road per column
+     * against the 0.30 base plate every other DUCK stands on, and by the
+     * arithmetic in kindread band 0 that takes the daylight occupancy under
+     * the bar from about 0.21 back toward 0.33 -- most of the way to the 0.38
+     * that was measured as eating the only cue this kind has. The daylight is
+     * worth more than the detail. It stands on the same base plate as the
+     * other seven.
+     *
+     * IT IS THE SHORTEST DUCK IN THE GAME, at 3.10 to the coping against v4
+     * 3.20, and that is on purpose: a bridge is a heavy low thing and the
+     * mass it does have is concentrated between 2.10 and 3.10 where the
+     * capital and the parapet are, rather than run up a thin post.
+     *
+     * ENVELOPE. The widest things are the capital and the coping at 1.118
+     * against a box halfX of 1.12, which is where v2 roundel already stands.
+     * The deepest is a rivet head at 0.235. Nothing new is below 1.90 but the
+     * base plate.
+     */
+    const duckBridgeGeo = (function () {
+      const px = 1.20 * LANE_FIT;
+      const parts = [
+        gl(hcbx(2.30, 0.40, 0.56, 0, 1.62, 0, 0xffc422, 0.05), GLOSS.paint),
+        gl(hcbx(2.38, 0.09, 0.58, 0, 1.785, 0, 0xfff0a0, 0.03), GLOSS.trim),
+        gl(hcbx(2.38, 0.07, 0.58, 0, 1.445, 0, 0xfff0a0, 0.02), GLOSS.trim),
+      ];
+      /**
+       * THE RIVET ROWS. Two rows of eleven on EACH face of the header, which
+       * is twice the work and is the whole of rule 1: the rear of this beam is
+       * what the player looks at for the second after they pass under it, and
+       * a riveted girder with a blank back is a stage flat.
+       */
+      for (const rz of [-0.20, 0.20]) {
+        for (const ry of [1.93, 2.11]) {
+          for (let i = 0; i < 11; i++) {
+            parts.push(gl(cyl(0.035, 0.035, 0.07, 6, (-1.00 + i * 0.20) * LANE_FIT, ry, rz,
+              0xd18a08, Math.PI / 2), GLOSS.trim));
+          }
+        }
+        // The field splice: a cover plate at mid span with its own rivets.
+        parts.push(gl(hbx(0.30, 0.36, 0.05, 0, 2.02, rz * 1.05, 0xd18a08), GLOSS.paint));
+        for (const sy of [1.88, 2.16]) {
+          for (const sxx of [-0.08, 0.08]) {
+            parts.push(gl(cyl(0.032, 0.032, 0.06, 6, sxx, sy, rz * 1.28, 0xfff0a0, Math.PI / 2), GLOSS.chrome));
+          }
+        }
+      }
+      for (const sx of [-1, 1]) {
+        const sxp = sx * px;
+        // THE COLUMN. Twelve-sided, r 0.14, 0 to 2.10 -- inside the same
+        // 0.718 to 1.018 band every other standard occupies at the road.
+        parts.push(gl(cyl(0.14, 0.145, 2.10, 12, sxp, 1.05, 0, 0xffc422), GLOSS.paint));
+        // Base plate, not a block, and no flare on it. See the header.
+        parts.push(bxAt(0.30, 0.07, 0.34, sx * 1.20, 0.035, 0, 0x2b1e05));
+        // A moulded band partway up, which is what stops a cast column being
+        // a length of pipe. Kept above 1.90 so the daylight bands do not move.
+        parts.push(gl(cyl(0.165, 0.165, 0.09, 12, sxp, 1.98, 0, 0xd18a08), GLOSS.trim));
+        /**
+         * THE FLARED CAPITAL and its abacus. r 0.14 to r 0.25 over 0.30, then
+         * a square plate. 0.868 + 0.25 = 1.118 against a box halfX of 1.12.
+         */
+        parts.push(gl(cyl(0.25, 0.14, 0.30, 12, sxp, 2.25, 0, 0xd18a08), GLOSS.paint));
+        parts.push(gl(bx(0.50, 0.09, 0.46, sxp, 2.445, 0, 0xfff0a0), GLOSS.chrome));
+        // THE BRIDGE PLATE, one on each column, on the face you come up to.
+        parts.push(gl(bx(0.24, 0.16, 0.04, sxp, 1.72, -0.235, 0xfff2e0), GLOSS.trim));
+        parts.push(gl(bx(0.17, 0.05, 0.05, sxp, 1.72, -0.255, 0x2b1e05), GLOSS.matte));
+        /**
+         * THE PARAPET. A sill across the deck, four balusters and a coping
+         * rail, on BOTH faces at z +/-0.15 -- a bridge is railed on both sides
+         * and the far one is in shot from behind for as long as the near one.
+         */
+        parts.push(gl(bx(0.46, 0.08, 0.42, sxp, 2.53, 0, 0x2b1e05), GLOSS.trim));
+        for (const rz of [-0.15, 0.15]) {
+          for (const bxo of [-0.18, -0.06, 0.06, 0.18]) {
+            parts.push(gl(bx(0.06, 0.44, 0.06, sxp + bxo, 2.79, rz, 0xffc422), GLOSS.paint));
+          }
+          parts.push(gl(bx(0.50, 0.09, 0.09, sxp, 3.055, rz, 0xfff0a0), GLOSS.chrome));
+        }
+      }
+      return merge(parts.concat(duckHeader()));
+    })();
+
+    /**
      * ============ THE DUCK SET AFTER THE DIFFERENTIATION PASS ============
      *
      * *"All duck obstacles looks exactly the same. Can you review them and
@@ -19889,6 +20946,26 @@ MR.World = (function () {
      *        rest post           -- left only               other
      *   v4   symmetric, 3.20     a SPOKED handwheel with    a blind flange
      *                            a hole in it               disc, and an elbow
+     *   v5   symmetric, 3.56     a CAGED LADDER: rungs      a landing plate and
+     *        I-section legs      and three hoops            a HANDRAIL, both
+     *                                                       sides of the deck
+     *   v6   symmetric, 3.47     a control box, and the     a big CANTED
+     *        TAPERED masts       head itself                FLOODLIGHT head on
+     *                                                       a yoke
+     *   v7   symmetric, 3.10     a FLARED CAPITAL that      a PARAPET: sill,
+     *        the shortest        opens r 0.14 to r 0.25     four balusters and
+     *                                                       a coping rail
+     *
+     * ---- AND THE FOURTH LEVER, WHICH THE FIRST FIVE LEFT ON THE TABLE -----
+     *
+     * The clearance header is 0.34 deep in a box of halfZ 0.30, so there is
+     * 0.12 of free relief in FRONT of it and 0.12 BEHIND it, running the whole
+     * span, in a band where mass across the lane is already allowed. v0 to v4
+     * use none of it. v5 puts a walkway toe plate in front and a cable tray
+     * with three cables behind; v6 puts three marker lamps in front and the
+     * armoured feed on saddle clips behind; v7 puts two rows of eleven rivets
+     * and a splice plate on BOTH faces. It is the only differentiator in this
+     * kind that is available across the lane rather than out at a standard.
      *
      * ---- THE TWO THINGS THAT WERE ACTIVELY WRONG --------------------------
      *
@@ -19928,6 +21005,9 @@ MR.World = (function () {
       { geo: duckSignGeo, face: [2.26, 0.34, 1.62, -0.292] },
       { geo: duckBoomGeo, face: [2.26, 0.38, 1.62, -0.292] },
       { geo: duckPipeGeo, face: [2.26, 0.34, 1.62, -0.292] },
+      { geo: duckWalkGeo, face: [2.26, 0.36, 1.60, -0.292] },
+      { geo: duckFloodGeo, face: [2.26, 0.34, 1.62, -0.292] },
+      { geo: duckBridgeGeo, face: [2.26, 0.38, 1.62, -0.292] },
     ]);
 
     /**
@@ -30145,6 +31225,10 @@ MR.Player = (function () {
       // SPAN rather than a flag so a bounce out of one lorry and into the next
       // is two incidents and not one -- see resolveDeck.
       flanked: null,
+      // The surge zone being run, or null. THE ZONE OBJECT, not a boolean, for
+      // the same reason `ramp` is: leaving one zone and entering another is two
+      // events, and a boolean cannot tell the second from the first.
+      surge: null,
       gateIdx: 0,
       aidIdx: 0,
       lastResult: null,  // 'clean' | 'hit'
@@ -30167,6 +31251,7 @@ MR.Player = (function () {
       s.airT = 0; s.airborne = false; s.duckT = 0; s.ducking = false;
       s.duck01 = 0; s.lean = 0; s.stumble = 0; s.bounce = 0; s.tripT = 0;
       s.surface = 0; s.ramp = null; s.falling = 0; s.fallFrom = 0; s.flanked = null;
+      s.surge = null;
       s.gateIdx = 0; s.aidIdx = 0;
       s.lastResult = null; s.lastGate = null; s.events.length = 0;
     };
@@ -30607,6 +31692,41 @@ MR.Player = (function () {
         s.events.push('aid');
       }
       return out;
+    };
+
+    /**
+     * Is the runner electing the surge right now?
+     *
+     * ---- THE WHOLE INPUT FOR THE WHOLE MECHANIC IS THIS FUNCTION ----------
+     *
+     * There is no button, no hold, no double-tap and no new verb. A surge is
+     * elected by BEING IN THE MARKED LANE, which means the swipe the player
+     * already knows is the entire commitment. A new control was considered and
+     * refused on a concrete ground rather than a stylistic one: every control
+     * in this game is a swipe ANYWHERE on the canvas, so any button would sit
+     * exactly where a mis-started swipe lands, and the cost of that misfire in
+     * a game where one contact ends a record attempt is the run.
+     *
+     * `fuelled` is passed in rather than read, because the pool lives on Pace
+     * and this file has never known about the race clock. An empty tank ends
+     * the surge on the spot: the pace eases back up under the same law it
+     * eased down, and the player sees the gauge empty and feels the gear go.
+     *
+     * The two edges are separate events. Entering is worth a cue because the
+     * player has just spent something; leaving is worth one because they have
+     * just stopped, and the two reasons for leaving -- swerving out and running
+     * dry -- feel different and are told apart by whether the tank is empty.
+     */
+    s.resolveSurge = function (course, unitsNow, fuelled) {
+      const zone = course && course.surgeAt
+        ? course.surgeAt(unitsNow, s.lane, s.onDeck) : null;
+      const want = zone && fuelled ? zone : null;
+      if (want !== s.surge) {
+        if (want) s.events.push('surge');
+        else s.events.push(fuelled ? 'surgeOut' : 'surgeDry');
+      }
+      s.surge = want;
+      return want;
     };
 
     s.drainEvents = function () {
@@ -31798,8 +32918,31 @@ MR.HUD = (function () {
         -->
         <div id="engine">
           <div class="lab">FUEL</div>
+          <!--
+            THE GAUGE CARRIES THE POOL UNDER EFFORT, AND NOTHING ELSE MOVES.
+
+            The owner's constraint was explicit: no new plate. So the tank the
+            player already reads becomes the tank the player already reads --
+            same box, same label, same white record tick -- and what fills it
+            becomes the pool rather than the pace.
+
+            That leaves the pace needing somewhere to be, because the record
+            tick is meaningless without it: the tick's whole job is to be the
+            line the pace crosses. So the pace becomes a HAIRLINE that slides
+            along the same bar. Pace and record are still read against each
+            other exactly as they were -- the hairline reaches the tick at the
+            same instant the fill used to -- and the fill is freed to be the
+            one thing the player now has to decide about.
+
+            Three readings, one bar, and no two of them are the same encoding:
+            the FILL is how much you have, the HAIRLINE is how fast you are, the
+            TICK is how fast the record needs. At EFFORT = 0 the hairline is
+            hidden and the fill goes back to being the pace, which is the
+            shipped plate to the pixel.
+          -->
           <div class="gauge tank" id="paceGauge">
             <div class="gaugeFill" id="gaugeFill"></div>
+            <div class="gaugePace" id="gaugePace"></div>
             <div class="gaugeRec"></div>
           </div>
           <div class="lab" id="paceLab">PACE</div>
@@ -32109,7 +33252,8 @@ MR.HUD = (function () {
       clock: q('clock'),
       projCell: q('projCell'), projVal: q('projVal'), margin: q('margin'), status: q('status'),
       engine: q('engine'), why: q('why'),
-      gaugeFill: q('gaugeFill'), paceVal: q('paceVal'),
+      gaugeFill: q('gaugeFill'), gaugePace: q('gaugePace'),
+      paceGauge: q('paceGauge'), paceVal: q('paceVal'),
       distVal: q('distVal'),
       railWrap: q('railWrap'),
       rail: q('rail'), railFill: q('railFill'), railGap: q('railGap'), railGhost: q('railGhost'),
@@ -32672,8 +33816,26 @@ MR.HUD = (function () {
       // and both cross the white record tick at the same instant, which is why
       // the required-pace line and the clean count that used to sit under here
       // were removed rather than reworded. See the plate's comment above.
-      n.gaugeFill.style.width =
-        (clamp01((K.START_PACE - p.pace) / (K.START_PACE - K.FLOOR_PACE)) * 100) + '%';
+      // The pace fill, which is what the bar has always drawn. Under EFFORT it
+      // is drawn against the SURGE floor rather than K.FLOOR_PACE, because the
+      // range the gauge maps has to be the range the player can actually reach
+      // -- a bar that pinned at 100% while a surge was still buying speed would
+      // stop moving at exactly the moment the player spent something for it.
+      const lo = MR.Pace.EFFORT > 0 ? MR.Pace.SURGE.FLOOR_SURGE : K.FLOOR_PACE;
+      const pace01 = clamp01((K.START_PACE - p.pace) / (K.START_PACE - lo));
+      if (MR.Pace.EFFORT > 0) {
+        // The fill is the POOL, counted. Fractional while a surge burns, which
+        // is the whole difference between the two spends: a guard takes one
+        // segment in a single step and reads as a notch going out, a surge
+        // slides continuously down through the divisions.
+        const pool01 = clamp01(p.pool / MR.Pace.SURGE.POOL_MAX);
+        n.gaugeFill.style.width = (pool01 * 100) + '%';
+        n.gaugePace.style.left = (pace01 * 100) + '%';
+        cls(n.paceGauge, 'gaugeCls', 'gauge tank pool' + (p.surging ? ' surging' : ''));
+        cls(n.engine, 'engCls', p.surging ? 'surging' : '');
+      } else {
+        n.gaugeFill.style.width = (pace01 * 100) + '%';
+      }
       set(n.paceVal, 'pace', Pace.pace(p.pace));
       cls(n.paceVal, 'paceCls', 'val num' + (p.pace <= K.RECORD_PACE ? ' ahead' : ''));
 
@@ -32778,6 +33940,21 @@ MR.HUD = (function () {
       n.engine.classList.add('broken');
       setTimeout(() => n.engine.classList.remove('broken'), 520);
       hintUntil = performance.now() + 2200;
+    };
+
+    /**
+     * A contact a segment paid for.
+     *
+     * DELIBERATELY NOT flashBroken. The plate going red is the game saying the
+     * streak is gone and the seconds are on the clock, and neither is true
+     * here -- a guard is the one contact in this game that costs no time at
+     * all. It flashes the plate in the engine's own colour instead, which reads
+     * as the tank doing its job rather than as damage, and it does not arm the
+     * STREAK CUT hint, because nothing was cut.
+     */
+    api.flashGuard = function () {
+      n.engine.classList.add('guarded');
+      setTimeout(() => n.engine.classList.remove('guarded'), 460);
     };
 
     // ---- the aid card ----------------------------------------------------
@@ -33148,6 +34325,14 @@ MR.HUD = (function () {
   // clamp themselves; see the accessors at the foot of course.js.
   if (params.has('narrow')) MR.Course.NARROW = params.get('narrow') || 1;
   if (params.has('ramp')) MR.Course.RAMP = params.get('ramp') || 1;
+  // ...and the third, which is the biggest of them. ?effort=0 returns the game
+  // exactly as it was before the pool, the guard and the surge zones existed:
+  // no zones are planned, no stream is drawn, the pace floor goes back to 4:14
+  // and the course is BIT-IDENTICAL. Read here, before Course.generate, for
+  // the same reason the other two are -- course.js asks MR.Pace.EFFORT whether
+  // to plan zones at all, so this line decides what road gets built.
+  if (params.has('effort')) MR.Pace.EFFORT = params.get('effort') || 1;
+  const EFFORT = MR.Pace.EFFORT > 0;
   // ?joy=0..1 forces the finish verdict the celebration pose blends on. Same
   // shape and same reason as ?polish: ONE build photographs both ends of the
   // gesture, and the losing version does not need a deliberately broken run to
@@ -33672,6 +34857,18 @@ MR.HUD = (function () {
       if (BOT) botThink();
       player.handle(controls);
 
+      // ---- THE ELECTION, AND IT HAPPENS BEFORE THE STEP -------------------
+      //
+      // Before pace.update, because the surge decides which FLOOR this step is
+      // run toward and a step cannot be run at a pace that is chosen after it.
+      // Resolved off pace.units -- where the runner is now -- and player.lane,
+      // which player.handle has already served this frame, so a swipe into the
+      // marked lane takes effect on the step the player made it.
+      if (EFFORT) {
+        player.resolveSurge(course, pace.units, pace.pool > 0);
+        pace.surging = !!player.surge;
+      }
+
       const before = pace.units;
       pace.update(dt);
       const after = pace.units;
@@ -33682,13 +34879,26 @@ MR.HUD = (function () {
       // the ramp's own gate line sits at the foot of its tailgate, so the mount
       // has to be established on the same step the gate resolves or the game
       // records the runner colliding with the lorry he is running up.
-      const deck = player.resolveDeck(course, before, after);
-      if (deck && deck.hit) {
-        pace.onHit();
-        hitAt.push(deck.z);
-        cam.impact(1);
+      // ---- WHAT A CONTACT COSTS IS NOW A QUESTION, NOT A CONSTANT ---------
+      //
+      // pace.onHit() returns 'guard' when a segment paid for the contact and
+      // 'hit' when nothing did, and the two must not look the same. The
+      // PHYSICAL event is identical either way -- the runner still bounces,
+      // still trips, still stumbles, and the camera still takes the impact --
+      // because a guard that swallowed the collision would read as the game
+      // failing to register it. What the guard buys is the CONSEQUENCE: the
+      // streak survives, the seconds are not added, and the engine plate does
+      // not flash broken, because nothing broke.
+      function charge(z, shake) {
+        const how = pace.onHit();
+        cam.impact(shake);
+        if (how === 'guard') { hud.flashGuard(); audio.aid(false); return; }
+        hitAt.push(z);
         hud.flashBroken();
       }
+
+      const deck = player.resolveDeck(course, before, after);
+      if (deck && deck.hit) charge(deck.z, 1);
 
       // Resolve gates crossed this step.
       const results = player.resolveGates(course, before, after);
@@ -33697,10 +34907,7 @@ MR.HUD = (function () {
           pace.onClean();
           audio.clean(pace.streak);
         } else {
-          pace.onHit();
-          hitAt.push(r.gate.z);
-          cam.impact(1);
-          hud.flashBroken();
+          charge(r.gate.z, 1);
         }
       }
 
@@ -33708,9 +34915,19 @@ MR.HUD = (function () {
       const aidIdxBefore = player.aidIdx;
       const aidTook = player.resolveAid(course, before, after);
       for (const item of aidTook) {
+        // Read the tank BEFORE the pour, so the card can tell "it went in" from
+        // "there was nowhere to put it". A wasted bottle is the price of
+        // hoarding and the player has to be told it happened, or the cap is a
+        // rule they can only learn by not noticing it.
+        const roomBefore = pace.pool < MR.Pace.SURGE.POOL_MAX;
         pace.onAid(item.gain);
         audio.aid(item.kind === 'banana');
-        if (item.kind === 'banana') hud.toastAid('FUEL', '+' + item.gain + ' STREAK');
+        if (EFFORT) {
+          hud.toastAid(roomBefore ? 'FUEL' : 'TANK FULL',
+                       roomBefore ? '+1' : 'WASTED');
+        } else if (item.kind === 'banana') {
+          hud.toastAid('FUEL', '+' + item.gain + ' STREAK');
+        }
         // Taking one proves the player has not simply stopped seeing them, so
         // the missed cue below is allowed to speak again. See its note.
         aidNagged = false;
@@ -33770,6 +34987,16 @@ MR.HUD = (function () {
         }
         if (face > 0 && worth >= face * 0.5) { aidNagged = true; audio.aidMissed(); }
       }
+      // ...and under EFFORT the arithmetic above is answering a question that
+      // no longer exists: onAid does not grant streak, so `paid` is always
+      // zero and the cue could never fire. What a declined bottle costs now is
+      // a SEGMENT, and it costs one exactly when there was room for it. Same
+      // once-not-every-time edge, same re-arm on a collected item.
+      if (EFFORT && player.aidIdx - aidIdxBefore > aidTook.length && !aidNagged
+          && pace.pool < MR.Pace.SURGE.POOL_MAX) {
+        aidNagged = true;
+        audio.aidMissed();
+      }
 
       // Player events -> audio.
       for (const e of player.drainEvents()) {
@@ -33779,6 +35006,14 @@ MR.HUD = (function () {
         else if (e === 'land') { audio.land(); cam.land(); }
         else if (e === 'duck') audio.duck();
         else if (e === 'hit') audio.hit();
+        // The surge edges. Borrowed cues rather than new ones: audio.js belongs
+        // to another pass and a sound invented from this file is a sound nobody
+        // mixed. Entering reuses the fruit pickup -- the brightest affirmative
+        // in the set, which is what spending on speed should feel like -- and
+        // running dry reuses the missed-aid cue, which is already the sound of
+        // help that is no longer there.
+        else if (e === 'surge') audio.aid(true);
+        else if (e === 'surgeDry') audio.aidMissed();
       }
 
       // Footsteps locked to the run cycle, not to a timer.

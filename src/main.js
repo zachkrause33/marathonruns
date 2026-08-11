@@ -872,7 +872,14 @@
     // After the camera, never before: the ghost's tag is placed against this
     // frame's lens (position, fov, aspect), and a frame of lag there shows up
     // as the tag swimming during a lane change.
-    ghost.update(sdt, { pace, camera: cam.camera, playerX: player.x, celT });
+    // The same two launch numbers the runner and the camera are handed, on the
+    // same frame: the record holder is starting the same race on the same gun,
+    // so it stands on the line and leaves it with the player rather than jogging
+    // through the countdown beside a runner who is not.
+    ghost.update(sdt, {
+      pace, camera: cam.camera, playerX: player.x, celT,
+      stand: stand01, launch,
+    });
 
     // The crossover is the moment the whole ghost exists for, so it gets a
     // sound like every other beat in the race. Ghost owns the detection (it

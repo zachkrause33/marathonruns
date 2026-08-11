@@ -444,7 +444,11 @@ MR.Ghost = (function () {
 
     /**
      * @param dt real seconds
-     * @param st { pace, camera, playerX }
+     * @param st { pace, camera, playerX, celT, stand, launch }
+     *
+     * `stand` and `launch` are the start line, handed down from main.js so the
+     * record holder leaves on the same gun as the player. See the block at
+     * body.update below.
      */
     s.update = function (dt, st) {
       const pace = st.pace;
@@ -525,7 +529,41 @@ MR.Ghost = (function () {
         // nearly all edge. It still dies with the body at the haze wall, which
         // is why it cannot use the shared, opaque, cached ink material.
         rim.uniforms.rimAlpha.value = Math.min(1, alpha * 1.45 + 0.10);
-        body.update(dt, { speed: SPEED });
+        // ---- IT TOES THE LINE TOO -------------------------------------------
+        //
+        // The owner, after the player was fixed: "The ghost runner also needs to
+        // stand still until it starts." Two figures on the start line, one
+        // correctly still and one still jogging, is worse than when both were
+        // wrong -- the difference is what draws the eye.
+        //
+        // Nothing is authored here. `stand` is the same pose blend and `launch`
+        // the same stride ramp main.js hands the player, off the same clock on
+        // the same frame, because the two are starting the same race on the same
+        // gun. What was worth checking rather than assuming is that a CONSTANT
+        // speed still ramps: cadence in runner.js is 2.55 * (speed / SPEED_LO)^
+        // 0.72, a power of the value it is handed and not of where that value
+        // came from, so SPEED * 0 is cadence 0 and the ghost's stride phase
+        // freezes exactly as the player's does.
+        //
+        // The two ramps are also the same SHAPE, which is the part that decides
+        // whether they look like one gun or two. The ghost runs record pace and
+        // the player starts at 5:30, so at any equal fraction of the launch the
+        // ghost's cadence is a constant 1.1449x the player's -- the ratio does
+        // not move across the ramp, so both reach their own full rate on the same
+        // frame. The 14% it keeps is the contrast this file already wants: the
+        // record's legs and the player's legs are never turning over together.
+        //
+        // The phase offset survives it. `body.phase` is seeded to 0.37 so the two
+        // do not read as one figure and its reflection; a frozen phase holds that
+        // seed through the countdown and the cycle resumes on it, so the offset
+        // costs nothing and is not re-derived here.
+        //
+        // NOTHING ABOVE OR BELOW THIS LINE MOVES. This is a rendering change:
+        // gz, gap, s.x, the crossover flash and ghostMiles are all untouched.
+        body.update(dt, {
+          speed: SPEED * (st.launch === undefined ? 1 : st.launch),
+          stand: st.stand || 0,
+        });
         // The ghost runs the same road. Its own maths is untouched -- ghostMiles
         // is raceTime / RECORD_PACE and race time is grade-neutral by
         // construction -- so this is the record holder being DRAWN on the

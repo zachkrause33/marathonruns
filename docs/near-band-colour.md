@@ -511,3 +511,171 @@ And the lever nobody had looked for was free the whole time: the fairness gate
 measures hazards against a tarmac patch that **does not contain the road
 markings**, so the markings' chroma is structurally independent of it — twelve
 variants, three legs, six steps, margins identical to three decimals.
+
+---
+
+## 8. The remainder, censused: there is nothing else down there
+
+Section 6 ended by saying the rest of the gap "is not in the palette of the
+surfaces we have" and that closing it "means putting more saturated non-road
+area into the bottom third of the frame". That was an inference. This section
+measures it, and the inference turns out to have been understated: it is not
+that the other things in the near band are near-neutral. **They are not there.**
+
+Diagnosis only. No file under `src/` was edited to produce any number here, and
+none was edited as a result of them.
+
+### The instrument, and the three defects it had first
+
+`tools/nearband.js`. It takes `chromadepth.js`'s readback verbatim -- the same
+default-framebuffer colour read, the same ink-aware id and depth passes, so the
+two reconcile exactly -- and adds a **world-space fingerprint** per cluster:
+a `Box3` over the cluster's meshes after an explicit `updateMatrixWorld(true)`,
+reported as lateral half-extent in LANES about the runner and base height over
+his feet. Shares are quoted **as a share of the near band**, not of the frame.
+
+Its own `--audit` found three defects before any output was used, and all three
+flattered the answer:
+
+- the cluster stat had lost the `y < third` restriction, so it measured
+  whole-frame area against a near-band denominator and shares summed to **300%**.
+- colour was read from a plain `WebGLRenderTarget`, which is **linear**, where
+  `chromadepth` reads the sRGB default framebuffer. It printed near L **0.092**
+  against a true 0.308 -- every dark surface darker than it is.
+- **the frame was not frozen.** `main.js` calls `requestAnimationFrame` at the
+  TOP of `frame()`, so overriding rAF still lets one queued frame run, and
+  `onBeforeRender` hooks read `performance.now()` directly. Every one of the
+  three renders a census performs advanced anything driven by wall time.
+  **Pinning the clock is what makes the band aggregate reconcile with
+  `chromadepth` exactly** -- 0.252 / 0.101 / 0.308 / 9.1 on both, where before
+  it was 0.004 out. `chromadepth` overrides rAF inside its own measure call and
+  so carries the same one-frame ambiguity; that is the size of its noise floor.
+
+Repeatability is asserted at 1pp on the world clusters and the measured drift is
+printed on every run. Five of six legs return **exactly 0.0000**; CITY START
+returns 0.22pp, because the world holds animated crowd whose integrators step
+per render. The run-to-run floor on the whole pipeline is discrete rather than
+continuous: CITY START near S comes back as either **0.243 or 0.252** depending
+on which step the runner's rig lands on.
+
+### The near band is the carriageway, and it is smaller than the road
+
+Every near-band pixel unprojected through the shipped camera at its own measured
+depth. The band is not a region of the world anyone chose; it is what the bottom
+third of a 620x1344 portrait frame reaches at a mean depth of 5.2 units:
+
+| leg | skip | footprint on the ground | half-width about the runner |
+|---|---|---|---|
+| CITY START | 25 | x -2.5..2.5, z 570.9..575.7 | 1.47 lanes |
+| RIVERSIDE | 60 | x -3.9..0.5, z 1472.1..1476.9 | 1.28 lanes |
+| THE BRIDGE | 95 | x -2.6..2.6, z 2414.5..2419.2 | 1.52 lanes |
+| THE BRIDGE | 110 | x -1.1..4.2, z 2820.7..2825.8 | 1.64 lanes |
+| PARKLAND | 140 | x -2.6..2.6, z 3637.5..3642.1 | 1.53 lanes |
+| THE WALL | 178 | x -2.6..2.6, z 4676.6..4681.2 | 1.52 lanes |
+
+**About five units wide and under five units deep.** The carriageway's own
+half-extent is 2.2 lanes. **The near band does not even span the road it lies
+on** -- it is the middle of the carriageway, directly under the runner, and the
+kerb line sits roughly 50% further out than the band's widest edge ever reaches.
+
+### What is in it, with correct occlusion
+
+Shares are % of the near band. One run, all six legs, so the rows are comparable.
+
+| leg | tarmac | paint | telegraph mats | runner | hazard | **other world scenery** | near S | vivid% |
+|---|---|---|---|---|---|---|---|---|
+| CITY START 25 | 56.1 | 33.6 | 0.0 | 10.3 | 0.0 | **0.0** | 0.252 | 9.1 |
+| RIVERSIDE 60 | 35.5 | 21.8 | 10.2 | 10.6 | 9.7 | **12.1** | 0.298 | 15.4 |
+| THE BRIDGE 95 | 26.2 | 22.0 | 36.7 | 15.0 | 0.0 | **0.0** | 0.249 | 9.1 |
+| THE BRIDGE 110 | 37.2 | 24.9 | 23.3 | 14.7 | 0.0 | **0.0** | 0.297 | 9.2 |
+| PARKLAND 140 | 54.2 | 31.3 | 0.0 | 14.5 | 0.0 | **0.0** | 0.282 | 9.9 |
+| THE WALL 178 | 31.8 | 23.9 | 31.4 | 9.7 | 3.2 | **0.0** | 0.362 | 26.7 |
+
+**On five of six legs, not one pixel of the near band belongs to anything that
+is not the play surface, the runner, or a hazard.** No kerb, no shoulder, no
+barrier, no railing, no street furniture, no verge, no building, no wall, no
+vehicle, no crowd member. Not near-neutral -- **absent**.
+
+On the sixth, RIVERSIDE, the single exception is one 144-triangle unlit quad at
+12.1% -- **the river**, which the band catches because `bank` cuts the shoulder
+away there and the runner was in an outer lane so the band spilled off the road
+edge. It is already at **S 0.355, C 0.187**: more colourful than the tarmac it
+sits beside, and the one piece of scenery the band can see is already doing
+better than the band average.
+
+The third thing in the band is the one nobody had named: **the telegraph mats.**
+Identified by construction rather than inference -- 1.4 x 16.0 quads at lane
+x = -1.70 / 0 / +1.70, renderOrder 5, a 128px map, `matMat[K.JUMP|DUCK|BLOCK]`
+at `world.js:6876`. They are **0% to 36.7%** of the band depending on whether a
+hazard happens to be telegraphing, and they are the single reason THE WALL sits
+at 0.362 while PARKLAND sits at 0.282. **The most colourful large thing that
+ever enters the near band is a gameplay signal, and it is already at full
+saturation.**
+
+### The experiment, because a table is an argument
+
+Saturating every world object that is **not** the play surface, about its own
+luminance-grey so linear luminance is preserved exactly, at k = 6:
+
+| leg | mode | what was touched | near S | near C | vivid% |
+|---|---|---|---|---|---|
+| CITY START | shipped | -- | **0.252** | 0.101 | 9.1 |
+| CITY START | **scenery** | 15 materials, 22 colour attributes, **31 texture maps** | **0.252** | 0.101 | 9.1 |
+| CITY START | all (control) | 19 materials, 33 colour attributes, 51 texture maps | **0.810** | 0.468 | 83.4 |
+| RIVERSIDE | shipped | -- | 0.298 | 0.136 | 15.4 |
+| RIVERSIDE | **scenery** | 18 materials, 28 colour attributes, 39 texture maps | **0.293** | 0.136 | 14.9 |
+| RIVERSIDE | all (control) | 23 materials, 41 colour attributes, 62 texture maps | **0.780** | 0.396 | 60.0 |
+
+**Repainting every piece of scenery in the world leaves the near band
+bit-identical**, while the same operation including the play surface moves it
+by 0.558. This is the strongest kind of ablation -- one that *must* move
+nothing, and does not -- and it is the same shape as the fog result in section 4.
+
+**The control is not decoration, and this tool needed it.** Its first version
+scaled `material.color` only, and reported the same zero for the wrong reason:
+the RIVERSIDE water is `0xffffff` with its tone in a **map**, so scaling white
+about its own grey returns white. **That is the `roadchroma` defect a third
+time** -- six identical rows that would have read as proof. Textured objects are
+now boosted through their texels, and the count of white-with-a-map materials is
+printed beside every result so a zero can never be read without it.
+
+### What closing the rest would cost
+
+Near-band S is an area-weighted mean of its clusters, so this is arithmetic
+rather than a model. To reach the Subway Surfers median of 0.460 by adding new
+saturated geometry to the band:
+
+| leg | new geometry at S 0.80 | at S 0.60 | at S 0.50 | vivid-area, at 100% vivid |
+|---|---|---|---|---|
+| CITY START | **38.0%** of the band | 59.8% | 83.9% | **51.9%** |
+| THE WALL | 21.5% | 39.9% | 69.9% | 40.2% |
+
+**Between a fifth and half of the carriageway directly under the runner would
+have to be covered in fully saturated material** -- inside a footprint of five
+units by five, on the surface the fairness gate protects.
+
+And the game already contains the object that would do it. A telegraph mat is
+S 0.507 in the band; three of them, one per lane, is roughly the 38%. **That
+change is unavailable for a reason no budget can fix: a mat means a hazard is
+coming, and a play surface that is permanently mat-coloured is precisely what
+the mat's meaning depends on it not being.** The colour and the signal are the
+same resource, and the signal has the prior claim.
+
+### The finding
+
+**The near band is the carriageway. There is nothing else down there to colour.**
+
+The candidates the brief for this pass listed -- kerbs and shoulders, barriers
+and railings, street furniture, buildings and walls, the verge, the vehicles,
+the crowd -- are not near-neutral contributors to the near band. **They
+contribute exactly zero, because none of them is in it on any leg measured.**
+Repainting them is not a small win; it is not a win at all, and the ablation
+says so to three decimal places.
+
+So the honest position is the one entry 57 reached from the other direction, now
+with a number under it: **k = 3 on the markings closed 24% of the gap and that
+is as far as this goes without new geometry ON the play surface.** The remaining
+76% is not recoverable from the palette of the things we have, because the
+things we have are not there. It is recoverable only by changing what the play
+surface *is* -- which is the difference between a crimson train roof and a road,
+and that is a design question about the game, not a colour question about it.

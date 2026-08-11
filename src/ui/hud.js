@@ -353,19 +353,28 @@ MR.HUD = (function () {
 
         <div class="blurb">
           Three lanes. Jump or slide past everything in the way.
-          <b>26.2 miles, about four minutes.</b>
+          <b>26.2 miles.</b>
         </div>
 
-        <div class="mech" id="startRule">
-          <p>Every obstacle you clear in a row buys speed &mdash;
-             ${Pace.pace(K.START_PACE)} up to ${Pace.pace(K.FLOOR_PACE)} a mile.
-             Touch one and most of it is gone.</p>
-        </div>
+        <!--
+          THREE LINES CAME OUT OF THIS PANEL AND NONE OF THEM WERE WRONG.
+          The owner cut the duration, the pace rule and the mistake count:
+          "about four minutes", "5:30 up to 4:14 a mile, touch one and most of
+          it is gone", "survives one mistake in 185".
 
+          Every one was true and every one was answering a question nobody had
+          asked yet. A player who has not run this cannot use a pace range, has
+          no idea whether 185 gates is a lot, and does not need the length of a
+          thing they are about to be shown. The panel now states the wager and
+          the controls and stops -- the mechanic teaches itself on the road,
+          where the fuel gauge and the pace readout are already saying it live.
+
+          The target keeps its number because that IS the wager. What it loses
+          is the gloss under it.
+        -->
         <div class="target">
           <span class="targetLab">TARGET</span>
           <b class="num">${K.RECORD_LABEL}</b>
-          <span class="targetSub" id="targetSub">&nbsp;</span>
         </div>
 
         <!--
@@ -556,7 +565,7 @@ MR.HUD = (function () {
       gapVal: q('gapVal'), gapTrend: q('gapTrend'), gapLabel: q('gapLabel'),
       toast: q('toast'), toastLab: q('toastLab'), toastBig: q('toastBig'),
       startPanel: q('startPanel'), startBtn: q('startBtn'), startDate: q('startDate'),
-      startRoute: q('startRoute'), startKeys: q('startKeys'), targetSub: q('targetSub'),
+      startRoute: q('startRoute'), startKeys: q('startKeys'),
       startMemory: q('startMemory'),
       endPanel: q('endPanel'), endTime: q('endTime'), endDate: q('endDate'),
       endVs: q('endVs'), endStreak: q('endStreak'), endStreakSub: q('endStreakSub'),
@@ -939,8 +948,6 @@ MR.HUD = (function () {
         ? set.map(function (x) { return x.name; }).join(' → ')
         : '';
       drawRoute(set);
-      const g = course.gates ? course.gates.length : 0;
-      n.targetSub.textContent = g ? 'survives one mistake in ' + g : '';
       // The route and the gate count arrive after the panel is first laid out
       // and both add height, so the overflow test has to run again here or it
       // measures a panel shorter than the one on screen.

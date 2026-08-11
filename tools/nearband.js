@@ -74,8 +74,10 @@ const H = parseInt(arg('h', '1344'), 10);
 const TOP = parseInt(arg('top', '18'), 10);
 const AUDIT = has('audit');
 const JSON_OUT = has('json');
+const BOOST = arg('boost', 'none');      // none | scenery | playsurface | all
+const BOOST_K = parseFloat(arg('k', '6'));
 
-const PAGE_FN = function () {
+const PAGE_FN = function (opt) {
   const THREE = window.THREE || (window.MR && MR.THREE);
   window.requestAnimationFrame = function () { return 0; };
   const g = MR.game;
@@ -135,6 +137,109 @@ const PAGE_FN = function () {
               ? m.geometry.attributes.position.count / 3 : 0),
     };
   });
+
+  // ---- the boost ablation -------------------------------------------------
+  //
+  // The census says the near band contains nothing but the play surface. That
+  // is an argument from a table. This turns it into an EXPERIMENT of the kind
+  // that exonerated the lighting: saturate every non-play-surface object in
+  // the world as hard as the colour space allows, and re-measure the band. If
+  // repainting the scenery is worth nothing, this must move the near band by
+  // ZERO -- and a mode that must move nothing, and does not, is the strongest
+  // test there is.
+  //
+  // 'all' is the CONTROL, and it is not optional. A boost that silently failed
+  // to bite would report the same zero and read as proof. tools/roadchroma.js
+  // shipped exactly that defect: it swept the markings by scaling
+  // mats.paint.color, which is 0xffffff with vertex colours on, and printed six
+  // identical rows that would have read as "repainting changes nothing". So
+  // 'all' must move the band a long way, or 'scenery' proves nothing.
+  //
+  // Chroma is scaled about each colour's own luminance-grey, which preserves
+  // linear luminance exactly, so the boost cannot move the band by making it
+  // brighter -- only by making it more colourful.
+  const boostMode = (opt && opt.boost) || 'none';
+  const boostK = (opt && opt.k) || 6;
+  var boostedMats = 0, boostedVerts = 0, boostedMaps = 0, skippedWhite = 0;
+  if (boostMode !== 'none') {
+    const seenMat = new Set();
+    function pushChroma(c) {
+      const y = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+      c.r = Math.max(0, Math.min(1, y + (c.r - y) * boostK));
+      c.g = Math.max(0, Math.min(1, y + (c.g - y) * boostK));
+      c.b = Math.max(0, Math.min(1, y + (c.b - y) * boostK));
+    }
+    for (var bi = 0; bi < meshes.length; bi++) {
+      if (info[bi].owner !== 'world') continue;
+      const triN = info[bi].tri;
+      const mb = Array.isArray(meshes[bi].material) ? meshes[bi].material[0] : meshes[bi].material;
+      if (!mb) continue;
+      // the play surface: road slab and lane bands (42), paint ladder (114),
+      // telegraph mats (64) -- all vertex-coloured.
+      const isPlay = !!mb.vertexColors &&
+        (Math.abs(triN - 42) < 1 || Math.abs(triN - 114) < 1 || Math.abs(triN - 64) < 1);
+      const want = boostMode === 'all' ? true : (boostMode === 'playsurface' ? isPlay : !isPlay);
+      if (!want) continue;
+      if (mb.color && !seenMat.has(mb.uuid)) {
+        seenMat.add(mb.uuid);
+        // A material whose colour is white with a MAP on it carries none of its
+        // tone in material.color, so scaling that colour returns white and the
+        // boost silently does nothing -- the roadchroma defect, and this tool
+        // shipped it too until the RIVERSIDE water refused to move. Count these
+        // so a zero result can never be read without knowing how many objects
+        // the boost could not reach through their colour alone.
+        const isWhite = mb.color.r > 0.99 && mb.color.g > 0.99 && mb.color.b > 0.99;
+        if (isWhite && mb.map) skippedWhite++;
+        pushChroma(mb.color); boostedMats++;
+      }
+      // The tone of a textured object lives in its TEXELS. Boost the image
+      // itself, about each texel's own luminance-grey, on the same rule.
+      if (mb.map && mb.map.image && !seenMat.has('map:' + mb.map.uuid)) {
+        seenMat.add('map:' + mb.map.uuid);
+        try {
+          const img = mb.map.image;
+          const iw = img.width || img.videoWidth, ih = img.height || img.videoHeight;
+          if (iw && ih) {
+            const cv = document.createElement('canvas');
+            cv.width = iw; cv.height = ih;
+            const cg = cv.getContext('2d', { willReadFrequently: true });
+            cg.drawImage(img, 0, 0);
+            const idata = cg.getImageData(0, 0, iw, ih);
+            const dd = idata.data;
+            const t2 = { r: 0, g: 0, b: 0 };
+            for (var pi = 0; pi < dd.length; pi += 4) {
+              t2.r = dd[pi] / 255; t2.g = dd[pi + 1] / 255; t2.b = dd[pi + 2] / 255;
+              pushChroma(t2);
+              dd[pi] = t2.r * 255; dd[pi + 1] = t2.g * 255; dd[pi + 2] = t2.b * 255;
+            }
+            cg.putImageData(idata, 0, 0);
+            const nt = new THREE.CanvasTexture(cv);
+            nt.wrapS = mb.map.wrapS; nt.wrapT = mb.map.wrapT;
+            nt.repeat.copy(mb.map.repeat); nt.offset.copy(mb.map.offset);
+            nt.colorSpace = mb.map.colorSpace;
+            nt.flipY = mb.map.flipY;
+            nt.needsUpdate = true;
+            mb.map = nt; mb.needsUpdate = true;
+            boostedMaps++;
+          }
+        } catch (e) { /* a cross-origin or unreadable image; counted by omission */ }
+      }
+      // Every actual tone can live in the geometry's colour attribute rather
+      // than in material.color; missing that is the roadchroma defect.
+      const ca = meshes[bi].geometry && meshes[bi].geometry.attributes && meshes[bi].geometry.attributes.color;
+      if (ca && !seenMat.has('geo:' + meshes[bi].geometry.uuid)) {
+        seenMat.add('geo:' + meshes[bi].geometry.uuid);
+        const tmp = { r: 0, g: 0, b: 0 };
+        for (var vi = 0; vi < ca.count; vi++) {
+          tmp.r = ca.getX(vi); tmp.g = ca.getY(vi); tmp.b = ca.getZ(vi);
+          pushChroma(tmp);
+          ca.setXYZ(vi, tmp.r, tmp.g, tmp.b);
+        }
+        ca.needsUpdate = true;
+        boostedVerts++;
+      }
+    }
+  }
 
   // ---- render + read back: chromadepth.js's, verbatim ---------------------
   // Colour comes from the DEFAULT FRAMEBUFFER, so it is the sRGB-encoded frame
@@ -229,6 +334,74 @@ const PAGE_FN = function () {
   const near = stat(function (k, y) { return y < third; });
   const far = stat(function (k, y) { return y >= 2 * third; });
 
+  // ---- the near band's FOOTPRINT ON THE WORLD -----------------------------
+  // The census says what is in the band. This says what the band can REACH.
+  // Every near-band pixel is unprojected through the shipped camera using its
+  // own measured depth, which turns the bottom third of the frame into a
+  // trapezoid of actual ground -- so "there is no kerb down here" becomes a
+  // statement about where the kerb is relative to a boundary, rather than an
+  // observation that might just be this leg's dressing.
+  const inv = new THREE.Matrix4().copy(cam.projectionMatrix).invert();
+  const v3 = new THREE.Vector3();
+  var fx0 = Infinity, fx1 = -Infinity, fz0 = Infinity, fz1 = -Infinity, fN = 0;
+  var topx0 = Infinity, topx1 = -Infinity;
+  for (var fy = 0; fy < third; fy++) {
+    for (var fx = 0; fx < RW; fx++) {
+      var kk2 = fy * RW + fx;
+      var dep = depth[kk2];
+      if (!(dep > 0) || dep > 400) continue;
+      // NDC -> view ray -> scale to the measured view depth -> world.
+      v3.set((fx + 0.5) / RW * 2 - 1, (fy + 0.5) / third * 2 * (third / RH) + ((0) / RH * 2 - 1), -1)
+        .set((fx + 0.5) / RW * 2 - 1, (fy + 0.5) / RH * 2 - 1, -1)
+        .applyMatrix4(inv);
+      v3.multiplyScalar(dep / -v3.z);
+      v3.applyMatrix4(cam.matrixWorld);
+      if (v3.x < fx0) fx0 = v3.x; if (v3.x > fx1) fx1 = v3.x;
+      if (v3.z < fz0) fz0 = v3.z; if (v3.z > fz1) fz1 = v3.z;
+      if (fy >= third - 2) { if (v3.x < topx0) topx0 = v3.x; if (v3.x > topx1) topx1 = v3.x; }
+      fN++;
+    }
+  }
+  const LANEW = (MR.K && MR.K.LANE_W) || 1.7;
+  const rp0 = new THREE.Vector3();
+  if (runnerG) runnerG.getWorldPosition(rp0);
+  const footprint = fN ? {
+    xMin: fx0, xMax: fx1, zMin: fz0, zMax: fz1,
+    halfWidthLanes: Math.max(Math.abs(fx0 - rp0.x), Math.abs(fx1 - rp0.x)) / LANEW,
+    topHalfWidthLanes: Math.max(Math.abs(topx0 - rp0.x), Math.abs(topx1 - rp0.x)) / LANEW,
+  } : null;
+
+  // How far out does the nearest world geometry that is NOT the play surface
+  // actually sit? Measured over everything in the scene, whether it lands in
+  // the band or not -- that is the comparison the footprint has to be read
+  // against.
+  var nearestScenery = null;
+  const sbox = new THREE.Box3();
+  for (var mi2 = 0; mi2 < meshes.length; mi2++) {
+    if (info[mi2].owner !== 'world') continue;
+    const mt2 = Array.isArray(meshes[mi2].material) ? meshes[mi2].material[0] : meshes[mi2].material;
+    // skip the play surface: road/paint are toon+vcol, mats are basic+vcol
+    const triN = info[mi2].tri;
+    if (mt2 && mt2.vertexColors && (Math.abs(triN - 42) < 1 || Math.abs(triN - 114) < 1 || Math.abs(triN - 64) < 1)) continue;
+    sbox.makeEmpty(); sbox.expandByObject(meshes[mi2]);
+    if (sbox.isEmpty()) continue;
+    // Skip the world-scale shells: sky dome, ground plane, water ripples. They
+    // straddle the runner in x and would report a nearest scenery distance of
+    // zero on every leg, which is the answer the first version of this probe
+    // gave -- a 1472-triangle ShaderMaterial 1800 units tall, i.e. the sky.
+    if (sbox.max.x - sbox.min.x > 60 || sbox.max.y - sbox.min.y > 60) continue;
+    // only things roughly abreast of the runner, within 40 units of road
+    if (sbox.max.z < rp0.z - 10 || sbox.min.z > rp0.z + 40) continue;
+    const lat = Math.max(0, Math.min(Math.abs(sbox.min.x - rp0.x), Math.abs(sbox.max.x - rp0.x)));
+    const inside = sbox.min.x < rp0.x && sbox.max.x > rp0.x;
+    const d2 = inside ? 0 : lat;
+    if (!nearestScenery || d2 < nearestScenery.lat) {
+      nearestScenery = { lat: d2, lanes: d2 / LANEW, tri: triN,
+                         type: mt2 ? mt2.type : '?', color: mt2 && mt2.color ? '#' + mt2.color.getHexString() : '',
+                         yBase: sbox.min.y - rp0.y, ySize: sbox.max.y - sbox.min.y };
+    }
+  }
+
   // ---- clusters, with a world fingerprint ---------------------------------
   const byGeo = {};
   for (var k2 = 0; k2 < info.length; k2++) {
@@ -271,7 +444,9 @@ const PAGE_FN = function () {
   cl.forEach(function (c) { if (c.nearb) classified += c.nearb.n; });
 
   return {
-    RW: RW, RH: RH, near: near, far: far,
+    RW: RW, RH: RH, near: near, far: far, footprint: footprint, nearestScenery: nearestScenery,
+    boost: boostMode, boostK: boostK, boostedMats: boostedMats, boostedVerts: boostedVerts,
+    boostedMaps: boostedMaps, skippedWhite: skippedWhite,
     nearN: nearN, classified: classified,
     unclassified: (nearN - classified) / nearN * 100,
     clusters: cl.filter(function (c) { return c.nearb; })
@@ -330,10 +505,15 @@ const PAGE_FN = function () {
       return { leg, mile: f * MR.K.MARATHON_MILES, draws: MR.game.renderer.info.render.calls,
                tris: MR.game.renderer.info.render.triangles };
     });
-    const r = await page.evaluate(PAGE_FN);
+    const r = await page.evaluate(PAGE_FN, { boost: BOOST, k: BOOST_K });
     if (errs.length) { console.error('PAGE THREW: ' + errs.join(' | ')); process.exit(1); }
     if (r.fail) { console.error('FAIL: ' + r.fail); process.exit(1); }
     all.push({ skip: SKIP, where, r });
+    if (BOOST !== 'none') {
+      console.log(`\nBOOST ${BOOST} k=${BOOST_K}: ${r.boostedMats} materials, ${r.boostedVerts} ` +
+        `colour attributes and ${r.boostedMaps} TEXTURE MAPS re-chroma'd about their own luminance-grey ` +
+        `(${r.skippedWhite} of those materials were white-with-a-map, i.e. carry no tone in material.color at all)`);
+    }
 
     console.log(`\nskip ${SKIP}  ${DATE}  ${W}x${H}  leg ${where.leg}  mile ${where.mile.toFixed(2)}  ` +
       `draws ${where.draws}  tris ${where.tris}  HUD off`);
@@ -348,6 +528,54 @@ const PAGE_FN = function () {
         `${c.dxLanes.toFixed(1).padStart(5)}  ${c.dyBase.toFixed(1).padStart(6)}  ` +
         `${String(c.meshes).padStart(3)}  ${String(Math.round(c.tri)).padStart(5)}  ` +
         `${c.owner.padEnd(8)} ${(c.matType + (c.vcol ? '+vcol' : '')).padEnd(21)} ${c.color}`);
+    }
+
+    if (r.footprint) {
+      const f = r.footprint;
+      console.log(`FOOTPRINT  the near band unprojects to ground x ${f.xMin.toFixed(1)}..${f.xMax.toFixed(1)}, ` +
+        `z ${f.zMin.toFixed(1)}..${f.zMax.toFixed(1)}  (half-width ${f.halfWidthLanes.toFixed(2)} lanes; ` +
+        `at the band's TOP edge ${f.topHalfWidthLanes.toFixed(2)} lanes)`);
+      if (r.nearestScenery) {
+        const s = r.nearestScenery;
+        console.log(`           nearest non-play-surface world geometry abreast of the runner sits ` +
+          `${s.lanes.toFixed(2)} lanes out (${s.lat.toFixed(2)}u), base ${s.yBase.toFixed(1)} height ${s.ySize.toFixed(1)}, ` +
+          `${Math.round(s.tri)}tri ${s.type} ${s.color}`);
+      } else {
+        console.log('           no non-play-surface world geometry abreast of the runner at all.');
+      }
+    }
+
+    // ---- the roll-up that answers "is there anything else down there" -----
+    // The play surface is the tarmac, the paint lying on it and the telegraph
+    // mats lying on it -- identified by material signature, then CHECKED
+    // against geometry, because a signature is a guess until it is. Everything
+    // else in the world role is scenery: kerbs, verges, barriers, furniture,
+    // buildings, crowd. That residual is the entire question this census is
+    // being asked, so it is printed in full and never truncated.
+    const isTarmac = (c) => c.owner === 'world' && c.matType === 'MeshToonMaterial' && c.vcol && c.color !== '#ffffff';
+    const isPaint = (c) => c.owner === 'world' && c.matType === 'MeshToonMaterial' && c.vcol &&
+      c.color === '#ffffff' && Math.abs(c.tri - 114) < 1;
+    const isMat = (c) => c.owner === 'world' && c.matType === 'MeshBasicMaterial' && c.vcol && Math.abs(c.tri - 64) < 1;
+    const sum = (f) => r.clusters.filter(f).reduce((a, c) => a + c.share, 0);
+    const scenery = r.clusters.filter((c) => c.owner === 'world' && !isTarmac(c) && !isPaint(c) && !isMat(c));
+    console.log('ROLL-UP (% of near band):' +
+      `  tarmac ${sum(isTarmac).toFixed(1)}` +
+      `  paint ${sum(isPaint).toFixed(1)}` +
+      `  telegraph mats ${sum(isMat).toFixed(1)}` +
+      `  runner ${sum((c) => c.owner === 'runner').toFixed(1)}` +
+      `  ghost ${sum((c) => c.owner === 'ghost').toFixed(1)}` +
+      `  hazard ${sum((c) => c.owner === 'hazard').toFixed(1)}` +
+      `  OTHER WORLD SCENERY ${scenery.reduce((a, c) => a + c.share, 0).toFixed(1)}`);
+    if (scenery.length) {
+      console.log('  every non-play-surface world cluster in the band, in full:');
+      for (const c of scenery) {
+        console.log(`    ${c.share.toFixed(2).padStart(6)}%  S ${c.S.toFixed(3)}  C ${c.C.toFixed(3)}  ` +
+          `L ${c.L.toFixed(3)}  viv ${c.vivid.toFixed(1).padStart(4)}  dx ${c.dxLanes.toFixed(1)}  ` +
+          `dy ${c.dyBase.toFixed(1)}  ${String(Math.round(c.tri))}tri x${c.meshes}  ` +
+          `${c.matType}${c.vcol ? '+vcol' : ''} ${c.color}`);
+      }
+    } else {
+      console.log('  NO non-play-surface world geometry reaches the near band on this leg.');
     }
 
     if (AUDIT) {
@@ -368,7 +596,7 @@ const PAGE_FN = function () {
       // hard the clock is frozen. The world is what a palette change touches
       // and the world must not move at all; the runner figure below is this
       // instrument's noise floor, stated rather than hidden.
-      const r2 = await page.evaluate(PAGE_FN);
+      const r2 = await page.evaluate(PAGE_FN, { boost: 'none', k: 1 });
       const worldA = r.clusters.filter((c) => c.owner === 'world');
       const worldB = r2.clusters.filter((c) => c.owner === 'world');
       const sameWorld = worldA.length === worldB.length &&

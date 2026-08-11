@@ -1,0 +1,162 @@
+{
+  "041a626e.png": {
+    "lane": "middle",
+    "demands": {
+      "left": "AROUND",
+      "middle": "CLEAR",
+      "right": "AROUND"
+    },
+    "confidence": "sure",
+    "reason": "Two blue subway train cars are standing on the track facing me rear-on, each showing taillights, a numberplate panel and a hatched bumper. To work out which lanes they sit in I traced the red glow their taillights throw onto the road: one pool runs down the road at x20-50 and the other at x98-129. At the near edge of the picture the three lanes measure [18-50], [56-88] and [99-131] between the rails, so the two glow pools land exactly in the left and the right lane and nothing lands in the middle one. Looking at the middle band itself it is bare gravel and sleepers all the way back to where the picture fades out. Both trains are full-height cars - I can see their roofs, and the bodies fill the frame from top to bottom - so there is no hopping onto them and no gap underneath them; the only thing to do with either is not be in its lane. That makes the middle lane the answer, and it is an easy call because it is genuinely empty rather than merely easier."
+  },
+  "05cc80b5.png": {
+    "lane": "left",
+    "demands": {
+      "left": "CLEAR",
+      "middle": "OVER",
+      "right": "UNDER"
+    },
+    "confidence": "sure",
+    "reason": "Four lavender rails run down the road and give me the lane edges; at the depth where the obstacles are standing (about 48-50 rows down) they sit at x=10, 38, 68 and 98. Against that, a group of wooden crates measures x38-70, which is the middle lane exactly. The crates are only about 11 pixels tall where the lane is 30 wide - a low stack, a stride or so high - so that lane asks for a jump. The yellow gantry to the right has two legs and I measured them at x66-71 and x96-100, with their feet on the road at the same depth. Those are precisely the two edges of the right lane, so the gantry straddles that lane and its solid hatched crossbeam hangs across it with roughly 20 pixels of open air below - you go under. The left lane between x10 and x38 has nothing standing in it at all; the only mark on it is a flat painted white line across the tarmac, which is paint, not an object. So I take the left lane and do not have to jump or duck for anything."
+  },
+  "061456d9.png": {
+    "lane": "left",
+    "demands": {
+      "left": "CLEAR",
+      "middle": "OVER",
+      "right": "OVER"
+    },
+    "confidence": "sure",
+    "reason": "The lane edges at the depth of the obstacles (about 60 rows down) come out at x=14, 45, 83 and 125. Two things are sitting on the road. The first is a row of three low blue bins or crates with pale lids, measuring x44-79, which puts them squarely in the middle lane; they stand about 16 pixels tall against a lane 38 wide, so they are low enough to clear with a jump and there is no space beneath them. The second is a heaped pile of orange and tan sacks or logs, measuring x78-107, which is the right lane; it is a loose mound lying directly on the road with no gap under it, so again the only way past is over the top. Two golden pools of light on the road back this up - one at x51-79 under the bins and one at x86-118 under the pile - and there is no such pool in the left lane. The left lane itself is empty dark road with sleeper marks running away into the mist. I take it, because it asks nothing of me while the other two both need a jump."
+  },
+  "141e54c6.png": {
+    "lane": "right",
+    "demands": {
+      "left": "OVER",
+      "middle": "AROUND",
+      "right": "CLEAR"
+    },
+    "confidence": "fairly sure",
+    "reason": "At the depth where the obstacles stand the lane edges measure x=40, 70, 97 and 126. In the left lane there are three wooden planter boxes with green plants in them, x43-75, and they are only about 8 pixels tall against a lane 30 wide - clearly something you hop. In the middle lane, x72-98, stands a road barricade. Blown up it is a red-and-white hatched panel held between two grey rails, standing on two crimson legs, with a further horizontal cross-rail low down between those legs. It is about 22 pixels tall, nearly three times the planters, and that low cross-rail closes off the space underneath, so it is neither a jump nor a duck - it is a lane to stay out of. The right lane is bare sleepers and rail running back unobstructed. The one thing that stops me being completely sure is an orange traffic cone at x97-102: that is right on the painted line at the right lane's left-hand edge, next to the barricade. It pinches the margin on that side but leaves the lane itself runnable, so I still take the right lane and simply keep off its inside edge."
+  },
+  "191bb0ff.png": {
+    "lane": "left",
+    "demands": {
+      "left": "CLEAR",
+      "middle": "AROUND",
+      "right": "AROUND"
+    },
+    "confidence": "sure",
+    "reason": "The lane edges at the vehicles' depth work out at x=13, 41, 72 and 105. Two vehicles are stopped side by side. The blue one measures x39-69, which is the middle lane; its roof is at the very top of the picture and its base is 49 pixels lower, so it is a solid wall of bodywork with no way over and nothing to duck into. The yellow one measures x70-98, the right lane. It is noticeably shorter than the blue one, which made me stop and check whether it might be low enough to vault, but blown up it is still a full vehicle rear - taillights, numberplate, hatched bumper - about 32 pixels of solid body against a lane only 30 wide, and it has an extra green crate strapped on the roof making it taller still. So both of those lanes are lanes to avoid. The left lane, from x13 to x41, is open road with nothing on it but flat painted dashes fading into the haze. I take the left."
+  },
+  "32a1aeba.png": {
+    "lane": "right",
+    "demands": {
+      "left": "UNDER",
+      "middle": "UNDER",
+      "right": "CLEAR"
+    },
+    "confidence": "sure",
+    "reason": "Sorting out the lanes mattered here because there is an extra line near the left edge. The road is bounded by two thick white edge lines and divided by two lavender sleepered rails; at the depth of the gantry's feet those four sit at x=40, 67, 93 and 122, and the extra line further left is the kerb of the raised pavement where the spectators are standing, not a lane. The yellow gantry stands on three legs and I measured them at x41-44, x67-71 and x93-97 - precisely on the first three of those lines. So its hatched deck roofs two lanes at once, the left and the middle, with a leg on each lane edge and the middle of each lane open. The deck's underside is at row 26 and the feet are at row 45, giving about 19 pixels of clearance in lanes 27 wide, so you pass through by ducking rather than by avoiding. The right lane, from x93 to x122, is bare road - the only thing on it is a flat painted white crossing line. That is the one lane where I need do nothing, so I take it."
+  },
+  "3da925dd.png": {
+    "lane": "left",
+    "demands": {
+      "left": "UNDER",
+      "middle": "OVER",
+      "right": "AROUND"
+    },
+    "confidence": "fairly sure",
+    "reason": "Lane edges at the obstacles' depth come out at x=44, 74, 106 and 140. The left lane holds a yellow gantry whose legs I measured at x44-50 and x72-79, sitting on that lane's own two edges; its hatched deck stops at row 30 and the feet reach the road at row 54, so there is a 25-pixel opening in a lane 31 wide and I can see the road surface and its markings straight through the arch - you run under it. The middle lane, x79-110, has a row of brown planter boxes with green shoots, only 8 pixels tall, an easy hop. The right lane, x106-142, has a red-and-white striped barricade plank with reflectors mounted on a wooden trestle. I checked it row by row because the gap beneath looked promising: it is solid from row 42 to row 50, then there is a narrow slot, and then an orange brace bar runs straight across that slot at row 54 before the road at row 56. So the only opening is about 4 pixels in a lane 33 wide and it is barred anyway, while the solid mass sits at body height - that lane is one to stay out of. Between the two workable lanes I took the left, because the archway needs no timing at all whereas the planters need a jump landed at the right moment. That preference is a judgement call rather than something the picture forces, which is why I am not fully sure; the middle would also get me through."
+  },
+  "41906cc6.png": {
+    "lane": "middle",
+    "demands": {
+      "left": "OVER",
+      "middle": "UNDER",
+      "right": "UNDER"
+    },
+    "confidence": "fairly sure",
+    "reason": "The lane edges at the obstacle depth measure x=10, 43, 71 and 101. The yellow gantry stands on three legs, measured at x39-42, x67-72 and x96-100, which puts them on the last three of those lines - so the deck roofs both the middle and the right lane, not just one. Its underside is at row 26 and the feet reach the road at row 49, giving 23 pixels of clearance in lanes about 29 wide, and when I enlarged the two bays under it both show unbroken road, rails and kerb straight through, so each is a duck-under rather than a block. The left lane holds a heap of tan and orange logs or sacks, x11-43, filling the lane's width but only 12 pixels tall and lying flat on the road - that one is a jump. I took the middle lane because running through a wide-open archway asks nothing of my timing while the log heap has to be cleared cleanly. Choosing the middle rather than the right is arbitrary - the two bays are identical and I simply preferred the more central one, which is why I am not fully sure."
+  },
+  "4e43dee0.png": {
+    "lane": "middle",
+    "demands": {
+      "left": "AROUND",
+      "middle": "CLEAR",
+      "right": "OVER"
+    },
+    "confidence": "sure",
+    "reason": "Lane edges at the obstacles' depth come out at x=18, 53, 88 and 125. The left lane is blocked twice over: a red truck seen from behind with a motorbike immediately in front of it, together measuring x26-50 and running from the truck's roof at row 10 down to the bike's wheel at row 59. That is solid, full height and two vehicles deep, so there is nothing to jump onto and nothing to duck into. The red glow those taillights throw pools on the road at x20-53, confirming it is the left lane they occupy. The right lane has a heap of tan and orange logs or sacks, x85-125, 16 pixels tall against a lane 37 wide and lying flat on the road, so that one is a jump; a golden pool of light at x101-134 confirms which lane it is in. I cropped and enlarged the middle lane to check it properly and it is bare sleepers between the two lavender rails, with no glow pool of its own and nothing standing in it all the way back into the haze. It is the one lane that is simply empty, so I take it."
+  },
+  "7f0cce4f.png": {
+    "lane": "middle",
+    "demands": {
+      "left": "OVER",
+      "middle": "UNDER",
+      "right": "OVER"
+    },
+    "confidence": "fairly sure",
+    "reason": "This road bends away to the upper right, so I fitted the four boundaries - a white left edge line, two lavender sleepered rails and a pale right edge - and at the obstacles' depth they sit at about x=83, 119, 150 and 185. The middle lane is spanned by a yellow gantry whose legs I measured at x112-117 and x146-151, on that lane's two edges; its deck underside is at row 34 and the feet at row 60, so 26 pixels of clearance, and enlarged the bay shows unbroken road and rail between the legs - a duck-under. The left lane has three low brown planter boxes with green shoots, x80-112, about 10 pixels tall in a lane 37 wide, so a straightforward hop. The right lane, x144-187, has a stack of barrels or pipe ends two courses high, about 15 pixels tall in a lane 38 wide. That stack is the part I am least certain about: it is half again as tall as the planters, so it is a bigger hurdle, but it is still only about half the height a runner would need to duck to under the gantry, so I read it as something you clear rather than something you must avoid. I take the middle lane because the archway is wide open and needs no timing at all, while both the other lanes require a jump landed at the right moment."
+  },
+  "bc22e0f5.png": {
+    "lane": "right",
+    "demands": {
+      "left": "UNDER",
+      "middle": "AROUND",
+      "right": "CLEAR"
+    },
+    "confidence": "sure",
+    "reason": "Lane edges at the obstacles' depth measure x=78, 115, 146 and 182. The left lane is spanned by a yellow gantry whose legs I measured at x78-83 and x112-117, which is exactly that lane's own two edges; the deck's underside is at row 32 and the feet reach the road at row 60, so there are about 29 pixels of clearance in a lane 37 wide, and enlarged I can see the road and its white edge line running clean through the opening - that lane is a duck-under. The middle lane holds a pyramid of wooden crates five courses high, measuring x118-149 and running from row 23 down to the road at row 60. That is 37 pixels of solid stack against a lane only 31 wide - taller than the lane is wide, with no gap anywhere in it - so it is neither a jump nor a duck, just a lane to keep out of. The right lane, enlarged, is bare sleepers between the lavender rail and the pale road edge, empty back into the haze. I take the right lane because it is the only one that asks nothing of me at all."
+  },
+  "bf062179.png": {
+    "lane": "left",
+    "demands": {
+      "left": "CLEAR",
+      "middle": "OVER",
+      "right": "UNDER"
+    },
+    "confidence": "sure",
+    "reason": "Lane edges at the obstacles' depth come out at x=11, 46, 81 and 123. The middle lane has three orange-and-white traffic cones set in a row across it, measuring x47-82, about 15 pixels tall in a lane 35 wide - low soft markers, the sort of thing you clear with a jump, and there is obviously nothing to duck under. The right lane is spanned by a yellow gantry whose legs I measured at x82-87 and x118-123, exactly that lane's two edges; the deck underside is at row 36 and the feet at row 63, so about 27 pixels of clearance, and the road with its white line shows straight through the opening - a duck-under. I enlarged the left lane to check it rather than assume: it is bare sleepers between the pale left edge line and the lavender rail, with only the nearest cone's orange sliver showing on the far side of that rail, so nothing is actually in the lane. I take the left, since it needs neither a jump nor a duck."
+  },
+  "ce3eb8d9.png": {
+    "lane": "middle",
+    "demands": {
+      "left": "AROUND",
+      "middle": "CLEAR",
+      "right": "OVER"
+    },
+    "confidence": "fairly sure",
+    "reason": "Lane edges at the obstacles' depth measure x=50, 90, 126 and 164. The left lane holds a pyramid of wooden crates, x56-92, running from row 6 down to the road at row 64 - 58 pixels of solid stack against a lane 40 wide, taller than the lane is wide and with no gap underneath, so it is a lane to stay out of; a red glow pools beneath it. The right lane, x125-165, has a pair of teal machines that read to me as two scooters or bikes with T-shaped handlebars, about 16 pixels tall in a lane 38 wide with a golden pool of light under them - low enough to clear, and nothing overhead, so a jump. The middle lane, enlarged as a strip, is bare sleepers between the two rails for the whole near stretch, so that is the lane I take. Two things keep me from being fully sure it is clear rather than just clearer. There is a thin flat teal bar lying across the lane further up, at about row 40, but it is only one or two pixels tall where a real object at that distance would be roughly ten, so I read it as paint on the road. And there is a tiny green-and-grey shape standing on the track right at the horizon, rows 24-33, which is too far off and too small to identify at all. Neither is in the stretch I actually have to commit to now, but I would rather flag them than pretend the lane is provably empty to the horizon."
+  },
+  "d0fcb50a.png": {
+    "lane": "left",
+    "demands": {
+      "left": "UNDER",
+      "middle": "OVER",
+      "right": "OVER"
+    },
+    "confidence": "fairly sure",
+    "reason": "Lane edges at the obstacles' depth measure x=75, 109, 144 and 179. The left lane is spanned by a yellow gantry whose legs I measured at x75-80 and x109-113, exactly that lane's own edges; the deck's underside is at row 33 and the feet reach the road at row 58, so 25 pixels of clearance in a lane 34 wide, and enlarged the road and its white line run clean through the opening - a duck-under. A cyan pool of light sits on the road inside that arch. The middle lane has three blue bins with pale lids, x107-147, about 15 pixels tall in a lane 35 wide; the right lane has wooden crates stacked two high in a two-by-two block, x150-180, about 14 pixels tall in the same width. Both are low, both sit flat on the road with no space beneath, and both have golden pools of light under them - so both are jumps. No lane here is empty, so the choice is between ducking once and jumping once. I took the archway because running under it needs no timing, whereas either crate lane needs a jump landed at the right moment. That is a preference rather than something the picture settles, which is why I am not fully sure."
+  },
+  "f21f97d1.png": {
+    "lane": "left",
+    "demands": {
+      "left": "CLEAR",
+      "middle": "UNDER",
+      "right": "OVER"
+    },
+    "confidence": "sure",
+    "reason": "Lane edges at the obstacles' depth come out at x=11, 52, 88 and 127. The middle lane is spanned by a yellow gantry whose legs I measured at x49-54 and x86-91, exactly that lane's two edges; the hatched deck ends at row 36 and the legs run down to row 65, giving about 29 pixels of clearance, and enlarged the road and rail run straight through the opening - a duck-under. The right lane has two teal kick-scooters, handlebars and decks clearly visible, measuring x92-125, about 16 pixels tall in a lane 39 wide - low enough to clear with a jump, and nothing above them. I enlarged the left lane rather than assume it was empty: it is bare sleepers with only a flat painted white line across it. The red-and-white fencing at the far left of the picture sits at x below 18, outside the left lane's own boundary, so that is roadside railing rather than something in the lane. I take the left, which needs neither a jump nor a duck."
+  },
+  "f8123696.png": {
+    "lane": "middle",
+    "demands": {
+      "left": "AROUND",
+      "middle": "CLEAR",
+      "right": "AROUND"
+    },
+    "confidence": "sure",
+    "reason": "Lane edges at the obstacles' depth measure x=12, 40, 69 and 100. What settled the lanes for me were the two red taillight pools on the road: one at x13-39 and one at x77-103, which is the left lane and the right lane, with nothing at all between them. The right lane holds a blue train; its rear face measures x66-98, which matches that lane's 32-pixel width exactly, and the extra blue reaching further left higher up is its side flank, seen at an angle because we are looking from the left of it - I checked at ground level and the train's near corner is right on the lane line at x69. It is a full-height car with taillights and a hatched bumper, so no way over and no gap under. The left lane holds another tall vehicle rear, x13-40, a grey ribbed shutter door with blue and red side stripes, standing from the road at row 52 up past row 5 - about 47 pixels of solid body in a lane 29 wide, so the same story. The middle lane, enlarged, is a clean channel of bare sleepers between the two vehicles, open at ground level from x40 to x69 and running away into the haze. I take it."
+  }
+}

@@ -188,6 +188,32 @@ const SAMPLE = parseInt(arg('sample', 0), 10);
  * Every key file records which it was, and the panel note says so too.
  */
 const NOMAT = !!arg('nomat', false);
+/**
+ * --art WIDENS THE CROP TO CONTAIN THE OBJECT, and it exists because the
+ * default does not.
+ *
+ * The window below is taken from MR.Collision.BOX, on the stated grounds that
+ * the box is the contract. For a JUMP (yMax 0.80) and a BLOCK (2.80) the box
+ * and the art are nearly the same thing. FOR A DUCK THEY ARE NOT: the box is
+ * y 1.41 to 1.83 and the art runs to between 3.10 and 3.58, so more than four
+ * box-heights of the object sit above the crop and only the 14% margin lets
+ * any of it in. Everything this kind is differentiated BY lives up there --
+ * duckScaffoldGeo's header says so in as many words, that the whole budget is
+ * what the standards are made of, what is bolted to them between 1.9 and 3.6,
+ * and how they TERMINATE.
+ *
+ * So every DUCK naming this instrument has ever taken was of a crop with the
+ * differentiators cut off, and the giveaway was in the key all along: eight
+ * variants whose art ranges 3.10 to 3.58 tall all report objectPx 187x202 at
+ * 8 units, to the pixel, because the rectangle reported is the box.
+ *
+ * IT IS NOT THE DEFAULT AND SHOULD NOT BECOME ONE. The route question --
+ * over, under or around -- is a question about the box, the default crop is
+ * the right frame for it, and it is the crop every published route score was
+ * taken at. This flag is for the OTHER question the prompt asks, "what is
+ * it", which is a question about the object.
+ */
+const ART = !!arg('art', false);
 const SEED = parseInt(arg('seed', String(Date.now() % 2147483647)), 10);
 const OUT = path.resolve(String(arg('out', path.join(os.tmpdir(), 'mr-blindread'))));
 
@@ -384,6 +410,9 @@ function setup(o) {
     buf: new Uint8Array(o.w * o.h * 4),
     prevRT: g.renderer.getRenderTarget(),
     w: o.w, h: o.h,
+    // See the crop window: --art widens it to contain the ART as well as the
+    // collision box.
+    art: !!o.art,
   };
 
   const counts = {};
@@ -472,6 +501,16 @@ function shoot(job) {
     mark(laneX + (i & 1 ? box.halfX : -box.halfX),
          yBase + (i & 2 ? box.yMax : box.yMin),
          z + (i & 4 ? 2 * box.halfZ : 0));
+  }
+  // THE ART, under --art only. Box3 walks bounding boxes and so overstates a
+  // rotated part, which is the wrong error for a measurement and the right one
+  // for a crop: a window that is slightly too generous shows the whole object,
+  // and a window that is slightly too tight is the defect this flag exists for.
+  if (S.art) {
+    const ab = new THREE.Box3().setFromObject(vg);
+    for (let i = 0; i < 8; i++) {
+      mark(i & 1 ? ab.max.x : ab.min.x, i & 2 ? ab.max.y : ab.min.y, i & 4 ? ab.max.z : ab.min.z);
+    }
   }
   // The mat's near run-up. Six units of it, which is the strong end of its
   // alpha ramp; the far end fades to nothing and pulling the crop out to 16
@@ -671,7 +710,7 @@ function teardown() {
   await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, { timeout: 30000 });
   await page.waitForTimeout(2600);
 
-  const info = await page.evaluate(setup, { w: W, h: H });
+  const info = await page.evaluate(setup, { w: W, h: H, art: ART });
   if (info.err) {
     console.log('FAILED: ' + info.err);
     await browser.close();

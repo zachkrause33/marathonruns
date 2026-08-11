@@ -4954,3 +4954,257 @@ nobody measured is worse than no number at all.**
     mat is worth to a careful reader; it cannot prove it worthless to a
     glancing one. The attack is an exposure limit, which this harness cannot
     currently impose.
+
+---
+
+## Roadmap 66 · Effort: the pool is playable, and the bots can finally see it
+
+The build the risk-reward measurement asked for, finished. `docs/risk-reward.md`
+condemned the shipped game in one number — **six distinct policies all finishing
+at 1:58:03, spread 0.0 seconds** — and `docs/strategy-space.md` proposed one
+pool with two rival spends. Both had landed in `src/` before this pass. Neither
+had ever been *measured playing*.
+
+**Standing rule 1 carries into the handover at the foot of this section.** Every
+object is modelled on all sides, fully, always. A marking painted on a surface
+is the one exception, because it is not an object — which is exactly what the
+surge zone's road paint is, and exactly what its entry signage is **not**.
+
+### The blocker, and it was the whole job
+
+The previous attempt's last words: *"`risk.js` is an honest negative: its six
+policies still tie at 0.0s because none of them surge — its bots can't see
+zones. The autopilot has the same blindness."*
+
+That is not one bug, it is a **defect class**, and this pass found it in three
+places. A surge is elected by *being in the marked lane*. Every bot in this
+project scores lanes on CLEAR, aid and ramp. So every bot took a marked lane
+only by coincidence, ran the course at the unsurged floor, and reported —
+truthfully — that the mechanic changed nothing.
+
+**A blind instrument does not report an error. It agrees with you.**
+
+| where | what it could not see | before → after |
+|---|---|---|
+| `tools/risk.js` | no lane term, no election | policy spread **0.0 s → 79.4 s** |
+| `main.js` autopilot | no lane term | surge **428u → 1272u** of marked road |
+| `main.js` `?skip=` | never called `resolveAid` **or** `resolveSurge` | pool always empty, in **every shot in the library** |
+
+The third is the one worth remembering. `?skip=` is how every frame this project
+photographs gets taken, and it had quietly run a *different game* from the live
+loop since before the pool existed — no aid collected, so under EFFORT no
+segments, so no guard and no surge, ever, in any measured frame.
+
+And a fourth, found on the way: the autopilot's **aid term was reading a rule
+that went stale when aid became guarded** (R50). It wanted items between the
+runner and the gate line — but an item sits at `g.z + 2*halfZ + AID_SETBACK`,
+i.e. always *past* its own gate, and is paid out on a receipt for that gate. So
+the bot steered for items it could no longer be paid for. **5 of 18 collected
+before, 16 of 18 after.** `tools/risk.js` had the right expression
+(`aid[ai].gate === gi`) all along, which is why that harness collected and the
+game's own bot did not.
+
+### What the fixed instruments say
+
+`tools/risk.js --section policy`, six collection policies plus four spend
+policies, real `Player`/`Collision`/`Course`/`Pace`, 450 ms latency, clean run:
+
+| policy | surged | finish | vs record |
+|---|---|---|---|
+| take every bottle | 36% | 1:59:45 | +16s |
+| take none | 0% | 2:00:28 | +59s |
+| safe lane (centre) | 0% | 2:00:28 | +59s |
+| **+ surge the first two** | 48% | 1:59:32 | **+2s** |
+| **+ surge the last two** | 60% | 1:59:15 | **−15s** |
+| **+ surge everything** | 64% | 1:59:12 | **−18s** |
+| **+ hold one, then all** | 66% | 1:59:09 | **−21s** |
+
+**Spread 0.0 s → 79.4 s. Three of ten beat the record, and all three spend.**
+Every non-spending policy misses by 16-59 s. *Surge the first two* misses by 2 s
+and *hold one, then all* wins by 21 — **the same pool, the same number of
+segments, spent on later road, is worth 23 seconds.** That is the design's
+central claim, and it is now measured rather than argued.
+
+`tools/simulate.js`, 10 policies × 5 skills × 8 dates × 14 seeds:
+
+**13 of 50 cells beat 1:59:30 (26%); on a FIRST attempt 5 of 20 (25%).**
+Spread across policies at perfect skill: 85.0 s. Against the owner's bar —
+*"if people get it on the first try everytime they will not always play"* — a
+first-attempt player wins one time in four, and only by spending.
+
+### The rule 4 defects, both found by writing the contract down
+
+Writing the marking contract as numbers is what caught these. Neither was
+visible any other way.
+
+**1. The boundary — 50 ms.** `spacingAt` read the action window at the gate
+*behind* the gap. Elevation varies smoothly and its own table looks 28 units
+ahead, so that was always fine. **A surge zone is a step**, and `SURGE_PAD = 28`
+cannot cover gate intervals that run to **70.4 units** (median 31.4). A gate
+short of the entry line with the next landing inside was spaced unsurged and
+answered surging. The guaranteed decide window inside a zone had a **floor of
+712 ms against a 5th percentile of 739** — the whole tail was these boundary
+gates, and 712 ms is tighter than anything this game has ever shipped.
+
+Fixed exactly rather than with a bigger pad: space provisionally, ask what the
+window is *where that lands*, take the larger. One step, cannot oscillate (a
+zone is ≥420 units against a ~70-unit interval, so a gate pushed forward can
+enter a zone and never leave one), and taken **only when zones exist**, so
+EFFORT = 0 stays bit-identical.
+
+**2. The datum — 22 ms.** The widening bought a **10 s/mi** lift
+(`FLOOR_PACE → FLOOR_SURGE`) when the lift the player actually takes is
+**17** (`FLOOR_BASE → FLOOR_SURGE`). The generator had paid for four sevenths of
+the speed it sold. The old comment defended `K.FLOOR_PACE` as the only datum on
+the grounds that `ACTION_WINDOW` and elevation's table are cut against it — the
+premise is right and **the conclusion does not follow.** What the player is owed
+is not a span in the generator's private units, it is **time**, and the time
+they are owed is the time the road either side of the zone gives them.
+
+**761 ms outside, 712 → 739 → 760 ms inside.** A surge now buys no reaction time
+and costs none.
+
+### Where this brief was wrong
+
+**The gate price is not 6-9%. It is 0.0%.** The brief and
+`docs/strategy-space.md` both predicted a zone would cost roughly 6-9% of its
+gates, and treated that as the price mechanism. Measured, it costs nothing.
+
+Getting that number needed a **matched control** — the road of the same length
+either side of each zone. The obvious cut, in-zone density against the whole
+rest of the course, reported zones as **7.9% DENSER**, i.e. the widening making
+the road tighter, which is impossible. The confound is position: gate spacing
+tightens monotonically through the race and zones live at 15-82% of it, so "the
+rest of the course" is mostly the sparse opening. **The same defect
+`tools/clarity.js` had to be re-cut for**, one instrument along, and it is now
+two for two — *if a measurement compares a selected region against everything
+else, the selection is doing the work.*
+
+Why the price is zero: the spacing floor is **not what binds at most gates**.
+The difficulty-driven random term is. A +1.43-unit widening on a 25.35-unit
+floor only bites on gates already at that floor. **So the entire price of a
+surge is the pool, and only the pool** — which is fine, because the pool binds
+hard (2205 units of zone wants 15.7 segments against 13.7 collectible), but it
+means every sentence in the earlier docs calling the gate loss "the price
+mechanism" is wrong and should not be quoted.
+
+### What is NOT built, and it is the thing a player would notice first
+
+**Nothing in the renderer reads the zone table.** Not `world.js`, not `hud.js`.
+The mechanic is mechanically complete and **visually absent**.
+
+Interim, in scope and shipped this pass: the zone is **announced on the toast
+that already exists** — no new HUD plate (the owner ruled that out), no new
+control (a surge is still elected by the swipe). It fires once per zone at the
+zone's own `sight` distance, read off the zone rather than written in `main.js`
+so the cue and the paint cannot disagree, and it **names the lane**, which is
+the one contracted fact a player cannot infer from anything else on screen.
+Verified live in the page: `SURGE 1 / RIGHT` at units 1643 against a zone
+starting at 1733, runner takes lane 2, pool drains 2.00 → 1.19.
+
+---
+
+### HANDOVER · the surge zone's marking contract, in numbers
+
+Reproduce every figure with **`node tools/risk.js --section zone`**, which
+fails the build if any of the guarantees below stop holding. Measured over 40
+days, 181 zones. This is the ramp's deck/tailgate contract for the surge.
+
+**RULE 1 APPLIES TO EVERYTHING THIS CONTRACT ASKS FOR.** The road paint —
+lane wash, entry line, chevrons, distance ticks — is a **marking on a surface
+and correctly has no back**, exactly as the lane dashes and the telegraph mats
+do. Anything that *stands*, and an entry gantry or a lane-flag or a
+count-down post would, **is built on all sides, fully, always.** The player
+passes it at 1.70 units and the camera banks through every lane change.
+
+**WHERE A ZONE IS**
+
+| | |
+|---|---|
+| count | 4-5 a course, mean 4.53 |
+| length | 420-560 units, median 492 |
+| marked road | 35.2% of the course |
+| first entry | 15% of the race; last 82% |
+| closest two zones | 156 units apart — no entry marking is ever read against another zone's paint |
+
+**WHAT MUST BE LEGIBLE, AND FROM HOW FAR**
+
+| | |
+|---|---|
+| sight distance | **90 units** |
+| in time | **3263 ms** of approach at the unsurged floor (27.59 u/s); 3050 ms if already surging (29.51 u/s) |
+| commit point | a lane change takes **136 ms** = **3.8 units**, so the last one that lands by the entry line starts 3.8 units out |
+| reading time owed | **3126 ms** before the last moment to act — **23x the act itself**, against a ~400-500 ms choice reaction |
+
+90 is **not a taste number**: it is `Elevation.SIGHT_MIN`, the distance the
+terrain sweep already *proves* stays visible over every crest on every course.
+A contract written at 90 cannot be broken by a hill, by construction, and
+`Elevation.validate()` is the proof. **Do not paint to a shorter distance and
+do not assume a longer one.**
+
+**Three facts, all three at 90 units, all three from one look:** that a zone
+begins · **which lane is marked** · how far it runs.
+
+**WHAT THE PLAYER CANNOT KNOW AT THE COMMIT POINT — this is the bet**
+
+| | |
+|---|---|
+| gates in a zone | 15.1 |
+| visible at the entry line | 2.7 of them (**18%**) |
+| bought blind | **82%** of the road is past the sight line when they commit |
+
+**WHAT THE MARKED LANE IS GUARANTEED TO BE**
+
+| | |
+|---|---|
+| BLOCK in a marked lane | **0** over 2731 gates — enforced in `generate()` |
+| rideable trains in a marked lane | **0** — `surgeAt` also refuses on deck |
+| what it is | **20% clear, 80% an action you must perform** |
+
+So the price of the surge is that **you cannot dodge** — you must act at what is
+in front of you. An elected surge is always completable, never a wall.
+
+**HOW MUCH OF IT IS A DECISION AT ALL — the number the art needs most**
+
+| | |
+|---|---|
+| free | **20%** of in-zone gates leave the marked lane clear; the surge costs nothing there |
+| contested | **35%** ask the player to give up a clear lane for one that demands an action |
+| coincidental election | a bot that never *seeks* a zone still surges **44%** of the marked road; one that seeks reaches **65%** |
+
+**The paint has to work hardest in the contested 35%**, where it is asking the
+player to leave a free lane. In the 44% a player would have landed there anyway,
+the marking is decoration — and that is the honest bound on what any art can be
+credited with.
+
+**FAIRNESS — the assertion that fails the build**
+
+| | |
+|---|---|
+| outside a zone | floor **761 ms**, 5th 761, median 843 (at 27.6 u/s) |
+| inside, surging | floor **760 ms**, 5th 760, median 817 (at 29.5 u/s) |
+
+Difficulty comes from the allocation and from the cost of a mistake. **It must
+never come from a reaction window the player cannot act on** — rule 4, and a
+build failure. This assertion has caught the mechanic taking 50 ms and then
+22 ms; it is why both were found.
+
+**WHAT IT COSTS THE COURSE**
+
+30.2 gates per 1000u beside a zone, 30.2 inside — **0.0%**, against matched
+control bands. Course-wide the two fairness fixes moved 184.6 → 183.7 gates.
+
+---
+
+### Gate
+
+`build`, `shoot`, `course-test`, `simulate`, `calendar` (32 days), `mechanics`
+(**identity bit-identical at flags off**), `footroom` 96/96, `deckdrop` 24/24,
+`kindread` (26 variants, 1 of 26 misclassified on profile alone — unchanged),
+`risk`, and `playthrough`. `index.html` is rebuilt and committed separately.
+
+**`tools/playthrough.js` is new** and is the answer to rule 2 for this mechanic:
+it plays a whole marathon *in the real page*, per policy, and fails if the bot
+elects no surge, collects no aid, or if seeking the marked lane barely beats
+ignoring it. Every module-level harness in this project can be — and was —
+simultaneously green and blind.

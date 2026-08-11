@@ -271,11 +271,20 @@ MR.Course = (function () {
    *
    * THE NUMBERS, and they are the contract the markings must be built to:
    *
-   *   COUNT       4 or 5 a course.
-   *   LENGTH      420 to 560 units. At the surge floor that is 14.2 to 19.0
-   *               real seconds, and at BURN_UNITS = 200 it costs 2.1 to 2.8
-   *               segments out of a pool that holds 3. One zone is very nearly
-   *               a full tank, which is what makes it a decision and not a tap.
+   *   COUNT       4 or 5 a course, mean 4.53 over 40 days.
+   *   LENGTH      420 to 560 units, median 492. At the surge floor that is
+   *               14.2 to 19.0 real seconds, and at BURN_UNITS = 140 it costs
+   *               3.0 to 4.0 segments out of a pool that holds 4. THE LONGEST
+   *               ZONE IS EXACTLY A FULL TANK, which is not a coincidence: the
+   *               cap is set by the longest zone precisely so that no zone is
+   *               unbuyable however well a player allocated. A smaller cap
+   *               would be a cap secretly editing the course.
+   *
+   *               And the pool is deliberately too small for the road. 2205
+   *               units of zone against 13.7 collectible items is 15.7
+   *               segments wanted against 13.7 had -- you can afford about
+   *               seven eighths of the marked road, and only by spending the
+   *               guard. Which eighth you decline is the strategy.
    *   LANE        one lane, constant for the whole zone. It is never BLOCK
    *               inside the zone -- enforced in generate(), see the surge
    *               clause there -- so an elected surge is always completable and
@@ -297,9 +306,16 @@ MR.Course = (function () {
    * they can read that a zone begins, which lane is marked, and how long it
    * runs. They can see roughly the first 90 units of road inside it. They
    * CANNOT see the rest, and that is the risk the owner asked for -- a surge is
-   * bought before its contents are known. It is a fair bet, not a hidden one:
-   * every gate inside a zone individually satisfies the same read window every
-   * other gate in the game does, at the surge speed.
+   * bought before its contents are known. Measured: a zone carries 15.1 gates,
+   * 2.7 of them are inside the sight line at the commit point, and 82% of the
+   * road bought is past it. THAT IS THE BET.
+   *
+   * It is a fair bet, not a hidden one, and "fair" is a number rather than a
+   * claim: the guaranteed decide window is 760 ms inside a zone at the surge
+   * speed against 761 ms on the road either side of it. A surge buys no
+   * reaction time and costs none. Run `node tools/risk.js --section zone` --
+   * it fails the build if that ever stops being true, and it has caught the
+   * mechanic taking 50 ms and then 22 ms already.
    */
   const SURGE_SIGHT = 90;
   const SURGE_LEN_MIN = 420, SURGE_LEN_MAX = 560;

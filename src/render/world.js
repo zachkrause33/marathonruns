@@ -5993,6 +5993,172 @@ MR.World = (function () {
     })();
 
     /**
+     * ============ THE SURGE ZONE, AND WHY IT IS PAINTED AT ALL ============
+     *
+     * A surge zone is a stretch of road 420 to 560 units long with ONE marked
+     * lane. Run it and you spend the pool; the road either side of it is
+     * ordinary. docs/roadmap.md section 67 is the contract and it is written
+     * to the number -- read it before changing anything here. The three facts
+     * it owes the player, all three legible from SURGE_SIGHT = 90 units and
+     * all three from one look, are:
+     *
+     *   THAT A ZONE BEGINS     the gantry and the entry bar
+     *   WHICH LANE IS MARKED   this paint, and the gantry's lane plate
+     *   HOW FAR AWAY IT IS     the three countdown posts
+     *
+     * WHY THE LANE IS CARRIED BY A LONGITUDINAL MARK. The file's own Egypt
+     * device note settles this one paragraph up: a perpendicular mark is
+     * foreshortened to nothing by forty units, and a mark that RUNS ALONG the
+     * road converges on the vanishing point and so keeps a screen-space length
+     * however far away its far end is. At 90 units a lane is about twelve
+     * pixels wide on a 390-pixel portrait frame; a transverse badge in it
+     * would be two pixels tall, and a 500-unit ribbon in it is a wedge running
+     * to the horizon. There is only one kind of mark that can answer "which
+     * lane" from the far end of the run-up and this is it.
+     *
+     * IT IS A RESERVED LANE, WHICH IS A THING A ROAD REALLY HAS. The owner's
+     * standing instruction is "objects that would make sense in a road
+     * setting", and this is a bus lane: a coloured surface between two bright
+     * lines. That is also why it is not a hazard's language -- red-and-white is
+     * JUMP, yellow-and-black is DUCK, orange is works, and amber/cyan/pink are
+     * the telegraph mats a race is lost by misreading. Green at 154 degrees is
+     * spoken by nothing in this game, is 37 degrees off the DUCK mat's cyan,
+     * and means GO on every road on earth. A surge is an invitation and it is
+     * marked like one.
+     *
+     * ============ WHAT IT MAY NOT DO: SHOW WHAT IS INSIDE ============
+     *
+     * 15.1 gates lie in a zone and 2.7 are visible at the entry line. 82% of
+     * the bet is bought blind and THAT IS THE MECHANIC. So every piece of this
+     * marking is either flat on the road or above OVERHEAD_Y; nothing added
+     * here lifts the eye over a hazard or opens a sightline the player has not
+     * earned. The paint says where the lane is, never what is standing in it.
+     *
+     * ============ THE TONES ARE RATIOS, AND ONE OF THEM IS A FLOOR ============
+     *
+     * Both tones go through overRoad(), so they are stated as multiples of the
+     * reference tarmac exactly like every other mark on this road, and they
+     * ride any relighting without being re-tuned.
+     *
+     *   SURGE_WASH  0.68x. A DARKENING, and the number is a fairness floor
+     *               rather than a taste. The wash is the surface a hazard in
+     *               the marked lane is read against, so it enters the contrast
+     *               gate -- api.contrastAudit reports it as three more roads
+     *               and tools/shoot.js tests all 26 variants against it. The
+     *               dimmest hazard in the game is JUMP v7 at L 88.1, so any
+     *               wash at or below L 70.5 clears the 1.25x gate for every
+     *               variant on luminance alone, whatever its saturation does.
+     *               0.68x renders at about L 61 -- 1.44x on the dimmest object
+     *               in the game, and better on the other 25.
+     *
+     *               A BRIGHT wash was the first idea and it is the wrong one
+     *               for exactly this reason: every hazard here is a bright
+     *               object (L 88 to 151) and lifting the road toward them is
+     *               the one direction that can take a variant under the gate.
+     *               The note on the paint ladder above says the same thing
+     *               from the other side -- the tarmac has no chroma freedom
+     *               because JUMP v5 passes on saturation difference alone.
+     *
+     *   SURGE_RAIL  1.72x. Bright, and deliberately a step UNDER the
+     *               carriageway edge line at 1.80x: the boundary of the play
+     *               surface out-values a mark inside it, which is the road's
+     *               own hierarchy and every real road agrees. The rails are
+     *               where the colour identity lives -- they are what is still
+     *               green at ninety units.
+     *
+     * ---- THE RAILS GO ON THE SEAM, AND THAT IS A FAIRNESS DECISION --------
+     *
+     * They were built inboard of the lane first, and measured: the contrast
+     * gate's sample window is LANE * 0.44 of half-width, so a 0.16 rail at
+     * 1.72x fell inside it, and although it is a fifth of the sampled area it
+     * is two and a half times the wash's brightness -- the surface came back
+     * at L 81 instead of the wash's own 61 and eighteen variants dropped into
+     * the 1.25-to-1.6 band that used to hold six. An area-weighted mean of a
+     * two-tone surface is a poor model of legibility in the first place: a
+     * hazard against dark-with-bright-edges is easier to pick out, not harder.
+     * But the answer is not to argue with the instrument.
+     *
+     * So the rails sit ON the lane boundary, at +/- 0.88, which is where every
+     * other longitudinal mark on this road already is -- the seam rail, its
+     * shadow, the beads, the carriageway edge line -- and which the audit
+     * window has excluded from "the road a hazard stands on" since it was
+     * written. The paint ladder's note says so in as many words: the gate
+     * builds its patch from laneBand() and paintGeo is not in it. A LINE at
+     * the lane boundary is not the surface; a WASH across the whole lane is,
+     * which is exactly why the wash is in the audit and the rails are not.
+     * Measured after the move: the surface reports the wash's own tone, and
+     * every one of the 26 variants clears the gate on luminance alone.
+     *
+     * It also draws better. A bus lane's boundary IS its lane line, the mark
+     * supersedes the ordinary seam rather than sitting beside it, and the lane
+     * count stays legible: three lanes, one of them painted.
+     *
+     * ---- ONE MESH, ONE GEOMETRY, ONE DRAW ---------------------------------
+     *
+     * Built once at x = 0 and moved to the marked lane on claim, so there is
+     * one geometry rather than three and a tile inside a zone costs exactly
+     * one extra draw call. Every part runs the full length of the tile and has
+     * a constant cross-section, which is what makes the partial tiles at each
+     * end of a zone free: a zone boundary lands wherever it lands, and scaling
+     * this mesh in z lands the paint on it exactly without distorting anything,
+     * because there is nothing along z to distort. No beads, no ticks, no
+     * chevrons -- and the chevrons are a refusal rather than an omission: a
+     * forward-pointing triangle on the tarmac is the JUMP telegraph's own
+     * glyph, this file already refused one for the expansion joints, and
+     * nothing on the road may compete with the mats.
+     */
+    const SURGE_GREEN = 0x2ee08a;        // 154 degrees -- spoken by nothing here
+    const SURGE_GREEN_HI = 0x5cffb4;
+    const SURGE_WASH = overRoad(SURGE_GREEN, 0.68);
+    const SURGE_RAIL = overRoad(SURGE_GREEN_HI, 1.72);
+    // Pale, and it is the END of the zone rather than the start of one. The
+    // end bar takes the carriageway edge line's own tone: a white bar across
+    // the road is a line you have finished with, and it cannot be mistaken for
+    // an invitation to enter anything.
+    const SURGE_END_BAR = overRoad(0xd8dcea, 1.72);
+    // Rail centre 0.03 outboard of the seam, 0.22 wide, so it covers the
+    // 0.15 seam rail underneath it and clears the audit window (0.748) by
+    // 22mm. Both numbers are load-bearing -- see the note above.
+    const SURGE_RAIL_IN = LANE / 2 + 0.03;
+    const SURGE_RAIL_W = 0.22;
+    const SURGE_WASH_W = LANE;               // the whole lane, kerb to kerb
+
+    /**
+     * The marked lane's paint, as a cross-section extruded over `len` at `y`.
+     * Shared by the road tile and by the contrast audit, so the surface the
+     * gate measures is the surface the game draws -- the carpet's own lesson
+     * one audit along.
+     */
+    function surgeLaneParts(len, y) {
+      const flat = -Math.PI / 2;
+      const parts = [part(new THREE.PlaneGeometry(SURGE_WASH_W, len), SURGE_WASH, 0, y, 0, flat)];
+      for (const s of [-1, 1]) {
+        parts.push(part(new THREE.PlaneGeometry(SURGE_RAIL_W, len), SURGE_RAIL,
+          s * SURGE_RAIL_IN, y + 0.001, 0, flat));
+      }
+      return parts;
+    }
+    const surgeLaneGeo = merge(surgeLaneParts(TILE, 0.0095));
+
+    /**
+     * The day's zones, straight off the course. Empty at MR.Pace.EFFORT = 0 --
+     * planSurge returns nothing there -- so every branch below is dead at
+     * flags off and tools/mechanics.js --identity stays bit-identical. Nothing
+     * here draws from the seeded stream either: a zone's side and its plates
+     * are derived from the zone, so the layout of every other prop in the race
+     * is untouched whether zones exist or not.
+     */
+    const surgeZones = course.surges || [];
+    /** The zone overlapping [a, b), or null. Four or five entries, so a scan. */
+    function surgeSpan(a, b) {
+      for (let i = 0; i < surgeZones.length; i++) {
+        const s = surgeZones[i];
+        if (b > s.z0 && a < s.z1) return s;
+      }
+      return null;
+    }
+
+    /**
      * Kerb + pavement: without it the tarmac sits straight on grass.
      *
      * Both now carry the same high frequency the carriageway does, and the KERB
@@ -6723,6 +6889,14 @@ MR.World = (function () {
       }
       const paint = new THREE.Mesh(paintGeo, mats.paint);
       t.add(paint);
+
+      // The marked lane of a surge zone, off unless this tile is inside one.
+      // An invisible mesh is a matrix update and no draw call, which is the
+      // same bargain the three edge kinds above take.
+      const surge = new THREE.Mesh(surgeLaneGeo, mats.paint);
+      surge.visible = false;
+      t.add(surge);
+      t.userData.surge = surge;
 
       // One of these is shown at a time; keeping all three built means a
       // biome change is a visibility flip rather than a rebuild.
@@ -15541,6 +15715,206 @@ MR.World = (function () {
       return g;
     }, group);
 
+    // ---- the surge zone's furniture ---------------------------------------
+    /**
+     * ============ THREE FACTS, THREE PIECES, NINETY UNITS ============
+     *
+     * The paint above answers WHICH LANE. These answer the other two, and the
+     * split is not decorative -- it is about what can be hidden from whom.
+     *
+     *   ROAD PAINT is on the ground, so it is never hidden by anything
+     *              overhead; it IS hidden, in patches, by hazards, which is
+     *              the commonest occluder in this game (tools/shoot.js's
+     *              BLANKS note has the census). A 500-unit ribbon survives
+     *              that: some of it always shows.
+     *   THE GANTRY is at 9.35 and up, so no hazard can ever be in front of it
+     *              -- the camera looks DOWN at the road, which is the same
+     *              argument shoot.js makes when it says overhead structure
+     *              accounts for 0% of the road a player cannot see. It is the
+     *              piece that cannot be blanked by traffic.
+     *   THE POSTS  are at the roadside and they are the only piece that
+     *              answers HOW FAR, because a distance is a thing you count
+     *              rather than a thing you see. Three, two, one.
+     *
+     * Neither of the two channels can be taken out by the same thing, which is
+     * the whole reason there are two.
+     *
+     * ---- WHY THE COUNTDOWN, AND WHY IT IS THE HONEST ANSWER ----------------
+     *
+     * "How far" cannot be read off a sign at 90 units: a mile numeral in this
+     * game is 1.74 world units of cap height, which at 90 units on a portrait
+     * frame is about twelve pixels, and that is the biggest lettering the game
+     * has. So the distance is not written, it is COUNTED, the way every
+     * motorway on earth counts down to a junction -- three bars, two bars, one
+     * bar, then the thing itself. The posts stand at exactly 90, 60 and 30
+     * units before the entry line, so the first of them is beside the player
+     * at the moment the zone becomes visible at all and the count IS the
+     * approach. It also degrades correctly: a player who misses the three-bar
+     * post still meets the two-bar one with 2175 ms in hand against a 136 ms
+     * lane change.
+     *
+     * ---- THE GANTRY, AND EVERY NUMBER ON IT THAT COULD FAIL A BUILD -------
+     *
+     * A structure spanning the road at the entry to a zone is the single
+     * riskiest thing in this file for the occlusion assertions, so it is built
+     * to the mile gantry's own clearances rather than to new ones:
+     *
+     *   lowest member over the corridor   9.35 = OVERHEAD_Y + 0.35, which is
+     *                                     BANNER_CHORD, the number the mile
+     *                                     gantry lifted to and the number LOW
+     *                                     tests against
+     *   lane plates                       10.35 to 11.85, clear above the
+     *                                     chord, so nothing of the sign hangs
+     *                                     into the band a BLOCK occupies
+     *                                     (0 to 2.80) or the jump apex (2.05)
+     *   legs                              +/- GANTRY = 4.95, which is 1.20
+     *                                     outside CORRIDOR_HALF and is where
+     *                                     the mile gantry's legs already stand
+     *
+     * And it must not read as a mile marker, because a player who reads it as
+     * one has learnt nothing. It is a different object: no lit board, three
+     * discrete lane plates on a lattice, and green rather than the mile sign's
+     * yellow-on-navy. What it looks like is a motorway lane-control gantry,
+     * which is exactly what it is doing.
+     *
+     * THE OTHER TWO PLATES ARE BLANK AND DARK, NOT CROSSED. A red X over a
+     * closed lane is what a real lane-control gantry draws and it is refused
+     * here: the BLOCK telegraph mat is a pink X, that mat is the device a race
+     * is lost by misreading, and a big X on a gantry over a lane would be the
+     * one road sign in this game that means something else. An unlit plate
+     * says "not this one" without borrowing a word.
+     *
+     * RULE 1. Every piece here is boxes and a cone -- solid bodies with a
+     * front, a back and two flanks. The lane plate is a 0.24-deep slab and not
+     * a plane, the arrow is a cone and not a triangle, and the countdown bars
+     * are boxes: the player passes all of it at 1.70 units with a camera that
+     * banks through every lane change, and the posts are still there in the
+     * mirror. The ONLY things here without a back are the bars painted across
+     * the road, which are markings on a surface and are the stated exception.
+     */
+    const SURGE_POST_X = Math.max(K.TRACK_HALF_WIDTH + 1.85, CORRIDOR_HALF + 1.75);
+    const SURGE_COUNT = [90, 60, 30];       // and the bar counts are 3, 2, 1
+    const SURGE_PLATE = 1.50;
+    const SURGE_PLATE_Y = 11.10;            // 10.35 to 11.85 -- above the chord
+    const SURGE_DARK = 0x232748;            // an unlit plate
+    const SURGE_FRAME = 0x2b2f52;           // the same steel the mile gantry is
+
+    const surgeGateGeo = (function () {
+      const parts = [];
+      const chord = BANNER_CHORD;                     // 9.35, the lowest member
+      const legTop = SURGE_PLATE_Y + SURGE_PLATE / 2 + 0.85;
+      for (const sx of [-1, 1]) {
+        parts.push(bx(0.40, legTop, 0.40, sx * GANTRY, legTop / 2, 0, SURGE_FRAME));
+        parts.push(bx(0.86, 0.30, 0.86, sx * GANTRY, 0.15, 0, 0x1b1633));
+        // A stub bracket each side at plate height, so the run of plates reads
+        // as carried by the frame rather than as floating in front of it.
+        parts.push(bx(0.26, 0.26, 1.40, sx * GANTRY, SURGE_PLATE_Y, 0, SURGE_FRAME));
+      }
+      // Bottom chord, top chord, and a green header band between them. The
+      // band is the part that says SURGE at a distance where the plates are
+      // three pixels each -- one continuous green line across the road, which
+      // is the widest mark the structure can make.
+      parts.push(bx(GANTRY * 2 + 0.4, 0.34, 0.40, 0, chord + 0.17, 0, SURGE_FRAME));
+      parts.push(bx(GANTRY * 2 + 0.4, 0.44, 0.44, 0, legTop - 0.22, 0, SURGE_FRAME));
+      parts.push(bx(GANTRY * 2 + 0.1, 0.40, 0.20, 0, chord + 0.62, -0.24, SURGE_GREEN_HI));
+      // The entry bar, across the whole carriageway: the line the zone starts
+      // on. Painted, so it has no back, and it is the one mark here that every
+      // lane shares -- "a zone begins" is a fact about the road, not about a
+      // lane.
+      parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, 0.62),
+        SURGE_RAIL, 0, 0.011, 0, -Math.PI / 2));
+      return merge(parts);
+    })();
+
+    // One geometry per marked lane: the lit plate and its arrow in that lane,
+    // the two dark plates in the others, and a solid green block laid in the
+    // marked lane just past the entry bar. Switched by visibility on claim, so
+    // a gantry costs two draws whichever lane the seed picked.
+    const surgeGateLaneGeo = [0, 1, 2].map(function (lane) {
+      const parts = [];
+      for (let l = 0; l < 3; l++) {
+        const x = K.LANE_X[l];
+        const on = l === lane;
+        parts.push(bx(SURGE_PLATE, SURGE_PLATE, 0.24, x, SURGE_PLATE_Y, 0,
+          on ? SURGE_GREEN : SURGE_DARK));
+        // A surround on every plate, so an unlit one still reads as a plate
+        // and not as a hole in the gantry.
+        parts.push(bx(SURGE_PLATE + 0.16, 0.14, 0.30, x, SURGE_PLATE_Y + SURGE_PLATE / 2 + 0.07, 0, SURGE_FRAME));
+        parts.push(bx(SURGE_PLATE + 0.16, 0.14, 0.30, x, SURGE_PLATE_Y - SURGE_PLATE / 2 - 0.07, 0, SURGE_FRAME));
+        if (!on) continue;
+        // The arrow: a cone pointing at the road and a shaft above it. Solid
+        // bodies, so it is an arrow from the flank and from behind as well.
+        parts.push(bx(0.26, 0.52, 0.16, x, SURGE_PLATE_Y + 0.40, -0.20, SURGE_GREEN_HI));
+        parts.push(part(new THREE.ConeGeometry(0.50, 0.74, 10), SURGE_GREEN_HI,
+          x, SURGE_PLATE_Y - 0.23, -0.20, Math.PI));
+      }
+      // The marked lane, on the ground, at the moment of commit. Painted.
+      parts.push(part(new THREE.PlaneGeometry(LANE - 0.34, 1.30), SURGE_RAIL,
+        K.LANE_X[lane], 0.0115, 0.96, -Math.PI / 2));
+      return merge(parts);
+    });
+
+    const surgeGatePool = Pool(function () {
+      const g = new THREE.Group();
+      g.add(S.outlined(surgeGateGeo, mats.prop, S.INK.banner));
+      const lanes = surgeGateLaneGeo.map(function (geo) {
+        const m = new THREE.Mesh(geo, mats.prop);
+        m.visible = false;
+        g.add(m);
+        return m;
+      });
+      g.userData.lanes = lanes;
+      return g;
+    }, group);
+
+    // Countdown posts: 3, 2, 1 bars at 90, 60 and 30 units out.
+    const surgePostPools = [1, 2, 3].map(function (n) {
+      const geo = (function () {
+        const parts = [];
+        parts.push(bx(0.72, 0.22, 0.72, 0, 0.11, 0, 0x1b1633));
+        parts.push(bx(0.24, 3.00, 0.24, 0, 1.50, 0, SURGE_FRAME));
+        parts.push(bx(0.34, 0.14, 0.34, 0, 3.05, 0, SURGE_FRAME));
+        for (let i = 0; i < n; i++) {
+          // Counted DOWN from the top, so the top bar lands at the same height
+          // on all three posts and the count is read as a stack growing
+          // shorter rather than as a post growing taller.
+          parts.push(bx(1.10, 0.26, 0.18, 0, 2.72 - i * 0.44, 0, SURGE_GREEN_HI));
+        }
+        return merge(parts);
+      })();
+      return Pool(function () {
+        return S.outlined(geo, mats.prop, S.INK.banner);
+      }, group);
+    });
+
+    /**
+     * The end of a zone, which the contract asks for by name: the pool stops
+     * draining and the player is owed that as plainly as they were owed the
+     * start. It is deliberately the opposite object -- a pale bar rather than a
+     * green one, a struck-through disc rather than an arrow, nothing overhead
+     * and nothing to enter. Where the entry says GO, this says NOTHING FURTHER
+     * IS BEING ASKED, which is what the end of a restriction looks like on a
+     * real road.
+     */
+    const surgeEndGeo = (function () {
+      const parts = [];
+      parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, 0.62),
+        SURGE_END_BAR, 0, 0.011, 0, -Math.PI / 2));
+      for (const sx of [-1, 1]) {
+        const x = sx * SURGE_POST_X;
+        parts.push(bx(0.62, 0.20, 0.62, x, 0.10, 0, 0x1b1633));
+        parts.push(bx(0.22, 2.30, 0.22, x, 1.15, 0, SURGE_FRAME));
+        parts.push(bx(1.00, 0.90, 0.20, x, 2.05, 0, SURGE_GREEN));
+        // Struck through, on both faces of the plate, so the cancellation is
+        // there from in front and from behind.
+        parts.push(bx(1.36, 0.17, 0.34, x, 2.05, 0, SURGE_END_BAR, 0, 0, 0.62));
+      }
+      return merge(parts);
+    })();
+    const surgeEndPool = Pool(function () {
+      return S.outlined(surgeEndGeo, mats.prop, S.INK.banner);
+    }, group);
+
     // ---------------------------------------------------------------------
     // Layout is drawn once from the seeded stream so it is identical for every
     // player, then indexed by z for windowed spawning.
@@ -15938,6 +16312,32 @@ MR.World = (function () {
       });
     }
 
+    /**
+     * The surge zones, laid out from the course's own table rather than from
+     * anything drawn here. Nothing in this loop touches the seeded stream, so
+     * a day with zones and the same day at MR.Pace.EFFORT = 0 place every
+     * other prop in the race identically.
+     *
+     * THE POSTS STAND ON THE MARKED LANE'S OWN SHOULDER, which is the aid
+     * table's rule and it is the same rule for the same reason: a cue about a
+     * lane belongs on the side of the road that lane is nearest, so the count
+     * and the lane are one glance rather than two. A centre-lane zone has no
+     * nearer shoulder, so the zone's own z picks one -- still identical for
+     * every player, which is the only property that matters.
+     */
+    for (const s of surgeZones) {
+      const lx = K.LANE_X[s.lane];
+      const side = lx > 0.05 ? 1 : lx < -0.05 ? -1 : ((Math.round(s.z0) & 1) ? 1 : -1);
+      for (let i = 0; i < SURGE_COUNT.length; i++) {
+        structures.push({
+          z: s.z0 - SURGE_COUNT[i], kind: 'surgePost', bars: SURGE_COUNT.length - i,
+          side, x: side * SURGE_POST_X, y: 0, ry: side < 0 ? Math.PI : 0,
+        });
+      }
+      structures.push({ z: s.z0, kind: 'surgeGate', lane: s.lane, x: 0, y: 0 });
+      structures.push({ z: s.z1, kind: 'surgeEnd', x: 0, y: 0 });
+    }
+
     structures.sort((p, q) => p.z - q.z);
 
     const banners = course.mileMarkers.map((m) => ({ m, tex: null }));
@@ -16017,6 +16417,11 @@ MR.World = (function () {
         if (kind === 'archway') return archwayPool;
         if (kind === 'arch') return archPool;
         if (kind === 'aidTable') return aidTablePool;
+        // A surge zone's furniture is the same in every city -- a lane
+        // reservation is a road marking, not local colour.
+        if (kind === 'surgeGate') return surgeGatePool;
+        if (kind === 'surgeEnd') return surgeEndPool;
+        if (kind === 'surgePost') return surgePostPools[Math.max(0, Math.min(2, (st.bars || 1) - 1))];
         if (kind === 'street') return streetPools[si][st.v || 0];
         return landmarkPools[kind] || null;
       }
@@ -16457,6 +16862,21 @@ MR.World = (function () {
           sh.scale.x = cut ? 0.30 : 1;
           sh.position.x = sx * (cut ? 8.9 : K.TRACK_HALF_WIDTH + 15);
         }
+        // The marked lane, clipped to the zone rather than to the tile. A zone
+        // boundary lands wherever the seed put it, so the paint has to stop on
+        // it to the unit -- the mechanic elects on z0 and a stripe that ran on
+        // to the next tile seam would be marking road that is not marked.
+        const sg = obj.userData.surge;
+        const zone = surgeSpan(tz - TILE / 2, tz + TILE / 2);
+        if (!zone) sg.visible = false;
+        else {
+          const a = Math.max(zone.z0, tz - TILE / 2);
+          const b = Math.min(zone.z1, tz + TILE / 2);
+          sg.visible = b - a > 0.01;
+          sg.position.x = K.LANE_X[zone.lane];
+          sg.position.z = (a + b) * 0.5 - tz;
+          sg.scale.z = (b - a) / TILE;
+        }
         obj.userData.auditName = 'road tile / ' + edge;
         activeRoad.push({ z: tz, obj });
         state.roadFrom++;
@@ -16777,6 +17197,13 @@ MR.World = (function () {
           obj.position.x = st.side * FSTAND_X;
           obj.rotation.y = st.side < 0 ? Math.PI : 0;
         }
+        // Which lane the gantry is pointing at. A pooled gantry recycles, so
+        // this is written on every claim -- a plate left lit from the last
+        // zone would be the marking telling the player to take the wrong lane,
+        // which is worse than no marking at all.
+        if (st.kind === 'surgeGate' && obj.userData.lanes) {
+          for (let l = 0; l < 3; l++) obj.userData.lanes[l].visible = (l === st.lane);
+        }
         if (st.kind === 'arch' && obj.userData.mat) {
           if (!st.tex) st.tex = labelTexture(st.label, st.bg, st.fg, 768, 128, st.sub);
           obj.userData.mat.map = st.tex;
@@ -16988,6 +17415,8 @@ MR.World = (function () {
       blockPool.releaseAll(); buildingPool.releaseAll();
       aidTablePool.releaseAll(); bannerPool.releaseAll(); archPool.releaseAll();
       abutPool.releaseAll(); riverPool.releaseAll();
+      surgeGatePool.releaseAll(); surgeEndPool.releaseAll();
+      for (const p of surgePostPools) p.releaseAll();
       overpassPool.releaseAll(); standPool.releaseAll();
       finishStandPool.releaseAll(); chutePool.releaseAll();
       footbridgePool.releaseAll(); archwayPool.releaseAll();
@@ -17305,6 +17734,32 @@ MR.World = (function () {
       // One entry per lane, at the same pose and through the same lens, so the
       // gate in tools/shoot.js tests every variant against it without knowing
       // the carpet exists.
+      /**
+       * A SURGE ZONE'S MARKED LANE IS A ROAD, so it is measured as one.
+       *
+       * This is the carpet's lesson, one surface along, and it is the reason
+       * the wash could be authored at all. 35.2% of the course is inside a
+       * zone and one lane in three of it wears the wash, so hazards stand on
+       * this surface for a substantial part of every race -- measuring them
+       * only against tarmac would be measuring them against a road that is not
+       * there. It is NOT the safe direction either, which the carpet's note
+       * concedes its own case was: the wash is a darkening and every hazard in
+       * this game is a bright object, so the ratio widens -- but "it happens
+       * to be safe" is exactly the reasoning this audit exists to replace, and
+       * a later hand brightening the wash by eye would be the failure it is
+       * here to catch.
+       *
+       * Built from surgeLaneParts, the same function the road tile draws, at
+       * the lane pose and through the same lens -- so what is measured is what
+       * is drawn, and the gate in tools/shoot.js tests all 26 variants against
+       * it without knowing the zone exists. The rails are inside the sampled
+       * window on purpose: they are part of what a hazard is seen against.
+       */
+      _audit.surges = [0, 1, 2].map(function (l) {
+        const m = new THREE.Mesh(merge(surgeLaneParts(6, 0.25)), mats.paint);
+        m.position.x = K.LANE_X[l];
+        return m;
+      });
       _audit.carpets = [0, 1, 2].map(function (l) {
         const g = new THREE.PlaneGeometry(LANE, 6);
         const uv = g.attributes.uv;
@@ -17664,6 +18119,12 @@ MR.World = (function () {
         const m = shotMean(renderer, scene, _audit.carpets[l], K.LANE_X[l], 0.02, 0,
           LANE * 0.44, LANE * 0.44);
         roads.push(Object.assign({ lane: 'carpet' + l }, m));
+      }
+      // ...and the marked lane of a surge zone. See auditSetup().
+      for (let l = 0; l < 3; l++) {
+        const m = shotMean(renderer, scene, _audit.surges[l], K.LANE_X[l], 0.25, 0,
+          LANE * 0.44, LANE * 0.44);
+        roads.push(Object.assign({ lane: 'surge' + l }, m));
       }
       return { hazards, roads };
     };

@@ -413,6 +413,16 @@ MAT arm; B's arm-mixing let the mat tutor the NOMAT arm and inflated it.
 does nothing** — which is the direction a null result must be discounted
 against.
 
+### 3.5c The framing defect did not bite — measured, not hoped
+
+Nine panels came back not exactly right across the three readers, and **zero of
+them are a one-lane rotation of the truth**. Every miss is a single lane called
+wrong in place, never the whole triple shifted. So the §2.6 crop problem — the
+one real nuisance in the design — **did not manifest**, and the lane anchor
+added to `PROMPT.txt` did its job. Readers described finding the lanes exactly
+as intended: *"Edge line, two broken purple lines, edge line: three lanes, with
+grass banks and railings outside them."*
+
 ### 3.6 By kind, and the three new DUCKs
 
 | kind | correct |

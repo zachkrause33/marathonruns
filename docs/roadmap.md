@@ -4555,3 +4555,123 @@ nobody measured is worse than no number at all.**
     START returns 0.22pp. The drift is printed on every run. **The ratio that
     matters is to an effect worth acting on, and this tool separates 0.000 from
     0.558.**
+
+65. **DUCK had five objects against 146 sightings a run, and the fix for that
+    is objects. Three more were built -- an access gantry, a floodlight rig and
+    a girder underbridge -- and the median gap between two sightings of the same
+    DUCK went 6.4 s to 10.5 s at ZERO extra draw calls.**
+
+    **BUILD EVERY ANGLE. THERE IS NO BACK OF AN OBJECT.** All three are
+    modelled on every side, and the cheap version of each was specifically
+    refused: the ladder cage is a closed ring of eight tangent segments and not
+    an arc facing the lens, the floodlight has a finned casting behind its lens,
+    the bridge parapet is railed on both faces of the deck, and every applique
+    on the clearance header is applied to the FRONT face and the REAR face.
+    `tools/orbit.js --kind DUCK` is the proof sheet.
+
+    ### The measurement that asked for them, and the one that scored them
+
+    `docs/staleness-and-mats.md` found DUCK worst on every measure -- five
+    skins, p10 gap 1.9 s, median 5.8 s, 4.0% back-to-back -- and stated the
+    arithmetic that makes it a pool-size problem rather than a drawing problem:
+    **freshness over a window cannot exceed skins divided by
+    sightings-in-window.** At mile 23 the game shows 38 DUCKs in thirty seconds
+    and owned five of them.
+
+    | on the same generator, 30 dates | 5 DUCKs | 8 DUCKs |
+    |---|---|---|
+    | sightings per skin per run | 29.2 | **18.3** |
+    | p10 gap | 1.9 s | **3.8 s** |
+    | p25 gap | 3.7 s | **6.4 s** |
+    | **median gap** | **6.4 s** | **10.5 s** |
+    | median in gates | 5 | **9** |
+    | back-to-back same skin | 4.0% | **1.5%** |
+    | read windows holding 2+ DUCKs that repeat | 17.6% | **6.6%** |
+
+    ### THE BEFORE NUMBER IN THE DOCUMENT WAS ALREADY STALE, AND QUOTING IT
+    WOULD HAVE CREDITED THIS PASS WITH SOMEBODY ELSE'S WORK
+
+    The published DUCK median is 5.8 s. Measured for this entry it is 6.4 s on
+    the same tree -- because a second agent landed a course-generator change
+    (surge zones, and `NARROW` switched on) between the document and this pass,
+    which moved gates per run from 185.0 to 183.5 and BLOCK sightings from 73.0
+    to 96.0. **Had the after arm been compared against the printed before, this
+    pass would have claimed 5.8 to 10.5 and about a tenth of that would have
+    been the other agent's.**
+
+    So both arms were rebuilt minutes apart from one tree differing only in the
+    three lines under test, and `tools/staleness.js` gained `--file` so a twin
+    is a twin. Rule 3 says audit the instrument; the instrument was fine and
+    **the stale thing was the number in the document**, which is the same
+    failure one step upstream.
+
+    ### What each object is, and the one-second test
+
+    The budget is unchanged and is set out at `duckScaffoldGeo`: the bar, the
+    caution face, the daylight beneath and the two tall verticals are fixed by
+    contract, and everything above the bar is confined to a standard's own x
+    band because the chase camera flies down the lane centre. So the levers are
+    OUTLINE, TOP TERMINATION and one BIG SHAPE on the standard.
+
+    - **v5, an access gantry with a caged ladder.** I-section legs, five rungs
+      and three hoops on each, and it terminates in a landing plate and a
+      handrail. It is the only REPEATING mark in the kind -- every other
+      variant puts one shape on the standard, this one puts a rhythm. Both legs
+      carry a ladder because a walkway across a road has to be got off at the
+      far end as well as on at the near one.
+    - **v6, a site floodlight gantry.** Tapered masts, a control box, and a big
+      canted floodlight head on a yoke at the top of each. **Nothing else in the
+      game is tilted off the vertical**, and this variant spends its big shape
+      and its termination on the same part so it can afford to make it large.
+    - **v7, a girder underbridge.** The archetype the clearance header was built
+      for. Flared cast capitals that open from r 0.14 to r 0.25, a parapet of
+      four balusters and a coping rail on both faces, and two rows of eleven
+      rivets along the whole span on the front AND the back of the beam.
+
+    ### A FOURTH LEVER THE FIRST FIVE VARIANTS LEFT ON THE TABLE
+
+    The header web is 0.34 deep in a box of halfZ 0.30, so there is **0.12 of
+    free relief in front of it and 0.12 behind it, running the whole span**, in
+    the one band where mass across the lane is already permitted. v0 to v4 use
+    none of it. v5 puts a walkway toe plate in front and a cable tray with three
+    cables behind; v6 three marker lamps in front and the armoured feed on
+    saddle clips behind; v7 the rivet rows on both faces. It is the only
+    differentiator in this kind that is available ACROSS THE LANE rather than
+    out at a standard, and it is most of what the rear elevation gained.
+
+    ### The refusal, with the number attached
+
+    **v7 has no flared base**, and the obvious move was to mirror the capital at
+    the road, which is what a real cast column does. A base flare of r 0.24 is
+    0.48 across the road per column against the 0.30 base plate every DUCK
+    stands on, and by `kindread`'s own band 0 that takes daylight occupancy from
+    0.21 back toward 0.33 -- most of the way to the 0.38 that entry 53 measured
+    as eating the only cue the kind has. **The daylight is worth more than the
+    detail.** Nothing new anywhere in this pass is below 1.90 except the shared
+    base plate, which was a constraint of the work and not a happy result.
+
+    ### The cost, measured as a deterministic twin rather than off a bot run
+
+    Shot-to-shot draw counts from `shoot.js` are noisy because the bot stops in
+    a different place, so both pages were loaded at the same `skip` and read
+    directly:
+
+    | | 5 DUCKs | 8 DUCKs |
+    |---|---|---|
+    | **draw calls** | **227** | **227** |
+    | triangles in that frame | 262,427 | 267,283 |
+    | meshes in the scene graph | 766 | **883** |
+
+    **117 more meshes and not one more draw call**, because every variant is
+    built and parented once at pool construction and switched by visibility.
+    That is the arithmetic the staleness projection promised and it holds.
+
+    ### Gates
+
+    `build`, `shoot`, `course-test`, `simulate`, `calendar` (32 days clean),
+    `footroom`, `deckdrop` all pass. `kindread` is **1 of 26** where it was 1 of
+    23 -- the same pre-existing `BLOCK v9` miss, and all three new variants
+    classify as DUCK on profile alone. Contrast against the local road, gate
+    1.25x luminance or 0.22 saturation: **v5 2.31x / 0.329, v6 2.08x / 0.342,
+    v7 2.16x / 0.362.** v5 clears the gate by the widest margin of any hazard in
+    the game.

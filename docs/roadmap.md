@@ -5608,7 +5608,17 @@ Three things move, and none of them is a hazard:
 | first tempo mat | — | **mile 2.00** (1.32 earliest) |
 | pool by end of mile 1 | 0.83 | **1.00** |
 
-The early zone is **mandated**, and it is deliberately a *bad* place to spend:
+The early zone is **mandated**, it is **short** (300–420 against 420–560), and
+it is an **addition** rather than one of the ordinary draws — and that last
+word was bought by rule 2. Every headless number said the first version was
+fine. Playing the whole race said the last zone had moved from 82% of the
+course to 71%, because the mandated zone was counted against the wanted count
+and so replaced an ordinary draw, usually a late one:
+`playthrough` went from *"surging every zone is worth 46.0 s"* to
+*"surging cost 23.4 s"*. With it added instead, the best spend policy finishes
+**1:58:32 against 1:58:37 before the pass**.
+
+It is deliberately a *bad* place to spend:
 `d(target)/d(FLOOR)` is 0.285 at streak 5 against 0.93 at streak 150, so the same
 segment buys a third of what it buys at the wall. The opening now asks its first
 real question — take the free speed now or carry it — and the tempting answer is
@@ -5641,9 +5651,59 @@ every bot here scored CLEAR, aid and ramp and nothing else, so a surge was
 elected only by coincidence and `risk.js` reported six policies tying at 0.0 s —
 truthfully, about a game its own instrument could not see. A tempo term omitted
 from `main.js`'s autopilot and `risk.js`'s policy scorer would have printed
-exactly the same honest nothing. Both weights sit **below** the clear-lane term,
-which is the honest ordering: a mat is worth seconds and a contact is worth tens
-of them.
+exactly the same honest nothing. **It had to be fixed in three places, and each
+one hid the next:**
+
+1. `main.js`'s autopilot and `risk.js`'s lane scorer got a tempo term — and the
+   A/B still came back **bit-identical at `--tempo 0` and `--tempo 1`**, because
+   `risk.js`'s race loop never applied a mat. *A scorer is where a bot decides;
+   the election is where the game answers; a measurement needs both.*
+2. The weights were then wrong in the direction that declined the mechanic.
+   Set below the clear-lane term on the argument that "a contact is worth tens
+   of seconds", which compares a mat to the wrong thing: taking a hurdle lane is
+   taking an **action**, not a contact, and an action costs P(fluff) × a contact
+   — 2 to 4 race seconds against a drag's measured 5.0. At −72 the bot preferred
+   a clear lane *with a drag in it* over a hurdle lane without one, which is
+   exactly the coasting decision the backward mat exists to make expensive.
+   −150 and +55 are the expected-cost numbers.
+3. `simulate.js` — the instrument the record contract is **quoted from** — was
+   lane-abstract. Every question it asked was about a *kind*, and the lane index
+   died at the end of each gate, so it could not see a mat at all.
+
+With all three fixed, `risk.js --section policy` at `--tempo 1` against
+`--tempo 0`, one build and one switch: **every policy is 6–7 s faster and 0 of
+40 record cells change.** The mats are a stream of small local decisions; they
+do not touch the record contract.
+
+`simulate.js`, which is where the 26% figure comes from:
+
+| | before | after |
+|---|---|---|
+| beats the record, all cells | 13 of 50 (26%) | **14 of 50 (28%)** |
+| on a first attempt | 5 of 20 (25%) | **5 of 20 (25%)** |
+| with the course learned | 8 of 30 (27%) | **9 of 30 (30%)** |
+| spread at perfect | 85.0 s | **87.8 s** |
+
+One cell easier on the pooled number, unchanged on first attempt, and slightly
+more spread between policies. The owner asked for it to stay hard and it has.
+
+**Two assertions in `playthrough.js` were also wrong, and re-cutting them is
+part of this entry rather than a footnote.** Demanding that surging *every*
+zone beat never seeking one is the instrument insisting on the one policy the
+design exists to make wrong. It is replaced by two tests that are **together
+strictly stronger**: the best spend policy must beat never seeking, **and**
+which zones must be worth something — which the old single test could not tell
+apart from a game where every allocation was identical. And the units ratio was
+a coverage test in disguise: coincidental surge scales with painted road, sought
+surge is capped by the pool, so the ratio fell from 1.80x to 1.25x purely as
+zone coverage went 38.7% → 46.5% with the mechanic untouched. The
+pool-denominated form is invariant to that, and the ratio is still printed every
+run.
+
+*(A finding worth keeping: coincidental surge is **40–48%**, not the 33% three
+lanes would give. The marked lane is guaranteed non-BLOCK inside a zone, so any
+bot that prefers a passable lane lands there more often than a coin would. That
+is a property of the generator, not an artefact.)*
 
 ### 9. What is NOT done, and it is the one thing that gates shipping
 
@@ -5669,6 +5729,22 @@ control. It names the slow lane and the open lane, at
   variant drops under the 1.25× contrast gate and `shoot.js` fails the build.
 - **A direction readable at `READ_NEAR` = 25.35 units**, because that is where
   the lane is chosen, and readable at a glance rather than by decoding.
+
+**A proposal, offered as a starting point and not as a decision.** Direction is
+best carried by a **gradient in spacing** rather than by any glyph: a ladder of
+transverse bars down the lane whose gaps **widen** forward on a lift and
+**close up** forward on a drag. It is the road's own vocabulary — converging
+transverse bars are what real carriageways paint to say *slow* — it is a shape
+and not a hue, it is orientationally distinct from the longitudinal lane dashes,
+and it is neither the JUMP mat's forward triangle nor the BLOCK mat's X. If a
+hue is wanted on the lift, the surge zone's green is the one already spoken and
+it already means *fast lane*, so confusing the two costs nothing: they say the
+same thing.
+
+The mechanic ships at `TEMPO = 1` regardless, because the interim toast covers
+the only half with a fairness exposure and the lift half has none. If that is
+judged too thin, `?tempo=0` is one query parameter and `MR.Course.TEMPO = 0` is
+one line.
 
 Until it lands, both flags are honest A/B scalars and `?tempo=0` returns the
 other game whole.

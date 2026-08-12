@@ -362,7 +362,7 @@ MR.Course = (function () {
    * mechanic taking 50 ms and then 22 ms already.
    */
   const SURGE_SIGHT = 90;
-  const SURGE_LEN_MIN = 420, SURGE_LEN_MAX = 560;
+  const SURGE_LEN_MIN = 420, SURGE_LEN_MAX = 520;
   const SURGE_N_MIN = 4, SURGE_N_MAX = 5;
   const SURGE_F0 = 0.15, SURGE_F1 = 0.90;
   /**

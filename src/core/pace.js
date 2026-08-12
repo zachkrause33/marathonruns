@@ -100,8 +100,9 @@ MR.Pace = (function () {
     // flat course keeps today holds inside a surge by construction.
     FLOOR_SURGE: 244,         // 4:04 /mi
     // Segments. FOUR, and it is set by the longest zone rather than chosen:
-    // SURGE_LEN_MAX is 560 units and BURN_UNITS is 140, so a full tank is
-    // exactly one maximum-length zone. A smaller cap would make the longest
+    // SURGE_LEN_MAX is 520 units and BURN_UNITS is 130, so a full tank is
+    // exactly one maximum-length zone -- and the two moved together in roadmap
+    // 68 precisely so that property survived the retune. A smaller cap would make the longest
     // zones unbuyable however well a player had allocated, which is a cap
     // secretly editing the course.
     POOL_MAX: 4,
@@ -131,7 +132,33 @@ MR.Pace = (function () {
     // So 140, and the surplus is deliberately negative. A player cannot buy
     // the whole course and cannot insure the whole course, and the pool is
     // filled by the one thing that already costs an action to reach.
-    BURN_UNITS: 140,
+    //
+    // ---- AND 130 AFTER ROADMAP 68, BECAUSE THE ROAD AND THE POOL BOTH GREW
+    //
+    // That pass added on both sides of the same balance: road aid went 13.7 ->
+    // 15.9 for the opening, and a sixth surge zone was mandated into the first
+    // eighth of the race. More pool AND more road to spend it on is more
+    // buyable speed, and tools/simulate.js said so -- the share of policy x
+    // skill cells beating the record went 26% -> 42%, with "with the course
+    // learned" at 53%. Over half of everything winning is the 260 finding in
+    // different clothes.
+    //
+    // BURN is the lever that cancels it exactly, because it is denominated in
+    // the same currency as both changes. Swept, with SURGE_LEN_MAX moved with
+    // it so a full tank stays exactly one maximum-length zone (POOL_MAX x BURN):
+    //
+    //   140 / 560   42% of cells, 25% first-attempt, 53% learned, spread  85.0s
+    //   130 / 520   32% of cells, 20% first-attempt, 40% learned, spread  94.1s
+    //   120 / 480   -            10% first-attempt, 20% learned, spread  85.9s
+    //
+    // 130, and the column that decided it is FIRST-ATTEMPT: 20% against the 25%
+    // the shipped game had, so a stranger is LESS likely to walk it than
+    // before, while "learned" rose from 27% to 40% and the spread from 85.0s to
+    // 94.1s. Knowing the course is worth more and guessing is worth less, which
+    // is the owner's sentence -- "if people get it on the first try everytime
+    // they will not always play" -- expressed as two numbers moving in opposite
+    // directions.
+    BURN_UNITS: 130,
   };
 
   /**

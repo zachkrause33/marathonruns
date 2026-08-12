@@ -6124,6 +6124,59 @@ MR.World = (function () {
     const SURGE_WASH_W = LANE;               // the whole lane, kerb to kerb
 
     /**
+     * ============ THE RAILS RUN BACK INTO THE APPROACH ============
+     *
+     * WHY, AND IT IS A MEASUREMENT RATHER THAN A PREFERENCE. Everything the
+     * first build of this marking put on the road lay AT or BEYOND the entry
+     * line. At the sight distance the entry line is ninety units away, so all
+     * of it -- the wash, the rails, the entry bar, the green block -- was
+     * compressed into the last few pixels before the vanishing point, while
+     * the near half of the frame was three telegraph mats at full saturation.
+     * A blind reader shown fourteen of those approaches never mentioned green
+     * paint at all, and on one of them wrote "at normal size this is a bare
+     * road". It was right: at ninety units there was nothing near enough to
+     * see.
+     *
+     * The run-up is the only ground in the picture with screen area on it, so
+     * the mark that answers WHICH LANE is put there. The rails -- not the wash
+     * -- run SURGE_RUNUP units back from the entry, so the marked lane is
+     * bounded by two bright green lines that begin at the runner's feet and
+     * converge on the gantry. That is a wedge across half the frame instead of
+     * a twelve-pixel smudge at the horizon, and it is lane-locked: the one
+     * fact it can carry is the one fact it is there to carry.
+     *
+     * WHAT IT MAY NOT DO IS MOVE THE COMMIT. The zone still begins at z0 to
+     * the unit -- the wash, the entry bar, the solid green block and the
+     * gantry all land there and nothing but the rails reaches back. A player
+     * who reads the rails as the zone would be early, not misled, and the
+     * moment the wash starts is unmistakable because the surface itself
+     * changes tone. It reveals nothing either: a boundary line on the approach
+     * says where the lane is, never what is standing in it, and the 82% of a
+     * zone bought blind is bought just as blind.
+     *
+     * IT IS FREE OF THE CONTRAST GATE for exactly the reason the zone's own
+     * rails are, and the reason is worth repeating rather than inheriting: the
+     * audit samples LANE * 0.44 of half-width about the lane centre, the rail
+     * sits on the seam at +/- 0.88, and a line at the lane boundary is not the
+     * surface a hazard stands on. Nothing about the run-up adds a tone to any
+     * road the audit measures, so no variant's margin can move -- which is an
+     * assertion tools/shoot.js re-checks on every build rather than a claim
+     * made here.
+     */
+    const SURGE_RUNUP = 90;                  // the far countdown board's own z
+
+    /** The two boundary rails, as a cross-section extruded over `len` at `y`. */
+    function surgeRailParts(len, y) {
+      const flat = -Math.PI / 2;
+      const parts = [];
+      for (const s of [-1, 1]) {
+        parts.push(part(new THREE.PlaneGeometry(SURGE_RAIL_W, len), SURGE_RAIL,
+          s * SURGE_RAIL_IN, y + 0.001, 0, flat));
+      }
+      return parts;
+    }
+
+    /**
      * The marked lane's paint, as a cross-section extruded over `len` at `y`.
      * Shared by the road tile and by the contrast audit, so the surface the
      * gate measures is the surface the game draws -- the carpet's own lesson
@@ -6132,13 +6185,15 @@ MR.World = (function () {
     function surgeLaneParts(len, y) {
       const flat = -Math.PI / 2;
       const parts = [part(new THREE.PlaneGeometry(SURGE_WASH_W, len), SURGE_WASH, 0, y, 0, flat)];
-      for (const s of [-1, 1]) {
-        parts.push(part(new THREE.PlaneGeometry(SURGE_RAIL_W, len), SURGE_RAIL,
-          s * SURGE_RAIL_IN, y + 0.001, 0, flat));
-      }
+      for (const p of surgeRailParts(len, y)) parts.push(p);
       return parts;
     }
     const surgeLaneGeo = merge(surgeLaneParts(TILE, 0.0095));
+    // The approach: rails only, no wash. A separate mesh because its span is a
+    // different span, and it is the CHEAP half -- a tile inside the zone still
+    // costs the one draw it always did, and only the four tiles of run-up pay
+    // an extra one.
+    const surgeRunGeo = merge(surgeRailParts(TILE, 0.0095));
 
     /**
      * The day's zones, straight off the course. Empty at MR.Pace.EFFORT = 0 --
@@ -6154,6 +6209,14 @@ MR.World = (function () {
       for (let i = 0; i < surgeZones.length; i++) {
         const s = surgeZones[i];
         if (b > s.z0 && a < s.z1) return s;
+      }
+      return null;
+    }
+    /** The zone whose APPROACH -- [z0 - SURGE_RUNUP, z0) -- overlaps [a, b). */
+    function surgeSpanRun(a, b) {
+      for (let i = 0; i < surgeZones.length; i++) {
+        const s = surgeZones[i];
+        if (b > s.z0 - SURGE_RUNUP && a < s.z0) return s;
       }
       return null;
     }
@@ -6897,6 +6960,14 @@ MR.World = (function () {
       surge.visible = false;
       t.add(surge);
       t.userData.surge = surge;
+
+      // The approach rails, on their own mesh because they run over a
+      // different span from the wash. Same bargain: invisible is a matrix
+      // update and no draw call.
+      const surgeRun = new THREE.Mesh(surgeRunGeo, mats.paint);
+      surgeRun.visible = false;
+      t.add(surgeRun);
+      t.userData.surgeRun = surgeRun;
 
       // One of these is shown at a time; keeping all three built means a
       // biome change is a visibility flip rather than a rebuild.
@@ -15827,7 +15898,40 @@ MR.World = (function () {
     // leaves 0.20 of sky between them, which at ninety units is the pixel and
     // a half that makes three plates three.
     const SURGE_PLATE = 1.50;
-    const SURGE_PLATE_Y = 11.20;            // 10.45 to 11.95 -- above the chord
+    /**
+     * ============ THE LIT PLATE IS A DIFFERENT SIZE FROM THE DARK ONES ======
+     *
+     * The three plates were the same 1.50 square and the marked one was told
+     * apart by its COLOUR and by the arrow inside it. Both of those channels
+     * are gone at the distance that matters. At ninety units a 1.50 plate is
+     * about eleven pixels across on a portrait frame, the arrow inside it is
+     * five, and the atmospheric haze this game draws pulls a saturated green
+     * most of the way to the sky behind it. What was left was three small
+     * blobs, one of them slightly greener -- which is a hue judgement made on
+     * a hundred pixels, and a blind reader shown fourteen of these approaches
+     * never once reported it.
+     *
+     * So the lit plate is given the one channel that survives distance and
+     * haze intact: SIZE. It is bottom-aligned with its neighbours and grows
+     * upward to PLATE_H_ON, so the marked lane carries a plate more than half
+     * again as tall as the other two and the gantry has an obvious odd one
+     * out at any scale, in any light, before any colour is resolved. The
+     * green and the arrow are still there and still do their work close in;
+     * they are no longer the only thing carrying the fact.
+     *
+     * WIDTH CANNOT GROW and that is the constraint that made height the
+     * answer: the lane pitch is 1.70 and a plate wider than about 1.56 touches
+     * its neighbour, which is the defect that made three plates read as one
+     * long board in the first build. Upward is the only free direction, and it
+     * is free -- everything here is above BANNER_CHORD and cannot occlude
+     * anything.
+     */
+    const PLATE_H_ON = 2.40;
+    // Bottom-aligned, above the header band, so growing the lit plate cannot
+    // reach down toward the corridor.
+    const SURGE_PLATE_BOT = 10.86;
+    const SURGE_PLATE_Y = SURGE_PLATE_BOT + SURGE_PLATE / 2;   // dark plate centre
+    const SURGE_PLATE_Y_ON = SURGE_PLATE_BOT + PLATE_H_ON / 2; // lit plate centre
     const SURGE_DARK = 0x232748;            // an unlit plate
     const SURGE_FRAME = 0x2b2f52;           // the same steel the mile gantry is
     // The arrow is WHITE ON GREEN, not green on green, and the first build had
@@ -15840,10 +15944,11 @@ MR.World = (function () {
     // "which lane" once the plate is big enough to have an inside.
     const SURGE_GLYPH = 0xf4fff8;
 
+    const SURGE_BAND_H = 0.98;              // was 0.62 -- see the note below
     const surgeGateGeo = (function () {
       const parts = [];
       const chord = BANNER_CHORD;                     // 9.35, the lowest member
-      const legTop = SURGE_PLATE_Y + SURGE_PLATE / 2 + 0.85;
+      const legTop = SURGE_PLATE_BOT + PLATE_H_ON + 0.96;
       for (const sx of [-1, 1]) {
         parts.push(bx(0.40, legTop, 0.40, sx * GANTRY, legTop / 2, 0, SURGE_FRAME));
         parts.push(bx(0.86, 0.30, 0.86, sx * GANTRY, 0.15, 0, 0x1b1633));
@@ -15859,11 +15964,21 @@ MR.World = (function () {
       // Bottom chord, top chord, and a green header band between them. The
       // band is the part that says SURGE at a distance where the plates are
       // three pixels each -- one continuous green line across the road, which
-      // is the widest mark the structure can make, and at 0.62 deep it is
-      // still four pixels of it at ninety units on a portrait frame.
+      // is the widest mark the structure can make.
+      //
+      // IT WAS 0.62 DEEP AND THAT WAS TOO THIN TO SURVIVE ITS OWN BACKGROUND.
+      // At ninety units the band is 4.6 pixels of pale mint against a pale
+      // sky, antialiased on both edges, in a frame that already contains lamp
+      // standards, a mile gantry, an access-gantry DUCK and a footbridge --
+      // every one of them a dark horizontal at the same height. 0.98 puts
+      // seven pixels of it there instead, and the band is now deep enough to
+      // sit UNDER the plates as one mass with them rather than as a separate
+      // hairline: the gantry makes one green shape at distance instead of
+      // three faint ones.
       parts.push(bx(GANTRY * 2 + 0.4, 0.34, 0.40, 0, chord + 0.17, 0, SURGE_FRAME));
       parts.push(bx(GANTRY * 2 + 0.4, 0.44, 0.44, 0, legTop - 0.22, 0, SURGE_FRAME));
-      parts.push(bx(GANTRY * 2 + 0.1, 0.62, 0.24, 0, chord + 0.72, -0.26, SURGE_GREEN_HI));
+      parts.push(bx(GANTRY * 2 + 0.1, SURGE_BAND_H, 0.24, 0,
+        chord + 0.34 + SURGE_BAND_H / 2, -0.26, SURGE_GREEN_HI));
       // The entry bar, across the whole carriageway: the line the zone starts
       // on. Painted, so it has no back, and it is the one mark here that every
       // lane shares -- "a zone begins" is a fact about the road, not about a
@@ -15883,18 +15998,22 @@ MR.World = (function () {
       for (let l = 0; l < 3; l++) {
         const x = K.LANE_X[l];
         const on = l === lane;
-        parts.push(bx(SURGE_PLATE, SURGE_PLATE, 0.24, x, SURGE_PLATE_Y, 0,
-          on ? SURGE_GREEN : SURGE_DARK));
+        const h = on ? PLATE_H_ON : SURGE_PLATE;
+        const cy = on ? SURGE_PLATE_Y_ON : SURGE_PLATE_Y;
+        parts.push(bx(SURGE_PLATE, h, 0.24, x, cy, 0, on ? SURGE_GREEN : SURGE_DARK));
         // A surround on every plate, so an unlit one still reads as a plate
         // and not as a hole in the gantry.
-        parts.push(bx(SURGE_PLATE + 0.16, 0.14, 0.30, x, SURGE_PLATE_Y + SURGE_PLATE / 2 + 0.07, 0, SURGE_FRAME));
-        parts.push(bx(SURGE_PLATE + 0.16, 0.14, 0.30, x, SURGE_PLATE_Y - SURGE_PLATE / 2 - 0.07, 0, SURGE_FRAME));
+        parts.push(bx(SURGE_PLATE + 0.16, 0.14, 0.30, x, cy + h / 2 + 0.07, 0, SURGE_FRAME));
+        parts.push(bx(SURGE_PLATE + 0.16, 0.14, 0.30, x, cy - h / 2 - 0.07, 0, SURGE_FRAME));
         if (!on) continue;
         // The arrow: a cone pointing at the road and a shaft above it. Solid
         // bodies, so it is an arrow from the flank and from behind as well.
-        parts.push(bx(0.30, 0.60, 0.18, x, SURGE_PLATE_Y + 0.44, -0.22, SURGE_GLYPH));
-        parts.push(part(new THREE.ConeGeometry(0.56, 0.82, 10), SURGE_GLYPH,
-          x, SURGE_PLATE_Y - 0.26, -0.22, Math.PI));
+        // Grown with the plate, and it now has room to be an arrow rather than
+        // a wedge -- the shaft is as long as the head, which is what makes a
+        // downward arrow read as pointing rather than as a diamond.
+        parts.push(bx(0.34, 1.02, 0.18, x, cy + 0.62, -0.22, SURGE_GLYPH));
+        parts.push(part(new THREE.ConeGeometry(0.62, 1.00, 10), SURGE_GLYPH,
+          x, cy - 0.44, -0.22, Math.PI));
       }
       // The marked lane, on the ground, at the moment of commit: a solid green
       // block three units long where the wash begins, so the ribbon starts
@@ -15918,51 +16037,121 @@ MR.World = (function () {
     }, group);
 
     /**
-     * Countdown marker boards: 3, 2, 1 bars at 90, 60 and 30 units out.
+     * ============ THE ADVANCE BOARD: HOW FAR, AND WHICH LANE ============
      *
-     * A BOARD, NOT A BARE POST, and that is the first thing this piece got
-     * wrong. Built as a dark mast with green bars bolted to it, it was the
-     * same navy as every lamp standard and utility pole on this road and the
-     * count read as one green dash in a thicket of verticals. A countdown
-     * marker on a real road is a PLATE -- a flat panel held up so the marks on
-     * it have something to be marks ON -- and a pale plate is also the only
-     * thing out here that reads at a glance against a green verge, a grey
-     * pavement and a dark pole. So the bars now sit on a 1.30 x 1.66 board,
-     * and the board is what is seen; the bars are what is counted.
+     * Countdown marker boards: 3, 2, 1 bars at 90, 60 and 30 units out. Three
+     * things changed about them and every one is a measurement.
      *
-     * The board faces the runner and is BUILT ON BOTH SIDES, with the count
-     * repeated on the back: the player passes it at close range and then it is
-     * behind them for the rest of the approach, and a blank rear on a sign
-     * this close is exactly the half-built object rule 1 exists to refuse.
+     * ---- 1. THEY WERE BEHIND SOMETHING, AND NOBODY HAD LOOKED -------------
+     *
+     * The first build put one board on the marked lane's own shoulder, on the
+     * argument that a cue about a lane belongs on that lane's side of the
+     * road. The argument is right and the placement was still wrong, because a
+     * single roadside object is the easiest thing in this game to occlude. On
+     * the very first zone approach photographed for this pass -- a centre-lane
+     * zone at ninety units -- BOTH visible boards projected inside the near
+     * leg of an access-gantry DUCK standing eight units in front of the lens,
+     * and the frame contains no countdown at all. The piece that answers HOW
+     * FAR was invisible on the frame it exists for.
+     *
+     * So there is a board on BOTH verges at each of the three counts. It costs
+     * one more pooled draw per live count and it makes the count the one piece
+     * of this marking that no single occluder can take: a hazard in the left
+     * lane hides the left board and not the right, and there is no object in
+     * this game that spans both verges at once below the corridor.
+     *
+     * ---- 2. THE BOARD NOW CARRIES THE LANE AS WELL AS THE COUNT -----------
+     *
+     * The three facts are carried by three pieces so that no two of them share
+     * an occluder -- but "which lane" was carried ONLY by the road paint and
+     * the gantry plate, and at ninety units both of those are at the vanishing
+     * point. A board at 30 or 60 units is the only piece of this marking with
+     * real screen area early in the approach, so it is given the second fact
+     * too: a three-cell lane diagram, the marked cell in the saturated green
+     * and the other two in the unlit plate's navy. That is the motorway
+     * advance-direction sign, which is exactly the object being imitated, and
+     * it means a player who sees ONE board has been told both facts.
+     *
+     * The cells are 0.62 wide on a 2.72 board. At 30 units -- where the first
+     * board a player meets stands -- that is fourteen pixels a cell on a
+     * portrait frame, which is a shape. At 90 it is under five and the board
+     * is a pale rectangle with a green mark somewhere in it, which is still
+     * the right answer at half a glance.
+     *
+     * ---- 3. A PALE PLATE, DARK BARS, AND THE GANTRY IS THE OTHER WAY ROUND
+     *
+     * The gantry's plates hang against SKY, so dark plates with a bright glyph
+     * is the readable pairing up there. These stand against a green verge, a
+     * hedge and a wall of trees, and a bright green bar in front of foliage is
+     * a bar nobody can find. So the board is the pale thing -- the only pale
+     * thing on that verge -- and the count is cut into it in the saturated
+     * green. Same language, inverted for its background, which is what the
+     * whole contrast gate is about one surface down.
+     *
+     * RULE 1. The board faces the runner and is BUILT ON BOTH SIDES, with the
+     * count and the lane diagram repeated on the back: the player passes it at
+     * close range and then it is behind them for the rest of the approach, and
+     * a blank rear on a sign this close is exactly the half-built object rule
+     * 1 exists to refuse. Every piece is a box -- the bars and the diagram
+     * cells are boxes THROUGH the plate rather than boxes on it, so there is
+     * one solid body and no hollow face anywhere on it.
+     */
+    const SURGE_BOARD_W = 2.72;
+    const SURGE_BOARD_H = 2.34;
+    const SURGE_BOARD_Y = 2.66;             // centre: 1.49 to 3.83 above the verge
+    /**
+     * One geometry per (count, marked lane): nine in all, and they are free.
+     * Geometry is the abundant resource here and draw calls are the scarce one
+     * -- baking the diagram into the board keeps a board at the two draws an
+     * outlined prop costs, where a switchable child mesh would have made it
+     * three. Same trade the gantry declined for the opposite reason: it has
+     * only one of itself on the road and six of these.
      */
     const surgePostPools = [1, 2, 3].map(function (n) {
-      const geo = (function () {
-        const parts = [];
-        parts.push(bx(0.76, 0.24, 0.76, 0, 0.12, 0, 0x1b1633));
-        parts.push(bx(0.26, 2.70, 0.26, 0, 1.35, 0, SURGE_FRAME));
-        // ---- PALE PLATE, DARK-GREEN BARS, AND THE GANTRY IS THE OTHER WAY
-        // ROUND ON PURPOSE. The gantry's plates hang against SKY, so dark
-        // plates with a bright glyph is the readable pairing up there. These
-        // stand against a green verge, a hedge and a wall of trees, and a
-        // bright green bar in front of foliage is a bar nobody can find. So
-        // the board is the pale thing -- the only pale thing on that verge --
-        // and the count is cut into it in the saturated green. Same language,
-        // inverted for its background, which is what the whole contrast gate
-        // is about one surface down.
-        parts.push(bx(1.50, 1.94, 0.24, 0, 1.73, 0, 0xf6f8fc));
-        parts.push(bx(1.66, 2.10, 0.16, 0, 1.73, 0, SURGE_FRAME));   // border
-        for (let i = 0; i < n; i++) {
-          // Counted DOWN from the top of the board, so the top bar lands at the
-          // same height on all three and the count reads as a stack growing
-          // shorter rather than as a board growing taller. Proud of the plate
-          // on BOTH faces -- one box through it, not one box on it.
-          parts.push(bx(1.10, 0.34, 0.38, 0, 2.42 - i * 0.56, 0, SURGE_GREEN));
-        }
-        return merge(parts);
-      })();
-      return Pool(function () {
-        return S.outlined(geo, mats.prop, S.INK.banner);
-      }, group);
+      return [0, 1, 2].map(function (lane) {
+        const geo = (function () {
+          const parts = [];
+          parts.push(bx(0.82, 0.26, 0.82, 0, 0.13, 0, 0x1b1633));
+          parts.push(bx(0.28, 1.70, 0.28, 0, 0.85, 0, SURGE_FRAME));
+          parts.push(bx(SURGE_BOARD_W, SURGE_BOARD_H, 0.24, 0, SURGE_BOARD_Y, 0, 0xf6f8fc));
+          parts.push(bx(SURGE_BOARD_W + 0.18, SURGE_BOARD_H + 0.18, 0.16, 0,
+            SURGE_BOARD_Y, 0, SURGE_FRAME));   // border
+          // The count, in the top half of the board. Counted DOWN from the top
+          // so the first bar lands at the same height on all three and the
+          // count reads as a stack growing shorter rather than as a board
+          // growing taller. Proud of the plate on BOTH faces -- one box
+          // through it, not one box on it.
+          for (let i = 0; i < n; i++) {
+            parts.push(bx(1.86, 0.32, 0.38, 0, SURGE_BOARD_Y + 0.86 - i * 0.50, 0, SURGE_GREEN));
+          }
+          // ---- THE LANE DIAGRAM, AND IT IS DRAWN TWICE ON PURPOSE ---------
+          //
+          // The count is left-right symmetric so one box THROUGH the plate
+          // serves both faces. A lane diagram is not: a viewer on the other
+          // side of the plate sees it mirrored, and a mirrored diagram sends a
+          // player to lane 2 when lane 0 is marked, which is worse than no
+          // diagram at all. So each face gets its own row of cells, laid out
+          // correctly for the side it is read from, and the plate between them
+          // is solid. That is rule 1 done properly rather than done cheaply --
+          // the object has a front, a back and no hollow face, and both faces
+          // tell the truth.
+          //
+          // LANE_X is DESCENDING (+1.70, 0, -1.70) and the chase camera looks
+          // down +z, so on the face the runner meets, larger x is further
+          // LEFT. Cell x therefore descends with the lane index, exactly as
+          // LANE_X does, and the far face mirrors it.
+          for (const s of [-1, 1]) {
+            for (let l = 0; l < 3; l++) {
+              parts.push(bx(0.62, 0.72, 0.16, -s * (1 - l) * 0.76, SURGE_BOARD_Y - 0.70,
+                s * 0.16, l === lane ? SURGE_GREEN : SURGE_DARK));
+            }
+          }
+          return merge(parts);
+        })();
+        return Pool(function () {
+          return S.outlined(geo, mats.prop, S.INK.banner);
+        }, group);
+      });
     });
 
     /**
@@ -16438,21 +16627,31 @@ MR.World = (function () {
      * a day with zones and the same day at MR.Pace.EFFORT = 0 place every
      * other prop in the race identically.
      *
-     * THE POSTS STAND ON THE MARKED LANE'S OWN SHOULDER, which is the aid
-     * table's rule and it is the same rule for the same reason: a cue about a
-     * lane belongs on the side of the road that lane is nearest, so the count
-     * and the lane are one glance rather than two. A centre-lane zone has no
-     * nearer shoulder, so the zone's own z picks one -- still identical for
-     * every player, which is the only property that matters.
+     * A BOARD ON EACH VERGE AT EVERY COUNT, and the rule it replaces was
+     * "the marked lane's own shoulder" -- the aid table's rule, on the sound
+     * argument that a cue about a lane belongs on the side of the road that
+     * lane is nearest. It is still a good argument and it lost to a
+     * photograph: on the first zone approach shot for this pass both live
+     * boards fell inside the near leg of an access-gantry DUCK eight units in
+     * front of the lens, and the frame that is supposed to answer HOW FAR
+     * contained no countdown at all. One roadside object is one occluder away
+     * from nothing. Two, on opposite verges, are not -- there is no object in
+     * this game that stands on both verges at once -- and the board now
+     * carries the lane in a diagram, so the side it happens to be on no longer
+     * has to carry it.
      */
     for (const s of surgeZones) {
-      const lx = K.LANE_X[s.lane];
-      const side = lx > 0.05 ? 1 : lx < -0.05 ? -1 : ((Math.round(s.z0) & 1) ? 1 : -1);
       for (let i = 0; i < SURGE_COUNT.length; i++) {
-        structures.push({
-          z: s.z0 - SURGE_COUNT[i], kind: 'surgePost', bars: SURGE_COUNT.length - i,
-          side, x: side * SURGE_POST_X, y: 0, ry: side < 0 ? Math.PI : 0,
-        });
+        for (const side of [-1, 1]) {
+          structures.push({
+            z: s.z0 - SURGE_COUNT[i], kind: 'surgePost', bars: SURGE_COUNT.length - i,
+            lane: s.lane, side, x: side * SURGE_POST_X, y: 0,
+            // Both faces of the board are built and both read correctly, so
+            // the yaw is free: it turns the board's own front toward the
+            // outside of the road on the left verge, exactly as it always did.
+            ry: side < 0 ? Math.PI : 0,
+          });
+        }
       }
       structures.push({ z: s.z0, kind: 'surgeGate', lane: s.lane, x: 0, y: 0 });
       structures.push({ z: s.z1, kind: 'surgeEnd', x: 0, y: 0 });
@@ -16541,7 +16740,10 @@ MR.World = (function () {
         // reservation is a road marking, not local colour.
         if (kind === 'surgeGate') return surgeGatePool;
         if (kind === 'surgeEnd') return surgeEndPool;
-        if (kind === 'surgePost') return surgePostPools[Math.max(0, Math.min(2, (st.bars || 1) - 1))];
+        if (kind === 'surgePost') {
+          return surgePostPools[Math.max(0, Math.min(2, (st.bars || 1) - 1))]
+            [Math.max(0, Math.min(2, st.lane | 0))];
+        }
         if (kind === 'street') return streetPools[si][st.v || 0];
         return landmarkPools[kind] || null;
       }
@@ -16996,6 +17198,21 @@ MR.World = (function () {
           sg.position.x = K.LANE_X[zone.lane];
           sg.position.z = (a + b) * 0.5 - tz;
           sg.scale.z = (b - a) / TILE;
+        }
+        // ...and the approach rails, clipped to [z0 - SURGE_RUNUP, z0) the same
+        // way and for the same reason. A tile can carry both -- the one the
+        // entry line falls in shows the wash ahead of z0 and the bare rails
+        // behind it -- so this is a second test and not an else.
+        const sr = obj.userData.surgeRun;
+        const runZone = surgeSpanRun(tz - TILE / 2, tz + TILE / 2);
+        if (!runZone) sr.visible = false;
+        else {
+          const a = Math.max(runZone.z0 - SURGE_RUNUP, tz - TILE / 2);
+          const b = Math.min(runZone.z0, tz + TILE / 2);
+          sr.visible = b - a > 0.01;
+          sr.position.x = K.LANE_X[runZone.lane];
+          sr.position.z = (a + b) * 0.5 - tz;
+          sr.scale.z = (b - a) / TILE;
         }
         obj.userData.auditName = 'road tile / ' + edge;
         activeRoad.push({ z: tz, obj });
@@ -17558,7 +17775,7 @@ MR.World = (function () {
       aidTablePool.releaseAll(); bannerPool.releaseAll(); archPool.releaseAll();
       abutPool.releaseAll(); riverPool.releaseAll();
       surgeGatePool.releaseAll(); surgeEndPool.releaseAll();
-      for (const p of surgePostPools) p.releaseAll();
+      for (const row of surgePostPools) for (const p of row) p.releaseAll();
       overpassPool.releaseAll(); standPool.releaseAll();
       finishStandPool.releaseAll(); chutePool.releaseAll();
       footbridgePool.releaseAll(); archwayPool.releaseAll();

@@ -404,6 +404,29 @@
   const SURGE_LOOK = (course.surges && course.surges.length)
     ? course.surges[0].sight : 90;
   let zoneToldOf = null;
+  /**
+   * ---- AND THE BACKWARD MAT IS ANNOUNCED FOR THE SAME REASON -------------
+   *
+   * The tempo paint does not exist in the renderer yet either (see the art
+   * commission in docs/roadmap.md entry 68), and of the two directions only one
+   * of them can take a run: a forward mat the player never noticed costs them
+   * nothing, while a backward mat they could not see is a slow-down outside
+   * their control, which rule 4 calls a build failure rather than a difficulty
+   * setting.
+   *
+   * SO ONLY THE BACKWARD ONES ARE ANNOUNCED. That is not economy of code, it is
+   * the same split the fairness rule makes: the cue exists to cover the
+   * exposure, and the lift has none. It also keeps the toast quiet -- 2.5 of
+   * these a course against 9.3 mats.
+   *
+   * TEMPO_LOOK is READ_NEAR plus a lane change, which is exactly the ground the
+   * player needs to read the cue and leave the lane: Course.READ_NEAR is the
+   * commit point measured from the lens and LANE_TRANSIT is what the swerve
+   * covers. Derived rather than typed, so a retune of the jump arc or the chase
+   * distance moves it.
+   */
+  const TEMPO_LOOK = MR.Course.READ_NEAR + MR.Course.LANE_TRANSIT;
+  let matToldOf = null;
   function botWantsZone(zone) {
     if (!zone || !EFFORT) return false;
     const zs = course.surges || [];
@@ -885,6 +908,19 @@
         if (soon && soon !== zoneToldOf) {
           zoneToldOf = soon;
           hud.toastAid('SURGE ' + soon.n, ['LEFT', 'CENTRE', 'RIGHT'][soon.lane]);
+        }
+      }
+      if (EFFORT && course.tempoAhead) {
+        const m = course.tempoAhead(pace.units, TEMPO_LOOK);
+        if (m && m !== matToldOf && m.dir < 0) {
+          matToldOf = m;
+          // It names the lane that is SLOW and the lane that is open, because
+          // those are the two facts the decision turns on and the second is the
+          // one the generator guarantees. course.js proves that lane is not
+          // BLOCK at any gate in the mark and holds no vehicle, so this cue can
+          // never point the player somewhere they cannot go.
+          hud.toastAid('SLOW ' + ['LEFT', 'CENTRE', 'RIGHT'][m.lane],
+                       'OPEN ' + ['LEFT', 'CENTRE', 'RIGHT'][m.open]);
         }
       }
 

@@ -7380,6 +7380,34 @@ MR.World = (function () {
             rd.visible = false;
             vg.add(rd);
             vg.userData.ride = rd;
+            /**
+             * ---- THE CONE ON THE DECK -------------------------------------
+             *
+             * The owner: *"Only obstacle on the roof can be cones."* It is the
+             * SAME jumpConeGeo the JUMP v1 variant stands on the road -- three
+             * large orange cones, no plinth, one continuous moulded body -- and
+             * reusing it rather than authoring a roof object is the point:
+             * every rule the road cone already obeys (the 1.12 x 0.52 x 0.80
+             * envelope, the continuous foot, no caution face) travels with the
+             * geometry, and MR.Collision.BOX[JUMP] is the box either way.
+             *
+             * A SIBLING OF THE BODY, NOT A CHILD OF IT, and that is load
+             * bearing: the body is scaled in z by the train span (see the cast
+             * site), and a cone inside it would be stretched to eight times its
+             * depth. It is placed in the variant's own unscaled frame and the
+             * cast site writes its z on every claim.
+             *
+             * The height is Course.DECK_Y read from the course, not 2.80 typed
+             * here. It is the same number player.surface is pinned to and the
+             * same number Collision.BOX[BLOCK].yMax is, so a cone drawn at any
+             * other height would be a cone standing in the air above the floor
+             * the game says the runner is on.
+             */
+            const ck = S.outlined(jumpConeGeo, mats.propLit, S.INK.hazard);
+            ck.visible = false;
+            ck.position.y = MR.Course.DECK_Y;
+            vg.add(ck);
+            vg.userData.deckCone = ck;
           }
           // THE NEAR-FACE ANCHOR, AND IT IS THIS ONE LINE.
           //
@@ -17012,8 +17040,30 @@ MR.World = (function () {
           // visibility above is: the pool recycles, and a tram that inherited
           // the last tenant's open tail would be a ramp painted on a wall.
           const ride = vs[vi].userData.ride;
-          const rideable = kind === K.BLOCK && gate.ramp === l;
+          // TWO LANES OF ONE GATE MAY BOTH BE RIDEABLE. The owner: *"You can
+          // add two vehicles with ramps together so they can cross on them."*
+          // Both carry the gate's one train span, so the two decks are the same
+          // length and both sit at Course.DECK_Y -- the crossing is level by
+          // construction. Reading only `gate.ramp` here would have drawn the
+          // second vehicle as a sealed wall with the runner standing on a roof
+          // that was not there.
+          const rideable = kind === K.BLOCK && (gate.ramp === l || gate.ramp2 === l);
           if (ride) ride.visible = rideable;
+          // The cone, from the course's own ramp table rather than from
+          // anything this file decides. Written on EVERY claim, both ways, for
+          // the reason the variant visibility above is: the pool recycles, and
+          // a bare deck that inherited the last tenant's cone would be a hazard
+          // the collision test does not know about -- the worst direction a
+          // pooling defect can point.
+          const dk = vs[vi].userData.deckCone;
+          if (dk) {
+            const rp = rideable && course.rampAt ? course.rampAt(gate.z + 1e-3, l) : null;
+            dk.visible = !!(rp && rp.cone);
+            // Gate space to the variant's own frame: the variant is offset
+            // forward by halfZ (see the near-face anchor note), so a point at
+            // gate-space z lands at z - gate.z - halfZ locally.
+            if (dk.visible) dk.position.z = rp.cone - gate.z - MR.Collision.BOX[K.BLOCK].halfZ;
+          }
           // The caution board is a lane-wide red-and-white panel on the rear
           // plane at knee height. On a rideable train that is straight across
           // the mouth the player is being invited into, so it comes down and

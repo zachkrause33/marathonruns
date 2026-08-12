@@ -380,11 +380,35 @@ function policyRace(key, skill, pol, seed) {
   for (const s of (course.surges || [])) if (pol.wants(s, course)) surgeOn.add(s);
 
   let gi = 0, guard = 0;
+  /**
+   * ---- THIS MODEL NOW HAS TO KNOW WHICH LANE IT IS IN -------------------
+   *
+   * It never did, and it never needed to: every question it asked was about a
+   * KIND -- what does the lane I chose demand -- and the lane index itself was
+   * a local variable that died at the end of the gate.
+   *
+   * A tempo mat is a fact about a LANE OVER A STRETCH OF ROAD, so a model that
+   * forgets which lane it is in cannot see one. Left alone, this sweep would
+   * have reported the record contract of a game with directional mats in it and
+   * never applied a single mat -- which is the same blindness roadmap 67 found
+   * in every bot in the project, and which this pass has now had to fix in
+   * risk.js as well.
+   *
+   * The lane persists between gates because the runner does: whatever lane the
+   * last gate was answered in is the lane the road under him belongs to until
+   * the next one. Starts at 1, the lane the player starts in.
+   */
+  let lane = 1;
   while (!p.finished && guard++ < 200000) {
     // The election, exactly as main.js makes it: in a zone, in its marked lane,
     // with fuel in the tank.
     const zone = course.surgeZoneAt ? course.surgeZoneAt(p.units) : null;
     p.surging = !!(zone && surgeOn.has(zone) && p.pool > 0);
+    // ...and the mat under the lane being held. Never while surging, which is
+    // Pace's own rule and is restated here only so the two cannot disagree
+    // about a case the generator does not produce anyway.
+    const mat = course.tempoAt ? course.tempoAt(p.units, lane) : null;
+    p.tempo = mat && !p.surging ? mat.dir : 0;
     p.update(DT);
     while (gi < course.gates.length && p.units >= course.gates[gi].z) {
       const g = course.gates[gi];
@@ -393,19 +417,44 @@ function policyRace(key, skill, pol, seed) {
       const item = wantAid.get(gi);
       gi++;
 
-      let kind;
       if (surging) {
         // Locked to the marked lane. Whatever is in it is what you answer.
-        kind = g.lanes[z.lane];
+        lane = z.lane;
       } else if (item) {
         // Gone to fetch a bottle: the lane it stands in, which the placement
         // rule guarantees holds a JUMP or a DUCK.
-        kind = g.lanes[item.lane];
+        lane = item.lane;
       } else {
-        // Free choice: CLEAR if any lane offers it, otherwise the gate forces
-        // an action and every lane is answerable with the right one.
-        kind = g.lanes.some((l) => l === Kk.CLEAR) ? Kk.CLEAR : g.lanes[0];
+        // ---- FREE CHOICE, AND THE MAT IS PART OF IT NOW ------------------
+        //
+        // It was "CLEAR if any lane offers it, otherwise lane 0", which is the
+        // right model of a player who only cares about actions. With mats on
+        // the road a clear lane is not necessarily the cheapest lane: a drag
+        // costs 5.0 race seconds and clearing a hurdle costs P(fluff) times a
+        // contact, which at the skills this sweep runs is less than that at
+        // three of its five levels.
+        //
+        // So the choice is scored in ONE currency -- race seconds -- rather
+        // than by a rule of thumb. An action is charged the seconds it is
+        // expected to cost THIS runner, which this model happens to know
+        // exactly, and the mat is charged what tools/tempo.js measured it at
+        // over the length actually run. That is a better-informed player than
+        // main.js's bot can be, and it is stated rather than hidden: what this
+        // sweep bounds is what a player who reads the road perfectly can do,
+        // which is the right question for a RECORD.
+        let best = null, bestCost = Infinity;
+        for (let l = 0; l < 3; l++) {
+          if (g.lanes[l] === Kk.BLOCK) continue;
+          const m = course.tempoAt ? course.tempoAt(g.z, l) : null;
+          const run = m ? Math.min(m.z1, g.z + 60) - g.z : 0;
+          let cost = g.lanes[l] === Kk.CLEAR ? 0 : skill * Kk.HIT_TIME_PENALTY * 8;
+          if (m) cost += (m.dir > 0 ? -Pace.TEMPO.LIFT : Pace.TEMPO.DRAG)
+            * run / Kk.UNITS_PER_MILE;
+          if (cost < bestCost) { bestCost = cost; best = l; }
+        }
+        lane = best === null ? 0 : best;
       }
+      const kind = g.lanes[lane];
 
       const demanded = kind !== Kk.CLEAR;
       if (demanded && rnd.next() >= skill) p.onHit();

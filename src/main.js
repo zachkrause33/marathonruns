@@ -576,21 +576,40 @@
         // term had to be added the day its mechanic landed or the harness
         // measured a version of the game with that mechanic routed around.
         //
-        // WEIGHTS. A drag is worth about 5.9 race seconds and a lift about
-        // 1.9, so avoiding a drag is worth roughly three times taking a lift --
-        // and the numbers below are that ratio, not a feel. Both sit BELOW the
-        // clear-lane term (100), which is deliberate and is the honest
-        // ordering: a mat is worth seconds and a contact is worth tens of them,
-        // so a bot that took a hurdle to dodge a drag would be trading the
-        // record for a couple of seconds. What these terms decide is the case
-        // the mechanic is actually about -- which of two lanes the bot could
-        // equally well take.
+        // WEIGHTS, AND THE FIRST DERIVATION OF THEM WAS WRONG. They were set
+        // below the clear-lane term (100) on the argument that "a mat is worth
+        // seconds and a contact is worth tens of them", which compares the mat
+        // to the WRONG THING: taking a hurdle lane is not taking a contact, it
+        // is taking an ACTION, and an action is cleared far more often than
+        // not. The honest currency is expected cost.
+        //
+        // The clear-lane term is 100, so one unit here is one hundredth of an
+        // action avoided. An action costs P(fluff) x the cost of a contact --
+        // about 2 to 4 race seconds at the skill this game is tuned around --
+        // against a drag's measured 5.0 and a lift's 1.9 (tools/tempo.js
+        // --section worth). So a drag is worth about one and a half actions
+        // and a lift about six tenths of one:
+        //
+        //     drag  -150      eating one costs more than clearing a hurdle
+        //     lift   +55      worth a detour, not worth an action
+        //
+        // The sign of that first number is the whole mechanic. At -72 the bot
+        // preferred a CLEAR lane with a drag in it over a JUMP lane without
+        // one, which is the coasting decision the backward mat exists to make
+        // expensive -- the harness would have been demonstrating the mat while
+        // declining to use it.
+        //
+        // It is a FIXED weight against a skill-dependent cost, and that is
+        // stated rather than hidden: at 30% fluff an action really is worth
+        // more than a drag and eating it would be right. A bot that
+        // conditioned on its own fluff rate would be measuring a player who
+        // knows their own error rate, which is not a player.
         //
         // Read at the GATE LINE rather than over the mark, because that is
         // where the lane is chosen and where this bot commits.
         if (course.tempoAt) {
           const m = course.tempoAt(g.z, l);
-          if (m) score += m.dir > 0 ? 24 : -72;
+          if (m) score += m.dir > 0 ? 55 : -150;
         }
         if (score > bestScore) { bestScore = score; best = l; }
       });

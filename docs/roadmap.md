@@ -5390,3 +5390,301 @@ at EFFORT 0 and nothing here draws from the seeded stream · `risk` ·
   colour over a third of the course. **A directional mat should take a shape,
   not a new colour**, and it should take it in a hue already spoken — otherwise
   the fifth language is the one that makes the other four stop reading.
+
+---
+
+## Roadmap 68 · Directional mats, cones on the deck, and an opening with something to decide
+
+**BUILD EVERY ANGLE. THERE IS NO BACK OF AN OBJECT.** Every object in this game
+is modelled on all sides, fully, always — every obstacle and vehicle of any
+kind, every building, bridge, tree, crowd, sign and prop, and the runner. **A
+marking painted on a surface is the one exception, because it is not an
+object**, and most of this pass is paint: the tempo mat is a marking and has no
+back. The cone on the deck is *not* an exception — it is `jumpConeGeo`, the
+same fully-revolved three-cone body the road already stands, reused rather than
+re-authored precisely so that no half-built roof variant could exist.
+
+The owner, verbatim:
+
+> *"I still think we need more obstacles and more rewards to navigating
+> obstacles. A few more waters and bananas. More obstacles. Like on top of the
+> cars with ramps. Inventive people to go up and there and under and over.*
+>
+> *I also want to add an idea. The Matts either go forward or backwards.
+> Forward speed you up briefly and backwards slow you down briefly. If there is
+> a backwards one, there needs to be an opening for the running to go through
+> one of the other lanes."*
+
+…then, in three corrections: **cones and nothing else on a roof**; **two
+vehicles with ramps together so they can cross on them**; and *"on adding more
+at the beginning — we need to find a way to get people engaged. The first few
+miles are boring."*
+
+### 1. The mat is a second mark, not a second meaning
+
+The first decision was whether the direction rides on the telegraph mat. It
+does not, and three measurements say so:
+
+| the objection | the number behind it |
+|---|---|
+| the colour code is already full | `mats-three-lane` §2.10: three cleanly separated hues, and *"the mat, on its own, is a sufficient answer"*. Every error four readers made was a JUMP read as AROUND — ten of them — which is a **hue** confusion. Doubling the palette attacks the axis that already fails. |
+| a telegraph mat is on every hazard lane of every gate | ~370 a course. The owner asked for an effect that lasts **briefly**; a direction on all of those is a continuous speed field. |
+| a telegraph mat stands in a lane that already costs an action | slowing it as well charges twice for one obstacle, which is a punishment and not a choice — and the choice is the whole point of the backward mat. |
+
+So a **tempo mat** is its own painted mark, on open road, between gates, saying
+one thing: this lane is faster / this lane is slower. The telegraph mat keeps
+its one meaning and its one measured job (§3.5b: teaching which low object is
+jumpable).
+
+### 2. The lift is derived, and it is widened for anyway
+
+`LIFT = FLOOR_BASE − K.FLOOR_PACE = 261 − 254 = 7 s/mi.` That is exactly the
+gap between the pace an unsurged runner runs toward and the pace `ACTION_WINDOW`,
+`LANE_TRANSIT` and every gate spacing in `course.js` have been cut against
+since the generator was written. Nothing was chosen.
+
+It would have been defensible to stop there — the course is already spaced for
+254 — and it would have been **wrong by this project's own standard**. The surge
+pass established it: *what the player is owed is not a span in the generator's
+private units, it is TIME, and the time they are owed is the time the ordinary
+road gives them.* Under EFFORT the ordinary road gives 761 ms. At 254 it gives
+741 ms. Taking those 20 ms is difficulty coming out of a reaction window rather
+than out of the allocation, which rule 4 forbids.
+
+So `surgeExtraAt` became `liftAt`, one function answering one question — *how
+many s/mi faster than the ordinary road may the runner be here, because of
+something the road said* — and a lift mark widens the window through the same
+arithmetic a zone does. Measured, `tools/tempo.js --section fair`:
+
+```
+off a mat        floor 761 ms, 5th 761 ms, median 838 ms  (at 27.6 u/s)
+on a forward mat floor 761 ms, 5th 761 ms, median 835 ms  (at 28.3 u/s)
+verdict          -1 ms
+```
+
+And a **clamp** behind the widening, because belt and braces is what a fairness
+proof is made of: `tempoTarget` maxes a lift at `K.FLOOR_PACE`, so no
+combination of streak, hill and mat can go below it, and the fastest the game
+can run is still exactly `FLOOR_SURGE`. Applied to the surge floor a lift
+returns 254 — it cannot compound.
+
+### 3. The open-lane guarantee is constructed, not hoped
+
+The owner's one constraint on the backward mat. It is five clauses, enforced in
+`assignTempo` and re-derived from the finished course in `validate()`:
+
+1. **Readable** — no vehicle in the mat's own lane from `readWindowAt` behind
+   its near edge to its far edge. Same standard every gate is held to.
+2. **The mark ends before the next gate's telegraph run-up** (`TEMPO_TAIL = 14`,
+   which is world.js's own mat length, not a number chosen here).
+3. **A forward mat is earned** — some gate inside it demands an action of the
+   marked lane. Without this a lift is two free seconds for running straight.
+4. **A backward mat has an opening** — a named other lane, not BLOCK at any gate
+   inside the mark, with no vehicle from `LANE_TRANSIT` before the near edge;
+   and the dragged lane itself CLEAR throughout, so the drag is the only price.
+5. **The opening is reserved** — no later mark may drag it. Without 5 the
+   guarantee is order-dependent, and a guarantee that depends on placement order
+   is not a guarantee.
+
+`tools/tempo.js --section open` re-derives the opening from the gate table
+rather than reading the field the generator wrote, and disagreement fails the
+build. **153 of 153 backward mats over 60 days have an opening; the named lane
+is open on every one.** 9% of openings are CLEAR the whole way through — swerve
+and pay nothing — and **91% ask for at least one action**. That split *is* the
+mechanic: eat five seconds, or pay one action to be in the fast lane.
+
+### 4. A mark is trimmed to where it is legal, not dropped
+
+The first version tested every gate the planned range covered and threw the
+whole mark away on the first failure. **That cost 82% of the backward mats and
+left one a course**, which is not a mechanic. The plan draws a z range before
+any gate exists, so where it happens to end has no meaning, and every rule is a
+statement about a **prefix** of gates. Trimming lands 2.55 a course with every
+clause intact.
+
+The same instrument then caught a second, quieter defect: `mat.gates` published
+the gates the **plan** covered rather than the ones the mat ended up over, so
+`tempo.js` re-derived the guarantee across ground the generator had never
+claimed and reported three failures that were not there. A field a downstream
+reader trusts has to describe the object that shipped.
+
+### 5. Cones, and why nothing else may stand on a deck
+
+**A deck has no sideways.** It is one lane wide, the runner is committed from
+the mouth to the dismount, and leaving sideways costs the streak. A DUCK up
+there is a demand with no alternative and a BLOCK is a wall with no
+alternative — neither is a decision, and both are arguably the rule 4 failure
+this project fails builds for. A cone is low, needs no overhead clearance, and
+asks for a jump the player can time.
+
+The deck layout is derived end to end:
+
+```
+z0                       the gate line, the foot of the tailgate
+z0 + RAMP_RUN  (6.00)    the top of the tailgate; deck at DECK_Y = 2.80
++ ACTION_WINDOW (21.00)  a FULL action window of flat deck before the cone
+the cone                 Collision.BOX[JUMP], resolved against the DECK
++ CONE_LAND    (19.84)   the whole airborne span, so the arc finishes on the
+                         deck rather than in mid-air over the road
+= 46.84 units            against 42.50 for the longest ramp the game shipped
+```
+
+`CONE_LAND` is the clause that stops the mechanic handing out free clears: a
+runner still airborne at the dismount arrives at the next road gate with
+`surface` above the DUCK bar and `y` above the JUMP block, and clears both for
+nothing. So a coned vehicle is span **13–16** (49.5 to 60.1 units), and that
+length is charged to the course through `reachOf` exactly as every other
+vehicle's is. Measured floors over 60 days: **21.00 units of approach against
+21 owed, 1.19 units of landing margin**, both proved in `validate()`.
+
+`clears(kind, st)` is now `clearsOn(kind, st, floor)` at floor zero — literally,
+by calling it. The shipped expression was exactly wrong in the dangerous
+direction up there: the runner's own `surface` is 2.80 on a deck, so
+`(y||0) + surface >= 0.84` is true before he has left the floor at all, and
+**every roof cone would have been cleared by standing still**.
+
+### 6. Two decks side by side. In series is not buildable, and here is the number
+
+Both readings were costed rather than chosen.
+
+**Side by side works and is nearly free.** Two rideable BLOCK lanes at one gate,
+both carrying the gate's single train span, so the decks are the same length and
+both sit at `DECK_Y` — level by construction, with no height term in the
+crossing at all. `reachOf` takes the max over lanes, so a pair costs **no extra
+spacing**. It puts a lane change at altitude in the game, which is a decision
+this game could express nowhere else, and with a cone on one deck and not the
+other it is a real choice.
+
+**In series is not buildable**, and the invariant that blocks it is the one this
+project will not trade:
+
+```
+gap floor     25.35u between one vehicle's far face and the next gate line
+jumpable gap  16.17u -- the ground covered while the feet are above JUMP_CLEAR_Y
+verdict       16.2 < 25.4
+```
+
+Two decks in one lane can neither abut nor be jumped without lowering
+`readWindowAt`, which is the number every gate's readability is built on. There
+is no version of this that is a tuning question.
+
+Waiting for a gate that happened to roll two BLOCKs with a ramp on one gave
+**0.13 pairs a course**. The second wall is made instead, and the safety comes
+from where it always comes from here: the converted gate goes through
+`solvable()` exactly as the roll did and is abandoned if the proof does not
+survive it. **1.30 pairs a course, 78 of 78 keeping a third lane open.**
+
+### 7. The opening: density was the wrong lever
+
+Measured first, because the coordinator was right that the figure may have
+drifted:
+
+| mile | gates/mi | haz/gate | forced | aid | pool if perfect |
+|---|---|---|---|---|---|
+| 0 | 2.80 | 1.26 | 0% | 0.00 | 0.00 |
+| 1 | 5.73 | 1.56 | 5% | 0.83 | 0.83 |
+| 2 | 6.03 | 1.67 | 9% | 0.17 | 1.00 |
+| 3 | 6.32 | 1.72 | 11% | 0.63 | 1.63 |
+
+**`makeGate` was not touched, and the reason is arithmetic rather than taste.**
+`staleness-and-mats` establishes that freshness cannot exceed objects divided by
+density, so packing the opening buys difficulty by spending novelty — the wrong
+trade for a boredom problem, and the opening is where every object is still
+being seen for the first time.
+
+The real cause is structural and nobody had written it down: **at the start of a
+race the pool is empty, so guard and surge — the entire strategic layer — do not
+exist yet.** The first zone landed at mile 5.73 and the first bottle at mile
+1.77. The opening is not boring because it is easy. It is boring because it is
+the only part of the race with nothing to decide.
+
+Three things move, and none of them is a hazard:
+
+| | before | after |
+|---|---|---|
+| first bottle | mile 1.77 (2.45 worst) | **mile 1.19** (1.88 worst) |
+| road aid | 13.7 items | **15.9** |
+| first surge zone | mile 5.73 (3.93 earliest) | **mile 2.33** (1.34 earliest) |
+| first tempo mat | — | **mile 2.00** (1.32 earliest) |
+| pool by end of mile 1 | 0.83 | **1.00** |
+
+The early zone is **mandated**, and it is deliberately a *bad* place to spend:
+`d(target)/d(FLOOR)` is 0.285 at streak 5 against 0.93 at streak 150, so the same
+segment buys a third of what it buys at the wall. The opening now asks its first
+real question — take the free speed now or carry it — and the tempting answer is
+the wrong one. The first tempo mat is mandated too, and is **forward every
+time**: the first meeting with a vocabulary should pay, so the association is
+that the paint means speed, and the first backward mat is then read against an
+association that already exists.
+
+This also answers the guard the coordinator raised: the first mile is the one
+stretch where a contact cannot be absorbed, so the fix had to be *something to
+spend*, not more to survive. It now has a segment by the end of mile 1.
+
+### 8. What it cost, and what the instrument had to be told
+
+```
+TEMPO=0 ROOF=0   183.9 gates, 17.9 aid, 0 degraded
+TEMPO=1 ROOF=0   183.8 gates  (-0.1)
+TEMPO=0 ROOF=1   183.1 gates  (-0.8)
+TEMPO=1 ROOF=1   182.9 gates, 19.2 aid, 0 degraded  (-1.0)
+```
+
+`mechanics --identity`: **the GATE hash did not move** — `e9f8d87f…`, the
+baseline taken before EFFORT existed. The **AID hash was re-taken deliberately**,
+because the aid curve moved for the opening. Aid reads the gate table and writes
+nothing back, so where the bottles go cannot touch the course; that split is why
+the two hashes are separate and this is the first time it has paid for itself.
+
+**And the bots had to be told the mats exist.** Roadmap 67's finding was that
+every bot here scored CLEAR, aid and ramp and nothing else, so a surge was
+elected only by coincidence and `risk.js` reported six policies tying at 0.0 s —
+truthfully, about a game its own instrument could not see. A tempo term omitted
+from `main.js`'s autopilot and `risk.js`'s policy scorer would have printed
+exactly the same honest nothing. Both weights sit **below** the clear-lane term,
+which is the honest ordering: a mat is worth seconds and a contact is worth tens
+of them.
+
+### 9. What is NOT done, and it is the one thing that gates shipping
+
+**There is no tempo paint.** `world.js` draws nothing for a mat. The
+interim channel is the toast the surge zone shipped with, and it announces
+**only the backward mats** — a forward mat the player never noticed costs them
+nothing, while a backward one they could not see is a slow-down outside their
+control. It names the slow lane and the open lane, at
+`READ_NEAR + LANE_TRANSIT` out.
+
+**The art commission, in the numbers it has to be built to:**
+
+- **A shape, not a new hue.** The handover from the surge pass measured the road
+  at 39–54% paint mesh by edge density in the near band and refused to spend a
+  fifth colour. Direction is a shape.
+- **Not a chevron and not an X in the lane.** A forward-pointing triangle on the
+  tarmac is the JUMP telegraph's own glyph and a red X on a plate is the BLOCK
+  mat's; either would make two marks mean two things each.
+- **Length**: 18 to 88 units, median 57, one lane wide, laid from `mat.z0` to
+  `mat.z1` with `Course.tempoAt(z, lane)` as the only source of truth.
+- **Luminance**: a hazard stands on a mat by construction (a forward mat is
+  *defined* by having one), so the surface must stay **at or below L 70.5** or a
+  variant drops under the 1.25× contrast gate and `shoot.js` fails the build.
+- **A direction readable at `READ_NEAR` = 25.35 units**, because that is where
+  the lane is chosen, and readable at a glance rather than by decoding.
+
+Until it lands, both flags are honest A/B scalars and `?tempo=0` returns the
+other game whole.
+
+### 10. Where this brief was wrong
+
+- **It said `Course.solvable()` must prove the open-lane guarantee.** It cannot
+  and should not: `solvable()` proves lane paths at gate lines, and a mat is a
+  statement about ground between them. The guarantee is proved in `validate()`
+  and re-derived independently in `tools/tempo.js`, which is the same division
+  the surge contract already uses.
+- **It framed the roof as needing "a way down that is not only the end of the
+  vehicle".** With cones as the only legal roof hazard, the way down that
+  matters turned out to be *sideways onto the paired deck*, which is free, level
+  and already a lane change — so no new dismount was built and `deckdrop.js`
+  needed no extension. It stays 24/24.
+- **It asked for more hazards at the start.** Measured, that is the wrong lever
+  for the stated problem, and the freshness arithmetic in
+  `staleness-and-mats` says why. `makeGate` is untouched.

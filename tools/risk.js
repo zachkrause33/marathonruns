@@ -90,6 +90,14 @@ function arg(name, def) {
 }
 const DAYS = parseInt(arg('days', 12), 10);
 const ONLY = arg('section', null);
+// The mechanic flags, so a policy table can be taken with a mechanic on and
+// again with it off THROUGH THE SAME INSTRUMENT. A before-and-after taken from
+// two different runs of two different builds is the comparison this project
+// has got wrong most often; one build, one binary, one switch is the only
+// version of it that cannot go stale. Applied after the modules load and
+// before any course is generated.
+const TEMPO_FLAG = arg('tempo', null);
+const ROOF_FLAG = arg('roof', null);
 const want = (s) => !ONLY || ONLY === s;
 
 // The REAL modules. Same one-field Runner stub tools/aid.js and
@@ -106,6 +114,8 @@ for (const f of ['src/core/rng.js', 'src/core/constants.js', 'src/core/elevation
   vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: f });
 }
 const { Course, Collision, Player, Pace, K } = ctx.MR;
+if (TEMPO_FLAG !== null) Course.TEMPO = TEMPO_FLAG;
+if (ROOF_FLAG !== null) Course.ROOF = ROOF_FLAG;
 
 let fail = 0;
 function bad(msg) { fail++; console.log('  ! ' + msg); }
@@ -517,14 +527,18 @@ function raceAt(course, opts) {
           // not see. A tempo term omitted here would print exactly the same
           // kind of honest nothing.
           //
-          // Below the clear-lane term (100) on purpose: a mat is worth a few
-          // seconds and a contact is worth tens, so these decide between lanes
-          // the bot could equally well take rather than buying a hurdle to
-          // dodge a drag. The 3:1 ratio is the measured worth of the two
-          // directions (tools/tempo.js --section worth), not a feel.
+          // The weights are an EXPECTED-COST derivation and the first attempt
+          // at them was wrong: they were set below the clear-lane term on the
+          // argument that a contact is worth tens of seconds, which compares
+          // the mat to the wrong thing. Taking a hurdle lane is taking an
+          // ACTION, not a contact, and an action costs P(fluff) times a
+          // contact -- 2 to 4 race seconds -- against a drag's measured 5.0
+          // and a lift's 1.9. The clear-lane term is 100, so one unit is one
+          // hundredth of an action avoided, and a drag is about one and a half
+          // of them. See the fuller note at the same term in main.js.
           if (course.tempoAt) {
             const m = course.tempoAt(g.z, l);
-            if (m) score += m.dir > 0 ? 24 : -72;
+            if (m) score += m.dir > 0 ? 55 : -150;
           }
           if (score > bestScore) { bestScore = score; best = l; }
         });
@@ -572,6 +586,21 @@ function raceAt(course, opts) {
     if (usePace) {
       pl.resolveSurge(course, units, p.pool > 0);
       p.surging = !!pl.surge;
+      // ---- AND THE MAT, WHICH THIS HARNESS WAS SILENT ABOUT ---------------
+      //
+      // Adding a tempo term to the LANE SCORER above and stopping there made
+      // this instrument steer for mats and then never apply one, so the policy
+      // table came out BIT-IDENTICAL at --tempo 0 and --tempo 1 -- an A/B that
+      // proved the mechanic did nothing, about a harness that had not been told
+      // it existed. That is roadmap 67's finding one level deeper: a scorer is
+      // where a bot decides, and the election is where the game answers, and a
+      // measurement needs both.
+      //
+      // Through player.resolveTempo for the same reason the line above goes
+      // through resolveSurge: the shipped question, asked once, rather than a
+      // second copy of it here that can drift.
+      const mat = pl.resolveTempo(course, units);
+      p.tempo = mat ? mat.dir : 0;
     }
     const before = units;
     if (usePace) { p.update(DT); units = p.units; speed = p.speed(); }

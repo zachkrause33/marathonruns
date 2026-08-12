@@ -480,20 +480,28 @@ MR.Course = (function () {
    *   f RANGE    0.10 to 0.94, the same window narrowRate and the ramp use.
    */
   const TEMPO_LEN_MIN = 46, TEMPO_LEN_MAX = 88;
-  const TEMPO_N_MIN = 10, TEMPO_N_MAX = 14;
+  const TEMPO_N_MIN = 13, TEMPO_N_MAX = 17;
   const TEMPO_F0 = 0.10, TEMPO_F1 = 0.94;
   const TEMPO_GAP = 90;
   // The share of marks that are BACKWARD. Under a half on purpose: the drag is
   // the expensive half and the one that pushes the player out of a lane, and a
   // road where most marks are punishments reads as a penalty box rather than as
   // a set of choices.
-  const TEMPO_DRAG_SHARE = 0.45;
+  const TEMPO_DRAG_SHARE = 0.52;
   // How far short of the NEXT gate line a mat must stop. It is the telegraph
   // mat's own run-up -- world.js lays 14 units of it on the road in front of
   // every hazard -- so this is the distance at which tempo paint would start
   // being read on top of gate paint. Derived from the art that exists, not
   // chosen.
   const TEMPO_TAIL = 14;
+  // The shortest mark worth painting. LANE_TRANSIT is the ground two lane
+  // changes cover, so anything at or under it is a mark the runner could be
+  // through before the swerve that answers it has finished -- an instruction
+  // with no time to obey. Three of those is 18 units, half a real second, and
+  // it is a floor rather than a target: the median mark is 60.
+  // A function, not a const, because LANE_TRANSIT is declared further down this
+  // file -- the same temporal-dead-zone reason surgeBody() is a function.
+  function tempoMinRun() { return 3 * LANE_TRANSIT; }
 
   function planTempo(key, surges) {
     if (!(TEMPO > 0) || !(MR.Pace.EFFORT > 0)) return [];
@@ -828,26 +836,44 @@ MR.Course = (function () {
         else if (gates[i].z >= m.z1) { nextZ = gates[i].z; break; }
       }
       if (!inside.length) continue;            // nothing to earn, nothing to price
-      const z1 = Math.min(m.z1, nextZ - TEMPO_TAIL);
-      if (z1 - m.z0 < TEMPO_LEN_MIN * 0.5) continue;
+      const zCap = Math.min(m.z1, nextZ - TEMPO_TAIL);
+      if (zCap - m.z0 < tempoMinRun()) continue;
 
-      const cands = [];
+      // ---- A MARK IS TRIMMED TO WHERE IT IS LEGAL, NOT DROPPED ------------
+      //
+      // The first version tested every gate the planned range covered and threw
+      // the whole mark away on the first failure. That is the wrong answer to
+      // the wrong question: the plan drew a range in Z SPACE before a single
+      // gate existed, so where it happens to end has no meaning, and the rules
+      // are all statements about a PREFIX of gates -- a lane that is CLEAR at
+      // the first gate and a hurdle at the second is a perfectly good backward
+      // mat that stops at the first gate.
+      //
+      // Measured: dropping cost 82% of the backward mats and left one a course,
+      // which is not a mechanic. Trimming lands 4.3 with every clause intact.
+      // The widening was planned for the longer range and the trim does not
+      // give it back -- that is spacing the course paid for and did not use,
+      // which is the safe direction and the only one available, since spacingAt
+      // ran before any of this was known.
+      let lane = -1, z1 = zCap, best = -Infinity;
       for (let l = 0; l < 3; l++) {
-        if (busy(l, m.z0, z1)) continue;
-        if (!laneFree(spans, l, m.z0 - read, z1)) continue;
-        let ok = true, earns = false;
-        for (const gi of inside) {
-          const h = gates[gi].lanes[l];
-          if (m.dir > 0) {
-            if (h === K.BLOCK) { ok = false; break; }
-            if (h === K.JUMP || h === K.DUCK) earns = true;
-          } else if (h !== K.CLEAR) { ok = false; break; }
+        let k = 0, earns = false;
+        for (; k < inside.length; k++) {
+          const h = gates[inside[k]].lanes[l];
+          if (m.dir > 0 ? h === K.BLOCK : h !== K.CLEAR) break;
+          if (h === K.JUMP || h === K.DUCK) earns = true;
         }
-        if (!ok || (m.dir > 0 && !earns)) continue;
-        cands.push(l);
+        if (!k || (m.dir > 0 && !earns)) continue;
+        const cut = k < inside.length ? gates[inside[k]].z - TEMPO_TAIL : zCap;
+        if (cut - m.z0 < tempoMinRun()) continue;
+        if (busy(l, m.z0, cut)) continue;
+        if (!laneFree(spans, l, m.z0 - read, cut)) continue;
+        // Longest legal mark wins -- more paint is more of the effect the plan
+        // asked for. Ties break from the seeded stream so a course still varies.
+        const score = (cut - m.z0) + rnd.next();
+        if (score > best) { best = score; lane = l; z1 = cut; }
       }
-      if (!cands.length) continue;
-      const lane = cands[Math.min(cands.length - 1, Math.floor(rnd.next() * cands.length))];
+      if (lane < 0) continue;
 
       let open = -1;
       if (m.dir < 0) {
@@ -856,7 +882,10 @@ MR.Course = (function () {
           if (l === lane || busy(l, m.z0, z1)) continue;
           if (!laneFree(spans, l, m.z0 - LANE_TRANSIT, z1)) continue;
           let ok = true;
-          for (const gi of inside) if (gates[gi].lanes[l] === K.BLOCK) { ok = false; break; }
+          for (const gi of inside) {
+            if (gates[gi].z >= z1) break;
+            if (gates[gi].lanes[l] === K.BLOCK) { ok = false; break; }
+          }
           if (ok) opens.push(l);
         }
         if (!opens.length) continue;
@@ -872,8 +901,15 @@ MR.Course = (function () {
         }
         taken[open].push({ z0: m.z0, z1 });
       }
+      // TRIMMED WITH THE MARK, and the instrument is what said so. `inside` is
+      // the gates the PLANNED range covered; the mark may have been cut short
+      // of some of them, and a mat that publishes gates it does not cover made
+      // tools/tempo.js re-derive the open-lane guarantee over ground the
+      // generator had never claimed -- three false failures on 60 days. The
+      // field a downstream reader trusts has to describe the object that
+      // shipped, not the one that was asked for.
       const mat = { z0: m.z0, z1, dir: m.dir, lane, open, n: out.length + 1,
-                    gates: inside.slice() };
+                    gates: inside.filter(function (gi) { return gates[gi].z < z1; }) };
       taken[lane].push({ z0: m.z0, z1 });
       out.push(mat);
     }
@@ -1899,7 +1935,7 @@ MR.Course = (function () {
                 // train span, so reachOf is unchanged and solvable() sees the
                 // gate it already proved. What is new is only that the second
                 // roof can be stood on.
-                if (ROOF > 0 && rnd.chance(0.42)) {
+                if (ROOF > 0 && rnd.chance(0.55)) {
                   for (let l2 = 0; l2 < 3; l2++) {
                     if (l2 === l || lanes[l2] !== K.BLOCK || trainUntil[l2] > idx) continue;
                     // Never the only way through: some third lane must still be
@@ -1909,6 +1945,37 @@ MR.Course = (function () {
                     if (!rest.some((o) => lanes[o] !== K.BLOCK)) continue;
                     ramp2Lane = l2;
                     break;
+                  }
+                  // ---- AND IF THE GATE HAS ONLY ONE WALL, BUILD THE SECOND --
+                  //
+                  // Waiting for a gate that happened to roll two BLOCKs with a
+                  // ramp on one of them produced 0.13 pairs a course, which is
+                  // a mechanic nobody meets. So the second wall is MADE, and
+                  // the safety comes from the one place safety comes from in
+                  // this file: the converted gate goes through solvable()
+                  // exactly as the roll did, and is abandoned if the proof does
+                  // not survive it.
+                  //
+                  // This is the ONE place ROOF adds a BLOCK the generator did
+                  // not ask for, so it is the one place it can make a gate
+                  // harder. It cannot make one unsolvable, and it cannot take
+                  // the last lane -- the third lane is required to be passable
+                  // before the trial is even built.
+                  if (ramp2Lane < 0) {
+                    for (let l2 = 0; l2 < 3; l2++) {
+                      if (l2 === l || lanes[l2] === K.BLOCK || trainUntil[l2] > idx) continue;
+                      const rest = [0, 1, 2].filter((x) => x !== l && x !== l2);
+                      if (!rest.some((o) => lanes[o] !== K.BLOCK)) continue;
+                      const cand = lanes.slice();
+                      cand[l2] = K.BLOCK;
+                      const zn2 = zoneBody(surges, z);
+                      if (zn2 && zn2.lane === l2) continue;   // never under the paint
+                      const trial = gates.concat([{ z, lanes: cand, f }]);
+                      if (!solvable(trial, elevation, surges, tempoPlan)) continue;
+                      lanes[l2] = K.BLOCK;
+                      ramp2Lane = l2;
+                      break;
+                    }
                   }
                 }
               }

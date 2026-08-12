@@ -401,6 +401,7 @@ MR.Course = (function () {
    * is the wrong one.
    */
   const SURGE_EARLY0 = 0.05, SURGE_EARLY1 = 0.13;
+  const SURGE_EARLY_LEN_MIN = 300, SURGE_EARLY_LEN_MAX = 420;
 
   function planSurge(key) {
     if (!(MR.Pace.EFFORT > 0)) return [];
@@ -415,12 +416,34 @@ MR.Course = (function () {
     // it rather than the other way about. Its z0 is bounded well clear of
     // SURGE_SIGHT (0.05 of the course is 315 units against 90), so the entry
     // marking has somewhere to be read from and validate() proves it as usual.
+    //
+    // ---- IT IS AN ADDITION, NOT A SUBSTITUTION, AND PLAYING IT SAID SO ----
+    //
+    // The first version counted the mandated zone against `want`, so the early
+    // zone REPLACED one of the ordinary draws -- and because the ordinary draws
+    // are spread over [0.15, 0.90], the one it replaced was usually a late one.
+    // Lowering the floor buys 0.285x at streak 5 and 0.93x at streak 150, so
+    // that trade moved a zone from the valuable end of the race to the
+    // worthless end and charged the player for the privilege.
+    //
+    // It was invisible in every headless number and obvious the moment the game
+    // was played end to end: tools/playthrough.js went from "surging every zone
+    // is worth 46.0s over never seeking one" to "surging cost 23.4s", with the
+    // last zone moving from 82% of the course to 71%. That is rule 2 doing
+    // exactly what it is for.
+    //
+    // SHORTER, TOO, and for the reason the coordinator named: the first mile is
+    // the one stretch where a contact cannot be absorbed, because the pool is
+    // empty. A 560-unit zone met with one segment is 25% completion and 420
+    // units of being locked in a marked lane with no guard. 300 to 420 is a
+    // zone a single bottle finishes most of, which is the lesson rather than a
+    // punishment.
     {
-      const len = rnd.range(SURGE_LEN_MIN, SURGE_LEN_MAX);
+      const len = rnd.range(SURGE_EARLY_LEN_MIN, SURGE_EARLY_LEN_MAX);
       const z0 = rnd.range(SURGE_EARLY0 * total, SURGE_EARLY1 * total);
       zones.push({ z0, z1: z0 + len, lane: rnd.int(0, 2), sight: SURGE_SIGHT, early: true });
     }
-    while (zones.length < want && guard++ < 400) {
+    while (zones.length < want + 1 && guard++ < 400) {
       const len = rnd.range(SURGE_LEN_MIN, SURGE_LEN_MAX);
       const z0 = rnd.range(lo, hi - len);
       const z1 = z0 + len;

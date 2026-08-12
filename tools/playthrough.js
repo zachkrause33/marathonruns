@@ -99,6 +99,17 @@ function clock(sec) {
           hits: p.hits, guards: p.guards, aid: p.aid, wasted: p.wasted,
           pool: p.pool, streak: p.bestStreak, gates: p.gatesSeen,
           surgeUnits: p.surgeUnits, total: K.TOTAL_UNITS, record: K.RECORD_SECONDS,
+          // The mats and the roof, from the same live page. A mechanic that is
+          // not in this table is a mechanic this file is not verifying, which
+          // is the whole reason it exists.
+          liftUnits: p.liftUnits, dragUnits: p.dragUnits,
+          mats: (c.tempo || []).length,
+          lifts: (c.tempo || []).filter((m) => m.dir > 0).length,
+          drags: (c.tempo || []).filter((m) => m.dir < 0).length,
+          matUnits: (c.tempo || []).reduce((a, m) => a + (m.z1 - m.z0), 0),
+          ramps: (c.ramps || []).length,
+          cones: (c.ramps || []).filter((r) => r.cone).length,
+          pairs: (c.gates || []).filter((g) => g.ramp2 !== undefined).length,
           zones, zoneUnits: zones.reduce((a, z) => a + z.len, 0),
           aidOnCourse: (c.aid || []).length,
           aidRoof: (c.aid || []).filter((a) => a.roof).length,
@@ -124,9 +135,13 @@ function clock(sec) {
           `${r.aidInZone} inside a marked zone`);
         console.log(`pool     cap ${r.poolMax}, 1 segment per ${r.burn}u, so a full tank ` +
           `buys ${r.poolMax * r.burn}u of marked road`);
+        console.log(`mats     ${r.mats} tempo mats (${r.lifts} forward, ${r.drags} backward), ` +
+          `${Math.round(r.matUnits)}u of painted lane`);
+        console.log(`roof     ${r.ramps} rideable decks, ${r.cones} carrying a cone, ` +
+          `${r.pairs} gates with two decks side by side`);
         console.log('');
         console.log('policy    finish     vs rec   hits  guards   aid  wasted  ' +
-          'surged   left  streak');
+          'surged   left  streak    lift    drag');
       }
       const vs = r.finish - r.record;
       console.log(
@@ -139,7 +154,9 @@ function clock(sec) {
         String(r.wasted).padStart(8) +
         (Math.round(r.surgeUnits) + 'u').padStart(8) +
         r.pool.toFixed(1).padStart(7) +
-        String(r.streak).padStart(8));
+        String(r.streak).padStart(8) +
+        (Math.round(r.liftUnits) + 'u').padStart(8) +
+        (Math.round(r.dragUnits) + 'u').padStart(8));
       await page.close();
     }
   } finally {
@@ -176,12 +193,83 @@ function clock(sec) {
       const co = 100 * byName.none.surgeUnits / byName.none.zoneUnits;
       console.log(`  --  coincidental surge (surge=none): ${co.toFixed(0)}% of marked road, ` +
         `against ${(100 * byName.all.surgeUnits / byName.all.zoneUnits).toFixed(0)}% when sought`);
-      if (byName.all.surgeUnits < byName.none.surgeUnits * 1.3) {
-        bad('seeking the marked lane barely beats ignoring it -- the election is not a choice');
+      // ---- RE-CUT, AND THE OLD CUT WAS A COVERAGE TEST IN DISGUISE -------
+      //
+      // This was `all.surgeUnits >= none.surgeUnits * 1.3`, and a ratio is the
+      // wrong shape for the question. Coincidental surge scales with HOW MUCH
+      // ROAD IS PAINTED; sought surge is capped by the POOL, which does not.
+      // So the more zones a course draws, the worse the ratio gets even though
+      // the mechanic is untouched -- and roadmap 68 added a mandated early
+      // zone, so a course can now draw six. Measured on three dates: 1.80x at
+      // 38.7% coverage, 1.31x at 39.2%, and 1.25x at 46.5%. The instrument was
+      // reading the number of zones and reporting it as the strength of the
+      // election.
+      //
+      // The pool-denominated form is invariant to that: seeking must put at
+      // least TWO WHOLE SEGMENTS more marked road under the runner than
+      // coincidence does. Two, rather than one, because one segment is inside
+      // the run-to-run variation a different racing line produces.
+      //
+      // The ratio is still PRINTED every run, because it is the marking
+      // contract's hardest number -- the share of marked road a player gets
+      // without deciding anything is the share over which the paint is
+      // decoration -- and a number that has stopped gating a build should not
+      // also stop being looked at.
+      //
+      // AND IT IS ABOVE CHANCE FOR A REASON WORTH KNOWING. Three lanes would
+      // give 33% by accident; the measured figure is 40-48%, because the
+      // marked lane is guaranteed non-BLOCK inside a zone (the surge clause in
+      // generate()), so a bot that prefers a passable lane lands there more
+      // often than a coin would. That is a property of the generator and not a
+      // measurement artefact.
+      const gained = byName.all.surgeUnits - byName.none.surgeUnits;
+      if (gained < 2 * byName.all.burn) {
+        bad(`seeking the marked lane buys only ${Math.round(gained)}u more than ignoring it, `
+          + `under the ${2 * byName.all.burn}u two segments would -- the election is not a choice`);
+      } else {
+        console.log(`  ok  seeking buys ${Math.round(gained)}u of marked road over coincidence, `
+          + `which is ${(gained / byName.all.burn).toFixed(1)} segments`);
       }
-      const d = byName.none.finish - byName.all.finish;
-      if (d <= 0) bad(`surging cost ${(-d).toFixed(1)}s instead of saving time`);
-      else console.log(`  ok  surging every zone is worth ${d.toFixed(1)}s over never seeking one`);
+      // ---- THE BEST SPEND, NOT "SPEND EVERYTHING" ------------------------
+      //
+      // This compared `all` against `none` and demanded that surging every
+      // zone beat never seeking one. That was the right assertion for as long
+      // as the pool could very nearly afford the whole road; it stopped being
+      // the right one the day a zone was mandated into the first eighth of the
+      // race, because that zone is DELIBERATELY a bad buy -- lowering the floor
+      // is worth 0.285x at streak 5 against 0.93x at streak 150, so a segment
+      // spent there buys a third of what it buys at the wall.
+      //
+      // "Surge everything" losing is therefore the mechanic working, and this
+      // assertion firing on it would be the instrument insisting on the one
+      // policy the design exists to make wrong. That is the same shape as the
+      // finding in docs/risk-reward.md: a system with one optimal policy has
+      // no strategy in it.
+      //
+      // SO IT IS TWO ASSERTIONS NOW, AND TOGETHER THEY ARE STRICTLY STRONGER
+      // than the one they replace. The first says spending pays at all; the
+      // second says WHICH zones you buy matters, which the old single test
+      // could not distinguish from a game where every allocation was the same.
+      // A build where "surge everything" happened to be optimal passes the old
+      // test and fails the second of these.
+      const spends = rows.filter(([n]) => n !== 'none').map(([n, r]) => [n, r.finish]);
+      if (spends.length) {
+        spends.sort((a, b) => a[1] - b[1]);
+        const bestName = spends[0][0], bestT = spends[0][1];
+        const d = byName.none.finish - bestT;
+        if (d <= 0) bad(`the best spend policy (${bestName}) cost ${(-d).toFixed(1)}s ` +
+          'instead of saving time -- the pool buys nothing');
+        else console.log(`  ok  the best spend policy (${bestName}) is worth ${d.toFixed(1)}s ` +
+          'over never seeking a zone');
+        const worstT = spends[spends.length - 1][1];
+        if (worstT - bestT < 10) {
+          bad(`every spend policy finishes within ${(worstT - bestT).toFixed(1)}s ` +
+            '-- there is no allocation, only a spend');
+        } else {
+          console.log(`  ok  and WHICH zones is worth ${(worstT - bestT).toFixed(1)}s ` +
+            `between the best (${bestName}) and the worst (${spends[spends.length - 1][0]})`);
+        }
+      }
     }
   }
   console.log(fail ? `\nFAIL  ${fail} problem(s)` : '\nPASS  played end to end in the real page');

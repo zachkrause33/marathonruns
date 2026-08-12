@@ -365,6 +365,42 @@ MR.Course = (function () {
   const SURGE_LEN_MIN = 420, SURGE_LEN_MAX = 560;
   const SURGE_N_MIN = 4, SURGE_N_MAX = 5;
   const SURGE_F0 = 0.15, SURGE_F1 = 0.90;
+  /**
+   * ---- ONE ZONE IS MANDATED EARLY, AND IT IS AN ENGAGEMENT FIX -----------
+   *
+   * The owner: *"The first few miles are boring."*
+   * docs/staleness-and-mats.md located the trough at miles 3-7 and named the
+   * cause as novelty spent while demand is still low. There is a third cause
+   * nobody had written down and it is structural:
+   *
+   *   AT THE START OF A RACE THE POOL IS EMPTY, so guard and surge -- the whole
+   *   of the strategic layer, the thing that took this game from six policies
+   *   tying at 0.0 s to an 85-second spread -- DO NOT EXIST YET. Measured on
+   *   the shipped generator: the first zone lands at f = 0.218 on average and
+   *   f = 0.150 at the earliest, which is mile 5.7 and mile 3.9. The opening is
+   *   not boring because it is easy. It is boring because it is the only part
+   *   of the race with nothing to decide.
+   *
+   * Raising the hazard density was the obvious answer and it is the wrong one:
+   * the same document establishes that freshness cannot exceed objects divided
+   * by density, so packing more into the opening buys difficulty by spending
+   * novelty -- the wrong trade for a boredom problem. makeGate's `nHaz`
+   * threshold is deliberately not touched by this pass.
+   *
+   * So the fix is to give the opening a DECISION instead of more work. One zone
+   * is placed by construction in the first eighth of the race, where a player
+   * who has taken one bottle can afford about a third of it. That is not a
+   * shortfall, it is the lesson: you watch the gauge empty and you feel the
+   * gear go, in a place where it costs a few seconds rather than the race.
+   *
+   * And it is a genuinely bad place to spend, which is what makes it a
+   * decision rather than a gift. d(target)/d(FLOOR) is 0.285 at streak 5
+   * against 0.93 at streak 150, so the same segment spent here buys a third of
+   * what it buys at the wall. The opening now asks the player its first real
+   * question -- take the free speed now, or carry it -- and the tempting answer
+   * is the wrong one.
+   */
+  const SURGE_EARLY0 = 0.05, SURGE_EARLY1 = 0.13;
 
   function planSurge(key) {
     if (!(MR.Pace.EFFORT > 0)) return [];
@@ -375,6 +411,15 @@ MR.Course = (function () {
     const want = rnd.int(SURGE_N_MIN, SURGE_N_MAX);
     const GAP = SURGE_SIGHT + 60;
     let guard = 0;
+    // The mandated one, first, so the ordinary draws below have to route round
+    // it rather than the other way about. Its z0 is bounded well clear of
+    // SURGE_SIGHT (0.05 of the course is 315 units against 90), so the entry
+    // marking has somewhere to be read from and validate() proves it as usual.
+    {
+      const len = rnd.range(SURGE_LEN_MIN, SURGE_LEN_MAX);
+      const z0 = rnd.range(SURGE_EARLY0 * total, SURGE_EARLY1 * total);
+      zones.push({ z0, z1: z0 + len, lane: rnd.int(0, 2), sight: SURGE_SIGHT, early: true });
+    }
     while (zones.length < want && guard++ < 400) {
       const len = rnd.range(SURGE_LEN_MIN, SURGE_LEN_MAX);
       const z0 = rnd.range(lo, hi - len);
@@ -481,7 +526,14 @@ MR.Course = (function () {
    */
   const TEMPO_LEN_MIN = 46, TEMPO_LEN_MAX = 88;
   const TEMPO_N_MIN = 13, TEMPO_N_MAX = 17;
-  const TEMPO_F0 = 0.10, TEMPO_F1 = 0.94;
+  // FROM 0.05, WHICH IS EARLIER THAN ANY OTHER MECHANIC IN THIS FILE OPENS,
+  // and the reason is the opening rather than the mat. A mat is the only
+  // decision this game has that costs NOTHING TO OWN -- no pool, no fuel, no
+  // collected item -- so it is the one thing that can put a real choice in
+  // front of a player who has nothing yet. 0.05 of the course is 315 units,
+  // twice START_GRACE, so the clean runway the opening reads calmly on is
+  // untouched.
+  const TEMPO_F0 = 0.05, TEMPO_F1 = 0.94;
   const TEMPO_GAP = 90;
   // The share of marks that are BACKWARD. Under a half on purpose: the drag is
   // the expensive half and the one that pushes the player out of a lane, and a
@@ -511,6 +563,24 @@ MR.Course = (function () {
     const marks = [];
     const want = rnd.int(TEMPO_N_MIN, TEMPO_N_MAX);
     let guard = 0;
+    // ---- THE FIRST MARK IS MANDATED, AND IT IS A FORWARD ONE -------------
+    //
+    // Same reason the first surge zone is mandated: a uniform draw put the
+    // first mat at mile 3.58 on average, which is inside the boredom trough
+    // rather than in front of it. Mandating it lands one between mile 1.3 and
+    // mile 2.9 every day.
+    //
+    // FORWARD, always, and that is a teaching decision rather than a balance
+    // one. The first time a player meets this vocabulary it should PAY, so the
+    // association is "the paint means speed" -- and then the first backward mat
+    // is read against an association that already exists rather than being the
+    // thing that has to establish it. A mechanic whose first appearance is a
+    // punishment teaches avoidance of the paint, not reading of it.
+    {
+      const len = rnd.range(TEMPO_LEN_MIN, TEMPO_LEN_MAX);
+      const z0 = rnd.range(0.05 * total, 0.11 * total);
+      marks.push({ z0, z1: z0 + len, dir: 1, first: true });
+    }
     while (marks.length < want && guard++ < 900) {
       const len = rnd.range(TEMPO_LEN_MIN, TEMPO_LEN_MAX);
       const z0 = rnd.range(lo, hi - len);
@@ -1596,7 +1666,20 @@ MR.Course = (function () {
 
     let gi = 0;
     let lastHg = -1;   // the gate the previous item hung off
-    let z = START_GRACE + rnd.range(200, 340);
+    // ---- WHERE THE FIRST BOTTLE GOES, WHICH IS THE OTHER HALF OF THE -------
+    //      OPENING FIX
+    //
+    // It was START_GRACE + [200, 340], which put the first item at mile 1.77 on
+    // average and mile 2.45 at the worst -- so a player carried an empty pool
+    // for the better part of two miles and had no guard at all through the one
+    // stretch where a contact cannot be absorbed.
+    //
+    // [90, 190] lands it at mile 1.00 to 1.42. It is still past START_GRACE by
+    // a comfortable margin -- the clean runway is 150 units and this starts at
+    // 240 -- so the opening still reads calmly; what changes is that the first
+    // real decision of the race arrives while the player is still learning
+    // rather than a mile after they have stopped.
+    let z = START_GRACE + rnd.range(90, 190);
     const end = K.TOTAL_UNITS - FINISH_GRACE - 60;
     let guard = 0;
 

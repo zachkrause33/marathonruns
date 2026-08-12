@@ -5679,13 +5679,33 @@ do not touch the record contract.
 
 | | before | after |
 |---|---|---|
-| beats the record, all cells | 13 of 50 (26%) | **14 of 50 (28%)** |
-| on a first attempt | 5 of 20 (25%) | **5 of 20 (25%)** |
-| with the course learned | 8 of 30 (27%) | **9 of 30 (30%)** |
-| spread at perfect | 85.0 s | **87.8 s** |
+| beats the record, all cells | 13 of 50 (26%) | **16 of 50 (32%)** |
+| on a first attempt | 5 of 20 (25%) | **4 of 20 (20%)** |
+| with the course learned | 8 of 30 (27%) | **12 of 30 (40%)** |
+| spread at perfect | 85.0 s | **94.1 s** |
 
-One cell easier on the pooled number, unchanged on first attempt, and slightly
-more spread between policies. The owner asked for it to stay hard and it has.
+**And that landing took a retune, because this pass added on both sides of the
+same balance.** Road aid went 13.7 → 15.9 and a sixth zone was mandated in;
+more pool *and* more road to spend it on is more buyable speed, and the first
+measurement said so — 42% of cells, 53% with the course learned. Over half of
+everything winning is the 260 finding in different clothes.
+
+`BURN_UNITS` is the lever that cancels it exactly, because it is denominated in
+the same currency as both changes, and `SURGE_LEN_MAX` moves with it so a full
+tank stays exactly one maximum-length zone:
+
+| burn / max zone | all cells | first attempt | learned | spread |
+|---|---|---|---|---|
+| 140 / 560 | 42% | 25% | 53% | 85.0 s |
+| **130 / 520** | **32%** | **20%** | **40%** | **94.1 s** |
+| 120 / 480 | — | 10% | 20% | 85.9 s |
+
+The column that decided it is **first attempt**: 20% against the 25% the
+shipped game had, so a stranger is *less* likely to walk it than before, while
+learned rose 27% → 40% and the spread 85.0 → 94.1 s. **Knowing the course is
+worth more and guessing is worth less**, which is the owner's *"if people get it
+on the first try everytime they will not always play"* expressed as two numbers
+moving in opposite directions.
 
 **Two assertions in `playthrough.js` were also wrong, and re-cutting them is
 part of this entry rather than a footnote.** Demanding that surging *every*

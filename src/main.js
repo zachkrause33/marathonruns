@@ -50,6 +50,13 @@
   // clamp themselves; see the accessors at the foot of course.js.
   if (params.has('narrow')) MR.Course.NARROW = params.get('narrow') || 1;
   if (params.has('ramp')) MR.Course.RAMP = params.get('ramp') || 1;
+  // ...and the two from roadmap 68, on the same contract. ?tempo=0 takes the
+  // directional mats off the road and ?roof=0 takes the cones and the paired
+  // decks off the vehicles; at zero neither draws from a seeded stream, so the
+  // course is the one the generator built before either existed. A flag that
+  // cannot be reached from a URL is a flag nobody will ever A/B.
+  if (params.has('tempo')) MR.Course.TEMPO = params.get('tempo') || 1;
+  if (params.has('roof')) MR.Course.ROOF = params.get('roof') || 1;
   // ...and the third, which is the biggest of them. ?effort=0 returns the game
   // exactly as it was before the pool, the guard and the surge zones existed:
   // no zones are planned, no stream is drawn, the pace floor goes back to 4:14

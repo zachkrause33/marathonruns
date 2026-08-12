@@ -507,6 +507,25 @@ function raceAt(course, opts) {
           // bottle out of a zone already being paid for spends the pool to
           // fill the pool.
           if (l === sLane) score += 500;
+          // ---- AND THE MATS ------------------------------------------------
+          //
+          // Added the day the mechanic landed, and the reason is the reason
+          // this whole file exists: roadmap 67 found that every bot here scored
+          // CLEAR, aid and ramp and NOTHING ELSE, so a surge was elected only
+          // by coincidence and this section reported six policies tying at
+          // 0.0 seconds -- truthfully, about a game its own instrument could
+          // not see. A tempo term omitted here would print exactly the same
+          // kind of honest nothing.
+          //
+          // Below the clear-lane term (100) on purpose: a mat is worth a few
+          // seconds and a contact is worth tens, so these decide between lanes
+          // the bot could equally well take rather than buying a hurdle to
+          // dodge a drag. The 3:1 ratio is the measured worth of the two
+          // directions (tools/tempo.js --section worth), not a feel.
+          if (course.tempoAt) {
+            const m = course.tempoAt(g.z, l);
+            if (m) score += m.dir > 0 ? 24 : -72;
+          }
           if (score > bestScore) { bestScore = score; best = l; }
         });
         targetLane = best === null ? pl.lane : best;

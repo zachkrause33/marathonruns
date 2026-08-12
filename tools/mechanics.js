@@ -181,7 +181,17 @@ const BASELINE_GATES = 'e9f8d87fa92e7a5d62a89f660964441e8c227a45';
 // and at the same commit as the gate hash above -- aid hangs off the gate
 // table, so a gate change moves it. It was
 // e81209a3dd064fbebaf5c7253b4d3ac0c634d39b. See docs/roadmap.md.
-const BASELINE_AID = 'ae74e0eef42e5eca0774bc0721f684dc9bb67dfe';
+//
+// ...and a third time, deliberately, in roadmap 68. Two changes to the aid
+// CURVE, both of them for the opening: the first bottle moved from
+// START_GRACE + [200, 340] to + [90, 190] (mile 1.77 -> 1.19), and the spacing
+// went from 620 - 400f to 520 - 300f (13.7 -> 15.9 road items). The gate hash
+// above did NOT move and must not: aid reads the gate table and writes nothing
+// back, so a change to where the bottles go cannot touch the course. That
+// split is the whole reason these two hashes are separate, and this is the
+// first time it has paid for itself. It was
+// ae74e0eef42e5eca0774bc0721f684dc9bb67dfe.
+const BASELINE_AID = 'a055853a7cf5c1d0e11e885c71e2e995e651c61d';
 /**
  * ---- THE FLAGS ARE FORCED OFF HERE, AND THAT IS NOT A WEAKENING ----------
  *

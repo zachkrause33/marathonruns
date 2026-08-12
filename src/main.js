@@ -568,6 +568,30 @@
         // ever broke, the bot would decline the surge rather than crash and
         // the failure would show up as a lost second and not a lost run.
         if (l === surgeLane) score += 180;
+        // ---- AND THE MATS, WHICH IS THE SAME BLINDNESS ONE MECHANIC ON ----
+        //
+        // Roadmap 67's whole lesson: a bot that cannot see a mechanic reports,
+        // truthfully, that the mechanic changes nothing. Every bot in this
+        // project scored CLEAR, aid, ramp and then the marked lane, and each
+        // term had to be added the day its mechanic landed or the harness
+        // measured a version of the game with that mechanic routed around.
+        //
+        // WEIGHTS. A drag is worth about 5.9 race seconds and a lift about
+        // 1.9, so avoiding a drag is worth roughly three times taking a lift --
+        // and the numbers below are that ratio, not a feel. Both sit BELOW the
+        // clear-lane term (100), which is deliberate and is the honest
+        // ordering: a mat is worth seconds and a contact is worth tens of them,
+        // so a bot that took a hurdle to dodge a drag would be trading the
+        // record for a couple of seconds. What these terms decide is the case
+        // the mechanic is actually about -- which of two lanes the bot could
+        // equally well take.
+        //
+        // Read at the GATE LINE rather than over the mark, because that is
+        // where the lane is chosen and where this bot commits.
+        if (course.tempoAt) {
+          const m = course.tempoAt(g.z, l);
+          if (m) score += m.dir > 0 ? 24 : -72;
+        }
         if (score > bestScore) { bestScore = score; best = l; }
       });
       if (best === null) best = player.lane;

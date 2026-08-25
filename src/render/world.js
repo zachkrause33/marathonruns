@@ -8816,6 +8816,146 @@ MR.World = (function () {
       return merge(parts);
     })();
 
+    /**
+     * ============ JUMP v8: THE REFERENCE'S OWN BARRICADE ============
+     *
+     * The double red-and-white striped barricade on round wooden posts, with
+     * the little round amber blinker lamps on the top corners -- the single
+     * most repeated obstacle in the citylook frames (citylook-barricade-slalom
+     * is named after it). Two boards, because the reference's slalom barricade
+     * is a double; v10 below is the single, and one bar versus two is a
+     * silhouette difference that survives to distance.
+     *
+     * face: null -- the object IS its own striped board twice over, and a
+     * third striped quad floating in front of it is the "sitting on
+     * something" defect this file has paid for twice.
+     *
+     * Envelope: posts at +/-0.92, boards 1.98 wide (+/-0.99 against halfX
+     * 1.12), blinker tops at 0.795 against yMax 0.80, everything within
+     * z +/-0.26 against halfZ 0.52. Built on all sides: the boards are boxes
+     * striped by segment so both faces carry the stripes, the posts are
+     * closed cylinders, the lamps are lensed both ways.
+     */
+    function barricadeBoard(parts, w, h, y, z, d) {
+      const RED = 0xf0402f, WHITE = 0xfff6ea;
+      const SEG = 9;
+      for (let i = 0; i < SEG; i++) {
+        const sw = w / SEG;
+        parts.push(gl(cbx(sw * 1.02, h, d, -w / 2 + sw * (i + 0.5), y, z,
+          (i & 1) ? WHITE : RED, 0.02), GLOSS.paint));
+      }
+    }
+    function blinker(parts, x, y, z) {
+      parts.push(gl(cyl(0.055, 0.062, 0.075, 8, x, y, z, 0x2a1608), GLOSS.trim));
+      parts.push(gl(sph(0.052, 8, x, y + 0.052, z, LAMP_AMBER), GLOSS.chrome));
+      parts.push(gl(sph(0.026, 6, x, y + 0.062, z - 0.032, LAMP_CORE), GLOSS.chrome));
+    }
+    const jumpBarricadeGeo = (function () {
+      const WOOD = 0xb47c42, WOOD_D = 0x8a5a2c;
+      const parts = [];
+      for (const sx of [-1, 1]) {
+        // Round wooden post on a skid foot, leaning nothing: the reference's
+        // posts are plumb.
+        parts.push(gl(cyl(0.070, 0.078, 0.66, 10, sx * 0.92, 0.33, 0, WOOD), GLOSS.matte));
+        parts.push(gl(cyl(0.082, 0.082, 0.035, 10, sx * 0.92, 0.675, 0, WOOD_D), GLOSS.matte));
+        parts.push(gl(cbx(0.16, 0.09, 0.52, sx * 0.92, 0.045, 0, WOOD_D, 0.02), GLOSS.matte));
+        blinker(parts, sx * 0.92, 0.695, 0);
+      }
+      barricadeBoard(parts, 1.98, 0.17, 0.585, 0, 0.075);
+      barricadeBoard(parts, 1.98, 0.17, 0.315, 0, 0.075);
+      return merge(parts);
+    })();
+
+    /**
+     * ============ JUMP v9: BLACK OIL DRUMS, ONE TIPPED ============
+     *
+     * The reference's black OIL drum (citylook-oilspill-green-car has one on
+     * the kerb beside its slick). Two standing, one on its side, and the
+     * tipped one has leaked: the stain is PAINT -- a dark quad lying on the
+     * road, rule 1's stated exception -- and everything else is closed
+     * geometry. The white band is the drum's one bright element and it is
+     * most of what the contrast audit reads at distance, so it is wide.
+     *
+     * y: standing drums 0.78 against yMax 0.80. The blinker on the near
+     * corner is the reference's own habit of marking a works pile.
+     */
+    const jumpDrumGeo = (function () {
+      const BODY = 0x16181f, RIB = 0x272b36, LID = 0x1e222c, BAND = 0xf4eedd;
+      const parts = [];
+      for (const [dx, dz, ry] of [[-0.52, 0.10, 0.3], [0.10, -0.06, 1.2]]) {
+        parts.push(gl(cyl(0.345, 0.345, 0.78, 12, dx, 0.39, dz, BODY, 0, ry, 0), GLOSS.trim));
+        parts.push(gl(cyl(0.352, 0.352, 0.05, 12, dx, 0.20, dz, RIB), GLOSS.trim));
+        parts.push(gl(cyl(0.352, 0.352, 0.05, 12, dx, 0.44, dz, RIB), GLOSS.trim));
+        parts.push(gl(cyl(0.352, 0.352, 0.15, 12, dx, 0.68, dz, BAND, 0, ry, 0), GLOSS.paint));
+        parts.push(gl(cyl(0.30, 0.30, 0.02, 12, dx, 0.782, dz, LID), GLOSS.trim));
+        parts.push(gl(cyl(0.045, 0.045, 0.02, 8, dx + 0.16, 0.787, dz, RIB), GLOSS.chrome));
+      }
+      // The tipped drum, lying across the lane's right half, band outboard.
+      parts.push(gl(cyl(0.33, 0.33, 0.72, 12, 0.72, 0.334, 0.02, BODY, 0, 0, Math.PI / 2), GLOSS.trim));
+      parts.push(gl(cyl(0.336, 0.336, 0.05, 12, 0.48, 0.338, 0.02, RIB, 0, 0, Math.PI / 2), GLOSS.trim));
+      parts.push(gl(cyl(0.336, 0.336, 0.15, 12, 0.92, 0.338, 0.02, BAND, 0, 0, Math.PI / 2), GLOSS.paint));
+      parts.push(gl(cyl(0.29, 0.29, 0.02, 12, 1.085, 0.338, 0.02, LID, 0, 0, Math.PI / 2), GLOSS.trim));
+      // The leak: paint on the road, no back, because it is not an object.
+      parts.push(part(new THREE.CircleGeometry(0.32, 10), 0x14121a, 0.62, 0.006, 0.14, -Math.PI / 2));
+      parts.push(part(new THREE.CircleGeometry(0.18, 8), 0x14121a, 0.28, 0.006, 0.02, -Math.PI / 2));
+      blinker(parts, -0.98, 0.06, -0.30);
+      return merge(parts);
+    })();
+
+    /**
+     * ============ JUMP v10: THE SINGLE-BAR BARRICADE ============
+     *
+     * The low single: one striped board, higher daylight under it, the same
+     * posts and blinkers as v8 so the two read as one family with one and two
+     * bars -- which is exactly how the reference mixes them mid-slalom.
+     */
+    const jumpLowBarGeo = (function () {
+      const WOOD = 0xb47c42, WOOD_D = 0x8a5a2c;
+      const parts = [];
+      for (const sx of [-1, 1]) {
+        parts.push(gl(cyl(0.070, 0.078, 0.60, 10, sx * 0.88, 0.30, 0, WOOD), GLOSS.matte));
+        parts.push(gl(cyl(0.082, 0.082, 0.035, 10, sx * 0.88, 0.615, 0, WOOD_D), GLOSS.matte));
+        // A-frame feet, splayed in z, closed boxes.
+        for (const sz of [-1, 1]) {
+          parts.push(gl(cbx(0.10, 0.42, 0.09, sx * 0.88, 0.215, sz * 0.135, WOOD_D, 0.02,
+            sz * 0.42, 0, 0), GLOSS.matte));
+        }
+        blinker(parts, sx * 0.88, 0.635, 0);
+      }
+      barricadeBoard(parts, 1.90, 0.20, 0.50, 0, 0.08);
+      return merge(parts);
+    })();
+
+    /**
+     * ============ JUMP v11: A TRASH PILE ============
+     *
+     * Bags and boxes together, straight off the reference's kerb line (the
+     * canyon pavement already carries the bags as scenery; this is the pile
+     * that fell into the lane). The cardboard is the bright warm mass that
+     * carries the contrast; the bags are the dark one that says trash. All
+     * closed solids; the loose sheet on the road is paint.
+     */
+    const jumpTrashGeo = (function () {
+      const BAG = 0x1e2438, BAG_HI = 0x2b3350, CARD = 0x6e5430, CARD_D = 0x54401f;
+      const parts = [];
+      // Two cardboard boxes, one turned, one open-flapped.
+      parts.push(gl(cbx(0.74, 0.50, 0.56, -0.55, 0.25, 0.05, CARD, 0.03, 0, 0.25), GLOSS.matte));
+      parts.push(gl(cbx(0.52, 0.36, 0.44, 0.06, 0.58, -0.02, CARD, 0.03, 0, -0.35), GLOSS.matte));
+      parts.push(gl(cbx(0.16, 0.03, 0.42, 0.27, 0.745, -0.02, CARD_D, 0.01, 0, -0.35, 0.35), GLOSS.matte));
+      // The bags: squashed spheres, a family of three sizes.
+      parts.push(gl(sph(0.38, 8, 0.55, 0.38, 0.08, BAG), GLOSS.trim));
+      parts.push(gl(sph(0.33, 8, -0.05, 0.33, 0.15, BAG_HI), GLOSS.trim));
+      parts.push(gl(sph(0.28, 7, 0.80, 0.28, -0.14, BAG), GLOSS.trim));
+      parts.push(gl(sph(0.24, 7, -0.86, 0.24, -0.08, BAG_HI), GLOSS.trim));
+      parts.push(gl(sph(0.20, 6, 0.30, 0.20, 0.28, BAG), GLOSS.trim));
+      // Knot ears on the two big bags.
+      parts.push(gl(sph(0.07, 5, 0.55, 0.72, 0.08, BAG_HI), GLOSS.matte));
+      parts.push(gl(sph(0.06, 5, -0.05, 0.64, 0.15, BAG), GLOSS.matte));
+      // A loose flattened sheet: paint, not an object.
+      parts.push(part(new THREE.CircleGeometry(0.20, 8), 0x8a8474, -0.85, 0.006, 0.24, -Math.PI / 2));
+      return merge(parts);
+    })();
+
     const jumpPool = hazardPool(K.JUMP, 'jump', [
       { geo: jumpSandGeo, face: null },
       /**
@@ -8853,6 +8993,13 @@ MR.World = (function () {
       // The kerbside furniture, in the lane. See the promotion note above.
       { geo: jumpPlanterGeo, face: null },
       { geo: jumpCrateGeo, face: null },
+      // The citylook batch: the reference's own vocabulary, weighted so the
+      // barricades -- its signature obstacle -- turn up often. All face: null,
+      // because each carries its own bands or is its own object.
+      { geo: jumpBarricadeGeo, face: null, weight: 2 },
+      { geo: jumpDrumGeo, face: null },
+      { geo: jumpLowBarGeo, face: null },
+      { geo: jumpTrashGeo, face: null },
     ]);
 
     /**
@@ -10318,6 +10465,143 @@ MR.World = (function () {
      * a design constraint of this pass and not a happy result. Nothing was
      * added below the bar anywhere in the kind.
      */
+    /**
+     * ============ DUCK v8: A SHOP AWNING RIGGED ACROSS THE LANE ============
+     *
+     * The reference's striped awning language, moved overhead: a green-and-
+     * white segmented canopy sloping up away from the lens, rigged on two
+     * dark shop poles. The KIND MARK STAYS ON THE BAR -- the yellow bar and
+     * the yellow-black face are exactly where every other DUCK puts them --
+     * and the canopy is the mass above the bar that duckHeader() normally
+     * supplies, in the reference's own material. Green-white, deliberately:
+     * red-white is JUMP's, yellow-black is this kind's own, and the awning
+     * palette (AWNING) already owns green for shopfronts.
+     *
+     * Across the lane nothing reaches above 2.20 (the canopy's high edge) or
+     * below 1.41 (the bar); above that only the pole finials at the
+     * standards. Canopy z extent +/-0.25 against halfZ 0.30.
+     */
+    const duckAwningGeo = (function () {
+      const POLE = 0x2f4438, BRASS = 0xd8b464, GREEN = 0x3f8452, CREAM = 0xf2eee2;
+      const parts = [
+        // The bar, as the kind puts it.
+        gl(hcbx(2.30, 0.30, 0.42, 0, 1.56, 0, 0xffc422, 0.05), GLOSS.paint),
+        // The dark soffit line under the canopy's front edge.
+        gl(hbx(2.02, 0.05, 0.30, 0, 1.845, -0.06, 0x1a1206), GLOSS.matte),
+      ];
+      // The canopy: seven striped segments sloping up and away.
+      const span = 2.02 * LANE_FIT, SEG = 7;
+      for (let i = 0; i < SEG; i++) {
+        const sw = span / SEG;
+        parts.push(gl(bx(sw * 1.02, 0.05, 0.52, -span / 2 + sw * (i + 0.5), 2.035, -0.02,
+          (i & 1) ? CREAM : GREEN, 0.55, 0, 0), GLOSS.matte));
+        // The valance: a short skirt hanging off the front edge.
+        parts.push(gl(bx(sw * 0.96, 0.15, 0.045, -span / 2 + sw * (i + 0.5), 1.90, -0.255,
+          (i & 1) ? 0xe4ded0 : mixHex(GREEN, 0, 0.25)), GLOSS.matte));
+      }
+      for (const sx of [-1, 1]) {
+        const px = sx * 1.20 * LANE_FIT;
+        parts.push(gl(cyl(0.10, 0.115, 3.30, 10, px, 1.65, 0, POLE), GLOSS.paint));
+        parts.push(bxAt(0.30, 0.07, 0.34, sx * 1.20, 0.035, 0, 0x1a1206));
+        // Brass collar and the finial ball -- the termination this kind asks
+        // every variant to own.
+        parts.push(gl(cyl(0.125, 0.125, 0.08, 10, px, 2.32, 0, BRASS), GLOSS.chrome));
+        parts.push(gl(sph(0.11, 8, px, 3.42, 0, BRASS), GLOSS.chrome));
+        // The rigging arm holding the canopy's high edge.
+        parts.push(gl(bx(0.07, 0.07, 0.46, px, 2.18, 0.0, POLE, 0.55, 0, 0), GLOSS.trim));
+      }
+      return merge(parts);
+    })();
+
+    /**
+     * ============ DUCK v9: A HANGING SHOP SIGN, FULL SPAN ============
+     *
+     * The reference's signboard fascia hung where a clearance header goes: a
+     * cream board with a deep green border and two text-weight stripes, on
+     * both faces (a sign with a blank back is a stage flat), swinging rings
+     * at its top corners, scroll brackets at the poles. The board occupies
+     * exactly the header's band -- 1.83 to 2.22 -- so the kind's directional
+     * mass is untouched; the bar and face below are the standard ones.
+     */
+    const duckShopSignGeo = (function () {
+      const POLE = 0x2f4438, BORDER = 0x2f8452, FIELD = 0xf6dc9c, INKC = 0x2a2436;
+      const parts = [
+        gl(hcbx(2.30, 0.30, 0.42, 0, 1.56, 0, 0xffc422, 0.05), GLOSS.paint),
+        gl(hbx(2.06, 0.06, 0.36, 0, 1.86, 0, 0x1a1206), GLOSS.matte),
+        // The board: border slab, field proud of it on both faces, stripes
+        // proud of the field on both faces.
+        gl(hcbx(2.02, 0.34, 0.16, 0, 2.045, 0, BORDER, 0.03), GLOSS.paint),
+        gl(hbx(1.86, 0.26, 0.18, 0, 2.045, 0, FIELD), GLOSS.matte),
+      ];
+      for (const sz of [-1, 1]) {
+        parts.push(gl(hbx(1.30, 0.07, 0.012, 0, 2.075, sz * 0.093, INKC), GLOSS.matte));
+        parts.push(gl(hbx(0.86, 0.045, 0.012, 0, 1.975, sz * 0.093, INKC), GLOSS.matte));
+      }
+      // Swinging rings at the top corners.
+      for (const sx of [-1, 1]) {
+        parts.push(gl(cyl(0.055, 0.055, 0.04, 8, sx * 0.86 * LANE_FIT, 2.16, 0, 0xd8b464, Math.PI / 2), GLOSS.chrome));
+      }
+      for (const sx of [-1, 1]) {
+        const px = sx * 1.20 * LANE_FIT;
+        parts.push(gl(bx(0.20, 3.44, 0.24, px, 1.72, 0, POLE), GLOSS.paint));
+        parts.push(bxAt(0.30, 0.07, 0.34, sx * 1.20, 0.035, 0, 0x1a1206));
+        // The scroll bracket: a quarter-turn of three short members.
+        parts.push(gl(bx(0.34, 0.06, 0.08, px - sx * 0.18, 2.30, 0, POLE, 0, 0, 0), GLOSS.trim));
+        parts.push(gl(bx(0.06, 0.22, 0.08, px - sx * 0.33, 2.22, 0, POLE), GLOSS.trim));
+        parts.push(gl(bx(0.18, 0.06, 0.08, px - sx * 0.24, 2.145, 0, POLE, 0, 0, sx * 0.6), GLOSS.trim));
+        // A pointed finial cap.
+        parts.push(gl(cone(0.13, 0.24, 8, px, 3.52, 0, 0xd8b464), GLOSS.chrome));
+      }
+      return merge(parts);
+    })();
+
+    /**
+     * ============ DUCK v10: A SCAFFOLD WALK-BOARD SPAN ============
+     *
+     * Distinct from v1 (which is tube-and-fitting): this one carries a solid
+     * PLANK DECK where the header band is -- three wood boards, an orange
+     * kick board over them, the dark soffit under -- on PAIRED standards,
+     * and it terminates in a davit pulley with a rope and bucket down one
+     * standard, which no other variant owns. Everything across the lane sits
+     * in 1.83-2.19; the davit is thin and out at the standard.
+     */
+    const duckWalkboardGeo = (function () {
+      const TUBE = 0xffc422, WOOD = 0xc89a58, WOOD_D = 0x9a7440, KICK = 0xe07030;
+      const parts = [
+        gl(hcbx(2.30, 0.26, 0.34, 0, 1.55, 0, TUBE, 0.04), GLOSS.paint),
+        gl(hbx(2.06, 0.06, 0.36, 0, 1.855, 0, 0x1a1206), GLOSS.matte),
+      ];
+      // Three planks, slight gaps, spanning the lane.
+      for (const [pz, pc] of [[-0.16, WOOD], [0.0, WOOD_D], [0.16, WOOD]]) {
+        parts.push(gl(hcbx(2.06, 0.07, 0.15, 0, 1.925, pz, pc, 0.015), GLOSS.matte));
+      }
+      // The kick board, both faces of the deck.
+      for (const sz of [-1, 1]) {
+        parts.push(gl(hbx(2.02, 0.20, 0.045, 0, 2.06, sz * 0.225, KICK), GLOSS.paint));
+      }
+      for (const sx of [-1, 1]) {
+        // Paired tube standards with a base plate each.
+        for (const dz of [-0.16, 0.16]) {
+          parts.push(gl(cyl(0.075, 0.08, 3.30, 10, sx * 1.20 * LANE_FIT, 1.65, dz, TUBE), GLOSS.paint));
+          parts.push(bxAt(0.22, 0.07, 0.22, sx * 1.20, 0.035, dz, 0x1a1206));
+        }
+        // Transoms joining the pair.
+        for (const ty of [1.00, 2.42]) {
+          parts.push(gl(bx(0.06, 0.06, 0.40, sx * 1.20 * LANE_FIT, ty, 0, 0xd18a08), GLOSS.trim));
+        }
+        // Open tube caps, uneven.
+        parts.push(gl(cyl(0.09, 0.09, 0.06, 10, sx * 1.20 * LANE_FIT, sx > 0 ? 3.33 : 3.12, -0.16, 0xfff0a0), GLOSS.chrome));
+      }
+      // The davit pulley and rope, right standard only: an arm, a sheave, a
+      // rope down to a bucket at the plate.
+      const dx = 1.20 * LANE_FIT;
+      parts.push(gl(bx(0.06, 0.06, 0.30, dx, 3.02, -0.14, 0xd18a08, 0.6, 0, 0), GLOSS.trim));
+      parts.push(gl(cyl(0.09, 0.09, 0.05, 10, dx, 2.94, -0.26, 0xfff0a0, Math.PI / 2), GLOSS.chrome));
+      parts.push(gl(bx(0.025, 2.30, 0.025, dx, 1.76, -0.26, 0x2b1e05), GLOSS.matte));
+      parts.push(gl(cyl(0.13, 0.10, 0.24, 8, dx, 0.50, -0.155, 0x8f95a2), GLOSS.trim));
+      return merge(parts);
+    })();
+
     const duckPool = hazardPool(K.DUCK, 'duck', [
       { geo: duckGeo, face: [2.26, 0.40, 1.62, -0.292] },
       { geo: duckScaffoldGeo, face: [2.26, 0.36, 1.58, -0.292] },
@@ -10327,6 +10611,10 @@ MR.World = (function () {
       { geo: duckWalkGeo, face: [2.26, 0.36, 1.60, -0.292] },
       { geo: duckFloodGeo, face: [2.26, 0.34, 1.62, -0.292] },
       { geo: duckBridgeGeo, face: [2.26, 0.38, 1.62, -0.292] },
+      // The citylook batch: the reference's own overhead vocabulary.
+      { geo: duckAwningGeo, face: [2.26, 0.36, 1.58, -0.209] },
+      { geo: duckShopSignGeo, face: [2.26, 0.36, 1.58, -0.209] },
+      { geo: duckWalkboardGeo, face: [2.26, 0.34, 1.56, -0.169] },
     ]);
 
     /**
@@ -10481,7 +10769,7 @@ MR.World = (function () {
      * because a floor is the one panel that must not flare.
      */
     const TRAM_DECK = 0xd8d2c4;
-    const BUS_BODY = 0x00c896, BUS_DARK = 0x0e2a26, BUS_CREASE = 0x008060;
+    const BUS_BODY = 0x14ccc4, BUS_DARK = 0x0c2a2a, BUS_CREASE = 0x0a948e;
     const TAXI_BODY = 0xffdd00, TAXI_DARK = 0x2e2412, TAXI_CREASE = 0xd89800;
     const VAN_BODY = 0xff8c00, VAN_DARK = 0x35220a, VAN_CREASE = 0xc26200;
     const BIN_BODY = 0xb4c800, BIN_DARK = 0x22300a, BIN_CREASE = 0x7ab800;
@@ -12663,6 +12951,229 @@ MR.World = (function () {
      * share the bumper line: the face plane is unlit and drawn in front of
      * everything, so a chevron overlapping the plate would simply delete it.
      */
+    /**
+     * ============ BLOCK v10: THE CARGO CONTAINER ============
+     *
+     * The reference's rust-red corrugated box, straight off
+     * citylook-ramp-arrow-container.jpg: a full-lane, full-height solid with
+     * vertical corrugation, corner castings, a pale label patch and a
+     * double-leaf rear door with lock rods. Built on all sides -- the
+     * corrugation runs on both flanks AND both ends, because you pass it at
+     * arm's length and see every face.
+     */
+    const blockContainerGeo = (function () {
+      const RUST = 0xa04a30, RUST_D = 0x7c3620, RUST_HI = 0xb85e3c, CAST = 0x5a281a;
+      const parts = [
+        // Two skid rails, then the box standing on them.
+        gl(hbx(0.30, 0.10, 3.66, -0.70, 0.05, 0, CAST), GLOSS.matte),
+        gl(hbx(0.30, 0.10, 3.66, 0.70, 0.05, 0, CAST), GLOSS.matte),
+        gl(hcbx(2.20, 2.52, 3.76, 0, 1.36, 0, RUST, 0.05), GLOSS.paint),
+        // Top perimeter rail.
+        gl(hcbx(2.24, 0.10, 3.76, 0, 2.66, 0, RUST_D, 0.03), GLOSS.trim),
+      ];
+      // Corner castings, all eight.
+      for (const sx of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          for (const cy of [0.24, 2.56]) {
+            parts.push(gl(bx(0.20, 0.24, 0.22, sx * 1.10 * LANE_FIT, cy, sz * 1.83, CAST), GLOSS.matte));
+          }
+        }
+      }
+      // Corrugation: proud vertical ribs down both flanks and across the
+      // front end (the rear is the door). Cheap boxes; triangles are the
+      // plentiful resource here.
+      const hw = 1.10 * LANE_FIT;
+      for (let i = 0; i < 13; i++) {
+        const rz = -1.62 + i * 0.27;
+        for (const sx of [-1, 1]) {
+          parts.push(gl(bx(0.045, 2.30, 0.12, sx * (hw + 0.012), 1.36, rz, (i & 1) ? RUST_D : RUST_HI), GLOSS.matte));
+        }
+      }
+      for (let i = 0; i < 9; i++) {
+        const rx = -0.88 + i * 0.22;
+        parts.push(gl(bx(0.12, 2.30, 0.045, rx * LANE_FIT, 1.36, 1.885, (i & 1) ? RUST_D : RUST_HI), GLOSS.matte));
+      }
+      // The label patch on each flank, with two text-weight stripes.
+      for (const sx of [-1, 1]) {
+        parts.push(gl(bx(0.02, 0.52, 1.30, sx * (hw + 0.04), 1.90, 0.30, 0xd8cfc0), GLOSS.matte));
+        parts.push(gl(bx(0.012, 0.14, 0.86, sx * (hw + 0.052), 2.00, 0.30, RUST_D), GLOSS.matte));
+        parts.push(gl(bx(0.012, 0.07, 0.60, sx * (hw + 0.052), 1.78, 0.30, RUST_D), GLOSS.matte));
+      }
+      // The rear door: frame, two leaves proud of the body, four lock rods
+      // with handles.
+      parts.push(gl(hcbx(2.12, 2.36, 0.10, 0, 1.36, -1.895, RUST_D, 0.03), GLOSS.paint));
+      for (const sx of [-1, 1]) {
+        parts.push(gl(hcbx(0.98, 2.24, 0.06, sx * 0.53, 1.36, -1.915, RUST, 0.02), GLOSS.paint));
+      }
+      for (const rx of [-0.80, -0.32, 0.32, 0.80]) {
+        parts.push(gl(bx(0.05, 2.20, 0.04, rx * LANE_FIT, 1.36, -1.9225, CAST), GLOSS.trim));
+        parts.push(gl(bx(0.16, 0.05, 0.04, rx * LANE_FIT + 0.08, 1.10, -1.9225, CAST), GLOSS.trim));
+      }
+      return merge(parts);
+    })();
+
+    /**
+     * ============ BLOCK v11: A DUMPSTER, LID THROWN OPEN ============
+     *
+     * Deep green steel box on casters, fork pockets on the flanks, the rear
+     * half of the lid standing open with the bags that overfilled it showing
+     * over the rim. The open lid is what takes the silhouette past the jump
+     * apex -- the same argument as the taxi's rank light -- and it is real:
+     * a dumpster in a lane is in a lane because someone left it mid-empty.
+     */
+    const blockDumpsterGeo = (function () {
+      const STEEL = 0x2f7a44, STEEL_D = 0x1e5230, STEEL_HI = 0x49985a, IRON = 0x232830;
+      const parts = [
+        gl(hcbx(2.16, 1.28, 2.56, 0, 0.94, 0, STEEL, 0.06), GLOSS.paint),
+        // The rim.
+        gl(hcbx(2.22, 0.12, 2.62, 0, 1.62, 0, STEEL_D, 0.03), GLOSS.trim),
+        // The closed front half of the lid, slightly domed with a rib.
+        gl(hcbx(2.10, 0.07, 1.20, 0, 1.71, -0.62, STEEL_HI, 0.02), GLOSS.paint),
+        gl(hbx(0.16, 0.05, 1.10, 0, 1.76, -0.62, STEEL_D), GLOSS.trim),
+        // The open rear half, standing up past the rim.
+        gl(hcbx(2.10, 0.07, 1.26, 0, 2.02, 1.34, STEEL_HI, 0.02, -1.18), GLOSS.paint),
+      ];
+      // Side ribs and fork pockets, both flanks.
+      const hw = 1.08 * LANE_FIT;
+      for (const sx of [-1, 1]) {
+        for (const rz of [-0.85, 0, 0.85]) {
+          parts.push(gl(bx(0.05, 1.10, 0.14, sx * (hw + 0.015), 0.94, rz, STEEL_D), GLOSS.matte));
+        }
+        parts.push(gl(bx(0.10, 0.22, 1.10, sx * (hw + 0.03), 0.52, 0, IRON), GLOSS.matte));
+      }
+      // The bags showing over the rim under the open lid.
+      parts.push(gl(sph(0.34, 7, 0.35, 1.66, 0.72, 0x2e3450), GLOSS.trim));
+      parts.push(gl(sph(0.28, 7, -0.40, 1.70, 0.95, 0x3f4668), GLOSS.trim));
+      parts.push(gl(sph(0.22, 6, 0.02, 1.72, 0.45, 0x2e3450), GLOSS.trim));
+      // Casters at the corners, and the road shows under the body between
+      // them -- a dumpster stands over the road the way the bus does.
+      for (const sx of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          parts.push(gl(cyl(0.11, 0.11, 0.10, 10, sx * 0.82 * LANE_FIT, 0.11, sz * 1.06, IRON, 0, 0, Math.PI / 2), GLOSS.trim));
+          parts.push(gl(bx(0.06, 0.16, 0.10, sx * 0.82 * LANE_FIT, 0.24, sz * 1.06, IRON), GLOSS.matte));
+        }
+      }
+      return merge(parts);
+    })();
+
+    /**
+     * ============ BLOCK v12: THE REFERENCE'S GREEN HATCHBACK, PARKED ========
+     *
+     * The one-box compact from citylook-oilspill-green-car and
+     * citylook-traffic-lights, nose-in at a small yaw the way a car actually
+     * abandons a lane. Saturated green, real glass all round, headlight
+     * lenses, low grille, rounded arches, a roof box that takes the
+     * silhouette past the jump apex.
+     *
+     * THE YAW IS BUDGETED, NOT EYEBALLED: the shell is 3.56 long by 1.46 wide
+     * before rotation; at ry 0.16 the swept half-extents are z 1.89 and
+     * x 1.01 against a box of 1.95 and 1.12 -- checked against the same
+     * circumscribed-extent arithmetic that burned the yawed objects this
+     * project has a note about, and verified by tools/orbit.js's measured
+     * extents below.
+     */
+    const HATCH_BODY = 0x3cc832, HATCH_CREASE = 0x2b9424, HATCH_DARK = 0x123812;
+    function hatchbackParts(sub, body, crease, dark) {
+      vUnder(sub, {
+        bodyW: 2.02, z0: -1.68, z1: 1.68, axles: [-1.02, 1.02],
+        skirtTop: 0.52, skirtBot: 0.10, spring: 0.14, archR: 0.40,
+        wheelX: 0.84, wheelR: 0.29, wheelW: 0.26, archPad: 0.08,
+        skirt: crease, under: dark, tyre: TYRE_WARM,
+        rim: WHEEL_RIM_WARM, hub: WHEEL_HUB_WARM,
+      });
+      vBumper(sub, 1.98, 0.24, 0.62, -1.74, dark, 0.52);
+      vLamps(sub, 0.86, 0.62, -1.74, 0.135);
+      vFront(sub, {
+        zFront: 1.76, w: 2.02, dark, crease,
+        grilleY: 0.86, grilleH: 0.22, lampX: 0.72, lampW: 0.30, lampH: 0.20,
+        bumpW: 1.98, bumpH: 0.24, bumpY: 0.62, plateW: 0.52,
+      });
+      sub.push(
+        gl(hcbx(2.02, 0.56, 3.44, 0, 0.82, 0, body, 0.08), GLOSS.paint),
+        gl(hcbx(2.00, 0.20, 3.36, 0, 1.18, 0, body, 0.05), GLOSS.paint),
+        // The bonnet, one sloping plane into the windscreen base.
+        gl(hcbx(1.96, 0.09, 1.06, 0, 1.32, 1.20, body, 0.04, 0.115), GLOSS.paint),
+        // The windscreen, raked so the bonnet line continues into the roof.
+        gl(hcbx(1.70, 0.08, 0.84, 0, 1.60, 0.40, GLASS_PALE_HI, 0.02, 0.82), GLOSS.glass),
+        // The roof, and the rear hatch glass falling away behind it.
+        gl(hcbx(1.62, 0.09, 1.24, 0, 1.90, -0.52, body, 0.04), GLOSS.paint),
+        gl(hcbx(1.58, 0.08, 0.74, 0, 1.60, -1.38, GLASS_PALE_LO, 0.02, -0.75), GLOSS.glass),
+        gl(hcbx(1.90, 0.14, 0.30, 0, 1.34, -1.58, body, 0.04), GLOSS.paint)
+      );
+      // Door glass between real A and C pillars.
+      vSideGlass(sub, 2.02, -1.08, 0.52, 1.30, 1.76, true);
+      for (const pz of [0.52, -1.12]) {
+        for (const sx of [-1, 1]) {
+          sub.push(gl(bx(0.09, 0.48, 0.22, sx * (1.01 * LANE_FIT - 0.03), 1.52, pz, body), GLOSS.paint));
+        }
+      }
+      // Wing mirrors and the door handles: the arm's-length details.
+      for (const sx of [-1, 1]) {
+        sub.push(gl(bx(0.10, 0.10, 0.14, sx * (1.01 * LANE_FIT + 0.05), 1.28, 0.62, body), GLOSS.paint));
+        sub.push(gl(bx(0.03, 0.04, 0.22, sx * (1.01 * LANE_FIT + 0.012), 1.06, -0.10, crease), GLOSS.chrome));
+      }
+      return sub;
+    }
+    const blockHatchGeo = (function () {
+      const parts = [];
+      const sub = hatchbackParts([], HATCH_BODY, HATCH_CREASE, HATCH_DARK);
+      // The roof box that keeps this visibly not-jumpable.
+      sub.push(gl(hcbx(1.10, 0.26, 1.10, 0, 2.08, -0.45, 0x2a2e38, 0.05), GLOSS.trim));
+      sub.push(gl(hbx(0.08, 0.06, 1.30, -0.55, 1.97, -0.45, HATCH_CREASE), GLOSS.chrome));
+      sub.push(gl(hbx(0.08, 0.06, 1.30, 0.55, 1.97, -0.45, HATCH_CREASE), GLOSS.chrome));
+      placeAt(parts, sub, 0, 0, 0, 0.16);
+      return merge(parts);
+    })();
+
+    /**
+     * ============ BLOCK v13: THE POLICE CAR ============
+     *
+     * citylook-police-curve: warm white body, black bonnet, boot and doors,
+     * a red-and-blue light bar. Straight in the lane -- a roadblock -- with
+     * the same real glass, lamps and grille as the hatchback shell.
+     */
+    const blockPoliceGeo = (function () {
+      const WHITE = 0xe8e4d4, BLACK = 0x26241c, BLACK_D = 0x16140e;
+      const parts = [];
+      vUnder(parts, {
+        bodyW: 2.06, z0: -1.80, z1: 1.80, axles: [-1.04, 1.00],
+        skirtTop: 0.54, skirtBot: 0.10, spring: 0.14, archR: 0.41,
+        wheelX: 0.86, wheelR: 0.29, wheelW: 0.26, archPad: 0.08,
+        skirt: 0xd8d4c4, under: BLACK_D, tyre: TYRE,
+      });
+      vBumper(parts, 2.00, 0.24, 0.64, -1.86, BLACK, 0.54);
+      vLamps(parts, 0.88, 0.64, -1.86, 0.14);
+      vFront(parts, {
+        zFront: 1.86, w: 2.06, dark: BLACK, crease: 0x8f8a78,
+        grilleY: 0.94, grilleH: 0.24, lampX: 0.76, lampW: 0.32, lampH: 0.20,
+        bumpW: 2.00, bumpH: 0.24, bumpY: 0.64, plateW: 0.54,
+      });
+      parts.push(
+        gl(hcbx(2.06, 0.44, 3.64, 0, 0.98, 0, WHITE, 0.07), GLOSS.paint),
+        // Black bonnet and boot planes over a white body.
+        gl(hcbx(2.02, 0.10, 1.24, 0, 1.26, 1.14, BLACK, 0.04, 0.065), GLOSS.paint),
+        gl(hcbx(2.02, 0.10, 1.16, 0, 1.27, -1.16, WHITE, 0.04, -0.048), GLOSS.paint),
+        // Black quarters, front and rear, over a white body -- the
+        // reference's own split (citylook-police-curve).
+        gl(bx(0.03, 0.48, 0.86, -(1.03 * LANE_FIT + 0.01), 0.96, 1.30, BLACK), GLOSS.paint),
+        gl(bx(0.03, 0.48, 0.86, (1.03 * LANE_FIT + 0.01), 0.96, 1.30, BLACK), GLOSS.paint),
+        gl(bx(0.03, 0.48, 0.92, -(1.03 * LANE_FIT + 0.01), 0.96, -1.32, BLACK), GLOSS.paint),
+        gl(bx(0.03, 0.48, 0.92, (1.03 * LANE_FIT + 0.01), 0.96, -1.32, BLACK), GLOSS.paint)
+      );
+      vGlass(parts, 1.54, 0.44, 1.30, 0, 1.55, -0.02, false);
+      vPillars(parts, 0.28, 0.44, 1.30, 0.90, 1.55, -0.02, WHITE);
+      parts.push(gl(hcbx(1.40, 0.07, 1.22, 0, 1.805, -0.02, WHITE, 0.03), GLOSS.paint));
+      // The light bar: chrome base, red and blue lenses, both readable from
+      // every azimuth because they are full-depth boxes.
+      parts.push(gl(hbx(0.94, 0.06, 0.30, 0, 1.87, -0.02, 0x3a3e48), GLOSS.trim));
+      parts.push(gl(hbx(0.42, 0.18, 0.26, -0.24, 1.99, -0.02, 0xf0402f), GLOSS.chrome));
+      parts.push(gl(hbx(0.42, 0.18, 0.26, 0.24, 1.99, -0.02, 0x2b62d8), GLOSS.chrome));
+      parts.push(gl(hbx(0.10, 0.18, 0.24, 0, 1.99, -0.02, 0xd8dce4), GLOSS.chrome));
+      // The whip antenna, thin and at the boot.
+      parts.push(gl(bx(0.025, 0.60, 0.025, 0.52, 1.62, -1.30, BLACK_D), GLOSS.matte));
+      return merge(parts);
+    })();
+
     const blockPool = hazardPool(K.BLOCK, 'block', [
       {
         // THE FACE MOVES TO THE TAIL, and its z is inside halfZ rather than
@@ -12767,6 +13278,13 @@ MR.World = (function () {
         geo: blockCrateLoadGeo, face: [1.90, 0.30, 0.40, -0.632], weight: 2,
       },
       { geo: blockMopedGeo, face: [1.30, 0.24, 1.10, -0.921], weight: 2, anim: 'idle' },
+      // The citylook batch. The container and the parked hatchback carry
+      // double weight: they are the two objects the reference frames show
+      // blocking lanes most often.
+      { geo: blockContainerGeo, face: [2.16, 0.32, 0.50, -1.945], weight: 2 },
+      { geo: blockDumpsterGeo, face: [2.10, 0.30, 0.60, -1.325], weight: 1 },
+      { geo: blockHatchGeo, face: [1.90, 0.22, 0.42, -1.90], weight: 2 },
+      { geo: blockPoliceGeo, face: [2.00, 0.22, 0.44, -1.90], weight: 1, anim: 'idle' },
     ]);
 
     /**

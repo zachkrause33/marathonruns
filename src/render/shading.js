@@ -129,7 +129,11 @@ MR.shading = (function () {
     // Contact-shadow tint. Deliberately a deep blue-violet rather than black:
     // it has to sit on grass, tarmac and sand across six biomes, and a neutral
     // black blob reads as a hole in every one of them.
-    contact: 0x241d3d,
+    // Warmed a step for the citylook pass: a third fresh reader read the
+    // runner-and-ghost shadow trail as 'a blue centerline stripe'. Still
+    // violet-of-neutral so a blob never reads as a hole, but no longer the
+    // bluest thing on the tarmac.
+    contact: 0x2c2532,
   };
 
   /**
@@ -1367,7 +1371,9 @@ MR.shading = (function () {
     // sun. At the old low sun the flipped key raked the street and the
     // vehicles' top surfaces never reached the highlight the reference puts
     // there.
-    const key = new THREE.DirectionalLight(0xfff2d8, 2.30);
+    // A touch more golden for the citylook pass (reader: 'golden-hour
+    // building tones' in the reference against our 'grayish-brick').
+    const key = new THREE.DirectionalLight(0xffeeca, 2.30);
     key.position.set(5.0, 15.0, -9.0);
 
     // The fill flips with it: it now aims DOWN the camera axis from behind

@@ -1876,7 +1876,7 @@ MR.World = (function () {
        * board is perpendicular, it crosses in front of the next building along
        * and gives the street wall a parallax it does not otherwise have.
        */
-      if (i % 3 === 1) {
+      if (i % 2 === 1) {
         sub.push(bx(0.62, 0.08, 0.08, fx - 0.31, 3.40, bw * 0.24, 0x3a3550));
         sub.push(bx(0.66, 0.78, 0.07, fx - 0.58, 3.00, bw * 0.24,
           AWNING[Math.floor(rnd() * AWNING.length)]));
@@ -1897,6 +1897,15 @@ MR.World = (function () {
        * and merges into the window's mean, which is the correct failure mode --
        * the window gets slightly lighter with distance and nothing else happens.
        */
+      // A painted wall sign high on the odd bay -- the faded ghost-sign
+      // every reference street wears once a block. A pale patch with two
+      // text-weight stripes, both faces never needed: it is paint-flat on
+      // the facade plane, proud 0.02 so it exists from the flank too.
+      if (rnd() < 0.18 && h > 9.0) {
+        sub.push(bx(0.04, 1.35, bw * 0.62, fx - 0.02, h - 2.1, 0, mixHex(col, 0xfff6e0, 0.55)));
+        sub.push(bx(0.05, 0.30, bw * 0.44, fx - 0.025, h - 1.85, 0, mixHex(col, 0x2a2436, 0.55)));
+        sub.push(bx(0.05, 0.18, bw * 0.34, fx - 0.025, h - 2.45, 0, mixHex(col, 0x2a2436, 0.45)));
+      }
       const surround = Math.abs(shadedL(t.trim) - shadedL(col)) > 22
         ? t.trim : mixHex(col, 0xffffff, 0.38);
       /**
@@ -1906,7 +1915,7 @@ MR.World = (function () {
        * set in a frame, with a sill under it. Frame + glass + sill is three
        * boxes; the frame's top edge is the lintel.
        */
-      const rows = t.rows || 4;
+      const rows = (t.rows || 4) - (rnd() < 0.28 ? 1 : 0);
       for (let r = 0; r < rows; r++) {
         const wy = 2.6 + r * ((h - 3.4) / Math.max(1, rows));
         if (wy > h - 1.0) break;
@@ -6541,7 +6550,7 @@ MR.World = (function () {
         }
         // The reference lamp, one per side per tile, staggered like the old
         // verge line so a column passes the lens every twelve units.
-        canyonLamp(parts, sx, POLE_Z[sx > 0 ? 0 : 1], 0xaaa798, 0x5c594c);
+        canyonLamp(parts, sx, POLE_Z[sx > 0 ? 0 : 1], 0x93907f, 0x55524a);
         // THE AMBER SIGNAL POLE, one per side per tile, staggered against the
         // lamp: citylook-traffic-lights lines its whole street with golden
         // signal columns, and they are the second-strongest repeated vertical
@@ -13104,7 +13113,10 @@ MR.World = (function () {
      * a dumpster in a lane is in a lane because someone left it mid-empty.
      */
     const blockDumpsterGeo = (function () {
-      const STEEL = 0x2f7a44, STEEL_D = 0x1e5230, STEEL_HI = 0x49985a, IRON = 0x232830;
+      // Deepened after the golden-hour key: at 0x2f7a44 the body's area
+      // mean landed 1.14x the warmed lane-1 road. Darker buys the ratio the
+      // honest direction for a repainted steel bin.
+      const STEEL = 0x35a44e, STEEL_D = 0x1e5c2e, STEEL_HI = 0x4cc466, IRON = 0x232830;
       const parts = [
         gl(hcbx(2.16, 1.28, 2.56, 0, 0.94, 0, STEEL, 0.06), GLOSS.paint),
         // The rim.

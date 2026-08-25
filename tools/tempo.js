@@ -136,7 +136,7 @@ if (want('place')) {
   console.log(`    length           median ${pctl(lens, 0.5).toFixed(1)}u, `
     + `${lens[0].toFixed(1)} to ${lens[lens.length - 1].toFixed(1)}`);
   console.log(`    gates inside     mean ${mean(gapsPer).toFixed(2)}`);
-  const sec = pctl(lens, 0.5) / ((K.UNITS_PER_MILE * K.TIME_SCALE) / Pace.SURGE.FLOOR_BASE);
+  const sec = pctl(lens, 0.5) / ((K.UNITS_PER_MILE * K.TIME_SCALE) / Pace.EFFORT_CFG.FLOOR_BASE);
   console.log(`    "briefly"        the median mark is ${sec.toFixed(2)} REAL seconds of running`);
   console.log('');
 }
@@ -196,7 +196,7 @@ if (want('open')) {
 // widened the spacing by at least as much as the speed took away.
 if (want('fair')) {
   console.log('  IS A FORWARD MAT STILL FAIR (rule 4)');
-  const baseSpeed = (K.UNITS_PER_MILE * K.TIME_SCALE) / Pace.SURGE.FLOOR_BASE;
+  const baseSpeed = (K.UNITS_PER_MILE * K.TIME_SCALE) / Pace.EFFORT_CFG.FLOOR_BASE;
   /**
    * ---- THIS LINE HAD A DERIVATION BAKED INTO IT AS A CONSTANT -----------
    *
@@ -217,7 +217,7 @@ if (want('fair')) {
    * Asked of Pace instead of assumed, so it tracks whatever the step becomes.
    */
   const liftSpeed = (K.UNITS_PER_MILE * K.TIME_SCALE)
-    / Pace.tempoTarget(Pace.SURGE.FLOOR_BASE, 1);
+    / Pace.tempoTarget(Pace.EFFORT_CFG.FLOOR_BASE, 1);
   const winIn = [], winOut = [];
   for (const c of courses) {
     const marks = (c.tempo || []).filter((m) => m.dir > 0);
@@ -253,8 +253,8 @@ if (want('fair')) {
     }
   }
   // And the clamp, which is the belt to the widening's braces.
-  const fastest = Pace.tempoTarget(Pace.SURGE.FLOOR_SURGE, 1);
-  if (fastest < Pace.SURGE.FLOOR_SURGE - 1e-9) {
+  const fastest = Pace.tempoTarget(Pace.EFFORT_CFG.FLOOR_SURGE, 1);
+  if (fastest < Pace.EFFORT_CFG.FLOOR_SURGE - 1e-9) {
     bad(`a mat on top of a surge reaches ${fastest.toFixed(1)} s/mi, below the surge floor`);
   } else {
     console.log(`    the clamp        a lift applied to the SURGE floor still returns `

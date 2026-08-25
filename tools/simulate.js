@@ -318,37 +318,70 @@ for (const [label, b] of [['no aid', b0], ['half', b5], ['all', b1]]) {
 const Kk = K;
 const rngOf = ctx.MR.rng;
 
-// The spend policies. `wants(zone, course)` decides whether this policy elects
-// the surge in a zone; `take` is whether it detours for aid at all; `learned`
-// records whether running it needs the day's course known in advance.
+/**
+ * ---- THE POLICIES ARE LINES NOW, NOT SPENDS --------------------------------
+ *
+ * They used to be SURGE ALLOCATIONS -- which zones to elect out of six, with
+ * HOLD 1 and HOLD 2 carrying the design's whole claim that the same pool spent
+ * later is worth more. The owner removed the surge ("One speed system"), so
+ * the pool has one spend again and there is no allocation left to sweep.
+ *
+ * docs/risk-reward.md is the standing warning about exactly this: BEFORE the
+ * pool had two rival uses, six policies finished at 1:58:03 with a spread of
+ * 0.0 seconds, because aid was insurance with no premium and there was nothing
+ * to decide. If this sweep now comes back near zero, this pass has undone
+ * roadmap 66 and the owner has to hear it in plain words.
+ *
+ * THE REPLACEMENT AXIS IS THE LINE. At nearly every gate the runner weighs
+ * what a lane costs in ACTIONS against what it pays in TEMPO, and the policies
+ * below are the different answers to that. It is a different KIND of strategy
+ * from an allocation -- local and repeated rather than global and committed --
+ * and whether it carries the weight is what the spread at the bottom measures.
+ *
+ * `mats` is how the policy reads the paint:
+ *   cost      score both in race seconds; the informed line
+ *   ignore    mats are invisible; route on actions alone
+ *   green     take a lift lane whatever the action costs
+ *   red       never stand on a drag while another lane is open
+ *   freegreen take a lift only where it costs no action
+ * `take` is aid: 0 none, 1 all, 'plan' only where the detour is not dragged.
+ * `learned` records whether running it needs the day's course known in advance
+ * -- and the split is real here: a mat is visible from READ_NEAR, so reading
+ * one is a FIRST-ATTEMPT skill, while planning a chain of them or declining a
+ * bottle you know sits in a slow lane is not.
+ */
 const POLICIES = [
-  { name: 'NO AID',   take: 0, learned: false, wants: () => false },
-  { name: 'GUARD',    take: 1, learned: false, wants: () => false },
-  { name: 'BLIND',    take: 1, learned: false, wants: () => true },
-  // Alternate zones. Needs no knowledge of the day -- you can count them as
-  // they arrive -- so it is a first-attempt policy, and it is the cheapest way
-  // to find out whether HALF the road is the right amount to buy.
-  { name: 'EVERY 2ND', take: 1, learned: false, wants: (s, c) => c.surges.indexOf(s) % 2 === 1 },
-  { name: 'EARLY',    take: 1, learned: true,  wants: (s) => s.z0 < Kk.TOTAL_UNITS * 0.5 },
-  { name: 'LATE',     take: 1, learned: true,  wants: (s) => s.z0 >= Kk.TOTAL_UNITS * 0.5 },
-  { name: 'LONGEST',  take: 1, learned: true,
-    wants: (s, c) => c.surges.slice().sort((a, b) => (b.z1 - b.z0) - (a.z1 - a.z0)).slice(0, 2).indexOf(s) >= 0 },
-  { name: 'LAST TWO', take: 1, learned: true,
-    wants: (s, c) => c.surges.indexOf(s) >= c.surges.length - 2 },
-  // ---- THE POLICY THE DESIGN IS ACTUALLY CLAIMING IS BEST ----------------
+  { name: 'NO AID',    take: 0,      mats: 'cost',      learned: false },
+  { name: 'ACTIONS',   take: 1,      mats: 'ignore',    learned: false },
+  { name: 'READ ROAD', take: 1,      mats: 'cost',      learned: false },
+  { name: 'AVOID RED', take: 1,      mats: 'red',       learned: false },
+  { name: 'CHASE GRN', take: 1,      mats: 'green',     learned: false },
+  { name: 'FREE GRN',  take: 1,      mats: 'freegreen', learned: false },
+  // ---- WHAT KNOWING THE COURSE IS ACTUALLY WORTH NOW --------------------
   //
-  // Every other selective policy above surges FEWER zones than BLIND, so of
-  // course it is slower -- it is not a better allocation, it is a smaller one,
-  // and a sweep made of those is a sweep that can only ever say "spend more".
+  // HOLD 1 and HOLD 2 carried this column and they were about the pool. With
+  // one spend, what a learned player has that a stranger does not is the
+  // ability to decline something in advance: a bottle standing in a lane they
+  // already know is dragged, or a detour that costs a lift they already know
+  // is coming. That is the same shape of claim -- the same resource spent with
+  // foreknowledge is worth more -- moved from the tank to the line.
+  { name: 'PLAN AID',  take: 'plan', mats: 'cost',      learned: true },
+  { name: 'PLAN+RED',  take: 'plan', mats: 'red',       learned: true },
+  // ---- THE ONE THING A STRANGER STRUCTURALLY CANNOT DO -----------------
   //
-  // HOLD spends the SAME pool on LATER road: it declines the first zone and
-  // takes every one after it. That is the whole design claim in one policy --
-  // lowering the floor is worth 0.285x at streak 5 and 0.93x at streak 150, so
-  // a segment burned in zone 1 buys about half what the same segment buys in
-  // zone 4. If HOLD does not beat BLIND, the opposite time preference this
-  // mechanic is built on does not exist and the tuning is wrong.
-  { name: 'HOLD 1',   take: 1, learned: true, wants: (s, c) => c.surges.indexOf(s) >= 1 },
-  { name: 'HOLD 2',   take: 1, learned: true, wants: (s, c) => c.surges.indexOf(s) >= 2 },
+  // Every policy above chooses at the gate line from what is visible there,
+  // which is READ_NEAR = 25.35 units of road. CHAIN looks 300 units ahead and
+  // picks the lane that leads to the most green over that span, which is a
+  // different and strictly harder problem: a greedy choice at one gate can
+  // leave the runner on the wrong side of the road for a mat two gates later,
+  // and only somebody who has run the day knows that in advance.
+  //
+  // This is the same claim HOLD 1 and HOLD 2 carried before the surge was
+  // removed -- the same resource spent with foreknowledge is worth more --
+  // moved from the tank to the line. If it does not beat the greedy policies,
+  // course knowledge buys nothing and this design has no learned axis at all,
+  // which is a finding rather than a tuning problem.
+  { name: 'GRN CHAIN', take: 'plan', mats: 'chain',     learned: true },
 ];
 
 /**
@@ -376,8 +409,6 @@ function policyRace(key, skill, pol, seed) {
       wantAid.set(it.gate, it);
     }
   }
-  const surgeOn = new Set();
-  for (const s of (course.surges || [])) if (pol.wants(s, course)) surgeOn.add(s);
 
   let gi = 0, guard = 0;
   /**
@@ -400,27 +431,29 @@ function policyRace(key, skill, pol, seed) {
    */
   let lane = 1;
   while (!p.finished && guard++ < 200000) {
-    // The election, exactly as main.js makes it: in a zone, in its marked lane,
-    // with fuel in the tank.
-    const zone = course.surgeZoneAt ? course.surgeZoneAt(p.units) : null;
-    p.surging = !!(zone && surgeOn.has(zone) && p.pool > 0);
-    // ...and the mat under the lane being held. Never while surging, which is
-    // Pace's own rule and is restated here only so the two cannot disagree
-    // about a case the generator does not produce anyway.
+    // The mat under the lane being held. This is the whole of the speed
+    // system now: there is no election and no burn, only which lane you are in.
     const mat = course.tempoAt ? course.tempoAt(p.units, lane) : null;
-    p.tempo = mat && !p.surging ? mat.dir : 0;
+    p.tempo = mat ? mat.dir : 0;
     p.update(DT);
     while (gi < course.gates.length && p.units >= course.gates[gi].z) {
       const g = course.gates[gi];
-      const z = course.surgeZoneAt ? course.surgeZoneAt(g.z) : null;
-      const surging = !!(z && surgeOn.has(z) && p.pool > 0);
-      const item = wantAid.get(gi);
+      let item = wantAid.get(gi);
       gi++;
 
-      if (surging) {
-        // Locked to the marked lane. Whatever is in it is what you answer.
-        lane = z.lane;
-      } else if (item) {
+      // ---- PLAN AID: DECLINE A BOTTLE THAT STANDS IN A SLOW LANE --------
+      //
+      // This is what course knowledge buys with one spend left. The placement
+      // rule puts an item behind a hurdle in that hurdle's lane, so fetching
+      // one already costs an action; if that lane is also dragged, the detour
+      // costs the action AND the tempo. A stranger cannot know that before
+      // committing to the lane, and a player who has run the day can.
+      if (item && pol.take === 'plan') {
+        const dm = course.tempoAt ? course.tempoAt(g.z, item.lane) : null;
+        if (dm && dm.dir < 0) item = null;
+      }
+
+      if (item) {
         // Gone to fetch a bottle: the lane it stands in, which the placement
         // rule guarantees holds a JUMP or a DUCK.
         lane = item.lane;
@@ -447,9 +480,64 @@ function policyRace(key, skill, pol, seed) {
           if (g.lanes[l] === Kk.BLOCK) continue;
           const m = course.tempoAt ? course.tempoAt(g.z, l) : null;
           const run = m ? Math.min(m.z1, g.z + 60) - g.z : 0;
-          let cost = g.lanes[l] === Kk.CLEAR ? 0 : skill * Kk.HIT_TIME_PENALTY * 8;
-          if (m) cost += (m.dir > 0 ? -Pace.TEMPO.LIFT : Pace.TEMPO.DRAG)
-            * run / Kk.UNITS_PER_MILE;
+          // ---- THE SKILL TERM WAS INVERTED, AND IT MATTERED --------------
+          //
+          // `skill` is P(clear a demanded action) -- the loop below rolls
+          // `rnd.next() >= skill` and calls that a hit. So the EXPECTED cost of
+          // taking an action lane is (1 - skill) x the cost of a contact. This
+          // charged `skill x cost`, which is exactly backwards: it billed a
+          // PERFECT runner the full price of an action they never fluff, and
+          // billed the sloppiest runner the least.
+          //
+          // The effect was not cosmetic. READ ROAD is the policy that scores
+          // both channels in race seconds and is supposed to bound what a
+          // player reading the road perfectly can do -- and it was losing to
+          // the naive CHASE GRN, because it was declining green lanes whose
+          // action it would have cleared every time. An instrument that makes
+          // the informed line look worse than the greedy one is not measuring
+          // the strategy, it is measuring its own arithmetic.
+          const act = g.lanes[l] === Kk.CLEAR ? 0 : (1 - skill) * Kk.HIT_TIME_PENALTY * 8;
+          const tempo = m ? (m.dir > 0 ? -Pace.TEMPO.LIFT : Pace.TEMPO.DRAG)
+            * run / Kk.UNITS_PER_MILE : 0;
+          let cost;
+          switch (pol.mats) {
+            // Actions only: the player who cannot or will not read the paint.
+            case 'ignore': cost = act; break;
+            // A drag is intolerable while any other lane is open; among the
+            // rest, actions decide.
+            case 'red': cost = act + (m && m.dir < 0 ? 1e4 : 0); break;
+            // A lift is taken whatever it costs in actions; among the rest,
+            // actions decide.
+            case 'green': cost = act - (m && m.dir > 0 ? 1e4 : 0); break;
+            // A lift is worth having only where it is free.
+            case 'freegreen':
+              cost = act - (m && m.dir > 0 && g.lanes[l] === Kk.CLEAR ? 1e4 : 0);
+              break;
+            // ---- LOOK PAST THIS GATE -------------------------------------
+            //
+            // The value of a lane is the tempo it leads to over the next
+            // CHAIN_LOOK units, not the tempo standing on it right now. A mat
+            // is at most TEMPO_PAINT_MAX long and gates are ~25 apart, so 300
+            // units is about a dozen gates and three or four marks -- far
+            // enough to be worth planning, short enough that the runner really
+            // could hold a line across it.
+            case 'chain': {
+              let v = 0;
+              for (const mm of (course.tempo || [])) {
+                if (mm.lane !== l) continue;
+                if (mm.z1 <= g.z || mm.z0 > g.z + 300) continue;
+                const ov = Math.min(mm.z1, g.z + 300) - Math.max(mm.z0, g.z);
+                v += (mm.dir > 0 ? Pace.TEMPO.LIFT : -Pace.TEMPO.DRAG)
+                  * ov / Kk.UNITS_PER_MILE;
+              }
+              cost = act - v;
+              break;
+            }
+            // Both charged in race seconds. The informed line, and the one
+            // that bounds what a player reading the road perfectly can do --
+            // which is the right question for a RECORD.
+            default: cost = act + tempo;
+          }
           if (cost < bestCost) { bestCost = cost; best = l; }
         }
         lane = best === null ? 0 : best;
@@ -475,8 +563,9 @@ console.log(`POLICY x SKILL  --  what beats ${Pace.clock(K.RECORD_SECONDS)}`);
 console.log('='.repeat(74));
 console.log(`  EFFORT ${ctx.MR.Pace.EFFORT}   ` +
   (ctx.MR.Pace.EFFORT > 0
-    ? `floor ${Pace.pace(ctx.MR.Pace.SURGE.FLOOR_BASE)}/mi, surge ${Pace.pace(ctx.MR.Pace.SURGE.FLOOR_SURGE)}/mi, ` +
-      `pool ${ctx.MR.Pace.SURGE.POOL_MAX}, burn 1 per ${ctx.MR.Pace.SURGE.BURN_UNITS}u`
+    ? `floor ${Pace.pace(ctx.MR.Pace.EFFORT_CFG.FLOOR_BASE)}/mi, ` +
+      `mat +-${Pace.TEMPO.LIFT}/${Pace.TEMPO.DRAG} s/mi, ` +
+      `pool ${ctx.MR.Pace.EFFORT_CFG.POOL_MAX} (guard only)`
     : '(the shipped game -- no pool, no zones)'));
 console.log('');
 

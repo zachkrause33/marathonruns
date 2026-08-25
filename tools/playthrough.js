@@ -115,7 +115,7 @@ function clock(sec) {
           aidRoof: (c.aid || []).filter((a) => a.roof).length,
           aidInZone: (c.aid || []).filter((a) => c.surgeZoneAt && c.surgeZoneAt(a.z)).length,
           effort: MR.Pace.EFFORT, narrow: MR.Course.NARROW,
-          poolMax: MR.Pace.SURGE.POOL_MAX, burn: MR.Pace.SURGE.BURN_UNITS,
+          poolMax: MR.Pace.EFFORT_CFG.POOL_MAX, burn: MR.Pace.EFFORT_CFG.BURN_UNITS,
           courseGates: c.gates.length, valid: c.valid.ok, why: c.valid.why || null,
         };
       });

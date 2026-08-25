@@ -98,7 +98,23 @@ MR.Pace = (function () {
     //
     // 261 is the value at which BOTH halves of the owner's sentence hold: a
     // stranger does not walk it, and more than one line gets there.
-    FLOOR_BASE: 261,          // 4:22 /mi
+    // ---- LOWERED WITH THE SURGE'S REMOVAL, AND THE ARITHMETIC IS FLAT --
+    //
+    // 261 was "the pace an UNSURGED runner runs toward". The whole reason it
+    // sat 7 s/mi slower than the datum every gate spacing is cut against was
+    // that the surge existed to buy the difference back. Remove the surge and
+    // the ordinary runner is permanently slow for no reason, and the record
+    // becomes unreachable: tools/simulate.js measured 0 of 40 cells beating
+    // 1:59:30 with the best line 41 seconds short, because surge had been
+    // worth about 131 race seconds a race and mats replace a fraction of it.
+    //
+    // 259 gives that back at 2 s/mi over 26.2 miles, which is 52 seconds -- so
+    // an ordinary line lands just OUTSIDE the record and a line that reads the
+    // paint lands just inside it. That is the difficulty bar the owner set
+    // ("if people get it on the first try everytime they will not always
+    // play") expressed as the two numbers it has always been expressed as, and
+    // simulate.js is what chose it rather than this comment.
+    FLOOR_BASE: 259.0,        // 4:19 /mi
     // FLOOR_SURGE STOOD HERE AT 244 (4:04/mi) and was the second floor an
     // elected surge ran toward. It is gone with the mechanic. The reasoning
     // that set it is worth keeping because it constrains any future second
@@ -208,8 +224,45 @@ MR.Pace = (function () {
    * an action's cost in both directions, which is the point.
    */
   const TEMPO = {
-    LIFT: (EFFORT_CFG.FLOOR_BASE - K.FLOOR_PACE) / 2,   // 3.5 s/mi: 4:21 -> 4:17
-    DRAG: 3 * (EFFORT_CFG.FLOOR_BASE - K.FLOOR_PACE) / 2, // 10.5 s/mi: 4:21 -> 4:32
+    /**
+     * ---- THE LIFT IS THE WHOLE GAP AGAIN, AND THE HALVING IS WHY ---------
+     *
+     * It was halved to 3.5 in this same pass, derived against the cost of an
+     * ACTION, on the design intent that a mat must change the price of a
+     * decision and never be the decision. That derivation was correct and its
+     * premise was deleted underneath it: at the time the SURGE still supplied
+     * the race's speed and the mat only had to nudge a lane choice.
+     *
+     * With one speed system the mat has to carry the race, and
+     * tools/simulate.js measured what the halved step left behind: NO POLICY
+     * AT ANY SKILL BEAT THE RECORD, 0 of 40 cells, and the spread across
+     * policies collapsed to 5.7 s against a 15 s floor. Surge had been worth
+     * about 131 race seconds a race (1848 units run at 17 s/mi); the halved
+     * mats were worth about 4. That is not a tuning error, it is a mechanic
+     * with no room in it.
+     *
+     * FLOOR_BASE - K.FLOOR_PACE is the whole room there is. It is the gap
+     * between the pace an unsurged runner runs toward and the pace every gate
+     * spacing in course.js is cut against, and tempoTarget clamps a lift at
+     * K.FLOOR_PACE so it can never go past it. Taking the whole gap is
+     * therefore not a choice about size, it is the statement that green means
+     * "as fast as this course is spaced for" and nothing beyond.
+     *
+     * AND IT IS STILL SMALL BY THE ONLY COMPARISON THAT EXISTS. The largest
+     * step this game ever had was the surge's 17 s/mi. 7 is 41% of it, it is
+     * the only step left, and a mat is 46 units long against a zone's 500.
+     */
+    LIFT: 7,                                        // s/mi: 4:19 -> 4:12
+    /**
+     * The drag stays HALVED, at one and a half lifts rather than the three it
+     * shipped at. The asymmetry is real -- a drag holds you on itself longer,
+     * so the same s/mi is worth more going backwards -- and 21 made eating one
+     * cost more than clearing a hurdle, which is the mat being the decision
+     * rather than pricing it. At 10.5 a drag over the median 46-unit mark
+     * costs about two race seconds against an action's two to four: enough to
+     * decide a close call, never enough to decide an open-and-shut one.
+     */
+    DRAG: 10.5,                                     // s/mi: 4:19 -> 4:29
   };
 
   /**
@@ -218,7 +271,26 @@ MR.Pace = (function () {
    */
   function tempoTarget(base, tempo) {
     if (EFFORT <= 0 || !tempo) return base;
-    return tempo > 0 ? Math.max(K.FLOOR_PACE, base - TEMPO.LIFT) : base + TEMPO.DRAG;
+    // ---- THE CLAMP WAS AT K.FLOOR_PACE AND HAD ONE JOB -----------------
+    //
+    // It stopped a lift compounding with a SURGE: a runner already at the
+    // surge floor could not be taken further by standing on a mat, so the
+    // fastest the game could run was exactly FLOOR_SURGE whatever combination
+    // of streak, hill and paint applied. The surge is gone and that job with
+    // it, and holding the clamp at K.FLOOR_PACE would mean a lift did nothing
+    // at all once FLOOR_BASE came down to meet it.
+    //
+    // So a lift now takes the runner BELOW the spacing datum, exactly as the
+    // surge used to, and it is paid for the same way: course.js widens the
+    // action window by precisely the lift (windowExtraAt), and
+    // tools/tempo.js --section fair measures the guaranteed decide window on a
+    // mat against the road either side of it and fails the build on a deficit.
+    // The clamp stays as a STATED hard floor rather than an active one -- the
+    // fastest pace this game can produce is FLOOR_BASE - LIFT and it is
+    // written down here rather than inferred.
+    return tempo > 0
+      ? Math.max(EFFORT_CFG.FLOOR_BASE - TEMPO.LIFT, base - TEMPO.LIFT)
+      : base + TEMPO.DRAG;
   }
 
   /**
@@ -237,7 +309,7 @@ MR.Pace = (function () {
 
   /** The fastest pace ANY line can reach, which is what a bound must use. */
   function bestFloor() {
-    return K.FLOOR_PACE;
+    return EFFORT > 0 ? EFFORT_CFG.FLOOR_BASE - TEMPO.LIFT : K.FLOOR_PACE;
   }
 
   function targetPace(streak, floor) {

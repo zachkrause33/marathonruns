@@ -789,8 +789,8 @@ if (want('zone')) {
     const lens = all.map((x) => x.s.z1 - x.s.z0).sort((a, b) => a - b);
     const cnt = cs.map((c) => (c.surges || []).length).sort((a, b) => a - b);
     const SIGHT = all[0].s.sight;
-    const baseSpeed = (K.UNITS_PER_MILE * K.TIME_SCALE) / Pace.SURGE.FLOOR_BASE;
-    const surgeSpeed = (K.UNITS_PER_MILE * K.TIME_SCALE) / Pace.SURGE.FLOOR_SURGE;
+    const baseSpeed = (K.UNITS_PER_MILE * K.TIME_SCALE) / Pace.EFFORT_CFG.FLOOR_BASE;
+    const surgeSpeed = (K.UNITS_PER_MILE * K.TIME_SCALE) / Pace.EFFORT_CFG.FLOOR_SURGE;
 
     console.log(`  measured over ${cs.length} days, ${all.length} zones\n`);
     console.log('  WHERE A ZONE IS');

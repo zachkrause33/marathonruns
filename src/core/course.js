@@ -476,7 +476,23 @@ MR.Course = (function () {
   // asked to weight had no paint anywhere near them. The yield is about a half
   // (tools/tempo.js --section place), so this asks for roughly double what it
   // expects to land, which is the same arithmetic the shipped pair used.
-  const TEMPO_N_MIN = 26, TEMPO_N_MAX = 34;
+  /**
+   * ---- HOW MANY, AND THE SURGE'S ROAD IS WHAT PAYS FOR IT --------------
+   *
+   * 13 to 17 while the surge existed, which yielded SIX placed marks on the
+   * day tools/playthrough.js walked -- because zones plus their sight
+   * exclusion closed better than half the course to marks before one was
+   * drawn. The surge is gone and all of that road is free.
+   *
+   * It has to be spent, not banked. simulate.js measured a policy spread of
+   * 5.7 s against a 15 s floor with a dozen small mats on the road: a mat is
+   * now the only thing separating one line from another, and a dozen of them
+   * cannot separate anything. What makes a LOCAL, REPEATED decision add up to
+   * a strategy is that it recurs -- so the count is what carries the axis the
+   * surge's allocation used to carry, and this asks for roughly double what
+   * the yield will land.
+   */
+  const TEMPO_N_MIN = 60, TEMPO_N_MAX = 76;
   // FROM 0.05, WHICH IS EARLIER THAN ANY OTHER MECHANIC IN THIS FILE OPENS,
   // and the reason is the opening rather than the mat. A mat is the only
   // decision this game has that costs NOTHING TO OWN -- no pool, no fuel, no
@@ -497,7 +513,7 @@ MR.Course = (function () {
    * the runner's feet -- READ_NEAR is 25.35, so 50 clears it by nearly a
    * factor of two and roughly doubles how many marks the road can carry.
    */
-  const TEMPO_GAP = 50;
+  const TEMPO_GAP = 30;
   // The share of marks that are BACKWARD. Under a half on purpose: the drag is
   // the expensive half and the one that pushes the player out of a lane, and a
   // road where most marks are punishments reads as a penalty box rather than as
@@ -528,7 +544,7 @@ MR.Course = (function () {
   // paint is a short mark placed inside that budget, on the decision. Every
   // unit of a shipped mark is inside its planned range, so the widening the
   // course already paid for covers it and nothing has to be re-validated.
-  const TEMPO_PAINT_MAX = 46;
+  const TEMPO_PAINT_MAX = 64;
   // The shortest mark worth painting. LANE_TRANSIT is the ground two lane
   // changes cover, so anything at or under it is a mark the runner could be
   // through before the swerve that answers it has finished -- an instruction
@@ -993,7 +1009,22 @@ MR.Course = (function () {
         // is the gate that ends it, i.e. the moment the player has to be out
         // of this lane anyway.
         let anchor = aidIn(l, m.z0, cut), site = 3;
+        // ---- A LIFT MUST STILL COVER THE THING IT IS EARNED BY -----------
+        //
+        // Clause 3 is that a forward mat has some gate inside it demanding an
+        // action of the marked lane, and validate() re-derives it from the
+        // SHIPPED mark. Anchoring on a bottle can slide the paint clear of the
+        // hurdle that earned it -- 1 course in 90 did exactly that -- so an
+        // aid anchor is only taken for a lift when the earning gate is still
+        // inside the run the anchor would produce. Otherwise the obstacle wins
+        // the anchor, which is the placement the owner asked for anyway.
+        if (anchor >= 0 && m.dir > 0) {
+          const t0 = Math.max(m.z0, Math.min(anchor - read, cut - tempoMinRun()));
+          const t1 = Math.min(cut, t0 + TEMPO_PAINT_MAX);
+          if (!(earns >= t0 && earns < t1)) anchor = -1;
+        }
         if (anchor < 0 && earns >= 0 && earns < cut) { anchor = earns; site = 2; }
+        if (anchor < 0 && m.dir > 0) continue;
         if (anchor < 0) {
           // A gate inside the reachable span where the lanes are not all the
           // same: somewhere a player is choosing at all.

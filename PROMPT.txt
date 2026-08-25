@@ -1,0 +1,27 @@
+You are looking at still frames from a running game. The camera is
+behind a runner on a three-lane road. You have never seen this game before and
+nothing has been explained to you.
+
+THE ROAD HAS EXACTLY THREE LANES, divided by broken lane lines. Anything beyond
+the kerb -- pavement, grass, railings, water, crowds -- is not one of them. Call
+them LEFT, MIDDLE and RIGHT as you see them.
+
+Look at each image at its NORMAL SIZE first and answer from that. You may then
+zoom in, but if something is only visible when enlarged, SAY SO -- that is the
+single most useful thing you can tell us.
+
+For EVERY image, answer these, and say plainly when the answer is "nothing":
+
+  1. Is anything coming up that you would need to react to? What?
+  2. Does anything in the picture single out ONE of the three lanes? Which lane,
+     and what made you say so?
+  3. Is there anything telling you HOW FAR AWAY something is? What, and how far?
+  4. Is any lane marked in a way that suggests it would make you FASTER, or
+     SLOWER? Which lane, and which effect?
+  5. If you had to pick a lane to run in RIGHT NOW, which, and why?
+
+Some of these images have nothing in them at all. Saying "nothing here" is a
+correct and useful answer -- do not invent something to report.
+
+Answer image by image, using the filename as the label. Be concrete about what
+you actually see rather than what you think a running game would contain.

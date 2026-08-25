@@ -6118,6 +6118,112 @@ the thread to pull if this is to be fixed properly.
 
 ---
 
+### 6b. THE BLIND READ, which is the acceptance test
+
+Three uncontaminated readers, run OUTSIDE this repository against parentless
+branches holding 22 panels and `PROMPT.txt` and nothing else -- roadmap entry
+63's recipe, `tools/roadread.js --push`. No source, no `CLAUDE.md`, no
+vocabulary to leak. 36 mat panels at 12, 25.35 and 40 units, 21 three-lane gate
+panels at `READ_NEAR`, 9 controls on road clear of any marking.
+
+**QUESTION ONE: do they still route correctly with no telegraph mats
+anywhere?** This is the one that matters, because it is the question removing
+them risked.
+
+**21 of 21 gate panels: a viable lane chosen. Zero blocked, zero refused** --
+with the single exception noted below, which is a panel my own harness broke.
+Readers named objects specifically and unaided: *"a red-and-white striped
+barricade"*, *"orange sandbags"*, *"a teal bicycle lying flat across the middle
+lane"*, *"a blue box truck"*. And they reconstructed the DUCK affordance from
+the art alone, with no mat to tell them: *"the middle obstacle is an overhead
+beam with clear road beneath, while the left has a bike lying on the tarmac"*.
+
+**QUESTION TWO: can they tell a green mat from a red one at `READ_NEAR`?**
+
+| | lane + colour named, of 12 |
+|---|---|
+| reader A | **12** |
+| reader B | 8 |
+| reader C | 9 (7 confident, 2 "only on zoom") |
+
+**Zero colour confusions across all three readers**: whenever a strip was named
+at all, its colour was named correctly. The misses are all "I could not see one
+here", never "I saw the other one".
+
+**AND ONE READER DERIVED THE WHOLE CODE UNAIDED**, in its own preamble, before
+any per-image answer:
+
+> *"The road surface sometimes carries a coloured strip filling exactly one
+> lane: dark green with bright green forward-pointing chevrons, or dark red with
+> pale backward-looking streaks. Nothing in any image says what these do.
+> Green-with-forward-chevrons reads as 'go faster' and red reads as 'slow
+> down', but that is me reading the colours, not something the game told me."*
+
+**THE RED MAT'S SHAPE DOES NOT CARRY ITS MEANING, AND THE GREEN ONE'S DOES.**
+This is the finding to act on. Reader B derived the lift from its stripes and
+could not derive the drag from its rungs:
+
+> *"the LEFT lane's green chevron strip reads as a speed-up. That's an inference
+> from the arrows pointing away down the road and the 'go' colour"*
+
+> *"The LEFT lane's red strip is a deliberately marked surface -- but it has
+> plain horizontal bands and no arrows, unlike the green strips elsewhere in
+> this set, so I genuinely can't say what it does."*
+
+So the redundancy the shape was put there for is **asymmetric**: longitudinal
+stripes read as direction, transverse rungs read as "a marked surface" and
+nothing more. Two of three readers got "green means faster" from the paint; none
+got "red means slower" from the paint -- reader A reached it from the COLOUR
+convention (*"the 'bad' colour"*), not from the rungs. For a red-green pair that
+is exactly the wrong way round, because red-green is the axis a colour-blind
+player cannot use. **The drag glyph needs to say "slow" on its own.**
+
+**A second limitation, in their words: the shape needs enlarging at 25 units.**
+
+> *"I had to zoom to see the streaks; at normal size it reads as a plain
+> dark-green patch."*
+
+The COLOUR reads at `READ_NEAR`; the glyph does not. So the mat is a
+colour-first mark with a shape that only pays close in, which is the opposite
+of what was designed and should be said plainly.
+
+**A third, and it is about the placement:** mats are anchored AT decisions, so
+the mat is frequently behind the very obstacle it prices.
+
+> *"There is a green sliver visible far behind the truck's left edge on zoom,
+> far too distant and too occluded to act on."*
+
+> *"the crates sit right at the far end of that green strip, so taking the
+> [lift] means committing to them"*
+
+The second of those is the mechanic working exactly as intended. The first is
+not: at 12 units the near hazard hides the paint. Anchoring a mark on an
+obstacle puts the obstacle between the player and the mark.
+
+**THE CONTROLS DID THEIR JOB.** On all 9 panels with no marking, every reader
+said so: *"No. No coloured strip on any of the three lanes in this frame."*,
+*"All three lane surfaces are plain tarmac."* Nobody hallucinated paint, which
+is what makes the silences above meaningful.
+
+**AND A READER CAUGHT A DEFECT IN MY OWN HARNESS**, which is the note this
+section most deserves to end on:
+
+> *"This looks to me like a rendering fault rather than a designed obstacle: the
+> shape has no outline, no shading, no markings, and the road's dark edges are
+> visible converging just above it."*
+
+It was right that the frame was wrong and right about which frame. It was a
+staging fault, not a rendering one: `camera.js` SMOOTHS toward the runner, so
+posing the runner does not pose the camera -- and eight update steps left the
+lens tens of units short, in that panel INSIDE a rideable vehicle, looking out
+across its own roof at `DECK_Y`. `roadread.js` now steps the camera until it
+stops moving and then ASSERTS where it landed. A second staging defect the same
+reader found -- *"only the top of his red cap shows, flush with the road
+surface"* -- was the runner posed at y = 0 on a hill; it is seated on the
+elevation now. Neither touches the markings, which world.js draws from the
+course table and which know nothing about the runner, but a panel with a defect
+in it spends the reader's attention on the defect.
+
 ### 7. Three instrument corrections, all rule 3
 
 1. **`tempo.js` had a derivation baked in as a constant.** `liftSpeed` read

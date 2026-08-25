@@ -15561,8 +15561,62 @@ MR.World = (function () {
      * The two orientations are also the road's own language rather than an
      * invention -- bars painted ACROSS a carriageway at close pitch are what a
      * real road paints to say slow down, and a line ALONG it is the direction
-     * of travel. Neither is a chevron and neither is a cross, which were the
-     * two glyphs the removed mats owned and which are now free but stay unused.
+     * of travel.
+     *
+     * ---- AND ORIENTATION ALONE DID NOT SAY WHICH WAY. THE READERS SAID SO --
+     *
+     * Three blind readers judged the first build of this mat (entry 69, 6b).
+     * Two of the three derived FASTER from the lift's longitudinal stripes.
+     * NONE of them derived SLOWER from the drag's transverse rungs:
+     *
+     *   "the LEFT lane's red strip is a deliberately marked surface -- but it
+     *    has plain horizontal bands and no arrows, unlike the green strips
+     *    elsewhere in this set, so I genuinely can't say what it does."
+     *
+     * The one reader who did reach "slower" reached it from the COLOUR --
+     * red is "the bad colour" -- which is precisely the channel the shape
+     * exists to back up, and precisely the channel a deuteranope does not
+     * have. So the redundancy was ASYMMETRIC: longitudinal read as direction,
+     * transverse read as "a marked surface" and nothing more.
+     *
+     * They also said the glyph was too small to do its job where the decision
+     * is made: "I had to zoom to see the streaks; at normal size it reads as
+     * a plain dark-green patch." A 0.09-wide stripe at READ_NEAR is a texture.
+     *
+     * ---- SO THE DART CARRIES THE DIRECTION AND THE FIELD CARRIES THE KIND --
+     *
+     * Both arms now repeat one GLYPH CELL along the lane, and the cell holds a
+     * DART -- a filled triangle 1.10 across and 2.00 long, better than two
+     * thirds of the mat's width, which is the "make it bolder" half of the
+     * finding. The dart points the way the pace goes: FORWARD, away down the
+     * road, on a lift; BACKWARD, at the runner, on a drag. That is one shape
+     * question asked the same way on both arms, which is what the old pair of
+     * orientations was not.
+     *
+     * The field each dart sits in is unchanged and is the reason the two prior
+     * reads are not thrown away to buy this one: a lift keeps a longitudinal
+     * SPINE running the whole mark, a drag keeps a transverse BAR across the
+     * lane at the head of every cell. Along versus across still separates them
+     * at any distance where the dart's apex has gone; the dart says which way
+     * once there are pixels for it.
+     *
+     * A dart is not a chevron -- the chevron is a pair of strokes and this is
+     * one solid triangle -- but the honest statement is that they are the same
+     * family, and the reason that is now allowed is that the mat which owned
+     * the chevron NO LONGER EXISTS. Entry 69 deleted telegraph() and every
+     * glyph it painted. Nothing else on this road speaks a triangle in a lane;
+     * grep says the surviving chevrons are all liveries on the sides of
+     * objects, which is a different surface and a different language. The
+     * cross stays unused.
+     *
+     * PERSPECTIVE FIGHTS THE BACKWARD DART AND THAT IS WHY THE BAR STAYS.
+     * Convergence makes everything on this road narrow toward the far end --
+     * a reader called the old lift's plain parallel stripes "forward-pointing
+     * chevrons", which they were not -- so a far-pointing apex is flattered
+     * and a near-pointing one is fought. The drag's dart is therefore hung off
+     * a full-width bar at its head: the bar is the wide end, it is where the
+     * cell starts, and a triangle narrowing BACK from a bar cannot be read as
+     * the same thing as a triangle narrowing forward into nothing.
      *
      * ---- THE TONE IS A CEILING BEFORE IT IS A COLOUR ---------------------
      *
@@ -15620,23 +15674,99 @@ MR.World = (function () {
     const TEMPO_SEG_LEN = 0.75;
     const TEMPO_MAX_LEN = 96;               // TEMPO_LEN_MAX is 88; this is the pool's
     const TEMPO_SEG = Math.round(TEMPO_MAX_LEN / TEMPO_SEG_LEN);
-    // Rungs across the lane. 0.54 in 3.00 is an 18% duty, which is the mark
-    // budget above; the pitch is what carries the "close together" read and it
-    // is scale-free -- the ratio of rung pitch to lane width is the same at
-    // eight units and at eighty, which a spacing GRADIENT would not have been.
-    const TEMPO_RUNG_PITCH = 3.00;
-    const TEMPO_RUNG_D = 0.54;
-    // Three stripes along the lane: a wider one on the centre line and a pair
-    // flanking it, totalling the same 0.31 of lane width the rungs average.
-    const TEMPO_LINES = [[0, 0.13], [-0.50, 0.09], [0.50, 0.09]];
+    // ---- THE GLYPH CELL --------------------------------------------------
+    // One cell repeats every TEMPO_CELL units along the mark. Its contents are
+    // the dart, plus the drag's bar; the lift's spine is not in the cell
+    // because it runs the whole mark without a break.
+    //
+    // THE PITCH IS SCALE-FREE AND A GRADIENT IN IT WOULD NOT BE. The ratio of
+    // cell pitch to lane width is the same at eight units and at eighty.
+    // Entry 69 section 8 has the arithmetic that killed the gradient proposal:
+    // perspective already compresses along-road spacing as 1/d^2, by 10.8x
+    // over a single mark, so both directions of gradient read as converging
+    // and differ only in rate.
+    const TEMPO_CELL = 6.00;
+    const TEMPO_DART_W = 1.10;   // across the lane: 71% of the mat's width
+    const TEMPO_DART_L = 2.00;   // along it
+    const TEMPO_DART_Z = 1.60;   // the dart's near edge inside its cell
+    const TEMPO_BAR_D = 0.34;    // the drag's transverse bar, at the dart's head
+    // One line along the lane on a lift. It was three (0.13 and two 0.09
+    // flanks) and they are what the readers could not see at READ_NEAR; the
+    // ink they were spending is now in the dart, where a shape can carry it.
+    const TEMPO_SPINE = 0.10;
+    //
+    // ---- THE INK BUDGET, WHICH IS THE CONTRAST GATE IN ANOTHER FORM ------
+    //
+    // The audit samples a WHOLE-LANE MEAN, so bright marks are a budget rather
+    // than a free choice: wash 0.46x lifted by marks at 1.50x over a fifth of
+    // the lane is what lands both arms under the L 70.5 ceiling. Per cell of
+    // TEMPO_W * TEMPO_CELL = 9.24 square units:
+    //
+    //   lift  dart 1.10 + spine 0.60 - overlap 0.19  = 1.51   16.3%
+    //   drag  dart 1.10 + bar 0.52                   = 1.62   17.6%
+    //
+    // against the 18-20% the stripes and rungs spent. Both arms therefore get
+    // very slightly DARKER, which is the safe direction: the gate wants the
+    // surface a hazard stands on at or below L 70.5, and every mark removed
+    // from a lane moves it down. Measured rather than trusted -- the audit
+    // builds its six roads from tempoCell below, the same source this draws.
+
+    /**
+     * WIND IT FACE UP. Takes a polygon as [x, z] pairs in the lane's own plane
+     * and returns it wound so the fan below faces +y, with the fan's indices.
+     *
+     * This is not fussiness. The first tempo strip ever built was positioned
+     * correctly, fitted to the road correctly, and drew NOTHING: its quads
+     * wound 0,1,3 / 0,3,2, which gives a -y normal, and mats.paint
+     * backface-culls it. It photographed as a correct, invisible mat -- the
+     * exact shape of failure a position check cannot catch. A glyph with a
+     * chosen handedness has that trap twice over, because the forward dart and
+     * the backward dart go round opposite ways for the same normal, so the
+     * winding is DERIVED here from the signed area rather than written out per
+     * shape and got right by luck on one of the two arms.
+     */
+    function windUp(v) {
+      let a = 0;
+      for (let i = 0; i < v.length; i++) {
+        const p = v[i], q = v[(i + 1) % v.length];
+        a += p[0] * q[1] - q[0] * p[1];
+      }
+      // A +y normal is a NEGATIVE signed area in (x, z); see the quad above.
+      const poly = a > 0 ? v.slice().reverse() : v;
+      const idx = [];
+      for (let k = 2; k < poly.length; k++) idx.push(0, k - 1, k);
+      return { v: poly, idx };
+    }
+
+    /**
+     * ONE GLYPH CELL in its own coordinates -- x across the lane, z along it
+     * from the cell's near edge -- and the single source both the pooled strip
+     * and the contrast audit build from, so what the gate measures is what the
+     * game draws. The carpet's lesson, a third surface along.
+     *
+     * A lift is one dart, apex FORWARD. A drag is a full-width bar with a dart
+     * hung off it, apex BACKWARD at the runner. See the header for why the
+     * drag gets the bar and the lift does not.
+     */
+    function tempoCell(dir) {
+      const w = TEMPO_DART_W / 2, half = TEMPO_W / 2;
+      const z0 = TEMPO_DART_Z, z1 = z0 + TEMPO_DART_L;
+      if (dir > 0) return [windUp([[-w, z0], [w, z0], [0, z1]])];
+      return [
+        windUp([[-w, z1], [w, z1], [0, z0]]),
+        windUp([[-half, z1], [half, z1], [half, z1 + TEMPO_BAR_D], [-half, z1 + TEMPO_BAR_D]]),
+      ];
+    }
+    // How far into its cell a glyph reaches. A cell is kept whole or not at
+    // all, and this is what "whole" is measured against -- the empty tail
+    // after the glyph does not have to fit.
+    const TEMPO_GLYPH_END = TEMPO_DART_Z + TEMPO_DART_L + TEMPO_BAR_D;
 
     /**
      * A mark's cross-section as the AUDIT sees it: `len` of it, flat, at `y`.
-     * The same numbers the strip below lays down, so what the gate measures is
-     * what the game draws -- the carpet's lesson, and the surge wash's, a third
-     * surface along. `len` must be a whole number of rung pitches or the drag
-     * arm's duty cycle -- and therefore its mean -- would be an artefact of
-     * where the sample happened to stop.
+     * `len` must be a whole number of CELLS or the duty cycle -- and therefore
+     * the mean the gate reads -- would be an artefact of where the sample
+     * happened to stop.
      */
     function tempoLaneParts(dir, len, y) {
       const flat = -Math.PI / 2;
@@ -15645,14 +15775,22 @@ MR.World = (function () {
         overRoad(hue, TEMPO_WASH_K), 0, y, 0, flat)];
       const mark = overRoad(hue, TEMPO_MARK_K);
       if (dir > 0) {
-        for (const ln of TEMPO_LINES) {
-          parts.push(part(new THREE.PlaneGeometry(ln[1], len), mark, ln[0], y + 0.001, 0, flat));
-        }
-      } else {
-        const n = Math.round(len / TEMPO_RUNG_PITCH);
-        for (let i = 0; i < n; i++) {
-          parts.push(part(new THREE.PlaneGeometry(TEMPO_W, TEMPO_RUNG_D), mark,
-            0, y + 0.001, -len / 2 + TEMPO_RUNG_PITCH * (i + 0.5), flat));
+        parts.push(part(new THREE.PlaneGeometry(TEMPO_SPINE, len), mark, 0, y + 0.001, 0, flat));
+      }
+      const cells = Math.round(len / TEMPO_CELL);
+      for (let c = 0; c < cells; c++) {
+        const z = -len / 2 + c * TEMPO_CELL;
+        for (const p of tempoCell(dir)) {
+          const pos = new Float32Array(p.v.length * 3);
+          const nor = new Float32Array(p.v.length * 3);
+          for (let i = 0; i < p.v.length; i++) {
+            pos[i * 3] = p.v[i][0]; pos[i * 3 + 2] = z + p.v[i][1]; nor[i * 3 + 1] = 1;
+          }
+          const g = new THREE.BufferGeometry();
+          g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+          g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+          g.setIndex(p.idx.slice());
+          parts.push(part(g, mark, 0, y + 0.002, 0));
         }
       }
       return parts;
@@ -15674,19 +15812,24 @@ MR.World = (function () {
       const hue = dir > 0 ? TEMPO_LIFT : TEMPO_DRAG;
       const washC = new THREE.Color(overRoad(hue, TEMPO_WASH_K));
       const markC = new THREE.Color(overRoad(hue, TEMPO_MARK_K));
-      // Every piece is either a RUN (a longitudinal ribbon clamped to length)
-      // or a RUNG (one quad, kept or collapsed). The wash is a run.
+      // Every piece is either a RUN -- a longitudinal ribbon clamped to the
+      // mark's length, which is the wash and the lift's spine -- or a TILE,
+      // one glyph polygon kept whole or collapsed to nothing. Nothing is ever
+      // clipped: a road marking ends on a whole glyph, and half a dart at the
+      // tail would read as the pattern breaking down rather than stopping.
       const runs = [[-TEMPO_W / 2, TEMPO_W / 2, 0, washC]];
-      const rungs = [];
-      if (dir > 0) {
-        for (const ln of TEMPO_LINES) {
-          runs.push([ln[0] - ln[1] / 2, ln[0] + ln[1] / 2, 0.001, markC]);
+      if (dir > 0) runs.push([-TEMPO_SPINE / 2, TEMPO_SPINE / 2, 0.001, markC]);
+      const tiles = [];
+      const nCell = Math.floor(TEMPO_MAX_LEN / TEMPO_CELL) + 1;
+      for (let c = 0; c < nCell; c++) {
+        const z = c * TEMPO_CELL;
+        for (const p of tempoCell(dir)) {
+          tiles.push({ v: p.v.map((q) => [q[0], z + q[1]]), idx: p.idx, end: z + TEMPO_GLYPH_END });
         }
-      } else {
-        const n = Math.floor(TEMPO_MAX_LEN / TEMPO_RUNG_PITCH) + 1;
-        for (let i = 0; i < n; i++) rungs.push(TEMPO_RUNG_PITCH * (i + 0.5));
       }
-      const nv = runs.length * (TEMPO_SEG + 1) * 2 + rungs.length * 4;
+      let ntv = 0;
+      for (const t of tiles) ntv += t.v.length;
+      const nv = runs.length * (TEMPO_SEG + 1) * 2 + ntv;
       const pos = new Float32Array(nv * 3);
       const nor = new Float32Array(nv * 3);
       const col = new Float32Array(nv * 3);
@@ -15711,16 +15854,17 @@ MR.World = (function () {
           idx.push(a, a + 3, a + 1, a, a + 2, a + 3);
         }
       }
-      for (let i = 0; i < rungs.length; i++) {
-        const base = v;
-        for (let k = 0; k < 4; k++) {
-          const x = (k & 1) ? TEMPO_W / 2 : -TEMPO_W / 2;
-          pos[v * 3] = x; pos[v * 3 + 1] = 0.001;
-          pos[v * 3 + 2] = rungs[i] + ((k & 2) ? TEMPO_RUNG_D / 2 : -TEMPO_RUNG_D / 2);
+      for (const t of tiles) {
+        t.base = v;
+        for (const q of t.v) {
+          // 0.002, above the spine's 0.001: the lift's dart sits ON its spine
+          // and two coplanar quads in the same colour are a z-fight, which
+          // reads as the glyph flickering rather than as a mark.
+          pos[v * 3] = q[0]; pos[v * 3 + 1] = 0.002; pos[v * 3 + 2] = q[1];
           col[v * 3] = markC.r; col[v * 3 + 1] = markC.g; col[v * 3 + 2] = markC.b;
           v++;
         }
-        idx.push(base, base + 3, base + 1, base, base + 2, base + 3);
+        for (const i of t.idx) idx.push(t.base + i);
       }
       for (let i = 0; i < nv; i++) { nor[i * 3 + 1] = 1; }
       const geo = new THREE.BufferGeometry();
@@ -15772,16 +15916,14 @@ MR.World = (function () {
             rest[w * 3 + 2] = z; w++;
           }
         }
-        for (let i = 0; i < rungs.length; i++) {
-          const far = rungs[i] + TEMPO_RUNG_D / 2;
-          for (let k = 0; k < 4; k++) {
-            // Collapsed to a point rather than merely moved: a degenerate quad
-            // rasterises nothing at all, which is what "this rung is not on
-            // this mark" has to mean.
-            rest[w * 3 + 2] = far > len ? len
-              : rungs[i] + ((k & 2) ? TEMPO_RUNG_D / 2 : -TEMPO_RUNG_D / 2);
-            rest[w * 3] = far > len ? 0
-              : ((k & 1) ? TEMPO_W / 2 : -TEMPO_W / 2);
+        for (const t of tiles) {
+          // Collapsed to a point rather than merely moved: a degenerate
+          // polygon rasterises nothing at all, which is what "this glyph is
+          // not on this mark" has to mean.
+          const off = t.end > len;
+          for (const q of t.v) {
+            rest[w * 3] = off ? 0 : q[0];
+            rest[w * 3 + 2] = off ? len : q[1];
             w++;
           }
         }
@@ -17679,12 +17821,12 @@ MR.World = (function () {
        * measuring them against a road that is not there.
        *
        * SIX ENTRIES -- lift and drag on each lane -- built from
-       * tempoLaneParts, the same function the pooled strip lays down, so what
-       * the gate measures is what the game draws. 6.0 units is exactly TWO rung
-       * pitches and is SHORTER than the window the ortho frame covers (8.36
-       * units at the audit pitch), so the whole surface is inside the frame and
-       * the drag arm's duty cycle is exact rather than an artefact of where the
-       * sample happened to stop.
+       * tempoLaneParts, which builds from the same tempoCell the pooled strip
+       * lays down, so what the gate measures is what the game draws. 6.0 units
+       * is exactly ONE glyph cell and is SHORTER than the window the ortho
+       * frame covers (8.36 units at the audit pitch), so the whole surface is
+       * inside the frame and each arm's duty cycle is exact rather than an
+       * artefact of where the sample happened to stop.
        */
       _audit.tempos = [];
       for (const dir of [1, -1]) {

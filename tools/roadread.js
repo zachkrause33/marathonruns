@@ -5,7 +5,9 @@
  *
  * ---- WHY THIS FILE EXISTS -------------------------------------------------
  *
- * A previous pass painted the surge zone and then checked it with a machine:
+ * THE SURGE ZONE THIS FILE WAS BUILT FOR HAS BEEN REMOVED, and the reason it
+ * was removed is the reason this file exists. A previous pass painted it and
+ * then checked it with a machine:
  * it projected the three lane centrelines through the real camera and took the
  * argmax of marking-hue pixels on the entry line. It scored 36 OF 36 and the
  * marking was, in fact, illegible. A blind reader shown twenty frames -- 14 of
@@ -23,8 +25,6 @@
  *
  * ---- WHAT IT STAGES -------------------------------------------------------
  *
- *   zone     a chase frame at a chosen distance before a surge zone's entry
- *            line. Asks: is something coming, WHICH LANE, HOW FAR.
  *   tempo    a chase frame at a chosen distance before a tempo mat. Asks:
  *            which lane is marked and does it make you FASTER or SLOWER.
  *   gate     a chase frame at READ_NEAR before a three-lane gate. Asks which
@@ -193,20 +193,15 @@ you actually see rather than what you think a running game would contain.
       }
       const g = MR.game, K = MR.K;
       const shots = [];
-      const surges = (g.course.surges || []);
       const tempo = (g.course.tempo || []);
       const near = function (z) {
-        for (const s of surges) if (z > s.z0 - 170 && z < s.z1 + 50) return true;
         for (const m of tempo) if (z > m.z0 - 100 && z < m.z1 + 30) return true;
         return false;
       };
-      for (const s of surges) {
-        for (const d of [90, 60, 25]) {
-          shots.push({ kind: 'zone', z: s.z0 - d, dist: d, lane: s.lane, lanes: null, dir: 0 });
-        }
-      }
       for (const m of tempo) {
-        for (const d of [40, 25]) {
+        // 40, READ_NEAR and 12: past the decision point, AT it, and close
+        // enough that a reader who can only see the paint late still says so.
+        for (const d of [40, 25.35, 12]) {
           shots.push({ kind: 'tempo', z: m.z0 - d, dist: d, lane: m.lane, lanes: null, dir: m.dir });
         }
       }
@@ -222,7 +217,7 @@ you actually see rather than what you think a running game would contain.
       }
       // Controls: empty road, well clear of any marking.
       let ctrl = 0;
-      for (let z = 420; z < K.TOTAL_UNITS - 400 && ctrl < 5; z += 97) {
+      for (let z = 420; z < K.TOTAL_UNITS - 400 && ctrl < 6; z += 97) {
         if (!near(z)) { shots.push({ kind: 'control', z, dist: 0, lane: -1, lanes: null, dir: 0 }); ctrl++; }
       }
       shots.sort(function (a, b) { return a.z - b.z; });

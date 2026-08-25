@@ -15735,6 +15735,28 @@ MR.World = (function () {
       geo.boundingSphere.radius += 6.0;
 
       const mesh = new THREE.Mesh(geo, mats.paint);
+      /**
+       * ---- EXEMPT FROM THE OCCLUSION AUDIT, AND IT HAD TO BE MEASURED -----
+       *
+       * A tempo mark is PAINT: single-sided quads lying on the tarmac, 12
+       * millimetres above it, with nothing standing anywhere on it. It cannot
+       * be between the lens and a hazard any more than a lane dash can.
+       *
+       * tools/calendar.js disagreed, and it was right to on the evidence it
+       * had: HIDES boxes an object and asks whether the box projects onto a
+       * hazard, and this object's box is 5.48 units TALL -- because it is
+       * fifty units of strip lying on a HILL, so its bounding box spans the
+       * road's own rise. On 2026-01-06 in CAPETOWN that box was reported as
+       * hiding a JUMP eighty units ahead. A flat mark had become a wall
+       * because the audit measures extents rather than surfaces.
+       *
+       * The exemption is the road tile's, not a new one: every marking already
+       * rides inside a tile mesh that HIDES never looks at, and this mark is
+       * only outside a tile because it is longer than one. Structural, in the
+       * sense the finish arch's exemption note uses -- the object cannot
+       * occlude by construction, rather than happening not to today.
+       */
+      mesh.userData.notScenery = true;
       // The rest pose is the fit's input and the claim's output; see
       // fitMatToRoad. y in it is a LIFT above the tarmac, not a height.
       const rest = Float32Array.from(pos);

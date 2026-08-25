@@ -6434,3 +6434,46 @@ clean (peak 206 draws / 324k tris, tightest contrast margin +0.123);
 course-test 90; simulate PASS; kindread profile 1 of 26; footroom 96/96;
 deckdrop 24/24; mechanics PASS and --identity PASS; tempo PASS; calendar and
 playthrough recorded in their own logs at the close of the pass.
+
+### Roadmap 70a · What the blind read said, verbatim, and what it leaves open
+
+A fresh session shown two unlabelled frames (branch
+`blindread-redraft-answers`, shots/blind/REDRAFT-ANSWERS.md) and asked only
+to describe the street. The words that matter, both ways:
+
+- *"Tall double-headed street lamps arch in from both sides and converge to
+  the horizon, which sells the depth of the street better than anything else
+  in the frame."*
+- *"They read as generic European-city terraces... at this distance the
+  repetition reads as 'a street', not as copy-paste."*
+- *"Nothing reads as hollow -- the barricade, the traffic light, and the
+  barriers all look like objects with sides."* And: *"the pipe stack even
+  shows the open ends of the pipes, which is a nice touch of real
+  geometry."* Rule 1, confirmed by a stranger.
+- *"The street is convincing as a race circuit and less convincing as a
+  city."*
+
+Acted on immediately: *"the placards are blank -- solid colour rectangles
+with nothing on them, which reads as unfinished"* -- they now carry an inner
+panel and two text-weight stripes, both faces.
+
+Open items, recorded rather than half-done:
+
+- **"The greenery is a small blob that reads more like a scoop of guacamole
+  than foliage"** -- JUMP v7's planter lobes want the understorey treatment
+  the scatter trees already got. Fleet SHAPE is owner-approved, so this is a
+  lobe-count change inside the same collision box, with the contrast audit
+  re-run.
+- **"Even and shadowless light... makes nothing feel anchored to the
+  ground."** The hazards carry blob shadows; the READER still wants more
+  grounding. The measured answer is not a shadow map (Roadmap 70's A/B:
+  +132 draws, refused) -- it is baked contact darkening on the tile under
+  barriers and lamps, and possibly a slightly stronger hazard blob. Needs
+  its own contrast re-measurement.
+- **Window flatness up close** -- *"pure flat colour with no depth, glint, or
+  interior"*. A per-window gloss opt-in (aGloss exists) would put the sky's
+  glint in facade glass for zero draws; worth a measured pass.
+- **The kerb reads "almost knee-high"** -- authored 0.34. A look question,
+  not a fairness one; halving it would need the pavement seam re-checked.
+- **The jagged tempo-mat chevron edge** the reader saw is the pre-existing
+  glyph geometry, already on the open list at Roadmap 69.

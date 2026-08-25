@@ -406,8 +406,27 @@ MR.Course = (function () {
    * is not being touched here. It is still re-measured rather than assumed:
    * see tools/simulate.js in the roadmap entry.
    */
-  const SURGE_LEN_MIN = 260, SURGE_LEN_MAX = 340;
-  const SURGE_N_MIN = 5, SURGE_N_MAX = 6;
+  const SURGE_LEN_MIN = 300, SURGE_LEN_MAX = 380;
+  /**
+   * ---- THE COUNT IS SET BY COVERAGE, AND SIMULATE IS WHAT SET IT --------
+   *
+   * Shrinking the zones and leaving the count alone took marked road from
+   * 43.3% of the course to about 30%, and tools/simulate.js said what that
+   * cost: the record fell from 16 of 50 cells to 8, first attempts from 4 of
+   * 20 to 2, learned from 12 of 30 to 6. The game got a whole notch harder.
+   *
+   * The mechanism is OPPORTUNITY rather than the pool. A tank still buys 520
+   * units of surged road; it can only be spent INSIDE a zone, so cutting the
+   * marked road by a third cut how much of the pool a race can ever convert.
+   * BURN_UNITS is denominated in road and was therefore innocent -- which is
+   * exactly why it was the wrong lever to reach for and why this is a count.
+   *
+   * Nine short zones restore the coverage the difficulty contract was tuned
+   * against while keeping every zone short: same committed road, half again as
+   * many separate commitments. That is "smaller and more frequent means more
+   * decisions" with the difficulty numbers held rather than traded.
+   */
+  const SURGE_N_MIN = 6, SURGE_N_MAX = 7;
   const SURGE_F0 = 0.15, SURGE_F1 = 0.90;
   /**
    * ---- ONE ZONE IS MANDATED EARLY, AND IT IS AN ENGAGEMENT FIX -----------
@@ -623,6 +642,28 @@ MR.Course = (function () {
    * factor of two and roughly doubles how many marks the road can carry.
    */
   const TEMPO_GAP = 50;
+  /**
+   * ---- THE EXCLUSION ROUND A ZONE IS NOT SYMMETRIC, AND WAS -------------
+   *
+   * A mark was refused within SURGE_SIGHT of a zone at BOTH ends, on the sound
+   * argument that the zone's entry marking has to be read from 90 units out
+   * and nothing may compete with it there. That argument is about the ENTRY.
+   * There is nothing on the exit side for a mark to compete with: the end of a
+   * zone is a pale bar and two small posts, and it is a fact a player learns by
+   * ARRIVING at it rather than by sighting it from distance -- the whole reason
+   * the entry gets a gantry, a countdown and 90 units of rails and the exit
+   * gets none of them.
+   *
+   * So the band is 90 in front and 30 behind. 30 is just over READ_NEAR, so
+   * the next mark enters the read window only once the end bar has passed the
+   * runner, and nothing is ever being read against anything.
+   *
+   * IT WAS WORTH MEASURING RATHER THAN ARGUING. Zone coverage and mat count
+   * are a direct trade through this band -- raising the zone count to hold the
+   * difficulty contract took mats from 11.1 a course to 6.9 -- and 60 units a
+   * zone is the cheapest road there is to give back.
+   */
+  const TEMPO_AFTER_ZONE = 30;
   // The share of marks that are BACKWARD. Under a half on purpose: the drag is
   // the expensive half and the one that pushes the player out of a lane, and a
   // road where most marks are punishments reads as a penalty box rather than as
@@ -704,7 +745,7 @@ MR.Course = (function () {
         ok = true;
         if (surges) {
           for (const s of surges) {
-            if (z0 + len + SURGE_SIGHT > s.z0 && z0 - SURGE_SIGHT < s.z1) { ok = false; break; }
+            if (z0 + len > s.z0 - SURGE_SIGHT && z0 < s.z1 + TEMPO_AFTER_ZONE) { ok = false; break; }
           }
         }
       }
@@ -728,7 +769,7 @@ MR.Course = (function () {
       // place so that the clamp never has to be the thing protecting the proof.
       if (!clash && surges) {
         for (const s of surges) {
-          if (z1 + SURGE_SIGHT > s.z0 && z0 - SURGE_SIGHT < s.z1) { clash = true; break; }
+          if (z1 > s.z0 - SURGE_SIGHT && z0 < s.z1 + TEMPO_AFTER_ZONE) { clash = true; break; }
         }
       }
       if (clash) continue;

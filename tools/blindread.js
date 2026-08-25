@@ -324,7 +324,6 @@ function setup(o) {
       extras++;
       if (c.isMesh) mat = c;
     }
-    if (!mat) continue;
     groups[kname] = { grp: n, mat: mat, extras: extras };
   }
   const missing = KINDS.map(function (kv) { return kv[0]; }).filter(function (k) { return !groups[k]; });
@@ -333,9 +332,31 @@ function setup(o) {
       + ' -- try another --skip. Pool.release removes an object from the scene, '
       + 'so only kinds currently cast can be borrowed.' };
   }
+  /**
+   * ---- THE TELEGRAPH MAT IS GONE AND THIS ASSERTION IS WHAT NOTICED -----
+   *
+   * This demanded exactly ONE non-variant child, and named it: the telegraph
+   * mat, 16 units of iconised paint the pool builder laid in front of every
+   * hazard. The owner removed the whole language -- "Remove all telegraph
+   * mats. Mats should all be there to increase or decrease speed" -- so the
+   * expected count is now ZERO and every mat-shaped thing below has nothing to
+   * measure.
+   *
+   * The assertion is kept rather than deleted, with both counts legal, because
+   * its real job was never the number: it was to fail LOUDLY if the pooled
+   * group grew a sibling this tool would otherwise photograph as the mat. Two
+   * or more children still means somebody added something and blindread has to
+   * be looked at.
+   *
+   * WHAT THIS DOES NOT WEAKEN, and it is the half worth keeping: the
+   * OBJECT-presence render below. That is the control that turns an empty
+   * panel into a STAGEFAIL instead of a quiet zero, and it is independent of
+   * whether any paint exists.
+   */
   for (const k in groups) {
-    if (groups[k].extras !== 1) {
-      return { err: k + ' pool group has ' + groups[k].extras + ' non-variant children, expected 1 (the telegraph mat) -- blindread needs updating' };
+    if (groups[k].extras > 1) {
+      return { err: k + ' pool group has ' + groups[k].extras + ' non-variant children, '
+        + 'expected 0 (the telegraph mat was removed) or 1 -- blindread needs updating' };
     }
   }
 
@@ -344,7 +365,7 @@ function setup(o) {
   for (const k in groups) {
     const n = groups[k].grp;
     restore.push({ o: n, pos: n.position.clone(), rot: n.rotation.clone(), vis: n.visible, parent: n.parent });
-    restore.push({ o: groups[k].mat, vis: groups[k].mat.visible });
+    if (groups[k].mat) restore.push({ o: groups[k].mat, vis: groups[k].mat.visible });
     for (const vg of n.userData.variants) {
       const rec = { o: vg, vis: vg.visible };
       const u = vg.userData;
@@ -563,14 +584,15 @@ function shoot(job) {
     }
   }
 
-  mat.visible = true;
+  // MATCHECK: the same frame without the paint, so the pixels that move are
+  // the mat's. With the telegraph mat removed there is no paint to hide, the
+  // two renders are the same render, and every count below is a legitimate
+  // zero rather than the meaningless one DEFECT 3 is about.
+  if (mat) mat.visible = true;
   const withMat = frame();
-  // MATCHECK. The same frame without the paint; the pixels that move are the
-  // mat's, counted inside the crop and nowhere else, because a mat that is
-  // only visible outside the panel is a mat the reader never saw.
-  mat.visible = false;
-  const noMat = frame();
-  mat.visible = true;
+  if (mat) mat.visible = false;
+  const noMat = mat ? frame() : withMat;
+  if (mat) mat.visible = true;
 
   // Counted inside the crop AND over the whole frame, with the frame-wide
   // bounding box of the difference. A mat that is drawn but landed outside the
@@ -648,6 +670,11 @@ function shoot(job) {
    * would silently turn a two-arm experiment into a one-arm one.
    */
   const panelBuf = job.nomat ? noMat : withMat;
+  // Whether this build HAS a telegraph mat at all, so a zero below can be told
+  // from a mat the game failed to draw. The two look identical in the pixels
+  // and only this flag separates them -- which is DEFECT 3 in this file's own
+  // header, arriving a second time by a different route.
+  const noMats = !mat;
 
   const cv = document.createElement('canvas');
   cv.width = cw; cv.height = ch;
@@ -664,7 +691,7 @@ function shoot(job) {
   grp.visible = false;
   g.renderer.setRenderTarget(S.prevRT);
   return {
-    png: png, crop: [x0, y0, cw, ch], matPx: matPx, clipped: clipped,
+    png: png, crop: [x0, y0, cw, ch], matPx: matPx, clipped: clipped, noMats: noMats,
     matAll: matAll, objAll: objAll,
     matBox: matAll ? [bx0, by0, bx1, by1] : null,
     slope: +EL.slope(z).toFixed(5),
@@ -767,9 +794,14 @@ function teardown() {
      *            the game and it is reported as one -- calling it a harness
      *            failure would bury it.
      */
-    const state = r.matPx ? 'ok'
+    // STAGEFAIL is tested FIRST now. It used to be reached only after the two
+    // mat verdicts, which was correct while every panel was supposed to carry
+    // paint; with the telegraph mat removed, a zero mat count is the expected
+    // reading and an empty panel is the only real defect left in this column.
+    const state = r.objAll === 0 ? 'STAGEFAIL'
+      : r.matPx ? 'ok'
       : r.matAll ? 'MATCROP'
-      : r.objAll === 0 ? 'STAGEFAIL'
+      : r.noMats ? 'no mat (removed)'
       : 'MATLOST';
     if (state === 'MATCROP') matCrop.push({ file, job });
     if (state === 'STAGEFAIL') stageFail.push({ file, job });

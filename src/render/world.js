@@ -6425,8 +6425,10 @@ MR.World = (function () {
         parts.push(bx(Math.hypot(dx, dy) + 0.14, 0.18, 0.18,
           (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, z, post, 0, 0, Math.atan2(dy, dx)));
       }
-      // The head shell -- dark grey housing above the lens the glow mesh adds.
-      parts.push(bx(1.10, 0.30, 0.52, sx * CANYON_HEAD_X, CANYON_HEAD_Y + 0.10, z, head));
+      // The head shell -- a thin dark cap over the lens the glow mesh adds.
+      // Thin on purpose: the reference luminaire is mostly GLOW from every
+      // angle, so the lens below carries most of the head's volume.
+      parts.push(bx(1.12, 0.14, 0.54, sx * CANYON_HEAD_X, CANYON_HEAD_Y + 0.22, z, head));
     }
     function canyonParts() {
       const parts = [];
@@ -6499,7 +6501,7 @@ MR.World = (function () {
       const parts = [];
       for (const sx of [-1, 1]) {
         const z = POLE_Z[sx > 0 ? 0 : 1];
-        parts.push(bx(0.96, 0.20, 0.42, sx * CANYON_HEAD_X, CANYON_HEAD_Y - 0.10, z, 0xffc36b));
+        parts.push(bx(1.04, 0.34, 0.48, sx * CANYON_HEAD_X, CANYON_HEAD_Y - 0.02, z, 0xffc36b));
       }
       return parts;
     }

@@ -4659,7 +4659,22 @@ MR.World = (function () {
     if (act === 0 && o.signs && r() < (o.placard === undefined ? 0.5 : o.placard)) {
       const py = 1.74 * S * 1.02 + (o.y || 0);
       parts.push(wv(bx(0.075, 0.42, 0.075, o.x, py + 0.16, o.z, 0x8a5a3c), ph, amp, CHEER.WAVE));
-      parts.push(wv(bx(0.78, 0.50, 0.07, o.x, py + 0.56, o.z, pick(o.signs)), ph, amp, CHEER.WAVE));
+      const pc = pick(o.signs);
+      parts.push(wv(bx(0.78, 0.50, 0.07, o.x, py + 0.56, o.z, pc), ph, amp, CHEER.WAVE));
+      // A blind reader called the plain rectangles "blank ... unfinished
+      // rather than stylised", and they were right: a sign with nothing on it
+      // is a coloured board. A contrasting inner panel plus a text-weight
+      // stripe is the cheapest thing that reads as WRITING at the distance a
+      // placard is seen, and both ride the same wave as the board so they can
+      // never separate from it.
+      const ink = shadedL(pc) > 120 ? 0x33305a : 0xfff2e0;
+      // Both faces, per rule 1: a placard is an object the finish camera and
+      // the orbiting replay can see from behind, so the writing is on both.
+      for (const sd of [1, -1]) {
+        parts.push(wv(bx(0.62, 0.34, 0.012, o.x, py + 0.56, o.z + sd * 0.041, mixHex(pc, 0xffffff, 0.55)), ph, amp, CHEER.WAVE));
+        parts.push(wv(bx(0.46, 0.09, 0.014, o.x, py + 0.60, o.z + sd * 0.045, ink), ph, amp, CHEER.WAVE));
+        parts.push(wv(bx(0.30, 0.07, 0.014, o.x, py + 0.47, o.z + sd * 0.045, ink), ph, amp, CHEER.WAVE));
+      }
     }
     return S;
   }

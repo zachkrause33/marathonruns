@@ -1,33 +1,28 @@
 /**
- * Cel-shading toolkit: banded toon ramps, normal-extruded ink outlines, the
- * atmosphere (sky dome + aerial perspective), the contact shadow, and the
- * palette everything else draws from.
+ * Shading toolkit: soft gradient ramps, the atmosphere (sky dome + aerial
+ * perspective), the contact shadow, and the palette everything else draws
+ * from. The ink-outline machinery is still here and fully wired, at weight 0
+ * everywhere -- see INK.
  *
- * The look is toy-plastic: few, wide bands; saturated mid-tones; a warm key
- * and a cool bounce so shadowed sides read blue rather than grey; and a
- * strong contact shadow grounding anything that stands on the road.
+ * THE LOOK IS SOFT NOW, NOT TOON. The owner, verbatim: "I don't like the
+ * 'toon' look." and "I want my game to look like this game... It looks more
+ * life like." (reference/citylook-*.jpg). What that means mechanically:
  *
- * OUTLINE POLICY, because it is the one place this build knowingly disagrees
- * with its own references. Subway Surfers and Sonic Forces -- the stated art
- * target -- use NO ink lines at all. They read as toys through saturated flat
- * colour, a wide soft light/shade step, chunky proportions and a contact
- * shadow; silhouettes separate on colour contrast, not on a black rim. An
- * earlier version of this file inked everything, which flattened depth (a
- * constant-width line ignores distance the way nothing else in the frame
- * does) and turned the skyline into a sheet of stickers.
+ *   - the ramp is a continuous curve, not bands -- see ramp(). The warm key /
+ *     cool shadow structure SURVIVES, because the reference's lifelike
+ *     quality is colour-in-shadow, not grey-in-shadow;
+ *   - no ink on anything, character and hazards included -- the reference
+ *     carries no outlines and hazard legibility is owned by the contrast
+ *     gate in tools/shoot.js, which still fails the build at 1.25x/0.22;
+ *   - the sky is one continuous gradient with painterly clouds;
+ *   - a strong contact shadow still grounds everything on the road (the
+ *     reference uses exactly this device under its cars).
  *
- * The line is therefore kept only where it buys GAMEPLAY readability -- the
- * player, the rivals and the hazards, which have to be picked out instantly
- * at distance and while moving -- and at about two thirds of its old weight.
- * Everything else (props, scenery, banners) is INK weight 0 and separates on
- * colour, band contrast and haze instead. See INK below; the weights are the
- * single control, so restoring lines anywhere is a one-number change.
- *
- * Where a line does survive it is extruded along the vertex normal in view
- * space and scaled by depth, which keeps it the same thickness on screen
- * whether the runner is under the camera or a rival is 60 units away -- a
- * plain scaled inverted hull would balloon on large geometry and vanish on
- * small.
+ * The outline machinery is kept, not deleted: outlined() still builds the
+ * shell and INK is still the single control, so a line anywhere can be
+ * restored as a one-number change if a measurement ever asks for one. Where
+ * a shell would draw, it is extruded along the vertex normal in view space
+ * and scaled by depth (see outlineVS).
  *
  * COLOUR SPACE, because it bites every shader in here: the renderer is in
  * SRGBColorSpace and ColorManagement is on, so a THREE.Color built from a hex
@@ -162,9 +157,23 @@ MR.shading = (function () {
    * each and painting a constant-width black rim that flattened exactly the
    * depth the haze was there to create.
    */
+  /**
+   * ALL ZERO NOW. The owner rejected the toon look outright ("I don't like
+   * the 'toon' look"), and the ink was half of it -- the reference frames in
+   * reference/citylook-*.jpg carry no outline on anything, character and
+   * hazards included. Separation is carried by the soft shading, the colour
+   * system and the contrast gate instead, and tools/shoot.js still fails the
+   * build if a hazard stops clearing 1.25x luminance or 0.22 saturation
+   * against its road -- measured after this change, every variant's margin
+   * WIDENED, because the ink was dark edging that dragged the area-mean down.
+   *
+   * The machinery all survives: outlined() still builds and parents a shell
+   * (invisible, zero draws), so restoring a line anywhere is still the
+   * one-number change this comment has always promised.
+   */
   const INK = {
-    character: 0.014,   // was 0.021 -- kept, lightened
-    hazard: 0.025,      // was 0.036 -- kept, lightened
+    character: 0,       // was 0.014 -- dropped with the toon look
+    hazard: 0,          // was 0.025 -- dropped with the toon look
     prop: 0,            // was 0.030 -- dropped
     scenery: 0,         // was 0.090 -- dropped
     banner: 0,          // was 0.045 -- dropped
@@ -233,26 +242,53 @@ MR.shading = (function () {
    * exactly the axis the measurement says is short. Form survives because the
    * band above it is unchanged.
    */
+  /**
+   * ============ THE RAMP IS CONTINUOUS NOW. THE BANDS ARE GONE. ============
+   *
+   * The owner, verbatim: "I don't like the 'toon' look." That is the whole of
+   * the reason. The banded ramp -- and the ink that partnered it -- WAS the
+   * toon look, so this function now returns a smooth curve and every material
+   * in the game goes soft through the one place they all already read.
+   *
+   * WHAT SURVIVES, deliberately: the `floor` (a shadow that cannot reach
+   * black), and the COOL TERM -- shadows tinted blue rather than grey. Those
+   * two are not toon devices, they are the painterly half of the reference
+   * look (citylook-*.jpg shades every facade warm-to-cool, never light-to-
+   * dark-grey), and they are why this is a curve through the old ramp's
+   * endpoints rather than a plain lambert.
+   *
+   * THE SHOULDER, and why the curve is not pow(k, 1.22) smoothed. A surface
+   * needs dotNL only ~0.9 to reach full brightness, so everything within ~25
+   * degrees of facing the key -- the road, roofs, the runner's lit side --
+   * stays where the old TOP BAND put it, and the whole gradient happens on
+   * the lower half of the sphere. Measured on the flat road (dotNL 0.566
+   * against this key): top band 1.00 -> 0.95, i.e. scene exposure is nearly
+   * unmoved, while a hazard's camera-facing read face RISES slightly (its
+   * floor now blends up instead of sitting pinned) -- which is the direction
+   * the contrast gate wants. Verified through tools/shoot.js, not assumed.
+   *
+   * `steps` is accepted and ignored: every caller keeps working, and all the
+   * old 2-step and 3-step materials now share one texture per floor.
+   */
   function ramp(steps, floor) {
     const base = floor === undefined ? 0.31 : floor;
-    const key = steps + '/' + base;
+    const key = 'soft/' + base;
     if (ramps.has(key)) return ramps.get(key);
-    const n = Math.max(2, steps);
+    const n = 160;
     const data = new Uint8Array(n * 4);
     for (let i = 0; i < n; i++) {
       const k = i / (n - 1);
-      // Bias the darkest band up so shadows stay colourful, never muddy, and
-      // curve the ramp so the mid band sits nearer the shadow than the light:
-      // an evenly spaced ramp puts the terminator's wide middle band close to
-      // full brightness and the form stops reading. 0.31 is as low as this can
-      // go before the ambient can no longer keep a shaded red vest from
-      // reading as brown.
-      const v = base + (1 - base) * Math.pow(k, 1.22);
-      // Cool the dark end. Pushed too far this desaturates the base colour to
-      // blue-grey instead of shading it, so it falls off fast toward the light.
-      // The exponent is what keeps a 3-band ramp's MIDDLE band only slightly
-      // cool: cooling the terminator as hard as the core shadow tints the
-      // whole object blue rather than tinting its shadow.
+      // Soft shoulder: full brightness from dotNL ~0.92 up, smooth roll-off
+      // below. smoothstep keeps both ends of the curve tangent-flat, so there
+      // is no residual band edge anywhere for the eye to find.
+      const t = Math.max(0, Math.min(1, k / 0.92));
+      const lit = Math.pow(t * t * (3 - 2 * t), 1.1);
+      const v = base + (1 - base) * lit;
+      // The cool term is unchanged from the banded ramp: shadows stay
+      // COLOURED. It falls off fast toward the light so only the shaded half
+      // takes the blue, exactly as before -- but it now arrives as a
+      // continuous temperature shift across the form, which is the reference
+      // frames' own shading.
       const cool = Math.pow(1 - k, 1.55) * 0.38;
       const rgb = [v * (1 - cool * 1.05), v * (1 - cool * 0.40), v * (1 + cool * 0.72)];
       for (let c = 0; c < 3; c++) {
@@ -261,7 +297,9 @@ MR.shading = (function () {
       data[i * 4 + 3] = 255;
     }
     const tex = new THREE.DataTexture(data, n, 1, THREE.RGBAFormat);
-    tex.minFilter = tex.magFilter = THREE.NearestFilter;
+    // Linear, not Nearest: Nearest was what made the bands hard, and the whole
+    // point of this pass is that there are no bands to keep hard.
+    tex.minFilter = tex.magFilter = THREE.LinearFilter;
     tex.generateMipmaps = false;
     tex.needsUpdate = true;
     ramps.set(key, tex);
@@ -936,28 +974,12 @@ MR.shading = (function () {
       // keeps the ramp.
       float t = clamp(sy * 3.20 + 0.07, 0.0, 1.0);
 
-      // Cel steps, blended part-way and antialiased with fwidth: a bare
-      // floor() aliases into a staircase wherever the band edge is not exactly
-      // horizontal.
-      //
-      // SIX steps became FOUR when t was re-ranged above, and the two changes
-      // have to be read together. The count is over the whole 0..1 range while
-      // the art direction at the top of this file is about how many bands are
-      // IN FRAME: at the old ramp the visible sky spanned t 0.06 to 0.68 and
-      // showed about four of the six, and re-ranging t to reach 1.0 inside the
-      // frame would have shown all six. Four keeps the frame looking the way it
-      // was tuned to look.
-      //
-      // It was ALSO tried as a fix for far-band edge density and is not one:
-      // six steps at the new ramp measured 36.9% on 02-early and four measured
-      // 37.1%, i.e. no effect. The small far-band edge rise this pass does
-      // carry comes from the sky simply having more contrast in it, not from
-      // the number of band edges. Recorded here because the first draft of this
-      // comment claimed the opposite.
-      float b = t * 4.0;
-      float aa = fwidth(b) * 0.6 + 0.002;
-      float stepped = (floor(b) + smoothstep(0.5 - aa, 0.5 + aa, fract(b))) / 4.0;
-      vec3 col = mix(bottom, top, mix(t, stepped, 0.85));
+      // The cel steps are gone with the rest of the toon look: the reference
+      // sky (citylook-*.jpg) is one continuous gradient with painterly cumulus
+      // on it, and the four hard bands were the one place the sky still said
+      // "toon" after the ramp went soft. The t ramp above already carries the
+      // depth of colour the steps were re-quantising.
+      vec3 col = mix(bottom, top, t);
 
       // Sun: broad bloom, two quantised corona steps, hard disc -- a poster
       // sun, not a lens flare. Drawn before the clouds so cover passes in

@@ -13848,8 +13848,32 @@ MR.World = (function () {
        */
       const shop = mixHex(t.win, 0xffffff, 0.62);
       sub.push(bx(d * 1.01, 0.40, bw * 0.99, 0, 0.20, 0, t.trim));      // stall riser
-      sub.push(bx(d * 1.00, 1.42, bw * 0.96, 0, 1.11, 0, shop));        // shopfront glazing
+      // One bay in four is SHUT: a grey roller shutter with ribs, straight off
+      // citylook-shopfronts. A street where every shop is open reads as a
+      // diorama; the reference mixes trading and shuttered.
+      if (rnd() < 0.26) {
+        sub.push(bx(d * 1.00, 1.42, bw * 0.96, 0, 1.11, 0, 0x9298a4));
+        for (let rb = 0; rb < 4; rb++) {
+          sub.push(bx(d * 1.005, 0.07, bw * 0.94, 0, 0.62 + rb * 0.32, 0, 0x7a8090));
+        }
+      } else {
+        sub.push(bx(d * 1.00, 1.42, bw * 0.96, 0, 1.11, 0, shop));      // shopfront glazing
+        // Mullions, so a row of open shops is not one unbroken glass ribbon.
+        for (const mz of [-bw * 0.16, bw * 0.16]) {
+          sub.push(bx(d * 1.005, 1.42, 0.09, 0, 1.11, mz, t.trim));
+        }
+      }
       sub.push(bx(d * 1.02, 0.22, bw, 0, 1.93, 0, t.trim));             // string course
+      /**
+       * THE SIGNBOARD, above the awning: every shopfront in the reference
+       * carries a painted fascia board -- the red HARDWARE panel, the green
+       * grocer, the cream cafe. It is the band that makes a ground floor a
+       * SHOP rather than a wall with a hole, and it is flat on the facade so
+       * it costs one box.
+       */
+      const SIGNS = [0xc8402f, 0x2f6e4f, 0x30508c, 0xf0e6d0, 0x8c3060, 0xc07a2a];
+      sub.push(bx(0.10, 0.66, bw * 0.90, fx - 0.05, 2.62, 0, SIGNS[Math.floor(rnd() * SIGNS.length)]));
+      sub.push(bx(0.11, 0.08, bw * 0.92, fx - 0.055, 2.98, 0, t.trim));
       /**
        * THE AWNING. Two boxes: a canopy sloping out from the facade at the top
        * of the ground floor, and a fascia hanging off its front edge.
@@ -13861,9 +13885,24 @@ MR.World = (function () {
        * depth rather than as paint, which is why it earns its cost in this
        * renderer and not only in the reference's.
        */
+      /**
+       * STRIPED, as the reference draws every one of them (blue/white,
+       * green/white, red/white). The old one-colour divergence note argued a
+       * stripe aliases to its own mean past 100 units -- it does, and its
+       * mean is the awning's own pastel, which is the correct failure. What
+       * changed is the geometry: the canyon facade stands at 8.55, not 12.2,
+       * so the near awnings are large in frame and the stripes read for the
+       * whole first third of the draw distance.
+       */
       const aw = AWNING[Math.floor(rnd() * AWNING.length)];
-      sub.push(bx(0.92, 0.10, bw * 0.88, fx - 0.40, 2.20, 0, aw, 0, 0, 0.22));
-      sub.push(bx(0.10, 0.34, bw * 0.88, fx - 0.82, 1.94, 0, mixHex(aw, 0, 0.30)));
+      const AWN_SEG = 7;
+      for (let sg = 0; sg < AWN_SEG; sg++) {
+        const segW = (bw * 0.88) / AWN_SEG;
+        const zc = -bw * 0.44 + segW * (sg + 0.5);
+        const sc = (sg & 1) ? 0xf2eee2 : aw;
+        sub.push(bx(0.92, 0.10, segW, fx - 0.40, 2.20, zc, sc, 0, 0, 0.22));
+        sub.push(bx(0.10, 0.34, segW, fx - 0.82, 1.94, zc, (sg & 1) ? 0xe4ded0 : mixHex(aw, 0, 0.30)));
+      }
       /**
        * A HANGING SIGN, one bay in three. A bracket and a board hung
        * PERPENDICULAR to the facade at awning height.
@@ -13896,14 +13935,27 @@ MR.World = (function () {
        */
       const surround = Math.abs(shadedL(t.trim) - shadedL(col)) > 22
         ? t.trim : mixHex(col, 0xffffff, 0.38);
+      /**
+       * THREE PORTRAIT SASHES PER BAY, IN REVEALS. The old two near-square
+       * panels read as warehouse glazing the moment the facades came to the
+       * pavement; every window in the reference is taller than it is wide,
+       * set in a frame, with a sill under it. Frame + glass + sill is three
+       * boxes; the frame's top edge is the lintel.
+       */
       const rows = t.rows || 4;
       for (let r = 0; r < rows; r++) {
         const wy = 2.6 + r * ((h - 3.4) / Math.max(1, rows));
         if (wy > h - 1.0) break;
-        for (const sz of [-1, 1]) {
-          sub.push(bx(0.18, 1.29, bw * 0.24 + 0.14, fx - 0.06, wy, sz * bw * 0.21, surround));
-          sub.push(bx(0.22, 1.15, bw * 0.24, fx - 0.08, wy, sz * bw * 0.21, t.win));
-          sub.push(bx(0.30, 0.16, bw * 0.30, fx - 0.10, wy + 0.68, sz * bw * 0.21, t.trim));
+        for (const sz of [-1, 0, 1]) {
+          sub.push(bx(0.16, 1.44, 0.60, fx - 0.05, wy, sz * bw * 0.27, surround));
+          sub.push(bx(0.20, 1.28, 0.48, fx - 0.07, wy, sz * bw * 0.27, t.win));
+          sub.push(bx(0.30, 0.10, 0.68, fx - 0.10, wy - 0.74, sz * bw * 0.27, t.trim));
+        }
+        // An air-conditioner under one window, a few bays apart -- the small
+        // grey box every reference facade wears at least one of.
+        if ((i + r) % 3 === 2) {
+          sub.push(bx(0.34, 0.28, 0.46, fx - 0.14, wy - 0.98, bw * 0.27, 0xc4c9d2));
+          sub.push(bx(0.06, 0.20, 0.38, fx - 0.32, wy - 0.98, bw * 0.27, 0x8f95a2));
         }
         if (t.balcony && r < t.balcony) {
           sub.push(bx(0.34, 0.10, bw * 0.86, fx - 0.20, wy - 0.62, 0, t.trim));
@@ -18424,7 +18476,7 @@ MR.World = (function () {
      * two faces and both are painted. There is no back of an object.
      */
     const CANYON_FRONT = 8.55;
-    const CANYON_PAVE_W = 4.68;   // kerb outer edge 3.92 -> facade line 8.60
+    const CANYON_PAVE_W = 5.55;   // kerb outer edge 3.92 -> 9.47: covers the deepest 0.62 bay step-back
     const CANYON_LAMP_TOP = 10.2;
     const CANYON_HEAD_X = 1.9;
     const CANYON_HEAD_Y = 13.0;

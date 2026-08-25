@@ -611,7 +611,7 @@ MR.World = (function () {
   const SETTING_LOOK = {
 
     BOSTON: {
-      sky: [0x5580c0, 0xd0ecfa], fog: 0xcfe6f2, ground: 0x86b45a, road: 0x66665e,
+      sky: [0x4478c4, 0xc8e8fa], fog: 0xcfe6f2, ground: 0x86b45a, road: 0x66665e,
       water: 0x3f7fae, edge: 0xf4ece0,
       terrace: {
         colors: [0xb8664a, 0xc8785a, 0xa65a44, 0xd89a70, 0xbc7862],
@@ -631,10 +631,10 @@ MR.World = (function () {
     },
 
     LONDON: {
-      sky: [0x6288bc, 0xe0ecf6], fog: 0xd6e4f0, ground: 0x5fbf6b, road: 0x65655e,
+      sky: [0x4f80c4, 0xd6e8f6], fog: 0xd6e4f0, ground: 0x5fbf6b, road: 0x65655e,
       water: 0x5a8fa8, edge: 0xffe8e8,
       terrace: {
-        colors: [0xf0e2c4, 0xe0d0ac, 0xd0bc98, 0xf6ecd4, 0xc4ae8c],
+        colors: [0xf0e2c4, 0xe0d0ac, 0xb86048, 0xf6ecd4, 0xc4ae8c],
         trim: 0xfff6e8, win: 0x33405e, roof: 'parapet', roofColor: 0x5c7040,
         h: [11.0, 13.5], bay: 4.4, depth: 7.0, rows: 5, stoop: 1, chimney: 3, balcony: 1,
       },
@@ -651,7 +651,7 @@ MR.World = (function () {
     },
 
     BERLIN: {
-      sky: [0x5a7cbc, 0xd8e8f8], fog: 0xc8dcf5, ground: 0x69c46e, road: 0x66665e,
+      sky: [0x4a74c0, 0xd0e4f8], fog: 0xc8dcf5, ground: 0x69c46e, road: 0x66665e,
       water: 0x4f86ae, edge: 0xeef0ff,
       terrace: {
         colors: [0xe8d8b8, 0xd4c0a0, 0xe0c8a0, 0xc4b090, 0xf2e6cc],
@@ -671,10 +671,10 @@ MR.World = (function () {
     },
 
     CHICAGO: {
-      sky: [0x4f74b4, 0xb8d8ec], fog: 0xa8cde0, ground: 0x63b46a, road: 0x65665f,
+      sky: [0x3f6cb8, 0xb0d4ec], fog: 0xa8cde0, ground: 0x63b46a, road: 0x65665f,
       water: 0x3f7fa8, edge: 0xe4e8f4,
       terrace: {
-        colors: [0xb0a084, 0xa09076, 0xc0ac8e, 0x92846c, 0xc8b89c],
+        colors: [0xb0a084, 0xa09076, 0xc0ac8e, 0x8f8a58, 0xc8b89c],
         trim: 0xd8cfc0, win: 0x2f3a58, roof: 'flat', roofColor: 0x596c3a,
         h: [11.5, 14.5], bay: 4.6, depth: 7.0, rows: 5, stoop: 1, chimney: 2,
       },
@@ -691,7 +691,7 @@ MR.World = (function () {
     },
 
     NEWYORK: {
-      sky: [0x567cbc, 0xcce6f8], fog: 0xbdd8ee, ground: 0x63c96b, road: 0x66655e,
+      sky: [0x4674c0, 0xc4e2f8], fog: 0xbdd8ee, ground: 0x63c96b, road: 0x66655e,
       water: 0x3d7ba6, edge: 0xfff0dc,
       terrace: {
         colors: [0xa8604a, 0xc07656, 0x965640, 0xd08c66, 0xb06e52],
@@ -732,10 +732,10 @@ MR.World = (function () {
     },
 
     SYDNEY: {
-      sky: [0x4f94cc, 0xe2f6fc], fog: 0xd8f4ff, ground: 0x7fc86a, road: 0x64665c,
+      sky: [0x3f8ed4, 0xd8f2fc], fog: 0xd8f4ff, ground: 0x7fc86a, road: 0x64665c,
       water: 0x2fa8d8, edge: 0xfff4e0,
       terrace: {
-        colors: [0xe4bc8e, 0xd0a276, 0xf0d8a8, 0xbc8c64, 0xf4e6c6],
+        colors: [0xe4bc8e, 0xb8603e, 0xf0d8a8, 0x9a9058, 0xf4e6c6],
         trim: 0xfff8e8, win: 0x3a4468, roof: 'pitch', roofColor: 0x8a5040,
         h: [10.5, 13.0], bay: 4.4, depth: 7.0, rows: 4, balcony: 1, chimney: 2,
       },
@@ -752,7 +752,7 @@ MR.World = (function () {
     },
 
     PARIS: {
-      sky: [0x6484bc, 0xe8ecf4], fog: 0xe0dfe8, ground: 0x6fc274, road: 0x67655e,
+      sky: [0x547cc0, 0xe0e8f4], fog: 0xe0dfe8, ground: 0x6fc274, road: 0x67655e,
       water: 0x6a94a8, edge: 0xf4f0e4,
       terrace: {
         colors: [0xecdebc, 0xe0d0ac, 0xf4e8c8, 0xd4c2a0, 0xe8dab6],
@@ -772,7 +772,7 @@ MR.World = (function () {
     },
 
     VALENCIA: {
-      sky: [0x4f94d0, 0xeef8ff], fog: 0xe8f6ff, ground: 0x8fc45f, road: 0x67655e,
+      sky: [0x3f8cd4, 0xe6f4ff], fog: 0xe8f6ff, ground: 0x8fc45f, road: 0x67655e,
       water: 0x30b0d0, edge: 0xfff8e8,
       terrace: {
         colors: [0xfff2d4, 0xf4e4c0, 0xffe8c4, 0xe8d8b8, 0xfff8e4],
@@ -792,7 +792,7 @@ MR.World = (function () {
     },
 
     AMSTERDAM: {
-      sky: [0x5a80bc, 0xdcecf8], fog: 0xcfe6f4, ground: 0x5fc07a, road: 0x65655e,
+      sky: [0x4a78c0, 0xd4e8f8], fog: 0xcfe6f4, ground: 0x5fc07a, road: 0x65655e,
       water: 0x4f7f96, edge: 0xf0ece0,
       terrace: {
         colors: [0x8a5040, 0x9c5e48, 0x745448, 0xa86e58, 0x64483e],
@@ -812,7 +812,7 @@ MR.World = (function () {
     },
 
     ROME: {
-      sky: [0x5a86c4, 0xffeac8], fog: 0xffe0bc, ground: 0x8fb45a, road: 0x6a655c,
+      sky: [0x4a7ec8, 0xffeac8], fog: 0xffe0bc, ground: 0x8fb45a, road: 0x6a655c,
       water: 0x5f9fae, edge: 0xfff0d8,
       terrace: {
         colors: [0xdc9a4c, 0xcc8640, 0xecb064, 0xbc743a, 0xf2c886],
@@ -832,7 +832,7 @@ MR.World = (function () {
     },
 
     CAPETOWN: {
-      sky: [0x4f88c8, 0xe8f4ff], fog: 0xdff0ff, ground: 0x9fb05a, road: 0x65665e,
+      sky: [0x3f80cc, 0xe0f0ff], fog: 0xdff0ff, ground: 0x9fb05a, road: 0x65665e,
       water: 0x2f9fd8, edge: 0xfff2e4,
       // Bo-Kaap: the one street in the world painted in flat saturated blocks,
       // and the cheapest possible way to say "Cape Town" at a hundred units.
@@ -5799,9 +5799,9 @@ MR.World = (function () {
      * to the end, and the frame at the end of it was rejected by the person
      * this game is being built for.
      */
-    const SEAM_RAIL = overRoad(0x8276bc, 1.28);
+    const SEAM_RAIL = overRoad(0x8f8d92, 1.28);
     const SEAM_BEAD = overRoad(0xfff6d8, 1.50);   // HELD -- see the hue note above
-    const EDGE_LINE = overRoad(0xb0b3ca, 1.80);
+    const EDGE_LINE = overRoad(0xbab8b2, 1.80);
 
     // The kerb-notch period, and now the road-bead period too. Declared here
     // because paintGeo beats against it and is built first.
@@ -6424,7 +6424,7 @@ MR.World = (function () {
           const lx = sx * (K.TRACK_HALF_WIDTH + 2.2);
           parts.push(bx(0.22, 6.4, 0.22, lx, 3.2, lz, 0x2b2f52));
           parts.push(bx(1.9, 0.20, 0.20, lx - sx * 0.85, 6.3, lz, 0x2b2f52));
-          parts.push(bx(0.8, 0.26, 0.44, lx - sx * 1.7, 6.1, lz, 0xffe45e));
+          parts.push(bx(0.8, 0.26, 0.44, lx - sx * 1.7, 6.1, lz, 0xffc24a));
           // The lamp-post banner SWINGS. It hangs off a bracket on a 6.4-unit
           // standard, it is the most saturated thing on the CITY START verge,
           // and it was nailed to the post. Two bands: the head is strapped to
@@ -6616,7 +6616,8 @@ MR.World = (function () {
       const parts = [];
       for (const sx of [-1, 1]) {
         const z = POLE_Z[sx > 0 ? 0 : 1];
-        parts.push(bx(1.04, 0.34, 0.48, sx * CANYON_HEAD_X, CANYON_HEAD_Y - 0.02, z, 0xfff480));
+        parts.push(bx(1.04, 0.30, 0.48, sx * CANYON_HEAD_X, CANYON_HEAD_Y + 0.01, z, 0xfff480));
+        parts.push(bx(0.96, 0.12, 0.42, sx * CANYON_HEAD_X, CANYON_HEAD_Y - 0.19, z, 0xffb339));
       }
       return parts;
     }

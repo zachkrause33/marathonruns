@@ -206,7 +206,14 @@ MR.Course = (function () {
       for (let i = 0; i < tempo.length; i++) {
         const t = tempo[i];
         if (t.dir > 0 && z >= t.z0 - SURGE_PAD && z < t.z1) {
-          const l = MR.Pace.SURGE.FLOOR_BASE - K.FLOOR_PACE;
+          // READ, NOT RE-DERIVED. This computed FLOOR_BASE - K.FLOOR_PACE for
+          // itself and pace.js computed the same expression for TEMPO.LIFT, so
+          // the size of a lift was written down twice. When the owner asked for
+          // a smaller step, one of the two would have moved and the other would
+          // have gone on widening the action window for a lift the runner no
+          // longer gets -- safe, but a window nobody could account for. One
+          // number, one place.
+          const l = MR.Pace.TEMPO.LIFT;
           if (l > lift) lift = l;
         }
       }
@@ -362,8 +369,45 @@ MR.Course = (function () {
    * mechanic taking 50 ms and then 22 ms already.
    */
   const SURGE_SIGHT = 90;
-  const SURGE_LEN_MIN = 420, SURGE_LEN_MAX = 520;
-  const SURGE_N_MIN = 4, SURGE_N_MAX = 5;
+  /**
+   * ---- SMALLER ZONES, AND THE REASON IS A CENSUS RATHER THAN A TASTE -----
+   *
+   * The owner: *"Make the zones smaller too."* The measurement that says what
+   * "smaller" has to buy came from the other end of this file entirely.
+   *
+   * A tempo mat may not sit within SURGE_SIGHT of a zone, at either end,
+   * because the zone's entry marking has to be read from 90 units out and
+   * nothing may compete with it there. At the shipped size, six zones covered
+   * 2727 units -- 43.3% of the course, measured by tools/playthrough.js -- and
+   * their exclusion bands took roughly 1080 more. So better than half the road
+   * was closed to mats before a single mark was drawn, and planTempo asked for
+   * 13 to 17 marks, managed to PLAN 11.9, and shipped SIX on the day
+   * playthrough walked. The owner's "placed strategically... around obstacles,
+   * around water and bananas" cannot be built on six marks and ~180 gates: it
+   * is not a placement problem, it is a road-space problem.
+   *
+   * 260 to 340 with one more zone takes coverage to about 30% and gives the
+   * marks somewhere to be. Fewer committed units, more separate commitments --
+   * which is the same sentence as "smaller and more frequent means more
+   * decisions".
+   *
+   * ---- AND BURN_UNITS DOES NOT MOVE, WHICH IS NOT AN OVERSIGHT ----------
+   *
+   * Pace.SURGE ties POOL_MAX x BURN_UNITS = 520 units to SURGE_LEN_MAX on the
+   * stated grounds that a smaller cap would make the longest zones unbuyable
+   * however well a player had allocated. Shrinking the zones moves that
+   * relation the SAFE way: a full tank now buys more than one maximum zone, so
+   * no zone is ever unbuyable and the clause is satisfied with room over.
+   *
+   * More importantly BURN_UNITS is denominated in UNITS OF ROAD, so the total
+   * surged road a full tank buys is 520 either way. Shrinking zones changes
+   * how that 520 may be SPREAD, not how much of it there is -- which is why
+   * the difficulty lever the last pass tuned (32% of cells, 20% first attempt)
+   * is not being touched here. It is still re-measured rather than assumed:
+   * see tools/simulate.js in the roadmap entry.
+   */
+  const SURGE_LEN_MIN = 260, SURGE_LEN_MAX = 340;
+  const SURGE_N_MIN = 5, SURGE_N_MAX = 6;
   const SURGE_F0 = 0.15, SURGE_F1 = 0.90;
   /**
    * ---- ONE ZONE IS MANDATED EARLY, AND IT IS AN ENGAGEMENT FIX -----------
@@ -401,7 +445,7 @@ MR.Course = (function () {
    * is the wrong one.
    */
   const SURGE_EARLY0 = 0.05, SURGE_EARLY1 = 0.13;
-  const SURGE_EARLY_LEN_MIN = 300, SURGE_EARLY_LEN_MAX = 420;
+  const SURGE_EARLY_LEN_MIN = 220, SURGE_EARLY_LEN_MAX = 300;
 
   function planSurge(key) {
     if (!(MR.Pace.EFFORT > 0)) return [];
@@ -535,7 +579,8 @@ MR.Course = (function () {
    *
    * THE NUMBERS.
    *
-   *   COUNT      10 to 14 marks planned a course.
+   *   COUNT      TEMPO_N_MIN to TEMPO_N_MAX planned a course, about half of
+   *              which find a legal lane and a site worth weighting.
    *   LENGTH     46 to 88 units. At the base floor that is 1.6 to 3.0 real
    *              seconds -- "briefly", and long enough that PACE_EASE (2.2 s/mi
    *              per race-second, so 66 s/mi per REAL second) has settled the
@@ -548,7 +593,15 @@ MR.Course = (function () {
    *   f RANGE    0.10 to 0.94, the same window narrowRate and the ramp use.
    */
   const TEMPO_LEN_MIN = 46, TEMPO_LEN_MAX = 88;
-  const TEMPO_N_MIN = 13, TEMPO_N_MAX = 17;
+  // RAISED WITH THE STEP LOWERED, and the two are one change. A mat is now
+  // worth roughly a quarter of what it was, so the same total effect on a race
+  // buys about four times as many of them -- and strategic placement needs
+  // sites: at the shipped count a whole course carried SIX mats against ~180
+  // gates and ~21 aid items, so all but a handful of the decisions the owner
+  // asked to weight had no paint anywhere near them. The yield is about a half
+  // (tools/tempo.js --section place), so this asks for roughly double what it
+  // expects to land, which is the same arithmetic the shipped pair used.
+  const TEMPO_N_MIN = 26, TEMPO_N_MAX = 34;
   // FROM 0.05, WHICH IS EARLIER THAN ANY OTHER MECHANIC IN THIS FILE OPENS,
   // and the reason is the opening rather than the mat. A mat is the only
   // decision this game has that costs NOTHING TO OWN -- no pool, no fuel, no
@@ -557,18 +610,50 @@ MR.Course = (function () {
   // twice START_GRACE, so the clean runway the opening reads calmly on is
   // untouched.
   const TEMPO_F0 = 0.05, TEMPO_F1 = 0.94;
-  const TEMPO_GAP = 90;
+  /**
+   * The separation between two marks, and it was SURGE_SIGHT because a mark
+   * used to be up to 88 units of paint carrying an effect worth five race
+   * seconds -- something to be read on its own, from a long way out.
+   *
+   * A mark is now at most TEMPO_PAINT_MAX of paint carrying a fraction of an
+   * action, so what it has to be read against is smaller and what it costs to
+   * misread is smaller with it. What the gap has to guarantee is that the next
+   * mark is not already in the read window while the last one is still under
+   * the runner's feet -- READ_NEAR is 25.35, so 50 clears it by nearly a
+   * factor of two and roughly doubles how many marks the road can carry.
+   */
+  const TEMPO_GAP = 50;
   // The share of marks that are BACKWARD. Under a half on purpose: the drag is
   // the expensive half and the one that pushes the player out of a lane, and a
   // road where most marks are punishments reads as a penalty box rather than as
   // a set of choices.
   const TEMPO_DRAG_SHARE = 0.52;
-  // How far short of the NEXT gate line a mat must stop. It is the telegraph
-  // mat's own run-up -- world.js lays 14 units of it on the road in front of
-  // every hazard -- so this is the distance at which tempo paint would start
-  // being read on top of gate paint. Derived from the art that exists, not
-  // chosen.
-  const TEMPO_TAIL = 14;
+  /**
+   * How far short of the gate that ENDS it a mark must stop.
+   *
+   * IT WAS 14 AND ITS DERIVATION HAS BEEN DELETED. 14 was the telegraph mat's
+   * own run-up -- world.js laid 14 units of coloured paint on the road in
+   * front of every hazard -- so it was the distance at which tempo paint would
+   * start being read on top of gate paint. The owner removed the telegraph
+   * mats entirely, so there is no gate paint left to run into and the number
+   * has nothing behind it any more.
+   *
+   * What is left to clear is the HAZARD ITSELF, and the new number is that:
+   * enough that a mark's end edge does not touch the near face of the object
+   * standing at the gate it stops at. HAZARD_HALF_Z is the deepest half-depth
+   * the fleet carries; 4 is comfortably outside it and small enough that a
+   * mark now reaches the decision it was laid to weight instead of stopping
+   * fourteen units short of it -- which is most of the strategic placement
+   * this pass is for, bought by a deletion rather than by new code.
+   */
+  const TEMPO_TAIL = 4;
+  // The longest run of PAINT, as against the longest planned RANGE. The plan
+  // still draws a long range because spacingAt reserved the action window over
+  // it before any gate existed and that reservation cannot be revisited; the
+  // paint is a short mark placed inside that budget, on the decision. Every
+  // unit of a shipped mark is inside its planned range, so the widening the
+  // course already paid for covers it and nothing has to be re-validated.
+  const TEMPO_PAINT_MAX = 46;
   // The shortest mark worth painting. LANE_TRANSIT is the ground two lane
   // changes cover, so anything at or under it is a mark the runner could be
   // through before the swerve that answers it has finished -- an instruction
@@ -600,9 +685,34 @@ MR.Course = (function () {
     // thing that has to establish it. A mechanic whose first appearance is a
     // punishment teaches avoidance of the paint, not reading of it.
     {
-      const len = rnd.range(TEMPO_LEN_MIN, TEMPO_LEN_MAX);
-      const z0 = rnd.range(0.05 * total, 0.11 * total);
-      marks.push({ z0, z1: z0 + len, dir: 1, first: true });
+      // ---- AND IT IS SEPARATED FROM A ZONE LIKE EVERY OTHER MARK ---------
+      //
+      // IT WAS NOT, AND THAT WAS A DEFECT FOUND BY LOOKING AT A FRAME. The
+      // ordinary draw below refuses any mark within SURGE_SIGHT of a zone, on
+      // the stated grounds that the zone's entry marking has to be read from
+      // SURGE_SIGHT out and nothing may compete with it there. The mandated
+      // first mark was pushed with no clash test at all -- and the first surge
+      // zone is mandated too, into an overlapping stretch of the opening -- so
+      // the one mark every player is guaranteed to meet was the one mark
+      // allowed to sit under a zone's gantry. A chase frame of exactly that
+      // collision is what turned it up; no headless number in this file was
+      // watching for it.
+      let z0 = 0, len = 0, ok = false;
+      for (let i = 0; i < 40 && !ok; i++) {
+        len = rnd.range(TEMPO_LEN_MIN, TEMPO_LEN_MAX);
+        z0 = rnd.range(0.05 * total, 0.11 * total);
+        ok = true;
+        if (surges) {
+          for (const s of surges) {
+            if (z0 + len + SURGE_SIGHT > s.z0 && z0 - SURGE_SIGHT < s.z1) { ok = false; break; }
+          }
+        }
+      }
+      // A mandated mark that cannot be separated is DROPPED rather than laid
+      // on top of a zone. The opening keeps its guaranteed first mat on every
+      // day the geometry allows one, and on the days it does not the player
+      // meets a zone instead -- which is the same lesson in a bigger object.
+      if (ok) marks.push({ z0, z1: z0 + len, dir: 1, first: true });
     }
     while (marks.length < want && guard++ < 900) {
       const len = rnd.range(TEMPO_LEN_MIN, TEMPO_LEN_MAX);
@@ -906,9 +1016,83 @@ MR.Course = (function () {
    * share of openings are CLEAR and what share demand an action, because that
    * split is the mechanic and it should be a number rather than a hope.
    */
-  function assignTempo(key, marks, gates, spans, elev, surges) {
+  /**
+   * ---- STRATEGIC PLACEMENT: A MAT WEIGHTS A DECISION, IT IS NOT ONE -------
+   *
+   * The owner: *"Placed strategically so that players need to make decisions.
+   * Around obstacles, on top of vehicles, around water and bananas."* And the
+   * intent handed down with it, which is the sentence to judge this code by:
+   * A MAT SHOULD NEVER BE THE DECISION -- IT SHOULD CHANGE THE PRICE OF A
+   * DECISION THE PLAYER WAS ALREADY MAKING.
+   *
+   * ---- WHY THE PLAN STILL DRAWS RANDOM RANGES, AND MUST -----------------
+   *
+   * There is a circularity here and it is worth stating because the obvious
+   * design walks straight into it. Strategic placement wants to know where the
+   * gates and the bottles are; but spacingAt() consults the tempo plan while
+   * it is LAYING those gates, because a lift widens the action window and a
+   * gate spaced for the unlifted pace would owe the player reaction time it
+   * did not give. So the plan cannot wait for the gates and the gates cannot
+   * wait for the plan.
+   *
+   * The way through is that the plan is a BUDGET rather than a placement. It
+   * draws a long range, spacingAt widens the window across all of it, and this
+   * function then paints a SHORT mark somewhere inside that range, on the
+   * decision. Every unit of painted road is inside a range the course already
+   * widened for, so the fairness arithmetic covers it with room to spare and
+   * nothing has to be re-derived. The slack the trim does not use is spacing
+   * the course paid for and did not spend -- the safe direction, and the same
+   * bargain the trim rule already documents below.
+   *
+   * ---- WHAT COUNTS AS A SITE -------------------------------------------
+   *
+   *   AN AID ITEM in the mark's own lane is the strongest, and it is the case
+   *   the owner named last and described most precisely. A bottle already sits
+   *   behind an obstacle in that obstacle's lane, so collecting it is already
+   *   a priced detour; a green mat makes that detour cheaper and a red one
+   *   makes it dear. The SAME pickup becomes a different decision depending on
+   *   what is painted around it, which is the whole ask in one object.
+   *
+   *   AN OBSTACLE in the mark's own lane is next, and for a lift it is not
+   *   merely preferred, it is REQUIRED and always was -- clause 3, "a forward
+   *   mat is earned". What changes here is that the paint is now positioned to
+   *   ARRIVE at that obstacle with a full read window in hand, instead of
+   *   starting wherever the plan's range happened to open.
+   *
+   *   A GATE WHERE THE LANES DIFFER is the weakest site and still a real one:
+   *   somewhere a player is choosing between lanes at all.
+   *
+   * Ground with none of these is not painted. That is the difference between
+   * this and the random draw it replaces, and it is why the yield is allowed
+   * to fall: a mark that lands on nothing is decoration, and decoration is
+   * what the near-band paint budget cannot afford.
+   *
+   * ---- WHAT IS NOT DONE, SAID HERE RATHER THAN DISCOVERED --------------
+   *
+   * ON TOP OF VEHICLES IS NOT BUILT. A deck is a different running surface at
+   * DECK_Y, so a roof mat is not this mark moved upward: tempoAt would have to
+   * answer for a lane the runner is riding rather than standing in, the strip
+   * would have to be laid on the deck instead of on roadSurfaceY, and the lift
+   * would have to enter spacingAt through ramps, which are created DURING gate
+   * generation and so land on the far side of the same circularity described
+   * above. It is a pass of its own and it is listed in the roadmap rather than
+   * half-built here.
+   */
+  function assignTempo(key, marks, gates, spans, elev, surges, aid) {
     if (!marks || !marks.length) return [];
     const rnd = MR.rng.stream(key, 'tempo/lane/v1');
+    // Aid by lane, sorted, so a site test is a scan of a short list rather
+    // than of the whole table. Roof items are excluded: a mat is painted on
+    // the road and a bottle on a deck is not a decision this mark can price.
+    const aidLane = [[], [], []];
+    for (const it of (aid || [])) {
+      if (it && !it.roof && it.lane >= 0 && it.lane < 3) aidLane[it.lane].push(it.z);
+    }
+    for (const l of aidLane) l.sort(function (a, b) { return a - b; });
+    function aidIn(lane, z0, z1) {
+      for (const z of aidLane[lane]) if (z >= z0 && z < z1) return z;
+      return -1;
+    }
     const out = [];
     // Per lane: stretches already spoken for, either by a mat or reserved as
     // some drag's guaranteed opening.
@@ -948,23 +1132,76 @@ MR.Course = (function () {
       // give it back -- that is spacing the course paid for and did not use,
       // which is the safe direction and the only one available, since spacingAt
       // ran before any of this was known.
-      let lane = -1, z1 = zCap, best = -Infinity;
+      let lane = -1, z0 = m.z0, z1 = zCap, best = -Infinity;
       for (let l = 0; l < 3; l++) {
-        let k = 0, earns = false;
+        let k = 0, earns = -1;
         for (; k < inside.length; k++) {
           const h = gates[inside[k]].lanes[l];
           if (m.dir > 0 ? h === K.BLOCK : h !== K.CLEAR) break;
-          if (h === K.JUMP || h === K.DUCK) earns = true;
+          if (earns < 0 && (h === K.JUMP || h === K.DUCK)) earns = gates[inside[k]].z;
         }
-        if (!k || (m.dir > 0 && !earns)) continue;
+        if (!k || (m.dir > 0 && earns < 0)) continue;
         const cut = k < inside.length ? gates[inside[k]].z - TEMPO_TAIL : zCap;
         if (cut - m.z0 < tempoMinRun()) continue;
-        if (busy(l, m.z0, cut)) continue;
-        if (!laneFree(spans, l, m.z0 - read, cut)) continue;
-        // Longest legal mark wins -- more paint is more of the effect the plan
-        // asked for. Ties break from the seeded stream so a course still varies.
-        const score = (cut - m.z0) + rnd.next();
-        if (score > best) { best = score; lane = l; z1 = cut; }
+
+        // ---- THE ANCHOR: THE THING THIS MARK IS HERE TO PRICE ------------
+        //
+        // Ordered by how much of a decision it is, and a mark with no anchor
+        // at all is not painted. A bottle first, then the obstacle a lift is
+        // earned by, then the last gate the mark can reach -- which for a drag
+        // is the gate that ends it, i.e. the moment the player has to be out
+        // of this lane anyway.
+        let anchor = aidIn(l, m.z0, cut), site = 3;
+        if (anchor < 0 && earns >= 0 && earns < cut) { anchor = earns; site = 2; }
+        if (anchor < 0) {
+          // A gate inside the reachable span where the lanes are not all the
+          // same: somewhere a player is choosing at all.
+          for (let j = 0; j < k; j++) {
+            const gl = gates[inside[j]].lanes;
+            if (gates[inside[j]].z >= cut) break;
+            if (gl[0] !== gl[1] || gl[1] !== gl[2]) { anchor = gates[inside[j]].z; site = 1; break; }
+          }
+        }
+        if (anchor < 0) continue;
+
+        // Start a full read window before the anchor so the paint is on screen
+        // with time to act on it, and never before the plan's own range began.
+        // Then cap the run: the paint is short and the anchor is inside it.
+        const a0 = Math.max(m.z0, Math.min(anchor - read, cut - tempoMinRun()));
+        let a1 = Math.min(cut, a0 + TEMPO_PAINT_MAX);
+        // ---- AND THE END IS SNAPPED CLEAR OF A GATE ----------------------
+        //
+        // The cap can land the far edge a metre or two short of a gate the
+        // mark was perfectly entitled to cover, which validate() reads as the
+        // paint stopping inside that gate's clearance -- and it is right to:
+        // a mark that peters out just before an obstacle looks like the paint
+        // giving up rather than like a mark that ends. Every gate up to `cut`
+        // has already passed this lane's clause, so the answer is to reach
+        // PAST it rather than to stop shorter. 24 of 60 courses failed
+        // validate() before this, all of them for a few tenths of a unit.
+        // The forbidden band is (gz - TEMPO_TAIL, gz] for every gate the mark
+        // can reach: land there and the paint stops inside that gate's
+        // clearance. Prefer to step PAST the gate -- it has already passed
+        // this lane's clause, so covering it is legal and reads as a mark that
+        // ends rather than one that gives up -- and retreat only when there is
+        // no room ahead. Gates are at least 25 units apart and the band is 4,
+        // so one pass settles it.
+        for (let j = 0; j < k; j++) {
+          const gz = gates[inside[j]].z;
+          if (a1 > gz - TEMPO_TAIL && a1 <= gz) {
+            const fwd = gz + TEMPO_TAIL;
+            a1 = fwd <= cut ? fwd : gz - TEMPO_TAIL;
+          }
+        }
+        if (a1 - a0 < tempoMinRun() || a1 <= anchor) continue;
+        if (busy(l, a0, a1)) continue;
+        if (!laneFree(spans, l, a0 - read, a1)) continue;
+        // The SITE decides, not the length. More paint is no longer more of
+        // the effect the plan asked for -- the effect is capped -- so what a
+        // candidate is worth is how much of a decision it is standing on.
+        // Ties break from the seeded stream so a course still varies.
+        const score = site * 4 + rnd.next();
+        if (score > best) { best = score; lane = l; z0 = a0; z1 = a1; }
       }
       if (lane < 0) continue;
 
@@ -972,11 +1209,12 @@ MR.Course = (function () {
       if (m.dir < 0) {
         const opens = [];
         for (let l = 0; l < 3; l++) {
-          if (l === lane || busy(l, m.z0, z1)) continue;
-          if (!laneFree(spans, l, m.z0 - LANE_TRANSIT, z1)) continue;
+          if (l === lane || busy(l, z0, z1)) continue;
+          if (!laneFree(spans, l, z0 - LANE_TRANSIT, z1)) continue;
           let ok = true;
           for (const gi of inside) {
             if (gates[gi].z >= z1) break;
+            if (gates[gi].z < z0) continue;
             if (gates[gi].lanes[l] === K.BLOCK) { ok = false; break; }
           }
           if (ok) opens.push(l);
@@ -988,11 +1226,14 @@ MR.Course = (function () {
         let best = -Infinity;
         for (const l of opens) {
           let free = 1;
-          for (const gi of inside) if (gates[gi].lanes[l] !== K.CLEAR) { free = 0; break; }
+          for (const gi of inside) {
+            if (gates[gi].z < z0 || gates[gi].z >= z1) continue;
+            if (gates[gi].lanes[l] !== K.CLEAR) { free = 0; break; }
+          }
           const score = free * 2 + rnd.next();
           if (score > best) { best = score; open = l; }
         }
-        taken[open].push({ z0: m.z0, z1 });
+        taken[open].push({ z0, z1 });
       }
       // TRIMMED WITH THE MARK, and the instrument is what said so. `inside` is
       // the gates the PLANNED range covered; the mark may have been cut short
@@ -1001,9 +1242,11 @@ MR.Course = (function () {
       // generator had never claimed -- three false failures on 60 days. The
       // field a downstream reader trusts has to describe the object that
       // shipped, not the one that was asked for.
-      const mat = { z0: m.z0, z1, dir: m.dir, lane, open, n: out.length + 1,
-                    gates: inside.filter(function (gi) { return gates[gi].z < z1; }) };
-      taken[lane].push({ z0: m.z0, z1 });
+      const mat = { z0, z1, dir: m.dir, lane, open, n: out.length + 1,
+                    gates: inside.filter(function (gi) {
+                      return gates[gi].z >= z0 && gates[gi].z < z1;
+                    }) };
+      taken[lane].push({ z0, z1 });
       out.push(mat);
     }
     return out;
@@ -2155,7 +2398,7 @@ MR.Course = (function () {
     const spans = buildSpans(gates, ramps);
     // The lane, last, because every rule that makes a mat fair is a statement
     // about gates and about where the vehicles ended up.
-    const tempo = assignTempo(key, tempoPlan, gates, spans, elevation, surges);
+    const tempo = assignTempo(key, tempoPlan, gates, spans, elevation, surges, aid);
     const tempoLanes = [[], [], []];
     for (const m of tempo) tempoLanes[m.lane].push(m);
     const course = { key, gates, aid, mileMarkers, biomes: BIOMES, length: K.TOTAL_UNITS,

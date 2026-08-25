@@ -99,12 +99,20 @@ MR.Pace = (function () {
     // inside a zone by exactly the difference so the SAME 1.16-unit margin the
     // flat course keeps today holds inside a surge by construction.
     FLOOR_SURGE: 244,         // 4:04 /mi
-    // Segments. FOUR, and it is set by the longest zone rather than chosen:
-    // SURGE_LEN_MAX is 520 units and BURN_UNITS is 130, so a full tank is
-    // exactly one maximum-length zone -- and the two moved together in roadmap
-    // 68 precisely so that property survived the retune. A smaller cap would make the longest
-    // zones unbuyable however well a player had allocated, which is a cap
-    // secretly editing the course.
+    // Segments. FOUR, and the clause it has to satisfy is that a full tank can
+    // buy the LONGEST zone -- a smaller cap would make the longest zones
+    // unbuyable however well a player had allocated, which is a cap secretly
+    // editing the course. POOL_MAX x BURN_UNITS is 520 units of surged road.
+    //
+    // It used to be exactly SURGE_LEN_MAX and the two moved together through
+    // roadmap 68's retune. Zones are now 260 to 340, so a full tank buys about
+    // one and a half of the longest -- the clause is satisfied with room over
+    // rather than exactly, which is the safe side of it. BURN_UNITS itself did
+    // NOT move with them, and deliberately: it is denominated in units of
+    // ROAD, so 520 units of surged road is what a tank buys whatever length
+    // the zones are. Shrinking zones changes how that 520 may be SPREAD, not
+    // how much of it exists, which is why the difficulty numbers this lever
+    // was tuned against are re-measured rather than re-tuned.
     POOL_MAX: 4,
     // One segment absorbs one contact whole.
     GUARD_COST: 1,
@@ -200,9 +208,52 @@ MR.Pace = (function () {
    * preference IS the strategy, and wrong here, where a mat is a local fact
    * about a lane and should cost the same wherever it is met.
    */
+  /**
+   * ---- BOTH STEPS HALVED, AND THE HALVING IS DERIVED ---------------------
+   *
+   * The owner: "Small speed increase and small speed decrease. Placed
+   * strategically so that players need to make decisions."
+   *
+   * The second sentence is what sizes the first. A mat is now laid ON a
+   * decision the player was already making -- a lane that costs an action
+   * against one that does not, a bottle behind a hurdle -- and the design
+   * intent handed down with it is that A MAT MUST CHANGE THE PRICE OF A
+   * DECISION AND NEVER BE THE DECISION. That is a statement about a ratio, so
+   * it can be measured against a number this project already owns:
+   *
+   *   AN ACTION COSTS 2 TO 4 RACE SECONDS. It is P(fluff) x a contact, and it
+   *   is the number roadmap 68 used to set the autopilot's own mat weights.
+   *
+   * At the shipped size a mat was worth -1.75 s forward and +4.75 s backward
+   * over a 58-unit mark (tools/tempo.js --section worth, 60 days). The
+   * BACKWARD one was therefore worth MORE than the action that avoids it, and
+   * a mat worth more than the action it modifies is not modifying anything --
+   * it is making the decision, and the correct play is simply to always
+   * swerve. That is the mechanic the owner is asking to shrink.
+   *
+   *   LIFT = (FLOOR_BASE - K.FLOOR_PACE) / 2 = 3.5 s/mi
+   *
+   * The whole quantity is the gap between the pace an unsurged runner runs
+   * toward and the pace every gate spacing in course.js is cut against -- the
+   * most a mat could give without carrying the runner past the course's own
+   * spacing datum. HALF of it is a mat that moves you toward that datum
+   * without reaching it, which is exactly the difference between a nudge and a
+   * mode change. Nothing is picked: the quantity is the same one the shipped
+   * number was derived from and the fraction is the one that keeps the mat
+   * under the thing it modifies.
+   *
+   * DRAG holds the authored 3:1 against it. The ratio is what makes a backward
+   * mat cost about three times what a forward one pays over the same ground --
+   * a mat you can ignore is worth less than a mat you must leave -- and it is
+   * unchanged so that only ONE number moves in this pass.
+   *
+   * MEASURED AFTER THE CHANGE, not predicted: see the roadmap entry. Halving
+   * the steps and capping the painted length together take a mat to well under
+   * an action's cost in both directions, which is the point.
+   */
   const TEMPO = {
-    LIFT: SURGE.FLOOR_BASE - K.FLOOR_PACE,   // 7 s/mi: 4:21 -> 4:14
-    DRAG: 21,                                // s/mi: 4:21 -> 4:42
+    LIFT: (SURGE.FLOOR_BASE - K.FLOOR_PACE) / 2,   // 3.5 s/mi: 4:21 -> 4:17
+    DRAG: 3 * (SURGE.FLOOR_BASE - K.FLOOR_PACE) / 2, // 10.5 s/mi: 4:21 -> 4:32
   };
 
   /**

@@ -197,7 +197,27 @@ if (want('open')) {
 if (want('fair')) {
   console.log('  IS A FORWARD MAT STILL FAIR (rule 4)');
   const baseSpeed = (K.UNITS_PER_MILE * K.TIME_SCALE) / Pace.SURGE.FLOOR_BASE;
-  const liftSpeed = (K.UNITS_PER_MILE * K.TIME_SCALE) / K.FLOOR_PACE;
+  /**
+   * ---- THIS LINE HAD A DERIVATION BAKED INTO IT AS A CONSTANT -----------
+   *
+   * It read K.FLOOR_PACE, on the reasoning that a lift takes the runner to the
+   * floor. That was TRUE and it was a COINCIDENCE: the shipped LIFT was
+   * exactly FLOOR_BASE - K.FLOOR_PACE, so the clamp in tempoTarget bound
+   * exactly and a lifted runner landed precisely on 254 s/mi.
+   *
+   * The moment the owner asked for a smaller step the coincidence broke. A
+   * halved lift puts the runner at 257.5, the clamp no longer binds, and this
+   * line went on measuring the window against a speed no runner could reach --
+   * reporting an 11 ms rule 4 failure against a course that had widened
+   * correctly for the speed it actually sells. Rule 3, on the instrument: it
+   * failed in the HONEST direction, inventing a problem rather than hiding
+   * one, which is the only reason it was caught at all rather than quietly
+   * excusing something.
+   *
+   * Asked of Pace instead of assumed, so it tracks whatever the step becomes.
+   */
+  const liftSpeed = (K.UNITS_PER_MILE * K.TIME_SCALE)
+    / Pace.tempoTarget(Pace.SURGE.FLOOR_BASE, 1);
   const winIn = [], winOut = [];
   for (const c of courses) {
     const marks = (c.tempo || []).filter((m) => m.dir > 0);

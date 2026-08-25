@@ -231,7 +231,7 @@ you actually see rather than what you think a running game would contain.
       // Lane the runner is in. A gate panel is shot from the middle so no lane
       // is privileged by the runner's own position; the others too, for the
       // same reason.
-      await page.evaluate(({ z }) => {
+      const pose = await page.evaluate(({ z }) => {
         const g = MR.game, K = MR.K;
         g.pace.units = z; g.pace.miles = z / K.TOTAL_UNITS * 26.2;
         g.world.update(z, 1);
@@ -252,11 +252,40 @@ you actually see rather than what you think a running game would contain.
          */
         const y = g.course.elevation ? g.course.elevation.at(z) : 0;
         g.runner.group.position.set(K.LANE_X[1], y, z);
-        for (let i = 0; i < 8; i++) {
+        /**
+         * ---- THE CAMERA HAS TO CONVERGE, AND EIGHT STEPS DID NOT ----------
+         *
+         * camera.js smooths toward the runner, so posing the runner does not
+         * pose the camera: it walks there. Eight updates left it TENS OF UNITS
+         * short, and on one panel that put the lens INSIDE a rideable vehicle
+         * -- the frame came back with a flat cream slab over the near road,
+         * which is the truck's own roof at DECK_Y seen from a lens sitting on
+         * it. A reader called it, unprompted and correctly, "a rendering fault
+         * rather than a designed obstacle".
+         *
+         * It was a staging fault. So the camera is stepped until it stops
+         * moving, and then the result is ASSERTED rather than trusted -- an
+         * instrument that can silently photograph the wrong place is the same
+         * class of defect as one that measures the wrong thing.
+         */
+        let last = 1e9, cz = 0;
+        for (let i = 0; i < 200; i++) {
           g.cam.update(0.5, { z, x: K.LANE_X[1], y, speed: 27.6, lean: 0, duck01: 0 });
+          cz = g.cam.camera.position.z;
+          if (Math.abs(cz - last) < 1e-4) break;
+          last = cz;
         }
         g.renderer.render(g.scene, g.cam.camera);
+        return { camZ: cz, want: z };
       }, { z: sh.z });
+      // CAM_BASE_BACK is 4.35 and the camera banks and eases, so the tolerance
+      // is generous -- what it is catching is a lens tens of units adrift, not
+      // a centimetre of lag.
+      const drift = Math.abs((sh.z - pose.camZ) - 4.35);
+      if (drift > 3.0) {
+        throw new Error('camera did not converge: wanted z ' + sh.z.toFixed(1)
+          + ', lens landed at ' + pose.camZ.toFixed(1) + ' (drift ' + drift.toFixed(1) + 'u)');
+      }
       const name = crypto.createHash('sha1')
         .update(date + ':' + sh.kind + ':' + sh.z + ':' + SEED).digest('hex').slice(0, 8);
       await page.screenshot({ path: path.join(OUT, 'panels', name + '.png') });

@@ -15610,7 +15610,7 @@ MR.World = (function () {
      * lift of 0.012 -- four times the margin, on the same arithmetic that
      * chose 32 segments for the old 16-unit mat.
      */
-    const TEMPO_LIFT = 0x2ee08a;            // the zone's own green: FASTER
+    const TEMPO_LIFT = 0x2ee08a;            // 154 degrees: FASTER
     const TEMPO_DRAG = 0xff3d4e;            // red: SLOWER
     const TEMPO_WASH_K = 0.46;
     const TEMPO_MARK_K = 1.50;
@@ -17669,6 +17669,31 @@ MR.World = (function () {
        * mechanic was removed. See the tempo section: six more roads, lift and
        * drag on each lane, built from the same function that draws them.
        */
+      /**
+       * A TEMPO MAT IS A ROAD, so it is measured as one -- the carpet's lesson
+       * a third surface along, and the reason the wash could be authored at
+       * all. A hazard stands on a lift mat BY CONSTRUCTION: assignTempo will
+       * not place one unless some gate inside it demands an action of the
+       * marked lane. So hazards are seen against this surface on a real share
+       * of every race, and measuring them only against tarmac would be
+       * measuring them against a road that is not there.
+       *
+       * SIX ENTRIES -- lift and drag on each lane -- built from
+       * tempoLaneParts, the same function the pooled strip lays down, so what
+       * the gate measures is what the game draws. 6.0 units is exactly TWO rung
+       * pitches and is SHORTER than the window the ortho frame covers (8.36
+       * units at the audit pitch), so the whole surface is inside the frame and
+       * the drag arm's duty cycle is exact rather than an artefact of where the
+       * sample happened to stop.
+       */
+      _audit.tempos = [];
+      for (const dir of [1, -1]) {
+        for (let l = 0; l < 3; l++) {
+          const m = new THREE.Mesh(merge(tempoLaneParts(dir, 6.0, 0.25)), mats.paint);
+          m.position.x = K.LANE_X[l];
+          _audit.tempos.push({ mesh: m, name: (dir > 0 ? 'lift' : 'drag') + l });
+        }
+      }
       _audit.carpets = [0, 1, 2].map(function (l) {
         const g = new THREE.PlaneGeometry(LANE, 6);
         const uv = g.attributes.uv;
@@ -18028,6 +18053,12 @@ MR.World = (function () {
         const m = shotMean(renderer, scene, _audit.carpets[l], K.LANE_X[l], 0.02, 0,
           LANE * 0.44, LANE * 0.44);
         roads.push(Object.assign({ lane: 'carpet' + l }, m));
+      }
+      // ...and both tempo mats on all three lanes. See auditSetup().
+      for (const t of _audit.tempos) {
+        const m = shotMean(renderer, scene, t.mesh, K.LANE_X[+t.name.slice(-1)], 0.25, 0,
+          LANE * 0.44, LANE * 0.44);
+        roads.push(Object.assign({ lane: t.name }, m));
       }
       return { hazards, roads };
     };

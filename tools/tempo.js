@@ -252,14 +252,22 @@ if (want('fair')) {
       console.log(`                     could not act on.`);
     }
   }
-  // And the clamp, which is the belt to the widening's braces.
-  const fastest = Pace.tempoTarget(Pace.EFFORT_CFG.FLOOR_SURGE, 1);
-  if (fastest < Pace.EFFORT_CFG.FLOOR_SURGE - 1e-9) {
-    bad(`a mat on top of a surge reaches ${fastest.toFixed(1)} s/mi, below the surge floor`);
+  // ---- AND THE HARD FLOOR, WHICH IS THE BELT TO THE WIDENING'S BRACES ---
+  //
+  // This asked whether a lift stacked on top of a SURGE could go below the
+  // surge floor, because that was the one way the two speed systems could
+  // compound. There is one speed system now, so the question is simply what
+  // the fastest pace this game can produce IS -- and it should be exactly the
+  // ordinary floor minus one lift, with nothing able to reach past it.
+  const hard = Pace.EFFORT_CFG.FLOOR_BASE - Pace.TEMPO.LIFT;
+  const fastest = Pace.tempoTarget(Pace.EFFORT_CFG.FLOOR_BASE, 1);
+  if (fastest < hard - 1e-9) {
+    bad(`a lift reaches ${fastest.toFixed(1)} s/mi, past the stated hard floor of ${hard}`);
   } else {
-    console.log(`    the clamp        a lift applied to the SURGE floor still returns `
-      + `${fastest.toFixed(0)} s/mi,`);
-    console.log(`                     so the fastest the game can run is unchanged.`);
+    console.log(`    the hard floor   a lift on the ordinary floor returns `
+      + `${fastest.toFixed(1)} s/mi, which is`);
+    console.log(`                     FLOOR_BASE - LIFT exactly, so that is the fastest`);
+    console.log(`                     pace the game can produce.`);
   }
   console.log('');
 }

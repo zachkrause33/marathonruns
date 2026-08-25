@@ -1149,18 +1149,25 @@ MR.HUD = (function () {
       // range the gauge maps has to be the range the player can actually reach
       // -- a bar that pinned at 100% while a surge was still buying speed would
       // stop moving at exactly the moment the player spent something for it.
-      const lo = MR.Pace.EFFORT > 0 ? MR.Pace.SURGE.FLOOR_SURGE : K.FLOOR_PACE;
+      // The fastest pace anything can reach. It was FLOOR_SURGE under EFFORT,
+      // because an elected surge ran toward a second floor; with one speed
+      // system there is one floor, and a lift moves the TARGET toward it
+      // rather than moving the floor itself.
+      const lo = K.FLOOR_PACE;
       const pace01 = clamp01((K.START_PACE - p.pace) / (K.START_PACE - lo));
       if (MR.Pace.EFFORT > 0) {
         // The fill is the POOL, counted. Fractional while a surge burns, which
         // is the whole difference between the two spends: a guard takes one
         // segment in a single step and reads as a notch going out, a surge
         // slides continuously down through the divisions.
-        const pool01 = clamp01(p.pool / MR.Pace.SURGE.POOL_MAX);
+        const pool01 = clamp01(p.pool / MR.Pace.EFFORT_CFG.POOL_MAX);
         n.gaugeFill.style.width = (pool01 * 100) + '%';
         n.gaugePace.style.left = (pace01 * 100) + '%';
-        cls(n.paceGauge, 'gaugeCls', 'gauge tank pool' + (p.surging ? ' surging' : ''));
-        cls(n.engine, 'engCls', p.surging ? 'surging' : '');
+        // The gauge is the POOL, counted, and it now has one spend: guard.
+        // The 'surging' class it used to carry while a segment burned has no
+        // state left to represent.
+        cls(n.paceGauge, 'gaugeCls', 'gauge tank pool');
+        cls(n.engine, 'engCls', '');
       } else {
         n.gaugeFill.style.width = (pace01 * 100) + '%';
       }

@@ -384,33 +384,55 @@
    * after the pool and the zones had shipped. The instrument was not wrong; it
    * was blind, which is worse, because a blind instrument agrees with you.
    *
-   * So the bot gets a spend policy, named to match tools/simulate.js's POLICIES
-   * so the game and the sweep are one model rather than two:
+   * So the bot gets a LINE POLICY, named to match tools/simulate.js's POLICIES
+   * so the game and the sweep are one model rather than two.
    *
-   *   all     elect every zone while there is fuel. The default, and the same
-   *           argument the ramp term below uses: every frame this project
-   *           photographs is bot-driven, so the default line must have the
-   *           mechanic switched ON or the shot library is a picture of a game
-   *           nobody is playing.
-   *   none    never elect. The A/B partner, and NOT the same thing as
-   *           ?effort=0 -- this one still runs the wider surge-spaced course.
-   *   hold1   decline the first zone, take every one after it. The design's
-   *   hold2   claim, that the same pool spent later is worth more.
-   *   late    the back half only.
-   *   every2  alternate.
+   * IT USED TO BE A SPEND POLICY and the difference is the whole of this pass.
+   * A segment bought guard or surge, the policies were about WHICH ZONES TO
+   * ELECT, and the strategy was an allocation across a race. The owner removed
+   * the surge -- "One speed system" -- so the pool has one spend again and the
+   * allocation is gone with it. docs/risk-reward.md is the standing warning
+   * about that: before the pool had two rival uses, six policies finished at
+   * 1:58:03 with a spread of 0.0 seconds, because there was nothing to decide.
    *
-   * ?surge= is read once, here, and never per frame.
+   * What replaces it is the LINE: at nearly every gate the player weighs what
+   * a lane costs in ACTIONS against what it pays in TEMPO. That is a decision
+   * far more often than four times a race, and it is a different KIND of
+   * decision -- local and repeated rather than global and allocated. Whether
+   * it carries the strategy is not asserted here; tools/simulate.js sweeps
+   * these policies and prints the spread, and a spread near zero would mean
+   * this pass had undone roadmap 66.
+   *
+   *   all     the derived weights below. The default, and the same argument
+   *           the ramp term uses: every frame this project photographs is
+   *           bot-driven, so the default line must have the mechanic ON.
+   *   ignore  mats are invisible; route on clearance and aid alone. The A/B
+   *           partner, and NOT the same thing as ?effort=0 -- this one still
+   *           runs the mat-spaced course.
+   *   green   chase a lift hard, ignore a drag.
+   *   red     avoid a drag hard, ignore a lift.
+   *   safe    take a lift only when it costs no action, never pay for one.
+   *   greedy  chase a lift and flee a drag above everything but the ramp.
+   *
+   * ?line= is read once, here, and never per frame.
    */
-  const SURGE_POL = (params.get('surge') || 'all').toLowerCase();
-  // How far ahead the HUD announces a zone. READ OFF THE ZONE, not written
-  // here: `sight` is the marking contract's legibility distance, the distance
-  // the terrain sweep already proves stays visible over every crest, and the
-  // cue and the paint must never disagree about where the commit point is.
-  // 90 only as the fallback for a course with no zones, where it is unused.
-  // See `node tools/risk.js --section zone`.
-  const SURGE_LOOK = (course.surges && course.surges.length)
-    ? course.surges[0].sight : 90;
-  let zoneToldOf = null;
+  /**
+   * What a mat is worth to the bot, in hundredths of an action avoided -- the
+   * clear-lane term below is 100, so one unit here is one hundredth of one
+   * action. An action costs P(fluff) x a contact, about 2 to 4 race seconds at
+   * the skill this game is tuned around; tools/tempo.js --section worth
+   * measures what a mat is worth in the same currency. Both mat steps halved
+   * when the owner asked for a smaller one, so these halve with them rather
+   * than being re-picked.
+   */
+  const LINE_W = {
+    all:    { lift: 17, drag: -67 },
+    ignore: { lift: 0, drag: 0 },
+    green:  { lift: 60, drag: 0 },
+    red:    { lift: 0, drag: -160 },
+    safe:   { lift: 17, drag: -67, clearOnly: true },
+    greedy: { lift: 170, drag: -200 },
+  }[(params.get('line') || 'all').toLowerCase()] || { lift: 17, drag: -67 };
   /**
    * ---- AND THE BACKWARD MAT IS ANNOUNCED FOR THE SAME REASON -------------
    *
@@ -434,41 +456,6 @@
    */
   const TEMPO_LOOK = MR.Course.READ_NEAR + MR.Course.LANE_TRANSIT;
   let matToldOf = null;
-  function botWantsZone(zone) {
-    if (!zone || !EFFORT) return false;
-    const zs = course.surges || [];
-    const i = zs.indexOf(zone);
-    if (i < 0) return false;
-    switch (SURGE_POL) {
-      case 'none': return false;
-      case 'hold1': return i >= 1;
-      case 'hold2': return i >= 2;
-      case 'late': return i >= Math.floor(zs.length / 2);
-      case 'every2': return i % 2 === 1;
-      default: return true;
-    }
-  }
-
-  /**
-   * The marked lane the bot should be standing in over the road between here
-   * and the gate it is planning for, or -1.
-   *
-   * Both ends of that span are asked, not just the gate line. A zone is 420 to
-   * 560 units and a gate interval is around 25, so the runner is almost always
-   * deep inside a zone rather than crossing its edge -- but the edges are
-   * exactly where the election is won or lost, and a test at the gate line
-   * alone would drop the surge for the last gate-interval of every zone.
-   */
-  function botSurgeLane(gz) {
-    if (!EFFORT || !course.surgeZoneAt) return -1;
-    const here = course.surgeZoneAt(pace.units);
-    const there = course.surgeZoneAt(gz);
-    const z = botWantsZone(here) ? here : (botWantsZone(there) ? there : null);
-    // No fuel, no surge -- and no detour for one either. Standing in the marked
-    // lane on an empty tank buys nothing and can still cost an action.
-    if (!z || pace.pool <= 0) return -1;
-    return z.lane;
-  }
 
   function botThink() {
     // Advance past gates already resolved.
@@ -531,7 +518,6 @@
       for (const it of (course.aid || [])) {
         if (it.gate === bot.gate && !it.roof) wants.push(it.lane);
       }
-      const surgeLane = botSurgeLane(g.z);
       let best = null, bestScore = -Infinity;
       order.forEach(function (l, i) {
         // A RIDEABLE BLOCK IS NOT A WALL TO THIS BOT. `gate.ramp` names the
@@ -558,23 +544,6 @@
         // is asking is what the roof costs, and a bot that prefers a bottle
         // would answer a different one.
         if (g.ramp === l) score += 220;
-        // ---- AND THE MARKED LANE, WHICH IS THE ELECTION ------------------
-        //
-        // 180: above aid (150), below the ramp (220). Both orderings are
-        // deliberate. Above aid, because a segment collected is only worth
-        // what it later buys and the zone IS the thing it buys -- a bot that
-        // detoured for a bottle out of a zone it had already paid to be in
-        // would be spending the pool to fill the pool. Below the ramp,
-        // because a runner on a roof is not electing anything: resolveSurge
-        // returns null on deck, so preferring the ramp here agrees with the
-        // shipped rule instead of fighting it.
-        //
-        // The marked lane is guaranteed non-BLOCK inside a zone by the surge
-        // clause in generate(), so this term can never steer into a wall --
-        // but the BLOCK filter above still runs first, so if that guarantee
-        // ever broke, the bot would decline the surge rather than crash and
-        // the failure would show up as a lost second and not a lost run.
-        if (l === surgeLane) score += 180;
         // ---- AND THE MATS, WHICH IS THE SAME BLINDNESS ONE MECHANIC ON ----
         //
         // Roadmap 67's whole lesson: a bot that cannot see a mechanic reports,
@@ -616,7 +585,12 @@
         // where the lane is chosen and where this bot commits.
         if (course.tempoAt) {
           const m = course.tempoAt(g.z, l);
-          if (m) score += m.dir > 0 ? 55 : -150;
+          // `clearOnly` is the SAFE policy: it takes a lift that happens to be
+          // in a clear lane and never pays an action for one, which is the
+          // cautious line and a real policy rather than a weaker default.
+          if (m && !(LINE_W.clearOnly && m.dir > 0 && g.lanes[l] !== K.CLEAR)) {
+            score += m.dir > 0 ? LINE_W.lift : LINE_W.drag;
+          }
         }
         if (score > bestScore) { bestScore = score; best = l; }
       });
@@ -776,8 +750,6 @@
       // which player.handle has already served this frame, so a swipe into the
       // marked lane takes effect on the step the player made it.
       if (EFFORT) {
-        player.resolveSurge(course, pace.units, pace.pool > 0);
-        pace.surging = !!player.surge;
         // ...and the mat, in the same breath and for the same reason: it shifts
         // the target this step is run toward, so it has to be read before the
         // step and not after it. No fuel test -- a mat costs nothing to run on.
@@ -836,7 +808,7 @@
         // "there was nowhere to put it". A wasted bottle is the price of
         // hoarding and the player has to be told it happened, or the cap is a
         // rule they can only learn by not noticing it.
-        const roomBefore = pace.pool < MR.Pace.SURGE.POOL_MAX;
+        const roomBefore = pace.pool < MR.Pace.EFFORT_CFG.POOL_MAX;
         pace.onAid(item.gain);
         audio.aid(item.kind === 'banana');
         if (EFFORT) {
@@ -910,7 +882,7 @@
       // a SEGMENT, and it costs one exactly when there was room for it. Same
       // once-not-every-time edge, same re-arm on a collected item.
       if (EFFORT && player.aidIdx - aidIdxBefore > aidTook.length && !aidNagged
-          && pace.pool < MR.Pace.SURGE.POOL_MAX) {
+          && pace.pool < MR.Pace.EFFORT_CFG.POOL_MAX) {
         aidNagged = true;
         audio.aidMissed();
       }
@@ -923,43 +895,19 @@
         else if (e === 'land') { audio.land(); cam.land(); }
         else if (e === 'duck') audio.duck();
         else if (e === 'hit') audio.hit();
-        // The surge edges. Borrowed cues rather than new ones: audio.js belongs
-        // to another pass and a sound invented from this file is a sound nobody
-        // mixed. Entering reuses the fruit pickup -- the brightest affirmative
-        // in the set, which is what spending on speed should feel like -- and
-        // running dry reuses the missed-aid cue, which is already the sound of
-        // help that is no longer there.
-        else if (e === 'surge') audio.aid(true);
-        else if (e === 'surgeDry') audio.aidMissed();
       }
 
-      // ---- THE ZONE HAS TO BE ANNOUNCED, BECAUSE NOTHING DRAWS IT YET -----
+      // ---- THE BACKWARD MAT IS ANNOUNCED, AND ONLY THE BACKWARD ONE -----
       //
-      // The road marking is world.js's and world.js belongs to another agent
-      // (see the contract in docs/roadmap.md and `node tools/risk.js
-      // --section zone`). Until it is painted, NOTHING in the renderer reads
-      // the zone table -- so the player is being asked to commit to a bet
-      // whose terms are invisible, which is not the risk the mechanic is made
-      // of, it is a different and much worse one.
-      //
-      // So: an announcement on the toast that already exists. NOT a new HUD
-      // plate -- the owner ruled that out and was right to -- and not a new
-      // control, because a surge is still elected by the swipe. It fires once
-      // per zone at SURGE_SIGHT units out, which is the same distance the
-      // marking contract obliges the paint to be legible from, so when the
-      // paint lands this cue is saying the same thing in the same place and
-      // can be retired in one line rather than re-tuned.
-      //
-      // It names the LANE, because which lane is marked is one of the three
-      // facts the contract says must be readable before the commit point, and
-      // it is the only one a player cannot infer from anything else on screen.
-      if (EFFORT && course.surgeZoneAt) {
-        const soon = course.surgeZoneAt(pace.units + SURGE_LOOK);
-        if (soon && soon !== zoneToldOf) {
-          zoneToldOf = soon;
-          hud.toastAid('SURGE ' + soon.n, ['LEFT', 'CENTRE', 'RIGHT'][soon.lane]);
-        }
-      }
+      // A zone nag stood here too and went with the surge. This one stays, and
+      // the split is the fairness rule rather than economy: of the two mat
+      // directions only one can take a run. A green mat the player never
+      // noticed costs them nothing; a red one they could not see is a slow-down
+      // outside their control, which rule 4 calls a build failure rather than a
+      // difficulty setting. The paint now exists -- world.js draws both -- so
+      // this is belt and braces over a channel that already works, kept because
+      // removing a fairness cue is not something to do casually and the reader
+      // test that would license it is about the paint, not about the toast.
       if (EFFORT && course.tempoAhead) {
         const m = course.tempoAhead(pace.units, TEMPO_LOOK);
         if (m && m !== matToldOf && m.dir < 0) {
@@ -1302,8 +1250,6 @@
       // Before pace.update, in the live loop's order and for the live loop's
       // reason: the surge decides which floor this step runs toward.
       if (EFFORT) {
-        player.resolveSurge(course, pace.units, pace.pool > 0);
-        pace.surging = !!player.surge;
         // The mat too, in the live loop's order. A fast-forward that skipped it
         // would report the mechanic doing nothing on exactly the runs the
         // harness inspects -- which is the defect the note above records for

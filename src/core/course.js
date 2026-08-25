@@ -122,7 +122,7 @@ MR.Course = (function () {
    * ---- SURGE ZONES: THE SAME MACHINERY, A DIFFERENT CAUSE -----------------
    *
    * A surge zone is a marked stretch of road where a runner in the marked lane
-   * runs to MR.Pace.SURGE.FLOOR_SURGE instead of FLOOR_BASE. That is a locally
+   * runs to MR.Pace.EFFORT_CFG.FLOOR_SURGE instead of FLOOR_BASE. That is a locally
    * higher top speed, which is EXACTLY the problem the descent already posed
    * and which Elevation.windowExtra already solved -- so this is not a new
    * fairness argument, it is the existing one with a second cause bolted to the
@@ -161,20 +161,15 @@ MR.Course = (function () {
    */
   const SPAN_NUM = K.JUMP_TIME * K.UNITS_PER_MILE * K.TIME_SCALE;
   const FLAT_SPAN = SPAN_NUM / K.FLOOR_PACE;
-  // How far BEHIND a zone the widening starts. A jump committed just short of
-  // the entry line lands inside the zone, and although the runner is not yet
-  // surging when they commit, the pad costs a few units and removes the need to
-  // reason about the boundary at all. Same constant elevation looks forward by.
-  const SURGE_PAD = 28;
-
-  function surgeExtraAt(z, surges) {
-    if (!surges || !surges.length) return 0;
-    for (let i = 0; i < surges.length; i++) {
-      const s = surges[i];
-      if (z >= s.z0 - SURGE_PAD && z < s.z1) return s;
-    }
-    return 0;
-  }
+  /**
+   * How far BEFORE a mark's near edge the lift is already counted. It was
+   * SURGE_PAD and it belonged to the surge; the surge is gone and the reason
+   * survives it unchanged -- a jump committed just short of a marking lands
+   * inside it, so the window has to be widened for ground the runner is not
+   * standing on yet, and the pad costs a few units and removes the need to
+   * reason about the boundary at all. Same constant elevation looks forward by.
+   */
+  const TEMPO_PAD = 28;
 
   /**
    * ---- THE ONE QUESTION THE WINDOW ACTUALLY ASKS -------------------------
@@ -197,22 +192,15 @@ MR.Course = (function () {
    * SURGE_PAD applies to both for the same reason: a jump committed just short
    * of a marking lands inside it.
    */
-  function liftAt(z, surges, tempo) {
+  function liftAt(z, tempo) {
     let lift = 0;
-    if (surgeExtraAt(z, surges)) {
-      lift = MR.Pace.SURGE.FLOOR_BASE - MR.Pace.SURGE.FLOOR_SURGE;
-    }
     if (tempo && tempo.length) {
       for (let i = 0; i < tempo.length; i++) {
         const t = tempo[i];
-        if (t.dir > 0 && z >= t.z0 - SURGE_PAD && z < t.z1) {
+        if (t.dir > 0 && z >= t.z0 - TEMPO_PAD && z < t.z1) {
           // READ, NOT RE-DERIVED. This computed FLOOR_BASE - K.FLOOR_PACE for
-          // itself and pace.js computed the same expression for TEMPO.LIFT, so
-          // the size of a lift was written down twice. When the owner asked for
-          // a smaller step, one of the two would have moved and the other would
-          // have gone on widening the action window for a lift the runner no
-          // longer gets -- safe, but a window nobody could account for. One
-          // number, one place.
+          // itself while pace.js computed the same expression for TEMPO.LIFT,
+          // so the size of a lift was written down twice. One number, one place.
           const l = MR.Pace.TEMPO.LIFT;
           if (l > lift) lift = l;
         }
@@ -221,9 +209,10 @@ MR.Course = (function () {
     return lift;
   }
 
-  function windowExtraAt(z, elev, surges, tempo) {
+
+  function windowExtraAt(z, elev, tempo) {
     const base = elev ? elev.windowExtra(z) : 0;
-    const lift = liftAt(z, surges, tempo);
+    const lift = liftAt(z, tempo);
     if (!lift) return base;
     // The local pace the base window was cut for, hill included, recovered from
     // elevation's own table -- then the same hill at the surge floor.
@@ -262,8 +251,8 @@ MR.Course = (function () {
     return Math.max(base, SPAN_NUM / surged - FLAT_SPAN);
   }
 
-  function actionWindowAt(z, elev, surges, tempo) {
-    return ACTION_WINDOW + windowExtraAt(z, elev, surges, tempo);
+  function actionWindowAt(z, elev, tempo) {
+    return ACTION_WINDOW + windowExtraAt(z, elev, tempo);
   }
 
   /**
@@ -307,8 +296,8 @@ MR.Course = (function () {
    * time; see tools/simulate.js, which is unchanged to the second by it because
    * pace integrates over distance and not over gates.
    */
-  function readWindowAt(z, elev, surges, tempo) {
-    return actionWindowAt(z, elev, surges, tempo) + K.CAM_BASE_BACK;
+  function readWindowAt(z, elev, tempo) {
+    return actionWindowAt(z, elev, tempo) + K.CAM_BASE_BACK;
   }
 
   /**
@@ -368,159 +357,26 @@ MR.Course = (function () {
    * it fails the build if that ever stops being true, and it has caught the
    * mechanic taking 50 ms and then 22 ms already.
    */
-  const SURGE_SIGHT = 90;
   /**
-   * ---- SMALLER ZONES, AND THE REASON IS A CENSUS RATHER THAN A TASTE -----
+   * ---- THE SURGE ZONE WAS PLANNED HERE, AND THE MECHANIC IS GONE --------
    *
-   * The owner: *"Make the zones smaller too."* The measurement that says what
-   * "smaller" has to buy came from the other end of this file entirely.
+   * planSurge drew 6 to 7 zones a course, 300 to 380 units each, one marked
+   * lane apiece; running that lane spent the pool and dropped the pace floor
+   * from FLOOR_BASE to FLOOR_SURGE. The owner removed it: "One speed system.
+   * Remove the surge I think it's too confusing."
    *
-   * A tempo mat may not sit within SURGE_SIGHT of a zone, at either end,
-   * because the zone's entry marking has to be read from 90 units out and
-   * nothing may compete with it there. At the shipped size, six zones covered
-   * 2727 units -- 43.3% of the course, measured by tools/playthrough.js -- and
-   * their exclusion bands took roughly 1080 more. So better than half the road
-   * was closed to mats before a single mark was drawn, and planTempo asked for
-   * 13 to 17 marks, managed to PLAN 11.9, and shipped SIX on the day
-   * playthrough walked. The owner's "placed strategically... around obstacles,
-   * around water and bananas" cannot be built on six marks and ~180 gates: it
-   * is not a placement problem, it is a road-space problem.
+   * WHAT WENT WITH IT, listed because each one was load-bearing somewhere:
+   * SURGE_SIGHT (the 90 units the entry marking had to be legible from, and
+   * the number spanning scenery was nudged off), the zone length and count
+   * bands, the mandated early zone, zoneAt / zoneBody / surgeExtraAt, the
+   * marked-lane promises inside makeGate, and every surge clause in validate().
    *
-   * 260 to 340 with one more zone takes coverage to about 30% and gives the
-   * marks somewhere to be. Fewer committed units, more separate commitments --
-   * which is the same sentence as "smaller and more frequent means more
-   * decisions".
-   *
-   * ---- AND BURN_UNITS DOES NOT MOVE, WHICH IS NOT AN OVERSIGHT ----------
-   *
-   * Pace.SURGE ties POOL_MAX x BURN_UNITS = 520 units to SURGE_LEN_MAX on the
-   * stated grounds that a smaller cap would make the longest zones unbuyable
-   * however well a player had allocated. Shrinking the zones moves that
-   * relation the SAFE way: a full tank now buys more than one maximum zone, so
-   * no zone is ever unbuyable and the clause is satisfied with room over.
-   *
-   * More importantly BURN_UNITS is denominated in UNITS OF ROAD, so the total
-   * surged road a full tank buys is 520 either way. Shrinking zones changes
-   * how that 520 may be SPREAD, not how much of it there is -- which is why
-   * the difficulty lever the last pass tuned (32% of cells, 20% first attempt)
-   * is not being touched here. It is still re-measured rather than assumed:
-   * see tools/simulate.js in the roadmap entry.
+   * WHAT DID NOT GO, AND IS THE REASON THE REMOVAL IS CHEAP: the widening
+   * arithmetic. windowExtraAt asks one question -- how many s/mi faster than
+   * the ordinary road may the runner be here, because of something the road
+   * said -- and a zone was only ever one of two answers. With the zone gone
+   * the question is unchanged and only the tempo mat answers it.
    */
-  const SURGE_LEN_MIN = 300, SURGE_LEN_MAX = 380;
-  /**
-   * ---- THE COUNT IS SET BY COVERAGE, AND SIMULATE IS WHAT SET IT --------
-   *
-   * Shrinking the zones and leaving the count alone took marked road from
-   * 43.3% of the course to about 30%, and tools/simulate.js said what that
-   * cost: the record fell from 16 of 50 cells to 8, first attempts from 4 of
-   * 20 to 2, learned from 12 of 30 to 6. The game got a whole notch harder.
-   *
-   * The mechanism is OPPORTUNITY rather than the pool. A tank still buys 520
-   * units of surged road; it can only be spent INSIDE a zone, so cutting the
-   * marked road by a third cut how much of the pool a race can ever convert.
-   * BURN_UNITS is denominated in road and was therefore innocent -- which is
-   * exactly why it was the wrong lever to reach for and why this is a count.
-   *
-   * Nine short zones restore the coverage the difficulty contract was tuned
-   * against while keeping every zone short: same committed road, half again as
-   * many separate commitments. That is "smaller and more frequent means more
-   * decisions" with the difficulty numbers held rather than traded.
-   */
-  const SURGE_N_MIN = 6, SURGE_N_MAX = 7;
-  const SURGE_F0 = 0.15, SURGE_F1 = 0.90;
-  /**
-   * ---- ONE ZONE IS MANDATED EARLY, AND IT IS AN ENGAGEMENT FIX -----------
-   *
-   * The owner: *"The first few miles are boring."*
-   * docs/staleness-and-mats.md located the trough at miles 3-7 and named the
-   * cause as novelty spent while demand is still low. There is a third cause
-   * nobody had written down and it is structural:
-   *
-   *   AT THE START OF A RACE THE POOL IS EMPTY, so guard and surge -- the whole
-   *   of the strategic layer, the thing that took this game from six policies
-   *   tying at 0.0 s to an 85-second spread -- DO NOT EXIST YET. Measured on
-   *   the shipped generator: the first zone lands at f = 0.218 on average and
-   *   f = 0.150 at the earliest, which is mile 5.7 and mile 3.9. The opening is
-   *   not boring because it is easy. It is boring because it is the only part
-   *   of the race with nothing to decide.
-   *
-   * Raising the hazard density was the obvious answer and it is the wrong one:
-   * the same document establishes that freshness cannot exceed objects divided
-   * by density, so packing more into the opening buys difficulty by spending
-   * novelty -- the wrong trade for a boredom problem. makeGate's `nHaz`
-   * threshold is deliberately not touched by this pass.
-   *
-   * So the fix is to give the opening a DECISION instead of more work. One zone
-   * is placed by construction in the first eighth of the race, where a player
-   * who has taken one bottle can afford about a third of it. That is not a
-   * shortfall, it is the lesson: you watch the gauge empty and you feel the
-   * gear go, in a place where it costs a few seconds rather than the race.
-   *
-   * And it is a genuinely bad place to spend, which is what makes it a
-   * decision rather than a gift. d(target)/d(FLOOR) is 0.285 at streak 5
-   * against 0.93 at streak 150, so the same segment spent here buys a third of
-   * what it buys at the wall. The opening now asks the player its first real
-   * question -- take the free speed now, or carry it -- and the tempting answer
-   * is the wrong one.
-   */
-  const SURGE_EARLY0 = 0.05, SURGE_EARLY1 = 0.13;
-  const SURGE_EARLY_LEN_MIN = 220, SURGE_EARLY_LEN_MAX = 300;
-
-  function planSurge(key) {
-    if (!(MR.Pace.EFFORT > 0)) return [];
-    const rnd = MR.rng.stream(key, 'surge/v1');
-    const total = K.TOTAL_UNITS;
-    const lo = SURGE_F0 * total, hi = SURGE_F1 * total;
-    const zones = [];
-    const want = rnd.int(SURGE_N_MIN, SURGE_N_MAX);
-    const GAP = SURGE_SIGHT + 60;
-    let guard = 0;
-    // The mandated one, first, so the ordinary draws below have to route round
-    // it rather than the other way about. Its z0 is bounded well clear of
-    // SURGE_SIGHT (0.05 of the course is 315 units against 90), so the entry
-    // marking has somewhere to be read from and validate() proves it as usual.
-    //
-    // ---- IT IS AN ADDITION, NOT A SUBSTITUTION, AND PLAYING IT SAID SO ----
-    //
-    // The first version counted the mandated zone against `want`, so the early
-    // zone REPLACED one of the ordinary draws -- and because the ordinary draws
-    // are spread over [0.15, 0.90], the one it replaced was usually a late one.
-    // Lowering the floor buys 0.285x at streak 5 and 0.93x at streak 150, so
-    // that trade moved a zone from the valuable end of the race to the
-    // worthless end and charged the player for the privilege.
-    //
-    // It was invisible in every headless number and obvious the moment the game
-    // was played end to end: tools/playthrough.js went from "surging every zone
-    // is worth 46.0s over never seeking one" to "surging cost 23.4s", with the
-    // last zone moving from 82% of the course to 71%. That is rule 2 doing
-    // exactly what it is for.
-    //
-    // SHORTER, TOO, and for the reason the coordinator named: the first mile is
-    // the one stretch where a contact cannot be absorbed, because the pool is
-    // empty. A 560-unit zone met with one segment is 25% completion and 420
-    // units of being locked in a marked lane with no guard. 300 to 420 is a
-    // zone a single bottle finishes most of, which is the lesson rather than a
-    // punishment.
-    {
-      const len = rnd.range(SURGE_EARLY_LEN_MIN, SURGE_EARLY_LEN_MAX);
-      const z0 = rnd.range(SURGE_EARLY0 * total, SURGE_EARLY1 * total);
-      zones.push({ z0, z1: z0 + len, lane: rnd.int(0, 2), sight: SURGE_SIGHT, early: true });
-    }
-    while (zones.length < want + 1 && guard++ < 400) {
-      const len = rnd.range(SURGE_LEN_MIN, SURGE_LEN_MAX);
-      const z0 = rnd.range(lo, hi - len);
-      const z1 = z0 + len;
-      let clash = false;
-      for (const s of zones) if (z1 + GAP > s.z0 && z0 - GAP < s.z1) { clash = true; break; }
-      if (clash) continue;
-      zones.push({ z0, z1, lane: rnd.int(0, 2), sight: SURGE_SIGHT });
-    }
-    zones.sort(function (a, b) { return a.z0 - b.z0; });
-    // Numbered in running order, so the marking, the HUD and the report can all
-    // name the same zone.
-    for (let i = 0; i < zones.length; i++) zones[i].n = i + 1;
-    return zones;
-  }
 
   /**
    * ---- DIRECTIONAL MATS: A SECOND MARK, NOT A SECOND MEANING -------------
@@ -642,28 +498,6 @@ MR.Course = (function () {
    * factor of two and roughly doubles how many marks the road can carry.
    */
   const TEMPO_GAP = 50;
-  /**
-   * ---- THE EXCLUSION ROUND A ZONE IS NOT SYMMETRIC, AND WAS -------------
-   *
-   * A mark was refused within SURGE_SIGHT of a zone at BOTH ends, on the sound
-   * argument that the zone's entry marking has to be read from 90 units out
-   * and nothing may compete with it there. That argument is about the ENTRY.
-   * There is nothing on the exit side for a mark to compete with: the end of a
-   * zone is a pale bar and two small posts, and it is a fact a player learns by
-   * ARRIVING at it rather than by sighting it from distance -- the whole reason
-   * the entry gets a gantry, a countdown and 90 units of rails and the exit
-   * gets none of them.
-   *
-   * So the band is 90 in front and 30 behind. 30 is just over READ_NEAR, so
-   * the next mark enters the read window only once the end bar has passed the
-   * runner, and nothing is ever being read against anything.
-   *
-   * IT WAS WORTH MEASURING RATHER THAN ARGUING. Zone coverage and mat count
-   * are a direct trade through this band -- raising the zone count to hold the
-   * difficulty contract took mats from 11.1 a course to 6.9 -- and 60 units a
-   * zone is the cheapest road there is to give back.
-   */
-  const TEMPO_AFTER_ZONE = 30;
   // The share of marks that are BACKWARD. Under a half on purpose: the drag is
   // the expensive half and the one that pushes the player out of a lane, and a
   // road where most marks are punishments reads as a penalty box rather than as
@@ -704,7 +538,7 @@ MR.Course = (function () {
   // file -- the same temporal-dead-zone reason surgeBody() is a function.
   function tempoMinRun() { return 3 * LANE_TRANSIT; }
 
-  function planTempo(key, surges) {
+  function planTempo(key) {
     if (!(TEMPO > 0) || !(MR.Pace.EFFORT > 0)) return [];
     const rnd = MR.rng.stream(key, 'tempo/v1');
     const total = K.TOTAL_UNITS;
@@ -726,34 +560,23 @@ MR.Course = (function () {
     // thing that has to establish it. A mechanic whose first appearance is a
     // punishment teaches avoidance of the paint, not reading of it.
     {
-      // ---- AND IT IS SEPARATED FROM A ZONE LIKE EVERY OTHER MARK ---------
+      // ---- THE SEPARATION CLAUSE THAT STOOD HERE WAS A REAL DEFECT ------
       //
-      // IT WAS NOT, AND THAT WAS A DEFECT FOUND BY LOOKING AT A FRAME. The
-      // ordinary draw below refuses any mark within SURGE_SIGHT of a zone, on
-      // the stated grounds that the zone's entry marking has to be read from
-      // SURGE_SIGHT out and nothing may compete with it there. The mandated
-      // first mark was pushed with no clash test at all -- and the first surge
-      // zone is mandated too, into an overlapping stretch of the opening -- so
-      // the one mark every player is guaranteed to meet was the one mark
-      // allowed to sit under a zone's gantry. A chase frame of exactly that
-      // collision is what turned it up; no headless number in this file was
-      // watching for it.
-      let z0 = 0, len = 0, ok = false;
-      for (let i = 0; i < 40 && !ok; i++) {
-        len = rnd.range(TEMPO_LEN_MIN, TEMPO_LEN_MAX);
-        z0 = rnd.range(0.05 * total, 0.11 * total);
-        ok = true;
-        if (surges) {
-          for (const s of surges) {
-            if (z0 + len > s.z0 - SURGE_SIGHT && z0 < s.z1 + TEMPO_AFTER_ZONE) { ok = false; break; }
-          }
-        }
-      }
-      // A mandated mark that cannot be separated is DROPPED rather than laid
-      // on top of a zone. The opening keeps its guaranteed first mat on every
-      // day the geometry allows one, and on the days it does not the player
-      // meets a zone instead -- which is the same lesson in a bigger object.
-      if (ok) marks.push({ z0, z1: z0 + len, dir: 1, first: true });
+      // The ordinary draw below refused any mark within SURGE_SIGHT of a surge
+      // zone, and this mandated one was pushed with no clash test at all --
+      // while the first zone was mandated too, into an overlapping stretch of
+      // the opening. So the one mark every player was guaranteed to meet was
+      // the one mark allowed to sit under a zone's gantry, and a chase frame
+      // of exactly that collision is what turned it up. No headless number in
+      // this file was watching for it.
+      //
+      // The surge is gone, so the clash it could have with is gone, and the
+      // draw is one line again. The defect is recorded rather than deleted
+      // because the shape of it will recur: a MANDATED thing skipping the
+      // constraint every ORDINARY thing is held to.
+      const len = rnd.range(TEMPO_LEN_MIN, TEMPO_LEN_MAX);
+      const z0 = rnd.range(0.05 * total, 0.11 * total);
+      marks.push({ z0, z1: z0 + len, dir: 1, first: true });
     }
     while (marks.length < want && guard++ < 900) {
       const len = rnd.range(TEMPO_LEN_MIN, TEMPO_LEN_MAX);
@@ -761,17 +584,12 @@ MR.Course = (function () {
       const z1 = z0 + len;
       let clash = false;
       for (const m of marks) if (z1 + TEMPO_GAP > m.z0 && z0 - TEMPO_GAP < m.z1) { clash = true; break; }
-      // Never inside or beside a surge zone. Two reasons, and the second is the
-      // one that would have been found late: the surge entry marking has to be
-      // read from SURGE_SIGHT out and nothing may compete with it there; and a
-      // lift inside a zone would be a second lift on top of the surge, which
-      // Pace clamps away anyway but which should not be generated in the first
-      // place so that the clamp never has to be the thing protecting the proof.
-      if (!clash && surges) {
-        for (const s of surges) {
-          if (z1 > s.z0 - SURGE_SIGHT && z0 < s.z1 + TEMPO_AFTER_ZONE) { clash = true; break; }
-        }
-      }
+      // A second clause stood here and went with the surge: no mark inside or
+      // within SURGE_SIGHT of a zone, because the zone's entry marking had to
+      // be read from 90 units out and nothing could compete with it there.
+      // With one speed system there is nothing left for a mark to compete
+      // with, and the road that clause reserved -- better than half the course
+      // once the exclusion bands were counted -- is now available to marks.
       if (clash) continue;
       marks.push({ z0, z1, dir: rnd.chance(TEMPO_DRAG_SHARE) ? -1 : 1 });
     }
@@ -781,13 +599,6 @@ MR.Course = (function () {
   }
 
   /** The zone covering z, or null. Zones never overlap, so a scan is exact. */
-  function zoneAt(surges, z) {
-    if (!surges) return null;
-    for (let i = 0; i < surges.length; i++) {
-      if (z >= surges[i].z0 && z < surges[i].z1) return surges[i];
-    }
-    return null;
-  }
 
   /**
    * The zone whose marked lane a hazard at THIS gate line could stand in, or
@@ -811,18 +622,7 @@ MR.Course = (function () {
   // evaluation time -- which throws on the temporal dead zone and takes the
   // whole page with it. Derived on every call rather than cached, so a retune
   // of either cannot leave this stale.
-  function surgeBody() {
-    return 2 * HAZARD_HALF_Z[K.BLOCK] * (1 + rampSpanMax() * 0.9);
-  }
 
-  function zoneBody(surges, z) {
-    if (!surges) return null;
-    const body = surgeBody();
-    for (let i = 0; i < surges.length; i++) {
-      if (z + body > surges[i].z0 && z < surges[i].z1) return surges[i];
-    }
-    return null;
-  }
 
   /**
    * Every hazard collision box's half-depth, by kind.
@@ -1119,7 +919,7 @@ MR.Course = (function () {
    * above. It is a pass of its own and it is listed in the roadmap rather than
    * half-built here.
    */
-  function assignTempo(key, marks, gates, spans, elev, surges, aid) {
+  function assignTempo(key, marks, gates, spans, elev, aid) {
     if (!marks || !marks.length) return [];
     const rnd = MR.rng.stream(key, 'tempo/lane/v1');
     // Aid by lane, sorted, so a site test is a scan of a short list rather
@@ -1143,7 +943,7 @@ MR.Course = (function () {
       return false;
     }
     for (const m of marks) {
-      const read = readWindowAt(m.z0, elev, surges, marks);
+      const read = readWindowAt(m.z0, elev, marks);
       // The gates the mark spans, and the gate that owns its far edge -- the
       // mat must stop TEMPO_TAIL short of the next gate line so its paint never
       // runs into that gate's telegraph run-up.
@@ -1516,7 +1316,7 @@ MR.Course = (function () {
     return Math.min(1, base * 0.86 + wall + home);
   }
 
-  function spacingAt(f, rnd, z, elev, lanes, train, surges, tempo) {
+  function spacingAt(f, rnd, z, elev, lanes, train, tempo) {
     const d = difficulty(f);
     // 44 units early, tightening as difficulty rises. The floor is
     // ACTION_WINDOW itself rather than a number chosen to sit near it: the
@@ -1580,11 +1380,11 @@ MR.Course = (function () {
     // -- which is what keeps the expression character-for-character the old one
     // at EFFORT = 0, where both lists are empty.
     const reach = reachOf(lanes, train);
-    const first = Math.max(readWindowAt(z, elev, surges, tempo) + reach,
+    const first = Math.max(readWindowAt(z, elev, tempo) + reach,
                            mean * rnd.range(0.84, 1.16));
-    const stepped = (surges && surges.length) || (tempo && tempo.length);
+    const stepped = tempo && tempo.length;
     if (!stepped) return first;
-    return Math.max(first, readWindowAt(z + first, elev, surges, tempo) + reach);
+    return Math.max(first, readWindowAt(z + first, elev, tempo) + reach);
   }
 
   /** Hazard mix widens as difficulty rises. */
@@ -2138,13 +1938,12 @@ MR.Course = (function () {
     // both are drawn from their own seeded stream so that at EFFORT = 0 (where
     // planSurge returns an empty list without drawing a number) the course
     // stream stays in phase and every gate is bit-identical.
-    const surges = planSurge(key);
     // ...and the tempo marks in the same breath and for the same reason: a LIFT
     // mark widens the action window over its own stretch, spacingAt and
     // solvable() both read that window, and both are called on every gate. Only
     // the Z RANGES and the DIRECTIONS are decided here; the LANE is assigned
     // once gates and occupancy exist. See planTempo and assignTempo.
-    const tempoPlan = planTempo(key, surges);
+    const tempoPlan = planTempo(key);
 
     const rnd = MR.rng.stream(key, 'course/v1');
     const gates = [];
@@ -2225,13 +2024,11 @@ MR.Course = (function () {
           // Forcing it open can only ADD a lane path, so it cannot cost
           // solvable() a proof, and it makes the all-BLOCK guard below
           // unreachable for an in-zone gate rather than merely unlikely.
-          const zn = zoneBody(surges, z);
-          if (zn && cand[zn.lane] === K.BLOCK) cand[zn.lane] = rollHazard(rnd, difficulty(f), false);
           if (cand.every((l) => l === K.BLOCK)) continue;
 
           tally.attempts++;
           const trial = gates.concat([{ z, lanes: cand, f }]);
-          if (solvable(trial, elevation, surges, tempoPlan)) { lanes = cand; break; }
+          if (solvable(trial, elevation, tempoPlan)) { lanes = cand; break; }
         }
         if (!closed) break;   // pass 0 had no closure to drop, so pass 1 is moot
       }
@@ -2243,8 +2040,6 @@ MR.Course = (function () {
         // does, and CLEAR is the right answer here rather than a rolled hazard:
         // this gate exists because the generator gave up, and a gate it gave up
         // on should not also be the one that asks the most.
-        const zd = zoneBody(surges, z);
-        if (zd) lanes[zd.lane] = K.CLEAR;
         tally.degraded++;
       }
 
@@ -2306,7 +2101,7 @@ MR.Course = (function () {
                 if (ROOF > 0 && rnd.chance(0.55)) {
                   span = rnd.int(ROOF_SPAN_MIN, ROOF_SPAN_MAX);
                   const depth = 2 * HAZARD_HALF_Z[K.BLOCK] * (1 + span * 0.9);
-                  const cz = z + RAMP_RUN + actionWindowAt(z, elevation, surges, tempoPlan);
+                  const cz = z + RAMP_RUN + actionWindowAt(z, elevation, tempoPlan);
                   // The arc has to finish on the deck. If it does not, there is
                   // no cone -- never a cone with a short landing, because a
                   // runner still airborne at the dismount clears the next road
@@ -2358,10 +2153,8 @@ MR.Course = (function () {
                       if (!rest.some((o) => lanes[o] !== K.BLOCK)) continue;
                       const cand = lanes.slice();
                       cand[l2] = K.BLOCK;
-                      const zn2 = zoneBody(surges, z);
-                      if (zn2 && zn2.lane === l2) continue;   // never under the paint
                       const trial = gates.concat([{ z, lanes: cand, f }]);
-                      if (!solvable(trial, elevation, surges, tempoPlan)) continue;
+                      if (!solvable(trial, elevation, tempoPlan)) continue;
                       lanes[l2] = K.BLOCK;
                       ramp2Lane = l2;
                       break;
@@ -2428,7 +2221,7 @@ MR.Course = (function () {
       // by the geometry of THAT gate: which kinds it actually stands in the road
       // decides how deep its deepest lane is, and a train's rear face is a long
       // way further forward than its gate line says.
-      z += spacingAt(f, rnd, z, elevation, lanes, span, surges, tempoPlan);
+      z += spacingAt(f, rnd, z, elevation, lanes, span, tempoPlan);
     }
 
     const mileMarkers = [];
@@ -2439,18 +2232,17 @@ MR.Course = (function () {
     const spans = buildSpans(gates, ramps);
     // The lane, last, because every rule that makes a mat fair is a statement
     // about gates and about where the vehicles ended up.
-    const tempo = assignTempo(key, tempoPlan, gates, spans, elevation, surges, aid);
+    const tempo = assignTempo(key, tempoPlan, gates, spans, elevation, aid);
     const tempoLanes = [[], [], []];
     for (const m of tempo) tempoLanes[m.lane].push(m);
     const course = { key, gates, aid, mileMarkers, biomes: BIOMES, length: K.TOTAL_UNITS,
-                     elevation, ramps, spans, surges, tempo, tempoPlan, tally };
+                     elevation, ramps, spans, tempo, tempoPlan, tally };
 
     /**
      * The zone the runner is in, or null. Read by the renderer to lay the
      * marking, by the HUD to say a zone is coming, and by main.js every frame
      * to decide whether the runner has elected the surge.
      */
-    course.surgeZoneAt = function (z) { return zoneAt(surges, z); };
 
     /**
      * THE ELECTION, AND IT IS ONE LINE. A surge is on when the runner is inside
@@ -2464,11 +2256,6 @@ MR.Course = (function () {
      * marking is painted on the road. Trains are kept out of marked lanes at
      * generation (see the TRAIN_LOOK clause) so this is belt and braces.
      */
-    course.surgeAt = function (z, lane, onDeck) {
-      if (onDeck) return null;
-      const s = zoneAt(surges, z);
-      return s && s.lane === lane ? s : null;
-    };
 
     /**
      * The vehicle standing in (z, lane), or null.
@@ -2564,7 +2351,7 @@ MR.Course = (function () {
    * conflicts are rejected: two gates closer than ACTION_WINDOW may not demand
    * a jump and a duck back to back on the chosen path.
    */
-  function solvable(gates, elev, surges, tempo) {
+  function solvable(gates, elev, tempo) {
     if (!gates.length) return true;
     // state: set of (lane, lastAction, lastActionZ) -- collapse by lane+action.
     let states = [];
@@ -2584,10 +2371,10 @@ MR.Course = (function () {
           // already looked one airborne reach forward from there when it built
           // the table. See actionWindowAt.
           if (h !== K.CLEAR && s.act !== K.CLEAR && h !== s.act
-            && g.z - s.z < actionWindowAt(s.z, elev, surges, tempo)) continue;
+            && g.z - s.z < actionWindowAt(s.z, elev, tempo)) continue;
           const act = h === K.CLEAR ? s.act : h;
           const az = h === K.CLEAR ? s.z : g.z;
-          const tag = l + ':' + act + ':' + (g.z - az < actionWindowAt(az, elev, surges, tempo) ? 1 : 0);
+          const tag = l + ':' + act + ':' + (g.z - az < actionWindowAt(az, elev, tempo) ? 1 : 0);
           if (seen.has(tag)) continue;
           seen.add(tag);
           next.push({ lane: l, act, z: az });
@@ -2603,7 +2390,6 @@ MR.Course = (function () {
     const errors = [];
     const g = course.gates;
     const elev = course.elevation;
-    const surges = course.surges;
     // The PLAN, not the placed mats: the window was widened for every planned
     // lift, whether or not a lane could be found for it, so the spacing floor
     // this loop re-proves has to be evaluated against the same list spacingAt
@@ -2626,7 +2412,7 @@ MR.Course = (function () {
       // The epsilon is float slop only -- spacingAt returns this quantity
       // exactly when the floor binds, which late in a course is most gates.
       if (i > 0) {
-        const need = readWindowAt(g[i - 1].z, elev, surges, tempoPlan) + reachOf(g[i - 1].lanes, g[i - 1].train);
+        const need = readWindowAt(g[i - 1].z, elev, tempoPlan) + reachOf(g[i - 1].lanes, g[i - 1].train);
         if (g[i].z - g[i - 1].z < need - 1e-9) {
           errors.push(`gate ${i}: ${(g[i].z - g[i - 1].z).toFixed(2)} behind gate ${i - 1} `
             + `needs ${need.toFixed(2)} to stay readable past it`);
@@ -2675,35 +2461,6 @@ MR.Course = (function () {
     //      units of solid a BLOCK really is, and the flank is contact now.
     //   3. THE ENTRY IS READABLE. SURGE_SIGHT units of road before z0, inside
     //      the course, so the marking has somewhere to be seen from.
-    if (surges && surges.length) {
-      const spans = course.spans;
-      for (const s of surges) {
-        if (s.z0 < SURGE_SIGHT) {
-          errors.push(`surge ${s.n}: starts at ${s.z0.toFixed(0)}, inside its own `
-            + `${SURGE_SIGHT}u sighting distance`);
-        }
-        for (let i = 0; i < g.length; i++) {
-          if (g[i].z < s.z0 || g[i].z >= s.z1) continue;
-          if (g[i].lanes[s.lane] === K.BLOCK) {
-            errors.push(`surge ${s.n}: gate ${i} blocks the marked lane ${s.lane}`);
-          }
-        }
-        if (spans) {
-          for (const sp of (spans[s.lane] || [])) {
-            if (sp.z1 > s.z0 && sp.z0 < s.z1) {
-              errors.push(`surge ${s.n}: a vehicle occupies the marked lane from `
-                + `${sp.z0.toFixed(1)} to ${sp.z1.toFixed(1)}`);
-            }
-          }
-        }
-      }
-      for (let i = 1; i < surges.length; i++) {
-        if (surges[i].z0 - surges[i - 1].z1 < SURGE_SIGHT) {
-          errors.push(`surge ${surges[i].n}: only `
-            + `${(surges[i].z0 - surges[i - 1].z1).toFixed(0)}u after surge ${surges[i - 1].n}`);
-        }
-      }
-    }
     // ---- THE TEMPO CONTRACT, PROVED RATHER THAN COMMENTED -----------------
     //
     // Five claims are made in prose above assignTempo. Every one of them is
@@ -2729,7 +2486,7 @@ MR.Course = (function () {
     if (mats && mats.length) {
       const spans = course.spans;
       for (const m of mats) {
-        const read = readWindowAt(m.z0, elev, surges, tempoPlan);
+        const read = readWindowAt(m.z0, elev, tempoPlan);
         if (spans && !laneFree(spans, m.lane, m.z0 - read, m.z1)) {
           errors.push(`tempo ${m.n}: a vehicle stands in lane ${m.lane} inside the `
             + `${read.toFixed(1)}u read window of its own paint`);
@@ -2781,7 +2538,7 @@ MR.Course = (function () {
     if (course.ramps) {
       for (const r of course.ramps) {
         if (!r.cone) continue;
-        const need = r.z0 + r.run + actionWindowAt(r.z0, elev, surges, tempoPlan);
+        const need = r.z0 + r.run + actionWindowAt(r.z0, elev, tempoPlan);
         if (r.cone < need - 1e-9) {
           errors.push(`ramp at ${r.z0.toFixed(0)}: cone ${(need - r.cone).toFixed(2)}u inside `
             + 'the action window past the top of its tailgate');
@@ -2792,7 +2549,7 @@ MR.Course = (function () {
         }
       }
     }
-    if (!solvable(g, elev, surges, tempoPlan)) errors.push('course has no solvable lane path');
+    if (!solvable(g, elev, tempoPlan)) errors.push('course has no solvable lane path');
     // The sightline sweep. A profile that hides the road beyond a crest hides
     // the lane telegraph mats with it, which is the same class of failure
     // tools/shoot.js fails a build for when a prop occludes a hazard -- so it
@@ -2815,7 +2572,7 @@ MR.Course = (function () {
            // The surge-zone contract, exported so the renderer and the tools
            // read the numbers from the file that enforces them rather than
            // restating them. SURGE_SIGHT is the one the art has to build to.
-           SURGE_SIGHT, SURGE_LEN_MIN, SURGE_LEN_MAX, planSurge, windowExtraAt,
+           windowExtraAt,
            // The tempo contract, exported for the same reason: the renderer has
            // to know how long a mat is and which way it points, and the tools
            // have to read the lift out of the file that enforces it.

@@ -71,7 +71,6 @@ MR.Player = (function () {
       // The surge zone being run, or null. THE ZONE OBJECT, not a boolean, for
       // the same reason `ramp` is: leaving one zone and entering another is two
       // events, and a boolean cannot tell the second from the first.
-      surge: null,
       // The tempo mat being run, or null. THE MAT OBJECT for the reason `ramp`
       // and `surge` are objects: leaving one mat and entering another is two
       // events, and a boolean cannot tell the second from the first.
@@ -102,7 +101,7 @@ MR.Player = (function () {
       s.airT = 0; s.airborne = false; s.duckT = 0; s.ducking = false;
       s.duck01 = 0; s.lean = 0; s.stumble = 0; s.bounce = 0; s.tripT = 0;
       s.surface = 0; s.ramp = null; s.falling = 0; s.fallFrom = 0; s.flanked = null;
-      s.surge = null; s.mat = null; s.coned = null;
+      s.mat = null; s.coned = null;
       s.gateIdx = 0; s.aidIdx = 0;
       s.lastResult = null; s.lastGate = null; s.events.length = 0;
     };
@@ -607,39 +606,17 @@ MR.Player = (function () {
     };
 
     /**
-     * Is the runner electing the surge right now?
+     * ---- resolveSurge STOOD HERE AND THE MECHANIC IS GONE ----------------
      *
-     * ---- THE WHOLE INPUT FOR THE WHOLE MECHANIC IS THIS FUNCTION ----------
+     * It answered one question every frame: is this runner inside a surge
+     * zone's marked lane with fuel in the tank. The owner removed the surge --
+     * "One speed system. Remove the surge I think it's too confusing." -- so
+     * there is no election left to resolve.
      *
-     * There is no button, no hold, no double-tap and no new verb. A surge is
-     * elected by BEING IN THE MARKED LANE, which means the swipe the player
-     * already knows is the entire commitment. A new control was considered and
-     * refused on a concrete ground rather than a stylistic one: every control
-     * in this game is a swipe ANYWHERE on the canvas, so any button would sit
-     * exactly where a mis-started swipe lands, and the cost of that misfire in
-     * a game where one contact ends a record attempt is the run.
-     *
-     * `fuelled` is passed in rather than read, because the pool lives on Pace
-     * and this file has never known about the race clock. An empty tank ends
-     * the surge on the spot: the pace eases back up under the same law it
-     * eased down, and the player sees the gauge empty and feels the gear go.
-     *
-     * The two edges are separate events. Entering is worth a cue because the
-     * player has just spent something; leaving is worth one because they have
-     * just stopped, and the two reasons for leaving -- swerving out and running
-     * dry -- feel different and are told apart by whether the tank is empty.
+     * resolveTempo below is what remains, and it is the same shape for the
+     * same reason: a mat is elected by being in its lane, with no button and
+     * no new verb.
      */
-    s.resolveSurge = function (course, unitsNow, fuelled) {
-      const zone = course && course.surgeAt
-        ? course.surgeAt(unitsNow, s.lane, s.onDeck) : null;
-      const want = zone && fuelled ? zone : null;
-      if (want !== s.surge) {
-        if (want) s.events.push('surge');
-        else s.events.push(fuelled ? 'surgeOut' : 'surgeDry');
-      }
-      s.surge = want;
-      return want;
-    };
 
     /**
      * Which tempo mat the runner is standing on, or null.

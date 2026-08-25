@@ -66,7 +66,14 @@ MR.Pace = (function () {
   // the game now. ?effort=0 returns the other one, whole, from the same build.
   let EFFORT = 1;
 
-  const SURGE = {
+  /**
+   * The EFFORT configuration. It was called SURGE and held the surge's second
+   * floor, the pool cap, the guard cost and the burn rate; the surge is gone
+   * and three of those four survive it, so the name is wrong and a wrong name
+   * on an exported object is a trap for whoever reads it next. Renamed rather
+   * than left as a fossil.
+   */
+  const EFFORT_CFG = {
     // The unsurged floor, and it is SLOWER than K.FLOOR_PACE on purpose. The
     // shipped game hands a flawless run 86 seconds of free margin and six
     // policies tie inside it; the 86 seconds have to stop being free before any
@@ -92,81 +99,30 @@ MR.Pace = (function () {
     // 261 is the value at which BOTH halves of the owner's sentence hold: a
     // stranger does not walk it, and more than one line gets there.
     FLOOR_BASE: 261,          // 4:22 /mi
-    // The floor while surging. NOT 240: at 4:00/mi the airborne span reaches
-    // exactly ACTION_WINDOW and the invariant that stops a course demanding a
-    // jump and a slide at once is gone (docs/strategy-space.md). At 244 the
-    // span is 20.66 against a window of 21, and course.js widens the window
-    // inside a zone by exactly the difference so the SAME 1.16-unit margin the
-    // flat course keeps today holds inside a surge by construction.
-    FLOOR_SURGE: 244,         // 4:04 /mi
-    // Segments. FOUR, and the clause it has to satisfy is that a full tank can
-    // buy the LONGEST zone -- a smaller cap would make the longest zones
-    // unbuyable however well a player had allocated, which is a cap secretly
-    // editing the course. POOL_MAX x BURN_UNITS is 520 units of surged road.
+    // FLOOR_SURGE STOOD HERE AT 244 (4:04/mi) and was the second floor an
+    // elected surge ran toward. It is gone with the mechanic. The reasoning
+    // that set it is worth keeping because it constrains any future second
+    // floor: NOT 240, because at 4:00/mi the airborne span reaches exactly
+    // ACTION_WINDOW and the invariant that stops a course demanding a jump and
+    // a slide at once is gone (docs/strategy-space.md).
+    // Segments. FOUR, and with one spend left the cap is what stops aid being
+    // hoarded into irrelevance: a small tank has to be SPENT to keep
+    // collecting, which is the property docs/strategy-space.md asked of it.
     //
-    // It used to be exactly SURGE_LEN_MAX and the two moved together through
-    // roadmap 68's retune. Zones are now 260 to 340, so a full tank buys about
-    // one and a half of the longest -- the clause is satisfied with room over
-    // rather than exactly, which is the safe side of it. BURN_UNITS itself did
-    // NOT move with them, and deliberately: it is denominated in units of
-    // ROAD, so 520 units of surged road is what a tank buys whatever length
-    // the zones are. Shrinking zones changes how that 520 may be SPREAD, not
-    // how much of it exists, which is why the difficulty numbers this lever
-    // was tuned against are re-measured rather than re-tuned.
+    // ---- BURN_UNITS IS GONE, AND IT WAS THE DIFFICULTY LEVER -------------
+    //
+    // A segment bought BURN_UNITS of surged road, so POOL_MAX x BURN_UNITS was
+    // how much road a full tank could buy, and roadmap 68 tuned the whole
+    // difficulty contract on it -- 140/560 gave 42% of cells and 25% on a
+    // first attempt, 130/520 gave 32% and 20%, 120/480 gave 10% first-attempt.
+    // With the surge removed there is nothing to burn: the pool buys guard and
+    // guard only, at GUARD_COST a contact.
+    //
+    // THAT LEVER IS THEREFORE UNAVAILABLE and whatever holds the difficulty
+    // bar now has to be a different number. Say which one moved and why in the
+    // roadmap rather than reaching for this one, because it is not here.
     POOL_MAX: 4,
-    // One segment absorbs one contact whole.
     GUARD_COST: 1,
-    // ---- THE ONE NUMBER THAT DECIDES WHETHER THERE IS AN ALLOCATION -------
-    //
-    // World units of marked-lane running per segment. It is set by making the
-    // pool BIND, and the first value it was given did not:
-    //
-    //   zones on a course      2205 units
-    //   collectible road aid   13.7 items, i.e. 13.7 segments
-    //
-    //   1 per 200u   surging EVERY zone costs 11.0 segments -- a 2.7 surplus,
-    //                so the pool never binds, "surge everything" is affordable
-    //                AND leaves change for guard, and it dominates every
-    //                selective policy. Measured: BLIND beat the record at 4 of
-    //                5 skill levels and every learned policy lost. One optimal
-    //                policy again, one level up.
-    //   1 per 140u   surging every zone costs 15.7 segments against 13.7. You
-    //                can afford about seven eighths of the road, and only by
-    //                spending the guard. Now WHICH zones you buy is the
-    //                decision, and because lowering the floor is worth 0.285x
-    //                at streak 5 and 0.93x at streak 150, the late ones are
-    //                worth nearly twice the early ones.
-    //
-    // So 140, and the surplus is deliberately negative. A player cannot buy
-    // the whole course and cannot insure the whole course, and the pool is
-    // filled by the one thing that already costs an action to reach.
-    //
-    // ---- AND 130 AFTER ROADMAP 68, BECAUSE THE ROAD AND THE POOL BOTH GREW
-    //
-    // That pass added on both sides of the same balance: road aid went 13.7 ->
-    // 15.9 for the opening, and a sixth surge zone was mandated into the first
-    // eighth of the race. More pool AND more road to spend it on is more
-    // buyable speed, and tools/simulate.js said so -- the share of policy x
-    // skill cells beating the record went 26% -> 42%, with "with the course
-    // learned" at 53%. Over half of everything winning is the 260 finding in
-    // different clothes.
-    //
-    // BURN is the lever that cancels it exactly, because it is denominated in
-    // the same currency as both changes. Swept, with SURGE_LEN_MAX moved with
-    // it so a full tank stays exactly one maximum-length zone (POOL_MAX x BURN):
-    //
-    //   140 / 560   42% of cells, 25% first-attempt, 53% learned, spread  85.0s
-    //   130 / 520   32% of cells, 20% first-attempt, 40% learned, spread  94.1s
-    //   120 / 480   -            10% first-attempt, 20% learned, spread  85.9s
-    //
-    // 130, and the column that decided it is FIRST-ATTEMPT: 20% against the 25%
-    // the shipped game had, so a stranger is LESS likely to walk it than
-    // before, while "learned" rose from 27% to 40% and the spread from 85.0s to
-    // 94.1s. Knowing the course is worth more and guessing is worth less, which
-    // is the owner's sentence -- "if people get it on the first try everytime
-    // they will not always play" -- expressed as two numbers moving in opposite
-    // directions.
-    BURN_UNITS: 130,
   };
 
   /**
@@ -252,8 +208,8 @@ MR.Pace = (function () {
    * an action's cost in both directions, which is the point.
    */
   const TEMPO = {
-    LIFT: (SURGE.FLOOR_BASE - K.FLOOR_PACE) / 2,   // 3.5 s/mi: 4:21 -> 4:17
-    DRAG: 3 * (SURGE.FLOOR_BASE - K.FLOOR_PACE) / 2, // 10.5 s/mi: 4:21 -> 4:32
+    LIFT: (EFFORT_CFG.FLOOR_BASE - K.FLOOR_PACE) / 2,   // 3.5 s/mi: 4:21 -> 4:17
+    DRAG: 3 * (EFFORT_CFG.FLOOR_BASE - K.FLOOR_PACE) / 2, // 10.5 s/mi: 4:21 -> 4:32
   };
 
   /**
@@ -265,15 +221,23 @@ MR.Pace = (function () {
     return tempo > 0 ? Math.max(K.FLOOR_PACE, base - TEMPO.LIFT) : base + TEMPO.DRAG;
   }
 
-  /** The floor this runner is running toward right now. */
-  function floorPace(surging) {
-    if (EFFORT <= 0) return K.FLOOR_PACE;
-    return surging ? SURGE.FLOOR_SURGE : SURGE.FLOOR_BASE;
+  /**
+   * The floor this runner is running toward right now.
+   *
+   * IT USED TO TAKE AN ARGUMENT. `floorPace(surging)` returned FLOOR_SURGE for
+   * a runner inside a surge zone's marked lane and FLOOR_BASE otherwise, which
+   * was the whole of the surge: an elected, pool-burning second floor. With
+   * one speed system there is one floor, and the mats move the TARGET above it
+   * rather than moving the floor itself -- see tempoTarget, and the clamp in
+   * it that keeps K.FLOOR_PACE the fastest anything can ever run.
+   */
+  function floorPace() {
+    return EFFORT <= 0 ? K.FLOOR_PACE : EFFORT_CFG.FLOOR_BASE;
   }
 
   /** The fastest pace ANY line can reach, which is what a bound must use. */
   function bestFloor() {
-    return EFFORT > 0 ? SURGE.FLOOR_SURGE : K.FLOOR_PACE;
+    return K.FLOOR_PACE;
   }
 
   function targetPace(streak, floor) {
@@ -330,11 +294,17 @@ MR.Pace = (function () {
       // Every field below stays at its initial value for the whole race when
       // the flag is off, so the finish time, the streak and the hit count are
       // bit-identical to the shipped game.
-      pool: 0,           // segments in hand, fractional while a surge burns
+      // ONE SPEND, and it used to be two. A segment bought either a GUARD or
+      // a stretch of surge, and the tension between them -- guard worth most
+      // early, surge worth most late -- was the whole strategic axis roadmap
+      // 66 built. The surge is gone, so the pool buys guard and nothing else;
+      // what replaces the axis is the LINE, a per-gate choice weighed against
+      // what the mats pay. docs/risk-reward.md is the warning that has to be
+      // answered with a number: with one spend, aid risks being free insurance
+      // again, which is exactly the defect that started all of this.
+      pool: 0,           // segments in hand
       guards: 0,         // contacts a segment absorbed
       wasted: 0,         // items collected into a full pool
-      surging: false,    // set by main.js from the runner's lane, read here
-      surgeUnits: 0,     // world units actually run under surge
       // ---- the mats, and they are inert at EFFORT = 0 ---------------------
       tempo: 0,          // +1 on a forward mat, -1 on a backward one, set by main
       liftUnits: 0,      // world units run on forward mats
@@ -367,8 +337,7 @@ MR.Pace = (function () {
       // in tempoTarget means that even if one were laid there, the pace could
       // not go below K.FLOOR_PACE and the fastest the game can run would still
       // be FLOOR_SURGE exactly.
-      const tgt = tempoTarget(targetPace(s.streak, floorPace(s.surging)),
-                              s.surging ? 0 : s.tempo);
+      const tgt = tempoTarget(targetPace(s.streak, floorPace()), s.tempo);
       const d = tgt - s.pace;
       const step = K.PACE_EASE * dRace;
       s.pace += Math.abs(d) <= step ? d : Math.sign(d) * step;
@@ -402,23 +371,16 @@ MR.Pace = (function () {
       const dUnits = dMiles * K.UNITS_PER_MILE;
       s.units += dUnits;
 
-      // ---- the burn -------------------------------------------------------
-      // Charged over GROUND rather than over time, so a surge costs the same
-      // whatever the hill under it is doing and a descent inside a zone cannot
-      // be used to buy the same road for less. Draining the pool ends the
-      // surge on the spot; the pace then eases back up under the same law,
-      // which is the honest and legible failure -- the player is shown the
-      // tank empty and feels the gear go.
       // Ground run under each mat, for the report and for tools/tempo.js. Not a
       // cost: a mat charges nothing and is free to run on. What it charges is
       // the lane it asks you to be in.
-      if (EFFORT > 0 && s.tempo && !s.surging && dUnits > 0) {
+      //
+      // THE BURN STOOD HERE. A surge drained the pool over GROUND rather than
+      // over time, so it cost the same whatever the hill was doing; draining
+      // it ended the surge on the spot. It is gone with the mechanic, and with
+      // it BURN_UNITS -- the lever roadmap 68 tuned the difficulty on.
+      if (EFFORT > 0 && s.tempo && dUnits > 0) {
         if (s.tempo > 0) s.liftUnits += dUnits; else s.dragUnits += dUnits;
-      }
-      if (EFFORT > 0 && s.surging && dUnits > 0) {
-        s.pool -= dUnits / SURGE.BURN_UNITS;
-        s.surgeUnits += dUnits;
-        if (s.pool <= 0) { s.pool = 0; s.surging = false; }
       }
       return dUnits;
     };
@@ -451,10 +413,10 @@ MR.Pace = (function () {
      */
     s.onHit = function () {
       s.gatesSeen++;
-      if (EFFORT > 0 && s.pool >= SURGE.GUARD_COST) {
-        s.pool -= SURGE.GUARD_COST;
+      if (EFFORT > 0 && s.pool >= EFFORT_CFG.GUARD_COST) {
+        s.pool -= EFFORT_CFG.GUARD_COST;
         s.guards++;
-        if (s.pool <= 0) { s.pool = 0; s.surging = false; }
+        if (s.pool <= 0) s.pool = 0;
         return 'guard';
       }
       s.hits++;
@@ -485,8 +447,8 @@ MR.Pace = (function () {
       // this pass does not touch.
       if (EFFORT > 0) {
         s.aid++;
-        if (s.pool >= SURGE.POOL_MAX) { s.wasted++; return; }
-        s.pool = Math.min(SURGE.POOL_MAX, s.pool + 1);
+        if (s.pool >= EFFORT_CFG.POOL_MAX) { s.wasted++; return; }
+        s.pool = Math.min(EFFORT_CFG.POOL_MAX, s.pool + 1);
         return;
       }
       // Three bounds, and each one is doing a job.
@@ -641,8 +603,7 @@ MR.Pace = (function () {
       return Math.min(K.MARATHON_MILES, s.raceTime / K.RECORD_PACE);
     };
 
-    s.targetPace = () => tempoTarget(targetPace(s.streak, floorPace(s.surging)),
-                                     s.surging ? 0 : s.tempo);
+    s.targetPace = () => tempoTarget(targetPace(s.streak, floorPace()), s.tempo);
 
     /** Whole segments in hand -- what the gauge counts and guard spends. */
     s.segments = function () { return Math.floor(s.pool); };
@@ -683,7 +644,7 @@ MR.Pace = (function () {
     return `${sign}${m}:${s.toFixed(1).padStart(4, '0')}`;
   }
 
-  const api = { create, targetPace, clock, pace, delta, SURGE, TEMPO, tempoTarget,
+  const api = { create, targetPace, clock, pace, delta, EFFORT_CFG, TEMPO, tempoTarget,
                 floorPace, bestFloor };
 
   // Accessor rather than a plain field, so a nonsense value cannot be written

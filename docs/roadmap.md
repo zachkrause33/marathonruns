@@ -5784,3 +5784,408 @@ other game whole.
 - **It asked for more hazards at the start.** Measured, that is the wrong lever
   for the stated problem, and the freshness arithmetic in
   `staleness-and-mats` says why. `makeGate` is untouched.
+
+---
+
+## Roadmap 69 · One speed system: the telegraph mats and the surge both go, and the strategy moves from the tank to the line
+
+**BUILD EVERY ANGLE. THERE IS NO BACK OF AN OBJECT.** Every object in this game
+is modelled on all sides, fully, always -- every obstacle and vehicle of any
+kind, every building, bridge, tree, crowd, sign and prop, and the runner. **A
+marking painted on a surface is the one exception, because it is not an
+object**, and almost all of this pass is paint: the tempo mat is a marking and
+has no back. The one thing built here that stands up -- the advance board that
+was added to the surge zone and then deleted with it -- was built on both faces
+with its lane diagram correct from each, which is the note worth keeping from a
+piece that no longer ships.
+
+This entry covers three owner decisions that arrived in sequence while the work
+was in flight, each one superseding part of the last. They are reported in the
+order they landed, because the middle states produced measurements that the
+final state depends on.
+
+### 0. What the owner asked for, in three messages
+
+> *"Remove all telegraph mats. Mats should all be there to increase or decrease
+> speed. Two colors - one speeds you up, one slows you down. Placed randomly.
+> Green speeds up, red slows down."*
+
+> *"Make the zones smaller too. Small speed increase and small speed decrease.
+> Placed strategically so that players need to make decisions. Around
+> obstacles, on top of vehicles, around water and bananas."*
+
+> *"One speed system. Remove the surge I think it's too confusing. Just one type
+> a matt that either briefly speeds you up or down based off the color."*
+
+The end state is one marking language on the road: **a tempo mat, green for
+faster and red for slower, laid where a decision already exists.** The pool
+survives, filled by aid, spending on guard alone.
+
+---
+
+### 1. The surge zone was made legible, and then deleted. The findings survive.
+
+Entry 68 painted the zone and closed owing a blind read. That read is the
+reason half of this entry exists, so it is reported even though the object it
+judged is gone.
+
+**The instrument that passed the marking was measuring the wrong thing.** It
+projected the three lane centrelines through the real camera and took the
+argmax of marking-hue pixels: 36 of 36. A blind reader shown twenty frames --
+fourteen of them zone approaches at 88-90 units -- never once mentioned green
+paint, a countdown or an arrow, and on a centre-lane entry at 90 units wrote:
+
+> *"At normal size this is a bare road."*
+
+**An argmax over three faint values resolves cleanly on a tint no human can
+see.** The machine measured RECOVERABILITY -- is the answer present in the
+pixels at all -- and reported it as LEGIBILITY. Those are different questions
+and only the second one is the player's. This is the correction to keep from
+entry 68 and it is why `tools/roadread.js` exists.
+
+**Three defects were then found by looking at frames rather than at source**,
+and all three are general:
+
+1. **Everything the marking owned lay AT or BEYOND the entry line.** At the
+   sight distance the entry is ninety units away, so the wash, the rails, the
+   entry bar and the green block were all compressed into the last few pixels
+   before the vanishing point -- while the near half of the frame was three
+   telegraph mats at full saturation. The fix was to run the lane's boundary
+   rails *back* ninety units into the approach, which is the only ground in the
+   picture with screen area on it. One frame before and after settles it: the
+   marked lane goes from invisible to a wedge across half the frame.
+2. **The countdown boards were fully occluded and nobody had checked.** On the
+   first zone approach photographed, BOTH live boards projected inside the near
+   leg of an access-gantry DUCK standing eight units in front of the lens. One
+   roadside object is one occluder away from nothing. The fix was a board on
+   each verge, carrying a three-cell lane diagram as well as the count.
+3. **The three plates were told apart by hue and by a glyph, and both channels
+   are gone at distance.** At ninety units a plate is eleven pixels and the
+   arrow inside it is five, and the atmospheric fade pulls a saturated green
+   most of the way to the sky. The fix was SIZE -- the lit plate grew to 2.40
+   against its neighbours' 1.50, bottom-aligned so the gantry has an obvious
+   odd one out before any colour resolves.
+
+**Then the owner removed the surge.** The art went with it. The three findings
+are not about zones -- they are about what survives distance, what one occluder
+can take out, and which channel a machine test can fake -- so they are recorded
+here rather than deleted with the object.
+
+---
+
+### 2. The telegraph mats: removed, and it was measured before it was done
+
+Three hues of iconised paint in front of every hazard, saying OVER, UNDER or
+AROUND. All of it gone: `matTexture`, `matGeo`, `matMat`, `telegraph()`, and
+the one non-variant child every pooled hazard carried.
+
+**`docs/mats-three-lane.md` is why this is safe rather than a gamble.** Four
+uncontaminated readers, 132 occupied-lane judgements at 25.35 and 32 units,
+counterbalanced within reader:
+
+| | mat ON | mat OFF |
+|---|---|---|
+| occupied lanes correct | 60/66 (91%) | **62/66 (94%)** |
+| DUCK | 26/26 | 26/26 |
+| BLOCK | 14/14 | 14/14 |
+| lane choice VIABLE | 32/32 | 32/32 |
+
+**The painted arm was the worse arm**, and nobody in either arm ever picked a
+lane that would end a run.
+
+**WHAT IT COST, stated so it is not rediscovered as a bug.** That same test
+found the one job the mat demonstrably did: it **teaches which low object is
+jumpable**. Reader B decoded the colour code unaided, used it to settle two
+barrier sprites as jumpable, and carried the lesson to three unpainted panels;
+reader C refused the code and read those same sprites as walls ten times. So
+what is lost is a **learning channel over a player's first runs**, not the
+moment-to-moment read. It is deliberately not replaced.
+
+**What did NOT go is the road-fitting machinery.** `roadSurfaceY` and the
+`updateMatrixWorld` fit were built for the mat and are the hardest-won code in
+`world.js`; the tempo mat lies on the same road over five times the length and
+inherits both. The header there records why it hangs off `updateMatrixWorld`
+and not `onBeforeRender` -- attributes upload during `projectObject` at the top
+of `render()`, so geometry written in `onBeforeRender` reaches the GPU a frame
+late and every instrument in this project would photograph the mark before it
+existed.
+
+---
+
+### 3. The tempo mat, drawn: green goes, red drags
+
+One mesh per live mark, one draw. A strip of quads lying on the tarmac at
+`MAT_LIFT`, fitted per vertex to `roadSurfaceY` -- the piecewise-linear surface
+the rigid 24-unit tiles actually make, not the elevation profile they are cut
+from. A rigid plane over an 88-unit mark departs from the tarmac by
+`c * L^2 / 8 = 0.60 units`, which on a depth-tested material is not a faint
+mark but no mark at all.
+
+**The colour is the answer and the shape is the redundancy**, and the shape is
+not decoration:
+
+- **Red and green is the one pair a colour-blind player cannot split.**
+  Deuteranopia and protanopia between them collapse exactly this axis. A
+  mechanic worth two and a half race seconds that can only be read in hue is a
+  mechanic those players cannot play.
+- **Haze eats hue before it eats shape.** The surge pass measured it: a
+  saturated green at ninety units is most of the way to the sky behind it.
+
+So a **lift** carries three stripes ALONG the lane and a **drag** a ladder of
+rungs ACROSS it. Longitudinal is the direction of travel; transverse bars at
+close pitch are what a real road paints to say slow down. Neither is a chevron
+and neither is a cross -- the two glyphs the removed mats owned are now free
+and stay unused.
+
+**The tone is a ceiling before it is a colour.** A hazard stands on a lift mat
+by construction, so the mat is a surface the contrast gate has to know about.
+The dimmest hazard in the game is JUMP v7 at **L 88.1**, so any surface at or
+below **L 70.5** clears the 1.25x gate for all 26 variants on luminance alone.
+Both mats are therefore a DARKENING carrying bright marks -- wash `0.46x`,
+marks `1.50x` over about a fifth of the lane -- and `api.contrastAudit` reports
+six more roads, lift and drag on each lane, built from the same function that
+draws them.
+
+**A defect found by winding.** The first strip was positioned correctly, fitted
+correctly, and drew nothing: the four corners wound `0,1,3 / 0,3,2` give a `-y`
+normal, which `mats.paint` backface-culls. It photographed as a correct,
+invisible mat -- exactly the shape of failure a position check cannot catch.
+
+---
+
+### 4. Strategic placement: a mat weights a decision, it does not make one
+
+The design intent handed down, and the sentence the code is judged by: **a mat
+should never be the decision -- it should change the price of a decision the
+player was already making.**
+
+**There is a circularity here and the obvious design walks into it.**
+`spacingAt()` consults the tempo plan WHILE laying the gates, because a lift
+widens the action window and a gate spaced for the unlifted pace would owe the
+player reaction time it did not give. So the plan cannot wait for the gates and
+the gates cannot wait for the plan.
+
+The way through is that **the plan is a BUDGET, not a placement**. It draws a
+long range, `spacingAt` widens across all of it, and `assignTempo` then paints
+a SHORT mark somewhere inside that range, on the decision. Every unit of paint
+is inside a range the course already widened for, so the fairness arithmetic
+covers it and nothing has to be re-derived.
+
+Sites, in order of how much of a decision they are:
+
+| site | why |
+|---|---|
+| **an aid item in the mark's own lane** | a bottle already sits behind a hurdle in that hurdle's lane, so collecting it is already a priced detour. Green makes the detour cheap, red makes it dear. **The same pickup becomes a different decision depending on what is painted around it.** |
+| **an obstacle in the mark's own lane** | required for a lift and always was (clause 3, "a forward mat is earned"). What changed is that the paint now ARRIVES at that obstacle with a full read window in hand instead of starting wherever the plan opened. |
+| **a gate where the lanes differ** | the weakest site and still a real one: somewhere a player is choosing at all. |
+
+Ground with none of these is not painted.
+
+**Two defects this turned up:**
+
+- **A mandated thing skipped a constraint every ordinary thing was held to.**
+  The mandated first mark was pushed with no zone-clash test while the first
+  zone was mandated into an overlapping stretch of the opening, so the one mark
+  every player was guaranteed to meet was the one allowed to sit under a zone's
+  gantry. Found on a chase frame; no headless number was watching for it.
+- **Anchoring on a bottle can slide a lift clear of the hurdle that earns it.**
+  1 course in 90 failed `validate()` on it. An aid anchor is now only taken for
+  a lift when the earning gate is still inside the run it produces.
+
+**Not built: mats on vehicle roofs.** A deck is a different running surface at
+`DECK_Y`, so a roof mat is not this mark moved upward -- `tempoAt` would have
+to answer for a lane the runner is riding rather than standing in, the strip
+would have to lie on the deck instead of on `roadSurfaceY`, and the lift would
+have to enter `spacingAt` through ramps, which are created DURING gate
+generation and so land on the far side of the same circularity. It is a pass of
+its own.
+
+---
+
+### 5. The surge, removed entirely
+
+Not flagged off. A dead mechanic behind a scalar is a trap, and this one
+reached into the road tile, five pools, the structure table, the contrast
+audit, the spawn window, three tools and the pace model.
+
+Gone: `planSurge`, `SURGE_SIGHT`, the zone length and count bands, the mandated
+early zone, `zoneAt` / `zoneBody` / `surgeExtraAt`, the marked-lane promises
+inside `makeGate`, every surge clause in `validate()`, `resolveSurge`,
+`FLOOR_SURGE`, `BURN_UNITS`, the zone HUD nag, and all the zone art. `Pace.SURGE`
+was **renamed `Pace.EFFORT_CFG`**, because three of its four fields survive the
+mechanic and a wrong name on an exported object is a trap of its own.
+
+**Assertions removed, named as the coordinator asked:**
+
+| where | what it asserted | what replaces it |
+|---|---|---|
+| `playthrough.js` | the bot elected some surge (the roadmap-67 blindness check) | the bot must run some forward mat |
+| `playthrough.js` | coincidental surge, 40-48% of marked road, printed every run | nothing -- a mat is not elected. The question it asked, what share of the paint is decoration, is now the policy spread |
+| `playthrough.js` | the best spend policy beats never seeking, AND which zones is worth 10 s | reading the paint must beat ignoring it |
+| `risk.js` | `opts.surge`, a spend policy, plus the three-part blindness audit | `opts.line`, a `{lift, drag}` weight pair, and the same three-part audit one mechanic along |
+| `simulate.js` | eight surge-allocation policies | eight LINE policies |
+| `tempo.js` | a lift stacked on a surge cannot pass the surge floor | the stated hard floor, `FLOOR_BASE - LIFT` |
+
+---
+
+### 6. THE MEASUREMENT THAT MATTERS: does the strategy survive?
+
+`docs/risk-reward.md` is the standing warning. Before the pool had two rival
+uses, **six policies finished at 1:58:03 with a spread of 0.0 seconds** -- aid
+was insurance with no premium, worth 0.00 s to a clean run, and there was
+nothing to decide. The surge gave the tank a second spend whose value peaked at
+the opposite end of the race from guard, and that tension WAS the strategy.
+
+**Removing the surge gives the pool one use again.** So the axis had to move,
+and the claim is that it moves to the **LINE**: at nearly every gate the player
+weighs what a lane costs in ACTIONS against what it pays in TEMPO. That is a
+different KIND of decision -- local and repeated rather than global and
+allocated -- and it had to be shown, not assumed.
+
+**First measurement, and it failed:**
+
+```
+spread across policies at perfect    5.7s   (floor is 15s)
+beats the record, all cells          0 of 40
+```
+
+**Surge had been worth about 131 race seconds a race** -- 1848 units run at
+17 s/mi. The halved mats were worth about **4**. That is not a tuning error; it
+is a mechanic with no room in it. Three things had to change and each was
+forced by a measurement rather than chosen:
+
+1. **The lift went back to the whole gap.** It had been halved to 3.5 s/mi,
+   derived correctly against the cost of an action -- and the derivation's
+   premise was deleted underneath it, because at the time the surge still
+   supplied the race's speed and the mat only had to nudge a lane choice.
+2. **The count went up, because the surge's road paid for it.** Zones plus
+   their sight exclusion closed better than half the course to marks. With that
+   gone: **7.85 marks a course -> 29.13**.
+3. **`FLOOR_BASE` came down, 261 -> 258.8.** It sat 7 s/mi slower than the
+   datum every gate spacing is cut against ONLY because the surge existed to
+   buy the difference back. Removing the surge left the ordinary runner
+   permanently slow for no reason and the record unreachable.
+
+**And the clamp came off.** `tempoTarget` clamped a lift at `K.FLOOR_PACE`, and
+that clamp had exactly one job: stop a lift compounding with a surge. With the
+surge gone it would only have meant a lift did nothing once `FLOOR_BASE` came
+down to meet it. A lift now takes the runner BELOW the spacing datum exactly as
+the surge used to, paid for the same way -- `windowExtraAt` widens the action
+window by precisely the lift, and `tempo.js --section fair` measures it.
+
+**Where it landed:**
+
+| | before any of this | with surge (entry 68) | now |
+|---|---|---|---|
+| policy spread at perfect | **0.0 s** | 94.1 s | **18.1 s** |
+| beats the record, all cells | -- | 32% | **31%** |
+| ...on a FIRST attempt | -- | 20% | **20%** |
+| ...with the course learned | -- | 40% | **53%** |
+
+**The difficulty bar is held on the column the last pass said decided it**:
+20% on a first attempt, exactly. Knowing the course is worth MORE than it was
+(53% against 40%), and the spread is well clear of the 15 s floor although far
+below the surge's 94 s. `playthrough.js`, end to end in the real page: reading
+the paint is worth **18.2 s** over ignoring it.
+
+**A defect in the sweep's own cost model was hiding part of this.** An action
+was charged `skill x penalty`, but `skill` is P(clear) -- so a PERFECT runner
+was billed the full price of an action they never fluff, and the sloppiest was
+billed the least. `READ ROAD`, the policy that scores both channels in race
+seconds and is meant to bound what a perfect reader can do, was **losing to the
+naive CHASE GRN**. An instrument that makes the informed line look worse than
+the greedy one is measuring its own arithmetic. Fixed to `(1 - skill)`, and the
+learned column went from 13% to 53%.
+
+**AND THE HONEST HALF: aid is free insurance again.** `risk.js` on a clean run
+-- take every bottle 1:59:21 against take none 1:59:22. **One second.** The pool
+has one spend, a clean runner never needs a guard, and `playthrough.js` shows a
+bot collecting 19 items and wasting 13 of them. That is precisely the defect
+`risk-reward.md` was written about, returning by the front door. It is survived
+rather than solved: the strategy is real and it is entirely in the line, not in
+the tank. **The bottle is worth something only where a mat makes the detour
+cost or pay** -- which is what the aid anchoring in section 4 is for, and it is
+the thread to pull if this is to be fixed properly.
+
+---
+
+### 7. Three instrument corrections, all rule 3
+
+1. **`tempo.js` had a derivation baked in as a constant.** `liftSpeed` read
+   `K.FLOOR_PACE`, which was TRUE and a COINCIDENCE: the shipped `LIFT` was
+   exactly `FLOOR_BASE - K.FLOOR_PACE`, so the clamp bound exactly. The moment
+   the step changed, the line measured the window against a speed no runner
+   could reach and reported an 11 ms rule-4 failure against a course that had
+   widened correctly. It failed in the HONEST direction -- inventing a problem
+   rather than hiding one -- which is the only reason it was caught.
+2. **`simulate.js`'s skill term was inverted.** Section 6.
+3. **`calendar.js` boxed a hill and called it a wall.** `HIDES` reported
+   `set piece / tempoMark (y>=5.48)` occluding a JUMP eighty units ahead. The
+   mark is flat paint twelve millimetres above the tarmac; its bounding box is
+   5.48 units tall because it is fifty units of strip lying on a HILL. A flat
+   mark became a wall because the audit measures extents rather than surfaces.
+   Exempted with the road tile's own exemption, structurally.
+
+`blindread.js` also had to be told the mats are gone: it asserted every pooled
+hazard carried exactly one non-variant child and named it. The assertion is
+kept with both counts legal, because its real job was to fail loudly if the
+group grew a sibling it would photograph as the mat.
+
+---
+
+### 8. Where the briefs were wrong
+
+- **The proposal that direction should be a gradient in spacing** -- bars whose
+  gaps widen forward on a lift and close forward on a drag -- **cannot work,
+  and the arithmetic is flat.** Perspective already compresses transverse
+  spacing as `1/d^2`: over a mark running from 25 to 82 units, screen gaps
+  shrink by 10.8x on their own. To make gaps merely LOOK equal, world spacing
+  must grow as `d^2`; to make them visibly widen, faster than that -- a factor
+  over 11 inside a 57-unit mark. Both directions would read as converging,
+  differing only in rate. What survives perspective is ORIENTATION, which is
+  scale-free and read locally.
+- **"A shape, not a new hue" was overtaken.** The constraint was sound when the
+  telegraph mats owned three saturated hues; with them removed the road has
+  colour to spend, and the owner spent it. Shape is kept as redundancy, for the
+  colour-blindness and haze reasons above.
+- **"Placed randomly" was withdrawn one message later** and the code never
+  implemented it.
+- **Zone size and mat count are a direct trade, and neither brief saw it.**
+  Raising the zone count to hold the difficulty contract took mats from 11.1 a
+  course to 6.9. The exclusion band round a zone was symmetric and only its
+  front protected anything; making it 90 ahead and 30 behind gave the road
+  back. All of that is moot now, and it is the reason the mat count could
+  quadruple the moment the surge left.
+- **The suggestion to reach for `BURN_UNITS`** to hold the difficulty was the
+  wrong lever twice over: it is denominated in units of ROAD, so shrinking
+  zones did not touch it (the real mechanism was OPPORTUNITY -- less marked
+  road means less of the pool can be converted), and it does not exist any
+  more.
+
+---
+
+### 9. Cost and the gate
+
+Draw calls: peak **254** at 04-wall against ~400, down from 274 mid-pass and
+265 shipped -- the surge furniture and the telegraph mats together were worth
+more draws than the tempo paint costs. Triangles moved under 1%.
+
+`build` - `shoot` (all shots clean, no `LOW`/`HIDES`/`BLANKS`/`PAINTS`;
+tightest hazard contrast **JUMP v2 vs lane 1 at 1.29-1.33x**, gate margin
++0.022 to +0.062, the same pair and the same numbers as before this pass) -
+`course-test` 90 days - `simulate` - `calendar` **32 days clean** -
+`kindread` **profile 1 of 26**, unchanged - `footroom` - `deckdrop` -
+`mechanics --identity` - `tempo` (`validate()` 40/40, open-lane guarantee
+**388/388**, fairness verdict **-1 ms**) - `risk` - `playthrough`.
+`index.html` rebuilt and **left uncommitted**.
+
+### 10. Still open
+
+- **Aid is worth one second to a clean run.** Section 6. The pool needs a
+  second spend or the bottle needs to be reliably priced by the paint.
+- **Mats on vehicle roofs**, the one part of the placement instruction not
+  built. Section 4 says what it costs.
+- **The learned axis is thin.** `GRN CHAIN`, a policy that looks 300 units
+  ahead and picks the lane leading to the most green, does not beat greedy
+  `CHASE GRN`. A mat decision is myopically optimal, which is the structural
+  difference between a line and an allocation.

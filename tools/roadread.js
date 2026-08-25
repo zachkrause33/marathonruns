@@ -235,9 +235,25 @@ you actually see rather than what you think a running game would contain.
         const g = MR.game, K = MR.K;
         g.pace.units = z; g.pace.miles = z / K.TOTAL_UNITS * 26.2;
         g.world.update(z, 1);
-        g.runner.group.position.set(K.LANE_X[1], 0, z);
+        /**
+         * ---- SEAT THE RUNNER ON THE ROAD, NOT AT ZERO --------------------
+         *
+         * This posed him at y = 0 and the road is a hill: at z where the
+         * elevation is four units the runner was four units UNDER the tarmac.
+         * A reader spotted it before I did, unprompted -- "the runner is
+         * nearly gone: only the top of his red cap shows, flush with the road
+         * surface" -- which is exactly the kind of thing a staging harness
+         * puts in a panel and then attributes to the game.
+         *
+         * It does not touch the markings, which are drawn by world.update from
+         * the course table and know nothing about the runner. But a panel with
+         * a defect in it spends the reader's attention on the defect, and a
+         * reader who reports it is a reader not answering the question.
+         */
+        const y = g.course.elevation ? g.course.elevation.at(z) : 0;
+        g.runner.group.position.set(K.LANE_X[1], y, z);
         for (let i = 0; i < 8; i++) {
-          g.cam.update(0.5, { z, x: K.LANE_X[1], y: 0, speed: 27.6, lean: 0, duck01: 0 });
+          g.cam.update(0.5, { z, x: K.LANE_X[1], y, speed: 27.6, lean: 0, duck01: 0 });
         }
         g.renderer.render(g.scene, g.cam.camera);
       }, { z: sh.z });

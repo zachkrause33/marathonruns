@@ -611,7 +611,7 @@ MR.World = (function () {
   const SETTING_LOOK = {
 
     BOSTON: {
-      sky: [0x4478c4, 0xc8e8fa], fog: 0xcfe6f2, ground: 0x86b45a, road: 0x66665e,
+      sky: [0x4c8cc2, 0xcceaf6], fog: 0xcfe6f2, ground: 0x86b45a, road: 0x66665e,
       water: 0x3f7fae, edge: 0xf4ece0,
       terrace: {
         colors: [0xb8664a, 0xc8785a, 0xa65a44, 0xd89a70, 0xbc7862],
@@ -631,7 +631,7 @@ MR.World = (function () {
     },
 
     LONDON: {
-      sky: [0x4f80c4, 0xd6e8f6], fog: 0xd6e4f0, ground: 0x5fbf6b, road: 0x65655e,
+      sky: [0x5590be, 0xd8ecf4], fog: 0xd6e4f0, ground: 0x5fbf6b, road: 0x65655e,
       water: 0x5a8fa8, edge: 0xffe8e8,
       terrace: {
         colors: [0xf0e2c4, 0xe0d0ac, 0xb86048, 0xf6ecd4, 0xc4ae8c],
@@ -651,7 +651,7 @@ MR.World = (function () {
     },
 
     BERLIN: {
-      sky: [0x4a74c0, 0xd0e4f8], fog: 0xc8dcf5, ground: 0x69c46e, road: 0x66665e,
+      sky: [0x5288c0, 0xd4e8f6], fog: 0xc8dcf5, ground: 0x69c46e, road: 0x66665e,
       water: 0x4f86ae, edge: 0xeef0ff,
       terrace: {
         colors: [0xe8d8b8, 0xd4c0a0, 0xe0c8a0, 0xc4b090, 0xf2e6cc],
@@ -671,7 +671,7 @@ MR.World = (function () {
     },
 
     CHICAGO: {
-      sky: [0x3f6cb8, 0xb0d4ec], fog: 0xa8cde0, ground: 0x63b46a, road: 0x65665f,
+      sky: [0x4680b6, 0xb4d8e8], fog: 0xa8cde0, ground: 0x63b46a, road: 0x65665f,
       water: 0x3f7fa8, edge: 0xe4e8f4,
       terrace: {
         colors: [0xb0a084, 0xa09076, 0xc0ac8e, 0x8f8a58, 0xc8b89c],
@@ -691,7 +691,7 @@ MR.World = (function () {
     },
 
     NEWYORK: {
-      sky: [0x4674c0, 0xc4e2f8], fog: 0xbdd8ee, ground: 0x63c96b, road: 0x66655e,
+      sky: [0x4e88c0, 0xc8e6f4], fog: 0xbdd8ee, ground: 0x63c96b, road: 0x66655e,
       water: 0x3d7ba6, edge: 0xfff0dc,
       terrace: {
         colors: [0xa8604a, 0xc07656, 0x965640, 0xd08c66, 0xb06e52],
@@ -732,10 +732,10 @@ MR.World = (function () {
     },
 
     SYDNEY: {
-      sky: [0x3f8ed4, 0xd8f2fc], fog: 0xd8f4ff, ground: 0x7fc86a, road: 0x64665c,
+      sky: [0x4f9cc8, 0xd8f2f8], fog: 0xd8f4ff, ground: 0x7fc86a, road: 0x64665c,
       water: 0x2fa8d8, edge: 0xfff4e0,
       terrace: {
-        colors: [0xe4bc8e, 0xb8603e, 0xf0d8a8, 0x9a9058, 0xf4e6c6],
+        colors: [0xe8bc8a, 0xb8603e, 0xf0d8a8, 0xd88a62, 0xf4e6c6],
         trim: 0xfff8e8, win: 0x3a4468, roof: 'pitch', roofColor: 0x8a5040,
         h: [10.5, 13.0], bay: 4.4, depth: 7.0, rows: 4, balcony: 1, chimney: 2,
       },
@@ -752,7 +752,7 @@ MR.World = (function () {
     },
 
     PARIS: {
-      sky: [0x547cc0, 0xe0e8f4], fog: 0xe0dfe8, ground: 0x6fc274, road: 0x67655e,
+      sky: [0x5c8cbe, 0xe2ecf4], fog: 0xe0dfe8, ground: 0x6fc274, road: 0x67655e,
       water: 0x6a94a8, edge: 0xf4f0e4,
       terrace: {
         colors: [0xecdebc, 0xe0d0ac, 0xf4e8c8, 0xd4c2a0, 0xe8dab6],
@@ -772,7 +772,7 @@ MR.World = (function () {
     },
 
     VALENCIA: {
-      sky: [0x3f8cd4, 0xe6f4ff], fog: 0xe8f6ff, ground: 0x8fc45f, road: 0x67655e,
+      sky: [0x4f98cc, 0xe6f6fc], fog: 0xe8f6ff, ground: 0x8fc45f, road: 0x67655e,
       water: 0x30b0d0, edge: 0xfff8e8,
       terrace: {
         colors: [0xfff2d4, 0xf4e4c0, 0xffe8c4, 0xe8d8b8, 0xfff8e4],
@@ -792,7 +792,7 @@ MR.World = (function () {
     },
 
     AMSTERDAM: {
-      sky: [0x4a78c0, 0xd4e8f8], fog: 0xcfe6f4, ground: 0x5fc07a, road: 0x65655e,
+      sky: [0x528cc0, 0xd6ecf6], fog: 0xcfe6f4, ground: 0x5fc07a, road: 0x65655e,
       water: 0x4f7f96, edge: 0xf0ece0,
       terrace: {
         colors: [0x8a5040, 0x9c5e48, 0x745448, 0xa86e58, 0x64483e],
@@ -812,7 +812,7 @@ MR.World = (function () {
     },
 
     ROME: {
-      sky: [0x4a7ec8, 0xffeac8], fog: 0xffe0bc, ground: 0x8fb45a, road: 0x6a655c,
+      sky: [0x5490c6, 0xffeac8], fog: 0xffe0bc, ground: 0x8fb45a, road: 0x6a655c,
       water: 0x5f9fae, edge: 0xfff0d8,
       terrace: {
         colors: [0xdc9a4c, 0xcc8640, 0xecb064, 0xbc743a, 0xf2c886],
@@ -832,7 +832,7 @@ MR.World = (function () {
     },
 
     CAPETOWN: {
-      sky: [0x3f80cc, 0xe0f0ff], fog: 0xdff0ff, ground: 0x9fb05a, road: 0x65665e,
+      sky: [0x4a90ca, 0xe2f2fc], fog: 0xdff0ff, ground: 0x9fb05a, road: 0x65665e,
       water: 0x2f9fd8, edge: 0xfff2e4,
       // Bo-Kaap: the one street in the world painted in flat saturated blocks,
       // and the cheapest possible way to say "Cape Town" at a hundred units.
@@ -5990,10 +5990,10 @@ MR.World = (function () {
       const nJ = Math.round(TILE / (ROAD_SLAB * 4));
       for (let i = 0; i < nJ; i++) {
         const jz = -TILE / 2 + i * ROAD_SLAB * 4;
-        parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, 0.20),
-          overRoad(0x2b2850, 0.58), 0, 0.004, jz, flat));
-        parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, 0.10),
-          overRoad(0x686879, 1.04), 0, 0.004, jz + 0.16, flat));
+        parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, 0.16),
+          overRoad(0x3c3a56, 0.76), 0, 0.004, jz, flat));
+        parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, 0.08),
+          overRoad(0x66666e, 1.02), 0, 0.004, jz + 0.14, flat));
       }
       /**
        * ============ THE EGYPT DEVICE: A RAIL THAT CARRIES BEADS ============
@@ -6616,8 +6616,9 @@ MR.World = (function () {
       const parts = [];
       for (const sx of [-1, 1]) {
         const z = POLE_Z[sx > 0 ? 0 : 1];
-        parts.push(bx(1.04, 0.30, 0.48, sx * CANYON_HEAD_X, CANYON_HEAD_Y + 0.01, z, 0xfff480));
-        parts.push(bx(0.96, 0.12, 0.42, sx * CANYON_HEAD_X, CANYON_HEAD_Y - 0.19, z, 0xffb339));
+        parts.push(bx(1.18, 0.36, 0.56, sx * CANYON_HEAD_X, CANYON_HEAD_Y + 0.02, z, 0xffcf3d));
+        parts.push(bx(0.86, 0.16, 0.44, sx * CANYON_HEAD_X, CANYON_HEAD_Y + 0.04, z - 0.09, 0xfff9c8));
+        parts.push(bx(1.02, 0.14, 0.48, sx * CANYON_HEAD_X, CANYON_HEAD_Y - 0.20, z, 0xffab2e));
       }
       return parts;
     }
@@ -10556,14 +10557,27 @@ MR.World = (function () {
         gl(hbx(2.02, 0.05, 0.30, 0, 1.845, -0.06, 0x1a1206), GLOSS.matte),
       ];
       // The canopy: seven striped segments sloping up and away.
+      //
+      // THE VALANCE IS THE HEADER NOW, and it is deep. The 33-panel blind
+      // read routed every new variant's verb correctly except this one: at
+      // 25 units the 0.15 skirt vanished and the reader answered "a low
+      // yellow-and-black striped road barrier -- OVER", which is the lethal
+      // misread the clearance header exists to prevent. A DUCK's read is
+      // MASS ABOVE THE BAR THAT SURVIVES DISTANCE, so the skirt is now a
+      // 0.34-deep fascia filling 1.83-2.17 -- the same band duckHeader's
+      // web occupies -- and the sloped striped canopy rides above it as the
+      // shop dressing rather than as the load-bearing signal.
       const span = 2.02 * LANE_FIT, SEG = 7;
       for (let i = 0; i < SEG; i++) {
         const sw = span / SEG;
-        parts.push(gl(bx(sw * 1.02, 0.05, 0.52, -span / 2 + sw * (i + 0.5), 2.035, -0.02,
+        parts.push(gl(bx(sw * 1.02, 0.07, 0.48, -span / 2 + sw * (i + 0.5), 2.055, 0.04,
           (i % 3 === 1) ? CREAM : GREEN, 0.55, 0, 0), GLOSS.matte));
-        // The valance: a short skirt hanging off the front edge.
-        parts.push(gl(bx(sw * 0.96, 0.15, 0.045, -span / 2 + sw * (i + 0.5), 1.90, -0.255,
+        // The valance: a deep striped fascia hanging off the front edge.
+        parts.push(gl(bx(sw * 0.96, 0.34, 0.055, -span / 2 + sw * (i + 0.5), 2.00, -0.245,
           (i % 3 === 1) ? 0xe8e2cc : mixHex(GREEN, 0, 0.20)), GLOSS.matte));
+        // Scallop tabs under the fascia, the awning's own signature edge.
+        parts.push(gl(bx(sw * 0.52, 0.07, 0.05, -span / 2 + sw * (i + 0.5), 1.795, -0.245,
+          (i % 3 === 1) ? 0xd8d2ba : mixHex(GREEN, 0, 0.32)), GLOSS.matte));
       }
       for (const sx of [-1, 1]) {
         const px = sx * 1.20 * LANE_FIT;

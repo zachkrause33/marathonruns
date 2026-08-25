@@ -10698,6 +10698,35 @@ MR.World = (function () {
       }
 
       /**
+       * ---- THE GOLD ARROW, PAINTED ON THE RAMP --------------------------
+       *
+       * reference/citylook-ramp-arrow-container.jpg: the reference marks its
+       * one rideable ramp with a large gold chevron-stack arrow painted up
+       * the boarding face, and it is visible exactly when the choice to ride
+       * exists. Ours is PAINT, not an object -- single planes lying on the
+       * running surface (rule 1's stated exception), on a dark backing panel
+       * because gold on the pale walkway deck would carry no value contrast.
+       * Lifted 0.06-0.075 above the surface so the tread battens beneath
+       * never z-fight it; road paint floats over tarmac by the same order.
+       * Merged into the ramp geometry: zero extra draws.
+       */
+      {
+        const upNorm = -(Math.PI / 2) - slope;
+        const upP = (f, lift, geo, col) => part(geo, col,
+          0, DECK * f + lift * Math.cos(slope),
+          zMouth + RUN * f - lift * Math.sin(slope), upNorm);
+        parts.push(upP(0.50, 0.060, new THREE.PlaneGeometry(0.94, 3.30), 0x5f2a24));
+        const GOLD = 0xffc63f;
+        const BARS = [[0.30, 0.30], [0.38, 0.42], [0.46, 0.54], [0.54, 0.66]];
+        for (const [f, w] of BARS) {
+          parts.push(upP(f, 0.075, new THREE.PlaneGeometry(w, 0.34), GOLD));
+        }
+        // The head: a triangle pointing up the slope. Plane-local -y maps to
+        // up-slope under the rotation above, so the apex goes at -90 degrees.
+        parts.push(upP(0.68, 0.075, new THREE.CircleGeometry(0.42, 3, -Math.PI / 2), GOLD));
+      }
+
+      /**
        * THE TWO TAIL WALLS. What makes the mouth a MOUTH: the ramp is cut into
        * the vehicle, so the vehicle has to still be there either side of it,
        * full height, from the gate line forward to where the scaled body picks

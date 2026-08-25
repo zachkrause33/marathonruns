@@ -449,9 +449,15 @@ MR.shading = (function () {
     // antialiases where the surface actually curves -- which is what a cel
     // highlight wants. The small constant keeps a flat face from aliasing
     // against its own neighbour at a grazing angle.
-    '      float aa = fwidth(nh) * 0.70 + 0.010;',
-    '      float sheen = smoothstep(' + SPEC_SHEEN.toFixed(2) + ' - aa, ' + SPEC_SHEEN.toFixed(2) + ' + aa, nh);',
-    '      float core = smoothstep(' + SPEC_CORE.toFixed(2) + ' - aa, ' + SPEC_CORE.toFixed(2) + ' + aa, nh);',
+    // SMOOTH NOW, NOT STEPPED. The two hard thresholds above were the cel
+    // highlight, tuned to sit under a banded diffuse; with the ramp
+    // continuous a stepped highlight was the last banded thing in the frame.
+    // A pow falloff puts a broad low sheen and a tight hot core in the same
+    // places the derivation above worked out -- chamfers, cylinders, glass at
+    // grazing angles -- and, unlike the steps, it cannot switch a whole flat
+    // panel on at once: the core is ~0.02 by ten degrees off peak.
+    '      float sheen = pow(nh, 8.0);',
+    '      float core = pow(nh, 60.0);',
     // FRESNEL, and it is what makes this usable on a fleet made of flat panels.
     //
     // The failure it fixes, measured on the orbit sheet: at the azimuth where a
@@ -472,7 +478,7 @@ MR.shading = (function () {
     // the core is the small hot one that reads as an actual reflection. Both
     // are scaled by the light's own colour, so the highlight is warm under the
     // key and cool under the bounce rather than being a white sticker.
-    '      spec += directionalLights[si].color * fres * (sheen * 0.10 + core * 0.34);',
+    '      spec += directionalLights[si].color * fres * (sheen * 0.14 + core * 0.55);',
     '    }',
     // THE HIGHLIGHT IS TINTED BY THE SURFACE, and that is a chroma decision
     // rather than a physical one. A dielectric's specular really is the light's
@@ -1103,7 +1109,7 @@ MR.shading = (function () {
         // the viewer is what their facades' lighting says. The disc still
         // exists for any framing that turns (the finish celebration looks
         // back down the road and picks it up).
-        sunDir: { value: new THREE.Vector3(0.42, 0.25, -0.87).normalize() },
+        sunDir: { value: new THREE.Vector3(0.27, 0.82, -0.49).normalize() },
         // Shared value object, so one syncFog() write moves every sky in the
         // scene -- and so a dome built before the first syncFog still picks the
         // colour up rather than being stuck on the constructor's guess.
@@ -1349,8 +1355,13 @@ MR.shading = (function () {
     // faces the player reads, and the hazard-contrast margins WIDEN with it
     // (read faces climb off the ramp floor) -- verified through shoot.js.
     // Along skyDome's sunDir, lifted for the terminator on the runner's legs.
+    // Elevation rose ~35 -> ~55 degrees for the redraft: the reference's
+    // shadows are short and its roofs, bonnets and the road itself carry the
+    // sun. At the old low sun the flipped key raked the street and the
+    // vehicles' top surfaces never reached the highlight the reference puts
+    // there.
     const key = new THREE.DirectionalLight(0xfff2d8, 2.30);
-    key.position.set(7.0, 9.0, -11.0);
+    key.position.set(5.0, 15.0, -9.0);
 
     // The fill flips with it: it now aims DOWN the camera axis from behind
     // the far side of the scene, so the faces pointing away from the lens --

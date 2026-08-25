@@ -5944,7 +5944,16 @@ below **L 70.5** clears the 1.25x gate for all 26 variants on luminance alone.
 Both mats are therefore a DARKENING carrying bright marks -- wash `0.46x`,
 marks `1.50x` over about a fifth of the lane -- and `api.contrastAudit` reports
 six more roads, lift and drag on each lane, built from the same function that
-draws them.
+draws them. Measured: **lift L 62.3 / S 0.803, drag L 57.8 / S 0.748**, against
+a ceiling of 70.5 and beside the finish carpet's own L 56.6.
+
+**AND THE AUDIT WIRING WAS WRITTEN AND NOT CONNECTED.** `tempoLaneParts` was
+built for the audit, documented as feeding it, and never called -- this entry
+claimed six extra roads while `contrastAudit` returned nine. Caught by grepping
+this file's own claim against the code. With it connected the gate tests all 26
+variants against both mats on all three lanes and **the tightest pair does not
+move**: JUMP v2 vs lane 1 at 1.29-1.33x, the same pair and the same numbers as
+before the mats existed.
 
 **A defect found by winding.** The first strip was positioned correctly, fitted
 correctly, and drew nothing: the four corners wound `0,1,3 / 0,3,2` give a `-y`
@@ -6166,16 +6175,18 @@ group grew a sibling it would photograph as the mat.
 
 ### 9. Cost and the gate
 
-Draw calls: peak **254** at 04-wall against ~400, down from 274 mid-pass and
-265 shipped -- the surge furniture and the telegraph mats together were worth
-more draws than the tempo paint costs. Triangles moved under 1%.
+Draw calls: peak **244** at 08-level against a ~400 ceiling, down from **265**
+shipped -- the surge furniture and the telegraph mats together cost more draws
+than the tempo paint does, so the road got cheaper as well as simpler.
 
 `build` - `shoot` (all shots clean, no `LOW`/`HIDES`/`BLANKS`/`PAINTS`;
 tightest hazard contrast **JUMP v2 vs lane 1 at 1.29-1.33x**, gate margin
 +0.022 to +0.062, the same pair and the same numbers as before this pass) -
 `course-test` 90 days - `simulate` - `calendar` **32 days clean** -
 `kindread` **profile 1 of 26**, unchanged - `footroom` - `deckdrop` -
-`mechanics --identity` - `tempo` (`validate()` 40/40, open-lane guarantee
+`mechanics --identity` **bit-identical at flags off**, gate hash
+`e9f8d87f...` and aid hash `a055853a...` against the recorded baselines, which
+is the 365-day determinism proof surviving the whole rewrite - `tempo` (`validate()` 40/40, open-lane guarantee
 **388/388**, fairness verdict **-1 ms**) - `risk` - `playthrough`.
 `index.html` rebuilt and **left uncommitted**.
 

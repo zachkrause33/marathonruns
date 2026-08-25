@@ -1125,6 +1125,41 @@ MR.World = (function () {
    * cyan and pink, and they are the device the whole game's readability rests
    * on; the road is allowed value variation and no hue at all.
    */
+  /**
+   * PLASTER GRUNGE, for the walls. The reference facades are not flat paint:
+   * they carry a soft mottle of weathering that flat colour cannot reproduce
+   * (the commission calls it out by name). One 64px canvas, multiplied into
+   * mats.prop: box UVs put the whole tile on every face, so a large facade
+   * face gets a soft stretched mottle -- exactly the reference's scale of
+   * grunge -- and small fittings get a wash the eye cannot resolve. Mean is
+   * held near white so no measured colour moves more than ~3%.
+   */
+  function plasterTexture() {
+    const c = canvas(64, 64);
+    const g = c.getContext('2d');
+    g.fillStyle = '#fdfdfc';
+    g.fillRect(0, 0, 64, 64);
+    let s = 0xbeef01;
+    const r = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+    for (let i = 0; i < 60; i++) {
+      const x = r() * 64, y = r() * 64, rad = 3 + r() * 14;
+      const dark = r() < 0.6;
+      g.fillStyle = dark
+        ? 'rgba(120,110,96,' + (0.03 + r() * 0.05).toFixed(3) + ')'
+        : 'rgba(255,255,255,' + (0.05 + r() * 0.06).toFixed(3) + ')';
+      g.beginPath();
+      g.arc(x, y, rad, 0, 6.2832);
+      g.fill();
+    }
+    // A few streaks of run-off, the reference's most legible weathering mark.
+    for (let i = 0; i < 7; i++) {
+      const x = r() * 64;
+      g.fillStyle = 'rgba(104,96,84,' + (0.035 + r() * 0.035).toFixed(3) + ')';
+      g.fillRect(x, r() * 20, 1 + r() * 2, 18 + r() * 34);
+    }
+    return texture(c, true);
+  }
+
   const ROAD_SLAB = 1.2;
   function roadSurfaceTexture() {
     const SLABS = 8, PX = 64;
@@ -1877,7 +1912,7 @@ MR.World = (function () {
         if (wy > h - 1.0) break;
         for (const sz of [-1, 0, 1]) {
           sub.push(bx(0.16, 1.44, 0.60, fx - 0.05, wy, sz * bw * 0.27, surround));
-          sub.push(gl(bx(0.20, 1.28, 0.48, fx - 0.07, wy, sz * bw * 0.27, t.win), GLOSS.glass));
+          sub.push(gl(bx(0.20, 1.28, 0.48, fx - 0.07, wy, sz * bw * 0.27, mixHex(t.win, 0x9ab0c8, 0.30)), GLOSS.glass));
           sub.push(bx(0.30, 0.10, 0.68, fx - 0.10, wy - 0.74, sz * bw * 0.27, t.trim));
         }
         // An air-conditioner under one window, a few bays apart -- the small
@@ -5332,7 +5367,13 @@ MR.World = (function () {
       // the ones that are load-bearing are re-authored below against the
       // tarmac rather than against a remembered number.
       paint: vtoon(2),
-      prop: vtoon(2, undefined, true),
+      prop: (function () {
+        const m = vtoon(2, undefined, true);
+        // The plaster mottle. See plasterTexture(): near-white mean, so the
+        // measured palette moves under 3% while the walls stop being flat.
+        m.map = plasterTexture();
+        return m;
+      })(),
       // The roadside furniture gets its own material so a setting can put a
       // little of its own light on the barriers, hedges and parapets without
       // dragging every tree and spectator with it. It only ever multiplies a
@@ -6501,6 +6542,30 @@ MR.World = (function () {
         // The reference lamp, one per side per tile, staggered like the old
         // verge line so a column passes the lens every twelve units.
         canyonLamp(parts, sx, POLE_Z[sx > 0 ? 0 : 1], 0xaaa798, 0x5c594c);
+        // THE AMBER SIGNAL POLE, one per side per tile, staggered against the
+        // lamp: citylook-traffic-lights lines its whole street with golden
+        // signal columns, and they are the second-strongest repeated vertical
+        // in the reference set after the lamps. Pavement furniture only --
+        // the pole stands at x 5.6, its short arm reaches to 4.9, well
+        // outside CORRIDOR_HALF, and the head faces the approaching player.
+        // Built on all sides: closed housings, visor lips, lenses proud of
+        // the -z face, a cap.
+        {
+          const SIG_POLE = 0xdca23c, SIG_DK = 0x9c7228, HOUSE = 0x4a4436;
+          const gx = sx * 5.6, gz = sx > 0 ? -9 : 3;
+          parts.push(bx(0.16, 6.2, 0.16, gx, 3.1, gz, SIG_POLE));
+          parts.push(bx(0.24, 0.10, 0.24, gx, 6.28, gz, SIG_DK));
+          parts.push(bx(0.14, 0.14, 0.7, gx - sx * 0.35, 5.9, gz, SIG_POLE, 0, 0, 0));
+          // The head, on the arm's end, lenses toward -z.
+          const hx = gx - sx * 0.62;
+          parts.push(bx(0.30, 0.86, 0.26, hx, 5.42, gz, HOUSE));
+          parts.push(bx(0.34, 0.08, 0.30, hx, 5.88, gz, SIG_DK));
+          const LENS = [[0xff2b3c, 5.68], [0xffb020, 5.42], [0x24d46a, 5.16]];
+          for (const [lc, ly] of LENS) {
+            parts.push(cyl(0.075, 0.075, 0.05, 8, hx, ly, gz - 0.135, lc, Math.PI / 2));
+            parts.push(bx(0.20, 0.05, 0.10, hx, ly + 0.09, gz - 0.16, HOUSE));
+          }
+        }
 
         // ---- pavement props, between the barrier and the facade ----------
         // Sides differ so the street does not mirror itself: drums and bags
@@ -10482,7 +10547,7 @@ MR.World = (function () {
      * standards. Canopy z extent +/-0.25 against halfZ 0.30.
      */
     const duckAwningGeo = (function () {
-      const POLE = 0x2f4438, BRASS = 0xd8b464, GREEN = 0x3f8452, CREAM = 0xf2eee2;
+      const POLE = 0x2f5a3c, BRASS = 0xd8b464, GREEN = 0x2f9450, CREAM = 0xf6f0da;
       const parts = [
         // The bar, as the kind puts it.
         gl(hcbx(2.30, 0.30, 0.42, 0, 1.56, 0, 0xffc422, 0.05), GLOSS.paint),
@@ -10494,10 +10559,10 @@ MR.World = (function () {
       for (let i = 0; i < SEG; i++) {
         const sw = span / SEG;
         parts.push(gl(bx(sw * 1.02, 0.05, 0.52, -span / 2 + sw * (i + 0.5), 2.035, -0.02,
-          (i & 1) ? CREAM : GREEN, 0.55, 0, 0), GLOSS.matte));
+          (i % 3 === 1) ? CREAM : GREEN, 0.55, 0, 0), GLOSS.matte));
         // The valance: a short skirt hanging off the front edge.
         parts.push(gl(bx(sw * 0.96, 0.15, 0.045, -span / 2 + sw * (i + 0.5), 1.90, -0.255,
-          (i & 1) ? 0xe4ded0 : mixHex(GREEN, 0, 0.25)), GLOSS.matte));
+          (i % 3 === 1) ? 0xe8e2cc : mixHex(GREEN, 0, 0.20)), GLOSS.matte));
       }
       for (const sx of [-1, 1]) {
         const px = sx * 1.20 * LANE_FIT;
@@ -11301,8 +11366,10 @@ MR.World = (function () {
       // 0x6e7789 -- a cool near-neutral family on a road that is itself a cool
       // near-neutral, which is the straddle the fleet header names. Warming
       // the hue costs nothing structural and moves both axes the same way.
-      const POLE = 0xd0ccc4;
-      const POLE_DK = 0x8e8880;
+      // AMBER, off citylook-traffic-lights: every signal pole in the
+      // reference street is a golden amber column with an amber head.
+      const POLE = 0xdca23c;
+      const POLE_DK = 0x9c7228;
       const PLINTH = 0xbcb6ac;
       const RED = 0xff2b3c, AMB = 0xffb020, GRN = 0x24d46a;
 

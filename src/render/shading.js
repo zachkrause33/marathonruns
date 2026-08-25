@@ -1379,11 +1379,14 @@ MR.shading = (function () {
     // warm/cool split across every curved or angled surface for the price of
     // one light, and that split is most of what makes the references' shading
     // read as coloured rather than as grey applied at different strengths.
-    const hemi = new THREE.HemisphereLight(0xbcd8ff, 0x4a4030, 0.55);
+    // Sky term eased toward neutral for the citylook pass: at 0xbcd8ff a
+    // shaded cream facade rendered pale blue-grey; the reference keeps its
+    // shaded walls warm (see the ramp's cool note).
+    const hemi = new THREE.HemisphereLight(0xc6d6e2, 0x4a4030, 0.55);
 
     // Kept, but only as a floor -- just enough that nothing in the frame can
     // reach zero and turn into a black hole in a saturated picture.
-    const amb = new THREE.AmbientLight(0xa8c4ff, 0.10);
+    const amb = new THREE.AmbientLight(0xb8c4d8, 0.10);
 
     scene.add(key, bounce, hemi, amb);
 

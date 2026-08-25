@@ -221,9 +221,12 @@ MR.World = (function () {
   //           settings on it. Every real frame takes its palette from
   //           SETTING_LOOK and its mood shift from BIOME_MOD below.
   const BIOME_LOOK = {
+    // `canyon` is the redraft's city form -- see canyonParts(). The street
+    // density went 0.70 -> 0.94 with it: a canyon with a third of its teeth
+    // missing is a suburb, and the reference's street wall is continuous.
     'CITY START': {
       sky: [0x2b3fa8, 0x9fdcff], ground: 0x63c96b, road: 0x5f6285, fog: 0x9fdcff,
-      edge: 'barrier', street: 0.70,
+      edge: 'canyon', street: 0.94,
       mix: { building: 1.5, tree: 1.1, grove: 0.3, crowd: 2.3, walkers: 1.1 },
     },
     // `bank` cuts the shoulder back on one side so the water can come right up
@@ -5486,10 +5489,14 @@ MR.World = (function () {
      * These are tints of the road's own hue and must never be mistaken for a
      * fourth colour language.
      */
+    // The steps HALVED for the redraft: the reference carriageway is one
+    // near-uniform asphalt and the white dashes now carry lane identity, so
+    // the bands keep only enough asymmetry to answer left-or-right in
+    // peripheral vision without reading as three materials.
     const LANE_BAND = [
-      0xbac7de,   // lane 0, screen LEFT  -- coolest and darkest
+      0xdde4f0,   // lane 0, screen LEFT  -- coolest and darkest
       0xffffff,   // lane 1, centre       -- the biome road colour, neat
-      0xe8e0d4,   // lane 2, screen RIGHT -- warmed, and a stop between the two
+      0xf4f0e8,   // lane 2, screen RIGHT -- warmed, half a step between
     ];
     // The hard shoulder outside the carriageway edge lines. Knocked well down
     // so the three lanes read as the bright mass and the tarmac beyond them as
@@ -5693,7 +5700,7 @@ MR.World = (function () {
      * Cost: 30 triangles per road tile instead of 6, and NO extra draw calls --
      * the strips merge into roadGeo exactly as the three bands did.
      */
-    const CAMBER_DEPTH = 0.22;                 // 1.00 at the crown, 0.78 at the edge
+    const CAMBER_DEPTH = 0.13;                 // halved for the redraft: one surface, gently domed
     const CARRIAGE_HALF = LANE * 1.5;          // 2.55 -- three lanes, no shoulder
     const CAMBER_STRIPS = 5;
     function camber(x) {
@@ -5825,23 +5832,25 @@ MR.World = (function () {
        * Cost: zero draw calls -- the same merged mesh -- and 30 fewer triangles
        * per tile.
        */
-      const nJ = Math.round(TILE / ROAD_SLAB);
+      /**
+       * ---- THE REDRAFT'S ROAD: ASPHALT, NOT TRACK BED ---------------------
+       *
+       * Under the soft light the full paint ladder -- twenty grooves, two
+       * violet rails, beads riding them -- read as tram track: the reference
+       * (citylook-*.jpg) runs a plain grey carriageway with white dashed lane
+       * lines and NOTHING else on it, and that plainness is a large part of
+       * "life like". So the light joints (22 Hz -- shimmer, by this file's own
+       * arithmetic) are gone, the heavy joint survives at reduced contrast as
+       * the transverse speed cue the eye actually resolves, and the lane seams
+       * become the reference's own fat white dashes below.
+       */
+      const nJ = Math.round(TILE / (ROAD_SLAB * 4));
       for (let i = 0; i < nJ; i++) {
-        // -TILE/2 + i*ROAD_SLAB, with TILE an exact multiple of ROAD_SLAB, so
-        // the run continues into the next tile without doubling or drifting.
-        const jz = -TILE / 2 + i * ROAD_SLAB;
-        const heavy = (i % 4) === 0;
-        parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, heavy ? 0.24 : 0.15),
-          overRoad(heavy ? 0x26234a : 0x302d55, heavy ? 0.40 : 0.50), 0, 0.004, jz, flat));
-        // And the surviving lip comes down toward the tarmac. It was 1.23x the
-        // road, which on twenty full-width bars a tile made it the brightest
-        // large thing in the near band after the edge lines. At 1.05x it is
-        // still a lit edge above a dark groove -- the pairing is what sells the
-        // cut -- but it no longer competes with the marking or the runner.
-        if (heavy) {
-          parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, 0.11),
-            overRoad(0x686879, 1.05), 0, 0.004, jz + 0.18, flat));
-        }
+        const jz = -TILE / 2 + i * ROAD_SLAB * 4;
+        parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, 0.20),
+          overRoad(0x2b2850, 0.58), 0, 0.004, jz, flat));
+        parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, 0.10),
+          overRoad(0x686879, 1.04), 0, 0.004, jz + 0.16, flat));
       }
       /**
        * ============ THE EGYPT DEVICE: A RAIL THAT CARRIES BEADS ============
@@ -5935,18 +5944,30 @@ MR.World = (function () {
        * centred) still clears it with room on both sides, so a gate never
        * buries the boundary the player is reading it against.
        */
+      /**
+       * ---- LANE SEAMS: THE REFERENCE'S WHITE DASHES -----------------------
+       *
+       * Every citylook frame separates its lanes with thick white dashes --
+       * roughly 3 units long on a 3-unit gap, 0.30 wide -- and nothing else.
+       * The Egypt rail-and-bead device they replace was built to survive the
+       * banded toon renderer; a dash this size survives on its own (a 3-unit
+       * mark at 60 units is still ~7px tall), and it is also a beat: at
+       * record pace the 6-unit period passes at ~4.4 Hz, right beside the
+       * heavy joint's 5.5, so the transverse and longitudinal speed cues
+       * agree instead of arguing.
+       *
+       * 2.05x the tarmac -- above the 1.80 edge line, below the old unlit
+       * paint's effective 2.4x, and the hue is held white-neutral so it
+       * cannot come near the mats' amber/cyan/pink. The mats stay the only
+       * saturated language on the road.
+       */
+      const DASH_L = 3.0, DASH_P = 6.0, DASH_W = 0.38;
+      const DASH_C = overRoad(0xffffff, 2.35);
       for (const lx of [-LANE / 2, LANE / 2]) {
-        for (const s of [-1, 1]) {
-          // 0.80x the tarmac. It was 1.19x -- brighter than the road it was
-          // named the shadow of, so it read as a second grey line beside the
-          // rail rather than as a shadow under it. Below the road is where a
-          // shadow goes, and putting it there buys a value step for nothing.
-          // Not near-black: the first pass tried that at 0.24 wide and turned
-          // the carriageway into three strips separated by chasms.
-          parts.push(part(new THREE.PlaneGeometry(0.11, TILE), overRoad(0x51487c, 0.80), lx + s * 0.12, 0.005, 0, flat));
+        for (let i = 0; i < TILE / DASH_P; i++) {
+          const dz = -TILE / 2 + DASH_P * 0.5 + i * DASH_P;
+          parts.push(part(new THREE.PlaneGeometry(DASH_W, DASH_L), DASH_C, lx, 0.007, dz, flat));
         }
-        parts.push(part(new THREE.PlaneGeometry(0.15, TILE), SEAM_RAIL, lx, 0.007, 0, flat));
-        beads(lx, SEAM_BEAD, 0.009);
       }
       return merge(parts);
     })();
@@ -5993,10 +6014,16 @@ MR.World = (function () {
      * into a tile mesh that is already being drawn: 24 little boxes cost
      * triangles, which are free, and no submissions, which are not.
      */
-    function pavement(parts, sx, top, kerb, joint) {
-      const x = sx * (K.TRACK_HALF_WIDTH + 4.0);
+    function pavement(parts, sx, top, kerb, joint, w) {
+      // `w` is the pavement's width; default is the 8.0 every kind has always
+      // had. The canyon tile passes its own, because its pavement ENDS AT THE
+      // FACADE -- the reference frames run facade / pavement / kerb / road
+      // with nothing between, so a pavement wider than the building line
+      // would poke grass through the ground floor of a shop.
+      const pw = w || 8.0;
+      const x = sx * (K.TRACK_HALF_WIDTH + 0.17 + pw / 2);
       const kx = sx * (K.TRACK_HALF_WIDTH + 0.17);
-      parts.push(bx(8.0, 0.30, TILE, x, -0.16, 0, top));
+      parts.push(bx(pw, 0.30, TILE, x, -0.16, 0, top));
       parts.push(bx(0.34, 0.34, TILE, kx, 0.0, 0, kerb));
       const n = Math.round(TILE / PAVE_JOINT);
       for (let i = 0; i < n; i++) {
@@ -6004,7 +6031,7 @@ MR.World = (function () {
         // A quad, not a box: the pavement is flat, so five of a box's six faces
         // were never going to be seen and this is a sixth of the vertex work.
         // The kerb notch stays a box because it has to turn the kerb's corner.
-        parts.push(part(new THREE.PlaneGeometry(7.9, 0.13), joint, x, 0.005, z, -Math.PI / 2));
+        parts.push(part(new THREE.PlaneGeometry(pw - 0.1, 0.13), joint, x, 0.005, z, -Math.PI / 2));
         parts.push(bx(0.36, 0.36, 0.09, kx, 0.0, z, joint));
       }
     }
@@ -6290,6 +6317,141 @@ MR.World = (function () {
       return parts;
     }
 
+    /**
+     * ============ THE CANYON TILE -- CITY START'S ROADSIDE ============
+     *
+     * The owner's commission, verbatim: "I want my game to look like this
+     * game. Buildings, road, obstacles, cars. It looks more life like." The
+     * reference (reference/citylook-*.jpg) is a street CANYON: facade,
+     * pavement, kerb, road -- nothing else. No verge, no grass, no gap. The
+     * street wall moves in to x = CANYON_FRONT and this tile cuts its
+     * pavement to end exactly there, so the facades stand ON the pavement
+     * the way every reference frame shows.
+     *
+     * WHAT THE PAVEMENT CARRIES, all read straight off the frames: oil drums,
+     * trash bags, a portaloo, a coffee A-board. NO crates and NO planters --
+     * the owner's standing rule is that those two exist only as road hazards
+     * ("They should only be on the road as obstacles"), and a prop that is
+     * decoration on the pavement and lethal on the tarmac teaches the player
+     * the wrong lesson. Everything here is a shape that never appears in a
+     * lane, and nothing wears amber, cyan or pink.
+     *
+     * THE LAMPS REACH OVER THE ROAD AGAIN, deliberately and within the rules.
+     * R3 took the arms off the road because the sky was covered in spans and
+     * the mile markers were unreadable; the reference the owner now points at
+     * has exactly one thing in its sky, and it is this lamp: a grey column, a
+     * long arm over the kerb lane, a head that GLOWS warm amber in daylight.
+     * The head sits at y 13.0 -- 4.0 above OVERHEAD_Y, far above every sign
+     * panel, and thin -- so LOW and HIDES pass by construction and the mile
+     * gantries stay in open sky below it. The glow is a separate unlit lens
+     * mesh (see canyonGlowParts) parented to this tile's edge group: one draw
+     * per live canyon tile, and the single strongest "this game" cue in the
+     * reference set.
+     *
+     * Fully built on all sides, per the standing rule: drums are closed
+     * cylinders, the portaloo is a box with all six faces, the A-board has
+     * two faces and both are painted. There is no back of an object.
+     */
+    const CANYON_FRONT = 8.55;
+    const CANYON_PAVE_W = 4.68;   // kerb outer edge 3.92 -> facade line 8.60
+    const CANYON_LAMP_TOP = 10.2;
+    const CANYON_HEAD_X = 1.9;
+    const CANYON_HEAD_Y = 13.0;
+    function canyonLamp(parts, sx, z, post, head) {
+      parts.push(bx(0.26, CANYON_LAMP_TOP, 0.26, sx * POLE_X, CANYON_LAMP_TOP / 2, z, post));
+      // Quarter-arc arm from the post top in and up to the head, three boxes,
+      // exactly the construction lampArc uses and for the same winding reason.
+      const ax = POLE_X - CANYON_HEAD_X;
+      const ay = CANYON_HEAD_Y - CANYON_LAMP_TOP;
+      const at = (i) => {
+        const t = (i / LAMP_SEGS) * (Math.PI / 2);
+        return [sx * (CANYON_HEAD_X + ax * Math.cos(t)), CANYON_LAMP_TOP + ay * Math.sin(t)];
+      };
+      for (let i = 0; i < LAMP_SEGS; i++) {
+        const a = at(i), b = at(i + 1);
+        const dx = b[0] - a[0], dy = b[1] - a[1];
+        parts.push(bx(Math.hypot(dx, dy) + 0.14, 0.18, 0.18,
+          (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, z, post, 0, 0, Math.atan2(dy, dx)));
+      }
+      // The head shell -- dark grey housing above the lens the glow mesh adds.
+      parts.push(bx(1.10, 0.30, 0.52, sx * CANYON_HEAD_X, CANYON_HEAD_Y + 0.10, z, head));
+    }
+    function canyonParts() {
+      const parts = [];
+      for (const sx of [-1, 1]) {
+        const x = sx * (K.TRACK_HALF_WIDTH + 0.85);
+        pavement(parts, sx, 0xb9bdd6, 0xe8ecff, 0x8f93ad, CANYON_PAVE_W);
+        // The crowd barrier, same as the barrier tile: this is still a race.
+        parts.push(bx(0.10, 0.09, TILE, x, 0.92, 0, 0xf2f4ff));
+        parts.push(bx(0.09, 0.07, TILE, x, 0.60, 0, 0xdfe6ff));
+        for (let i = 0; i < 8; i++) {
+          const z = -TILE / 2 + 1.5 + i * 3;
+          parts.push(bx(0.13, 1.0, 0.13, x, 0.5, z, 0x2b2f52));
+          if (i % 2 === 0) {
+            const px = x - sx * 0.03, pz = z + 1.5, pph = z * 0.43 + sx * 0.7;
+            for (const [dz, len, amp] of [[-1.0, 0.7, 0.30], [0, 1.5, 1.0], [1.0, 0.7, 0.30]]) {
+              parts.push(wv(bx(0.06, 0.30, len, px, 0.74, pz + dz, 0xff3b6b), pph, amp));
+            }
+          }
+        }
+        // The reference lamp, one per side per tile, staggered like the old
+        // verge line so a column passes the lens every twelve units.
+        canyonLamp(parts, sx, POLE_Z[sx > 0 ? 0 : 1], 0x9aa0b2, 0x4a4f60);
+
+        // ---- pavement props, between the barrier and the facade ----------
+        // Sides differ so the street does not mirror itself: drums and bags
+        // one side, the portaloo and the coffee A-board the other. Everything
+        // sits x 4.6 to 8.1 -- outside CORRIDOR_HALF by 0.85 or more, inboard
+        // of the facade line.
+        if (sx < 0) {
+          // Two oil drums, one upright, one turned a little.
+          for (const [dz, ry] of [[-3.6, 0], [-2.5, 0.7]]) {
+            parts.push(cyl(0.42, 0.42, 0.95, 8, sx * 5.0, 0.475, dz, 0x3f4658, 0, ry, 0));
+            parts.push(cyl(0.435, 0.435, 0.06, 8, sx * 5.0, 0.24, dz, 0x2b3145));
+            parts.push(cyl(0.435, 0.435, 0.06, 8, sx * 5.0, 0.72, dz, 0x2b3145));
+          }
+          // Trash bags: three squashed dark spheres against the facade line.
+          for (const [bz, r] of [[8.6, 0.46], [9.4, 0.38], [8.9, 0.33]]) {
+            const s = sph(r, 6, sx * 7.7, r * 0.72, bz, 0x262c47);
+            parts.push(s);
+          }
+          parts.push(sph(0.30, 6, sx * 7.1, 0.22, 9.0, 0x323a58));
+        } else {
+          // The portaloo: a pale steel-blue cabin with a roof cap and a door
+          // seam, hard against the facade line the way the frames place it.
+          parts.push(bx(0.92, 2.05, 0.92, sx * 7.9, 1.025, 4.2, 0x9fb8cc));
+          parts.push(bx(1.00, 0.16, 1.00, sx * 7.9, 2.13, 4.2, 0xd8e4ee));
+          parts.push(bx(0.06, 1.7, 0.55, sx * 7.42, 0.95, 4.2, 0x8aa4ba));
+          // The coffee A-board on the pavement mid-band: two leaning boards
+          // and a top bar, cream faces both sides.
+          parts.push(bx(0.06, 0.74, 0.56, sx * 6.15, 0.36, -7.8, 0xf2ead8, 0, 0, sx * 0.26));
+          parts.push(bx(0.06, 0.74, 0.56, sx * 6.45, 0.36, -7.8, 0xf2ead8, 0, 0, -sx * 0.26));
+          parts.push(bx(0.24, 0.07, 0.60, sx * 6.30, 0.72, -7.8, 0x3a3550));
+          // And a bag pair of its own further down the tile.
+          parts.push(sph(0.40, 6, sx * 7.8, 0.30, -10.6, 0x262c47));
+          parts.push(sph(0.30, 6, sx * 7.2, 0.22, -10.1, 0x323a58));
+        }
+      }
+      return parts;
+    }
+    /**
+     * The lamp lenses, as their own merged geometry: these are the ONE thing
+     * on the tile that must not take the lighting, because the reference's
+     * lamps glow the same warm amber at any time of day. Drawn unlit, fogged,
+     * parented to the canyon edge group so visibility and draw cost follow
+     * the tile (one extra draw per live canyon tile). NOT the HUD's accent
+     * hex -- see PALETTE.accent's note; an unlit part lands on its authored
+     * value exactly, so this is deliberately 20 points away from 0xffe45e.
+     */
+    function canyonGlowParts() {
+      const parts = [];
+      for (const sx of [-1, 1]) {
+        const z = POLE_Z[sx > 0 ? 0 : 1];
+        parts.push(bx(0.96, 0.20, 0.42, sx * CANYON_HEAD_X, CANYON_HEAD_Y - 0.10, z, 0xffc36b));
+      }
+      return parts;
+    }
+
     /** Park/river edge: a clipped hedge, a gravel path and the odd bench. */
     function hedgeParts() {
       const parts = [];
@@ -6435,8 +6597,13 @@ MR.World = (function () {
      */
     const LIT_EDGES = {
       barrier: merge(barrierParts()),
+      canyon: merge(canyonParts()),
       hedge: merge(hedgeParts()),
     };
+    const canyonGlowGeo = merge(canyonGlowParts());
+    // Unlit and vertex-coloured; fog on, so a lamp 200 units out condenses out
+    // of the haze with the street it stands in.
+    const canyonGlowMat = new THREE.MeshBasicMaterial({ vertexColors: true });
 
     /**
      * THE WALL: concrete jersey barrier and a graffitied site hoarding. The leg
@@ -6728,6 +6895,10 @@ MR.World = (function () {
         edges[k] = S.outlined(LIT_EDGES[k],
           k === 'hedge' ? mats.edgeLeaf : mats.edgeCloth, S.INK.prop);
       }
+      // The lamp lenses ride as a child of the canyon edge group, so their
+      // visibility and their one draw call follow the tile with no extra
+      // bookkeeping anywhere.
+      edges.canyon.add(new THREE.Mesh(canyonGlowGeo, canyonGlowMat));
       for (const k in edges) { edges[k].visible = false; t.add(edges[k]); }
       t.userData.shoulders = shoulders;
       t.userData.edges = edges;
@@ -16320,9 +16491,17 @@ MR.World = (function () {
           if (markBlocks.some((m) => (m.side === 0 || m.side === side)
             && Math.abs(m.z - cz) < 30)) continue;
           const depth = SETS[si].look.terrace.depth;
+          // THE CANYON: on a canyon leg the facade lands at the pavement edge
+          // (CANYON_FRONT = 8.55, awnings overhanging the pavement the way
+          // every reference frame shows), everywhere else it keeps the 12.2
+          // it has always had. 8.55 is 1.14 road-widths off the centre line,
+          // which is the reference's own proportion, and it is 4.8 outside
+          // CORRIDOR_HALF on a road that never curves -- a facade beside a
+          // straight road can never stand between the lens and a gate.
+          const front = b.look.edge === 'canyon' ? 8.55 : 12.2;
           structures.push({
             z: cz, kind: 'street', set: si, v, side,
-            x: side * (12.2 + depth / 2), y: 0,
+            x: side * (front + depth / 2), y: 0,
             ry: side < 0 ? Math.PI : 0, rz: 0,
           });
         }
@@ -17033,6 +17212,15 @@ MR.World = (function () {
         const s = scenery[state.sceneIdx++];
         const pool = sceneryPool(s);
         if (!pool) continue;
+        // On a canyon leg there is no verge for these three kinds to stand in:
+        // trees and groves roll x over the band the facades now occupy, and a
+        // walker's whole band (WALK_IN outward) is inside the buildings. The
+        // reference's city pavements carry props, not planting or pedestrians.
+        // Skipping the CLAIM is deterministic -- the layout stream was already
+        // consumed when `scenery` was generated, so every other prop on the
+        // course stands exactly where it always did.
+        const cnEdge = lookAtZ(s.z).look.edge === 'canyon';
+        if (cnEdge && (s.kind === 'tree' || s.kind === 'grove' || s.kind === 'walkers')) continue;
         const obj = pool.claim();
         if (s.kind === 'building') {
           // The blocks set back behind the street wall. Their tint and their
@@ -17143,7 +17331,14 @@ MR.World = (function () {
           // for as long as the wave has existed, because the corridor rule
           // only ever tested things whose bounding box MOVED and a crowd's
           // never does; see the shader-mover note in tools/motion.js.
-          obj.position.set(s.side * (K.TRACK_HALF_WIDTH + 2.25 + s.b * 3.4), 0, s.z);
+          // On a canyon leg the roll compresses onto the pavement: the facade
+          // stands at 8.55, a knot's own bodies reach 1.7 from its centre and
+          // the wave adds 0.13 of sway, so the centre may not pass 6.55 --
+          // spectators stand between the barrier and the shopfronts, which is
+          // where a city marathon actually puts them. Everywhere else the old
+          // 3.4-unit band stands.
+          const crowdRoll = cnEdge ? 0.55 : 3.4;
+          obj.position.set(s.side * (K.TRACK_HALF_WIDTH + 2.25 + s.b * crowdRoll), 0, s.z);
           obj.rotation.y = s.side > 0 ? Math.PI : 0;
           // A pooled knot inherits the last tenant's lift, and the lift is now
           // the shader's. Zero it on claim rather than leaving a knot standing

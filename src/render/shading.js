@@ -271,7 +271,13 @@ MR.shading = (function () {
    * old 2-step and 3-step materials now share one texture per floor.
    */
   function ramp(steps, floor) {
-    const base = floor === undefined ? 0.31 : floor;
+    // The default floor rose 0.31 -> 0.38 and the cool term eased 0.38 ->
+    // 0.30 when the key light flipped behind the camera: a facade's road face
+    // now sees no directional light at all, and at the old numbers a whole
+    // flank of the street washed out to pale blue-grey. The reference keeps
+    // its shaded facades warm and only a step down; hazards are unaffected
+    // (their propLit floor is 0.62) and the road is a lit flat-up surface.
+    const base = floor === undefined ? 0.38 : floor;
     const key = 'soft/' + base;
     if (ramps.has(key)) return ramps.get(key);
     const n = 160;
@@ -289,7 +295,7 @@ MR.shading = (function () {
       // takes the blue, exactly as before -- but it now arrives as a
       // continuous temperature shift across the form, which is the reference
       // frames' own shading.
-      const cool = Math.pow(1 - k, 1.55) * 0.38;
+      const cool = Math.pow(1 - k, 1.55) * 0.30;
       const rgb = [v * (1 - cool * 1.05), v * (1 - cool * 0.40), v * (1 + cool * 0.72)];
       for (let c = 0; c < 3; c++) {
         data[i * 4 + c] = Math.round(Math.max(0, Math.min(1, rgb[c])) * 255);
@@ -1091,9 +1097,13 @@ MR.shading = (function () {
         glowColor: { value: new THREE.Color(PALETTE.sunGlow) },
         // Up-and-forward, matching the key light so the lit side of the runner
         // points back at the visible sun. World +x is SCREEN LEFT for a camera
-        // looking down +z, and the elevation is low (~14 degrees) because the
-        // chase camera is pitched down: anything higher leaves the frame.
-        sunDir: { value: new THREE.Vector3(0.42, 0.25, 0.87).normalize() },
+        // looking down +z. The z flipped with the key light: the sun is now
+        // BEHIND the camera, where every citylook reference frame keeps it --
+        // no frame in the set shows a sun disc, and a street lit from behind
+        // the viewer is what their facades' lighting says. The disc still
+        // exists for any framing that turns (the finish celebration looks
+        // back down the road and picks it up).
+        sunDir: { value: new THREE.Vector3(0.42, 0.25, -0.87).normalize() },
         // Shared value object, so one syncFog() write moves every sky in the
         // scene -- and so a dome built before the first syncFog still picks the
         // colour up rather than being stuck on the constructor's guess.
@@ -1327,20 +1337,27 @@ MR.shading = (function () {
    * flat-lit road is within 2% of where it was, so nothing else has to move.
    */
   function lights(scene) {
-    // Along skyDome's sunDir so the drawn sun and the shading agree, but
-    // lifted: at the sun's true 14-degree elevation the terminator ran across
-    // the runner's waist and the legs went dark.
+    // THE KEY COMES FROM BEHIND THE CAMERA NOW. It used to sit ahead of the
+    // runner (z +11), which under the banded ramp barely mattered -- most
+    // things landed in one band or another regardless -- but under the soft
+    // ramp it meant every surface facing the LENS sat in cool bounce light:
+    // the facades, the hazard read faces, the runner's back -- the entire
+    // picture the player looks at was the unlit side of the world. Every
+    // citylook reference frame is lit the other way: the street the camera
+    // looks down is in sun, one flank of it warmer than the other, and no
+    // sun disc is ever in frame. Flipping z puts the warm key on exactly the
+    // faces the player reads, and the hazard-contrast margins WIDEN with it
+    // (read faces climb off the ramp floor) -- verified through shoot.js.
+    // Along skyDome's sunDir, lifted for the terminator on the runner's legs.
     const key = new THREE.DirectionalLight(0xfff2d8, 2.30);
-    key.position.set(7.0, 9.0, 11.0);
+    key.position.set(7.0, 9.0, -11.0);
 
-    // Aimed back down the camera axis on purpose: the player is seen from
-    // behind, so without this the one surface that matters most -- the
-    // runner's back -- would sit in the ramp's darkest band for the whole
-    // race. Half its old strength; the hemisphere took over the rest, and
-    // this is now only doing the job the hemisphere cannot, which is putting
-    // SOME light on a surface pointing straight at the camera.
+    // The fill flips with it: it now aims DOWN the camera axis from behind
+    // the far side of the scene, so the faces pointing away from the lens --
+    // the ones the key just left -- keep a cool floor instead of going dead.
+    // Same colour and strength as before; only the axis changed.
     const bounce = new THREE.DirectionalLight(0x86aeff, 0.42);
-    bounce.position.set(-6, 2, -9);
+    bounce.position.set(-6, 2, 9);
 
     // Cool sky over a warm ground, which is the whole trick: it puts a
     // warm/cool split across every curved or angled surface for the price of

@@ -426,7 +426,24 @@
    * than being re-picked.
    */
   const LINE_W = {
-    all:    { lift: 17, drag: -67 },
+    // ---- MEASURED, NOT DERIVED, AND THE DERIVATION UNDERSHOT ------------
+    //
+    // The per-mark arithmetic says a lift over the median 53-unit mark is
+    // worth about 1.5 race seconds and a drag about 2.3, against an action's 2
+    // to 4 -- which puts them at roughly a half and three quarters of an
+    // action, so +50 and -85. tools/playthrough.js then ran the six policies
+    // end to end in the real page and the GREEDY line, at +170 / -200, came in
+    // 20 seconds ahead of those weights.
+    //
+    // The gap is CHAINING and the myopic sum cannot see it: holding the green
+    // lane through this gate is also what leaves the runner in position for
+    // the next mark, and marks are laid at decisions, which cluster. A weight
+    // set from one mark's worth systematically undervalues a mat for the same
+    // reason a greedy path is not a shortest path.
+    //
+    // So the default sits near the measured optimum rather than near the
+    // arithmetic, and the arithmetic is written down as the thing it corrects.
+    all:    { lift: 100, drag: -140 },
     ignore: { lift: 0, drag: 0 },
     green:  { lift: 60, drag: 0 },
     red:    { lift: 0, drag: -160 },

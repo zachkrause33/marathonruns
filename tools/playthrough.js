@@ -59,9 +59,11 @@ const DATE = arg('date', '');
 const SKILL = arg('bot', '1');
 const EFFORT = arg('effort', '1');
 const ALL = has('all');
+// LINE policies now, not spend policies. ?surge= named which zones to elect;
+// the surge is gone and ?line= names how the bot reads the paint. See main.js.
 const POLICIES = ALL
-  ? ['none', 'all', 'hold1', 'hold2', 'late', 'every2']
-  : [arg('surge', 'all')];
+  ? ['ignore', 'all', 'green', 'red', 'safe', 'greedy']
+  : [arg('line', 'all')];
 
 function clock(sec) {
   if (!isFinite(sec)) return '--:--';
@@ -85,20 +87,17 @@ function clock(sec) {
       page.on('pageerror', (e) => { thrown = String(e); });
       const q = [
         'bot=' + SKILL, 'nocount=1', 'nosave=1', 'effort=' + EFFORT,
-        'surge=' + pol, 'skip=9000',
+        'line=' + pol, 'skip=9000',
       ].concat(DATE ? ['date=' + DATE] : []).join('&');
       await page.goto('file://' + FILE + '?' + q);
       await page.waitForFunction('window.MR && MR.game && MR.game.ready', null, { timeout: 180000 });
       const r = await page.evaluate(() => {
         const p = MR.game.pace, c = MR.game.course, K = MR.K;
-        const zones = (c.surges || []).map((s) => ({
-          n: s.n, z0: Math.round(s.z0), len: Math.round(s.z1 - s.z0), lane: s.lane,
-        }));
         return {
           finished: p.finished, finish: p.finishTime, race: p.raceTime,
           hits: p.hits, guards: p.guards, aid: p.aid, wasted: p.wasted,
           pool: p.pool, streak: p.bestStreak, gates: p.gatesSeen,
-          surgeUnits: p.surgeUnits, total: K.TOTAL_UNITS, record: K.RECORD_SECONDS,
+          total: K.TOTAL_UNITS, record: K.RECORD_SECONDS,
           // The mats and the roof, from the same live page. A mechanic that is
           // not in this table is a mechanic this file is not verifying, which
           // is the whole reason it exists.
@@ -110,12 +109,10 @@ function clock(sec) {
           ramps: (c.ramps || []).length,
           cones: (c.ramps || []).filter((r) => r.cone).length,
           pairs: (c.gates || []).filter((g) => g.ramp2 !== undefined).length,
-          zones, zoneUnits: zones.reduce((a, z) => a + z.len, 0),
           aidOnCourse: (c.aid || []).length,
           aidRoof: (c.aid || []).filter((a) => a.roof).length,
-          aidInZone: (c.aid || []).filter((a) => c.surgeZoneAt && c.surgeZoneAt(a.z)).length,
           effort: MR.Pace.EFFORT, narrow: MR.Course.NARROW,
-          poolMax: MR.Pace.EFFORT_CFG.POOL_MAX, burn: MR.Pace.EFFORT_CFG.BURN_UNITS,
+          poolMax: MR.Pace.EFFORT_CFG.POOL_MAX,
           courseGates: c.gates.length, valid: c.valid.ok, why: c.valid.why || null,
         };
       });
@@ -125,23 +122,15 @@ function clock(sec) {
       if (rows.length === 1) {
         console.log(`\ncourse   ${r.courseGates} gates, valid=${r.valid}, ` +
           `EFFORT ${r.effort}, NARROW ${r.narrow}`);
-        console.log(`zones    ${r.zones.length}, ${r.zoneUnits}u of marked road ` +
-          `(${(100 * r.zoneUnits / r.total).toFixed(1)}% of the course)`);
-        for (const z of r.zones) {
-          console.log(`  zone ${z.n}  z ${String(z.z0).padStart(5)}  ` +
-            `${z.len}u  lane ${z.lane}  (${(100 * z.z0 / r.total).toFixed(0)}% in)`);
-        }
-        console.log(`aid      ${r.aidOnCourse} items on course, ${r.aidRoof} on roofs, ` +
-          `${r.aidInZone} inside a marked zone`);
-        console.log(`pool     cap ${r.poolMax}, 1 segment per ${r.burn}u, so a full tank ` +
-          `buys ${r.poolMax * r.burn}u of marked road`);
+        console.log(`aid      ${r.aidOnCourse} items on course, ${r.aidRoof} on roofs`);
+        console.log(`pool     cap ${r.poolMax}, one spend: guard. A segment absorbs one contact.`);
         console.log(`mats     ${r.mats} tempo mats (${r.lifts} forward, ${r.drags} backward), ` +
           `${Math.round(r.matUnits)}u of painted lane`);
         console.log(`roof     ${r.ramps} rideable decks, ${r.cones} carrying a cone, ` +
           `${r.pairs} gates with two decks side by side`);
         console.log('');
         console.log('policy    finish     vs rec   hits  guards   aid  wasted  ' +
-          'surged   left  streak    lift    drag');
+          '  left  streak    lift    drag');
       }
       const vs = r.finish - r.record;
       console.log(
@@ -152,7 +141,6 @@ function clock(sec) {
         String(r.guards).padStart(8) +
         String(r.aid).padStart(6) +
         String(r.wasted).padStart(8) +
-        (Math.round(r.surgeUnits) + 'u').padStart(8) +
         r.pool.toFixed(1).padStart(7) +
         String(r.streak).padStart(8) +
         (Math.round(r.liftUnits) + 'u').padStart(8) +
@@ -177,98 +165,46 @@ function clock(sec) {
   }
   if (EFFORT !== '0') {
     if (byName.all) {
-      if (byName.all.surgeUnits <= 0) bad('the bot elected NO surge -- it cannot see the zones');
       if (byName.all.aid <= 0) bad('the bot collected NO aid -- the pool can never fill');
+      if (byName.all.liftUnits <= 0) bad('the bot ran NO forward mat -- it cannot see the paint');
     }
-    // ---- COINCIDENTAL SURGE IS A FINDING, NOT A FAILURE -------------------
-    //
-    // surge=none does not avoid the marked lane, it simply does not seek it --
-    // and with three lanes it lands there about a third of the time by
-    // accident. That number is worth printing every run rather than asserting
-    // away, because it IS the marking contract's hardest number: the fraction
-    // of marked road a player gets without deciding anything is the fraction
-    // over which the paint is decoration. What must hold is that seeking beats
-    // not seeking by a wide margin.
-    if (byName.none && byName.all) {
-      const co = 100 * byName.none.surgeUnits / byName.none.zoneUnits;
-      console.log(`  --  coincidental surge (surge=none): ${co.toFixed(0)}% of marked road, ` +
-        `against ${(100 * byName.all.surgeUnits / byName.all.zoneUnits).toFixed(0)}% when sought`);
-      // ---- RE-CUT, AND THE OLD CUT WAS A COVERAGE TEST IN DISGUISE -------
-      //
-      // This was `all.surgeUnits >= none.surgeUnits * 1.3`, and a ratio is the
-      // wrong shape for the question. Coincidental surge scales with HOW MUCH
-      // ROAD IS PAINTED; sought surge is capped by the POOL, which does not.
-      // So the more zones a course draws, the worse the ratio gets even though
-      // the mechanic is untouched -- and roadmap 68 added a mandated early
-      // zone, so a course can now draw six. Measured on three dates: 1.80x at
-      // 38.7% coverage, 1.31x at 39.2%, and 1.25x at 46.5%. The instrument was
-      // reading the number of zones and reporting it as the strength of the
-      // election.
-      //
-      // The pool-denominated form is invariant to that: seeking must put at
-      // least TWO WHOLE SEGMENTS more marked road under the runner than
-      // coincidence does. Two, rather than one, because one segment is inside
-      // the run-to-run variation a different racing line produces.
-      //
-      // The ratio is still PRINTED every run, because it is the marking
-      // contract's hardest number -- the share of marked road a player gets
-      // without deciding anything is the share over which the paint is
-      // decoration -- and a number that has stopped gating a build should not
-      // also stop being looked at.
-      //
-      // AND IT IS ABOVE CHANCE FOR A REASON WORTH KNOWING. Three lanes would
-      // give 33% by accident; the measured figure is 40-48%, because the
-      // marked lane is guaranteed non-BLOCK inside a zone (the surge clause in
-      // generate()), so a bot that prefers a passable lane lands there more
-      // often than a coin would. That is a property of the generator and not a
-      // measurement artefact.
-      const gained = byName.all.surgeUnits - byName.none.surgeUnits;
-      if (gained < 2 * byName.all.burn) {
-        bad(`seeking the marked lane buys only ${Math.round(gained)}u more than ignoring it, `
-          + `under the ${2 * byName.all.burn}u two segments would -- the election is not a choice`);
+    /**
+     * ---- THE SURGE ASSERTIONS THAT STOOD HERE, AND WHY THEY ARE GONE -----
+     *
+     * Three of them, all about the elected zone, all removed with it:
+     *
+     *   1. "the bot elected NO surge -- it cannot see the zones", the
+     *      blindness check roadmap 67 added after every bot in the project
+     *      turned out to score CLEAR, aid and ramp and nothing else. Its
+     *      replacement is directly above: the bot must run some forward mat,
+     *      which is the same check one mechanic along.
+     *   2. COINCIDENTAL SURGE, printed every run: what share of marked road a
+     *      bot that does not seek it lands on anyway (40-48%, above the 33% of
+     *      three lanes, because the marked lane was guaranteed non-BLOCK). It
+     *      has no analogue here -- a mat is not elected, it is simply the lane
+     *      you are in -- and the question it asked, what share of the paint is
+     *      decoration, is now answered by tools/simulate.js's policy spread.
+     *   3. THE TWO SPEND ASSERTIONS: that the best spend policy beats never
+     *      seeking, and that WHICH zones you buy is worth 10 s between the
+     *      best and worst allocation. Together they were the proof that an
+     *      allocation existed. There is no allocation now.
+     *
+     * WHAT REPLACES ALL THREE is the same question asked of the LINE rather
+     * than of the tank, and it is asked where it belongs -- tools/simulate.js
+     * sweeps eight line policies across five skills and fails the build if the
+     * spread falls under 15 s. That is the assertion docs/risk-reward.md
+     * demands, because before this game had two rival spends six policies
+     * finished within 0.0 s of each other.
+     */
+    if (byName.ignore && byName.all) {
+      const d = byName.ignore.finish - byName.all.finish;
+      if (d <= 0) {
+        bad(`reading the paint cost ${(-d).toFixed(1)}s against ignoring it ` +
+          '-- the mats buy nothing on a real run');
       } else {
-        console.log(`  ok  seeking buys ${Math.round(gained)}u of marked road over coincidence, `
-          + `which is ${(gained / byName.all.burn).toFixed(1)} segments`);
-      }
-      // ---- THE BEST SPEND, NOT "SPEND EVERYTHING" ------------------------
-      //
-      // This compared `all` against `none` and demanded that surging every
-      // zone beat never seeking one. That was the right assertion for as long
-      // as the pool could very nearly afford the whole road; it stopped being
-      // the right one the day a zone was mandated into the first eighth of the
-      // race, because that zone is DELIBERATELY a bad buy -- lowering the floor
-      // is worth 0.285x at streak 5 against 0.93x at streak 150, so a segment
-      // spent there buys a third of what it buys at the wall.
-      //
-      // "Surge everything" losing is therefore the mechanic working, and this
-      // assertion firing on it would be the instrument insisting on the one
-      // policy the design exists to make wrong. That is the same shape as the
-      // finding in docs/risk-reward.md: a system with one optimal policy has
-      // no strategy in it.
-      //
-      // SO IT IS TWO ASSERTIONS NOW, AND TOGETHER THEY ARE STRICTLY STRONGER
-      // than the one they replace. The first says spending pays at all; the
-      // second says WHICH zones you buy matters, which the old single test
-      // could not distinguish from a game where every allocation was the same.
-      // A build where "surge everything" happened to be optimal passes the old
-      // test and fails the second of these.
-      const spends = rows.filter(([n]) => n !== 'none').map(([n, r]) => [n, r.finish]);
-      if (spends.length) {
-        spends.sort((a, b) => a[1] - b[1]);
-        const bestName = spends[0][0], bestT = spends[0][1];
-        const d = byName.none.finish - bestT;
-        if (d <= 0) bad(`the best spend policy (${bestName}) cost ${(-d).toFixed(1)}s ` +
-          'instead of saving time -- the pool buys nothing');
-        else console.log(`  ok  the best spend policy (${bestName}) is worth ${d.toFixed(1)}s ` +
-          'over never seeking a zone');
-        const worstT = spends[spends.length - 1][1];
-        if (worstT - bestT < 10) {
-          bad(`every spend policy finishes within ${(worstT - bestT).toFixed(1)}s ` +
-            '-- there is no allocation, only a spend');
-        } else {
-          console.log(`  ok  and WHICH zones is worth ${(worstT - bestT).toFixed(1)}s ` +
-            `between the best (${bestName}) and the worst (${spends[spends.length - 1][0]})`);
-        }
+        console.log(`  ok  reading the paint is worth ${d.toFixed(1)}s over ignoring it, ` +
+          `on ${Math.round(byName.all.liftUnits)}u of lift and ` +
+          `${Math.round(byName.all.dragUnits)}u of drag`);
       }
     }
   }

@@ -16096,6 +16096,272 @@ MR.World = (function () {
       return S.outlined(surgeEndGeo, mats.prop, S.INK.banner);
     }, group);
 
+    /**
+     * ============ THE TEMPO MAT: GREEN GOES, RED DRAGS ============
+     *
+     * The only mat left on this road. The owner, verbatim:
+     *
+     *   "Remove all telegraph mats. Mats should all be there to increase or
+     *    decrease speed. Two colors - one speeds you up, one slows you down.
+     *    Placed randomly. Green speeds up, red slows down."
+     *
+     * So a mat no longer names a verb. It names a direction of pace, it is one
+     * of exactly two colours, and it lies on open road between gates rather
+     * than in front of a hazard. Course.tempoAt(z, lane) is the only source of
+     * truth for where one is; this file draws that table and decides nothing.
+     *
+     * ---- WHY GREEN IS ALLOWED TO MEAN TWO THINGS, AND WHY THAT IS SAFE ----
+     *
+     * The surge zone's marked lane is already green, and a lift mat is now
+     * green too. That is deliberate: both say THIS LANE IS FASTER, so a player
+     * who conflates them has drawn the correct conclusion. But it is not left
+     * to that argument, because "they mean the same thing" is a claim about
+     * meaning and the risk is a claim about pixels -- two green markings in
+     * one frame, one of which is a five-hundred-unit corridor you elect and
+     * the other a sixty-unit patch you simply run over.
+     *
+     * THEY CAN NEVER BE IN ONE FRAME, AND IT IS THE GENERATOR THAT SAYS SO.
+     * planTempo refuses any mark within SURGE_SIGHT -- 90 units -- of a zone,
+     * at either end, and has since before this pass: "the surge entry marking
+     * has to be read from SURGE_SIGHT out and nothing may compete with it
+     * there". 90 is also exactly the length of the zone's approach rails, so
+     * the nearest a mat can come to the first green paint of a zone is the
+     * moment that paint begins. The separation is a build-time guarantee that
+     * tools/tempo.js re-derives, not an art decision that could drift.
+     *
+     * ---- THE SHAPE IS KEPT EVEN THOUGH THE COLOUR IS THE ANSWER -----------
+     *
+     * The owner asked for two colours and this draws two colours. The lift
+     * also carries three stripes ALONG the lane and the drag a ladder of rungs
+     * ACROSS it, and that redundancy is not decoration:
+     *
+     *   RED AND GREEN IS THE ONE PAIR A COLOUR-BLIND PLAYER CANNOT SPLIT.
+     *   Deuteranopia and protanopia are between them the commonest inherited
+     *   vision difference there is, and they collapse exactly this axis. A
+     *   mechanic that costs five race seconds and can only be read in hue is a
+     *   mechanic those players cannot play. Orientation is free and they can
+     *   read it.
+     *
+     *   HAZE EATS HUE BEFORE IT EATS SHAPE. This game draws atmospheric fade,
+     *   and the surge pass measured what it does: a saturated green at ninety
+     *   units is most of the way to the sky behind it. Longitudinal against
+     *   transverse survives that, because it is a fact about direction rather
+     *   than about a channel value.
+     *
+     * The two orientations are also the road's own language rather than an
+     * invention -- bars painted ACROSS a carriageway at close pitch are what a
+     * real road paints to say slow down, and a line ALONG it is the direction
+     * of travel. Neither is a chevron and neither is a cross, which were the
+     * two glyphs the removed mats owned and which are now free but stay unused.
+     *
+     * ---- THE TONE IS A CEILING BEFORE IT IS A COLOUR ---------------------
+     *
+     * A hazard stands on a lift mat BY CONSTRUCTION -- assignTempo will not
+     * place one unless some gate inside it demands an action of the marked
+     * lane -- so the mat is a surface the contrast gate has to know about. The
+     * dimmest hazard in the game is JUMP v7 at L 88.1, so any surface at or
+     * below L 70.5 clears the 1.25x gate for all 26 variants on luminance
+     * alone, whatever saturation does. Both mats are therefore a DARKENING
+     * carrying bright marks, exactly as the surge wash is, and both are
+     * measured rather than asserted: api.contrastAudit reports six more roads
+     * -- lift and drag on each lane -- built from the same function that draws
+     * them, and tools/shoot.js tests every variant against all six.
+     *
+     * The audit sample is a WHOLE-LANE MEAN, so the bright marks are a budget:
+     * wash 0.46x with marks at 1.50x over about a fifth of the lane lands both
+     * arms near the surge wash's own L 61.5 with room to spare.
+     *
+     * ---- IT IS PAINT, SO IT HAS NO BACK ----------------------------------
+     *
+     * Rule 1's stated exception, and the test it gives: the player cannot get
+     * to the other side of the road. Single-sided quads lying on the tarmac,
+     * as the lane dashes and the finish carpet are.
+     *
+     * ---- IT LIES ON THE ROAD, WHICH IS THE HARD PART ---------------------
+     *
+     * A mark is 18 to 88 units long and the road is laid as rigid 24-unit
+     * tiles through hills. A rigid plane over 88 units departs from the tarmac
+     * by c * L^2 / 8 = 6.2e-4 * 7744 / 8 = 0.60 units -- half a metre in the
+     * air at a crest and half a metre under the road in a dip, and the paint
+     * material is depth-TESTED, so a submerged mark is not a faint mark, it is
+     * no mark. That is the defect the removed telegraph mat was fixed for over
+     * a 16-unit run, and this is five times the length.
+     *
+     * So the strip is fitted PER VERTEX to roadSurfaceY -- the piecewise-linear
+     * surface the tiles actually make, not the elevation profile they are cut
+     * from -- through the same updateMatrixWorld hook, for the same reason
+     * written out there at length: attributes are uploaded during
+     * projectObject at the top of render(), so geometry written in
+     * onBeforeRender reaches the GPU one frame late and every instrument in
+     * this project would photograph the mark before it existed.
+     *
+     * Segments are 0.75 units, so the residual where a tile joint falls inside
+     * a segment is dSlope * 0.25 * h = 0.0149 * 0.25 * 0.75 = 0.0028 against a
+     * lift of 0.012 -- four times the margin, on the same arithmetic that
+     * chose 32 segments for the old 16-unit mat.
+     */
+    const TEMPO_LIFT = 0x2ee08a;            // the zone's own green: FASTER
+    const TEMPO_DRAG = 0xff3d4e;            // red: SLOWER
+    const TEMPO_WASH_K = 0.46;
+    const TEMPO_MARK_K = 1.50;
+    // Inset from the lane edges, so a mat never touches the seam rail and can
+    // never be mistaken for a lane boundary the way a full-width wash could.
+    const TEMPO_W = LANE - 0.16;
+    const TEMPO_SEG_LEN = 0.75;
+    const TEMPO_MAX_LEN = 96;               // TEMPO_LEN_MAX is 88; this is the pool's
+    const TEMPO_SEG = Math.round(TEMPO_MAX_LEN / TEMPO_SEG_LEN);
+    // Rungs across the lane. 0.54 in 3.00 is an 18% duty, which is the mark
+    // budget above; the pitch is what carries the "close together" read and it
+    // is scale-free -- the ratio of rung pitch to lane width is the same at
+    // eight units and at eighty, which a spacing GRADIENT would not have been.
+    const TEMPO_RUNG_PITCH = 3.00;
+    const TEMPO_RUNG_D = 0.54;
+    // Three stripes along the lane: a wider one on the centre line and a pair
+    // flanking it, totalling the same 0.31 of lane width the rungs average.
+    const TEMPO_LINES = [[0, 0.13], [-0.50, 0.09], [0.50, 0.09]];
+
+    /**
+     * A mark's cross-section as the AUDIT sees it: `len` of it, flat, at `y`.
+     * The same numbers the strip below lays down, so what the gate measures is
+     * what the game draws -- the carpet's lesson, and the surge wash's, a third
+     * surface along. `len` must be a whole number of rung pitches or the drag
+     * arm's duty cycle -- and therefore its mean -- would be an artefact of
+     * where the sample happened to stop.
+     */
+    function tempoLaneParts(dir, len, y) {
+      const flat = -Math.PI / 2;
+      const hue = dir > 0 ? TEMPO_LIFT : TEMPO_DRAG;
+      const parts = [part(new THREE.PlaneGeometry(TEMPO_W, len),
+        overRoad(hue, TEMPO_WASH_K), 0, y, 0, flat)];
+      const mark = overRoad(hue, TEMPO_MARK_K);
+      if (dir > 0) {
+        for (const ln of TEMPO_LINES) {
+          parts.push(part(new THREE.PlaneGeometry(ln[1], len), mark, ln[0], y + 0.001, 0, flat));
+        }
+      } else {
+        const n = Math.round(len / TEMPO_RUNG_PITCH);
+        for (let i = 0; i < n; i++) {
+          parts.push(part(new THREE.PlaneGeometry(TEMPO_W, TEMPO_RUNG_D), mark,
+            0, y + 0.001, -len / 2 + TEMPO_RUNG_PITCH * (i + 0.5), flat));
+        }
+      }
+      return parts;
+    }
+
+    /**
+     * The pooled strip. One mesh, one draw, whatever the mark's length -- and
+     * the length is written into the REST POSE rather than into a scale,
+     * because a scale would stretch the rungs and because the road fit reads
+     * the rest pose.
+     *
+     * The vertex buffer is built once at TEMPO_MAX_LEN and every claim rewrites
+     * it: longitudinal runs are CLAMPED to the mark's length, so the strip ends
+     * exactly on z1 to the unit, and a rung whose far edge would fall past z1
+     * is COLLAPSED rather than clipped -- a road marking ends on a whole bar,
+     * and half a rung at the tail would read as the pattern breaking down.
+     */
+    function tempoStrip(dir) {
+      const hue = dir > 0 ? TEMPO_LIFT : TEMPO_DRAG;
+      const washC = new THREE.Color(overRoad(hue, TEMPO_WASH_K));
+      const markC = new THREE.Color(overRoad(hue, TEMPO_MARK_K));
+      // Every piece is either a RUN (a longitudinal ribbon clamped to length)
+      // or a RUNG (one quad, kept or collapsed). The wash is a run.
+      const runs = [[-TEMPO_W / 2, TEMPO_W / 2, 0, washC]];
+      const rungs = [];
+      if (dir > 0) {
+        for (const ln of TEMPO_LINES) {
+          runs.push([ln[0] - ln[1] / 2, ln[0] + ln[1] / 2, 0.001, markC]);
+        }
+      } else {
+        const n = Math.floor(TEMPO_MAX_LEN / TEMPO_RUNG_PITCH) + 1;
+        for (let i = 0; i < n; i++) rungs.push(TEMPO_RUNG_PITCH * (i + 0.5));
+      }
+      const nv = runs.length * (TEMPO_SEG + 1) * 2 + rungs.length * 4;
+      const pos = new Float32Array(nv * 3);
+      const nor = new Float32Array(nv * 3);
+      const col = new Float32Array(nv * 3);
+      const idx = [];
+      let v = 0;
+      for (const r of runs) {
+        const base = v;
+        for (let i = 0; i <= TEMPO_SEG; i++) {
+          for (const x of [r[0], r[1]]) {
+            pos[v * 3] = x; pos[v * 3 + 1] = r[2]; pos[v * 3 + 2] = i * TEMPO_SEG_LEN;
+            col[v * 3] = r[3].r; col[v * 3 + 1] = r[3].g; col[v * 3 + 2] = r[3].b;
+            v++;
+          }
+        }
+        for (let i = 0; i < TEMPO_SEG; i++) {
+          // WOUND FACE UP. The four corners are (left,near) (right,near)
+          // (left,far) (right,far), and the obvious order round them --
+          // 0,1,3 / 0,3,2 -- gives a -y normal, which mats.paint backface-culls
+          // into an invisible mat. It photographed as a correctly positioned,
+          // correctly fitted strip that drew nothing.
+          const a = base + i * 2;
+          idx.push(a, a + 3, a + 1, a, a + 2, a + 3);
+        }
+      }
+      for (let i = 0; i < rungs.length; i++) {
+        const base = v;
+        for (let k = 0; k < 4; k++) {
+          const x = (k & 1) ? TEMPO_W / 2 : -TEMPO_W / 2;
+          pos[v * 3] = x; pos[v * 3 + 1] = 0.001;
+          pos[v * 3 + 2] = rungs[i] + ((k & 2) ? TEMPO_RUNG_D / 2 : -TEMPO_RUNG_D / 2);
+          col[v * 3] = markC.r; col[v * 3 + 1] = markC.g; col[v * 3 + 2] = markC.b;
+          v++;
+        }
+        idx.push(base, base + 3, base + 1, base, base + 2, base + 3);
+      }
+      for (let i = 0; i < nv; i++) { nor[i * 3 + 1] = 1; }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+      geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      geo.setIndex(idx);
+      // Culled by the mark's own extent, and the fit only ever moves a vertex
+      // in y by the road's own relief -- MAX_GRADE over TEMPO_MAX_LEN -- so the
+      // sphere is padded by that rather than recomputed every claim.
+      geo.computeBoundingSphere();
+      geo.boundingSphere.radius += 6.0;
+
+      const mesh = new THREE.Mesh(geo, mats.paint);
+      // The rest pose is the fit's input and the claim's output; see
+      // fitMatToRoad. y in it is a LIFT above the tarmac, not a height.
+      const rest = Float32Array.from(pos);
+      mesh.userData.matRest = rest;
+      mesh.userData.matGen = 0;
+      mesh.updateMatrixWorld = matUpdateMatrixWorld;
+      mesh.userData.writeTempo = function (len) {
+        let w = 0;
+        for (let r = 0; r < runs.length; r++) {
+          for (let i = 0; i <= TEMPO_SEG; i++) {
+            const z = Math.min(i * TEMPO_SEG_LEN, len);
+            rest[w * 3 + 2] = z; w++;
+            rest[w * 3 + 2] = z; w++;
+          }
+        }
+        for (let i = 0; i < rungs.length; i++) {
+          const far = rungs[i] + TEMPO_RUNG_D / 2;
+          for (let k = 0; k < 4; k++) {
+            // Collapsed to a point rather than merely moved: a degenerate quad
+            // rasterises nothing at all, which is what "this rung is not on
+            // this mark" has to mean.
+            rest[w * 3 + 2] = far > len ? len
+              : rungs[i] + ((k & 2) ? TEMPO_RUNG_D / 2 : -TEMPO_RUNG_D / 2);
+            rest[w * 3] = far > len ? 0
+              : ((k & 1) ? TEMPO_W / 2 : -TEMPO_W / 2);
+            w++;
+          }
+        }
+        mesh.userData.matGen++;
+      };
+      return mesh;
+    }
+    const tempoPools = {
+      lift: Pool(function () { return tempoStrip(1); }, group),
+      drag: Pool(function () { return tempoStrip(-1); }, group),
+    };
+
     // ---------------------------------------------------------------------
     // Layout is drawn once from the seeded stream so it is identical for every
     // player, then indexed by z for windowed spawning.
@@ -16571,6 +16837,19 @@ MR.World = (function () {
       structures.push({ z: s.z1, kind: 'surgeEnd', x: 0, y: 0 });
     }
 
+    /**
+     * The tempo mats, straight off Course.tempoAt's own table. Keyed on z0 --
+     * the near edge -- so a mark spawns before its first paint could be seen,
+     * and carrying `len` so the release below can tell that a mark whose START
+     * is behind the runner may still have most of itself in front of them.
+     */
+    for (const m of (course.tempo || [])) {
+      structures.push({
+        z: m.z0, kind: 'tempoMark', lane: m.lane, dir: m.dir,
+        len: m.z1 - m.z0, x: K.LANE_X[m.lane], y: 0,
+      });
+    }
+
     structures.sort((p, q) => p.z - q.z);
 
     const banners = course.mileMarkers.map((m) => ({ m, tex: null }));
@@ -16652,6 +16931,10 @@ MR.World = (function () {
         if (kind === 'aidTable') return aidTablePool;
         // A surge zone's furniture is the same in every city -- a lane
         // reservation is a road marking, not local colour.
+        // The tempo mat, which is paint rather than furniture -- pooled here
+        // only because the windowed spawn is the machinery that already knows
+        // when a thing on the road comes into and goes out of view.
+        if (kind === 'tempoMark') return st.dir > 0 ? tempoPools.lift : tempoPools.drag;
         if (kind === 'surgeGate') return surgeGatePool;
         if (kind === 'surgeEnd') return surgeEndPool;
         if (kind === 'surgePost') {
@@ -17496,6 +17779,25 @@ MR.World = (function () {
         // Buildings and trees stay plumb because nothing hangs off them.
         obj.position.y += eAt(st.z);
         obj.rotation.x = -Math.atan(EL.slope(st.z));
+        /**
+         * A TEMPO MAT TAKES NEITHER OF THOSE TWO LINES, and it is the only
+         * thing here that does not. Every other set piece is a rigid body
+         * standing at one z, so seating it on the chord height and pitching it
+         * to the local slope is exactly right. A mat is up to 88 units of
+         * marking lying ON the road, and no rigid transform can put a straight
+         * strip on a piecewise-linear surface -- see the note above tempoStrip
+         * for the half-metre this is worth at the tightest legal curvature.
+         *
+         * So it is placed flat at y = 0 and its vertices are put where the
+         * road is under them. The length is written FIRST: the fit reads the
+         * rest pose, and a fit taken against the last tenant's length would
+         * paint the previous mark's ladder on this one's ground.
+         */
+        if (st.kind === 'tempoMark') {
+          obj.position.y = 0;
+          obj.rotation.x = 0;
+          obj.userData.writeTempo(st.len || 0);
+        }
         // A pooled hull must never inherit the last one's voyage. Cleared here
         // rather than in the sail loop, because that loop only ever sees
         // objects that are already claimed and could not tell a fresh claim
@@ -17504,7 +17806,11 @@ MR.World = (function () {
         obj.userData.auditName = 'set piece / ' + st.kind;
         activeStruct.push({ st, obj, pool });
       }
-      while (activeStruct.length && activeStruct[0].st.z < back - 60) {
+      // `st.len` is zero for everything but a tempo mat, so this is the old
+      // rule everywhere else. A mark is up to 88 units long, and releasing it
+      // when its NEAR edge passed would take the paint off the road while most
+      // of it was still in front of the runner.
+      while (activeStruct.length && activeStruct[0].st.z + (activeStruct[0].st.len || 0) < back - 60) {
         const e = activeStruct.shift();
         e.pool.release(e.obj);
       }
@@ -17689,6 +17995,7 @@ MR.World = (function () {
       aidTablePool.releaseAll(); bannerPool.releaseAll(); archPool.releaseAll();
       abutPool.releaseAll(); riverPool.releaseAll();
       surgeGatePool.releaseAll(); surgeEndPool.releaseAll();
+      tempoPools.lift.releaseAll(); tempoPools.drag.releaseAll();
       for (const row of surgePostPools) for (const p of row) p.releaseAll();
       overpassPool.releaseAll(); standPool.releaseAll();
       finishStandPool.releaseAll(); chutePool.releaseAll();

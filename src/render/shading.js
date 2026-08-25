@@ -832,7 +832,9 @@ MR.shading = (function () {
     const puffs = [];
     for (let i = 0; i < 9; i++) {
       const cx = rnd() * N, cy = rnd() * N;
-      const w = N * (0.075 + rnd() * rnd() * 0.170);
+      // Larger, lower cumulus: a reader read the old field as 'small,
+      // wispy, high' against the reference's big soft bank at the horizon.
+      const w = N * (0.105 + rnd() * rnd() * 0.225);
       const n = 4 + Math.floor(rnd() * 4);
       const lobes = [];
       for (let j = 0; j < n; j++) {

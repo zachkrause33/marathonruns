@@ -6302,6 +6302,19 @@ is the 365-day determinism proof surviving the whole rewrite - `tempo` (`validat
   second spend or the bottle needs to be reliably priced by the paint.
 - **Mats on vehicle roofs**, the one part of the placement instruction not
   built. Section 4 says what it costs.
+- **THE RED MAT'S SHAPE DOES NOT SAY "SLOW".** Section 6b. Two of three blind
+  readers derived "green means faster" from the lift's stripes; none derived
+  "red means slower" from the drag's rungs. On a red-green pair that is the
+  wrong way round, because red-green is the one axis a colour-blind player
+  cannot use. The drag needs a glyph that reads as braking on its own.
+- **The glyph needs enlarging at `READ_NEAR`.** The colour reads at 25 units and
+  the stripes and rungs do not: *"at normal size it reads as a plain dark-green
+  patch"*. Either the marks get bolder or the redundancy claim gets narrowed to
+  close range.
+- **Anchoring a mark on an obstacle hides the mark behind the obstacle.** At 12
+  units a reader found the paint *"far too distant and too occluded to act on"*.
+  The lead-in is a full read window from the ANCHOR; it may need to be from the
+  point the near hazard stops blocking the sightline instead.
 - **The learned axis is thin.** `GRN CHAIN`, a policy that looks 300 units
   ahead and picks the lane leading to the most green, does not beat greedy
   `CHASE GRN`. A mat decision is myopically optimal, which is the structural

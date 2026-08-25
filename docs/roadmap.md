@@ -6319,3 +6319,118 @@ is the 365-day determinism proof surviving the whole rewrite - `tempo` (`validat
   ahead and picks the lane leading to the most green, does not beat greedy
   `CHASE GRN`. A mat decision is myopically optimal, which is the structural
   difference between a line and an allocation.
+
+## Roadmap 70 · The redraft: soft light, no ink, and the street becomes a canyon
+
+The owner, in order: *"I want my game to look like this game. Buildings, road,
+obstacles, cars. It looks more life like."* (reference/citylook-*.jpg, ten
+frames) and then, mid-pass and decisively, *"I don't like the 'toon' look."*
+The second sentence promoted the shading swap from phase 3 to the headline:
+the toon ramp and the ink WERE the look being rejected, so they went first and
+the geometry followed under the new light.
+
+**Phase 1 -- the shading swap** (`src/render/shading.js`). `ramp()` returns a
+160-sample continuous curve with a soft shoulder at dotNL 0.92 instead of
+bands; the floor and the warm-to-cool shadow tint survive, because the
+reference shades in temperature, not in grey. Every `INK` weight is 0 --
+character and hazard included -- through the existing invisible-shell path, so
+a line anywhere is still a one-number restoration. The sky lost its four cel
+steps. Measured, not hoped: every hazard-contrast margin WIDENED when the ink
+came off (tightest gate margin +0.028 before, +0.235 after, same shot) --
+the dark edging had been dragging the area-means down.
+
+- **The envelope did not move.** tools/envelope.js measures fill geometry and
+  always excluded the shells (its own header says so); worst drift across all
+  ten states was 0.00006. No re-baseline needed, and that finding is recorded
+  INSTEAD of a silent skip. footroom 96/96 and deckdrop 24/24 likewise.
+- **Shadow maps refused on measurement.** Live A/B at the peak-draw framing:
+  blob shadows 182 draws / 2.6 ms, a single 1024 PCF shadow map 314 draws /
+  4.6 ms on SwiftShader. +132 draws against a ~400 ceiling with a 244-draw
+  peak frame. The pooled blob system stays; it is also what the reference
+  draws under its own cars.
+- **Ink removal's real price:** peak frame 244 -> 206 draws. The commissioning
+  brief predicted "roughly half" -- stale, because scenery/prop/banner ink was
+  already 0; only character and hazard shells remained.
+- **The ghost still reads as not-solid** (verified frame): its rim is its own
+  raw-shader treatment in ghost.js, untouched by the INK weights.
+
+**Phase 2 -- the canyon** (`src/render/world.js`). CITY START gets a new
+`canyon` roadside kind: pavement ends at the facade line (8.55 = 1.14
+road-widths off centre, the reference's own proportion), the street wall
+pulls in from 12.2, density 0.70 -> 0.94, and the pavement carries the
+reference's props -- oil drums, trash bags, a portaloo, a coffee A-board, and
+deliberately NO crates or planters (the owner's rule: those exist only as
+hazards). Crowd knots compress onto the pavement; trees, groves and walkers
+skip canyon tiles (their bands are inside the buildings now; skipping the
+claim is deterministic because the layout stream was already consumed).
+FINAL MILE keeps its grandstands -- they are that leg's canyon -- and the
+open legs keep their forms, per citylook-desert-outskirts.jpg: the canyon is
+the city's shape, not the game's.
+
+- **The lamps reach over the road again**, deliberately, inside the rules R3
+  wrote: head at y 13.0 (4 above OVERHEAD_Y), thin, glowing amber through an
+  unlit lens mesh that rides the canyon edge group (one draw per live tile).
+  The receding line of lit lamps is the single strongest cue in the
+  reference set. LOW/HIDES pass by construction; the mile gantries stay in
+  open sky below the arms.
+- **The road stopped being track bed.** Light 1.2-unit joints deleted (22 Hz
+  -- shimmer, by this file's own earlier arithmetic), heavy joint kept at
+  reduced contrast, the Egypt rail-and-bead seams replaced by the
+  reference's white dashes (0.38 x 3.0 / 6-unit period, 2.35x tarmac,
+  neutral hue -- the mats keep amber/cyan/pink to themselves), lane bands and
+  camber halved. The dashes carry lane identity now.
+- **The key light swung behind the camera and rose to ~55 degrees**, the
+  drawn sun following it out of frame (no citylook frame shows a sun disc).
+  Every face the player reads is now in warm light, one flank warmer than
+  the other, exactly as the reference lights its street. Ramp floor
+  0.31 -> 0.38, cool 0.38 -> 0.30, so the shaded flank stays warm.
+
+**Phase 3 -- the facade language.** Striped awnings (the old one-colour
+divergence note is half-expired: its aliasing arithmetic was computed at the
+12.2 facade line, and at 8.55 the stripes read for the first third of the
+draw distance; past that they fade to their own pastel mean, which is the
+reference's own distance behaviour). Signboard fascias, one bay in four
+shuttered, mullions, three portrait sashes per bay in reveals with sills,
+air-conditioners. Pavement widened to cover the deepest bay step-back.
+
+**Phase 4 -- vehicles and the ramp's invitation.** The cel specular's two
+hard thresholds became smooth pow terms (8 / 60) -- under a continuous ramp a
+stepped highlight was the last banded thing in the frame, and a pow core
+cannot switch a whole flat panel on at once, which was the failure the old
+constants' comment records. The rideable tram ramp carries the reference's
+gold chevron-stack arrow (citylook-ramp-arrow-container.jpg) as PAINT --
+planes on the running surface over a dark backing, rule 1's stated
+exception, zero extra draws.
+
+**Runner rules whose reason has expired, recorded so nobody obeys a dead
+rule** (the ink went to 0; the runner's geometry is untouched):
+
+- *"THE INK SHELL IS THE UNIT OF COMPOSITION"* (runner.js, the character-pass
+  header) and *"the cause is not the shapes. It is the INK"* (the arm weld
+  note): part boundaries are no longer hard black lines, so the
+  one-outline-per-limb constraint on future part-count decisions is moot.
+  The welds themselves stay -- they are good masses -- but a new part no
+  longer costs a counted outline.
+- The lace-panel post-mortem's third clause ("two 0.014 shells close a 0.008
+  gap twice over") describes an occlusion that no longer occurs; the panel
+  stays deleted for the other two clauses, which were about geometry.
+- Proud-ness margins quoted against the 0.014 ink ("0.022 proud ... clears
+  the 0.014 ink") are now just proud-ness; nothing needs to clear a shell.
+
+**Deferred, stated:** citylook-tunnel.jpg (an enclosed bore) is recorded as an
+optional set-piece candidate and NOT built -- it is the hardest possible
+geometry for LOW/HIDES/BLANKS and nothing in the owner's instruction asks for
+it. Nothing in the canyon work made an over-road enclosure cheap; the canyon
+is all lateral geometry.
+
+**Side-by-sides**, honest names: reference/redraft-canyon-vs-citylook.png,
+reference/redraft-shopfronts-vs-citylook.png,
+reference/redraft-ramp-arrow-vs-citylook.png. Blind read of two unlabelled
+frames by a fresh session: shots/blind/REDRAFT-ANSWERS.md on branch
+blindread-redraft-answers.
+
+**The full gate at the final build:** build --check clean; shoot all shots
+clean (peak 206 draws / 324k tris, tightest contrast margin +0.123);
+course-test 90; simulate PASS; kindread profile 1 of 26; footroom 96/96;
+deckdrop 24/24; mechanics PASS and --identity PASS; tempo PASS; calendar and
+playthrough recorded in their own logs at the close of the pass.

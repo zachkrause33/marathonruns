@@ -395,23 +395,21 @@ function occupied(course, lane, z0, z1) {
  *                     lens -- the pessimistic reading of the contract) or a
  *                     number of units of clear sight (the optimistic control)
  * @param opts.seek    aid policy: 0 ignore, 1 pay an action for it
- * @param opts.surge   SPEND policy: a predicate (i, n) over the zone's index
- *                     and the course's zone count, or nothing to never elect.
+ * @param opts.line    LINE policy: { lift, drag } weights in hundredths of an
+ *                     action avoided, exactly as main.js's bot scores them.
  *
  *                     ---- THE BLINDNESS THIS PARAMETER ENDS ----------------
  *
- *                     Without it this file reported six policies finishing
- *                     within 0.0 s of each other AFTER the pool, the guard and
- *                     the surge zones had shipped -- and the report was
- *                     honest, because none of its bots ever stood in a marked
- *                     lane, so all six ran the whole course at the unsurged
- *                     floor. An instrument that cannot see the mechanic under
- *                     test does not return "no effect", it returns "no
- *                     effect" INDISTINGUISHABLY from a mechanic that is
- *                     broken, and that is worse than no number at all
- *                     (standing rule 3). Every measurement taken between the
- *                     zones landing and this parameter existing was of a game
- *                     nobody was playing.
+ *                     It was opts.surge, a SPEND policy over which zones to
+ *                     elect, and it existed because this file once reported
+ *                     six policies finishing within 0.0 s of each other AFTER
+ *                     the pool, the guard and the surge zones had shipped --
+ *                     honestly, because none of its bots ever stood in a
+ *                     marked lane. An instrument that cannot see the mechanic
+ *                     under test does not return "no effect", it returns "no
+ *                     effect" INDISTINGUISHABLY from a mechanic that is broken
+ *                     (standing rule 3). The surge is gone; the trap is not,
+ *                     so the parameter moved to the mechanic that replaced it.
  * @param opts.aidFrom, opts.aidTo   only seek aid in this fraction of the race
  * @param opts.bias    lane tie-break
  * @param opts.miss    deliberately fluff this fraction of the ACTIONS the bot
@@ -444,22 +442,17 @@ function raceAt(course, opts) {
   const ctrl = stubControls();
   const DT = 1 / 60;
   const out = { hits: 0, gates: 0, aid: 0, gain: 0, late: 0, wrongLane: 0, flank: 0, actions: 0,
-                guards: 0, wasted: 0, surgeUnits: 0, zoneUnits: 0 };
+                guards: 0, wasted: 0, liftU: 0, dragU: 0 };
   const aid = course.aid.filter((a) => !a.roof);
 
-  // ---- the spend policy, resolved once ----------------------------------
-  const zones = course.surges || [];
-  const surgeOn = new Set();
-  if (opts.surge) {
-    for (let i = 0; i < zones.length; i++) if (opts.surge(i, zones.length)) surgeOn.add(zones[i]);
-  }
-  for (const z of zones) out.zoneUnits += z.z1 - z.z0;
-  /** The marked lane to be standing in at z, or -1. Fuel is required. */
-  function surgeLaneAt(z) {
-    if (!surgeOn.size || !p || p.pool <= 0) return -1;
-    const s = course.surgeZoneAt ? course.surgeZoneAt(z) : null;
-    return s && surgeOn.has(s) ? s.lane : -1;
-  }
+  // ---- the LINE policy, resolved once ------------------------------------
+  //
+  // It was a SPEND policy: which of a course's zones to elect. The surge is
+  // gone, the pool has one spend, and what a policy varies now is how it reads
+  // the paint. `opts.line` supplies the two weights, in the same currency
+  // main.js's bot uses: hundredths of an action avoided, against a clear-lane
+  // term of 100.
+  const LINE = opts.line || { lift: 100, drag: -140 };
 
   // Where each gate becomes decidable, under the chosen sighting model.
   const seeAt = new Array(course.gates.length);
@@ -506,7 +499,7 @@ function raceAt(course, opts) {
         // asks both: a zone is 420-560 units against a ~25-unit gate interval,
         // so the edges are the only place a single-point test can be wrong,
         // and they are exactly where the election is won or lost.
-        const sLane = surgeLaneAt(units) >= 0 ? surgeLaneAt(units) : surgeLaneAt(g.z);
+
         let best = null, bestScore = -Infinity;
         cand.forEach(function (l, i) {
           if (g.lanes[l] === K.BLOCK) return;
@@ -516,7 +509,6 @@ function raceAt(course, opts) {
           // collected is only worth what it later buys, so detouring for a
           // bottle out of a zone already being paid for spends the pool to
           // fill the pool.
-          if (l === sLane) score += 500;
           // ---- AND THE MATS ------------------------------------------------
           //
           // Added the day the mechanic landed, and the reason is the reason
@@ -538,7 +530,7 @@ function raceAt(course, opts) {
           // of them. See the fuller note at the same term in main.js.
           if (course.tempoAt) {
             const m = course.tempoAt(g.z, l);
-            if (m) score += m.dir > 0 ? 55 : -150;
+            if (m) score += m.dir > 0 ? LINE.lift : LINE.drag;
           }
           if (score > bestScore) { bestScore = score; best = l; }
         });
@@ -584,8 +576,6 @@ function raceAt(course, opts) {
     // coincidence is a real property of a three-lane road rather than a
     // measurement artefact to be conditioned away.
     if (usePace) {
-      pl.resolveSurge(course, units, p.pool > 0);
-      p.surging = !!pl.surge;
       // ---- AND THE MAT, WHICH THIS HARNESS WAS SILENT ABOUT ---------------
       //
       // Adding a tempo term to the LANE SCORER above and stopping there made
@@ -637,7 +627,8 @@ function raceAt(course, opts) {
   }
   if (p) {
     out.time = p.finishTime; out.streak = p.bestStreak;
-    out.surgeUnits = p.surgeUnits; out.wasted = p.wasted; out.pool = p.pool;
+    out.liftU = p.liftUnits; out.dragU = p.dragUnits;
+    out.wasted = p.wasted; out.pool = p.pool;
   }
   return out;
 }
@@ -1037,15 +1028,17 @@ if (want('policy')) {
     ['shortest line (stay) ', { seek: 0, bias: (l) => [l, l - 1, l + 1] }],
     // Spend policies. Same collection (take every bottle), different answer to
     // the only question the pool asks: which road do you buy?
-    ['+ surge everything   ', { seek: 1, surge: () => true }],
-    ['+ surge the last two ', { seek: 1, surge: (i, n) => i >= n - 2 }],
-    ['+ hold one, then all ', { seek: 1, surge: (i) => i >= 1 }],
-    ['+ surge the first two', { seek: 1, surge: (i) => i < 2 }],
+    // LINE policies. Same collection (take every bottle), different answer to
+    // the only question left: which lane, given what is painted on it.
+    ['+ read the paint     ', { seek: 1, line: { lift: 100, drag: -140 } }],
+    ['+ ignore the paint   ', { seek: 1, line: { lift: 0, drag: 0 } }],
+    ['+ chase green only   ', { seek: 1, line: { lift: 170, drag: 0 } }],
+    ['+ flee red only      ', { seek: 1, line: { lift: 0, drag: -200 } }],
   ];
   for (const miss of [0, 0.06, 0.15, 0.30]) {
     console.log(`  fluffing ${(100 * miss).toFixed(0)}% of the actions asked for:`);
     console.log('');
-    console.log('    policy                  contacts  guards   aid  surged   finish     vs record');
+    console.log('    policy                  contacts  guards   aid    lift   finish     vs record');
     const times = [];
     for (const [label, opts] of POLICIES) {
       const rs = courses.map((c) => raceAt(c, Object.assign(
@@ -1054,11 +1047,11 @@ if (want('policy')) {
       const ft = mean((r) => r.time);
       times.push(ft);
       const vs = ft - K.RECORD_SECONDS;
-      const surged = mean((r) => r.surgeUnits), zoneU = mean((r) => r.zoneUnits);
+      const lift = mean((r) => r.liftU || 0);
       console.log(`    ${label}  ${mean((r) => r.hits).toFixed(2).padStart(8)}  ` +
                   `${mean((r) => r.guards).toFixed(2).padStart(6)}  ` +
                   `${mean((r) => r.aid).toFixed(1).padStart(4)}   ` +
-                  `${(100 * surged / zoneU).toFixed(0).padStart(4)}%   ${Pace.clock(ft)}   ` +
+                  `${Math.round(lift).toString().padStart(5)}u   ${Pace.clock(ft)}   ` +
                   `${(vs <= 0 ? '' : '+') + vs.toFixed(0)}s`);
     }
     const spread = Math.max.apply(null, times) - Math.min.apply(null, times);
@@ -1139,21 +1132,25 @@ console.log('\n=== audit: is this instrument lying to me? ===\n');
   if (Pace.EFFORT > 0) {
     const cs = PKEYS.slice(0, 3).map((k) => Course.generate(k));
     const on = cs.map((c) => raceAt(c, { pace: true, react: 0.45, sight: 'guarded',
-                                         seek: 1, surge: () => true }));
-    const off = cs.map((c) => raceAt(c, { pace: true, react: 0.45, sight: 'guarded', seek: 1 }));
+                                         seek: 1, line: { lift: 170, drag: -200 } }));
+    const off = cs.map((c) => raceAt(c, { pace: true, react: 0.45, sight: 'guarded',
+                                          seek: 1, line: { lift: 0, drag: 0 } }));
     const avg = (a, f) => a.reduce((x, r) => x + f(r), 0) / a.length;
-    const su = avg(on, (r) => r.surgeUnits), zu = avg(on, (r) => r.zoneUnits);
-    if (su <= 0) {
-      bad('a bot told to surge everything elected NO surge -- this instrument is blind');
-    } else if (su < 0.4 * zu) {
-      bad(`surge-everything covered only ${(100 * su / zu).toFixed(0)}% of the marked road`);
+    // Same three checks, one mechanic along. A lane term that never fires
+    // fails the first; a mat that never reaches Pace fails the second; a
+    // target shift that does nothing fails the third.
+    const lu = avg(on, (r) => r.liftU), lo = avg(off, (r) => r.liftU);
+    if (lu <= 0) {
+      bad('a bot told to chase green ran NO forward mat -- this instrument is blind');
+    } else if (lu <= lo) {
+      bad(`chasing green ran ${lu.toFixed(0)}u of lift against ${lo.toFixed(0)}u ignoring it`);
     } else {
-      console.log(`  ok  the bot can see the zones: surge-everything runs ` +
-        `${(100 * su / zu).toFixed(0)}% of the marked road`);
+      console.log(`  ok  the bot can see the paint: chasing green runs ` +
+        `${lu.toFixed(0)}u of lift against ${lo.toFixed(0)}u ignoring it`);
     }
     const gain = avg(off, (r) => r.time) - avg(on, (r) => r.time);
-    if (gain <= 1) bad(`surging is worth ${gain.toFixed(1)}s -- the floor swap is not reaching Pace`);
-    else console.log(`  ok  and it is worth something: ${gain.toFixed(1)}s over the same bot not seeking`);
+    if (gain <= 1) bad(`reading the paint is worth ${gain.toFixed(1)}s -- it is not reaching Pace`);
+    else console.log(`  ok  and it is worth something: ${gain.toFixed(1)}s over the same bot ignoring it`);
   }
 }
 

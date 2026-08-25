@@ -967,76 +967,35 @@ MR.World = (function () {
   }
 
   /**
-   * The lane telegraph that lies on the road ahead of a hazard.
+   * THE LANE TELEGRAPH IS GONE, and this note is where it stood.
    *
-   * The icon is a SHAPE first and a colour second: solid up-triangles for
-   * JUMP, an OPEN PORTAL for DUCK, crosses for BLOCK. At 90 units the mat is
-   * about a dozen pixels tall, which is enough for shape but not for reading
-   * a small hazard mesh -- which is exactly the distance the lane choice has
-   * to be made at.
+   * Three hues of iconised paint -- amber ramp, cyan portal, pink cross -- lay
+   * on the road in front of every hazard and said OVER, UNDER or AROUND. The
+   * owner removed the whole language: "Remove all telegraph mats. Mats should
+   * all be there to increase or decrease speed. Two colors - one speeds you
+   * up, one slows you down."
    *
-   * ---- THE DUCK GLYPH WAS THREE STACKED RUNGS, AND A RUNG IS A LADDER ----
+   * IT WAS MEASURED BEFORE IT WAS REMOVED, which is the only reason this is a
+   * decision rather than a loss. docs/mats-three-lane.md: four uncontaminated
+   * readers, 132 occupied-lane judgements at 25.35 and 32 units, counterbalanced
+   * within reader. The painted arm scored 60/66 and the unpainted arm 62/66 --
+   * the paint was the WORSE arm. DUCK was 52/52 and BLOCK 28/28 in both arms,
+   * and lane choice was 64 of 64 VIABLE in both: across the whole test nobody,
+   * with or without the mats, ever picked a lane that would end a run.
    *
-   * A blind reader asked what the DUCK objects meant answered "UNDER, low
-   * confidence" on all five, and named the reason: *"The yellow-and-black
-   * diagonals tell me danger... They do NOT tell me over or under."* The mat is
-   * the channel this file already calls the one the race is lost by misreading,
-   * and it was not helping: three horizontal bars is a LADDER, and a ladder is
-   * a thing you climb.
+   * WHAT IT DID COST, stated here so nobody rediscovers it as a bug. That same
+   * test found the one job the mat demonstrably did: it TEACHES which low
+   * object is jumpable. Reader B decoded the colour code unaided, used it to
+   * settle two barrier sprites as jumpable, and carried that to three unpainted
+   * panels; reader C refused the code and read those same sprites as walls ten
+   * times. So what is lost is a learning channel over a player's first runs,
+   * not the moment-to-moment read -- and it is deliberately not replaced.
    *
-   * A MAT CANNOT DRAW AN ARROW THAT MEANS "DOWN", and that is the constraint
-   * the rungs were probably a retreat from. The mat lies flat on the road, so
-   * every direction it can draw is a direction along the road -- which is why
-   * the JUMP glyph is a RAMP PROFILE (apex away from the runner) rather than an
-   * up-arrow, and why "under" cannot be an arrow here either.
-   *
-   * What a flat mat CAN draw is the shape of the hole. The DUCK glyph is now an
-   * inverted U -- a lintel on two legs with the road showing through the middle
-   * -- which is a PORTAL YOU PASS THROUGH, and which is now literally the
-   * silhouette of the object it precedes: see duckHeader(), where the span
-   * between the standards above the bar is filled in for the same reason.
-   * Glyph and object say the same sentence.
+   * The road-fitting machinery the mat needed is NOT gone: roadSurfaceY and the
+   * updateMatrixWorld fit below were built for it, they are the hardest-won
+   * code in this file, and the tempo mat that replaces it lies on the same road
+   * over five times the length. See the tempo section.
    */
-  function matTexture(kind, tint, wash) {
-    const c = canvas(128, 256);
-    const g = c.getContext('2d');
-    // A wash under the icons: the road is mid-value, the icons are bright, and
-    // without this the edges of the mat vanish into it. The wash is a dark
-    // version of the hazard's own hue, not neutral -- at the faded near end a
-    // neutral wash read as a dirty grey smear on the tarmac.
-    g.fillStyle = wash;
-    g.fillRect(0, 0, 128, 256);
-    g.fillStyle = tint;
-    g.fillRect(0, 0, 8, 256); g.fillRect(120, 0, 8, 256);
-
-    for (let i = 0; i < 3; i++) {
-      const cy = 42 + i * 86;
-      if (kind === K.JUMP) {
-        // Apex points down-canvas, which after the -90deg lay-down points
-        // AWAY from the runner: a ramp read, not a "stop" read.
-        g.beginPath();
-        g.moveTo(64, cy + 30); g.lineTo(108, cy - 28); g.lineTo(20, cy - 28);
-        g.closePath(); g.fill();
-      } else if (kind === K.DUCK) {
-        // The lintel, thick, and the two legs it stands on. The opening is
-        // 52 of the glyph's 88 -- more than half of it is the hole, because
-        // "legal is not legible" and an opening that merely exists reads as a
-        // line rather than as a way through.
-        g.fillRect(20, cy - 32, 88, 22);
-        g.fillRect(20, cy - 10, 18, 42);
-        g.fillRect(90, cy - 10, 18, 42);
-      } else {
-        g.lineWidth = 17; g.strokeStyle = tint; g.lineCap = 'butt';
-        g.beginPath();
-        g.moveTo(24, cy - 30); g.lineTo(104, cy + 30);
-        g.moveTo(104, cy - 30); g.lineTo(24, cy + 30);
-        g.stroke();
-      }
-    }
-    const t = texture(c, true);
-    t.repeat.set(1, 5);
-    return t;
-  }
 
   /** Diagonal caution stripes for the face a hazard turns toward the player. */
   function stripeTexture(a, b) {
@@ -7087,52 +7046,6 @@ MR.World = (function () {
       block: new THREE.MeshBasicMaterial({ map: stripeTex.block }),
     };
 
-    // Lane telegraph mats. Transparent, unlit, and laid a hair above the road
-    // paint so they never z-fight with the lane dashes.
-    /**
-     * The telegraph mat: 14 units of run-up, because the lane choice has to be
-     * made 3-4 gate-lengths out, not 1.
-     *
-     * The end nearest the player fades to nothing through a per-vertex alpha
-     * ramp. Without it the mat is informative at 60 units and then swells into
-     * a screen-filling slab of saturated colour in the last quarter-second,
-     * which is precisely when the player needs to see the hazard instead.
-     */
-    const matGeo = (function () {
-      // 32 segments over the mat's 16 units, not 16. See fitMatToRoad(): the
-      // only place the fitted strip can miss the road is a segment with a tile
-      // joint inside it, and that error is proportional to the segment length.
-      const g = new THREE.PlaneGeometry(1.95 * LANE_FIT, 16, 1, 32);
-      const pos = g.attributes.position;
-      const col = new Float32Array(pos.count * 4);
-      for (let i = 0; i < pos.count; i++) {
-        // Local +Y lays down toward -Z, i.e. toward the approaching runner, so
-        // the ramp runs over most of the mat's length and only the last few
-        // units before the hazard reach full strength.
-        const t = Math.max(0, Math.min(1, (8.0 - pos.getY(i)) / 11.0));
-        const a = Math.pow(t, 1.5);
-        col[i * 4] = 1; col[i * 4 + 1] = 1; col[i * 4 + 2] = 1; col[i * 4 + 3] = a;
-      }
-      g.setAttribute('color', new THREE.BufferAttribute(col, 4));
-      // Culling uses this and it is computed BEFORE the fit displaces anything,
-      // so it is padded by more than the fit can ever move a vertex (see the
-      // arithmetic in fitMatToRoad: 0.10 of profile, a hair of tile chord).
-      g.computeBoundingSphere();
-      g.boundingSphere.radius += 0.30;
-      return g;
-    })();
-    /**
-     * A PRISTINE COPY OF THE MAT'S VERTICES, because the fit is not idempotent.
-     *
-     * fitMatToRoad rewrites the position attribute in place. Fitting the result
-     * of the last fit would compound, and a pooled mat is re-fitted every time
-     * its group is claimed for a new gate. Every fit starts from here.
-     */
-    const matRest = Float32Array.from(matGeo.attributes.position.array);
-    const matMat = {};
-    matMat[K.JUMP] = new THREE.MeshBasicMaterial({ map: matTexture(K.JUMP, '#ffc23a', 'rgba(58,34,0,0.40)'), transparent: true, depthWrite: false, vertexColors: true });
-    matMat[K.DUCK] = new THREE.MeshBasicMaterial({ map: matTexture(K.DUCK, '#4fdcff', 'rgba(0,36,54,0.40)'), transparent: true, depthWrite: false, vertexColors: true });
-    matMat[K.BLOCK] = new THREE.MeshBasicMaterial({ map: matTexture(K.BLOCK, '#ff4f78', 'rgba(62,0,22,0.44)'), transparent: true, depthWrite: false, vertexColors: true });
 
     /**
      * ============ THE ROAD AS BUILT, NOT THE PROFILE IT WAS BUILT FROM =======
@@ -7285,41 +7198,38 @@ MR.World = (function () {
       _matBaseUMW.call(this, force);
       fitMatToRoad.call(this);
     }
+    /**
+     * `this.userData.matRest` is the pristine copy of the vertices, because the
+     * fit is not idempotent: it rewrites the position attribute in place, and
+     * fitting the result of the last fit would compound. It lives on the mesh
+     * rather than in this closure because the tempo mat has two rest poses --
+     * one per direction -- and a mark whose length is written at claim time
+     * rewrites its own rest pose before asking for a fit.
+     */
     function fitMatToRoad() {
+      const rest = this.userData.matRest;
+      if (!rest) return;
       const e = this.matrixWorld.elements;
       // e[13], e[14] are the world y and z of the mat's origin; e[6] is the
       // pitch term. Together they are everything about the transform that can
-      // change where the road is under this strip.
+      // change where the road is under this strip -- plus the rest pose's own
+      // serial, which a length rewrite bumps.
       const was = this.userData.fitKey;
-      if (was && was[0] === e[13] && was[1] === e[14] && was[2] === e[6]) return;
-      this.userData.fitKey = [e[13], e[14], e[6]];
+      const gen = this.userData.matGen || 0;
+      if (was && was[0] === e[13] && was[1] === e[14] && was[2] === e[6] && was[3] === gen) return;
+      this.userData.fitKey = [e[13], e[14], e[6], gen];
       _matInv.copy(this.matrixWorld).invert();
       const pos = this.geometry.attributes.position;
       const arr = pos.array;
       for (let i = 0; i < pos.count; i++) {
         const j = i * 3;
-        _matV.set(matRest[j], matRest[j + 1], matRest[j + 2]);
+        _matV.set(rest[j], rest[j + 1], rest[j + 2]);
         _matV.applyMatrix4(this.matrixWorld);          // where the rest pose puts it
         _matV.y = roadSurfaceY(_matV.z) + MAT_LIFT;    // where the tarmac is under it
         _matV.applyMatrix4(_matInv);                   // back into the mesh's frame
         arr[j] = _matV.x; arr[j + 1] = _matV.y; arr[j + 2] = _matV.z;
       }
       pos.needsUpdate = true;
-    }
-
-    function telegraph(kind) {
-      // Its OWN geometry, because fitMatToRoad writes vertices and every mat on
-      // the road stands on different ground. This is the one cost of the fix
-      // and it is paid in the abundant currency: about 2.4 KB a mat, no extra
-      // draw call, no extra material, no extra texture.
-      const m = new THREE.Mesh(matGeo.clone(), matMat[kind]);
-      m.rotation.x = -Math.PI / 2;
-      // Runs a little past the gate line so the paint shows through the open
-      // gap under a DUCK bar -- colour at the exact spot of the hazard.
-      m.position.set(0, MAT_LIFT, -7.2);
-      m.renderOrder = 5;
-      m.updateMatrixWorld = matUpdateMatrixWorld;
-      return m;
     }
 
     /**
@@ -7540,7 +7450,11 @@ MR.World = (function () {
          * costs +105 to +201 draw calls here and puts two of the eight shots
          * over the 400 ceiling -- 04-wall 265 to 438, 08-level 264 to 465.
          */
-        g.add(telegraph(kind));
+        // NOTHING IS PAINTED IN FRONT OF A HAZARD ANY MORE. A telegraph mat
+        // was added here, and the pooled group therefore had exactly one
+        // non-variant child -- an invariant tools/blindread.js asserts on and
+        // which has moved to zero. See the note where matTexture stood for the
+        // measurement that made the removal safe and the one thing it costs.
         // A hazard is the thing the audit protects, not a thing it polices: it
         // is meant to be in the corridor, and one gate hiding another is the
         // game rather than a bug. See api.crossings().

@@ -68,12 +68,9 @@ MR.Player = (function () {
       // SPAN rather than a flag so a bounce out of one lorry and into the next
       // is two incidents and not one -- see resolveDeck.
       flanked: null,
-      // The surge zone being run, or null. THE ZONE OBJECT, not a boolean, for
-      // the same reason `ramp` is: leaving one zone and entering another is two
-      // events, and a boolean cannot tell the second from the first.
-      // The tempo mat being run, or null. THE MAT OBJECT for the reason `ramp`
-      // and `surge` are objects: leaving one mat and entering another is two
-      // events, and a boolean cannot tell the second from the first.
+      // The tempo mat being run, or null. THE MAT OBJECT and not a boolean,
+      // for the same reason `ramp` is one: leaving one mat and entering another
+      // is two events, and a boolean cannot tell the second from the first.
       mat: null,
       // Cones already answered, by ramp. A cone is resolved off a z crossing
       // like a gate, and without a latch a frame-rate spike would charge one
@@ -633,8 +630,8 @@ MR.Player = (function () {
      * NEVER FROM A ROOF. The paint is on the road, and a runner on a deck is
      * two and a half units above it. course.js will not lay a mat where a
      * vehicle stands -- laneFree over the read window is one of the conditions
-     * validate() proves -- so this is belt and braces, and it is the same guard
-     * resolveSurge makes for the same reason.
+     * validate() proves -- so this is belt and braces. resolveSurge made the
+     * same guard for the same reason before the surge was removed.
      */
     s.resolveTempo = function (course, unitsNow) {
       const m = course && course.tempoAt && !s.onDeck

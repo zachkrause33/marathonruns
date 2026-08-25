@@ -225,7 +225,7 @@ MR.World = (function () {
     // density went 0.70 -> 0.94 with it: a canyon with a third of its teeth
     // missing is a suburb, and the reference's street wall is continuous.
     'CITY START': {
-      sky: [0x2b3fa8, 0x9fdcff], ground: 0x63c96b, road: 0x5f6285, fog: 0x9fdcff,
+      sky: [0x5580b8, 0xbfe4f4], ground: 0x63c96b, road: 0x64655c, fog: 0xbfe4f4,
       edge: 'canyon', street: 0.94,
       mix: { building: 1.5, tree: 1.1, grove: 0.3, crowd: 2.3, walkers: 1.1 },
     },
@@ -233,7 +233,7 @@ MR.World = (function () {
     // to the road; at full shoulder width the river sat 35 units out and read
     // as a smear on the horizon.
     'RIVERSIDE': {
-      sky: [0x1f6fb8, 0xbdf0ff], ground: 0x57c7a8, road: 0x52677b, fog: 0xbdf0ff,
+      sky: [0x4f8cc0, 0xcdf2fc], ground: 0x57c7a8, road: 0x5a675f, fog: 0xcdf2fc,
       edge: 'hedge', bank: -1, street: 0.26,
       mix: { building: 0.35, tree: 2.0, grove: 2.0, crowd: 1.0, walkers: 0.8 },
     },
@@ -241,12 +241,12 @@ MR.World = (function () {
     // spectator out there would be standing on the river. What the leg gets
     // instead is the span itself, which is the setting's to choose.
     'THE BRIDGE': {
-      sky: [0x3a4fc0, 0xffd9a8], ground: 0x2f8fc4, road: 0x6a607b, fog: 0xffd9a8,
+      sky: [0x3a4fc0, 0xffd9a8], ground: 0x2f8fc4, road: 0x6a635c, fog: 0xffd9a8,
       edge: 'rail', street: 0,
       mix: {},
     },
     'PARKLAND': {
-      sky: [0x2e8fd0, 0xcdf5c0], ground: 0x6fd46a, road: 0x5d6477, fog: 0xcdf5c0,
+      sky: [0x2e8fd0, 0xcdf5c0], ground: 0x6fd46a, road: 0x60655c, fog: 0xcdf5c0,
       edge: 'hedge', street: 0.05,
       mix: { building: 0.12, tree: 2.6, grove: 3.6, crowd: 1.1, walkers: 0.9 },
     },
@@ -256,7 +256,7 @@ MR.World = (function () {
       mix: { building: 1.2, tree: 0.25, crowd: 0.35, walkers: 0.3 },
     },
     'FINAL MILE': {
-      sky: [0x24306e, 0xffcf6b], ground: 0x5cb46a, road: 0x656181, fog: 0xffcf6b,
+      sky: [0x24306e, 0xffcf6b], ground: 0x5cb46a, road: 0x67635a, fog: 0xffcf6b,
       edge: 'barrier', street: 0.52,
       mix: { building: 0.7, tree: 0.7, crowd: 3.4, walkers: 0.7 },
     },
@@ -611,14 +611,14 @@ MR.World = (function () {
   const SETTING_LOOK = {
 
     BOSTON: {
-      sky: [0x2a55b0, 0xc6e8ff], fog: 0xcfe6f2, ground: 0x86b45a, road: 0x626374,
+      sky: [0x5580c0, 0xd0ecfa], fog: 0xcfe6f2, ground: 0x86b45a, road: 0x66665e,
       water: 0x3f7fae, edge: 0xf4ece0,
       terrace: {
-        colors: [0x9c5b4a, 0xb06a52, 0x8a5040, 0xc08a68, 0xa66a58],
-        trim: 0xe8dcc4, win: 0x3c4a72, roof: 'flat', roofColor: 0x5a5266,
-        h: [8.5, 11.5], bay: 4.6, depth: 7.0, rows: 4, stoop: 1, bow: 1, chimney: 2,
+        colors: [0xb8664a, 0xc8785a, 0xa65a44, 0xd89a70, 0xbc7862],
+        trim: 0xe8dcc4, win: 0x3c4a72, roof: 'flat', roofColor: 0x627438,
+        h: [11.0, 14.0], bay: 4.6, depth: 7.0, rows: 5, stoop: 1, bow: 1, chimney: 2,
       },
-      tower: { colors: [0x6a7ea8, 0x8a92b8, 0xb8b0a0], glass: 0, crown: 'flat' },
+      tower: { colors: [0x8a8a98, 0xa89e94, 0xc0b4a0], glass: 0, crown: 'flat' },
       tree: { kind: 'round', colors: [0xe0692f, 0xd8952a, 0xc04a2a, 0xe8b13a], h: 1.05 },
       marks: {
         'CITY START': [{ k: 'citgo', x: 15 }, { k: 'spireWhite', x: 14 }, { k: 'clock', x: 14.5 }],
@@ -631,14 +631,14 @@ MR.World = (function () {
     },
 
     LONDON: {
-      sky: [0x3a63b8, 0xdae8f4], fog: 0xd6e4f0, ground: 0x5fbf6b, road: 0x616372,
+      sky: [0x6288bc, 0xe0ecf6], fog: 0xd6e4f0, ground: 0x5fbf6b, road: 0x65655e,
       water: 0x5a8fa8, edge: 0xffe8e8,
       terrace: {
-        colors: [0xe8dcc8, 0xd8c8b0, 0xc8b8a4, 0xefe4d4, 0xb8a894],
-        trim: 0xfff6e8, win: 0x33405e, roof: 'parapet', roofColor: 0x4a4458,
-        h: [8.5, 11.0], bay: 4.4, depth: 7.0, rows: 4, stoop: 1, chimney: 3, balcony: 1,
+        colors: [0xf0e2c4, 0xe0d0ac, 0xd0bc98, 0xf6ecd4, 0xc4ae8c],
+        trim: 0xfff6e8, win: 0x33405e, roof: 'parapet', roofColor: 0x5c7040,
+        h: [11.0, 13.5], bay: 4.4, depth: 7.0, rows: 5, stoop: 1, chimney: 3, balcony: 1,
       },
-      tower: { colors: [0x7a8ab0, 0x9aa4c0, 0xc8ccd8], glass: 1, crown: 'flat' },
+      tower: { colors: [0x9a9aa4, 0xb0aca8, 0xc8c4b8], glass: 1, crown: 'flat' },
       tree: { kind: 'round', colors: [0x5f7f30, 0x84a83c, 0xaad84e], h: 1.15, trunk: 0x9a9a86 },
       marks: {
         'CITY START': [{ k: 'stPauls', x: 17 }, { k: 'bigBen', x: 14 }],
@@ -651,14 +651,14 @@ MR.World = (function () {
     },
 
     BERLIN: {
-      sky: [0x2f52b0, 0xcfe2f8], fog: 0xc8dcf5, ground: 0x69c46e, road: 0x616374,
+      sky: [0x5a7cbc, 0xd8e8f8], fog: 0xc8dcf5, ground: 0x69c46e, road: 0x66665e,
       water: 0x4f86ae, edge: 0xeef0ff,
       terrace: {
-        colors: [0xe4d8c0, 0xcfc0a8, 0xdcc8a8, 0xbfb098, 0xefe6d2],
-        trim: 0xfff8ec, win: 0x384464, roof: 'mansard', roofColor: 0x59607a,
-        h: [10.0, 13.0], bay: 4.8, depth: 7.4, rows: 5, chimney: 2, balcony: 1,
+        colors: [0xe8d8b8, 0xd4c0a0, 0xe0c8a0, 0xc4b090, 0xf2e6cc],
+        trim: 0xfff8ec, win: 0x384464, roof: 'mansard', roofColor: 0x5f6668,
+        h: [11.5, 14.0], bay: 4.8, depth: 7.4, rows: 5, chimney: 2, balcony: 1,
       },
-      tower: { colors: [0x8894b8, 0xa8b0cc, 0xd8dce8], glass: 1, crown: 'flat' },
+      tower: { colors: [0x9a9ca8, 0xb4b0ac, 0xd0ccc0], glass: 1, crown: 'flat' },
       tree: { kind: 'round', colors: [0x688a2e, 0x8cb43a, 0xb0e04e], h: 1.2 },
       marks: {
         'CITY START': [{ k: 'fernsehturm', x: 22 }, { k: 'brandenburg', over: 1 }],
@@ -671,12 +671,12 @@ MR.World = (function () {
     },
 
     CHICAGO: {
-      sky: [0x1f3fa0, 0xa8cfe8], fog: 0xa8cde0, ground: 0x63b46a, road: 0x616377,
+      sky: [0x4f74b4, 0xb8d8ec], fog: 0xa8cde0, ground: 0x63b46a, road: 0x65665f,
       water: 0x3f7fa8, edge: 0xe4e8f4,
       terrace: {
-        colors: [0x9a8f7e, 0x8a8070, 0xa8998a, 0x7c7466, 0xb0a494],
-        trim: 0xd8cfc0, win: 0x2f3a58, roof: 'flat', roofColor: 0x4e4a5c,
-        h: [9.0, 12.0], bay: 4.6, depth: 7.0, rows: 4, stoop: 1, chimney: 1,
+        colors: [0xb0a084, 0xa09076, 0xc0ac8e, 0x92846c, 0xc8b89c],
+        trim: 0xd8cfc0, win: 0x2f3a58, roof: 'flat', roofColor: 0x596c3a,
+        h: [11.5, 14.5], bay: 4.6, depth: 7.0, rows: 5, stoop: 1, chimney: 2,
       },
       tower: { colors: [0x2f3550, 0x3a4160, 0x4a5270], glass: 1, crown: 'antenna' },
       tree: { kind: 'round', colors: [0x5c8028, 0x7fa838, 0xa4d848], h: 1.0 },
@@ -691,13 +691,13 @@ MR.World = (function () {
     },
 
     NEWYORK: {
-      sky: [0x2b46b4, 0xbde0f8], fog: 0xbdd8ee, ground: 0x63c96b, road: 0x616376,
+      sky: [0x567cbc, 0xcce6f8], fog: 0xbdd8ee, ground: 0x63c96b, road: 0x66655e,
       water: 0x3d7ba6, edge: 0xfff0dc,
       terrace: {
-        colors: [0x8f5442, 0xa6644c, 0x7c4838, 0xb87a5c, 0x96604a],
-        trim: 0xe4d4bc, win: 0x35406a, roof: 'flat', roofColor: 0x4c4658,
-        h: [9.5, 12.5], bay: 4.4, depth: 7.0, rows: 5, stoop: 1, tank: 1,
-        fireEscape: 1, chimney: 1,
+        colors: [0xa8604a, 0xc07656, 0x965640, 0xd08c66, 0xb06e52],
+        trim: 0xe4d4bc, win: 0x35406a, roof: 'flat', roofColor: 0x566838,
+        h: [12.0, 15.0], bay: 4.4, depth: 7.0, rows: 6, stoop: 1, tank: 1,
+        fireEscape: 1, chimney: 2,
       },
       tower: { colors: [0x8a8272, 0xa89c88, 0x6f7488], glass: 0, crown: 'stepped' },
       tree: { kind: 'round', colors: [0x5c8028, 0x7fa838, 0xa4d848], h: 1.1 },
@@ -712,12 +712,12 @@ MR.World = (function () {
     },
 
     TOKYO: {
-      sky: [0x3a3f9e, 0xffd0d8], fog: 0xffd6dc, ground: 0x5fbf7a, road: 0x666276,
+      sky: [0x5f68ac, 0xffdce0], fog: 0xffd6dc, ground: 0x5fbf7a, road: 0x67655f,
       water: 0x4f8fb0, edge: 0xffe4ec,
       terrace: {
-        colors: [0xdcdce4, 0xc8ccd8, 0xe8e4e0, 0xb8bcc8, 0xd0c8c8],
-        trim: 0xfffdf5, win: 0x2f3856, roof: 'flat', roofColor: 0x4a4a5e,
-        h: [9.0, 13.0], bay: 3.8, depth: 6.6, rows: 5, neon: 1, balcony: 2,
+        colors: [0xe4e0da, 0xd0ccc4, 0xf0e8dc, 0xc0bcb4, 0xd8ccbe],
+        trim: 0xfffdf5, win: 0x2f3856, roof: 'flat', roofColor: 0x555c48,
+        h: [11.5, 15.0], bay: 3.8, depth: 6.6, rows: 6, neon: 1, balcony: 2, chimney: 1,
       },
       tower: { colors: [0xb8bcd0, 0xd0d4e0, 0x8f96b0], glass: 1, crown: 'antenna' },
       tree: { kind: 'columnar', colors: [0x4e7530, 0x74a03c, 0x9ccc4c], h: 1.0 },
@@ -732,14 +732,14 @@ MR.World = (function () {
     },
 
     SYDNEY: {
-      sky: [0x1f7fd0, 0xdcf4ff], fog: 0xd8f4ff, ground: 0x7fc86a, road: 0x606474,
+      sky: [0x4f94cc, 0xe2f6fc], fog: 0xd8f4ff, ground: 0x7fc86a, road: 0x64665c,
       water: 0x2fa8d8, edge: 0xfff4e0,
       terrace: {
-        colors: [0xd8b48c, 0xc49a74, 0xe8cfa8, 0xb08464, 0xefe0c4],
-        trim: 0xfff8e8, win: 0x3a4468, roof: 'pitch', roofColor: 0x7f4a3a,
-        h: [7.5, 9.5], bay: 4.4, depth: 7.0, rows: 3, balcony: 1, chimney: 2,
+        colors: [0xe4bc8e, 0xd0a276, 0xf0d8a8, 0xbc8c64, 0xf4e6c6],
+        trim: 0xfff8e8, win: 0x3a4468, roof: 'pitch', roofColor: 0x8a5040,
+        h: [10.5, 13.0], bay: 4.4, depth: 7.0, rows: 4, balcony: 1, chimney: 2,
       },
-      tower: { colors: [0x8fa8c8, 0xb0c4dc, 0xd8e4ee], glass: 1, crown: 'flat' },
+      tower: { colors: [0xa4a8ac, 0xbcbcb4, 0xd8d4c8], glass: 1, crown: 'flat' },
       tree: { kind: 'palm', colors: [0x5f8a30, 0x92c040], h: 1.1 },
       marks: {
         'CITY START': [{ k: 'operaHouse', x: 19 }, { k: 'sydneyTower', x: 20 }],
@@ -752,12 +752,12 @@ MR.World = (function () {
     },
 
     PARIS: {
-      sky: [0x3a58b8, 0xe2e4f2], fog: 0xe0dfe8, ground: 0x6fc274, road: 0x65636d,
+      sky: [0x6484bc, 0xe8ecf4], fog: 0xe0dfe8, ground: 0x6fc274, road: 0x67655e,
       water: 0x6a94a8, edge: 0xf4f0e4,
       terrace: {
-        colors: [0xe8dcc0, 0xdcceb0, 0xf0e6cc, 0xd0c0a4, 0xe4d8bc],
-        trim: 0xfff8ea, win: 0x38446a, roof: 'mansard', roofColor: 0x5a6076,
-        h: [10.5, 12.5], bay: 4.6, depth: 7.2, rows: 5, balcony: 2, chimney: 4,
+        colors: [0xecdebc, 0xe0d0ac, 0xf4e8c8, 0xd4c2a0, 0xe8dab6],
+        trim: 0xfff8ea, win: 0x38446a, roof: 'mansard', roofColor: 0x5e6467,
+        h: [12.0, 14.0], bay: 4.6, depth: 7.2, rows: 5, balcony: 2, chimney: 4,
       },
       tower: { colors: [0xc8c0ac, 0xd8d0bc, 0xb0a894], glass: 0, crown: 'flat' },
       tree: { kind: 'pollard', colors: [0x62862e, 0x8ab23c, 0xaedc4e], h: 1.1, trunk: 0xa8a894 },
@@ -772,12 +772,12 @@ MR.World = (function () {
     },
 
     VALENCIA: {
-      sky: [0x1f7fd8, 0xeaf6ff], fog: 0xe8f6ff, ground: 0x8fc45f, road: 0x65636e,
+      sky: [0x4f94d0, 0xeef8ff], fog: 0xe8f6ff, ground: 0x8fc45f, road: 0x67655e,
       water: 0x30b0d0, edge: 0xfff8e8,
       terrace: {
-        colors: [0xfff2d8, 0xf4e4c4, 0xffe8c8, 0xe8d8bc, 0xfff8e8],
+        colors: [0xfff2d4, 0xf4e4c0, 0xffe8c4, 0xe8d8b8, 0xfff8e4],
         trim: 0xffffff, win: 0x3f4a70, roof: 'tile', roofColor: 0xc86a42,
-        h: [8.0, 10.5], bay: 4.4, depth: 7.0, rows: 4, balcony: 1,
+        h: [10.0, 12.5], bay: 4.4, depth: 7.0, rows: 4, balcony: 1, chimney: 1,
       },
       tower: { colors: [0xf4ecd8, 0xffffff, 0xe4dcc8], glass: 0, crown: 'flat' },
       tree: { kind: 'palm', colors: [0x6b9834, 0xa0d045], h: 1.25 },
@@ -792,12 +792,12 @@ MR.World = (function () {
     },
 
     AMSTERDAM: {
-      sky: [0x2f5fb8, 0xd4e8f6], fog: 0xcfe6f4, ground: 0x5fc07a, road: 0x606472,
+      sky: [0x5a80bc, 0xdcecf8], fog: 0xcfe6f4, ground: 0x5fc07a, road: 0x65655e,
       water: 0x4f7f96, edge: 0xf0ece0,
       terrace: {
-        colors: [0x7a4438, 0x8f5442, 0x64483c, 0x9c6250, 0x543c34],
+        colors: [0x8a5040, 0x9c5e48, 0x745448, 0xa86e58, 0x64483e],
         trim: 0xf4ece0, win: 0x2f3a5e, roof: 'stepgable', roofColor: 0x6a4438,
-        h: [10.0, 13.0], bay: 3.2, depth: 6.4, rows: 5, hoist: 1, lean: 1,
+        h: [11.5, 14.0], bay: 3.2, depth: 6.4, rows: 5, hoist: 1, lean: 1,
       },
       tower: { colors: [0x8f6a58, 0xa88070, 0xc8a890], glass: 0, crown: 'flat' },
       tree: { kind: 'round', colors: [0x5f8a2e, 0x84b03a, 0xa8dc4c], h: 1.15 },
@@ -812,12 +812,12 @@ MR.World = (function () {
     },
 
     ROME: {
-      sky: [0x2a63c0, 0xffe6c0], fog: 0xffe0bc, ground: 0x8fb45a, road: 0x69626c,
+      sky: [0x5a86c4, 0xffeac8], fog: 0xffe0bc, ground: 0x8fb45a, road: 0x6a655c,
       water: 0x5f9fae, edge: 0xfff0d8,
       terrace: {
-        colors: [0xd8964a, 0xc8823e, 0xe8ac60, 0xb87038, 0xefc484],
+        colors: [0xdc9a4c, 0xcc8640, 0xecb064, 0xbc743a, 0xf2c886],
         trim: 0xfff0d0, win: 0x4a4058, roof: 'tile', roofColor: 0xb05a34,
-        h: [9.0, 11.5], bay: 4.6, depth: 7.2, rows: 4, balcony: 1, chimney: 2,
+        h: [10.5, 13.0], bay: 4.6, depth: 7.2, rows: 4, balcony: 1, chimney: 2,
       },
       tower: { colors: [0xe8c48c, 0xd8a868, 0xf0dcb0], glass: 0, crown: 'flat' },
       tree: { kind: 'umbrella', colors: [0x466a24, 0x628c30, 0x88bc3c], h: 1.2 },
@@ -832,14 +832,14 @@ MR.World = (function () {
     },
 
     CAPETOWN: {
-      sky: [0x1666c8, 0xe4f2ff], fog: 0xdff0ff, ground: 0x9fb05a, road: 0x616373,
+      sky: [0x4f88c8, 0xe8f4ff], fog: 0xdff0ff, ground: 0x9fb05a, road: 0x65665e,
       water: 0x2f9fd8, edge: 0xfff2e4,
       // Bo-Kaap: the one street in the world painted in flat saturated blocks,
       // and the cheapest possible way to say "Cape Town" at a hundred units.
       terrace: {
         colors: [0x39c0d8, 0xf05a7a, 0x62d07a, 0xffc23a, 0x9a7bff, 0xff8a4a],
         trim: 0xffffff, win: 0x2f3a5e, roof: 'pitch', roofColor: 0xb8b0a0,
-        h: [6.5, 8.0], bay: 4.4, depth: 6.6, rows: 2, stoop: 1,
+        h: [8.5, 10.5], bay: 4.4, depth: 6.6, rows: 3, stoop: 1, chimney: 1,
       },
       tower: { colors: [0xdce4ec, 0xc8d4e0, 0xf0f4f8], glass: 1, crown: 'flat' },
       tree: { kind: 'scrub', colors: [0x7d8f38, 0x9cb04c, 0x6a8440], h: 0.9 },
@@ -1786,7 +1786,7 @@ MR.World = (function () {
           sub.push(bx(d * 1.005, 0.07, bw * 0.94, 0, 0.62 + rb * 0.32, 0, 0x7a8090));
         }
       } else {
-        sub.push(bx(d * 1.00, 1.42, bw * 0.96, 0, 1.11, 0, shop));      // shopfront glazing
+        sub.push(gl(bx(d * 1.00, 1.42, bw * 0.96, 0, 1.11, 0, shop), GLOSS.glass));  // shopfront glazing
         // Mullions, so a row of open shops is not one unbroken glass ribbon.
         for (const mz of [-bw * 0.16, bw * 0.16]) {
           sub.push(bx(d * 1.005, 1.42, 0.09, 0, 1.11, mz, t.trim));
@@ -1877,7 +1877,7 @@ MR.World = (function () {
         if (wy > h - 1.0) break;
         for (const sz of [-1, 0, 1]) {
           sub.push(bx(0.16, 1.44, 0.60, fx - 0.05, wy, sz * bw * 0.27, surround));
-          sub.push(bx(0.20, 1.28, 0.48, fx - 0.07, wy, sz * bw * 0.27, t.win));
+          sub.push(gl(bx(0.20, 1.28, 0.48, fx - 0.07, wy, sz * bw * 0.27, t.win), GLOSS.glass));
           sub.push(bx(0.30, 0.10, 0.68, fx - 0.10, wy - 0.74, sz * bw * 0.27, t.trim));
         }
         // An air-conditioner under one window, a few bays apart -- the small
@@ -1893,6 +1893,24 @@ MR.World = (function () {
               wy - 0.40, -bw * 0.40 + k * (bw * 0.80 / 6), 0x3a3550));
           }
           sub.push(bx(0.30, 0.08, bw * 0.86, fx - 0.22, wy - 0.18, 0, 0x3a3550));
+        }
+      }
+      /**
+       * BRICK QUOINS, one bay in about 2.5: the stacked contrasting corner
+       * blocks every second reference facade wears (citylook-coin-field's
+       * cream building carries brick-red quoins; citylook-shopfronts' brick
+       * one carries cream). Contrast picked against the wall the way the
+       * window surround already is: a light facade gets warm brick quoins, a
+       * dark one gets stone.
+       */
+      if (rnd() < 0.40) {
+        const qc = shadedL(col) > 120 ? 0xb06a48 : mixHex(col, 0xffffff, 0.42);
+        const qz = bw * 0.47;
+        for (let q = 0; ; q++) {
+          const qy = 2.55 + q * 1.15;
+          if (qy > h - 0.7) break;
+          const qs = (q & 1) ? 0.36 : 0.52;
+          sub.push(bx(0.14, 0.52, qs, fx - 0.03, qy, (q & 1) ? qz : qz - 0.07, qc));
         }
       }
       // Door and stoop. It stands proud of the shopfront glazing, which is what
@@ -1970,10 +1988,27 @@ MR.World = (function () {
       } else {
         // Flat, with a parapet. Two heights of parapet, because a row of
         // identical cornices reads as extrusion rather than as buildings.
+        //
+        // THE CORNICE IS THE REFERENCE'S GREEN CAP on roughly half the bays
+        // (citylook-desert-outskirts, citylook-coin-field: an olive-green
+        // cornice band with dentils under it, on cream and brick facades
+        // alike); the other half keep a masonry parapet so the roofline
+        // still alternates. The dentil strip is a row of small blocks under
+        // the cap -- the reference draws them plainly at the near range the
+        // canyon now puts the roofline at.
         const ph = t.roof === 'parapet' ? 0.95 : 0.55;
+        const capGreen = rnd() < 0.55;
+        const capCol = capGreen ? rc : mixHex(col, t.trim, 0.45);
         sub.push(bx(d * 1.04, 0.30, bw, 0, h + 0.15, 0, t.trim));
-        sub.push(bx(d * 1.02, ph, bw * 0.99, 0, h + 0.3 + ph / 2, 0, rc));
-        sub.push(bx(d * 1.06, 0.18, bw, 0, h + 0.3 + ph, 0, t.trim));
+        sub.push(bx(d * 1.02, ph, bw * 0.99, 0, h + 0.3 + ph / 2, 0, capCol));
+        sub.push(bx(d * 1.10, 0.22, bw * 1.01, 0, h + 0.34 + ph, 0, capCol));
+        if (capGreen) {
+          const nd = 6;
+          for (let dd = 0; dd < nd; dd++) {
+            sub.push(bx(0.16, 0.16, 0.30, fx - 0.04, h + 0.10,
+              -bw * 0.42 + dd * (bw * 0.84 / (nd - 1)), mixHex(capCol, 0xffffff, 0.25)));
+          }
+        }
       }
       if (t.tank) {
         // The New York roof water tower: a cedar barrel on a steel frame, and
@@ -5297,7 +5332,7 @@ MR.World = (function () {
       // the ones that are load-bearing are re-authored below against the
       // tarmac rather than against a remembered number.
       paint: vtoon(2),
-      prop: vtoon(2),
+      prop: vtoon(2, undefined, true),
       // The roadside furniture gets its own material so a setting can put a
       // little of its own light on the barriers, hedges and parapets without
       // dragging every tree and spectator with it. It only ever multiplies a
@@ -5561,9 +5596,9 @@ MR.World = (function () {
     // the bands keep only enough asymmetry to answer left-or-right in
     // peripheral vision without reading as three materials.
     const LANE_BAND = [
-      0xdde4f0,   // lane 0, screen LEFT  -- coolest and darkest
+      0xeaeef4,   // lane 0, screen LEFT  -- coolest and darkest
       0xffffff,   // lane 1, centre       -- the biome road colour, neat
-      0xf4f0e8,   // lane 2, screen RIGHT -- warmed, half a step between
+      0xf8f5ee,   // lane 2, screen RIGHT -- warmed, half a step between
     ];
     // The hard shoulder outside the carriageway edge lines. Knocked well down
     // so the three lanes read as the bright mass and the tarmac beyond them as
@@ -6311,7 +6346,7 @@ MR.World = (function () {
       const parts = [];
       for (const sx of [-1, 1]) {
         const x = sx * (K.TRACK_HALF_WIDTH + 0.85);
-        pavement(parts, sx, 0xb9bdd6, 0xe8ecff, 0x8f93ad);
+        pavement(parts, sx, 0xbfc2c2, 0xd8d5c8, 0x96999c);
         parts.push(bx(0.10, 0.09, TILE, x, 0.92, 0, 0xf2f4ff));
         parts.push(bx(0.09, 0.07, TILE, x, 0.60, 0, 0xdfe6ff));
         for (let i = 0; i < 8; i++) {
@@ -6449,7 +6484,7 @@ MR.World = (function () {
       const parts = [];
       for (const sx of [-1, 1]) {
         const x = sx * (K.TRACK_HALF_WIDTH + 0.85);
-        pavement(parts, sx, 0xb9bdd6, 0xe8ecff, 0x8f93ad, CANYON_PAVE_W);
+        pavement(parts, sx, 0xbfc2c2, 0xd8d5c8, 0x96999c, CANYON_PAVE_W);
         // The crowd barrier, same as the barrier tile: this is still a race.
         parts.push(bx(0.10, 0.09, TILE, x, 0.92, 0, 0xf2f4ff));
         parts.push(bx(0.09, 0.07, TILE, x, 0.60, 0, 0xdfe6ff));
@@ -6465,7 +6500,7 @@ MR.World = (function () {
         }
         // The reference lamp, one per side per tile, staggered like the old
         // verge line so a column passes the lens every twelve units.
-        canyonLamp(parts, sx, POLE_Z[sx > 0 ? 0 : 1], 0x9aa0b2, 0x4a4f60);
+        canyonLamp(parts, sx, POLE_Z[sx > 0 ? 0 : 1], 0xaaa798, 0x5c594c);
 
         // ---- pavement props, between the barrier and the facade ----------
         // Sides differ so the street does not mirror itself: drums and bags
@@ -6516,7 +6551,7 @@ MR.World = (function () {
       const parts = [];
       for (const sx of [-1, 1]) {
         const z = POLE_Z[sx > 0 ? 0 : 1];
-        parts.push(bx(1.04, 0.34, 0.48, sx * CANYON_HEAD_X, CANYON_HEAD_Y - 0.02, z, 0xffc36b));
+        parts.push(bx(1.04, 0.34, 0.48, sx * CANYON_HEAD_X, CANYON_HEAD_Y - 0.02, z, 0xfff480));
       }
       return parts;
     }

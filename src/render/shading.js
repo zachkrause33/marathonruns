@@ -295,7 +295,12 @@ MR.shading = (function () {
       // takes the blue, exactly as before -- but it now arrives as a
       // continuous temperature shift across the form, which is the reference
       // frames' own shading.
-      const cool = Math.pow(1 - k, 1.55) * 0.30;
+      // 0.30 -> 0.21 for the citylook pass: at 0.30 a whole shaded facade
+      // flank rendered blue-grey, and the reference keeps its shaded walls
+      // WARM (measured: the shaded cream flank in citylook-twin-buses renders
+      // #a8985f -- darker and a touch cooler than the lit side, never blue).
+      // The temperature shift survives; it just stops overpowering the paint.
+      const cool = Math.pow(1 - k, 1.55) * 0.21;
       const rgb = [v * (1 - cool * 1.05), v * (1 - cool * 0.40), v * (1 + cool * 0.72)];
       for (let c = 0; c < 3; c++) {
         data[i * 4 + c] = Math.round(Math.max(0, Math.min(1, rgb[c])) * 255);

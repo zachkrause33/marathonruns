@@ -100,6 +100,36 @@ const OUT = path.resolve(String(arg('out', path.join(os.tmpdir(), 'mr-roadread')
 const DATES = String(arg('dates', '2026-08-11,2026-08-12,2026-08-13')).split(',');
 const W = parseInt(arg('w', 390), 10);
 const H = parseInt(arg('h', 844), 10);
+/**
+ * ---- --mono: THE ONLY TEST THE SHAPE'S OWN JUSTIFICATION SURVIVES ---------
+ *
+ * The tempo mat's shape exists for one stated reason: RED AND GREEN IS THE ONE
+ * PAIR A COLOUR-BLIND PLAYER CANNOT SPLIT, so a mechanic worth race seconds
+ * that is only in the hue is a mechanic those players cannot play. Every blind
+ * read of it so far has been run in full colour, and a reader in full colour
+ * answers from the hue whatever the shape does -- one of them said so in as
+ * many words, reaching "slower" from red being "the bad colour". That read
+ * cannot distinguish a shape that works from a shape that is not there.
+ *
+ * So --mono desaturates the frame. It is a CSS filter on the canvas rather
+ * than a change to any material, so the game is photographed exactly as it
+ * ships and nothing in the scene knows it is being tested; the filter applies
+ * at composite, which is what the screenshot captures.
+ *
+ * Greyscale is STRICTER than the vision it stands in for -- a deuteranope
+ * keeps a luminance difference between red and green that this deletes -- and
+ * that is the point. A shape that carries the answer with no hue at all
+ * carries it for every player. The two mats are within 1.8 L of each other by
+ * the contrast audit's own measurement (lift 56.9, drag 58.7), so a mono
+ * reader who names an arm is reading the glyph and nothing else.
+ */
+const MONO = !!arg('mono', false);
+// Marks are dense enough that one date fills a reader's patience. --every 4
+// takes one mark in four, keeping all its distances together.
+const EVERY = parseInt(arg('every', 1), 10);
+const DISTS = String(arg('dists', '40,25.35,12')).split(',').map(Number);
+const GATE_EVERY = parseInt(arg('gate-every', 8), 10);
+const CTRL_N = parseInt(arg('controls', 6), 10);
 const SEED = parseInt(arg('seed', String(Date.now() % 2147483647)), 10);
 
 /**
@@ -163,6 +193,19 @@ Answer image by image, using the filename as the label. Be concrete about what
 you actually see rather than what you think a running game would contain.
 `;
 
+/**
+ * The mono set has to say it is mono. A reader who thinks the greyscale is a
+ * fault spends its attention on the fault and stops answering the question --
+ * that is not a guess, it is what happened when a staging bug put the lens
+ * inside a truck and a reader correctly reported a rendering error instead of
+ * a road. Saying "there is no colour" leaks nothing: it does not say what the
+ * colours were, that there are two of them, or that either means anything.
+ */
+const MONO_NOTE = `
+THESE IMAGES HAVE NO COLOUR IN THEM. That is deliberate and it is not a fault
+-- they have been converted to grey on purpose. Answer from what you can see.
+`;
+
 (async () => {
   fs.mkdirSync(path.join(OUT, 'panels'), { recursive: true });
   fs.mkdirSync(path.join(OUT, 'key'), { recursive: true });
@@ -184,12 +227,13 @@ you actually see rather than what you think a running game would contain.
     await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, { timeout: 30000 });
     await page.waitForTimeout(300);
 
-    const plan = await page.evaluate(() => {
+    const plan = await page.evaluate(({ mono, dists, every, gateEvery, ctrlN }) => {
       window.requestAnimationFrame = function () { return 0; };
       // Strip everything that is not the canvas: the HUD names the mechanic in
       // words and a reader must not be handed the answer in a caption.
       for (const el of document.querySelectorAll('body > *')) {
         if (el.tagName !== 'CANVAS') el.style.display = 'none';
+        else if (mono) el.style.filter = 'grayscale(1)';
       }
       const g = MR.game, K = MR.K;
       const shots = [];
@@ -198,31 +242,37 @@ you actually see rather than what you think a running game would contain.
         for (const m of tempo) if (z > m.z0 - 100 && z < m.z1 + 30) return true;
         return false;
       };
+      let mi = 0;
       for (const m of tempo) {
-        // 40, READ_NEAR and 12: past the decision point, AT it, and close
-        // enough that a reader who can only see the paint late still says so.
-        for (const d of [40, 25.35, 12]) {
+        if ((mi++ % every) !== 0) continue;
+        // 40, READ_NEAR and 12 by default: past the decision point, AT it, and
+        // close enough that a reader who can only see the paint late still
+        // says so.
+        for (const d of dists) {
           shots.push({ kind: 'tempo', z: m.z0 - d, dist: d, lane: m.lane, lanes: null, dir: m.dir });
         }
       }
-      // Gates: every eighth live gate with at least one hazard, at READ_NEAR.
+      // Gates: every gateEvery-th live gate with at least one hazard, at
+      // READ_NEAR. These are the ROUTING control and they are also the reason
+      // a mat set is not all mats -- a reader shown nothing but marked road
+      // learns that every panel has paint in it, and starts hunting.
       const RN = 25.35;
       let n = 0;
       for (const gt of g.course.gates) {
         const occ = gt.lanes.filter(function (x) { return x !== K.CLEAR; }).length;
         if (!occ) continue;
-        if ((n++ % 8) !== 0) continue;
+        if ((n++ % gateEvery) !== 0) continue;
         shots.push({ kind: 'gate', z: gt.z - RN, dist: RN, lane: -1,
           lanes: gt.lanes.slice(), dir: 0 });
       }
       // Controls: empty road, well clear of any marking.
       let ctrl = 0;
-      for (let z = 420; z < K.TOTAL_UNITS - 400 && ctrl < 6; z += 97) {
+      for (let z = 420; z < K.TOTAL_UNITS - 400 && ctrl < ctrlN; z += 97) {
         if (!near(z)) { shots.push({ kind: 'control', z, dist: 0, lane: -1, lanes: null, dir: 0 }); ctrl++; }
       }
       shots.sort(function (a, b) { return a.z - b.z; });
       return shots;
-    });
+    }, { mono: MONO, dists: DISTS, every: EVERY, gateEvery: GATE_EVERY, ctrlN: CTRL_N });
 
     let last = -1e9;
     for (const sh of plan) {
@@ -297,7 +347,7 @@ you actually see rather than what you think a running game would contain.
   await browser.close();
 
   key.sort(function (a, b) { return a.sort - b.sort; });
-  fs.writeFileSync(path.join(OUT, 'panels', 'PROMPT.txt'), PROMPT);
+  fs.writeFileSync(path.join(OUT, 'panels', 'PROMPT.txt'), PROMPT + (MONO ? MONO_NOTE : ''));
   fs.writeFileSync(path.join(OUT, 'key', 'key.json'), JSON.stringify(key, null, 1));
   const by = {};
   for (const k of key) by[k.kind] = (by[k.kind] || 0) + 1;

@@ -21087,8 +21087,10 @@ MR.World = (function () {
         for (const rx of [-hw * 0.55, hw * 0.55]) {
           parts.push(gl(cyl(0.338, 0.338, 0.06, 14, rx, dy, dz, RIB, 0, 0, Math.PI / 2), GLOSS.trim));
         }
-        parts.push(gl(cyl(0.338, 0.338, 0.10, 14, -hw * 0.80, dy, dz, 0xcfc9b8, 0, 0, Math.PI / 2), GLOSS.paint));
-        parts.push(gl(cyl(0.338, 0.338, 0.10, 14, hw * 0.80, dy, dz, 0xcfc9b8, 0, 0, Math.PI / 2), GLOSS.paint));
+        // ONE band per drum, off-centre. Two symmetric band pairs read at 25
+        // units as 'two striped upright posts' to a blind reader; a single
+        // asymmetric collar keeps the OIL-drum read without drawing verticals.
+        parts.push(gl(cyl(0.338, 0.338, 0.11, 14, hw * 0.55, dy, dz, 0xcfc9b8, 0, 0, Math.PI / 2), GLOSS.paint));
         for (const sx of [-1, 1]) {
           parts.push(gl(cyl(0.29, 0.29, 0.025, 14, sx * (hw + 0.012), dy, dz, LID, 0, 0, Math.PI / 2), GLOSS.trim));
         }

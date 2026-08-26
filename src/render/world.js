@@ -225,7 +225,7 @@ MR.World = (function () {
     // density went 0.70 -> 0.94 with it: a canyon with a third of its teeth
     // missing is a suburb, and the reference's street wall is continuous.
     'CITY START': {
-      sky: [0x5580b8, 0xbfe4f4], ground: 0x63c96b, road: 0x64655c, fog: 0xbfe4f4,
+      sky: [0x5580b8, 0xbfe4f4], ground: 0x63c96b, road: 0x606158, fog: 0xbfe4f4,
       edge: 'canyon', street: 0.94,
       // building 1.5 -> 0.6 for the citylook pass: a fifth reader named 'a
       // distant taller skyline' as a tell against the reference, whose city
@@ -244,12 +244,12 @@ MR.World = (function () {
     // spectator out there would be standing on the river. What the leg gets
     // instead is the span itself, which is the setting's to choose.
     'THE BRIDGE': {
-      sky: [0x3a4fc0, 0xffd9a8], ground: 0x2f8fc4, road: 0x6a635c, fog: 0xffd9a8,
+      sky: [0x3a4fc0, 0xffd9a8], ground: 0x2f8fc4, road: 0x665f58, fog: 0xffd9a8,
       edge: 'rail', street: 0,
       mix: {},
     },
     'PARKLAND': {
-      sky: [0x2e8fd0, 0xcdf5c0], ground: 0x6fd46a, road: 0x60655c, fog: 0xcdf5c0,
+      sky: [0x2e8fd0, 0xcdf5c0], ground: 0x6fd46a, road: 0x5c6158, fog: 0xcdf5c0,
       edge: 'hedge', street: 0.05,
       mix: { building: 0.12, tree: 2.6, grove: 3.6, crowd: 1.1, walkers: 0.9 },
     },
@@ -259,7 +259,7 @@ MR.World = (function () {
       mix: { building: 1.2, tree: 0.25, crowd: 0.35, walkers: 0.3 },
     },
     'FINAL MILE': {
-      sky: [0x24306e, 0xffcf6b], ground: 0x5cb46a, road: 0x67635a, fog: 0xffcf6b,
+      sky: [0x24306e, 0xffcf6b], ground: 0x5cb46a, road: 0x635f56, fog: 0xffcf6b,
       edge: 'barrier', street: 0.52,
       mix: { building: 0.7, tree: 0.7, crowd: 3.4, walkers: 0.7 },
     },
@@ -614,7 +614,7 @@ MR.World = (function () {
   const SETTING_LOOK = {
 
     BOSTON: {
-      sky: [0x4c8cc2, 0xc7ecee], fog: 0xcae8ed, ground: 0x86b45a, road: 0x66665e,
+      sky: [0x4c8cc2, 0xc7ecee], fog: 0xcae8ed, ground: 0x86b45a, road: 0x6a6a62,
       water: 0x3f7fae, edge: 0xf4ece0,
       terrace: {
         colors: [0xb8664a, 0xc8785a, 0xa65a44, 0xd89a70, 0xbc7862],
@@ -634,7 +634,7 @@ MR.World = (function () {
     },
 
     LONDON: {
-      sky: [0x5590be, 0xceedec], fog: 0xcfe7eb, ground: 0x5fbf6b, road: 0x65655e,
+      sky: [0x5590be, 0xceedec], fog: 0xcfe7eb, ground: 0x5fbf6b, road: 0x696962,
       water: 0x5a8fa8, edge: 0xffe8e8,
       terrace: {
         colors: [0xf0e2c4, 0xe0d0ac, 0xb86048, 0xf6ecd4, 0xc4ae8c],
@@ -654,7 +654,7 @@ MR.World = (function () {
     },
 
     BERLIN: {
-      sky: [0x5288c0, 0xcceaee], fog: 0xc5e1ef, ground: 0x69c46e, road: 0x66665e,
+      sky: [0x5288c0, 0xcceaee], fog: 0xc5e1ef, ground: 0x69c46e, road: 0x6a6a62,
       water: 0x4f86ae, edge: 0xeef0ff,
       terrace: {
         colors: [0xe8d8b8, 0xd4c0a0, 0xe0c8a0, 0xc4b090, 0xf2e6cc],
@@ -674,14 +674,14 @@ MR.World = (function () {
     },
 
     CHICAGO: {
-      sky: [0x4680b6, 0xb8e0e5], fog: 0xafd7e0, ground: 0x63b46a, road: 0x65665f,
+      sky: [0x4680b6, 0xb8e0e5], fog: 0xafd7e0, ground: 0x63b46a, road: 0x696a64,
       water: 0x3f7fa8, edge: 0xe4e8f4,
       terrace: {
-        colors: [0xb0a084, 0xa09076, 0xc0ac8e, 0x8f8a58, 0xc8b89c],
+        colors: [0xbca27e, 0xac9270, 0xccae88, 0x9c9058, 0xd4ba94],
         trim: 0xd8cfc0, win: 0x2f3a58, roof: 'flat', roofColor: 0x596c3a,
         h: [11.5, 14.5], bay: 4.6, depth: 7.0, rows: 5, stoop: 1, chimney: 2,
       },
-      tower: { colors: [0x2f3550, 0x3a4160, 0x4a5270], glass: 1, crown: 'antenna' },
+      tower: { colors: [0x4a4a54, 0x5a5660, 0x6e6870], glass: 1, crown: 'antenna' },
       tree: { kind: 'round', colors: [0x5c8028, 0x7fa838, 0xa4d848], h: 1.0 },
       marks: {
         'CITY START': [{ k: 'willis', x: 20 }, { k: 'lTrack', over: 1, run: 48 }],
@@ -694,7 +694,7 @@ MR.World = (function () {
     },
 
     NEWYORK: {
-      sky: [0x4e88c0, 0xc5e9ec], fog: 0xbedfea, ground: 0x63c96b, road: 0x66655e,
+      sky: [0x4e88c0, 0xc5e9ec], fog: 0xbedfea, ground: 0x63c96b, road: 0x6a6962,
       water: 0x3d7ba6, edge: 0xfff0dc,
       terrace: {
         colors: [0xa8604a, 0xc07656, 0x965640, 0xd08c66, 0xb06e52],
@@ -715,7 +715,7 @@ MR.World = (function () {
     },
 
     TOKYO: {
-      sky: [0x5f68ac, 0xffdce0], fog: 0xffd6dc, ground: 0x5fbf7a, road: 0x67655f,
+      sky: [0x5f68ac, 0xffdce0], fog: 0xffd6dc, ground: 0x5fbf7a, road: 0x6b6964,
       water: 0x4f8fb0, edge: 0xffe4ec,
       terrace: {
         colors: [0xe4e0da, 0xd0ccc4, 0xf0e8dc, 0xc0bcb4, 0xd8ccbe],
@@ -735,7 +735,7 @@ MR.World = (function () {
     },
 
     SYDNEY: {
-      sky: [0x4f9cc8, 0xcef0ef], fog: 0xd0f2f6, ground: 0x7fc86a, road: 0x64665c,
+      sky: [0x4f9cc8, 0xcef0ef], fog: 0xd0f2f6, ground: 0x7fc86a, road: 0x686a60,
       water: 0x2fa8d8, edge: 0xfff4e0,
       terrace: {
         colors: [0xe8bc8a, 0xb8603e, 0xf0d8a8, 0xd88a62, 0xf4e6c6],
@@ -755,7 +755,7 @@ MR.World = (function () {
     },
 
     PARIS: {
-      sky: [0x5c8cbe, 0xd5edec], fog: 0xd6e4e6, ground: 0x6fc274, road: 0x67655e,
+      sky: [0x5c8cbe, 0xd5edec], fog: 0xd6e4e6, ground: 0x6fc274, road: 0x6b6962,
       water: 0x6a94a8, edge: 0xf4f0e4,
       terrace: {
         colors: [0xecdebc, 0xe0d0ac, 0xf4e8c8, 0xd4c2a0, 0xe8dab6],
@@ -775,7 +775,7 @@ MR.World = (function () {
     },
 
     VALENCIA: {
-      sky: [0x4f98cc, 0xd7f3f1], fog: 0xdcf4f6, ground: 0x8fc45f, road: 0x67655e,
+      sky: [0x4f98cc, 0xd7f3f1], fog: 0xdcf4f6, ground: 0x8fc45f, road: 0x6b6962,
       water: 0x30b0d0, edge: 0xfff8e8,
       terrace: {
         colors: [0xfff2d4, 0xf4e4c0, 0xffe8c4, 0xe8d8b8, 0xfff8e4],
@@ -795,7 +795,7 @@ MR.World = (function () {
     },
 
     AMSTERDAM: {
-      sky: [0x528cc0, 0xcdedee], fog: 0xcae8ee, ground: 0x5fc07a, road: 0x65655e,
+      sky: [0x528cc0, 0xcdedee], fog: 0xcae8ee, ground: 0x5fc07a, road: 0x696962,
       water: 0x4f7f96, edge: 0xf0ece0,
       terrace: {
         colors: [0x8a5040, 0x9c5e48, 0x745448, 0xa86e58, 0x64483e],
@@ -815,7 +815,7 @@ MR.World = (function () {
     },
 
     ROME: {
-      sky: [0x5490c6, 0xffeac8], fog: 0xffe0bc, ground: 0x8fb45a, road: 0x6a655c,
+      sky: [0x5490c6, 0xffeac8], fog: 0xffe0bc, ground: 0x8fb45a, road: 0x6f6960,
       water: 0x5f9fae, edge: 0xfff0d8,
       terrace: {
         colors: [0xdc9a4c, 0xcc8640, 0xecb064, 0xbc743a, 0xf2c886],
@@ -835,7 +835,7 @@ MR.World = (function () {
     },
 
     CAPETOWN: {
-      sky: [0x4a90ca, 0xd5f0f1], fog: 0xd5eff6, ground: 0x9fb05a, road: 0x65665e,
+      sky: [0x4a90ca, 0xd5f0f1], fog: 0xd5eff6, ground: 0x9fb05a, road: 0x61625a,
       water: 0x2f9fd8, edge: 0xfff2e4,
       // Bo-Kaap: the one street in the world painted in flat saturated blocks,
       // and the cheapest possible way to say "Cape Town" at a hundred units.
@@ -1559,7 +1559,7 @@ MR.World = (function () {
    * failure the JUMP chevron block was measured at. One colour per awning, with
    * the fascia one step darker, which is the part that survives.
    */
-  const AWNING = [0xe0563c, 0x2f9ca8, 0x3fa05c, 0xb85a8c, 0xd88a30, 0x5a74c0];
+  const AWNING = [0xe0563c, 0x2f9ca8, 0xe0563c, 0x5a74c0, 0x3fa05c, 0x2f9ca8, 0xd88a30, 0x5a74c0];
 
   // ======================================================================
   //  PARAMETRIC VOCABULARY
@@ -6468,7 +6468,7 @@ MR.World = (function () {
       // The bunting went with the spans, and is better for it: it now appears
       // only in the finish chute, so the first time the player sees pennants
       // overhead in a whole race is the moment they can see the tape.
-      vergeLine(parts, 0x2b2f52, 0xffe45e, 0x2b2f52);
+      vergeLine(parts, 0x8f8c80, 0xffc23a, 0x2b2f52);
       return parts;
     }
 
@@ -6777,7 +6777,7 @@ MR.World = (function () {
       // lamps and trees, the avenue already carries the trees, and this is the
       // sparsest overhead in the race by design -- PARKLAND is where the player
       // gets the longest look down the road.
-      for (const sx of [-1, 1]) lampArc(parts, sx, POLE_Z[sx > 0 ? 0 : 1], 0x3a4560, 0xfff2e0);
+      for (const sx of [-1, 1]) lampArc(parts, sx, POLE_Z[sx > 0 ? 0 : 1], 0x8f8c80, 0xffc23a);
       return parts;
     }
 
@@ -8973,27 +8973,37 @@ MR.World = (function () {
      * corner is the reference's own habit of marking a works pile.
      */
     const jumpDrumGeo = (function () {
-      const BODY = 0x16181f, RIB = 0x272b36, LID = 0x1e222c, BAND = 0xf4eedd;
+      const BODY = 0x111319, RIB = 0x22252e, LID = 0x191c24, BAND = 0xf4eedd;
       const parts = [];
-      for (const [dx, dz, ry] of [[-0.72, 0.06, 0.3], [0.02, -0.04, 1.2], [0.76, 0.10, 2.1]]) {
-        parts.push(gl(cyl(0.345, 0.345, 0.78, 12, dx, 0.39, dz, BODY, 0, ry, 0), GLOSS.trim));
-        parts.push(gl(cyl(0.352, 0.352, 0.05, 12, dx, 0.20, dz, RIB), GLOSS.trim));
-        parts.push(gl(cyl(0.352, 0.352, 0.05, 12, dx, 0.44, dz, RIB), GLOSS.trim));
-        parts.push(gl(cyl(0.352, 0.352, 0.15, 12, dx, 0.68, dz, BAND, 0, ry, 0), GLOSS.paint));
-        parts.push(gl(cyl(0.30, 0.30, 0.02, 12, dx, 0.782, dz, LID), GLOSS.trim));
-        parts.push(gl(cyl(0.045, 0.045, 0.02, 8, dx + 0.16, 0.787, dz, RIB), GLOSS.chrome));
+      // LYING SIDE-ON, NOT STANDING. Two blind readers in a row refused to
+      // jump this object while it stood: upright drums read as waist-high
+      // solids you go around, whatever their real height, and the tipped
+      // drum's end-on circle read as 'a rolled mat'. What DOES read OVER at
+      // a glance is the ducting-pipe stack (v5) -- horizontal cylinders,
+      // axis across the lane -- and it is also the reference's own idea:
+      // in citylook-oilspill-green-car the drum is furniture and the SLICK
+      // is the lane hazard. So the drum lies side-on, its slick spreads
+      // forward, and the silhouette is a low wide horizontal roll.
+      for (const [dy, dz, hw] of [[0.33, 0.10, 0.95], [0.34, -0.15, 0.62]]) {
+        parts.push(gl(cyl(0.33, 0.33, hw * 2, 14, 0, dy, dz, BODY, 0, 0, Math.PI / 2), GLOSS.trim));
+        for (const rx of [-hw * 0.55, hw * 0.55]) {
+          parts.push(gl(cyl(0.338, 0.338, 0.06, 14, rx, dy, dz, RIB, 0, 0, Math.PI / 2), GLOSS.trim));
+        }
+        parts.push(gl(cyl(0.338, 0.338, 0.10, 14, -hw * 0.80, dy, dz, 0xcfc9b8, 0, 0, Math.PI / 2), GLOSS.paint));
+        parts.push(gl(cyl(0.338, 0.338, 0.10, 14, hw * 0.80, dy, dz, 0xcfc9b8, 0, 0, Math.PI / 2), GLOSS.paint));
+        for (const sx of [-1, 1]) {
+          parts.push(gl(cyl(0.29, 0.29, 0.025, 14, sx * (hw + 0.012), dy, dz, LID, 0, 0, Math.PI / 2), GLOSS.trim));
+        }
       }
-      // THREE UPRIGHT, NOT TWO-AND-A-TIPPED. The tipped drum's end-on
-      // circle read to a blind reader as 'a black rolled mat' and drew
-      // AROUND -- a lethal misread on a jumpable object. Three standing
-      // drums in a row is the composition the cones already prove readable,
-      // and a row of flat-topped waist-high cylinders says OVER.
-      // The leak: paint on the road, no back, because it is not an object.
-      parts.push(part(new THREE.CircleGeometry(0.30, 10), 0x14121a, 0.40, 0.006, 0.20, -Math.PI / 2));
-      parts.push(part(new THREE.CircleGeometry(0.17, 8), 0x14121a, -0.28, 0.006, 0.30, -Math.PI / 2));
-      // The blinker rides a short post at the row's end, works-style.
-      parts.push(gl(bx(0.06, 0.30, 0.06, -1.02, 0.15, -0.34, 0x8a5a2c), GLOSS.matte));
-      blinker(parts, -1.02, 0.32, -0.34);
+      // The bung on the near drum's face, dribbling.
+      parts.push(gl(cyl(0.05, 0.05, 0.03, 8, 0.42, 0.33, 0.42, RIB, Math.PI / 2), GLOSS.chrome));
+      // The slick: paint on the road, no back, because it is not an object.
+      parts.push(part(new THREE.CircleGeometry(0.34, 10), 0x14121a, 0.42, 0.006, 0.14, -Math.PI / 2));
+      parts.push(part(new THREE.CircleGeometry(0.20, 8), 0x14121a, -0.10, 0.006, 0.30, -Math.PI / 2));
+      parts.push(part(new THREE.CircleGeometry(0.13, 8), 0x14121a, -0.44, 0.006, 0.18, -Math.PI / 2));
+      // The blinker rides a short works post at the pile's end.
+      parts.push(gl(bx(0.06, 0.30, 0.06, -1.04, 0.15, -0.36, 0x8a5a2c), GLOSS.matte));
+      blinker(parts, -1.04, 0.32, -0.36);
       return merge(parts);
     })();
 
@@ -10863,7 +10873,7 @@ MR.World = (function () {
      * measured off `tgr-taxi-street` at (228,200,12) and put through this
      * renderer's shading, which returns (168,161,3).
      */
-    const TRAM_BODY = 0x1e9cf0, TRAM_DARK = 0x0c2436, TRAM_CREASE = 0x0074a8;
+    const TRAM_BODY = 0x3cbcff, TRAM_DARK = 0x0c2436, TRAM_CREASE = 0x0092d0;
     /**
      * The deck walkway, and it is a VALUE and not a hue.
      *

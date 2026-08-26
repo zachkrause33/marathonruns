@@ -22756,7 +22756,19 @@ MR.World = (function () {
      * mass is untouched; the bar and face below are the standard ones.
      */
     const duckShopSignGeo = (function () {
-      const POLE = 0x2f4438, BORDER = 0x2f8452, FIELD = 0xf6dc9c, INKC = 0x2a2436;
+      /* FIELD was 0xf6dc9c, and that cream cost the variant its gate. The
+       * board's field is the largest surface on the sign, both faces, so its
+       * saturation dominates the variant mean -- and at 0.477 mean S the sign
+       * sat 0.003-0.011 UNDER the 0.22 dS floor against the two warmest road
+       * palettes in the game (ROME and SYDNEY, lane 2, L 84-87 roads the
+       * citylook repaint warmed). Luminance cannot save it there: 94.5 vs 84
+       * is 1.13x against a 1.25x floor, and pushing the sign BRIGHTER than
+       * 108 to clear on L would blow the L 70.5 ceiling rule for surfaces.
+       * So the field deepens toward the reference's gold-cream instead --
+       * higher chroma, a touch darker -- which lifts mean S past the gate
+       * with margin on every road while staying the fascia the reference
+       * frames actually show. */
+      const POLE = 0x2f4438, BORDER = 0x2f8452, FIELD = 0xf8d178, INKC = 0x2a2436;
       const parts = [
         gl(hcbx(2.30, 0.30, 0.42, 0, 1.56, 0, 0xffc422, 0.05), GLOSS.paint),
         gl(hbx(2.06, 0.06, 0.36, 0, 1.86, 0, 0x1a1206), GLOSS.matte),

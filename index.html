@@ -3268,7 +3268,21 @@ MR.Course = (function () {
   // the expensive half and the one that pushes the player out of a lane, and a
   // road where most marks are punishments reads as a penalty box rather than as
   // a set of choices.
-  const TEMPO_DRAG_SHARE = 0.52;
+  //
+  // 0.52 -> 0.55 WITH THE DENSITY PASS, and the number is about what LANDS,
+  // not what is planned. This share is applied at plan time, but a forward mat
+  // must be EARNED (an action in its lane) and a drag needs its lane CLEAR at
+  // every gate inside -- so a denser road converts more planned lifts into
+  // placed ones and kills more planned drags. Measured at 0.52 over 60 days:
+  // landed mats went fwd 19.6 / bwd 9.7 before the density change to
+  // fwd 20.5 / bwd 8.5 after it, which handed the mat-chasing line about two
+  // free seconds and moved the first-attempt column of the policy sweep off
+  // its 20% bar. 0.55 restored the landed forward count exactly (19.67
+  // against 19.60) and brought first-attempt to 7 of 30 -- one cell over, the
+  // green-chasing line still a second inside the record at 0.995 -- and 0.57
+  // is the notch that puts the landed drags back too and the column back on
+  // 6 of 30. Measured at each step, not derived.
+  const TEMPO_DRAG_SHARE = 0.57;
   /**
    * How far short of the gate that ENDS it a mark must stop.
    *
@@ -4106,6 +4120,19 @@ MR.Course = (function () {
     // rule and let the proof hold the line. Tying the two together means a
     // retune of the jump arc or the pace floor moves both ends of the same
     // constraint at once, instead of moving one and leaving the other stale.
+    // ---- TRIED FOR THE DENSITY PASS AND PUT BACK, WITH THE NUMBER -------
+    //
+    // The density pass tried 40.5 - 22 * d here, on the argument that density
+    // has two factors and gates per mile should carry part of the lift. The
+    // sweep refused it: ten extra gates a course made a CLEAN run ~20 s
+    // faster, because pace follows the streak and the streak is a count of
+    // CLEARED GATES -- so gates per mile is a speed dial before it is a
+    // density dial, and the record is an absolute 1:59:30. First-attempt
+    // cells beating the record went 20% to 80%, at PERFECT skill, where no
+    // amount of extra hazard demand can claw it back. This is the measured
+    // form of what roadmap 58 said in passing: spacing is not the density
+    // lever. Density comes from nHaz and `full` above, which add hazards
+    // without adding streak.
     const mean = 44 - 23 * d;
     // The floor is the SAME call the solver makes, evaluated at the same z, so
     // a descent widens the generator's tightest spacing and the proof's window
@@ -4202,11 +4229,23 @@ MR.Course = (function () {
     // lanes are JUMP or DUCK and every one of them is passable WITH the right
     // action. Forcing an action is therefore never unfair -- it is the
     // difference between choosing a lane and playing the game.
+    // ---- RAISED FOR THE DENSITY PASS, AND THE BAR WAS RE-MEASURED --------
+    //
+    // The owner, across weeks: more obstacles, lots more. The bag went 26 to
+    // 37 variants first, deliberately, because freshness cannot exceed
+    // objects / density -- and with the bag enlarged this is the density half
+    // of that sequence. Two dials move together here: this table (three-lane
+    // gates, which FORCE an action) and the mid-band chance on nHaz below.
+    // 7b0a1d2 left `full` alone on the argument that forced actions are a
+    // harsher change needing their own evidence; the evidence now exists --
+    // the difficulty bar is measured (tools/simulate.js policy x skill sweep,
+    // ~20% of first-attempt cells beat 1:59:30, held through two retunes) and
+    // the sweep was re-run either side of this change to hold it.
     const full = d < 0.14 ? 0
-      : d < 0.34 ? 0.10
-      : d < 0.58 ? 0.30
-      : d < 0.80 ? 0.48
-      : 0.62;
+      : d < 0.34 ? 0.16
+      : d < 0.58 ? 0.40
+      : d < 0.80 ? 0.58
+      : 0.70;
     // ---- AND THE SECOND HAZARD ARRIVES EARLIER THAN IT DID ---------------
     //
     // The owner: *"Add a few more obstacles to the beginning of the game."*
@@ -4241,9 +4280,20 @@ MR.Course = (function () {
     // FORCE an action; it opens at mile 1.4 at 10% and it can stay there. More
     // obstacles is what was asked for. More forced actions is a different and
     // harsher change, and it should be argued for on its own evidence.
+    // ---- THE MIDDLE BAND: A COIN FLIP BECAME A DIAL ----------------------
+    //
+    // rnd.int(1, 2) held the second hazard at a flat 50% from mile 0.7 to
+    // mile 8.2, and that flat line is the trough of boredom: measured over 60
+    // days, miles 3-7 carried 11.68 hazards/mi against 17.21 on the rest of
+    // the race. The chance now rises with difficulty, continuous with the old
+    // value at the band's floor -- at d = 0.09 it is exactly the 0.50 the
+    // coin gave, so the opening two thirds of a mile and the learning stretch
+    // just after it are untouched -- and reaches ~0.96 where the band hands
+    // over to the always-2 rule, so there is no seam there either. One draw
+    // either way, same as the coin it replaces.
     const nHaz = rnd.chance(full) ? 3
       : d < 0.09 ? 1
-      : d < 0.42 ? rnd.int(1, 2)
+      : d < 0.42 ? (rnd.chance(0.50 + 1.40 * (d - 0.09)) ? 2 : 1)
       : 2;
 
     const order = [0, 1, 2];

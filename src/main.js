@@ -161,6 +161,8 @@
   // already spoken this run. See the block that sets it for why it is an edge
   // and not a per-item reaction.
   let aidNagged = false;
+  // TANK FULL is told once per full episode, not once per wasted coin.
+  let tankToldOf = false;
   // ---- WHAT HIS BODY SAYS ABOUT THE RUN HE JUST FINISHED ------------------
   //
   // One number, 0..1, because the finish pose is one blend between two ends of
@@ -246,6 +248,7 @@
     recordGone = false;
     tierIdx = -1;
     aidNagged = false;
+    tankToldOf = false;
     finishJoy = 0;
     celClock = 0;
     hitAt = [];
@@ -535,6 +538,22 @@
       for (const it of (course.aid || [])) {
         if (it.gate === bot.gate && !it.roof) wants.push(it.lane);
       }
+      // ---- AND THE TRAILS, WHICH ARE THE ABUNDANCE PASS'S OWN MECHANIC ----
+      //
+      // Loose pickups (trails and clusters, collected by lane match) between
+      // here and the next gate. Roadmap 67's lesson again: a bot that cannot
+      // see a mechanic reports that the mechanic changes nothing, and every
+      // frame this project photographs is bot-driven. The weight is a
+      // TIE-BREAK, deliberately under the clear-lane term and the mat terms:
+      // a trail lane is entered when it is free, and a trail is never worth
+      // an action or a drag to this bot -- the arc term above (+150) is the
+      // one that pays actions for aid, exactly as the receipt rule prices it.
+      const trailN = [0, 0, 0];
+      for (const it of (course.aid || [])) {
+        if (it.roof || it.gate != null) continue;
+        if (it.z <= g.z || it.z > g.z + 50) continue;
+        trailN[it.lane]++;
+      }
       let best = null, bestScore = -Infinity;
       order.forEach(function (l, i) {
         // A RIDEABLE BLOCK IS NOT A WALL TO THIS BOT. `gate.ramp` names the
@@ -554,6 +573,7 @@
         // because a bot that breaks its streak fetching a bottle is measuring
         // the wrong thing.
         if (wants.indexOf(l) >= 0) score += 150;
+        score += Math.min(trailN[l], 5) * 8;
         // Take the ramp when there is one, so every automated run that has one
         // available rides it and the frames, the finish times and the fairness
         // audit are all measured with the mechanic switched on rather than
@@ -821,22 +841,37 @@
       const aidIdxBefore = player.aidIdx;
       const aidTook = player.resolveAid(course, before, after);
       for (const item of aidTook) {
-        // Read the tank BEFORE the pour, so the card can tell "it went in" from
-        // "there was nowhere to put it". A wasted bottle is the price of
-        // hoarding and the player has to be told it happened, or the cap is a
-        // rule they can only learn by not noticing it.
+        // ---- A PICKUP IS A SIP NOW, SO THE TOAST MOVES TO THE SEGMENT -----
+        //
+        // Aid arrives in trails and arcs -- five or six items inside a second
+        // -- and a toast per item is a strobe, not a message. The event worth
+        // words is the one the pickup ECONOMY defines: a whole guard segment
+        // completing, which is when the collecting actually bought something.
+        // The per-item channel is the audio blip and the pop, which scale
+        // with abundance the way a toast cannot.
+        //
+        // Read the tank BEFORE the pour, so the card can tell "it went in"
+        // from "there was nowhere to put it". A wasted pickup is the price of
+        // hoarding and the player has to be told it happens -- once per full
+        // episode, not once per coin, or the cap reads as a scold.
+        const segBefore = pace.segments();
         const roomBefore = pace.pool < MR.Pace.EFFORT_CFG.POOL_MAX;
         pace.onAid(item.gain);
         audio.aid(item.kind === 'banana');
         if (EFFORT) {
-          hud.toastAid(roomBefore ? 'FUEL' : 'TANK FULL',
-                       roomBefore ? '+1' : 'WASTED');
+          if (pace.segments() > segBefore) {
+            hud.toastAid('GUARD', '+1');
+            // A completed segment proves the player is collecting, so the
+            // missed cue below is allowed to speak again. See its note.
+            aidNagged = false;
+          } else if (!roomBefore && !tankToldOf) {
+            tankToldOf = true;
+            hud.toastAid('TANK FULL', 'WASTED');
+          }
         } else if (item.kind === 'banana') {
           hud.toastAid('FUEL', '+' + item.gain + ' STREAK');
         }
-        // Taking one proves the player has not simply stopped seeing them, so
-        // the missed cue below is allowed to speak again. See its note.
-        aidNagged = false;
+        if (roomBefore) tankToldOf = false;
       }
 
       // ---- THE DECLINED BOTTLE, AND WHY THIS RULE HAD TO CHANGE -----------
@@ -895,11 +930,19 @@
       }
       // ...and under EFFORT the arithmetic above is answering a question that
       // no longer exists: onAid does not grant streak, so `paid` is always
-      // zero and the cue could never fire. What a declined bottle costs now is
-      // a SEGMENT, and it costs one exactly when there was room for it. Same
-      // once-not-every-time edge, same re-arm on a collected item.
+      // zero and the cue could never fire.
+      //
+      // WITH AID ABUNDANT THE CUE NARROWS AGAIN, for the same reason it
+      // narrowed when roadmap 50 made declining ordinary: hundreds of
+      // pickups pass every race, most of them in lanes the player rightly
+      // declined, and a cue that fires on "you passed some" is a nag about
+      // normal play. The one state worth a sound is EXPOSED AND PASSING
+      // FUEL: no whole segment in hand -- the next contact costs the streak
+      // -- while collectable pickups go by. Once, not every time; re-armed
+      // when a segment completes (above), because completing one is proof
+      // the player can see the trail.
       if (EFFORT && player.aidIdx - aidIdxBefore > aidTook.length && !aidNagged
-          && pace.pool < MR.Pace.EFFORT_CFG.POOL_MAX) {
+          && pace.segments() < 1) {
         aidNagged = true;
         audio.aidMissed();
       }

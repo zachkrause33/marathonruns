@@ -1856,7 +1856,14 @@ MR.Course = (function () {
       const hard = g.train > 0 || g.lanes.every(function (l) { return l !== K.CLEAR; });
       if (hard && rnd.chance(0.62)) {
         const z0 = g.z + reachOf(g.lanes, g.train) + 3;
-        const z1 = Math.min(z0 + 12, nextZ - 6);
+        // Three caps, and the third was missing first time: the burst is
+        // short, it stops before the next gate, and it stops before the
+        // tape's clear run-in -- a gate can stand as late as `end` and a
+        // train's reach carries the burst up to 33 units past it, which
+        // walked one item into FINISH_GRACE on day 44 of a 60-day sweep.
+        // The exact class of defect the ramp's run-in had (roadmap 63), and
+        // the reason tools/aid.js asserts the tape line on every item.
+        const z1 = Math.min(z0 + 12, nextZ - 6, K.TOTAL_UNITS - FINISH_GRACE - 2);
         if (z1 - z0 >= 8) {
           const cands = [];
           for (let l = 0; l < 3; l++) {

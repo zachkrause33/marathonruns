@@ -12325,7 +12325,10 @@ MR.World = (function () {
     'CITY START': {
       sky: [0x5580b8, 0xbfe4f4], ground: 0x63c96b, road: 0x64655c, fog: 0xbfe4f4,
       edge: 'canyon', street: 0.94,
-      mix: { building: 1.5, tree: 1.1, grove: 0.3, crowd: 2.3, walkers: 1.1 },
+      // building 1.5 -> 0.6 for the citylook pass: a fifth reader named 'a
+      // distant taller skyline' as a tell against the reference, whose city
+      // is low-rise to the horizon. The terraces carry the enclosure now.
+      mix: { building: 0.6, tree: 1.1, grove: 0.3, crowd: 2.3, walkers: 1.1 },
     },
     // `bank` cuts the shoulder back on one side so the water can come right up
     // to the road; at full shoulder width the river sat 35 units out and read
@@ -18626,7 +18629,11 @@ MR.World = (function () {
       // The head shell -- a thin dark cap over the lens the glow mesh adds.
       // Thin on purpose: the reference luminaire is mostly GLOW from every
       // angle, so the lens below carries most of the head's volume.
-      parts.push(bx(1.12, 0.14, 0.54, sx * CANYON_HEAD_X, CANYON_HEAD_Y + 0.22, z, head));
+      // Chunky rectangular housing, per the reader: theirs is 'a bulky
+      // grey fixture with a warm glowing rectangular lens', ours read as a
+      // teardrop on a stick. The cap grows into a real housing.
+      parts.push(bx(1.30, 0.22, 0.62, sx * CANYON_HEAD_X, CANYON_HEAD_Y + 0.26, z, head));
+      parts.push(bx(0.30, 0.16, 0.34, sx * CANYON_HEAD_X + (sx > 0 ? 0.62 : -0.62), CANYON_HEAD_Y + 0.10, z, head));
     }
     function canyonParts() {
       const parts = [];

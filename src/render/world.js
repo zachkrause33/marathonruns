@@ -6671,6 +6671,30 @@ MR.World = (function () {
             parts.push(s);
           }
           parts.push(sph(0.30, 6, sx * 7.1, 0.22, 9.0, 0x323a58));
+          // THE WATER COOLER AND ITS CHALKBOARD, straight off item 13 of the
+          // citylook gap list: "a blue water-cooler-like object with a
+          // chalkboard sign near the shops". A muted blue cabinet on a squat
+          // stand, a paler bottle riding its top, and a dark A-framed board
+          // leaning open beside it. All closed boxes and cylinders -- built
+          // on every side, per the standing rule -- and the blue is held
+          // toward navy: the pavement wears no amber, cyan or pink, and this
+          // must never read as the DUCK family's old cyan.
+          {
+            const cz2 = 5.6, cx2 = sx * 6.4;
+            parts.push(bx(0.56, 0.18, 0.56, cx2, 0.09, cz2, 0x2e3644));       // stand
+            parts.push(bx(0.50, 0.88, 0.50, cx2, 0.62, cz2, 0x3a639e));       // cabinet
+            parts.push(bx(0.52, 0.10, 0.52, cx2, 1.10, cz2, 0x2f5183));       // collar
+            parts.push(cyl(0.17, 0.19, 0.34, 8, cx2, 1.32, cz2, 0x9fc3dd));   // bottle
+            parts.push(cyl(0.09, 0.09, 0.06, 8, cx2, 1.52, cz2, 0x7ea6c4));   // cap
+            parts.push(bx(0.10, 0.08, 0.10, cx2 - sx * 0.22, 0.78, cz2 + 0.28, 0xd8dde4)); // tap
+            // The chalkboard: two dark boards leaning into an A, a wooden
+            // top bar, and a chalk-pale strip on the road face.
+            const bz2 = cz2 + 1.1;
+            parts.push(bx(0.05, 0.78, 0.52, cx2 - sx * 0.44, 0.38, bz2, 0x30333a, 0, 0, sx * 0.24));
+            parts.push(bx(0.05, 0.78, 0.52, cx2 - sx * 0.16, 0.38, bz2, 0x30333a, 0, 0, -sx * 0.24));
+            parts.push(bx(0.22, 0.06, 0.56, cx2 - sx * 0.30, 0.76, bz2, 0x6b5138));
+            parts.push(bx(0.03, 0.30, 0.36, cx2 - sx * 0.51, 0.46, bz2, 0xd9d4c2, 0, 0, sx * 0.24));
+          }
         } else {
           // The portaloo: a pale steel-blue cabin with a roof cap and a door
           // seam, hard against the facade line the way the frames place it.
@@ -6685,6 +6709,14 @@ MR.World = (function () {
           // And a bag pair of its own further down the tile.
           parts.push(sph(0.40, 6, sx * 7.8, 0.30, -10.6, 0x262c47));
           parts.push(sph(0.30, 6, sx * 7.2, 0.22, -10.1, 0x323a58));
+          // THE BLACK TRASH BIN, the gap list's other named prop: a
+          // near-black barrel by the shops with a lipped rim and a domed
+          // lid. Closed cylinders on every side; near-black held off pure
+          // so the toon ramp still turns it.
+          parts.push(cyl(0.36, 0.40, 0.86, 8, sx * 5.1, 0.43, 1.9, 0x272a31));
+          parts.push(cyl(0.42, 0.42, 0.08, 8, sx * 5.1, 0.88, 1.9, 0x34383f));
+          parts.push(sph(0.34, 8, sx * 5.1, 0.94, 1.9, 0x2c2f36));
+          parts.push(bx(0.10, 0.16, 0.10, sx * 5.1, 1.24, 1.9, 0x34383f));
         }
       }
       return parts;

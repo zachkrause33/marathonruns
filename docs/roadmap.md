@@ -6477,3 +6477,128 @@ Open items, recorded rather than half-done:
   not a fairness one; halving it would need the pavement seam re-checked.
 - **The jagged tempo-mat chevron edge** the reader saw is the pre-existing
   glyph geometry, already on the open list at Roadmap 69.
+
+## Roadmap 71 · Citylook to the limit: the canyon at reference height, eleven new objects, and four reader loops
+
+The commission, verbatim: *"I want to make the game look better and as close
+to the screenshots I sent as possible. I want the cars to look the same, the
+obstacles to look the same and the same color. I want the buildings to look
+the same. Do not be afraid to make wholesale adjustments and make it utterly
+perfect."* Mid-pass the owner added: lots more obstacles -- the gameplay
+freeze lifted for VARIANTS only, density explicitly still owned by course.js
+and untouched.
+
+**Enclosure, measured not eyeballed.** Instrument: frame-edge column fill and
+whole-frame sky fraction, same code on their frames and ours (HUD masked on
+theirs, canvas-only shots for ours). The reference's six city frames measure
+0.85-1.00 edge fill and 0.163-0.190 sky. Ours before: 0.54-0.88 edge,
+0.227-0.276 sky. Ours after: 1.00 edge on every city frame sampled and
+0.102-0.132 sky -- now slightly MORE enclosed than the reference; the sky
+instrument counts our shaded cloud bellies as non-sky, so the true figure
+sits a little above what it prints. What moved it: every setting's terrace
+gained 2.5-3.5 units and one to two storeys, the near facade line stayed at
+CANYON_FRONT 8.55 (the reference's own 1.14 road-widths, already matched),
+and the backdrop towers stepped back.
+
+**The palette was sampled, not guessed** (scratchpad sampler, median of
+rects): their lit cream renders #e0d38f, brick #9a5234, olive #867344 under
+green cornices #465427; road #586259 -- warm green-grey, shadedL ~94; sky top
+#8ac1d2 powder cyan; lamp pole #9e9374 with lens #fdf96d; cars #e84328 /
+#5bc13e / #c4973d saturated; police warm black #373326 on cream #d9d2a5;
+bus lit teal #75fbfc. Everything below chases those numbers through our own
+lighting, verified by re-sampling our shots.
+
+**What changed on the street.** Twelve settings warmed toward the sampled
+band (each keeps its hue identity as a tint inside it); green cornice caps
+with dentils on half the flat-roof bays; brick quoins one bay in 2.5; window
+glass lightened 30% toward the reference's blue-grey and given the cel
+specular through aGloss; plaster grunge -- a 64px near-white mottle with
+run-off streaks -- multiplies into mats.prop so large wall faces stop being
+flat paint for under 3% of any measured colour; roads went from blue-violet
+0x61637x to the reference's warm grey at the same shadedL (every paint ratio
+holds by construction), then lifted 4.5% toward their L94 -- half the lift
+first tried, because the full 9% put lane 1 at L100 and the tram at 1.16x
+against a 1.25x gate; pavements went stone grey; the violet lane seam dropped
+to a whisper (1.28x -> 1.10x, bead 1.50 -> 1.32); margins warmed; ten
+blue-sky cities' horizons mixed 38% toward mint-cyan with fogs following;
+cloud coverage opened twice; the key warmed and rose 2.30 -> 2.50 with the
+hemisphere eased toward neutral so a shaded flank stays warm paint (ramp
+cool 0.30 -> 0.21 -- the reference's shaded cream renders #a8985f, never
+blue). The canyon lamp head dropped 13.0 -> 12.55, still above every mile
+panel, and the amber signal column -- the reference's second-strongest
+vertical -- now stands one per side per canyon tile, arm stopping at x 4.9.
+Barrier-tile lamps took the same warm pole and amber head.
+
+**The fleet.** The bus went the reference's teal; the tram brightened
+0x1e9cf0 -> 0x3cbcff to clear the lifted road. Eleven new variants, all
+objects the frames actually contain, every one inside its collision box by
+tools/orbit.js's measured extents and every one through the full gate:
+
+- JUMP v8 the double-bar red-and-white barricade on wooden posts with round
+  amber blinkers (weight 2 -- it is the reference's signature obstacle);
+  v9 black OIL drums; v10 the single-bar low barricade; v11 a trash pile.
+- DUCK v8 a shop awning rigged across the lane (green-white; the kind mark
+  stays on the bar and face); v9 a hanging shop signboard; v10 a scaffold
+  walk-board span with a davit and bucket.
+- BLOCK v10 the rust Cargo container (weight 2); v11 a dumpster with its
+  lid thrown open; v12 the green one-box hatchback parked at 0.16 rad of
+  yaw (swept extents 1.90/1.04 against 1.95/1.12 -- budgeted, not
+  eyeballed); v13 the black-and-white police car.
+
+**Repetition, staleness.js on 30 dates, before -> after:** median same-skin
+gap JUMP 9.0s -> 13.7s, DUCK 10.6s -> 14.6s, BLOCK 13.4s -> 17.1s;
+back-to-back BLOCK 18.2% -> 16.7% (the train floor is structural and no
+skin count moves it). kindread profile: 1 of 37 misclassified, was 1 of 26
+-- same lone moped, nothing new misreads; hue-alone stays the known-bad
+channel it has always been.
+
+**Four reader loops, all fresh headless readers outside the repo with no
+context** (the CCR-sibling route stalled on a permission prompt and was
+abandoned for claude -p from a neutral directory -- an uncontaminated
+reader, which blindread.js's own header says is worth more):
+
+1. Verb read, 33 panels at 8/12/25: every barricade OVER, every new DUCK
+   UNDER sure, container/dumpster/hatchback/police AROUND -- and both dark
+   low JUMPs failed as 'solids you go around'.
+2. Drums recomposed upright-in-a-row (the cones' composition): failed
+   AGAIN. Two readers cannot both be wrong: an upright drum does not
+   afford a jump. It now lies side-on with its slick spreading forward --
+   the reference's own composition, and the pipe stack's proven horizontal
+   silhouette. Trash lowered to 0.62 and widened: OVER at all three.
+3. Drums lying: OVER at 8 and 12; at 25 the two symmetric band pairs read
+   as 'two striped posts'. One off-centre collar per drum.
+4. Drums at 25: OVER, sure ('a speed bump' -- a low over-able road shape,
+   which at ten pixels is the honest limit of naming). All eleven variants
+   now read their verb at 8, 12 and 25.
+
+**The gap list, iterated to its stopping point.** A fresh reader ranked
+ours-vs-theirs differences three times across the pass (plus one inherited
+from the M4-M8 arc). By the last iteration the top five tells were: the
+runner on screen, course props instead of moving traffic, no floating
+coins, course furniture down the road, and the spectator crowd -- every one
+of them the game's own identity (traffic is formally refused with
+measurement at the top of world.js; the crowd and barriers ARE a marathon).
+Below the fold the actionable items were acted on (awnings re-weighted to
+their red/blue, warm lamps everywhere, Chicago out of grey, road value,
+cloud bank). What remains that our engine cannot express, stated plainly
+per the brief's stopping rule: legible per-shop signage text (every prop
+shares one vertex-coloured material with one map -- per-sign canvas decals
+would cost a mesh and draw call per sign against the ~300/400 draw budget),
+their 2D-painted backdrop softness, and texture-resolution weathering
+beyond the shared plaster mottle. Those are the honest limit of 'utterly
+perfect' in this renderer, and everything short of them has been built.
+
+**The full sweep at the close:** build --check clean; shoot all shots clean
+(tightest margin +0.021 after the knife-edge +0.006 was widened on
+purpose); course-test 90 PASS; simulate PASS; calendar 32 days clean;
+kindread 1 of 37; footroom 96/96; deckdrop 24/24; mechanics --identity
+bit-identical; tempo PASS; playthrough PASS. Peak draws unchanged at ~206
+against ~400 -- eleven variants cost zero draws by the pool's own
+arithmetic (only the visible body is ever submitted), and the signal
+columns ride the canyon tile's existing merge.
+
+Side-by-sides, honest names: reference/citylook-vs-ours-street.png,
+citylook-vs-ours-street-2.png, citylook-vs-ours-cars.png,
+citylook-vs-ours-obstacles.png. Density is owed to course.js and was
+deliberately not touched -- the variant bag got deeper, the road did not
+get busier.

@@ -1004,6 +1004,75 @@ MR.World = (function () {
    */
 
   /** Diagonal caution stripes for the face a hazard turns toward the player. */
+  /**
+   * ---- THE FASCIA ATLAS: six shop signs, one canvas, one material --------
+   *
+   * The citylook residual this answers, from roadmap 71b: "their shop
+   * fascias carry legible, varied text at close range; ours carry pattern."
+   * The reference (citylook-shopfronts: the red HARDWARE board, the green
+   * grocer, the cream cafe A-board) is a street where every shop says what
+   * it is, in a different voice.
+   *
+   * Six designs, not thirty: a handful of DISTINCT fascias rotated by seed
+   * reads as a lived-in street, while a font catalogue reads as a test
+   * card. Each cell's ground is painted the SAME hex as the SIGNS board it
+   * lands on in vTerrace, so the textured face and the box it sits on are
+   * one object in every light; the variety is carried by the lettering --
+   * three typographic voices (heavy caps, condensed caps, italic serif),
+   * keylines on some, a motif dot on one.
+   *
+   * Names are generic trades, no real-world brand anywhere. Cell layout is
+   * 2 x 3 at 512x128 each -- the fascia is ~3.0 x 0.60 world units, so a
+   * cell carries ~170px per world unit, the same order as the mile plates.
+   */
+  const FASCIA_CELLS = 6;
+  function fasciaTexture() {
+    const c = canvas(1024, 384);
+    const g = c.getContext('2d');
+    const fam = 'ui-sans-serif, system-ui, -apple-system, Arial, sans-serif';
+    const serif = 'Georgia, "Times New Roman", serif';
+    // [bg, fg, text, font, keyline, motif]
+    const DESIGNS = [
+      ['#c8402f', '#f5ead8', 'HARDWARE', `900 74px ${fam}`, true, false],
+      ['#2f6e4f', '#f0e6c8', 'GROCERY', `800 70px ${fam}`, false, true],
+      ['#30508c', '#e8eef8', 'LAUNDRY', `700 64px ${fam}`, true, false],
+      ['#f0e6d0', '#4a3428', 'Cafe', `italic 700 84px ${serif}`, false, true],
+      ['#8c3060', '#f2d8e4', 'RECORDS', `800 62px ${fam}`, true, false],
+      ['#c07a2a', '#3a2818', 'BAKERY', `900 70px ${fam}`, false, false],
+    ];
+    for (let i = 0; i < DESIGNS.length; i++) {
+      const [bg, fg, text, font, keyline, motif] = DESIGNS[i];
+      const x0 = (i % 2) * 512, y0 = Math.floor(i / 2) * 128;
+      g.fillStyle = bg; g.fillRect(x0, y0, 512, 128);
+      if (keyline) {
+        g.strokeStyle = fg; g.lineWidth = 4;
+        g.strokeRect(x0 + 12, y0 + 12, 512 - 24, 128 - 24);
+      }
+      g.fillStyle = fg; g.font = font;
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      const tx = x0 + 256 + (motif ? 26 : 0);
+      g.fillText(text, tx, y0 + 68, motif ? 400 : 460);
+      if (motif) {
+        g.beginPath();
+        g.arc(x0 + 52, y0 + 64, 22, 0, Math.PI * 2);
+        g.fillStyle = fg; g.fill();
+        g.beginPath();
+        g.arc(x0 + 52, y0 + 64, 11, 0, Math.PI * 2);
+        g.fillStyle = bg; g.fill();
+      }
+    }
+    return texture(c);
+  }
+  /** Remap a PlaneGeometry's UVs into fascia atlas cell `ci`. */
+  function fasciaCell(geo, ci) {
+    const uv = geo.attributes.uv;
+    const col = ci % 2, row = Math.floor(ci / 2);
+    for (let i = 0; i < uv.count; i++) {
+      uv.setXY(i, (col + uv.getX(i)) / 2, (2 - row + uv.getY(i)) / 3);
+    }
+    return geo;
+  }
+
   function stripeTexture(a, b) {
     const c = canvas(128, 64);
     const g = c.getContext('2d');
@@ -1839,8 +1908,23 @@ MR.World = (function () {
        * it costs one box.
        */
       const SIGNS = [0xc8402f, 0x2f6e4f, 0x30508c, 0xf0e6d0, 0x8c3060, 0xc07a2a];
-      sub.push(bx(0.10, 0.66, bw * 0.90, fx - 0.05, 2.62, 0, SIGNS[Math.floor(rnd() * SIGNS.length)]));
+      const sgi = Math.floor(rnd() * SIGNS.length);
+      sub.push(bx(0.10, 0.66, bw * 0.90, fx - 0.05, 2.62, 0, SIGNS[sgi]));
       sub.push(bx(0.11, 0.08, bw * 0.92, fx - 0.055, 2.98, 0, t.trim));
+      /**
+       * THE LETTERING, when the caller asks for it (t.signs): a single quad
+       * on the board's road face, UV-mapped into the fascia atlas cell whose
+       * ground is painted the same hex as the board -- so the marking and
+       * its board read as one object from every angle, and the marking
+       * itself has no back because it is paint on a face that exists. The
+       * quads are collected separately because they need a textured
+       * material: the caller merges them into ONE extra mesh per row.
+       */
+      if (t.signs) {
+        const sq = part(fasciaCell(new THREE.PlaneGeometry(bw * 0.86, 0.58), sgi),
+          undefined, fx - 0.105, 2.62, 0, 0, -Math.PI / 2, 0);
+        placeAt(t.signs, [sq], step, 0, z, lean);
+      }
       /**
        * THE AWNING. Two boxes: a canopy sloping out from the facade at the top
        * of the ground floor, and a fascia hanging off its front edge.
@@ -14352,13 +14436,30 @@ MR.World = (function () {
      * games' foreground props do, without ever coming near the corridor.
      */
     const STREET_LEN = 30;
+    /**
+     * THE FASCIA LETTERING RIDES THE ROW AS ONE EXTRA MESH. The quads
+     * vTerrace collects share one unlit atlas material (fogged, like the
+     * mile plates and the aid sign), merged per row variant -- so the cost
+     * is exactly ONE draw call per live street row, and the atlas itself is
+     * one texture for the whole game. Measured on the default sweep: the
+     * city frames carry 8-10 live rows, so the whole feature is single
+     * digits of draws at its worst and nothing anywhere else moved.
+     */
+    const fasciaMat = new THREE.MeshBasicMaterial({ map: fasciaTexture() });
     const streetPools = SETS.map(function (st) {
       const t = st.look.terrace;
       return [11, 47, 83].map(function (seed) {
         const parts = [];
-        vTerrace(parts, Object.assign({ bays: Math.max(3, Math.round(STREET_LEN / t.bay)) }, t), seed);
+        const opts = Object.assign({ bays: Math.max(3, Math.round(STREET_LEN / t.bay)) }, t,
+          { signs: [] });
+        vTerrace(parts, opts, seed);
         const geo = merge(parts);
-        return Pool(function () { return S.outlined(geo, mats.prop, S.INK.scenery); }, group);
+        const signGeo = opts.signs.length ? merge(opts.signs) : null;
+        return Pool(function () {
+          const row = S.outlined(geo, mats.prop, S.INK.scenery);
+          if (signGeo) row.add(new THREE.Mesh(signGeo, fasciaMat));
+          return row;
+        }, group);
       });
     });
 

@@ -6653,3 +6653,105 @@ get busier.
   Small actionable leftovers, cheap, unclaimed: manhole covers and road
   debris; one or two more pavement prop kinds (their chalkboard cooler);
   distant landscape silhouettes down the vanishing point on open legs.
+
+## Roadmap 72 · Density: the road carries more, the mats pay the bill, and the bar does not move
+
+The commission: **more obstacles, lots more** — the owner's phrase across
+weeks. Sequenced deliberately after the citylook variant expansion (26 → 37)
+because freshness cannot exceed objects ÷ density: the bag was enlarged
+first, and this is the density half of the same lever. Everything below was
+measured either side on the same instruments, 60 days headless for density,
+30 dates in the running page for repeats (`tools/staleness.js`), and the
+policy × skill sweep in `tools/simulate.js` for the bar.
+
+**What moved, in `makeGate` and one mat constant:**
+
+1. **The mid-band second hazard became a dial.** `rnd.int(1, 2)` held the
+   second hazard at a flat 50% from mile 0.7 to mile 8.2 — precisely the
+   measured trough of boredom at miles 3–7. Now
+   `rnd.chance(0.50 + 1.40 * (d - 0.09))`: continuous with the coin at the
+   band floor (the opening's learning stretch is untouched), ~0.96 at the
+   hand-over to the always-2 band, one draw either way.
+2. **`full` (three-lane, forced-action gates) rose** 0.10/0.30/0.48/0.62 →
+   0.16/0.40/0.58/0.70. 7b0a1d2 had declined to touch this pending its own
+   evidence; the evidence is the sweep, run either side, bar held (below).
+3. **`TEMPO_DRAG_SHARE` 0.52 → 0.57**, and the reason is what LANDS, not
+   what is planned: a forward mat must be earned by an action in its lane
+   and a drag needs its lane clear, so a denser road converts more planned
+   lifts into placed ones and kills more drags. At 0.52 the landed mats went
+   fwd 19.6/bwd 9.7 → fwd 20.5/bwd 8.5, handing the mat-chasing line ~2
+   free seconds and pushing first-attempt to 30%, then 23% at 0.55. 0.57
+   restores the landed balance (fwd 18.8/bwd 9.2) and the bar exactly.
+
+**What was tried and refused by the measurement:** `spacingAt`'s mean,
+44 − 23d → 40.5 − 22d. Ten extra gates a course made a CLEAN run ~20 s
+faster and sent first-attempt cells from 20% to 80% — at PERFECT skill,
+where no hazard demand claws it back — because pace follows the streak and
+the streak is a count of cleared gates. **Gates per mile is a speed dial
+before it is a density dial**, and the record is an absolute 1:59:30. This
+is the measured form of what entry 58 said in passing when it named `nHaz`
+as the one number. Reverted; recorded at the site in course.js.
+
+**Density, hazards/mi (60 days):**
+
+| band | before | after | |
+|---|---|---|---|
+| opening 3 miles | 7.53 | **8.41** | +12% |
+| miles 3–7 (the trough) | 11.68 | **13.72** | +17% |
+| miles 7–13 | 15.78 | 16.88 | +7% |
+| miles 13–20 | 18.83 | 19.85 | +5% |
+| miles 20–26.2 | 20.31 | 21.12 | +4% |
+| whole race | 16.10 | **17.23** | +7% |
+
+Hazards per gate at miles 3–7: 1.82 → 2.16. Hazard sightings per run
+422 → 453. Gates per run 182.3 → 184.8 (+1.4 s on a clean run — fewer
+BLOCK trains means smaller reach at the spacing floor; absorbed into the
+retune). Forced-action share at mile 6: 35% → 50%.
+
+**The repetition line held — the whole point of the sequencing** (30 dates,
+skill 1, `staleness.js`):
+
+| kind | median gap before | after | p10 before | after | b2b before | after |
+|---|---|---|---|---|---|---|
+| JUMP | 13.7 s | 12.5 s | 4.1 s | 3.8 s | 1.6% | 1.8% |
+| DUCK | 14.6 s | 13.4 s | 5.1 s | 4.7 s | 0.9% | 0.9% |
+| BLOCK | 17.1 s | 18.5 s | 1.3 s | 1.2 s | 16.7% | 16.9% |
+
+DUCK's median was 5.8 s at 5 variants and ~8.2 s at 8; at 11 skins it
+absorbs a 17% denser trough and stays at 13.4 s. No kind fell below its
+pre-expansion line. BLOCK lengthened (fewer blocks: more full gates, which
+never carry one). The b2b BLOCK figure is the train, as ever — with trains
+out it is 3.3%. The one real cost: gate SHAPE variety narrowed — top-three
+shapes 12.8% → 16.8% of gates, shape entropy 5.43 → 5.27 bits — because
+all-action gates crowd out CLEAR combinations. That is what density IS; it
+is stated here rather than hidden.
+
+**The difficulty bar, held exactly:**
+
+| | before | after |
+|---|---|---|
+| beats 1:59:30, all cells | 14/45 (31%) | **15/45 (33%)** |
+| ...on a FIRST attempt | 6/30 (20%) | **6/30 (20%)** — same six cells |
+| ...with the course learned | 8/15 (53%) | 9/15 (60%) |
+| policy spread at perfect | 18.1 s | 18.0 s |
+
+No reaction-time was spent: `spacingAt`'s floor (readWindowAt + reachOf) is
+untouched, `shoot.js` clean, calendar 32 days clean, the guaranteed decide
+window unchanged. Difficulty moved where rule 4 allows: demand frequency
+(forced share up across the mid-race) — and the mats' price structure paid
+the difference back.
+
+**Identity re-taken, in its own commit, old and new stated** (the 7b0a1d2
+lesson, not repeated): gates e9f8d87f… → 95e55c3cdbae17988b36ca57aa8f0a59f480b618,
+aid a055853a… → c40930a11001c3e86039e55dd25e77a3775c0d22 (dependent move
+only — the placement rule is untouched, `aid.js` proves it on the new
+course: 14/14 items, cut-in bot 0, reach 100% at 30% fluff).
+
+**The full gate on the final state:** build --check, shoot, course-test 90
+and 365, simulate, calendar 32 clean, kindread PROFILE 1 of 37, footroom
+96/96, deckdrop 24/24, mechanics (re-baselined), tempo 365/365 with
+3426/3426 drag openings proved, playthrough end to end 1:59:34.
+
+**Where the brief was wrong, recorded:** it framed spacing as part of the
+density lift ("gates/mi" in the record). The streak coupling makes that a
+speed change first — the strongest single finding of this pass.

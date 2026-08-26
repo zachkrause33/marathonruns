@@ -237,7 +237,7 @@ MR.World = (function () {
     // as a smear on the horizon.
     'RIVERSIDE': {
       sky: [0x4f8cc0, 0xcdf2fc], ground: 0x57c7a8, road: 0x5a675f, fog: 0xcdf2fc,
-      edge: 'hedge', bank: -1, street: 0.26,
+      edge: 'hedge', bank: -1, street: 0.26, horizon: 1,
       mix: { building: 0.35, tree: 2.0, grove: 2.0, crowd: 1.0, walkers: 0.8 },
     },
     // Nothing stands beside a bridge deck -- the emptiness is the point, and a
@@ -250,12 +250,12 @@ MR.World = (function () {
     },
     'PARKLAND': {
       sky: [0x2e8fd0, 0xcdf5c0], ground: 0x6fd46a, road: 0x5c6158, fog: 0xcdf5c0,
-      edge: 'hedge', street: 0.05,
+      edge: 'hedge', street: 0.05, horizon: 1,
       mix: { building: 0.12, tree: 2.6, grove: 3.6, crowd: 1.1, walkers: 0.9 },
     },
     'THE WALL': {
       sky: [0x8a3a6b, 0xffb27a], ground: 0x8f9a5e, road: 0x795d6a, fog: 0xffb27a,
-      edge: 'wall', street: 0.46,
+      edge: 'wall', street: 0.46, horizon: 1,
       mix: { building: 1.2, tree: 0.25, crowd: 0.35, walkers: 0.3 },
     },
     'FINAL MILE': {
@@ -5586,6 +5586,64 @@ MR.World = (function () {
     hills.userData.notScenery = true;
     group.add(hills);
 
+    /**
+     * ---- THE HORIZON DOWN THE VANISHING POINT, on open legs only ---------
+     *
+     * The hills ring above deliberately leaves the forward 60 degrees open so
+     * nothing stands across the road. On the canyon legs the street wall
+     * closes that gap itself; on the OPEN legs -- riverside, parkland, the
+     * wall's approaches -- the road ended in bare sky, and the reference's
+     * desert frames (citylook-desert-outskirts, citylook-shopfronts) close
+     * exactly this axis with low reddish mesas. GAPLIST-iter2 item 8 named
+     * the miss.
+     *
+     * So: a cluster of flat-topped mesas filling the forward arc the hills
+     * skip, radius 158-200 -- far outside every corridor number this file
+     * knows and mostly dissolved in fog (FOG_FAR is 215), which is the read
+     * wanted: land closing the horizon, not scenery you can inspect. Tops
+     * stay low (height <= 12, sunk 3) so they sit under the mile gantries'
+     * open-sky band; tools/shoot.js frames are the check. One mesh, one draw
+     * call when visible, flagged notScenery exactly like the hills ring it
+     * completes -- it follows the camera and nothing 158 units out can ever
+     * stand between the lens and a gate that spawns at 210.
+     *
+     * Which legs show it is the biome's call (BIOME_LOOK.horizon); the tint
+     * is pulled warm-red toward the reference's rock and then most of the
+     * way into the leg's own fog, so each open leg gets its silhouettes in
+     * its own air.
+     */
+    const horizonGeo = (function () {
+      const parts = [];
+      let s = 8181;
+      const r = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+      // Hand-spread across the forward arc rather than rolled: eight forms,
+      // asymmetric, the widest masses off-centre the way the reference
+      // stacks its rock to one side of the street's end.
+      const MESAS = [
+        [-0.46, 152, 11.0, 30], [-0.33, 166, 14.5, 40], [-0.19, 174, 9.0, 26],
+        [-0.05, 160, 13.0, 44], [0.07, 170, 7.5, 24], [0.20, 154, 13.5, 38],
+        [0.34, 168, 10.0, 30], [0.47, 144, 11.0, 28],
+      ];
+      for (const [a, rad, h, w] of MESAS) {
+        const x = Math.sin(a) * rad, z = Math.cos(a) * rad;
+        const tone = r() > 0.5 ? 0xd8ccc4 : 0xb2a49a;
+        // The mesa: a flat-topped taper, and a lower shoulder butte beside it
+        // so the skyline steps instead of repeating one silhouette.
+        parts.push(cyl(w * 0.32, w * 0.5, h, 6, x, h / 2 - 3, z, tone, 0, r() * 2.1, 0));
+        parts.push(cyl(w * 0.42, w * 0.52, h * 0.38, 6, x + (r() - 0.5) * w * 0.7,
+          h * 0.19 - 3, z + (r() - 0.5) * 10, tone === 0xd8ccc4 ? 0xb2a49a : 0xd8ccc4,
+          0, r() * 2.1, 0));
+      }
+      return merge(parts);
+    })();
+    const horizonMat = vtoon(2);
+    const horizon = new THREE.Mesh(horizonGeo, horizonMat);
+    horizon.renderOrder = -489;
+    horizon.frustumCulled = false;
+    horizon.userData.notScenery = true;
+    horizon.visible = false;
+    group.add(horizon);
+
     // Ripples ride just above the water surface and are only shown when the
     // ground is acting as a river, so still terrain never shimmers.
     const rippleTex = rippleTexture();
@@ -6175,24 +6233,38 @@ MR.World = (function () {
       // a tenth of its contrast: one value step below the tarmac, no hue.
       parts.push(part(new THREE.CircleGeometry(0.52, 10), overRoad(0x5e5c54, 0.92),
         2.35, 0.0035, 8.6, flat, 0, 0));
-      // Stones: closed boxes on the shoulder margin, outside the edge line.
+      /**
+       * THE DEBRIS IS PAINT TOO, and the corridor audit is what makes it so.
+       * A road tile is rigid on the CHORD of eAt across its 24 units, so at
+       * the tightest legal curvature anything it carries mid-tile rides up to
+       * c * 24^2 / 8 = 0.041 above the road directly under it -- and
+       * crossings() measures against Y_FLOOR = 0.06 from that road. A stone
+       * built as a 0.05-tall box therefore crests the floor on a hill and
+       * fails LOW (measured: skips 48/148/152 fired on exactly this). So on
+       * the tarmac inside the corridor, debris that cannot be a marking has
+       * no legal height to exist in: grit and flattened leaves are decals at
+       * y <= 0.012 (0.012 + 0.041 clears the floor with margin), and
+       * anything genuinely three-dimensional stands outside the corridor
+       * with the rest of the props.
+       */
       const STONE = [0x8a877c, 0x6f6d64, 0x7c796e];
-      const STONES = [
-        [-3.05, -9.2, 0.09, 0], [-2.88, -8.8, 0.06, 1], [-3.30, 2.2, 0.07, 2],
-        [3.10, -1.6, 0.08, 1], [2.92, -1.2, 0.05, 0], [3.38, 10.4, 0.07, 2],
+      const GRIT = [
+        [-3.05, -9.2, 0.10, 0], [-2.88, -8.8, 0.06, 1], [-3.30, 2.2, 0.08, 2],
+        [3.10, -1.6, 0.09, 1], [2.92, -1.2, 0.05, 0], [3.38, 10.4, 0.08, 2],
       ];
-      for (const [sx2, sz2, ss, ci] of STONES) {
-        parts.push(bx(ss * 1.5, ss * 0.55, ss * 1.2, sx2, ss * 0.27, sz2,
-          overRoad(STONE[ci], 0.98), 0, sz2 * 0.7, 0));
+      for (const [sx2, sz2, ss, ci] of GRIT) {
+        parts.push(part(new THREE.CircleGeometry(ss, 6), overRoad(STONE[ci], 0.86),
+          sx2, 0.010, sz2, flat, 0, sz2 * 0.7));
       }
-      // The leaf drift, swept against the kerb line: near-flat, dull browns.
+      // The leaf drift, swept against the kerb line: flat flecks, dull browns
+      // -- deliberately nowhere near the tempo mats' green.
       const LEAF = [0x7d6a4c, 0x8a7550, 0x66584a];
       for (let i = 0; i < 7; i++) {
         const side = i < 4 ? -1 : 1;
         const lz = side < 0 ? -6.4 + i * 0.55 : 4.9 + (i - 4) * 0.62;
         const lxx = side * (3.42 - (i % 3) * 0.14);
-        parts.push(bx(0.16 + (i % 2) * 0.05, 0.018, 0.11 + (i % 3) * 0.04,
-          lxx, 0.012, lz, overRoad(LEAF[i % 3], 1.0), 0, i * 0.9, 0));
+        parts.push(part(new THREE.PlaneGeometry(0.16 + (i % 2) * 0.05, 0.11 + (i % 3) * 0.04),
+          overRoad(LEAF[i % 3], 1.0), lxx, 0.011, lz, flat, 0, i * 0.9));
       }
       return merge(parts);
     })();
@@ -17591,6 +17663,8 @@ MR.World = (function () {
       water: new THREE.Color(), edge: new THREE.Color(),
     };
     const _a = new THREE.Color(), _b = new THREE.Color(), _t = new THREE.Color();
+    // The reference's mesa rock, the fixed warm target the horizon pulls at.
+    const _mesa = new THREE.Color(0xa86448);
 
     /** Apply one biome's pulls to the blended base, into `out`. */
     function applyMod(out, key, mod) {
@@ -17631,6 +17705,7 @@ MR.World = (function () {
         mats.edgeCloth.color.set(0xffffff);
         api.fogColor.copy(_base.fog);
         hillsMat.color.copy(mats.shoulder.color).lerp(api.fogColor, 0.45);
+        horizonMat.color.copy(mats.shoulder.color).lerp(_mesa, 0.72).lerp(api.fogColor, 0.34);
         state.biome = b;
         state.look = look;
         return b;
@@ -17676,6 +17751,10 @@ MR.World = (function () {
       // Hills take the ground hue knocked back toward the fog, so they read as
       // the same land seen through a great deal of air.
       hillsMat.color.copy(_shoulder).lerp(api.fogColor, 0.45);
+      // The forward mesas pull toward the reference's warm rock first, then
+      // most of the way into the leg's own fog: land at the end of the road,
+      // in the same air as everything else standing in it.
+      horizonMat.color.copy(_shoulder).lerp(_mesa, 0.72).lerp(api.fogColor, 0.34);
       return b;
     };
 
@@ -17915,6 +17994,12 @@ MR.World = (function () {
       hills.position.y = eHere;
       // On the bridge there is no land to see, only water to the horizon.
       hills.visible = lift < 0.6;
+      // The forward mesas ride with the hills but show only where the leg is
+      // open -- BIOME_LOOK.horizon -- so the canyon keeps its street wall as
+      // its own horizon and the bridge keeps its water.
+      horizon.position.z = z;
+      horizon.position.y = eHere;
+      horizon.visible = lift < 0.6 && !!(state.look && state.look.horizon);
       ripples.visible = lift > 0.02;
       if (ripples.visible) {
         // Water is level. The bridge is excluded from hill placement, so eAt(z)

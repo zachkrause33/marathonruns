@@ -6755,3 +6755,33 @@ and 365, simulate, calendar 32 clean, kindread PROFILE 1 of 37, footroom
 **Where the brief was wrong, recorded:** it framed spacing as part of the
 density lift ("gates/mi" in the record). The streak coupling makes that a
 speed change first — the strongest single finding of this pass.
+
+## Roadmap 73 · One city a day: measured, recommended, waiting on the owner — **OPEN**
+
+The owner: *"Consult with agents and determine if it makes sense to only run
+one location a day. It doesn't make sense to me that we go to 3-4 locations. I
+think this would help with the daily game occurrence."*
+
+Analysis pass only — nothing under `src/` touched, nothing ships from it. The
+full memo is **`docs/one-city-a-day.md`**; the finding in three lines:
+
+- **Recommended: one city per day, dealt from a shuffled bag of the twelve.**
+  Today a city returns after a median of 2–3 days and 73.6% of consecutive
+  days share a city — no day is ever *about* anywhere. A bag makes every city
+  exactly once per 12-day cycle, worst gap 23 days.
+- **The seams carry less than assumed**: mean seam ΔE 9.7 against biome pulls
+  of 17.7 (THE WALL) and 13.7 (THE BRIDGE), which one-city keeps in full; and
+  the first seam lands at mean 69 s, after the miles-3–7 trough it was
+  credited with relieving. The real cost is architectural variety and
+  landmark kinds per course (14.3 → 7.8), traded for 100% of a city's beats
+  per appearance instead of 40%.
+- **The core change is identity-safe, verified**: settings are drawn after the
+  gates on their own stream, and `mechanics.js --identity` hashes gates and
+  aid only. The work is world.js dormant paths (keep the seam machinery, do
+  not delete), the start panel headline, a replacement for `decisiveChapter`
+  (cut by biome leg instead of city), tool sampling assumptions, and a
+  content top-up for the thin cities (VALENCIA 6 kinds, AMSTERDAM/CAPETOWN 7)
+  — fully-built, all angles, as everything is.
+
+Fallback if the four-minute single vocabulary fails in play: two cities per
+day, pre-measured in the memo (H2), one seam per run, machinery already built.

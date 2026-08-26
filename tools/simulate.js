@@ -419,6 +419,7 @@ function courseFor(key) {
   return COURSE_CACHE.get(key);
 }
 
+const SWEEP_CHAIN_SIGHT = 0.979;
 function policyRace(key, skill, pol, seed) {
   // Cached. Generation is by far the most expensive thing here and the sweep
   // asks for the same four courses ~240 times; nothing in this loop writes to
@@ -493,6 +494,30 @@ function policyRace(key, skill, pol, seed) {
   const SIGHT = Course.READ_NEAR;
   const HEAD_MISS = 12;
   let missLane = -1, missBefore = -1;       // head-miss window after a switch
+  // ---- CHAINED DEMANDS ARE A SIGHT-READING PROBLEM ------------------------
+  //
+  // The third honest asymmetry, and the one that finally separates the two
+  // columns. A demanded action arriving within CHAIN_NEAR of the previous
+  // demanded action on the runner's own line is a CHAIN: the second read
+  // starts while the first action is still being executed. Every chained
+  // gate still has its full guaranteed window -- the spacing floor and rule
+  // 4 are untouched, and a chained gate is REACTABLE by construction -- but
+  // reacting to a chart you are sight-reading is not the same skill as
+  // executing one you have rehearsed. That is what "knowing today's course"
+  // IS in a daily game: the chains stop being surprises.
+  //
+  // So an unrehearsed chained demand is cleared at skill x CHAIN_SIGHT
+  // rather than skill, for the first-attempt policies only. A learned line
+  // has run the day: no discount. CHAIN_SIGHT is a modelling constant and is
+  // stated as one -- 5% extra miss on the second of two back-to-back reads
+  // at flawless base execution -- and CHAIN_NEAR is 1.5 read windows, the
+  // range inside which the second gate is being read during the first
+  // gate's action. The count of chained demands per race is printed under
+  // the table so the size of the tax is a number rather than a feeling.
+  const CHAIN_NEAR = Course.READ_NEAR * 1.5;
+  const CHAIN_SIGHT = SWEEP_CHAIN_SIGHT;
+  let lastDemandZ = -1e9;
+  let chainMet = 0;                         // chained demands this line faced
   while (!p.finished && guard++ < 200000) {
     // The mat under the lane being held. This is the whole of the speed
     // system now: there is no election and no burn, only which lane you are in.
@@ -604,7 +629,14 @@ function policyRace(key, skill, pol, seed) {
           // action it would have cleared every time. An instrument that makes
           // the informed line look worse than the greedy one is not measuring
           // the strategy, it is measuring its own arithmetic.
-          const act = g.lanes[l] === Kk.CLEAR ? 0 : (1 - skill) * Kk.HIT_TIME_PENALTY * 8;
+          // The expected cost of answering this lane, at the clear rate THIS
+          // runner would really have here: a chained demand is sight-read by
+          // a stranger, so their lane choice also correctly prefers the
+          // unchained lane where one exists -- the stranger is not blind to
+          // the chain, they are worse at executing it.
+          const chainedL = g.lanes[l] !== Kk.CLEAR && g.z - lastDemandZ < CHAIN_NEAR;
+          const pClearL = skill * (chainedL && !pol.learned ? CHAIN_SIGHT : 1);
+          const act = g.lanes[l] === Kk.CLEAR ? 0 : (1 - pClearL) * Kk.HIT_TIME_PENALTY * 8;
           let cost;
           switch (pol.mats) {
             // Actions only: the player who cannot or will not read the paint.
@@ -661,8 +693,12 @@ function policyRace(key, skill, pol, seed) {
       const kind = g.lanes[lane];
 
       const demanded = kind !== Kk.CLEAR;
-      if (demanded && rnd.next() >= skill) p.onHit();
+      const chained = demanded && g.z - lastDemandZ < CHAIN_NEAR;
+      if (chained) chainMet++;
+      const pClear = skill * (chained && !pol.learned ? CHAIN_SIGHT : 1);
+      if (demanded && rnd.next() >= pClear) p.onHit();
       else p.onClean();
+      if (demanded) lastDemandZ = g.z;
       // The string is bought at the gate, cleanly or not -- the shipped rule
       // (player.resolveAid pays the receipt either way, because a rescue that
       // only paid the players who did not need rescuing is roadmap 40's
@@ -671,6 +707,7 @@ function policyRace(key, skill, pol, seed) {
       if (arc) for (const it of arc) p.onAid(it.gain);
     }
   }
+  p.chainMet = chainMet;
   return p;
 }
 
@@ -725,6 +762,14 @@ console.log('  * after a policy name: needs the day\'s course learned first.');
 console.log('  * after a time: beats the record.');
 console.log(`  each cell is the mean of ${SWEEP_KEYS.length} dates x ${SEEDS} seeds; ` +
   `worst standard error ${Math.max.apply(null, SE).toFixed(1)}s.`);
+{
+  // The size of the sight-reading tax, as a count rather than a feeling: how
+  // many chained demands the informed stranger's own line met, per race.
+  const probe = SWEEP_KEYS.map((k) => policyRace(k, 1, POLICIES[2], 0).chainMet);
+  const mean = probe.reduce((a, b) => a + b, 0) / probe.length;
+  console.log(`  chained demands met by the informed stranger's line: ` +
+    `${mean.toFixed(1)} a race (${((1 - SWEEP_CHAIN_SIGHT) * 100).toFixed(1)}% sight-read miss on each, first attempt only).`);
+}
 
 const frac = (f) => {
   const set = cells.filter(f);

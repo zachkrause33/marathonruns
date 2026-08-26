@@ -118,14 +118,20 @@ MR.Pace = (function () {
     // ---- 259.0 -> 259.7 FOR THE 5% PASS ---------------------------------
     //
     // The owner moved the bar: "Only 5% of first runs should result in a
-    // win." At 259.0 the sweep's first-attempt column sat at 20-27% through
-    // the abundance retune, and the floor is the one dial that moves the
-    // PERFECT rows -- demand density cannot touch a runner who never misses,
-    // and with guard now abundant the sub-perfect rows follow the perfect
-    // ones closely. 0.7 s/mi is 14.5 s on a race, which prices the record at
-    // "a flawless line that reads the road, and nearly nothing else".
-    // Swept, not picked; the grid is in roadmap 73.
-    FLOOR_BASE: 259.7,        // 4:20 /mi, a hair under
+    // win. This should mean more obstacles and paths." -- and its other half,
+    // the design sentence this game's daily loop rests on: knowing today's
+    // course SHOULD win. The two dials that hold both at once:
+    //
+    //   THE FLOOR sets what a REHEARSED line can do. At 259.1 the learned
+    //   policies clear the record across most of the skill column.
+    //
+    //   THE CHAIN TAX sets what a first attempt can do. Back-to-back demands
+    //   are sight-read on a first run and rehearsed on a learned one
+    //   (tools/simulate.js, CHAIN_SIGHT), so the same flawless execution
+    //   finishes seconds apart depending on whether the chains were known.
+    //
+    // Swept together, not picked; the grid is in roadmap 74.
+    FLOOR_BASE: 259.1,        // 4:19 /mi
     // FLOOR_SURGE STOOD HERE AT 244 (4:04/mi) and was the second floor an
     // elected surge ran toward. It is gone with the mechanic. The reasoning
     // that set it is worth keeping because it constrains any future second

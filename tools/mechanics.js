@@ -174,7 +174,19 @@ console.log(`\n=== identity: flags off must be the generator that shipped ===\n`
 // So the surge work is bit-identical to the commit before it at EFFORT = 0,
 // which is the property this check is for, and the number below is 7b0a1d2's.
 // Recorded in docs/roadmap.md.
-const BASELINE_GATES = 'e9f8d87fa92e7a5d62a89f660964441e8c227a45';
+//
+// ---- RE-TAKEN AGAIN, DELIBERATELY, FOR THE DENSITY PASS ------------------
+//
+// The density pass changed gate generation on purpose: makeGate's mid-band
+// second-hazard draw went from rnd.int(1, 2) to a difficulty-weighted chance,
+// and the `full` (three-lane gate) table rose 0.10/0.30/0.48/0.62 ->
+// 0.16/0.40/0.58/0.70. Both alter the seeded stream, so the course is
+// legitimately a different course at every flag setting and this hash MUST
+// move -- silently inheriting the failure is what the note above is about.
+// It was e9f8d87fa92e7a5d62a89f660964441e8c227a45; re-taken same-day, in its
+// own commit, with the density change measured either side (hazards/mi 16.10
+// -> 17.23, first-attempt sweep held at 6 of 30). Recorded in docs/roadmap.md.
+const BASELINE_GATES = '95e55c3cdbae17988b36ca57aa8f0a59f480b618';
 // Re-taken twice. Once deliberately, when the aid placement rule was rewritten
 // so a bottle stands behind an obstacle rather than in open road (it was
 // 7f17eb4893b067571344191ddd6478b4f8da3329); and once here, for the same reason
@@ -191,7 +203,14 @@ const BASELINE_GATES = 'e9f8d87fa92e7a5d62a89f660964441e8c227a45';
 // split is the whole reason these two hashes are separate, and this is the
 // first time it has paid for itself. It was
 // ae74e0eef42e5eca0774bc0721f684dc9bb67dfe.
-const BASELINE_AID = 'a055853a7cf5c1d0e11e885c71e2e995e651c61d';
+//
+// ...and a fourth time, with the density pass, for the dependent reason
+// rather than the deliberate one: aid hangs off the gate table, the gate
+// table moved (see BASELINE_GATES above), so this followed. The aid RULE --
+// a bottle behind an obstacle, in its lane, bought at its gate, never
+// trapped by the next -- is untouched; tools/aid.js proves it on the new
+// course. It was a055853a7cf5c1d0e11e885c71e2e995e651c61d.
+const BASELINE_AID = 'c40930a11001c3e86039e55dd25e77a3775c0d22';
 /**
  * ---- THE FLAGS ARE FORCED OFF HERE, AND THAT IS NOT A WEAKENING ----------
  *

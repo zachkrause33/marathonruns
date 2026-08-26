@@ -18101,9 +18101,13 @@ MR.World = (function () {
       for (let i = 0; i < nJ; i++) {
         const jz = -TILE / 2 + i * ROAD_SLAB * 4;
         parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, 0.16),
-          overRoad(0x3c3a56, 0.76), 0, 0.004, jz, flat));
+          // Warm-neutral, not violet: a fresh gap reader ranked the old
+          // blue-violet transverse band as a tell (the longitudinal rail was
+          // neutralised in M4; this groove kept the old hue). The
+          // reference's patch seams are just darker asphalt.
+          overRoad(0x4a4840, 0.80), 0, 0.004, jz, flat));
         parts.push(part(new THREE.PlaneGeometry(K.TRACK_HALF_WIDTH * 2, 0.08),
-          overRoad(0x66666e, 1.02), 0, 0.004, jz + 0.14, flat));
+          overRoad(0x6a6a62, 1.02), 0, 0.004, jz + 0.14, flat));
       }
       /**
        * ============ THE EGYPT DEVICE: A RAIL THAT CARRIES BEADS ============

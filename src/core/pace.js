@@ -114,7 +114,18 @@ MR.Pace = (function () {
     // ("if people get it on the first try everytime they will not always
     // play") expressed as the two numbers it has always been expressed as, and
     // simulate.js is what chose it rather than this comment.
-    FLOOR_BASE: 259.0,        // 4:19 /mi
+    //
+    // ---- 259.0 -> 259.7 FOR THE 5% PASS ---------------------------------
+    //
+    // The owner moved the bar: "Only 5% of first runs should result in a
+    // win." At 259.0 the sweep's first-attempt column sat at 20-27% through
+    // the abundance retune, and the floor is the one dial that moves the
+    // PERFECT rows -- demand density cannot touch a runner who never misses,
+    // and with guard now abundant the sub-perfect rows follow the perfect
+    // ones closely. 0.7 s/mi is 14.5 s on a race, which prices the record at
+    // "a flawless line that reads the road, and nearly nothing else".
+    // Swept, not picked; the grid is in roadmap 73.
+    FLOOR_BASE: 259.7,        // 4:20 /mi, a hair under
     // FLOOR_SURGE STOOD HERE AT 244 (4:04/mi) and was the second floor an
     // elected surge ran toward. It is gone with the mechanic. The reasoning
     // that set it is worth keeping because it constrains any future second
@@ -139,6 +150,46 @@ MR.Pace = (function () {
     // roadmap rather than reaching for this one, because it is not here.
     POOL_MAX: 4,
     GUARD_COST: 1,
+    /**
+     * ---- THE POOL IS FILLED IN SIPS NOW, AND THIS IS THE DENOMINATION ----
+     *
+     * The owner: "Adjust the water and bananas. We need countless of them
+     * similar to these other games that have coins. That keeps players
+     * engaged." So aid went from ~16 scarce items, each a whole segment, to
+     * hundreds of small pickups laid in trails, arcs and clusters -- see
+     * generateAid in course.js. A pickup is a BITE of a segment, not a
+     * segment: PER_SEG of them fill one, and the pool is fractional between
+     * whole segments so the gauge can fill visibly as they accumulate.
+     *
+     * THE NUMBER IS THE ECONOMY. Total pickups on a course divided by this is
+     * the total guard the road can pay, and the tuning target is that a real
+     * line's collectable segments stay near the old economy (~13-16 a race)
+     * rather than inflating with the item count -- endless aid at the old
+     * value would make contacts free and hand the record to a first attempt,
+     * which is the exact opposite of what the same owner asked for in the
+     * same breath. tools/aid.js measures collectable segments per race and
+     * fails the build outside its band; tools/simulate.js holds the
+     * difficulty bar. GUARD_COST stays 1: only a WHOLE segment guards.
+     */
+    PER_SEG: 24,
+    /**
+     * ---- A GUARDED CONTACT KEEPS THE STREAK, NOT THE STUMBLE -------------
+     *
+     * Under scarce aid a guard was total absolution: streak kept, no seconds.
+     * That was affordable when a segment cost an action to collect. With
+     * pickups abundant and mostly free to gather, total absolution makes
+     * skill irrelevant anywhere the pool is topped up -- measured on the
+     * policy sweep, every collecting policy's five skill columns collapsed to
+     * within a few seconds of its perfect one, and the first-attempt bar
+     * cannot be held by any pace number when 0.96 plays like 1.0.
+     *
+     * So a guard now buys the STREAK -- which is tens of seconds and the
+     * whole run -- and the physical stumble still costs its seconds, same
+     * count as an unguarded hit's time term. player.js already plays the
+     * bounce and the trip either way; this makes the picture and the clock
+     * agree. The streak is the thing that was worth insuring, and it still is.
+     */
+    GUARD_TIME: 1.5,
   };
 
   /**
@@ -485,10 +536,17 @@ MR.Pace = (function () {
      */
     s.onHit = function () {
       s.gatesSeen++;
-      if (EFFORT > 0 && s.pool >= EFFORT_CFG.GUARD_COST) {
+      // The epsilon is float slop only: the pool is a sum of 1/PER_SEG steps
+      // and PER_SEG of them can land a hair under 1.0 in binary. Same slop,
+      // same reason, in s.segments().
+      if (EFFORT > 0 && s.pool >= EFFORT_CFG.GUARD_COST - 1e-9) {
         s.pool -= EFFORT_CFG.GUARD_COST;
         s.guards++;
         if (s.pool <= 0) s.pool = 0;
+        // The stumble's seconds are still paid -- what the segment buys is
+        // the streak. See the GUARD_TIME note in EFFORT_CFG for why total
+        // absolution stopped being affordable when aid became abundant.
+        s.raceTime += EFFORT_CFG.GUARD_TIME;
         return 'guard';
       }
       s.hits++;
@@ -513,14 +571,17 @@ MR.Pace = (function () {
       // so an item collected into a full tank is genuinely thrown away. That
       // waste is the price of holding, and holding is now a choice.
       //
-      // `gain` is deliberately ignored: a segment is a segment, so the gauge
+      // `gain` is deliberately ignored: a pickup is a pickup, so the gauge
       // can be counted rather than read. What water and fruit still differ in
-      // is where the course puts them, which generateAid already decides and
-      // this pass does not touch.
+      // is where the course puts them, which generateAid already decides.
+      //
+      // A SIP, NOT A SEGMENT. PER_SEG pickups fill one guard segment, and the
+      // pool holds the fraction between whole ones so the gauge fills as they
+      // come in. Only whole segments spend -- see s.segments() and onHit.
       if (EFFORT > 0) {
         s.aid++;
         if (s.pool >= EFFORT_CFG.POOL_MAX) { s.wasted++; return; }
-        s.pool = Math.min(EFFORT_CFG.POOL_MAX, s.pool + 1);
+        s.pool = Math.min(EFFORT_CFG.POOL_MAX, s.pool + 1 / EFFORT_CFG.PER_SEG);
         return;
       }
       // Three bounds, and each one is doing a job.
@@ -678,7 +739,7 @@ MR.Pace = (function () {
     s.targetPace = () => tempoTarget(targetPace(s.streak, floorPace()), s.tempo);
 
     /** Whole segments in hand -- what the gauge counts and guard spends. */
-    s.segments = function () { return Math.floor(s.pool); };
+    s.segments = function () { return Math.floor(s.pool + 1e-9); };
 
     return s;
   }

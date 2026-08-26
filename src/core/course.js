@@ -955,9 +955,17 @@ MR.Course = (function () {
     // Aid by lane, sorted, so a site test is a scan of a short list rather
     // than of the whole table. Roof items are excluded: a mat is painted on
     // the road and a bottle on a deck is not a decision this mark can price.
+    //
+    // RECEIPT ITEMS ONLY, since the abundance pass. A trail pickup is a
+    // twenty-fourth of a segment lying in a free lane -- with hundreds of
+    // them on the road, "there is a pickup here" stopped being a decision a
+    // mat could price, and anchoring on one would put paint nearly
+    // everywhere the seeded draw looked. An ARC (it.gate != null) is still
+    // the old object: a string bought with an action at one gate, which is
+    // exactly the priced detour the mat-site rule was written for.
     const aidLane = [[], [], []];
     for (const it of (aid || [])) {
-      if (it && !it.roof && it.lane >= 0 && it.lane < 3) aidLane[it.lane].push(it.z);
+      if (it && !it.roof && it.gate != null && it.lane >= 0 && it.lane < 3) aidLane[it.lane].push(it.z);
     }
     for (const l of aidLane) l.sort(function (a, b) { return a - b; });
     function aidIn(lane, z0, z1) {
@@ -1491,11 +1499,20 @@ MR.Course = (function () {
     // the difficulty bar is measured (tools/simulate.js policy x skill sweep,
     // ~20% of first-attempt cells beat 1:59:30, held through two retunes) and
     // the sweep was re-run either side of this change to hold it.
+    // ---- RAISED AGAIN FOR THE 5% PASS ------------------------------------
+    //
+    // The owner: "Make the game tougher. Only 5% of first runs should result
+    // in a win. This should mean more obstacles and paths." Roadmap 72's
+    // finding stands -- gates per mile is a speed dial before it is a
+    // density dial -- so the lift is again hazards PER gate, which adds
+    // demand without adding streak: this table (+0.06 a band) and the
+    // mid-band slope below. Measured either side with the policy x skill
+    // sweep; numbers in roadmap 73.
     const full = d < 0.14 ? 0
-      : d < 0.34 ? 0.16
-      : d < 0.58 ? 0.40
-      : d < 0.80 ? 0.58
-      : 0.70;
+      : d < 0.34 ? 0.22
+      : d < 0.58 ? 0.46
+      : d < 0.80 ? 0.64
+      : 0.76;
     // ---- AND THE SECOND HAZARD ARRIVES EARLIER THAN IT DID ---------------
     //
     // The owner: *"Add a few more obstacles to the beginning of the game."*
@@ -1541,9 +1558,13 @@ MR.Course = (function () {
     // just after it are untouched -- and reaches ~0.96 where the band hands
     // over to the always-2 rule, so there is no seam there either. One draw
     // either way, same as the coin it replaces.
+    // 1.40 -> 1.70 with the 5% pass: the second hazard arrives still earlier
+    // through the mid-band. Continuous with the 0.50 coin at d = 0.09 as
+    // before, so the opening two thirds of a mile and the learning stretch
+    // stay untouched; the chance saturates near d = 0.38 instead of 0.42.
     const nHaz = rnd.chance(full) ? 3
       : d < 0.09 ? 1
-      : d < 0.42 ? (rnd.chance(0.50 + 1.40 * (d - 0.09)) ? 2 : 1)
+      : d < 0.42 ? (rnd.chance(0.50 + 1.70 * (d - 0.09)) ? 2 : 1)
       : 2;
 
     const order = [0, 1, 2];
@@ -1616,7 +1637,13 @@ MR.Course = (function () {
     // either: difficulty() saturates there on purpose and the last question of
     // a race should not be a corridor.
     if (f < 0.12 || f > 0.88) return 0;
-    return 0.06 * NARROW;
+    // 0.06 -> 0.08 with the 5% pass. "More paths" in the owner's brief, and
+    // the cheap version that survives every constraint (docs/strategy-space.md
+    // ranks the full geometric fork out of scope): a closure is a committed
+    // route choice -- the road tapers, the survivor lane is chosen from what
+    // can be read, and the choice holds for 2-4 gates. Still a punctuation
+    // mark, not a texture: ~5 a course against ~3.7.
+    return 0.08 * NARROW;
   }
 
   function narrowPlan(rnd) {
@@ -1634,130 +1661,96 @@ MR.Course = (function () {
 
 
   /**
-   * ---- THE PLACEMENT RULE, AND IT IS ONE SENTENCE LONG --------------------
+   * ---- AID IS ABUNDANT NOW, AND THE OLD RULE IS RETIRED ON PURPOSE --------
    *
-   * A BOTTLE STANDS BEHIND AN OBSTACLE, IN THAT OBSTACLE'S OWN LANE, AT A GATE
-   * THAT ALSO OFFERS A LANE THROUGH FOR NOTHING.
+   * The owner: *"Adjust the water and bananas. We need countless of them
+   * similar to these other games that have coins. That keeps players
+   * engaged."* So aid stops being ~16 scarce items, each a whole guard
+   * segment, each a priced decision behind an obstacle -- and becomes
+   * hundreds of small pickups laid the way the reference game strews coins:
+   * TRAILS down open lanes, ARCS behind the obstacles that earn them,
+   * CLUSTERS after the hard sections, RUNS along the roofs. A pickup is a
+   * bite of a segment (Pace.EFFORT_CFG.PER_SEG of them fill one), so the
+   * pool economy stays near the old one while the road reads collect,
+   * collect, collect.
    *
-   * Every road item is laid AID_SETBACK past the rear face of a JUMP block or a
-   * DUCK bar, in the same lane as that hazard, and only at a gate that leaves
-   * some other lane CLEAR and leaves the aid lane open at the gate after. So
-   * the only way to the bottle is over or under the thing standing in front of
-   * it; declining is always free, because the empty lane is right there to be
-   * taken instead; and paying once buys the item outright, because the gate
-   * ahead is never allowed to shut the lane you just bought your way into.
+   * ---- WHAT IS RETIRED, RECORDED HONESTLY --------------------------------
    *
-   * The owner's instruction: "Ensure waters and bananas are strategically
-   * placed so that they have to go around an obstacle to get it."
+   * Roadmap 50's rule -- "a bottle stands behind an obstacle, in that
+   * obstacle's own lane, at a gate that also offers a lane through for
+   * nothing" -- is deliberately retired for the TRAIL and CLUSTER items.
+   * That rule solved a real defect: when a bottle was a whole segment, a
+   * free bottle was free insurance and tools/aid.js measured 56% of them
+   * costing nothing. Abundance is a different design: one pickup is worth a
+   * twenty-fourth of a segment, so a free one is a twenty-fourth of the
+   * problem, and the owner has chosen engagement over scarcity with the item
+   * count. What survives of the old rule is its POINT, moved up a level:
+   * the guard economy as a whole must still be priced, which is now done by
+   * the denomination (PER_SEG), by the guarded share below, and by the
+   * guard's own residual cost (Pace.EFFORT_CFG.GUARD_TIME). tools/aid.js
+   * measures collectable segments per race and fails the build when the
+   * economy inflates.
    *
-   * ---- WHAT WAS THERE BEFORE, AND WHY IT DID NOT DO THAT ------------------
+   * ---- WHAT IS NOT FREE, AND WHY THOSE ITEMS STILL CARRY A RECEIPT -------
    *
-   * The old rule scored the open lanes and took the hardest one. That is a
-   * RELATIVE test, and a relative test buys nothing when every candidate is
-   * equally easy: at a gate whose three lanes are all clear it picks one at
-   * random and the item is free. Half the pool was then scored the other way up
-   * on purpose, into the EASIEST lane, which is free by construction. And the
-   * item sat in the middle of the gap, 30 units of open road from anything, so
-   * even a hard placement could be taken by dipping into the lane and coming
-   * straight back out without clearing a thing.
-   *
-   * Measured on the shipped course by tools/aid.js, over 365 days, three ways:
-   * 56% of items cost NOTHING at all over and above the cheapest line through
-   * the course, and only 1% cost an extra action; four natural-line bots that
-   * cannot see aid at all collected 64% of it between them; and a bot that
-   * simply went and got everything finished in exactly the same time, with
-   * exactly the same zero contacts, as one that ignored the lot. Aid was not a
-   * decision. It was scenery that happened to pay.
-   *
-   * ---- WHY THE SETBACK IS SMALL, WHICH IS THE WHOLE MECHANISM -------------
-   *
-   * player.resolveAid is a LANE MATCH AT A POINT, and player.changeLane moves
-   * `lane` on the same frame the input is served -- so any patch of road can be
-   * reached by a swerve, and no placement can charge for anything if the player
-   * has room to swerve into it. The only ground a hazard genuinely guards is
-   * the ground DIRECTLY BEHIND ITSELF, because reaching that means being in the
-   * lane at the gate line a moment earlier, which is where resolveGates fires.
-   *
-   * So the item is pushed right up against the back of the obstacle: the rear
-   * face plus AID_SETBACK, which is 1.39 units behind a JUMP block and 0.95
-   * behind a DUCK bar. At the fastest the runner ever goes that is 52 and 36
-   * milliseconds -- two or three frames -- against the 0.075 s player.handle
-   * makes a player wait between lane changes. The gap between two gates is
-   * never less than 25.35 units, so the old placement had four hundred times
-   * that much room to cut in over.
-   *
-   * This is measured rather than argued. tools/aid.js drives the real state
-   * machine with a bot that takes the free lane at the gate and then swerves
-   * for the bottle as fast as the input queue will serve it; on the old course
-   * it collected 13 of 14 items for half a contact.
-   *
-   * AID_SETBACK is NOT a taste number and must not be tuned down to zero: the
-   * bottle is 1.41 units tall and the DUCK bar's underside is at 1.41, so an
-   * item laid inside a bar's own depth would interpenetrate the art. It is the
-   * smallest offset that keeps the pickup clear of the geometry it stands
-   * behind, and the frames it costs are the price of that.
-   *
-   * ---- THE RESCUE ARGUMENT, WHICH THIS RULE ANSWERS RATHER THAN DROPS -----
-   *
-   * The pool used to be split half hard and half easy, and the reason was real:
-   * scoring every item for maximum difficulty produced a rescue mechanic only a
-   * player who did not need rescuing could reach. 71% of items demanded an
-   * action at the gate on BOTH sides, so aid was gated behind two consecutive
-   * clean clears plus a lane change, asked of the one player whose defining
-   * problem is that they cannot string two clean clears together.
-   *
-   * The fix for that was never "make half of it free". It was to stop asking
-   * for a CHAIN. This rule charges exactly ONE action, at exactly ONE gate, and
-   * explicitly forbids the gate ahead from asking for another -- so there is a
-   * price and there is no compounding. A run fluffing 30% of the actions it
-   * attempts still collects three quarters of the aid on the course; the table
-   * is in tools/aid.js.
-   *
-   * ---- AND IT DOES NOT FIGHT THE ROOF ------------------------------------
-   *
-   * Roof aid, below, is the same rule one step further out: the price is the
-   * mount rather than a jump, and the free lane is the road either side. It is
-   * generated from its own stream and this loop never touches it.
+   * An ARC stands behind a JUMP or a DUCK, in that hazard's own lane, and is
+   * bought AT THAT GATE exactly as the old bottles were -- the gate-receipt
+   * machinery in player.resolveAid is unchanged, because the reason it
+   * exists (a lane match at a point can be cheated by a swerve, measured at
+   * 13 of 14 items in roadmap 50) is as true for five pickups as it was for
+   * one. So the richest features on the road still reward the action that
+   * earns them, mid-jump over the block or flat under the bar, and a line
+   * that never takes an obstacle collects only the trail share. Collection
+   * still correlates with skill; it just stops being all-or-nothing.
    *
    * Nothing here can affect Course.solvable(). Aid reads the gate table and
-   * writes nothing back, so the clean path of a player who ignores every bottle
-   * on the course is the one the BFS proved, untouched.
+   * writes nothing back, so the clean path of a player who ignores every
+   * pickup on the course is the one the BFS proved, untouched.
    *
-   * One item per aid point, never a cluster. An earlier version put out a
-   * table of 3-5 bottles, which fired five pickups inside a second and a half
-   * and read as a single smear rather than as a decision.
+   * ---- THE FOUR SHAPES, AND WHAT EACH ONE PAYS FOR -----------------------
    *
-   * Sparse early and dense late, with fruit getting commoner as the race goes
-   * on. A run is rarely broken in the first mile; the back half is where the
-   * wall is, where the streak is worth most, and where a rescue is worth
-   * having.
+   *   TRAIL     a run of pickups down a lane that is CLEAR at the gate it
+   *             starts behind and holds no vehicle over its whole length.
+   *             Free to collect by design -- the flow the owner asked for --
+   *             and worth the least per unit of attention: each item is one
+   *             PER_SEG-th of a segment. Ends short of the next gate line so
+   *             it never leads the eye into a hazard read.
+   *   ARC       pickups behind a JUMP or a DUCK, in that hazard's lane,
+   *             receipt-guarded at that gate. Behind a JUMP they hang on the
+   *             falling half of the jump arc (`y` above the local road, the
+   *             same field roof items already carry); behind a DUCK they lie
+   *             low where the slide comes out. One action buys the whole
+   *             string, which keeps "collection correlates with skill".
+   *   CLUSTER   a burst after a BLOCK train or a full-width gate, in a lane
+   *             that is open there -- the reward for coming through a hard
+   *             section still moving.
+   *   ROOF RUN  the deck carries a line of pickups instead of one bottle.
+   *             Collection still requires standing on the ramp; roof trails
+   *             stay roof-only.
+   *
+   * AID_SETBACK survives from the old rule and for the old reason: an item
+   * laid inside a DUCK bar's own depth would interpenetrate the art, so the
+   * first item of an ARC sits the rear face plus this behind its obstacle.
    */
   const AID_SETBACK = 0.35;
-  // How far the placement may hunt forward for a gate of the right shape before
-  // giving the point up. Bounded so aid cannot migrate far from where the
-  // density curve wanted it, and so a stretch with no qualifying gate cannot
-  // silently swallow every item behind it. Eight gates is about 250 units.
-  const AID_WALK = 8;
+  // Trail items every this many units -- close enough to read as a line from
+  // READ_NEAR, far enough apart that each one registers as taken.
+  const AID_STEP = 6.0;
+  // Where an arc's items sit behind a JUMP, along the falling half of the
+  // jump arc. Heights are above the LOCAL ROAD, the exact field (`y`) roof
+  // items carry, and they stay under the duck bar's 1.41 underside so an
+  // elevated pickup can never read as overhead furniture.
+  const ARC_DZ = [0.0, 2.4, 4.8, 7.2, 9.6];
+  const ARC_Y  = [1.30, 1.00, 0.66, 0.32, 0.0];
 
   /**
-   * The lane an item may stand in behind gate `gi`, or -1 if this gate is the
-   * wrong shape.
+   * The lane an ARC may stand in behind gate `gi`, or -1 if this gate is the
+   * wrong shape. The clauses are roadmap 50's, kept for the one item class
+   * that is still priced:
    *
-   * Three conditions, and each one is a clause of the rule above:
-   *
-   *   the gate leaves some lane CLEAR   -- or nothing is being given up, and a
-   *                                        full-width gate demands an action in
-   *                                        every lane anyway, so the aid lane
-   *                                        would cost exactly nothing extra
-   *   the aid lane holds a JUMP or DUCK -- the obstacle the bottle stands behind
-   *   the next gate does not BLOCK it   -- paying once buys it outright, and the
-   *                                        player is never trapped in the lane
-   *                                        they bought
-   *
-   * A BLOCK can never be the obstacle: it is impassable, so an item behind one
-   * is aid dangled somewhere the player is not allowed to go. That is the same
-   * exclusion the old `open` test made, stated as a consequence of the rule
-   * rather than as a separate guard.
+   *   the gate leaves some lane CLEAR   -- declining is free
+   *   the aid lane holds a JUMP or DUCK -- the obstacle the arc hangs off
+   *   the next gate does not BLOCK it   -- paying once buys it outright
    */
   function aidLaneAt(gates, gi, rnd) {
     const g = gates[gi];
@@ -1781,193 +1774,179 @@ MR.Course = (function () {
     return lane;
   }
 
-  function generateAid(key, gates, ramps) {
-    // v4: the placement rule changed, so the stream is renamed rather than
-    // silently reused. tools/mechanics.js hashes gates and aid SEPARATELY now
-    // for exactly this reason -- the gate stream is untouched and stays
-    // bit-identical, and only the aid baseline moves.
-    const rnd = MR.rng.stream(key, 'aid/v4');
+  function generateAid(key, gates, ramps, spans) {
+    // v5: the ECONOMY changed -- countless small pickups instead of ~16
+    // whole-segment bottles -- so the stream is renamed rather than silently
+    // reused, exactly as v4 was when the placement rule changed. The gate
+    // stream is untouched by this function; only the aid identity baseline
+    // moves, and tools/mechanics.js hashes the two separately for exactly
+    // this moment.
+    const rnd = MR.rng.stream(key, 'aid/v5');
     const items = [];
     if (!gates.length) return items;
 
     /**
-     * ---- WHY THERE IS ANYTHING ON THE ROOF AT ALL --------------------------
+     * ---- THE ROOF RUN ----------------------------------------------------
      *
-     * Without this the ramp is STRICTLY DOMINATED and the whole mechanic is
-     * dead, which is a thing measurement said and intuition did not.
+     * The reason there is anything up there is unchanged (a ramp with no
+     * reward is strictly dominated -- see roadmap 63); what changed is the
+     * denomination. One bottle was one segment; one bottle is now a sip, so
+     * a single item would make the roof a rounding error. The deck carries a
+     * LINE of pickups instead -- the reference game's gold bars along the
+     * bin lorry's roof, literally -- spaced like a road trail, never on the
+     * tailgate, and behind the cone where the deck carries one so the jump
+     * up there is still what the string is bought with.
      *
-     * Riding a roof pays the same one clean gate that going round the lorry
-     * pays -- the streak does not care which way you got past it -- and it
-     * charges a real price on top: you cannot change lane for the length of the
-     * vehicle, leaving sideways costs the streak, and 10% of ramps put a BLOCK
-     * in the lane you fall back into. A rational player would never take it.
-     * The reference frame says the same thing in pictures: the gold bars along
-     * the top of the bin lorry are not decoration, they are the reason to be up
-     * there.
-     *
-     * So the roof carries aid, and aid is exactly the right currency for it.
-     * The mechanic it plugs into is already built as a trade -- see the long
-     * note in the placement loop below: half the pool is scored into the
-     * HARDEST legal lane so a strong run has something to go and get, and half
-     * is scored into the easiest so a broken run has a road back. A roof is the
-     * hardest legal lane there is. It also makes the ramp worthless to a
-     * perfect run, which is correct and is the same shape as AID_CEILING: a
-     * flawless line is already above the ceiling and gains nothing from a
-     * bottle, so the ramp becomes what aid is -- the way back into a race you
-     * are losing, not a faster way to win one.
-     *
-     * Its own seeded stream, so switching the ramp on cannot shift a single
-     * road-level item; and skipped entirely when there are no ramps, so at
-     * RAMP = 0 no number is drawn at all.
+     * Its own seeded stream, so the road items cannot shift when RAMP moves;
+     * skipped entirely when there are no ramps, so at RAMP = 0 no number is
+     * drawn at all. `y` is height above the LOCAL ROAD, the interface the
+     * renderer draws from; collection still requires standing on the ramp
+     * (player.resolveAid), so roof trails stay roof-only.
      */
     if (ramps && ramps.length) {
-      const rr = MR.rng.stream(key, 'aid/roof/v1');
+      const rr = MR.rng.stream(key, 'aid/roof/v2');
       for (const r of ramps) {
-        // The middle of the FLAT roof, never on the tailgate: an item on the
-        // slope would be collected on the way up whatever the player decided,
-        // which is not a trade.
-        //
-        // ...and BEHIND THE CONE when the deck carries one, which is the road
-        // placement rule one storey up: the bottle stands behind the obstacle,
-        // in that obstacle's lane, and declining is free because the road and
-        // the paired deck are both right there. Midway between the far face of
-        // the cone's own box and the dismount, so it is never inside the cone
-        // and never hanging off the lip.
         const flat0 = r.cone ? r.cone + 2 * HAZARD_HALF_Z[K.JUMP] : r.z0 + r.run;
-        const z = flat0 + (r.z1 - flat0) * 0.5;
-        const fruit = rr.chance(0.55);
-        // `y` IS THE INTERFACE TO THE ART, and it is carried on the item rather
-        // than recomputed by the renderer. A roof pickup drawn at road level is
-        // drawn INSIDE the lorry -- which is what shipped, and is invisible in a
-        // diff because nothing in course space was wrong. It is height above the
-        // LOCAL ROAD, the same quantity player.surface and camera.dk are, so
-        // world.js adds it exactly where it already adds elevation.at(z).
-        //
-        // Only roof items carry it: adding a y: 0 to every road item would
-        // change the aid JSON and break the identity hash for no gain.
-        const roof = { z, lane: r.lane, y: DECK_Y, guarded: true, roof: true };
-        items.push(fruit
-          ? Object.assign(roof, { kind: 'banana', gain: K.AID_BANANA })
-          : Object.assign(roof, { kind: 'water', gain: K.AID_WATER }));
+        const flat1 = r.z1 - 1.5;
+        const room = flat1 - flat0;
+        if (room < 2 * AID_STEP) continue;
+        const n = Math.min(5, Math.max(3, Math.floor(room / AID_STEP)));
+        const step = room / n;
+        for (let i = 0; i < n; i++) {
+          const fruit = rr.chance(0.3);
+          items.push({
+            z: flat0 + step * (i + 0.5), lane: r.lane, y: DECK_Y,
+            roof: true, guarded: true,
+            kind: fruit ? 'banana' : 'water',
+            gain: fruit ? K.AID_BANANA : K.AID_WATER,
+          });
+        }
       }
     }
 
-    let gi = 0;
-    let lastHg = -1;   // the gate the previous item hung off
-    // ---- WHERE THE FIRST BOTTLE GOES, WHICH IS THE OTHER HALF OF THE -------
-    //      OPENING FIX
-    //
-    // It was START_GRACE + [200, 340], which put the first item at mile 1.77 on
-    // average and mile 2.45 at the worst -- so a player carried an empty pool
-    // for the better part of two miles and had no guard at all through the one
-    // stretch where a contact cannot be absorbed.
-    //
-    // [90, 190] lands it at mile 1.00 to 1.42. It is still past START_GRACE by
-    // a comfortable margin -- the clean runway is 150 units and this starts at
-    // 240 -- so the opening still reads calmly; what changes is that the first
-    // real decision of the race arrives while the player is still learning
-    // rather than a mile after they have stopped.
-    let z = START_GRACE + rnd.range(90, 190);
-    const end = K.TOTAL_UNITS - FINISH_GRACE - 60;
-    let guard = 0;
+    /**
+     * ---- THE ROAD: ONE FEATURE PER GATE, DRAWN IN GATE ORDER -------------
+     *
+     * The walk is over GATES rather than over a z cursor, because every
+     * feature hangs off a gate's shape: a cluster off a hard gate, an arc
+     * off an obstacle, a trail off the gap to the next gate. One feature per
+     * gate is the density governor -- it caps the road at a readable
+     * collect-line per screen rather than a carpet -- and the draw order is
+     * the gate order, so the stream is deterministic by construction.
+     */
+    const end = K.TOTAL_UNITS - FINISH_GRACE - 30;
+    const first = START_GRACE + 40;
 
-    while (z < end && guard++ < 4000) {
-      while (gi < gates.length - 1 && gates[gi + 1].z < z) gi++;
+    for (let gi = 0; gi < gates.length; gi++) {
+      const g = gates[gi];
+      if (g.z < first || g.z > end) continue;
+      const next = gi + 1 < gates.length ? gates[gi + 1] : null;
+      const nextZ = next ? next.z : K.TOTAL_UNITS;
+      const nextLanes = next ? next.lanes : [K.CLEAR, K.CLEAR, K.CLEAR];
 
-      // Hunt forward from here for a gate of the right shape. The density curve
-      // below decides ROUGHLY where an aid point goes; the rule decides exactly
-      // which gate it hangs off, and a point with no qualifying gate within
-      // AID_WALK is given up rather than dropped somewhere free.
+      // ---- CLUSTER: the burst after a hard section -----------------------
       //
-      // ---- THREE BOUNDS, AND ALL THREE WERE MISSING FIRST TIME ------------
-      //
-      // NEVER BEFORE THE PREVIOUS ITEM'S GATE. The hunt starts at the gate
-      // BEHIND the target z, so the placement can pull an item backwards by up
-      // to one gap. Left alone that can order two items the wrong way round or
-      // stack them on one gate. Starting at lastHg + 1 makes the gate index
-      // strictly increasing, so z is too, and the sort at the end has nothing
-      // left to do.
-      //
-      // NEVER PAST THE END. `end` bounds where an aid POINT may be asked for,
-      // and the hunt can carry the item eight gates -- about 250 units -- past
-      // wherever that was. On the last point of the course that walks straight
-      // through the tape. The exact class of defect the ramp's run-in had, and
-      // the exact reason this file's sweeps run at 365 days.
-      let hg = -1, lane = -1;
-      for (let k = Math.max(gi, lastHg + 1); k < gates.length - 1 && k < gi + AID_WALK; k++) {
-        if (gates[k].z > end) break;
-        const l = aidLaneAt(gates, k, rnd);
-        if (l >= 0) { hg = k; lane = l; break; }
-      }
-      if (hg >= 0) {
-        const g = gates[hg];
-        // Behind the obstacle: its rear face, from the SAME nose-anchored
-        // expression reachOf, buildSpans and world.js's gateBoxes all use, so
-        // the bottle can never end up inside the thing it stands behind.
-        //
-        // ASSIGNED, NOT MAXED. This was Math.max(z, ...) so that an item could
-        // never move backwards, and the cost of that was the whole rule: where
-        // the target z already sat past the gate the item simply stayed there,
-        // 46 units downstream, behind nothing at all. Monotonicity is the
-        // hunt's job now, above, and the placement's only job is to be behind
-        // the obstacle.
-        lastHg = hg;
-        z = g.z + 2 * HAZARD_HALF_Z[g.lanes[lane]] + AID_SETBACK;
-        const f2 = z / K.TOTAL_UNITS;
-        const fruit = rnd.chance(0.12 + 0.46 * f2 * f2);
-        // `gate` IS THE INTERFACE TO THE COLLECTION TEST, and it is carried on
-        // the item for the same reason the roof item carries `y`: the rule has
-        // to travel with the thing it governs, or the renderer and the player
-        // are left to rediscover it. player.resolveAid pays a guarded item out
-        // to a runner who was in `lane` when gate `gate` resolved, cleanly or
-        // not -- see the long note there for why a lane match at a point cannot
-        // do this job.
-        //
-        // Every road item is guarded now: that is the rule, so the flag is a
-        // constant rather than a score. It is kept because the roof items carry
-        // it and the two should describe themselves the same way.
-        items.push(fruit
-          ? { z, lane, gate: hg, kind: 'banana', gain: K.AID_BANANA, guarded: true }
-          : { z, lane, gate: hg, kind: 'water', gain: K.AID_WATER, guarded: true });
+      // A BLOCK train or a full-width gate is the course asking its hardest
+      // question, so the road just past it pays a handful at once -- the
+      // reward for coming through still moving, and the refill point for a
+      // pool that guard has just been drawing down. Laid past the deepest
+      // box the gate stands in the road (reachOf), in a lane with no vehicle
+      // over the whole burst and no wall at the next gate, so collecting it
+      // never leads anywhere the player cannot leave.
+      const hard = g.train > 0 || g.lanes.every(function (l) { return l !== K.CLEAR; });
+      if (hard && rnd.chance(0.62)) {
+        const z0 = g.z + reachOf(g.lanes, g.train) + 3;
+        const z1 = Math.min(z0 + 12, nextZ - 6);
+        if (z1 - z0 >= 8) {
+          const cands = [];
+          for (let l = 0; l < 3; l++) {
+            if (nextLanes[l] === K.BLOCK) continue;
+            if (spans && !laneFree(spans, l, z0, z1)) continue;
+            cands.push(l);
+          }
+          if (cands.length) {
+            const c = cands[rnd.int(0, cands.length - 1)];
+            // A diamond: a line up the chosen lane with the middle widened
+            // into the free neighbours -- the reference game's cluster shape,
+            // as near as three discrete lanes can spell it.
+            const mid = (z0 + z1) / 2;
+            const put = function (lane, z) {
+              const fruit = rnd.chance(0.35);
+              items.push({ z, lane,
+                kind: fruit ? 'banana' : 'water',
+                gain: fruit ? K.AID_BANANA : K.AID_WATER });
+            };
+            put(c, z0);
+            put(c, mid - 2.2); put(c, mid + 2.2);
+            for (const d of [-1, 1]) {
+              const l = c + d;
+              if (l < 0 || l > 2 || cands.indexOf(l) < 0) continue;
+              put(l, mid);
+            }
+            put(c, z1);
+            continue;
+          }
+        }
       }
 
-      // Sparse early, dense late. Aid exists to rescue a broken run, and a run
-      // is rarely broken in the first mile, so the opening stays clean and the
-      // back half -- where the wall is and where the streak is worth most --
-      // carries most of the help.
+      // ---- ARC: the string an action buys --------------------------------
       //
-      // Read off z AFTER the placement has moved it, not before: the hunt above
-      // can carry a point forward by up to AID_WALK gates, and pacing the next
-      // one off where this one was WANTED rather than where it LANDED would let
-      // two items stack up behind a single dense stretch.
-      // ---- MORE AID, AND FRONT-LOADED RATHER THAN JUST DENSER --------------
+      // Behind a JUMP the items hang on the falling half of the jump arc,
+      // collectable mid-flight; behind a DUCK they lie flat where the slide
+      // comes out. Receipt-guarded at this gate -- the roadmap 50 machinery,
+      // unchanged -- so the whole string is bought by being in the hazard's
+      // lane when the gate resolves, and a cut-in swerve still buys nothing.
+      const arcLane = aidLaneAt(gates, gi, rnd);
+      if (arcLane >= 0 && rnd.chance(0.52)) {
+        const kind = g.lanes[arcLane];
+        const base = g.z + 2 * HAZARD_HALF_Z[kind] + AID_SETBACK;
+        const n = kind === K.JUMP ? ARC_DZ.length : 4;
+        const fruitAt = rnd.int(1, n - 2);
+        for (let i = 0; i < n; i++) {
+          const it = {
+            z: base + ARC_DZ[i], lane: arcLane, gate: gi, guarded: true,
+            kind: i === fruitAt ? 'banana' : 'water',
+            gain: i === fruitAt ? K.AID_BANANA : K.AID_WATER,
+          };
+          // Elevated only behind a JUMP: the falling half of the arc. The
+          // heights stay under the DUCK bar's 1.41 underside, so a lifted
+          // pickup can never read as overhead furniture.
+          if (kind === K.JUMP && ARC_Y[i] > 0) it.y = ARC_Y[i];
+          items.push(it);
+        }
+        continue;
+      }
+
+      // ---- TRAIL: the line down the open lane ----------------------------
       //
-      // The owner asked for "a few more waters and bananas", and separately for
-      // the opening to stop being boring. THE SAME CURVE ANSWERS BOTH, and the
-      // second reason is the stronger one.
-      //
-      // Under EFFORT the pool is the whole strategic layer -- guard and surge
-      // are its only two exits and aid is its only source -- so a runner with
-      // an empty pool has nothing to decide and nothing to spend. Measured on
-      // the shipped curve, the FIRST item lands at z = 420 +- and the second
-      // near 1000, so the first segment arrives around mile 1.7 and the second
-      // near mile 4. The stretch docs/staleness-and-mats.md measured as the
-      // boredom trough -- miles 3 to 7 -- is exactly the stretch where the
-      // player is carrying one segment and has never had a choice about it.
-      //
-      // 620 - 400f was steeply back-loaded on the argument that a run is rarely
-      // broken in the first mile, and that argument was written when aid was a
-      // STREAK REBATE. It repaired damage, so it belonged where the damage was.
-      // It is a POOL now. A pool is worth having before you need it, because
-      // having it is what makes the guard-or-surge question exist at all.
-      //
-      // 520 - 300f keeps the same shape -- sparser early than late -- and lifts
-      // the whole curve: ~15.9 road items against 13.7, the "few more" that was
-      // asked for, and the opening 3 miles go from 1.2 items to 2.2. The back
-      // half is barely touched (220 -> 232 at the tape), so the rescue argument
-      // the old curve was built on is intact.
-      const spacing = 520 - 300 * (z / K.TOTAL_UNITS);
-      z += spacing * rnd.range(0.82, 1.18);
+      // The collect-collect-collect of the reference game, free by design --
+      // see the retirement note above. In a lane that asks nothing at this
+      // gate, holds no vehicle over the run, and is not walled at the next,
+      // ending well short of the next gate line so the line of pickups never
+      // leads the eye into a hazard read.
+      if (next && nextZ - g.z >= 30 && rnd.chance(0.55)) {
+        const cands = [];
+        for (let l = 0; l < 3; l++) {
+          if (g.lanes[l] !== K.CLEAR || nextLanes[l] === K.BLOCK) continue;
+          if (spans && !laneFree(spans, l, g.z, nextZ)) continue;
+          cands.push(l);
+        }
+        if (cands.length) {
+          const l = cands[rnd.int(0, cands.length - 1)];
+          const t0 = g.z + 3;
+          const t1 = nextZ - 8;
+          const n = Math.min(8, Math.floor((t1 - t0) / AID_STEP) + 1);
+          if (n >= 3) {
+            const step = (t1 - t0) / (n - 1);
+            for (let i = 0; i < n; i++) {
+              const fruit = rnd.chance(0.1);
+              items.push({ z: t0 + i * step, lane: l,
+                kind: fruit ? 'banana' : 'water',
+                gain: fruit ? K.AID_BANANA : K.AID_WATER });
+            }
+          }
+        }
+      }
     }
     items.sort(function (p, q) { return p.z - q.z; });
     return items;
@@ -2309,8 +2288,13 @@ MR.Course = (function () {
     for (let m = 1; m <= 26; m++) mileMarkers.push({ mile: m, z: m * K.UNITS_PER_MILE });
     mileMarkers.push({ mile: K.MARATHON_MILES, z: K.TOTAL_UNITS, finish: true });
 
-    const aid = generateAid(key, gates, ramps);
+    // Spans FIRST, and the reordering is load-bearing: generateAid's trails
+    // and clusters refuse any lane a vehicle stands in, and the spans are the
+    // one statement of where vehicles stand. buildSpans reads gates and ramps
+    // only, draws nothing from the seeded stream, and never read aid -- so
+    // moving it up cannot change a single gate or ramp.
     const spans = buildSpans(gates, ramps);
+    const aid = generateAid(key, gates, ramps, spans);
     // The lane, last, because every rule that makes a mat fair is a statement
     // about gates and about where the vehicles ended up.
     const tempo = assignTempo(key, tempoPlan, gates, spans, elevation, aid);

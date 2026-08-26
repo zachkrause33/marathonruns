@@ -350,13 +350,34 @@ const rngOf = ctx.MR.rng;
  * one is a FIRST-ATTEMPT skill, while planning a chain of them or declining a
  * bottle you know sits in a slow lane is not.
  */
+/**
+ * ---- `take` CHANGED MEANING WITH THE ABUNDANCE PASS ----------------------
+ *
+ * Aid is hundreds of small pickups now -- trails collected by being in their
+ * lane, arc strings bought at a gate with an action -- so "collect it or not"
+ * stopped being a binary. EVERY policy collects whatever falls in the lane it
+ * is running (a player cannot decline a coin under their feet), and `take` is
+ * how the policy STEERS for more:
+ *
+ *   'none'   no pickup term in the lane choice; incidental collection only.
+ *   'chase'  a flat attraction per visible pickup -- the coin-chasing
+ *            newcomer the abundance is for, who will pay an action or stand
+ *            on paint they have not read for a fat trail.
+ *   'value'  pickups priced honestly in race seconds: a segment is worth
+ *            roughly a mid-race contact's streak cost only when a hit is
+ *            still likely and the pool has room, so the term scales with
+ *            (1 - skill) and vanishes for a runner who does not miss.
+ *   'plan'   'value' plus course knowledge: an arc whose lane is dragged, or
+ *            a trail that parks the runner in red paint, is declined in
+ *            advance -- the thing a stranger structurally cannot do.
+ */
 const POLICIES = [
-  { name: 'NO AID',    take: 0,      mats: 'cost',      learned: false },
-  { name: 'ACTIONS',   take: 1,      mats: 'ignore',    learned: false },
-  { name: 'READ ROAD', take: 1,      mats: 'cost',      learned: false },
-  { name: 'AVOID RED', take: 1,      mats: 'red',       learned: false },
-  { name: 'CHASE GRN', take: 1,      mats: 'green',     learned: false },
-  { name: 'FREE GRN',  take: 1,      mats: 'freegreen', learned: false },
+  { name: 'NO AID',    take: 'none',  mats: 'cost',      learned: false },
+  { name: 'COIN CHASE',take: 'chase', mats: 'ignore',    learned: false },
+  { name: 'READ ROAD', take: 'value', mats: 'cost',      learned: false },
+  { name: 'AVOID RED', take: 'none',  mats: 'red',       learned: false },
+  { name: 'CHASE GRN', take: 'none',  mats: 'green',     learned: false },
+  { name: 'FREE GRN',  take: 'none',  mats: 'freegreen', learned: false },
   // ---- WHAT KNOWING THE COURSE IS ACTUALLY WORTH NOW --------------------
   //
   // HOLD 1 and HOLD 2 carried this column and they were about the pool. With
@@ -367,21 +388,25 @@ const POLICIES = [
   // foreknowledge is worth more -- moved from the tank to the line.
   { name: 'PLAN AID',  take: 'plan', mats: 'cost',      learned: true },
   { name: 'PLAN+RED',  take: 'plan', mats: 'red',       learned: true },
-  // ---- THE ONE THING A STRANGER STRUCTURALLY CANNOT DO -----------------
+  // ---- GRN CHAIN IS RETIRED, AND THE REASON IS A FINDING ---------------
   //
-  // Every policy above chooses at the gate line from what is visible there,
-  // which is READ_NEAR = 25.35 units of road. CHAIN looks 300 units ahead and
-  // picks the lane that leads to the most green over that span, which is a
-  // different and strictly harder problem: a greedy choice at one gate can
-  // leave the runner on the wrong side of the road for a mat two gates later,
-  // and only somebody who has run the day knows that in advance.
+  // CHAIN looked 300 units ahead and picked the lane leading to the most
+  // green, on the claim that a greedy gate choice can strand the runner on
+  // the wrong side of the road for a mat two gates later. Measured, it LOST
+  // to the myopic informed line at every skill -- because a lane change in
+  // this game costs nothing and every mat covers a gate line, so whatever a
+  // greedy line "missed" it simply swerves into at the next gate. There is
+  // no wrong side of the road to be stranded on. That is the structural cap
+  // on what course knowledge can be worth here at flawless execution, and
+  // it is stated in roadmap 73 rather than papered over.
   //
-  // This is the same claim HOLD 1 and HOLD 2 carried before the surge was
-  // removed -- the same resource spent with foreknowledge is worth more --
-  // moved from the tank to the line. If it does not beat the greedy policies,
-  // course knowledge buys nothing and this design has no learned axis at all,
-  // which is a finding rather than a tuning problem.
-  { name: 'GRN CHAIN', take: 'plan', mats: 'chain',     learned: true },
+  // What replaces it is the learned line the ABUNDANCE actually creates:
+  // HARVEST runs the informed read with a deliberate appetite for pickups
+  // (drag-aware, pre-positioned so no trail head is missed, arcs fetched) --
+  // the line that maximises guard, which is what knowing the day buys when
+  // the currency is coins. It gives up mat-seconds for segments, so it is
+  // the specialist of the sub-perfect rows where segments matter.
+  { name: 'HARVEST',   take: 'harvest', mats: 'cost',   learned: true },
 ];
 
 /**
@@ -401,14 +426,30 @@ function policyRace(key, skill, pol, seed) {
   const course = courseFor(key);
   const p = Pace.create(course.elevation);
   const rnd = rngOf.stream(key, 'sweep/' + skill + '/' + pol.name + '/' + seed);
-  // Which gates carry an aid item the policy wants, and in which lane.
-  const wantAid = new Map();
-  if (pol.take) {
-    for (const it of (course.aid || [])) {
-      if (it.gate == null) continue;       // roof items need a ramp, not a lane
-      wantAid.set(it.gate, it);
-    }
+  // The aid table, split the way the collection rules split it: ARCS are
+  // receipt-guarded strings hanging off a gate (fetched by steering into the
+  // hazard lane at that gate), LOOSE items are trails and clusters collected
+  // by being in their lane when z passes them. Roof items need a ramp this
+  // model does not ride, same as before.
+  const arcs = new Map();                 // gate index -> [items]
+  const loose = [];                       // unguarded road items, by z
+  for (const it of (course.aid || [])) {
+    if (it.roof) continue;
+    if (it.gate != null) {
+      if (!arcs.has(it.gate)) arcs.set(it.gate, []);
+      arcs.get(it.gate).push(it);
+    } else loose.push(it);
   }
+  // What one pickup is worth to an HONEST line, in race seconds: a whole
+  // segment guards one contact, a contact costs its streak (~tens of seconds
+  // mid-race, proxied by the same 8x penalty the action term uses) less the
+  // stumble the guard still charges -- and it is worth that only to a runner
+  // who still misses. (1 - skill) is that runner. A perfect line prices every
+  // pickup at zero, which is the honest answer and the reason a COIN CHASE
+  // values them at a flat rate instead.
+  const segWorth = Math.max(0, (1 - skill) * Kk.HIT_TIME_PENALTY * 8 - Pace.EFFORT_CFG.GUARD_TIME);
+  const pickVal = segWorth / Pace.EFFORT_CFG.PER_SEG;
+  const CHASE_VAL = 0.5;                  // flat seconds-equivalent per coin
 
   let gi = 0, guard = 0;
   /**
@@ -430,33 +471,86 @@ function policyRace(key, skill, pol, seed) {
    * the next one. Starts at 1, the lane the player starts in.
    */
   let lane = 1;
+  let li = 0;                               // cursor over the loose pickups
+  // ---- WHAT A FIRST ATTEMPT CAN SEE, AND WHAT PRE-POSITIONING BUYS --------
+  //
+  // Two facts about the real game that the first version of this model
+  // flattened, both in the direction of making course knowledge worthless:
+  //
+  //   SIGHT. Paint and pickups are readable from READ_NEAR (~25 u), not from
+  //   arbitrarily far. A first-attempt line choosing a lane at a gate can
+  //   weigh what lies within that range of the gate; a learned line knows
+  //   the whole gap and beyond. So the myopic policies read mats and coins
+  //   over [gate, gate + READ_NEAR] and the learned ones over the full gap
+  //   (and 300 u for CHAIN).
+  //
+  //   THE HEAD OF THE TRAIL. A trail is ~25-40 u of items. A stranger sees
+  //   its first coin at READ_NEAR, swerves, and joins the line a few items
+  //   in; a player who ran the day this morning is already in the lane. So a
+  //   non-learned policy that SWITCHES lane at a gate misses the loose items
+  //   in the first HEAD_MISS units past it. That is the pre-positioning
+  //   edge, stated as geometry rather than invented as a bonus.
+  const SIGHT = Course.READ_NEAR;
+  const HEAD_MISS = 12;
+  let missLane = -1, missBefore = -1;       // head-miss window after a switch
   while (!p.finished && guard++ < 200000) {
     // The mat under the lane being held. This is the whole of the speed
     // system now: there is no election and no burn, only which lane you are in.
     const mat = course.tempoAt ? course.tempoAt(p.units, lane) : null;
     p.tempo = mat ? mat.dir : 0;
     p.update(DT);
+    // ---- LOOSE PICKUPS ARE COLLECTED BY THE LANE, NOT BY A DECISION ------
+    //
+    // A trail item pays out to whoever is in its lane when z passes it --
+    // player.resolveAid's unguarded branch, term for term. Every policy
+    // collects incidentally, because a player cannot decline a coin under
+    // their feet; what `take` steers is whether the lane CHOICE leans toward
+    // them, below.
+    while (li < loose.length && loose[li].z <= p.units) {
+      const it = loose[li++];
+      if (it.lane !== lane) continue;
+      if (it.lane === missLane && it.z < missBefore) continue;   // joined late
+      p.onAid(it.gain);
+    }
     while (gi < course.gates.length && p.units >= course.gates[gi].z) {
       const g = course.gates[gi];
-      let item = wantAid.get(gi);
+      let arc = arcs.get(gi) || null;
       gi++;
+      const nextZ = gi < course.gates.length ? course.gates[gi].z : Kk.TOTAL_UNITS;
 
-      // ---- PLAN AID: DECLINE A BOTTLE THAT STANDS IN A SLOW LANE --------
+      // ---- FETCH THE ARC, OR PRICE IT AND DECLINE --------------------------
       //
-      // This is what course knowledge buys with one spend left. The placement
-      // rule puts an item behind a hurdle in that hurdle's lane, so fetching
-      // one already costs an action; if that lane is also dragged, the detour
-      // costs the action AND the tempo. A stranger cannot know that before
-      // committing to the lane, and a player who has run the day can.
-      if (item && pol.take === 'plan') {
-        const dm = course.tempoAt ? course.tempoAt(g.z, item.lane) : null;
-        if (dm && dm.dir < 0) item = null;
+      // An arc string is bought with one action at this gate. A COIN CHASE
+      // fetches every one -- that is what chasing is. The honest policies
+      // price it: the string's worth (which scales with (1 - skill), because
+      // a segment only guards a hit you were going to take) against the
+      // action's expected cost -- and at the shipped numbers that trade says
+      // no for a runner who rarely misses, which is the intended shape:
+      // arcs feed the players who need the guard. PLAN additionally declines
+      // an arc whose lane is dragged, which a stranger cannot know in time.
+      if (arc) {
+        if (pol.take === 'none') arc = null;
+        else if (pol.take === 'harvest') {
+          // The learned harvester fetches every arc that is not in red paint:
+          // segments are what it is there for.
+          const dm = course.tempoAt ? course.tempoAt(g.z, arc[0].lane) : null;
+          if (dm && dm.dir < 0) arc = null;
+        } else if (pol.take === 'value' || pol.take === 'plan') {
+          const aLane = arc[0].lane;
+          const dm = course.tempoAt ? course.tempoAt(g.z, aLane) : null;
+          if (pol.take === 'plan' && dm && dm.dir < 0) arc = null;
+          else {
+            const actCost = (1 - skill) * Kk.HIT_TIME_PENALTY * 8;
+            if (arc.length * pickVal <= actCost) arc = null;
+          }
+        }
       }
 
-      if (item) {
-        // Gone to fetch a bottle: the lane it stands in, which the placement
-        // rule guarantees holds a JUMP or a DUCK.
-        lane = item.lane;
+      const prevLane = lane;
+      if (arc) {
+        // Gone to fetch the string: the lane it hangs in, which the arc rule
+        // guarantees holds a JUMP or a DUCK.
+        lane = arc[0].lane;
       } else {
         // ---- FREE CHOICE, AND THE MAT IS PART OF IT NOW ------------------
         //
@@ -475,11 +569,25 @@ function policyRace(key, skill, pol, seed) {
         // main.js's bot can be, and it is stated rather than hidden: what this
         // sweep bounds is what a player who reads the road perfectly can do,
         // which is the right question for a RECORD.
+        // How far this policy reads the road it is choosing for: a stranger
+        // to READ_NEAR past the gate, a learned line to the next gate. See
+        // the SIGHT note above -- this is the honest split, and flattening
+        // it is how the first version of this model priced course knowledge
+        // at zero.
+        const look = pol.learned ? nextZ : Math.min(nextZ, g.z + SIGHT);
         let best = null, bestCost = Infinity;
         for (let l = 0; l < 3; l++) {
           if (g.lanes[l] === Kk.BLOCK) continue;
-          const m = course.tempoAt ? course.tempoAt(g.z, l) : null;
-          const run = m ? Math.min(m.z1, g.z + 60) - g.z : 0;
+          // Signed tempo seconds over what this policy can see of the lane,
+          // and the presence flags the rule-of-thumb policies key on.
+          let tempo = 0, hasLift = false, hasDrag = false;
+          for (const mm of (course.tempo || [])) {
+            if (mm.lane !== l || mm.z1 <= g.z || mm.z0 >= look) continue;
+            const ov = Math.min(mm.z1, look) - Math.max(mm.z0, g.z);
+            tempo += (mm.dir > 0 ? -Pace.TEMPO.LIFT : Pace.TEMPO.DRAG)
+              * ov / Kk.UNITS_PER_MILE;
+            if (mm.dir > 0) hasLift = true; else hasDrag = true;
+          }
           // ---- THE SKILL TERM WAS INVERTED, AND IT MATTERED --------------
           //
           // `skill` is P(clear a demanded action) -- the loop below rolls
@@ -497,61 +605,70 @@ function policyRace(key, skill, pol, seed) {
           // the informed line look worse than the greedy one is not measuring
           // the strategy, it is measuring its own arithmetic.
           const act = g.lanes[l] === Kk.CLEAR ? 0 : (1 - skill) * Kk.HIT_TIME_PENALTY * 8;
-          const tempo = m ? (m.dir > 0 ? -Pace.TEMPO.LIFT : Pace.TEMPO.DRAG)
-            * run / Kk.UNITS_PER_MILE : 0;
           let cost;
           switch (pol.mats) {
             // Actions only: the player who cannot or will not read the paint.
             case 'ignore': cost = act; break;
             // A drag is intolerable while any other lane is open; among the
             // rest, actions decide.
-            case 'red': cost = act + (m && m.dir < 0 ? 1e4 : 0); break;
+            case 'red': cost = act + (hasDrag ? 1e4 : 0); break;
             // A lift is taken whatever it costs in actions; among the rest,
             // actions decide.
-            case 'green': cost = act - (m && m.dir > 0 ? 1e4 : 0); break;
+            case 'green': cost = act - (hasLift ? 1e4 : 0); break;
             // A lift is worth having only where it is free.
             case 'freegreen':
-              cost = act - (m && m.dir > 0 && g.lanes[l] === Kk.CLEAR ? 1e4 : 0);
+              cost = act - (hasLift && g.lanes[l] === Kk.CLEAR ? 1e4 : 0);
               break;
-            // ---- LOOK PAST THIS GATE -------------------------------------
-            //
-            // The value of a lane is the tempo it leads to over the next
-            // CHAIN_LOOK units, not the tempo standing on it right now. A mat
-            // is at most TEMPO_PAINT_MAX long and gates are ~25 apart, so 300
-            // units is about a dozen gates and three or four marks -- far
-            // enough to be worth planning, short enough that the runner really
-            // could hold a line across it.
-            case 'chain': {
-              let v = 0;
-              for (const mm of (course.tempo || [])) {
-                if (mm.lane !== l) continue;
-                if (mm.z1 <= g.z || mm.z0 > g.z + 300) continue;
-                const ov = Math.min(mm.z1, g.z + 300) - Math.max(mm.z0, g.z);
-                v += (mm.dir > 0 ? Pace.TEMPO.LIFT : -Pace.TEMPO.DRAG)
-                  * ov / Kk.UNITS_PER_MILE;
-              }
-              cost = act - v;
-              break;
-            }
+            // The 'chain' case stood here and went with GRN CHAIN -- see the
+            // retirement note on the POLICIES table.
             // Both charged in race seconds. The informed line, and the one
             // that bounds what a player reading the road perfectly can do --
             // which is the right question for a RECORD.
             default: cost = act + tempo;
           }
+          // ---- AND THE COINS PULL ON THE CHOICE --------------------------
+          //
+          // The pickups lying in this lane over the same `look` the mats
+          // use. A CHASE values each at a flat half-second-equivalent, which
+          // is not a price, it is an appetite -- big enough to pay an unread
+          // action or stand on unread paint for a fat trail, which is
+          // exactly the newcomer the abundance is built to engage. The
+          // honest policies use pickVal, priced above, which goes to zero as
+          // skill goes to one -- and PLAN, which knows the day, does not
+          // count a coin that sits in red paint.
+          if (pol.take !== 'none') {
+            let cnt = 0;
+            for (let j = li; j < loose.length && loose[j].z < look; j++) {
+              if (loose[j].lane !== l) continue;
+              if ((pol.take === 'plan' || pol.take === 'harvest') && course.tempoAt) {
+                const dm = course.tempoAt(loose[j].z, l);
+                if (dm && dm.dir < 0) continue;
+              }
+              cnt++;
+            }
+            cost -= cnt * (pol.take === 'chase' ? CHASE_VAL
+              : pol.take === 'harvest' ? 0.35 : pickVal);
+          }
           if (cost < bestCost) { bestCost = cost; best = l; }
         }
         lane = best === null ? 0 : best;
+      }
+      // The head of the trail is missed by a stranger who switched for it --
+      // see HEAD_MISS above. A learned line was already there.
+      if (lane !== prevLane && !pol.learned) {
+        missLane = lane; missBefore = g.z + HEAD_MISS;
       }
       const kind = g.lanes[lane];
 
       const demanded = kind !== Kk.CLEAR;
       if (demanded && rnd.next() >= skill) p.onHit();
-      else {
-        p.onClean();
-        // The bottle is bought at the gate, cleanly or not -- but a run that
-        // fell over is not in the lane any more, so only a cleared gate pays.
-        if (item) p.onAid(item.gain);
-      }
+      else p.onClean();
+      // The string is bought at the gate, cleanly or not -- the shipped rule
+      // (player.resolveAid pays the receipt either way, because a rescue that
+      // only paid the players who did not need rescuing is roadmap 40's
+      // defect). The fetch put the runner in the arc's lane, so the receipt
+      // matches whenever the fetch happened.
+      if (arc) for (const it of arc) p.onAid(it.gain);
     }
   }
   return p;

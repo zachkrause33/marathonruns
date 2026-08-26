@@ -8930,6 +8930,12 @@ MR.World = (function () {
      * closed cylinders, the lamps are lensed both ways.
      */
     function barricadeBoard(parts, w, h, y, z, d) {
+      // Segmented red/white, not diagonal. The diagonal version was built
+      // and photographed: box-stripes rotated across a 0.17 board read as
+      // white diamonds floating on red, not as paint -- a clipped diagonal
+      // needs per-stripe polygon clipping this merge idiom does not do.
+      // The segmented board is what two blind readers named 'a red-and-white
+      // striped sawhorse barricade' without hesitation, so it stays.
       const RED = 0xf0402f, WHITE = 0xfff6ea;
       const SEG = 9;
       for (let i = 0; i < SEG; i++) {
@@ -8954,6 +8960,10 @@ MR.World = (function () {
         parts.push(gl(cbx(0.16, 0.09, 0.52, sx * 0.92, 0.045, 0, WOOD_D, 0.02), GLOSS.matte));
         blinker(parts, sx * 0.92, 0.695, 0);
       }
+      // The middle post and its blinker: the reference's double-bar carries
+      // three, one per post (citylook-barricade-slalom, the near barricade).
+      parts.push(gl(cyl(0.062, 0.070, 0.64, 10, 0, 0.32, 0.02, WOOD), GLOSS.matte));
+      blinker(parts, 0, 0.675, 0.02);
       barricadeBoard(parts, 1.98, 0.17, 0.585, 0, 0.075);
       barricadeBoard(parts, 1.98, 0.17, 0.315, 0, 0.075);
       return merge(parts);

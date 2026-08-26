@@ -18498,9 +18498,15 @@ MR.World = (function () {
        * gameplay-shaped ever stands. The leaf drift is near-flat geometry in
        * dull browns, deliberately nowhere near the tempo mats' green.
        */
-      const MH_RIM = overRoad(0x8a877c, 1.06);
-      const MH_LID = overRoad(0x4c4a42, 0.74);
-      const MH_DOT = overRoad(0x5a584f, 0.88);
+      // Re-tuned after the blind road-items read: six frames, and the one
+      // uncertain mention was the cover ("solid ground or a thing that
+      // should have been avoided?"). The primary answers never flagged it,
+      // but the doubt is cheap to spend: the ladder now sits EXACTLY on the
+      // expansion joint's proven rungs (groove 0.80, lip 1.02) -- a family
+      // many reads have already passed over in silence.
+      const MH_RIM = overRoad(0x8a877c, 1.02);
+      const MH_LID = overRoad(0x4c4a42, 0.80);
+      const MH_DOT = overRoad(0x5a584f, 0.90);
       for (const [mx, mz, r] of [[-LANE / 2, -4.5, 0.34], [1.95, 7.5, 0.30]]) {
         parts.push(part(new THREE.CircleGeometry(r + 0.06, 14), MH_RIM, mx, 0.0042, mz, flat));
         parts.push(part(new THREE.CircleGeometry(r, 14), MH_LID, mx, 0.005, mz, flat));

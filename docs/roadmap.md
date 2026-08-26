@@ -6620,3 +6620,36 @@ get busier.
   blue band a tell, and the pixel hunt confirmed it. Warm asphalt family
   now (0x4a4840 at 0.80), same as the rest of the ladder. Shoot clean
   after each of the three.
+
+71b. **The citylook pass closes: what remains is identity, not deficit.** The
+  final reader gap list (verbatim on `blindread-citylook`,
+  `shots/blind/citylook/GAPLIST-iter2.md`) ranks fourteen differences between
+  our frame and the reference, and the top five are things this game is RIGHT
+  to differ on: a visible runner on foot against no character at all; a
+  marathon course with static works against lanes of moving traffic (refused
+  here three times with measurements); their coins against our aid; their
+  bare pavements against our crowd; their open road against our race
+  furniture. The reader's own closing line makes the point better than any
+  defence: the strongest tells "almost certainly distinguish a
+  dodge-traffic runner from a marathon on foot." That is the game telling a
+  stranger what it is from one frame, which is what identity means.
+
+  Of the nine quality items below those, the later milestones (M3 grunge and
+  warm fill, M8 lamp housings and the stepped-back towers, the warm joint
+  and barricade refinements after 71a) acted on the asphalt tone, the lamp
+  fixtures, the facade warmth and the weathering. What is left, stated as
+  the engine residuals the stopping rule asked for:
+
+  - **Readable signage density.** Their shop fascias carry legible, varied
+    text at close range; ours carry pattern. Canvas textures could push
+    further, at real draw-call and authoring cost per distinct sign.
+  - **Painted-texture richness** -- tire-wear striping on asphalt, per-wall
+    weathering variation, poster clutter. A 3D engine with procedural
+    surfaces approximates this; matching a hand-painted backdrop
+    pixel-for-pixel is the one thing it cannot do.
+  - **Sky softness.** Theirs is a painting; ours is a shader. Close, and the
+    remaining distance is brushwork.
+
+  Small actionable leftovers, cheap, unclaimed: manhole covers and road
+  debris; one or two more pavement prop kinds (their chalkboard cooler);
+  distant landscape silhouettes down the vanishing point on open legs.

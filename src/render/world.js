@@ -6128,6 +6128,72 @@ MR.World = (function () {
           parts.push(part(new THREE.PlaneGeometry(DASH_W, DASH_L), DASH_C, lx, 0.007, dz, flat));
         }
       }
+      /**
+       * ---- MANHOLES AND ROAD DEBRIS: THE STREET IS USED ------------------
+       *
+       * citylook-shopfronts carries a dark manhole/drain patch on the tarmac
+       * and small debris around it; ours was clinically clean, and the gap
+       * reader ranked it (GAPLIST-iter2 item 12). Manholes are PAINT -- a
+       * marking flush on the surface, no back, per the standing rule's one
+       * exception -- so they fold into this merged mesh at zero draw calls.
+       *
+       * THE ONE REAL TRAP, and why every number here is conservative: this
+       * road CARRIES MEANING. Mats own green and red, aid glows, hazards
+       * demand actions, and one contact ends a record attempt -- so anything
+       * laid on the tarmac must be provably not-a-signal. Therefore:
+       *
+       *   NEVER LANE-CENTRED. A telegraph mat is 1.41 wide, centred in its
+       *     lane. The covers sit ON the lane seam (x 0.85, where a real
+       *     road puts its ironwork) and in a wheel path (x 1.95), 0.34 and
+       *     0.30 radius -- a quarter of a mat's width, straddling or beside
+       *     the paint a mat never touches.
+       *   ASPHALT'S OWN FAMILY. Everything is overRoad() in the 0.72-1.10
+       *     band the expansion joints already occupy (groove 0.80, lip
+       *     1.02), near-neutral warm greys. Nothing green, nothing red,
+       *     nothing glowing, nothing near the mats' 1.25x/0.22S gate from
+       *     the other side.
+       *   BELOW THE PAINT. The dashes render at 2.35x, the edge lines at
+       *     1.80x; a cover at 0.74x is a stain-dark accent an order quieter
+       *     than any marking the player is asked to read.
+       *
+       * The debris is the brief's second half: small stones on the shoulder
+       * margin and a leaf drift against the kerb line. Stones are OBJECTS --
+       * tiny closed boxes, built on all sides by construction -- and they
+       * stay outside the carriageway edge line (x 2.85-3.45) where nothing
+       * gameplay-shaped ever stands. The leaf drift is near-flat geometry in
+       * dull browns, deliberately nowhere near the tempo mats' green.
+       */
+      const MH_RIM = overRoad(0x8a877c, 1.06);
+      const MH_LID = overRoad(0x4c4a42, 0.74);
+      const MH_DOT = overRoad(0x5a584f, 0.88);
+      for (const [mx, mz, r] of [[-LANE / 2, -4.5, 0.34], [1.95, 7.5, 0.30]]) {
+        parts.push(part(new THREE.CircleGeometry(r + 0.06, 14), MH_RIM, mx, 0.0042, mz, flat));
+        parts.push(part(new THREE.CircleGeometry(r, 14), MH_LID, mx, 0.005, mz, flat));
+        parts.push(part(new THREE.CircleGeometry(r * 0.55, 10), MH_DOT, mx, 0.0056, mz, flat));
+      }
+      // A faint dry stain off the second cover, the reference's dark patch at
+      // a tenth of its contrast: one value step below the tarmac, no hue.
+      parts.push(part(new THREE.CircleGeometry(0.52, 10), overRoad(0x5e5c54, 0.92),
+        2.35, 0.0035, 8.6, flat, 0, 0));
+      // Stones: closed boxes on the shoulder margin, outside the edge line.
+      const STONE = [0x8a877c, 0x6f6d64, 0x7c796e];
+      const STONES = [
+        [-3.05, -9.2, 0.09, 0], [-2.88, -8.8, 0.06, 1], [-3.30, 2.2, 0.07, 2],
+        [3.10, -1.6, 0.08, 1], [2.92, -1.2, 0.05, 0], [3.38, 10.4, 0.07, 2],
+      ];
+      for (const [sx2, sz2, ss, ci] of STONES) {
+        parts.push(bx(ss * 1.5, ss * 0.55, ss * 1.2, sx2, ss * 0.27, sz2,
+          overRoad(STONE[ci], 0.98), 0, sz2 * 0.7, 0));
+      }
+      // The leaf drift, swept against the kerb line: near-flat, dull browns.
+      const LEAF = [0x7d6a4c, 0x8a7550, 0x66584a];
+      for (let i = 0; i < 7; i++) {
+        const side = i < 4 ? -1 : 1;
+        const lz = side < 0 ? -6.4 + i * 0.55 : 4.9 + (i - 4) * 0.62;
+        const lxx = side * (3.42 - (i % 3) * 0.14);
+        parts.push(bx(0.16 + (i % 2) * 0.05, 0.018, 0.11 + (i % 3) * 0.04,
+          lxx, 0.012, lz, overRoad(LEAF[i % 3], 1.0), 0, i * 0.9, 0));
+      }
       return merge(parts);
     })();
 

@@ -6785,3 +6785,5 @@ full memo is **`docs/one-city-a-day.md`**; the finding in three lines:
 
 Fallback if the four-minute single vocabulary fails in play: two cities per
 day, pre-measured in the memo (H2), one seam per run, machinery already built.
+
+  Roadmap 73 DECIDED by the owner 2026-08-26: one city per day, via the shuffled bag.

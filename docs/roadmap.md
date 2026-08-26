@@ -6602,3 +6602,21 @@ citylook-vs-ours-street-2.png, citylook-vs-ours-cars.png,
 citylook-vs-ours-obstacles.png. Density is owed to course.js and was
 deliberately not touched -- the variant bag got deeper, the road did not
 get busier.
+
+### Roadmap 71a · Three refinements after the entry closed
+
+- **The drums' one collar** (f421908): at 25 units the lying drums' two
+  symmetric band pairs read to a fresh reader as "two striped upright
+  posts, around"; one off-centre collar per drum keeps the horizontal
+  silhouette unambiguous. Reader iteration five: OVER, sure, at all three
+  distances.
+- **The barricade's middle post** (fe4c5bd): the reference's double-bar
+  carries three posts and three blinkers; ours now does. The diagonal
+  stripe experiment was built, photographed, and refused -- at gameplay
+  scale the rotated stripe boxes shimmered against the board edges.
+- **The transverse joint drops its violet** (d58a836): the M4
+  neutralisation caught the longitudinal seam rail and left the heavy
+  expansion joint on 0x3c3a56 -- a fresh gap reader ranked the resulting
+  blue band a tell, and the pixel hunt confirmed it. Warm asphalt family
+  now (0x4a4840 at 0.80), same as the rest of the ladder. Shoot clean
+  after each of the three.

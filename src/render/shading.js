@@ -834,7 +834,7 @@ MR.shading = (function () {
     // tiles visibly -- the eye finds the grid immediately once the same shape
     // shows up four times across the frame.
     const puffs = [];
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < 12; i++) {
       const cx = rnd() * N, cy = rnd() * N;
       // Larger, lower cumulus: a reader read the old field as 'small,
       // wispy, high' against the reference's big soft bank at the horizon.
@@ -1096,10 +1096,10 @@ MR.shading = (function () {
       // top tenth of the frame, the largest single term in the sky; this keeps
       // the parallax it was added for and gives most of that back.
       vec4 lo = texture2D(cloudMap, p * 0.125 + vec2(0.41 + time * CLOUD_DRIFT * 0.55 * 0.125, 0.63));
-      col = mix(col, mix(col, lit, 0.55), smoothstep(0.34, 0.88, lo.a) * reach * 0.38);
+      col = mix(col, mix(col, lit, 0.55), smoothstep(0.26, 0.78, lo.a) * reach * 0.48);
 
       vec4 hi = texture2D(cloudMap, p * 0.300 + vec2(time * CLOUD_DRIFT * 0.300, 0.0));
-      col = mix(col, mix(shd, lit, smoothstep(0.35, 0.65, hi.r)), smoothstep(0.30, 0.82, hi.a) * reach);
+      col = mix(col, mix(shd, lit, smoothstep(0.35, 0.65, hi.r)), smoothstep(0.22, 0.70, hi.a) * reach);
 
       gl_FragColor = vec4(lin2srgb(col), 1.0);
     }`;

@@ -6628,6 +6628,16 @@ MR.World = (function () {
         parts.push(bx(1.18, 0.36, 0.56, sx * CANYON_HEAD_X, CANYON_HEAD_Y + 0.02, z, 0xffcf3d));
         parts.push(bx(0.86, 0.16, 0.44, sx * CANYON_HEAD_X, CANYON_HEAD_Y + 0.04, z - 0.09, 0xfff9c8));
         parts.push(bx(1.02, 0.14, 0.48, sx * CANYON_HEAD_X, CANYON_HEAD_Y - 0.20, z, 0xffab2e));
+        // THE DRAWN GLOW. Three readers running have said 'no visible glow',
+        // and a blended halo is the wrong tool against a bright sky (additive
+        // vanishes into it). The reference paints its glow as opaque shape,
+        // so ours is geometry in the same one-draw mesh: a 45-degree diamond
+        // burst behind the lens, a wider soft-amber underwash, and the bulb
+        // drop under the head. Unlit, fogged, y >= 12.5 so LOW/HIDES hold by
+        // construction.
+        parts.push(bx(0.74, 0.74, 0.40, sx * CANYON_HEAD_X, CANYON_HEAD_Y - 0.04, z + 0.04, 0xffbe33, 0, 0, Math.PI / 4));
+        parts.push(bx(1.44, 0.20, 0.50, sx * CANYON_HEAD_X, CANYON_HEAD_Y - 0.10, z, 0xffb42e));
+        parts.push(sph(0.15, 8, sx * CANYON_HEAD_X, CANYON_HEAD_Y - 0.36, z, 0xfff4b8));
       }
       return parts;
     }

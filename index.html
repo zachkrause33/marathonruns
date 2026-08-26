@@ -6578,7 +6578,7 @@ MR.shading = (function () {
     // tiles visibly -- the eye finds the grid immediately once the same shape
     // shows up four times across the frame.
     const puffs = [];
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < 12; i++) {
       const cx = rnd() * N, cy = rnd() * N;
       // Larger, lower cumulus: a reader read the old field as 'small,
       // wispy, high' against the reference's big soft bank at the horizon.
@@ -6840,10 +6840,10 @@ MR.shading = (function () {
       // top tenth of the frame, the largest single term in the sky; this keeps
       // the parallax it was added for and gives most of that back.
       vec4 lo = texture2D(cloudMap, p * 0.125 + vec2(0.41 + time * CLOUD_DRIFT * 0.55 * 0.125, 0.63));
-      col = mix(col, mix(col, lit, 0.55), smoothstep(0.34, 0.88, lo.a) * reach * 0.38);
+      col = mix(col, mix(col, lit, 0.55), smoothstep(0.26, 0.78, lo.a) * reach * 0.48);
 
       vec4 hi = texture2D(cloudMap, p * 0.300 + vec2(time * CLOUD_DRIFT * 0.300, 0.0));
-      col = mix(col, mix(shd, lit, smoothstep(0.35, 0.65, hi.r)), smoothstep(0.30, 0.82, hi.a) * reach);
+      col = mix(col, mix(shd, lit, smoothstep(0.35, 0.65, hi.r)), smoothstep(0.22, 0.70, hi.a) * reach);
 
       gl_FragColor = vec4(lin2srgb(col), 1.0);
     }`;
@@ -18726,6 +18726,16 @@ MR.World = (function () {
         parts.push(bx(1.18, 0.36, 0.56, sx * CANYON_HEAD_X, CANYON_HEAD_Y + 0.02, z, 0xffcf3d));
         parts.push(bx(0.86, 0.16, 0.44, sx * CANYON_HEAD_X, CANYON_HEAD_Y + 0.04, z - 0.09, 0xfff9c8));
         parts.push(bx(1.02, 0.14, 0.48, sx * CANYON_HEAD_X, CANYON_HEAD_Y - 0.20, z, 0xffab2e));
+        // THE DRAWN GLOW. Three readers running have said 'no visible glow',
+        // and a blended halo is the wrong tool against a bright sky (additive
+        // vanishes into it). The reference paints its glow as opaque shape,
+        // so ours is geometry in the same one-draw mesh: a 45-degree diamond
+        // burst behind the lens, a wider soft-amber underwash, and the bulb
+        // drop under the head. Unlit, fogged, y >= 12.5 so LOW/HIDES hold by
+        // construction.
+        parts.push(bx(0.74, 0.74, 0.40, sx * CANYON_HEAD_X, CANYON_HEAD_Y - 0.04, z + 0.04, 0xffbe33, 0, 0, Math.PI / 4));
+        parts.push(bx(1.44, 0.20, 0.50, sx * CANYON_HEAD_X, CANYON_HEAD_Y - 0.10, z, 0xffb42e));
+        parts.push(sph(0.15, 8, sx * CANYON_HEAD_X, CANYON_HEAD_Y - 0.36, z, 0xfff4b8));
       }
       return parts;
     }

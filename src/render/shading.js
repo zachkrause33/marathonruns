@@ -1096,10 +1096,10 @@ MR.shading = (function () {
       // top tenth of the frame, the largest single term in the sky; this keeps
       // the parallax it was added for and gives most of that back.
       vec4 lo = texture2D(cloudMap, p * 0.125 + vec2(0.41 + time * CLOUD_DRIFT * 0.55 * 0.125, 0.63));
-      col = mix(col, mix(col, lit, 0.55), smoothstep(0.26, 0.78, lo.a) * reach * 0.48);
+      col = mix(col, mix(col, lit, 0.55), smoothstep(0.24, 0.74, lo.a) * reach * 0.54);
 
       vec4 hi = texture2D(cloudMap, p * 0.300 + vec2(time * CLOUD_DRIFT * 0.300, 0.0));
-      col = mix(col, mix(shd, lit, smoothstep(0.35, 0.65, hi.r)), smoothstep(0.22, 0.70, hi.a) * reach);
+      col = mix(col, mix(shd, lit, smoothstep(0.35, 0.65, hi.r)), smoothstep(0.15, 0.60, hi.a) * reach);
 
       gl_FragColor = vec4(lin2srgb(col), 1.0);
     }`;
@@ -1373,7 +1373,7 @@ MR.shading = (function () {
     // there.
     // A touch more golden for the citylook pass (reader: 'golden-hour
     // building tones' in the reference against our 'grayish-brick').
-    const key = new THREE.DirectionalLight(0xffeeca, 2.30);
+    const key = new THREE.DirectionalLight(0xffeeca, 2.50);
     key.position.set(5.0, 15.0, -9.0);
 
     // The fill flips with it: it now aims DOWN the camera axis from behind

@@ -614,7 +614,7 @@ MR.World = (function () {
   const SETTING_LOOK = {
 
     BOSTON: {
-      sky: [0x4c8cc2, 0xcceaf6], fog: 0xcfe6f2, ground: 0x86b45a, road: 0x66665e,
+      sky: [0x4c8cc2, 0xc7ecee], fog: 0xcae8ed, ground: 0x86b45a, road: 0x66665e,
       water: 0x3f7fae, edge: 0xf4ece0,
       terrace: {
         colors: [0xb8664a, 0xc8785a, 0xa65a44, 0xd89a70, 0xbc7862],
@@ -634,7 +634,7 @@ MR.World = (function () {
     },
 
     LONDON: {
-      sky: [0x5590be, 0xd8ecf4], fog: 0xd6e4f0, ground: 0x5fbf6b, road: 0x65655e,
+      sky: [0x5590be, 0xceedec], fog: 0xcfe7eb, ground: 0x5fbf6b, road: 0x65655e,
       water: 0x5a8fa8, edge: 0xffe8e8,
       terrace: {
         colors: [0xf0e2c4, 0xe0d0ac, 0xb86048, 0xf6ecd4, 0xc4ae8c],
@@ -654,7 +654,7 @@ MR.World = (function () {
     },
 
     BERLIN: {
-      sky: [0x5288c0, 0xd4e8f6], fog: 0xc8dcf5, ground: 0x69c46e, road: 0x66665e,
+      sky: [0x5288c0, 0xcceaee], fog: 0xc5e1ef, ground: 0x69c46e, road: 0x66665e,
       water: 0x4f86ae, edge: 0xeef0ff,
       terrace: {
         colors: [0xe8d8b8, 0xd4c0a0, 0xe0c8a0, 0xc4b090, 0xf2e6cc],
@@ -674,7 +674,7 @@ MR.World = (function () {
     },
 
     CHICAGO: {
-      sky: [0x4680b6, 0xb4d8e8], fog: 0xa8cde0, ground: 0x63b46a, road: 0x65665f,
+      sky: [0x4680b6, 0xb8e0e5], fog: 0xafd7e0, ground: 0x63b46a, road: 0x65665f,
       water: 0x3f7fa8, edge: 0xe4e8f4,
       terrace: {
         colors: [0xb0a084, 0xa09076, 0xc0ac8e, 0x8f8a58, 0xc8b89c],
@@ -694,7 +694,7 @@ MR.World = (function () {
     },
 
     NEWYORK: {
-      sky: [0x4e88c0, 0xc8e6f4], fog: 0xbdd8ee, ground: 0x63c96b, road: 0x66655e,
+      sky: [0x4e88c0, 0xc5e9ec], fog: 0xbedfea, ground: 0x63c96b, road: 0x66655e,
       water: 0x3d7ba6, edge: 0xfff0dc,
       terrace: {
         colors: [0xa8604a, 0xc07656, 0x965640, 0xd08c66, 0xb06e52],
@@ -735,7 +735,7 @@ MR.World = (function () {
     },
 
     SYDNEY: {
-      sky: [0x4f9cc8, 0xd8f2f8], fog: 0xd8f4ff, ground: 0x7fc86a, road: 0x64665c,
+      sky: [0x4f9cc8, 0xcef0ef], fog: 0xd0f2f6, ground: 0x7fc86a, road: 0x64665c,
       water: 0x2fa8d8, edge: 0xfff4e0,
       terrace: {
         colors: [0xe8bc8a, 0xb8603e, 0xf0d8a8, 0xd88a62, 0xf4e6c6],
@@ -755,7 +755,7 @@ MR.World = (function () {
     },
 
     PARIS: {
-      sky: [0x5c8cbe, 0xe2ecf4], fog: 0xe0dfe8, ground: 0x6fc274, road: 0x67655e,
+      sky: [0x5c8cbe, 0xd5edec], fog: 0xd6e4e6, ground: 0x6fc274, road: 0x67655e,
       water: 0x6a94a8, edge: 0xf4f0e4,
       terrace: {
         colors: [0xecdebc, 0xe0d0ac, 0xf4e8c8, 0xd4c2a0, 0xe8dab6],
@@ -775,7 +775,7 @@ MR.World = (function () {
     },
 
     VALENCIA: {
-      sky: [0x4f98cc, 0xe6f6fc], fog: 0xe8f6ff, ground: 0x8fc45f, road: 0x67655e,
+      sky: [0x4f98cc, 0xd7f3f1], fog: 0xdcf4f6, ground: 0x8fc45f, road: 0x67655e,
       water: 0x30b0d0, edge: 0xfff8e8,
       terrace: {
         colors: [0xfff2d4, 0xf4e4c0, 0xffe8c4, 0xe8d8b8, 0xfff8e4],
@@ -795,7 +795,7 @@ MR.World = (function () {
     },
 
     AMSTERDAM: {
-      sky: [0x528cc0, 0xd6ecf6], fog: 0xcfe6f4, ground: 0x5fc07a, road: 0x65655e,
+      sky: [0x528cc0, 0xcdedee], fog: 0xcae8ee, ground: 0x5fc07a, road: 0x65655e,
       water: 0x4f7f96, edge: 0xf0ece0,
       terrace: {
         colors: [0x8a5040, 0x9c5e48, 0x745448, 0xa86e58, 0x64483e],
@@ -835,7 +835,7 @@ MR.World = (function () {
     },
 
     CAPETOWN: {
-      sky: [0x4a90ca, 0xe2f2fc], fog: 0xdff0ff, ground: 0x9fb05a, road: 0x65665e,
+      sky: [0x4a90ca, 0xd5f0f1], fog: 0xd5eff6, ground: 0x9fb05a, road: 0x65665e,
       water: 0x2f9fd8, edge: 0xfff2e4,
       // Bo-Kaap: the one street in the world painted in flat saturated blocks,
       // and the cheapest possible way to say "Cape Town" at a hundred units.
@@ -1559,7 +1559,7 @@ MR.World = (function () {
    * failure the JUMP chevron block was measured at. One colour per awning, with
    * the fascia one step darker, which is the part that survives.
    */
-  const AWNING = [0xd8503f, 0x2f8090, 0x3f8452, 0x9a4f7f, 0xc07a2a, 0x4f5f9a];
+  const AWNING = [0xe0563c, 0x2f9ca8, 0x3fa05c, 0xb85a8c, 0xd88a30, 0x5a74c0];
 
   // ======================================================================
   //  PARAMETRIC VOCABULARY
@@ -5658,7 +5658,7 @@ MR.World = (function () {
     // the frame around it -- the same job the brown ballast does in the
     // reference. It is only 1.2 units wide a side, so it costs the play surface
     // nothing in the "lightest large mass" reckoning.
-    const ROAD_MARGIN = 0xd0d0d0;
+    const ROAD_MARGIN = 0xd2cec2;
 
     // The longitudinal marks. The lane seam is a two-level ladder -- a rail
     // that runs the whole tile and a bead that rides it every PAVE_JOINT -- and
@@ -5811,8 +5811,8 @@ MR.World = (function () {
      * to the end, and the frame at the end of it was rejected by the person
      * this game is being built for.
      */
-    const SEAM_RAIL = overRoad(0x8f8d92, 1.28);
-    const SEAM_BEAD = overRoad(0xfff6d8, 1.50);   // HELD -- see the hue note above
+    const SEAM_RAIL = overRoad(0x8f8d92, 1.10);
+    const SEAM_BEAD = overRoad(0xfff6d8, 1.32);   // HELD -- see the hue note above
     const EDGE_LINE = overRoad(0xbab8b2, 1.80);
 
     // The kerb-notch period, and now the road-bead period too. Declared here
@@ -6511,7 +6511,7 @@ MR.World = (function () {
     const CANYON_PAVE_W = 5.55;   // kerb outer edge 3.92 -> 9.47: covers the deepest 0.62 bay step-back
     const CANYON_LAMP_TOP = 10.2;
     const CANYON_HEAD_X = 1.9;
-    const CANYON_HEAD_Y = 13.0;
+    const CANYON_HEAD_Y = 12.55;
     function canyonLamp(parts, sx, z, post, head) {
       parts.push(bx(0.26, CANYON_LAMP_TOP, 0.26, sx * POLE_X, CANYON_LAMP_TOP / 2, z, post));
       // Quarter-arc arm from the post top in and up to the head, three boxes,
@@ -8975,7 +8975,7 @@ MR.World = (function () {
     const jumpDrumGeo = (function () {
       const BODY = 0x16181f, RIB = 0x272b36, LID = 0x1e222c, BAND = 0xf4eedd;
       const parts = [];
-      for (const [dx, dz, ry] of [[-0.52, 0.10, 0.3], [0.10, -0.06, 1.2]]) {
+      for (const [dx, dz, ry] of [[-0.72, 0.06, 0.3], [0.02, -0.04, 1.2], [0.76, 0.10, 2.1]]) {
         parts.push(gl(cyl(0.345, 0.345, 0.78, 12, dx, 0.39, dz, BODY, 0, ry, 0), GLOSS.trim));
         parts.push(gl(cyl(0.352, 0.352, 0.05, 12, dx, 0.20, dz, RIB), GLOSS.trim));
         parts.push(gl(cyl(0.352, 0.352, 0.05, 12, dx, 0.44, dz, RIB), GLOSS.trim));
@@ -8983,15 +8983,17 @@ MR.World = (function () {
         parts.push(gl(cyl(0.30, 0.30, 0.02, 12, dx, 0.782, dz, LID), GLOSS.trim));
         parts.push(gl(cyl(0.045, 0.045, 0.02, 8, dx + 0.16, 0.787, dz, RIB), GLOSS.chrome));
       }
-      // The tipped drum, lying across the lane's right half, band outboard.
-      parts.push(gl(cyl(0.33, 0.33, 0.72, 12, 0.72, 0.334, 0.02, BODY, 0, 0, Math.PI / 2), GLOSS.trim));
-      parts.push(gl(cyl(0.336, 0.336, 0.05, 12, 0.48, 0.338, 0.02, RIB, 0, 0, Math.PI / 2), GLOSS.trim));
-      parts.push(gl(cyl(0.336, 0.336, 0.15, 12, 0.92, 0.338, 0.02, BAND, 0, 0, Math.PI / 2), GLOSS.paint));
-      parts.push(gl(cyl(0.29, 0.29, 0.02, 12, 1.085, 0.338, 0.02, LID, 0, 0, Math.PI / 2), GLOSS.trim));
+      // THREE UPRIGHT, NOT TWO-AND-A-TIPPED. The tipped drum's end-on
+      // circle read to a blind reader as 'a black rolled mat' and drew
+      // AROUND -- a lethal misread on a jumpable object. Three standing
+      // drums in a row is the composition the cones already prove readable,
+      // and a row of flat-topped waist-high cylinders says OVER.
       // The leak: paint on the road, no back, because it is not an object.
-      parts.push(part(new THREE.CircleGeometry(0.32, 10), 0x14121a, 0.62, 0.006, 0.14, -Math.PI / 2));
-      parts.push(part(new THREE.CircleGeometry(0.18, 8), 0x14121a, 0.28, 0.006, 0.02, -Math.PI / 2));
-      blinker(parts, -0.98, 0.06, -0.30);
+      parts.push(part(new THREE.CircleGeometry(0.30, 10), 0x14121a, 0.40, 0.006, 0.20, -Math.PI / 2));
+      parts.push(part(new THREE.CircleGeometry(0.17, 8), 0x14121a, -0.28, 0.006, 0.30, -Math.PI / 2));
+      // The blinker rides a short post at the row's end, works-style.
+      parts.push(gl(bx(0.06, 0.30, 0.06, -1.02, 0.15, -0.34, 0x8a5a2c), GLOSS.matte));
+      blinker(parts, -1.02, 0.32, -0.34);
       return merge(parts);
     })();
 
@@ -9029,23 +9031,23 @@ MR.World = (function () {
      * closed solids; the loose sheet on the road is paint.
      */
     const jumpTrashGeo = (function () {
-      const BAG = 0x1e2438, BAG_HI = 0x2b3350, CARD = 0x6e5430, CARD_D = 0x54401f;
+      const BAG = 0x141a2c, BAG_HI = 0x1f2740, CARD = 0x574023, CARD_D = 0x3f2e15;
       const parts = [];
       // Two cardboard boxes, one turned, one open-flapped.
-      parts.push(gl(cbx(0.74, 0.50, 0.56, -0.55, 0.25, 0.05, CARD, 0.03, 0, 0.25), GLOSS.matte));
-      parts.push(gl(cbx(0.52, 0.36, 0.44, 0.06, 0.58, -0.02, CARD, 0.03, 0, -0.35), GLOSS.matte));
-      parts.push(gl(cbx(0.16, 0.03, 0.42, 0.27, 0.745, -0.02, CARD_D, 0.01, 0, -0.35, 0.35), GLOSS.matte));
+      parts.push(gl(cbx(0.78, 0.42, 0.58, -0.60, 0.21, 0.05, CARD, 0.03, 0, 0.25), GLOSS.matte));
+      parts.push(gl(cbx(0.54, 0.30, 0.46, 0.06, 0.42, -0.02, CARD, 0.03, 0, -0.35), GLOSS.matte));
+      parts.push(gl(cbx(0.16, 0.03, 0.44, 0.28, 0.575, -0.02, CARD_D, 0.01, 0, -0.35, 0.35), GLOSS.matte));
       // The bags: squashed spheres, a family of three sizes.
-      parts.push(gl(sph(0.38, 8, 0.55, 0.38, 0.08, BAG), GLOSS.trim));
-      parts.push(gl(sph(0.33, 8, -0.05, 0.33, 0.15, BAG_HI), GLOSS.trim));
-      parts.push(gl(sph(0.28, 7, 0.80, 0.28, -0.14, BAG), GLOSS.trim));
-      parts.push(gl(sph(0.24, 7, -0.86, 0.24, -0.08, BAG_HI), GLOSS.trim));
-      parts.push(gl(sph(0.20, 6, 0.30, 0.20, 0.28, BAG), GLOSS.trim));
+      parts.push(gl(sph(0.30, 8, 0.58, 0.30, 0.08, BAG), GLOSS.trim));
+      parts.push(gl(sph(0.27, 8, -0.05, 0.27, 0.16, BAG_HI), GLOSS.trim));
+      parts.push(gl(sph(0.24, 7, 0.86, 0.24, -0.14, BAG), GLOSS.trim));
+      parts.push(gl(sph(0.22, 7, -0.88, 0.22, -0.08, BAG_HI), GLOSS.trim));
+      parts.push(gl(sph(0.18, 6, 0.30, 0.18, 0.30, BAG), GLOSS.trim));
       // Knot ears on the two big bags.
-      parts.push(gl(sph(0.07, 5, 0.55, 0.72, 0.08, BAG_HI), GLOSS.matte));
-      parts.push(gl(sph(0.06, 5, -0.05, 0.64, 0.15, BAG), GLOSS.matte));
+      parts.push(gl(sph(0.07, 5, 0.58, 0.62, 0.08, BAG_HI), GLOSS.matte));
+      parts.push(gl(sph(0.06, 5, -0.05, 0.56, 0.16, BAG), GLOSS.matte));
       // A loose flattened sheet: paint, not an object.
-      parts.push(part(new THREE.CircleGeometry(0.20, 8), 0x8a8474, -0.85, 0.006, 0.24, -Math.PI / 2));
+      parts.push(part(new THREE.CircleGeometry(0.18, 8), 0x6e6a5c, -0.85, 0.006, 0.24, -Math.PI / 2));
       return merge(parts);
     })();
 
@@ -13070,7 +13072,7 @@ MR.World = (function () {
      * arm's length and see every face.
      */
     const blockContainerGeo = (function () {
-      const RUST = 0xa04a30, RUST_D = 0x7c3620, RUST_HI = 0xb85e3c, CAST = 0x5a281a;
+      const RUST = 0xb04a2a, RUST_D = 0x842f1a, RUST_HI = 0xc65e36, CAST = 0x571f12;
       const parts = [
         // Two skid rails, then the box standing on them.
         gl(hbx(0.30, 0.10, 3.66, -0.70, 0.05, 0, CAST), GLOSS.matte),

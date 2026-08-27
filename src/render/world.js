@@ -18541,7 +18541,27 @@ MR.World = (function () {
         }
         activeGates.push({ gate, objs });
       }
-      while (activeGates.length && activeGates[0].gate.z < back) {
+      // A gate releases when it is BEHIND -- but "it" is the gate LINE, and a
+      // train is one gate carrying up to 60.1 units of vehicle FORWARD of
+      // that line (2 * halfZ * (1 + span*0.9), nose-anchored; ROOF_SPAN_MAX
+      // is 16), while BEHIND is 34. So on the deeper trains there are up to
+      // 26 units of deck where the gate line has crossed the threshold and
+      // the rider has not: the pool reclaimed the lorry from under his feet,
+      // leaving him running on the invisible-but-solid course data until the
+      // dismount. Reported by the owner from a phone, mid-ride; measured at
+      // 128 of 796 on-deck half-units on the day it was fixed, the first
+      // hole opening at 34.1 units in -- the BEHIND line to the sample.
+      // So a train's release waits for its TAIL: the whole vehicle is
+      // 2*halfZ*(1 + train*0.9) deep (the claim site's own arithmetic), and
+      // that depth is added to the gate line before it is compared.
+      // Non-train gates add nothing and keep their exact timing.
+      // FIFO stays sound: a short gate queued behind a long train waits a
+      // beat longer than it strictly needs, which costs a pool slot for a
+      // second and nothing else.
+      const trainDepth = (gate) =>
+        gate.train ? 2 * MR.Collision.BOX[K.BLOCK].halfZ * (1 + gate.train * 0.9) : 0;
+      while (activeGates.length
+          && activeGates[0].gate.z + trainDepth(activeGates[0].gate) < back) {
         const g = activeGates.shift();
         for (let l = 0; l < 3; l++) if (g.objs[l]) releaseHazard(g.gate.lanes[l], g.objs[l]);
       }

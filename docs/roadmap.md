@@ -7019,3 +7019,58 @@ onecity-val-* (the thin city, full course), onecity-rome-* (the rich case),
 onecity-ams-mill, onecity-cpt-light, onecity-cpt-stad (the new pieces),
 onecity-endcard and onecity-endcard-burst (the leg verdict, silent and
 speaking).
+
+## Roadmap 76 · Two bugs from the owner's phone: the pop in the lens, the lorry gone underfoot
+
+Both found by the owner playing on a phone, neither by the gate suite, and
+the pattern of why is the same both times: every instrument was aimed
+elsewhere.
+
+**The pop** ("when you collect the fuel it flies in your face so you can't
+see"): the collect animation lifted the item toward the lens with a 1.55x
+swell, and its own comment claimed the climb PREVENTED blinding. At the old
+economy's density it was rare; at ~585 pickups it was near-permanent. The
+rule had outlived its reason -- the fourth recorded instance of that
+failure. Replaced with a collapse-and-sink: the item shrinks and drops out
+of frame instead of crossing the eye line at maximum angular size. Shipped
+in 825eb6a / 8f4d8c7, deployed as label sinking-pop.
+
+**The lorry** ("when on top of of a vehicle, halfway across it the vehicle
+disappears before jumping off"): the pool-release loop in world.js compared
+the gate LINE against the reclaim threshold, `gate.z < z - BEHIND` with
+BEHIND = 34 -- and a train is one gate carrying up to 60.1 units of vehicle
+nose-anchored FORWARD of that line (2*halfZ*(1 + span*0.9), ROOF_SPAN_MAX
+16). The deeper decks therefore had up to 26 units of ride past the point
+where the pool had already reclaimed the mesh: the runner ran on the
+invisible-but-solid course data until the dismount. Fixed by making a
+train's release wait for its TAIL -- the vehicle's full depth, computed by
+the claim site's own arithmetic, is added to the gate line before the
+comparison. Non-train gates add nothing and keep their exact timing.
+
+**Why the suite missed it, and the new instrument:** deckdrop imposes its
+deck (resolveDeck stubbed, surface written directly -- "THE WORLD DOES NOT
+KNOW"), so no gate ever asked whether the world keeps the vehicle itself
+alive for as long as someone can stand on it. `tools/ridehold.js` now asks
+exactly that: it freezes the game loop, hand-drives the real
+world.update(z, lane) down the whole course in half-unit steps, and fails
+if any train gate leaves liveCast() while z is within its deck. The first
+draft of the probe waited for ?bot=1 to ride a ramp and collected zero deck
+samples -- the same aiming defect deckdrop documents -- so the shipped tool
+causes the observation instead of hoping for it.
+
+**The instrument audited before it was believed, per the standing rule:**
+against the pre-fix build ridehold reports 128 vanished-underfoot samples
+of 796 -- the first at 34.1 units into a 53-unit deck, the BEHIND line to
+the sample; the worst at 59.9 of 60.1 units, a lorry gone for its last 26
+units of deck. Against the fixed build: 0 of 796, same 21 trains, same 796
+samples. And the audit corrected this entry's own author once already: the
+fix's first comment said "up to sixty units", was "corrected" to 42.5 from
+RAMP_SPAN_MAX -- and ridehold's `deepest 60.1` showed the sixty was right,
+because roof trains draw from ROOF_SPAN_MAX = 16, not RAMP_SPAN_MAX = 11. A
+number nobody measured, again.
+
+**Corrections list, continued:**
+27. The release loop treated a nose-anchored 60-unit train as a plane at
+    its gate line -- the same box-vs-plane error course.js's reachOf was
+    written for, made independently on the render side. The two sides now
+    agree: depth is charged everywhere a hazard is compared to a z.

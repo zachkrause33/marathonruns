@@ -30999,19 +30999,31 @@ MR.World = (function () {
             activeAid.splice(i, 1);
             continue;
           }
-          // Punch out, then away. Scale and lift only: a fade would need a
-          // material per item, and transparent surfaces are the one thing this
-          // renderer genuinely cannot spare.
+          // Punch out, then away. Scale only: a fade would need a material per
+          // item, and transparent surfaces are the one thing this renderer
+          // genuinely cannot spare.
           //
-          // It climbs, and climbs fast. Collection happens at the runner's own
-          // z with the camera four units behind, so the pop goes off almost at
-          // the lens: a burst that swelled in place would sit across the road
-          // the player is reading. Lifting it out of the road read in the first
-          // tenth is what makes it a flourish instead of a blindfold -- and the
-          // swell is kept to 1.35, which is noticed rather than looked at.
-          const s = (1 + 0.55 * Math.sin(Math.PI * t)) * (1 - t * t);
-          e.obj.scale.setScalar(Math.max(0.001, s));
-          e.obj.position.y = e.y0 + 3.4 * Math.sqrt(t);
+          // THE POP USED TO CLIMB, AND THE CLIMB WAS THE BLINDFOLD. The old
+          // flourish lifted the item 3.4 units on a square-root curve while
+          // swelling it to 1.55x, on the reasoning that rising "out of the
+          // road read" cleared the view. It did the opposite, and the owner
+          // photographed it: collection happens at the runner's own z with
+          // the camera four units behind and its eye at 3.1, so a rising item
+          // crosses the eye line exactly where its angular size is largest --
+          // bottle, pool disc and all, dead centre of the frame, hiding the
+          // road at the one moment a trail-following player is mid-decision.
+          // Under the scarce economy that was a rare flash; at ~585 pickups a
+          // race it was a near-permanent obstruction.
+          //
+          // So the pop now does the opposite of climbing: it collapses fast
+          // and sinks. The item shrinks to nothing in the first third of the
+          // slot, drifts DOWN from hip height, and the camera simply passes
+          // over the spot -- at race speed the lens overruns the item's z in
+          // about a tenth of a second, so below the eye line means below the
+          // frame. No swell: a thing being absorbed should get smaller.
+          const s = Math.max(0.001, 1 - t / 0.35);
+          e.obj.scale.setScalar(s);
+          e.obj.position.y = e.y0 - 0.9 * t;
           e.obj.rotation.y += 0.3;
         }
       }

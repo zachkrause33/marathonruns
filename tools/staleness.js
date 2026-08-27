@@ -27,7 +27,7 @@
  *   shape      the gate as a SHAPE -- which lanes hold what -- independent of
  *              which skin is painted on it
  *   mile       per-mile density, and the freshness curve that says WHERE
- *   legs       the six biomes and the three-or-four settings
+ *   legs       the six biomes and the day's one city (a 12-day bag since roadmap 73)
  *
  * ---- HOW THIS INSTRUMENT COULD HAVE BEEN WRONG, AND WHAT STOPS IT ---------
  *
@@ -956,7 +956,10 @@ function shapeFreshness(shapes, skill, W) {
   const nset = days.map(function (d) { return d.settings.length; });
   const setCount = {};
   for (const d of days) for (const s of d.settings) setCount[s.tag] = (setCount[s.tag] || 0) + 1;
-  console.log('settings per run  ' + f2(mean(nset)) + '  (3 or 4 drawn from ' + Object.keys(setCount).length + ' seen)');
+  // One per run since the one-city bag deal (roadmap 73); printed as a
+  // measurement rather than restated, so a future change shows up here.
+  console.log('settings per run  ' + f2(mean(nset)) + '  (one city a day, dealt from a 12-day bag; '
+    + Object.keys(setCount).length + ' seen in this sample)');
   console.log('');
 
   if (JSON_OUT) {

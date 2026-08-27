@@ -35,9 +35,11 @@
  * is a more dangerous object than a red one." The same sentence is true with
  * "course" replaced by "calendar" and nobody had written it down.
  *
- * The calendar is worse than the course, because the course generator draws
- * 3-4 named settings per day out of twelve. WHOLE SET PIECES ONLY EXIST ON
- * SOME DAYS -- the viaduct that prompted this appears on 66 of 365 -- so a
+ * The calendar is worse than the course, because the course generator deals
+ * ONE named setting per day out of twelve (a 12-day bag since roadmap 73; it
+ * drew 3-4 per day before). WHOLE SET PIECES ONLY EXIST ON SOME DAYS -- a
+ * city's pieces now appear on ~30 days of 365, though each such day shows
+ * 100% of that city's beats where the old draw showed ~40% -- so a
  * single-date harness cannot see most of the game's content however many
  * skips it takes. tools/motion.js hit the identical wall and grew --date.
  *
@@ -73,28 +75,51 @@
  * setting draws different content depending on which biome leg it lands on --
  * CHICAGO on a RIVERSIDE leg is the quay and the crane, CHICAGO on PARKLAND is
  * not -- so the unit is the (setting, biome) PAIR. There are 12 x 6 = 72 of
- * them and all 72 occur within a year. Walking the prefix:
+ * them and all 72 occur within a year.
+ *
+ * RE-MEASURED FOR THE ONE-CITY DEAL (roadmap 73), old and new stated per
+ * rule 3. Under the 3-4-city draw the prefix saturated at 32 days:
  *
  *      8 days   11/12 settings   45/72 pairs
  *     16 days   12/12 settings   65/72 pairs
- *     24 days   12/12 settings   69/72 pairs
- *     32 days   12/12 settings   72/72 pairs      <- saturates here
- *     90 days   12/12 settings   72/72 pairs
+ *     32 days   12/12 settings   72/72 pairs      <- the old saturation point
  *
- * 32 is therefore the smallest prefix that stands on every piece of ground the
- * game can generate, and it is where the default sits. CONFIRMED BY THE RUN,
- * not just by the plan: the default reaches 12/12 settings, 72/72 pairs and 91
- * distinct named objects, against the 92 a full 365-day walk finds. The tool
- * prints all three on every run, pass or fail, so the claim is checkable
- * against the run rather than against this comment -- which is the failure
- * mode docs/roadmap.md lists four times.
+ * Under one city a day, a day covers its city times all six biomes = 6 pairs
+ * at once, and the bag deals every city exactly once per ALIGNED 12-day
+ * cycle -- but a prefix starting on an arbitrary date straddles two shuffles,
+ * so its saturation is bounded by the worst repeat gap (23 days), not by 12.
+ * Walked from 2026-01-01 with the shipped generator:
  *
- * WHAT A 32-DAY PREFIX STILL MISSES, and it is one object in 365 days: the
- * census gains its 92nd name somewhere past day 32. A sample sized on
- * (setting, biome) pairs is not the same as one sized on every prop the
- * generator can place, and the honest position is that --full exists, costs 17
- * minutes, and should be run when world.js changes rather than every time
- * anything does.
+ *      8 days    8/12 settings   48/72 pairs
+ *     12 days   10/12 settings   60/72 pairs
+ *     16 days   12/12 settings   72/72 pairs      <- saturates at day 15
+ *     32 days   12/12 settings   72/72 pairs
+ *
+ * AND ONE CLAIM THE DECISION MEMO GOT WRONG, recorded so nobody restates it:
+ * "all 72 pairs in any 12-day window" is only true of windows ALIGNED to the
+ * bag's own cycle (measured: 30/30 aligned cycles cover 12/12 cities; the
+ * worst SLIDING 12-day window covers 42/72 pairs, because it takes the tail
+ * of one shuffle and the head of the next).
+ *
+ * THE DEFAULT STAYS AT 32, deliberately. It saturates the pairs from ANY
+ * epoch date -- 23 days is the worst-case bound and 32 clears it -- and the
+ * days past saturation are not waste: with the pairs this cheap to cover,
+ * gate LAYOUTS are the axis the sample is thin on, and 32 days of layouts is
+ * what the RACE/WALK split was already sized against. CONFIRMED BY THE RUN,
+ * not just by the plan: the default reaches 12/12 settings and 72/72 pairs,
+ * and the tool prints both on every run, pass or fail, so the claim is
+ * checkable against the run rather than against this comment -- which is the
+ * failure mode docs/roadmap.md lists four times.
+ *
+ * WHAT A 32-DAY PREFIX STILL MISSES: the named-object census is sized on
+ * every prop the generator can place, not on (setting, biome) pairs, and a
+ * name can hide past day 32 (under the old draw the census gained its last
+ * name somewhere past the default). Measured on the day this comment was
+ * re-cut: the default's 26 walked days census 100 distinct names, every
+ * city-exclusive set piece appearing exactly twice -- its city's two days
+ * in the prefix. The honest position is unchanged: --full exists, costs
+ * ~17 minutes, and should be run when world.js changes rather than every
+ * time anything does.
  *
  * ---- TWO LAYERS, AND WHAT EACH ONE GUARANTEES ----------------------------
  *

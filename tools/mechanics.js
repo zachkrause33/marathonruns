@@ -186,7 +186,20 @@ console.log(`\n=== identity: flags off must be the generator that shipped ===\n`
 // It was e9f8d87fa92e7a5d62a89f660964441e8c227a45; re-taken same-day, in its
 // own commit, with the density change measured either side (hazards/mi 16.10
 // -> 17.23, first-attempt sweep held at 6 of 30). Recorded in docs/roadmap.md.
-const BASELINE_GATES = '95e55c3cdbae17988b36ca57aa8f0a59f480b618';
+//
+// ---- RE-TAKEN A THIRD TIME, DELIBERATELY, FOR THE 5% PASS ----------------
+//
+// The owner: "Make the game tougher. Only 5% of first runs should result in
+// a win. This should mean more obstacles and paths." Gate generation moved
+// on purpose in three places: makeGate's `full` table rose 0.06 a band
+// (0.16/0.40/0.58/0.70 -> 0.22/0.46/0.64/0.76), the mid-band second-hazard
+// slope went 1.40 -> 1.70, and narrowRate went 0.06 -> 0.08. All three draw
+// from the seeded stream, so the course is legitimately a different course
+// and this hash MUST move. It was
+// 95e55c3cdbae17988b36ca57aa8f0a59f480b618; re-taken in its own commit with
+// the sweep measured either side (first-attempt 2/30, learned 6/15).
+// Recorded in docs/roadmap.md entry 74.
+const BASELINE_GATES = 'dc33748a788cd4c2756da24208e8428181f2efd3';
 // Re-taken twice. Once deliberately, when the aid placement rule was rewritten
 // so a bottle stands behind an obstacle rather than in open road (it was
 // 7f17eb4893b067571344191ddd6478b4f8da3329); and once here, for the same reason
@@ -210,7 +223,16 @@ const BASELINE_GATES = '95e55c3cdbae17988b36ca57aa8f0a59f480b618';
 // a bottle behind an obstacle, in its lane, bought at its gate, never
 // trapped by the next -- is untouched; tools/aid.js proves it on the new
 // course. It was a055853a7cf5c1d0e11e885c71e2e995e651c61d.
-const BASELINE_AID = 'c40930a11001c3e86039e55dd25e77a3775c0d22';
+//
+// ...and a fifth time, for BOTH reasons at once, with the abundance pass:
+// the aid RULE changed deliberately (generateAid v5 -- trails, arcs,
+// clusters and roof runs instead of ~16 guarded bottles; roadmap 50's
+// placement rule retired for the loose classes, recorded at the site), and
+// the gate table it hangs off moved too (see BASELINE_GATES above). It was
+// c40930a11001c3e86039e55dd25e77a3775c0d22. The receipt machinery the old
+// rule ran on is untouched and tools/aid.js proves it on the new course:
+// the cut-in bot collects 0.0 of 132 guarded items.
+const BASELINE_AID = '6e39f1380d8372f6e1816006ea8d782ae07593f6';
 /**
  * ---- THE FLAGS ARE FORCED OFF HERE, AND THAT IS NOT A WEAKENING ----------
  *
@@ -503,8 +525,13 @@ if (rampAcc.gateInRide) bad(`${rampAcc.gateInRide} gates sit inside a rideable v
     for (const a of c.aid) { if (a.roof) roof++; else road++; }
   }
   console.log(`  aid items on roofs            ${roof}   against ${road} on the road`);
-  if (rampAcc.n && roof !== rampAcc.n) {
-    bad(`${rampAcc.n} ramps but ${roof} roof pickups -- the reward does not match the ride`);
+  // A RUN of 3-5 per deck since the abundance pass -- one pickup was one
+  // segment when a bottle was a segment; it is a rounding error now, and the
+  // reference's gold bars line the whole roof. Every deck must still carry
+  // its reward: under 3 a ramp somewhere is unpaid, over 5 something is
+  // double-laying.
+  if (rampAcc.n && (roof < 3 * rampAcc.n || roof > 5 * rampAcc.n)) {
+    bad(`${rampAcc.n} ramps but ${roof} roof pickups -- every deck owes a run of 3 to 5`);
   }
 })();
 

@@ -6756,7 +6756,7 @@ and 365, simulate, calendar 32 clean, kindread PROFILE 1 of 37, footroom
 density lift ("gates/mi" in the record). The streak coupling makes that a
 speed change first — the strongest single finding of this pass.
 
-## Roadmap 73 · One city a day: measured, recommended, waiting on the owner — **OPEN**
+## Roadmap 73 · One city a day: measured, recommended, waiting on the owner — **SHIPPED** (see 75)
 
 The owner: *"Consult with agents and determine if it makes sense to only run
 one location a day. It doesn't make sense to me that we go to 3-4 locations. I
@@ -6787,6 +6787,7 @@ Fallback if the four-minute single vocabulary fails in play: two cities per
 day, pre-measured in the memo (H2), one seam per run, machinery already built.
 
   Roadmap 73 DECIDED by the owner 2026-08-26: one city per day, via the shuffled bag.
+  SHIPPED 2026-08-27 — what actually changed, and where the memo's sketch was wrong, is Roadmap 75.
 
 ## Roadmap 74 · Abundance and the 5% bar: countless pickups, one guard economy, and a record only rehearsal walks
 
@@ -6936,3 +6937,85 @@ column is real only under the stated sight-reading model. And its
 "~13-16 segments" framing conflated on-course supply (now 24) with
 line-collectable (14.7); this entry uses the second, which is the one
 that prices anything.
+
+## Roadmap 75 · One city a day, shipped: the bag, the headline, the leg verdict, and the thin cities fattened
+
+Roadmap 73's decision, implemented. The owner: *"one location a day ... would
+help with the daily game occurrence"*; the memo (`docs/one-city-a-day.md`)
+ranked the shuffled bag first and this pass ships exactly that. Every claim
+below was re-verified against today's source rather than taken from the memo,
+and the places the memo's sketch was wrong are listed at the end, because
+that is what the memo asked for.
+
+**The deal** (`src/core/course.js` `pickSettings`): one city, whole course,
+`from 0, to 1`, dealt by Fisher–Yates over the twelve on a stream keyed by
+the cycle index — epoch-day / 12, derived from the passed date key, never the
+clock — with salt `settings/v2`; `settings/v1` retired with the draw it
+described. Epoch days count straight through month and year boundaries, so a
+cycle that starts December 27th ends January 7th with no seam. Measured over
+730 days from 2026-01-01: every aligned cycle deals 12/12 distinct cities,
+same-city gap median 12 / p90 18 / worst 23 days, five back-to-back repeats
+in two years (cycle-boundary doubles, inherent to any bag). The next twelve
+days from the ship date: TOKYO, NEW YORK, CAPE TOWN, BERLIN, BOSTON, LONDON,
+AMSTERDAM, CHICAGO, ROME, VALENCIA, PARIS, CHICAGO.
+
+**Identity, the strongest guard this pass had:** settings are drawn after
+generation on their own stream, and `mechanics --identity` came through
+bit-identical — gate hash `dc33748a` and aid hash `6e39f138` both unmoved,
+re-checked after every course.js edit including the hint strings. The
+simulate grid did not move either: first-attempt 2 of 30, spread 33.2s,
+PLAN AID still the winning learned line.
+
+**What the player sees** (`src/ui/hud.js`, stylesheet): the start panel's
+route line becomes the day's headline — "ROME" at masthead weight under the
+wordmark, sized against AMSTERDAM at the 320px floor — because one word now
+carries the identity three names used to share. The rail's city row is a
+single centred label (`.rcity.solo`); the cut-drawing loops and the whole
+seam machinery in world.js stay dormant, not deleted, per the memo. The end
+card's "city that carried the run" died with the seams (its guard requires
+two settings), and the replacement cuts the same counterfactual by BIOME LEG:
+`chapterCosts` now cuts at the six biome boundaries and the card says "CLEAN
+THROUGH THE WALL · 1:57:24" — proved by driving the real card with five
+synthetic contacts concentrated in THE WALL, and by its correct silence on a
+clean run. Floor and majority rule unchanged; six rows make the majority
+stricter, so the line prints less often, the safe direction for a verdict.
+
+**The thin cities carry whole days now, so they were fattened** — fully
+built, all angles, in each city's own vocabulary: VALENCIA gains the Torres
+de Serranos (merlon rings all the way round both towers) and the orange
+grove its hint had owed from the start (6 kinds → 8); AMSTERDAM a smock
+windmill with lattice sails facing the course (7 → 8); CAPE TOWN the Green
+Point lighthouse — bands as stacked drums, so the stripes have no back — and
+the stadium the real race finishes at (7 → 9). All five spawn (walk census:
+torresSerranos x14, orangeGrove x11, windmill x13, lighthouse x15,
+ctStadium x9 on their days) and the three city-days raced end to end clean
+through LOW/HIDES/BLANKS/contrast.
+
+**The instrument got the same scrutiny** (`tools/calendar.js`, own commit):
+the 32-day default was sized on pair saturation under the 3–4 draw; the
+re-measured curve saturates at day 15 (bounded by the 23-day worst gap, not
+by 12, because a prefix straddles two shuffles). Default kept at 32 — it
+clears the bound from any start date and the surplus is gate-layout
+coverage. The run confirms: 32 days clean, 12/12 settings, 72/72 pairs, 100
+named objects, 6/6 races to the tape.
+
+**Where the memo's sketch was wrong, recorded:**
+- *"all 72 pairs in any 12-day window"* — only ALIGNED windows: the worst
+  sliding 12-day window covers 42/72 pairs (tail of one shuffle, head of
+  the next). Coverage claims must be stated per aligned cycle or per
+  23-day bound.
+- *"spread, never doubled"* (§4) — a bag CAN double across a cycle
+  boundary; measured ~2.5 back-to-back repeats a year. Small, but not
+  never.
+- The memo implied 12-day saturation for the fairness calendar; the honest
+  number from an arbitrary epoch is "by day 23 at worst, 15 measured from
+  2026-01-01".
+
+Full gate on the shipped build: build --check, shoot 8/8, course-test 90
+and 365, simulate (grid unmoved), calendar 32 clean, kindread, footroom,
+deckdrop, mechanics --identity bit-identical, tempo, playthrough end to
+end. Frames in shots/: onecity-panel-tokyo/rome (the headline panel),
+onecity-val-* (the thin city, full course), onecity-rome-* (the rich case),
+onecity-ams-mill, onecity-cpt-light, onecity-cpt-stad (the new pieces),
+onecity-endcard and onecity-endcard-burst (the leg verdict, silent and
+speaking).

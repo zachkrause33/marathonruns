@@ -17592,31 +17592,38 @@ MR.World = (function () {
      * placed independently -- the props and the pickups have to be telling the
      * same story.
      *
-     * That story changed. course.js used to emit a table as a run of three to
-     * five consecutive water items in one lane, and this loop grouped the run
-     * back up into one table; aid is now ONE item per point, spaced 620 units
-     * early to 220 late, about fourteen in a marathon. So a table is no longer
-     * a stand serving a stretch of road -- it is a single station beside a
-     * single bottle, and it is keyed straight off that bottle. There are eight
-     * or nine of them in a whole race, which is about right for a marathon and
-     * far enough apart that each one is an event.
+     * That story changed twice. First aid became one item per point (~14 a
+     * marathon), and a table stood beside each bottle. Then the ABUNDANCE
+     * pass made aid countless -- ~580 pickups in trails, arcs and clusters
+     * -- and keying a trestle table off every water item would line the
+     * course with four hundred of them: a furniture warehouse, and a draw
+     * budget nothing else could pay for.
      *
-     * Fruit gets no prop. Every water point having a stand and every fruit
-     * point having nothing is what tells the two apart before either is close
-     * enough to identify by shape.
+     * So the STATION comes back to marathon fiction: one every ~450 units of
+     * road, placed beside the first water item past the mark. That is 13-14
+     * stations a race -- the cadence real marathons feed at, the same count
+     * the scarce economy had -- and it is derived from the course's own aid
+     * table with no drawn state, so it is identical for every player. The
+     * pickups between stations are the coin trail; the station is the
+     * landmark that says what the trail is made of.
      */
-    for (const a of (course.aid || [])) {
-      if (a.kind !== 'water') continue;
-      // The nearer shoulder to the lane being served. A centre-lane item has
-      // no nearer side, so the course's own z picks one -- still identical for
-      // every player, which is the only property that matters.
-      const lx = K.LANE_X[a.lane];
-      const side = lx > 0.05 ? 1 : lx < -0.05 ? -1 : ((Math.round(a.z) & 1) ? 1 : -1);
-      structures.push({
-        z: a.z, kind: 'aidTable', side,
-        x: side * (K.TRACK_HALF_WIDTH + 3.4), y: 0,
-        ry: side < 0 ? Math.PI : 0, rz: 0,
-      });
+    {
+      let nextTableZ = 0;
+      for (const a of (course.aid || [])) {
+        if (a.kind !== 'water' || a.roof || a.z < nextTableZ) continue;
+        nextTableZ = a.z + 450;
+        // The nearer shoulder to the lane being served. A centre-lane item
+        // has no nearer side, so the course's own z picks one -- still
+        // identical for every player, which is the only property that
+        // matters.
+        const lx = K.LANE_X[a.lane];
+        const side = lx > 0.05 ? 1 : lx < -0.05 ? -1 : ((Math.round(a.z) & 1) ? 1 : -1);
+        structures.push({
+          z: a.z, kind: 'aidTable', side,
+          x: side * (K.TRACK_HALF_WIDTH + 3.4), y: 0,
+          ry: side < 0 ? Math.PI : 0, rz: 0,
+        });
+      }
     }
 
     /**
@@ -18466,7 +18473,16 @@ MR.World = (function () {
         // matches on lane alone", is no longer true of any item on the course.
         // Nothing about WHERE the bottle is drawn depends on that; see aidTaken
         // for the part that does.
-        const aidY = eAt(it.z);
+        //
+        // `it.y` IS THE INTERFACE TO THE COURSE and it is honoured here now.
+        // course.js has carried it on roof items since the roof runs shipped
+        // -- height above the LOCAL ROAD, the same quantity player.surface is
+        // -- and the abundance pass added it to arc items hanging on the
+        // falling half of the jump arc. This claim site ignored it, which
+        // drew every roof pickup INSIDE its lorry (invisible in any diff,
+        // because nothing in course space was wrong). Added exactly where
+        // elevation is added, as the course comment always said it would be.
+        const aidY = eAt(it.z) + (it.y || 0);
         obj.position.set(K.LANE_X[it.lane], aidY, it.z);
         obj.scale.setScalar(1);
         activeAid.push({ it, obj, pool, pop: -1, y0: aidY });

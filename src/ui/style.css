@@ -538,6 +538,11 @@ html, body {
  * card, where it can be computed honestly. */
 .rcity.past { opacity: 0.6; }
 .rcity.here { opacity: 1; font-weight: 700; }
+/* The shipped case since one-city-a-day: a single label owning the whole bar.
+ * Centred under it -- a lone word pinned to the start line read as a stray
+ * axis label, not as the road's name. Multi-stop courses keep the boxed
+ * left-aligned layout above, unchanged. */
+.rcity.solo { text-align: center; padding-right: 0; }
 
 /* ---- overlays ---- */
 .panel {
@@ -566,17 +571,25 @@ html, body {
 }
 .panel .blurb b { font-weight: 700; opacity: 1; }
 
-/* Today's road. The one line on this panel that is different tomorrow, so it
- * sits directly under the wordmark where a masthead's dateline would. */
+/* Today's city. The one line on this panel that is different tomorrow, so it
+ * sits directly under the wordmark where a masthead's dateline would.
+ *
+ * A HEADLINE now, not a route string: one city a day (roadmap 73) turned
+ * "VALENCIA -> ROME -> CHICAGO" into "ROME", and one word carries the day's
+ * whole identity, so it gets headline size and wide tracking instead of the
+ * 10.5px a three-stop line had to squeeze into. Sized against the longest
+ * name in the pool -- AMSTERDAM, nine glyphs: at the 320px floor the clamp
+ * gives 20px, which with 0.22em tracking is ~230px in a 320px column, so
+ * even the worst case sits on one line with margin. */
 .panel .route {
-  /* Sized to hold four city names on one line at 390px and to break evenly
-     rather than orphan a city when it cannot. Tracking is 0.08em, not 0.13:
-     at the wider setting a four-stop route was exactly 362px inside a 362px
-     column, so any longer name wrapped. */
-  font-size: clamp(10.5px, 3.05vw, 12px);
-  font-weight: 700; letter-spacing: 0.08em;
-  color: var(--accent); opacity: 0.92;
-  margin-top: 9px; line-height: 1.5;
+  font-size: clamp(20px, 6.2vw, 30px);
+  font-weight: 700; letter-spacing: 0.22em;
+  /* The tracking hangs 0.22em of empty advance after the last glyph; the
+   * negative margin gives half of it back so the word sits optically centred
+   * rather than drifting left. */
+  margin-right: -0.11em;
+  color: var(--accent); opacity: 0.95;
+  margin-top: 10px; line-height: 1.15;
   text-wrap: balance;
 }
 .panel .route:empty { display: none; }
@@ -991,6 +1004,8 @@ html, body {
   .panelInner { max-width: 700px; }
   .panel h1 { font-size: 80px; }
   .panel .date { font-size: 13px; }
+  /* The city headline scales with the wordmark it sits under. */
+  .panel .route { font-size: 38px; }
   .finLab { font-size: 12px; }
   .panel .blurb { font-size: 16px; max-width: 500px; }
   .rule { font-size: 11px; margin: 24px 0 12px; }
@@ -1068,9 +1083,11 @@ html, body {
   .panel h1 { font-size: clamp(26px, 6vh, 40px); }
   /* Landscape phone: the panel is thinnest exactly where the headline has the
    * most work to do, so drop the explanation and keep what makes someone
-   * press the button. The route line and the target survive. */
+   * press the button. The city headline and the target survive, the city a
+   * step down from its portrait size but still the loudest line under the
+   * wordmark. */
   .panel .blurb, .rule, .mech { display: none; }
-  .panel .route { font-size: 11px; margin-top: 6px; }
+  .panel .route { font-size: 17px; margin-top: 5px; }
   .target { margin-top: 10px; }
   .target b { font-size: 22px; }
   .panel .keys { margin-top: 10px; }

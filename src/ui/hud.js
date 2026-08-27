@@ -764,7 +764,18 @@ MR.HUD = (function () {
     }
 
     /**
-     * WHICH CITY THE RUN WAS LOST IN.
+     * WHICH LEG THE RUN WAS LOST IN.
+     *
+     * It was "which CITY", cut at the day's setting boundaries -- and the
+     * one-city-a-day decision (docs/one-city-a-day.md, roadmap 73) removed
+     * those boundaries: a course is one city end to end, so a per-city
+     * counterfactual has exactly one row and answers nothing. The cut moves
+     * to the BIOME LEGS, which are the six chapters every day's race still
+     * has (CITY START through FINAL MILE), and everything below -- the
+     * counterfactual, the floor, the majority rule -- is cut-agnostic and
+     * carries over unchanged. The history that justified the counterfactual
+     * itself is kept as written, city names and all; the measurements were
+     * real and the reasoning is about CUTS, not about what they are named.
      *
      * The roadmap asked for "a segment clock" per city. Measured over 60
      * dates, that is a number about the COURSE and not about the player: a
@@ -799,27 +810,29 @@ MR.HUD = (function () {
      *     8 contacts   63%, 47/60
      *    20 contacts   51%, 27/60
      *
-     * So on the runs a player is reading the card for, one city IS the story
-     * and the other rows are zeros; on a wreck the breakdown flattens into
-     * three similar numbers -- the split table's second failure, noise -- and
+     * So on the runs a player is reading the card for, one chapter IS the
+     * story and the other rows are zeros; on a wreck the breakdown flattens
+     * into similar numbers -- the split table's second failure, noise -- and
      * the counterfactuals stop summing to the plate's own total (55s adrift
      * at 20 contacts, against 1.2s at three). A table would print its worst
      * self on the runs it reads worst. A single line simply does not appear
-     * unless one city genuinely carried the run, which is the same rule the
-     * memory plates, the best-today line and the aid note already follow.
+     * unless one chapter genuinely carried the run, which is the same rule
+     * the memory plates, the best-today line and the aid note already follow.
      */
     function chapterCosts() {
       if (chapterCost !== null) return chapterCost;
       chapterCost = [];
-      const set = course && course.settings;
-      if (!set || set.length < 2 || !hitZ || !hitZ.size
+      // The biome legs are course.js's BIOMES: six of them, every day, by
+      // design -- so unlike the settings cut this one never degenerates.
+      const legs = course && course.biomes;
+      if (!legs || legs.length < 2 || !hitZ || !hitZ.size
           || !course.gates || !course.gates.length) return chapterCost;
 
-      // A gate's city is decided by the gate's own z, not by where the runner
+      // A gate's leg is decided by the gate's own z, not by where the runner
       // happened to be on the frame that resolved it. Frame-rate independent,
-      // and it is the same test world.js uses to decide which city to build.
-      const cut = set.map(function (s) { return s.from * K.TOTAL_UNITS; });
-      const cityOf = function (z) {
+      // and it is the same test world.js uses to decide which leg to build.
+      const cut = legs.map(function (b) { return b.from * K.TOTAL_UNITS; });
+      const legOf = function (z) {
         let i = 0;
         for (let k = 0; k < cut.length; k++) if (z >= cut[k]) i = k;
         return i;
@@ -838,7 +851,7 @@ MR.HUD = (function () {
           while (gi < course.gates.length && p.units >= course.gates[gi].z) {
             const g = course.gates[gi];
             gi++;
-            if (hitZ.has(g.z) && cityOf(g.z) !== skip) p.onHit();
+            if (hitZ.has(g.z) && legOf(g.z) !== skip) p.onHit();
             else p.onClean();
           }
         }
@@ -853,13 +866,13 @@ MR.HUD = (function () {
       // into the answer.
       const base = run(-1);
       if (!base) { chapterCost = []; return chapterCost; }
-      for (let i = 0; i < set.length; i++) {
-        chapterCost.push({ name: set[i].name, cost: Math.max(0, base - run(i)) });
+      for (let i = 0; i < legs.length; i++) {
+        chapterCost.push({ name: legs[i].name, cost: Math.max(0, base - run(i)) });
       }
       return chapterCost;
     }
 
-    /** The city that carried the run, or nothing when no single city did. */
+    /** The leg that carried the run, or nothing when no single leg did. */
     function decisiveChapter(actualFinish) {
       const rows = chapterCosts();
       if (!rows.length) return null;
@@ -868,7 +881,10 @@ MR.HUD = (function () {
       // A majority, and worth naming. Ten seconds is roughly a quarter of what
       // a single contact costs, so the floor only suppresses trivia; the
       // majority test is what keeps the line off a run that fell apart
-      // everywhere, where naming one city would be a lie about the other two.
+      // everywhere, where naming one leg would be a lie about the other five.
+      // Six rows instead of three or four makes the majority STRICTER, not
+      // looser, so the line prints less often rather than more -- the safe
+      // direction for a verdict.
       if (total <= 0 || top.cost < 10 || top.cost / total <= 0.5) return null;
       // Reported against the run's OWN finish time, so the two numbers on the
       // card are commensurable even where the reconstruction drifted.
@@ -897,6 +913,10 @@ MR.HUD = (function () {
       n.railRoute.innerHTML = '';
       if (!set || !set.length) return;
 
+      // ONE city a day means this loop draws no cuts (it starts at 1) and the
+      // row below is a single label owning the whole bar. Both are left as
+      // loops on purpose: the seam machinery stays dormant, not deleted, and
+      // an old multi-stop course still draws its boundaries correctly.
       for (let i = 1; i < set.length; i++) {
         const cut = el('div', 'railCut');
         cut.style.left = (set[i].from * 100) + '%';
@@ -907,9 +927,11 @@ MR.HUD = (function () {
       // generator's floor is 60% of an even share), which is ~51px at 390
       // wide -- narrower than the word AMSTERDAM. Clipping keeps a long name
       // inside its own city rather than letting it push the next one along
-      // the axis, which would put every label in the wrong place.
+      // the axis, which would put every label in the wrong place. A solo
+      // label -- the shipped case -- is centred under the bar instead of
+      // hugging the start line (.rcity.solo).
       for (const s of set) {
-        const span = el('span', 'rcity', s.name);
+        const span = el('span', 'rcity' + (set.length === 1 ? ' solo' : ''), s.name);
         span.style.left = (s.from * 100) + '%';
         span.style.width = ((s.to - s.from) * 100) + '%';
         n.railRoute.appendChild(span);
@@ -952,9 +974,16 @@ MR.HUD = (function () {
     /**
      * Name today's road, and price the wager.
      *
-     * The route is the only thing on this panel that is visibly different
+     * ONE CITY since the one-city-a-day decision (roadmap 73), so this is a
+     * HEADLINE rather than a route string: the day's identity in a word --
+     * "ROME" -- the way a single puzzle has a single name, styled up to
+     * headline weight in the stylesheet (.panel .route). The map/join is kept
+     * because it is exactly one name now and still prints an old multi-stop
+     * course honestly if one ever reaches it.
+     *
+     * The city is the only thing on this panel that is visibly different
      * tomorrow. A different gate layout is invisible before you press start; a
-     * different set of cities is not, which makes this the one line that earns
+     * different city is not, which makes this the one line that earns
      * a daily habit rather than describing one.
      *
      * The gate count is read off the real course rather than typed in, because
@@ -1239,8 +1268,10 @@ MR.HUD = (function () {
       // gone -- which is exactly why its tone is already neutral there: `tone`
       // can only be red when the projection itself is red, and on a dead run
       // the projection has retargeted onto the ladder and is not.
-      // Which city the runner is in. Written only on the crossing -- there are
-      // two or three of them in a race, against ~14,000 frames.
+      // Which segment of the day's road the runner is in. Written only on the
+      // crossing -- with one city a day that is exactly once, at the gun,
+      // against ~14,000 frames; kept because it costs nothing and an old
+      // multi-stop course still highlights correctly.
       // NOT named `set`: that is the cached text writer this function has been
       // calling since its first line, and shadowing it here throws on the
       // temporal dead zone for the whole race while still building clean.
@@ -1252,8 +1283,11 @@ MR.HUD = (function () {
         if (cache.here !== hi) {
           cache.here = hi;
           const spans = n.railRoute.children;
+          // `solo` is layout, not state -- it must survive this rewrite, or
+          // the one-city label snaps off-centre the moment the race starts.
+          const solo = spans.length === 1 ? ' solo' : '';
           for (let i = 0; i < spans.length; i++) {
-            spans[i].className = 'rcity' + (i === hi ? ' here' : i < hi ? ' past' : '');
+            spans[i].className = 'rcity' + solo + (i === hi ? ' here' : i < hi ? ' past' : '');
           }
         }
       }
@@ -1527,10 +1561,10 @@ MR.HUD = (function () {
       const notes = [];
       const turn = turnLine(p);
       if (turn) notes.push(turn);
-      // Where the run went. See chapterCosts(): this is the only per-city
-      // number in the game that moves with how the player ran rather than with
-      // which cities the date drew, and it prints only when one city really
-      // did carry the run.
+      // Where the run went. See chapterCosts(): this is the only per-chapter
+      // number in the game that moves with how the player ran rather than
+      // with what the date drew, and it prints only when one biome leg really
+      // did carry the run ("CLEAN THROUGH THE WALL").
       const where = p.hits ? decisiveChapter(t) : null;
       if (where) notes.push('CLEAN THROUGH ' + where.name + ' · ' + Pace.clock(where.would));
       // Not on a flawless line. cleanFinish() spells out why aid is worth

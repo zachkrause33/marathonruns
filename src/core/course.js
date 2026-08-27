@@ -1259,9 +1259,10 @@ MR.Course = (function () {
    * THE SETTING POOL.
    *
    * Twelve places, led by the World Marathon Majors, because a daily marathon
-   * game should be run somewhere you have heard of. Each is a real marathon
-   * city with landmarks that can be modelled in this game's own flat-shaded
-   * style -- no photography, no licensed imagery, nothing fetched at runtime.
+   * game should be run somewhere you have heard of. ONE of them hosts each
+   * day's race -- see pickSettings. Each is a real marathon city with
+   * landmarks that can be modelled in this game's own flat-shaded style -- no
+   * photography, no licensed imagery, nothing fetched at runtime.
    *
    * `tag` is the stable key world.js looks up for palette and content. `hint`
    * is not decorative: it is the contract for what that setting owes the
@@ -1284,47 +1285,63 @@ MR.Course = (function () {
   ];
 
   /**
-   * Pick this date's course settings.
+   * Pick this date's course setting: ONE city, dealt from a shuffled bag of
+   * the twelve. The owner's decision, docs/one-city-a-day.md (roadmap 73).
    *
-   * Three or four per run, drawn from the twelve. That number is chosen from
-   * the clock rather than by feel: at four minutes a race, three settings is
-   * ~80 seconds each and four is ~60, which is long enough for a place to
-   * register and short enough that something new is always coming. One setting
-   * for the whole race would be four minutes of the same street.
+   * It was three or four per run, jitter-split down the course, on stream
+   * 'settings/v1'. Measured over a year that draw made every day blur into
+   * the last -- 73.6% of consecutive days shared a city, a given city came
+   * back after a median of 2-3 days -- so no day was ever ABOUT anywhere.
+   * One city makes the day nameable ("today is the Rome course"), and the
+   * bag is the only deal worth shipping: an independent uniform draw of one
+   * has a worst same-city gap of 65 days and 36 back-to-back repeats a year.
    *
-   * Every day therefore gets a genuinely different course -- a different
-   * layout AND a different journey -- from the same twelve places, and the
-   * pool can grow without any of this changing.
+   * THE BAG. Day N of a 12-day cycle deals entry N of that CYCLE's shuffle,
+   * so every city appears exactly once per cycle and the worst repeat gap is
+   * 23 days (last of one cycle, first of the next, both drawn fairly).
+   *
+   *   day    = the UTC epoch-day of the PASSED key -- never the wall clock;
+   *            the determinism rule at the top of this file holds. Date.UTC
+   *            of a calendar midnight is an exact multiple of 86400000 (Unix
+   *            time has no leap seconds), and epoch days count straight
+   *            through month and year boundaries, so a cycle that starts on
+   *            December 27th ends on January 7th with no seam and no reset.
+   *            Every client agrees on the cycle for any date, past or future
+   *            (Math.floor keeps cycle/pos consistent even pre-1970).
+   *   cycle  = floor(day / 12); pos = day - cycle * 12, always in 0..11.
+   *   deal   = Fisher-Yates over the twelve on a stream keyed by the CYCLE,
+   *            not the date -- all twelve days of a cycle deal from the SAME
+   *            shuffle, which is what makes it a bag rather than twelve
+   *            independent draws.
+   *
+   * The stream salt is 'settings/v2', retiring 'settings/v1' with the draw it
+   * described: a stream name is never reused for a different draw.
+   *
+   * IDENTITY-SAFE, and checked rather than claimed: settings are drawn on
+   * their own stream, assigned after generate() has finished the gates and
+   * the aid, and nothing in generation reads them -- so tools/mechanics.js
+   * --identity (gate and aid hashes over 365 days) must not move under this
+   * change. If it moves, this function has been made to touch something it
+   * must not.
    */
   function pickSettings(key) {
-    const rnd = MR.rng.stream(key, 'settings/v1');
-    const n = rnd.chance(0.5) ? 3 : 4;
+    const p = key.split('-');
+    const day = Math.floor(Date.UTC(+p[0], +p[1] - 1, +p[2]) / 86400000);
+    const cycle = Math.floor(day / SETTINGS.length);
+    const pos = day - cycle * SETTINGS.length;
 
-    // Draw without replacement.
+    const rnd = MR.rng.stream('cycle:' + cycle, 'settings/v2');
     const bag = SETTINGS.slice();
-    const chosen = [];
-    for (let i = 0; i < n; i++) chosen.push(bag.splice(rnd.int(0, bag.length - 1), 1)[0]);
-
-    // Segment boundaries. Even splits, jittered, but never so far that a
-    // setting becomes a blink: no segment may be under 60% of an even share.
-    const even = 1 / n;
-    const cuts = [0];
-    for (let i = 1; i < n; i++) cuts.push(i * even + rnd.range(-0.35, 0.35) * even);
-    cuts.push(1);
-    for (let i = 1; i < cuts.length; i++) {
-      if (cuts[i] - cuts[i - 1] < even * 0.6) cuts[i] = cuts[i - 1] + even * 0.6;
+    for (let i = bag.length - 1; i > 0; i--) {
+      const j = rnd.int(0, i);
+      const t = bag[i]; bag[i] = bag[j]; bag[j] = t;
     }
-    const span = cuts[cuts.length - 1] - cuts[0];
-    for (let i = 0; i < cuts.length; i++) cuts[i] = cuts[i] / span;
 
-    return chosen.map(function (s, i) {
-      return {
-        tag: s.tag, name: s.name, hint: s.hint,
-        from: cuts[i], to: cuts[i + 1],
-        first: i === 0,
-        last: i === chosen.length - 1,
-      };
-    });
+    const s = bag[pos];
+    return [{
+      tag: s.tag, name: s.name, hint: s.hint,
+      from: 0, to: 1, first: true, last: true,
+    }];
   }
 
   function biomeAt(f) {
@@ -2400,7 +2417,9 @@ MR.Course = (function () {
       return s ? s.ride : null;
     };
 
-    // This date's places, in the order they will be run through. Carried
+    // This date's place -- ONE city since the one-city-a-day decision, still
+    // carried as a list because every consumer walks a list and the seam
+    // machinery downstream stays dormant rather than deleted. Carried
     // ALONGSIDE `biomes` rather than replacing it: `biomes` describes the shape
     // of the race (where the bridge is, where the wall is) and is the same
     // every day by design, while `settings` describes where that race is being

@@ -4112,10 +4112,10 @@ MR.Course = (function () {
     { tag: 'TOKYO',     name: 'TOKYO',         hint: 'the Imperial Palace moat, torii, neon signage, the Skytree' },
     { tag: 'SYDNEY',    name: 'SYDNEY',        hint: 'the Harbour Bridge, the Opera House shells, ferries, harbour water' },
     { tag: 'PARIS',     name: 'PARIS',         hint: 'the Eiffel Tower, Haussmann facades, Seine bridges, kiosks' },
-    { tag: 'VALENCIA',  name: 'VALENCIA',      hint: 'the City of Arts and Sciences, palms, orange groves, white stone' },
-    { tag: 'AMSTERDAM', name: 'AMSTERDAM',     hint: 'canals, gabled houses, bicycle racks, humpback bridges' },
+    { tag: 'VALENCIA',  name: 'VALENCIA',      hint: 'the City of Arts and Sciences, the Serranos gate, palms, orange groves, white stone' },
+    { tag: 'AMSTERDAM', name: 'AMSTERDAM',     hint: 'canals, gabled houses, bicycle racks, humpback bridges, a smock windmill' },
     { tag: 'ROME',      name: 'ROME',          hint: 'the Colosseum, an aqueduct, umbrella pines, ochre walls' },
-    { tag: 'CAPETOWN',  name: 'CAPE TOWN',     hint: 'Table Mountain, the coast road, fynbos, Atlantic surf' },
+    { tag: 'CAPETOWN',  name: 'CAPE TOWN',     hint: 'Table Mountain, the coast road, the Green Point lighthouse, the stadium, fynbos' },
   ];
 
   /**
@@ -12813,8 +12813,9 @@ MR.World = (function () {
   /**
    * ============================ THE SETTINGS ============================
    *
-   * Twelve places, three or four of which the day's course draws (see
-   * pickSettings in course.js). This table is the whole of what makes one
+   * Twelve places, ONE of which hosts each day's course since the
+   * one-city-a-day decision (see pickSettings in course.js; it dealt three
+   * or four per day before roadmap 73). This table is the whole of what makes one
    * different from another: a palette, a street, a tree, and a short list of
    * SILHOUETTES keyed by which beat of the race they belong to.
    *
@@ -13026,12 +13027,16 @@ MR.World = (function () {
       },
       tower: { colors: [0xf4ecd8, 0xffffff, 0xe4dcc8], glass: 0, crown: 'flat' },
       tree: { kind: 'palm', colors: [0x6b9834, 0xa0d045], h: 1.25 },
+      // One-city-a-day top-up: torresSerranos and orangeGrove joined the
+      // rotation when VALENCIA started carrying whole days alone -- it was
+      // the thinnest city in the pool (6 landmark kinds against a median 8),
+      // and the grove was owed by the hint all along.
       marks: {
-        'CITY START': [{ k: 'calatravaRibs', x: 17 }, { k: 'hemisferic', x: 20 }],
-        'RIVERSIDE': [{ k: 'hemisferic', x: 20 }, { k: 'calatravaRibs', x: 17 }],
-        'PARKLAND': [{ k: 'calatravaRibs', x: 17 }, { k: 'pond', x: 27 }],
-        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'calatravaRibs', x: 16 }],
-        'FINAL MILE': [{ k: 'hemisferic', x: 20 }, { k: 'jumbo', x: 13.5 }],
+        'CITY START': [{ k: 'calatravaRibs', x: 17 }, { k: 'torresSerranos', x: 19 }, { k: 'hemisferic', x: 20 }],
+        'RIVERSIDE': [{ k: 'hemisferic', x: 20 }, { k: 'orangeGrove', x: 17 }, { k: 'calatravaRibs', x: 17 }],
+        'PARKLAND': [{ k: 'calatravaRibs', x: 17 }, { k: 'orangeGrove', x: 17 }, { k: 'pond', x: 27 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'torresSerranos', x: 19 }],
+        'FINAL MILE': [{ k: 'hemisferic', x: 20 }, { k: 'jumbo', x: 13.5 }, { k: 'torresSerranos', x: 19 }],
       },
       bridge: 'harp',
     },
@@ -13046,10 +13051,12 @@ MR.World = (function () {
       },
       tower: { colors: [0x8f6a58, 0xa88070, 0xc8a890], glass: 0, crown: 'flat' },
       tree: { kind: 'round', colors: [0x5f8a2e, 0x84b03a, 0xa8dc4c], h: 1.15 },
+      // One-city-a-day top-up: the windmill joined when AMSTERDAM started
+      // carrying whole days alone (7 landmark kinds against a median 8).
       marks: {
         'CITY START': [{ k: 'canal', x: 20, run: 40, alt: 'canalBridge', every: 3, side: -1 }, { k: 'westerkerk', x: 15 }],
-        'RIVERSIDE': [{ k: 'canal', x: 20, run: 40, alt: 'canalBridge', every: 3, side: -1 }, { k: 'westerkerk', x: 16 }],
-        'PARKLAND': [{ k: 'oak', x: 15 }, { k: 'pond', x: 27 }],
+        'RIVERSIDE': [{ k: 'canal', x: 20, run: 40, alt: 'canalBridge', every: 3, side: -1 }, { k: 'westerkerk', x: 16 }, { k: 'windmill', x: 17.5 }],
+        'PARKLAND': [{ k: 'oak', x: 15 }, { k: 'windmill', x: 17.5 }, { k: 'pond', x: 27 }],
         'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'westerkerk', x: 15 }],
         'FINAL MILE': [{ k: 'westerkerk', x: 15 }, { k: 'jumbo', x: 13.5 }],
       },
@@ -13088,12 +13095,16 @@ MR.World = (function () {
       },
       tower: { colors: [0xdce4ec, 0xc8d4e0, 0xf0f4f8], glass: 1, crown: 'flat' },
       tree: { kind: 'scrub', colors: [0x7d8f38, 0x9cb04c, 0x6a8440], h: 0.9 },
+      // One-city-a-day top-up: the Green Point lighthouse and the stadium
+      // joined when CAPE TOWN started carrying whole days alone (7 landmark
+      // kinds against a median 8, and every leg leaning on the one massif).
+      // Both stand on the real course; the mountain run is unchanged.
       marks: {
-        'CITY START': [{ k: 'tableMountain', x: 72, run: 220, side: -1 }, { k: 'clock', x: 15 }],
-        'RIVERSIDE': [{ k: 'tableMountain', x: 78, run: 220, side: -1 }, { k: 'ship', x: 34, y: -0.12 }],
-        'PARKLAND': [{ k: 'tableMountain', x: 72, run: 220, side: -1 }, { k: 'oak', x: 15 }],
+        'CITY START': [{ k: 'tableMountain', x: 72, run: 220, side: -1 }, { k: 'clock', x: 15 }, { k: 'ctStadium', x: 30 }],
+        'RIVERSIDE': [{ k: 'tableMountain', x: 78, run: 220, side: -1 }, { k: 'ship', x: 34, y: -0.12 }, { k: 'lighthouse', x: 16.5 }],
+        'PARKLAND': [{ k: 'tableMountain', x: 72, run: 220, side: -1 }, { k: 'oak', x: 15 }, { k: 'lighthouse', x: 16.5 }],
         'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'tableMountain', x: 72, run: 220, side: -1 }],
-        'FINAL MILE': [{ k: 'tableMountain', x: 72, run: 220, side: -1 }, { k: 'jumbo', x: 13.5 }],
+        'FINAL MILE': [{ k: 'tableMountain', x: 72, run: 220, side: -1 }, { k: 'jumbo', x: 13.5 }, { k: 'ctStadium', x: 30 }],
       },
       bridge: 'tower',
     },
@@ -14690,10 +14701,10 @@ MR.World = (function () {
   //  out the right colour, and returns a merged geometry: one draw call for
   //  the whole thing, exactly like the generic landmarks already here.
   //
-  //  Geometries are built LAZILY, and only for the three or four settings the
-  //  day actually drew. Twelve cities' worth of landmarks built eagerly would
-  //  be most of a second of start-up for geometry nine tenths of which is
-  //  never shown.
+  //  Geometries are built LAZILY, and only for the city the day actually
+  //  drew (one, since one-city-a-day). Twelve cities' worth of landmarks
+  //  built eagerly would be most of a second of start-up for geometry eleven
+  //  twelfths of which is never shown.
   //
   //  REACH. Every builder's road-facing extent is noted where it is not
   //  obvious. A mark placed at x is clamped to LANDMARK_IN (11.75), so a
@@ -15502,6 +15513,102 @@ MR.World = (function () {
       return merge(parts);
     },
 
+    /**
+     * The Torres de Serranos: the medieval twin-towered city gate, in the
+     * white-and-sand stone the rest of Valencia's table speaks. Two
+     * crenellated polygonal towers flanking a lower body with a pointed
+     * portal facing the road. Part of the one-city-a-day content top-up:
+     * VALENCIA carries whole days alone now, and it was the thinnest city in
+     * the pool (6 landmark kinds against a median of 8).
+     *
+     * Built on every side -- towers, rear walls, both flanks, the portal
+     * reveal -- per rule 1; bx/cyl/cone emit closed solids, so there is no
+     * half to forget. Reach -6.5 in local x (the tower bellies), so the
+     * table places it at x >= 18.5.
+     */
+    torresSerranos: function () {
+      const parts = [];
+      const S = 0xf2e8d0, S2 = 0xd8ccae, DARK = 0x8a7a5e;
+      // The two towers: a taper told in two stacked drums, twelve-sided so
+      // the belly reads round from every angle, then the machicolation ledge
+      // and a ring of merlons.
+      for (const sz of [-1, 1]) {
+        const z = sz * 8.6;
+        parts.push(cyl(5.2, 6.0, 9.0, 12, 0, 4.5, z, S));
+        parts.push(cyl(4.6, 5.2, 7.5, 12, 0, 12.7, z, sz < 0 ? S : S2));
+        // The ledge the defenders leaned over: a wider drum with a shadowed
+        // underside band.
+        parts.push(cyl(5.6, 4.9, 1.6, 12, 0, 17.2, z, S2));
+        parts.push(cyl(5.4, 5.4, 0.5, 12, 0, 16.5, z, DARK));
+        // Merlons around the full circle -- the crown is seen from every
+        // side as the runner passes.
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * 6.2832;
+          parts.push(bx(1.6, 1.7, 1.0, Math.cos(a) * 4.9, 18.9, z + Math.sin(a) * 4.9,
+            S, 0, -a, 0));
+        }
+      }
+      // The body between the towers, with the pointed portal through it.
+      // Built along x and turned a quarter so the arch faces the road.
+      const sub = [];
+      for (const sy of [-1, 1]) {
+        sub.push(bx(3.6, 11.0, 6.4, sy * 5.0, 5.5, 0, S));
+      }
+      vArc(sub, { cx: 0, cy: 6.2, cz: 0, rx: 3.4, ry: 4.6, n: 6, th: 1.0, d: 6.0, color: S2, alt: S });
+      sub.push(bx(13.6, 2.6, 6.4, 0, 12.3, 0, S));
+      sub.push(bx(14.2, 0.7, 7.0, 0, 13.9, 0, S2));
+      for (let i = 0; i < 5; i++) {
+        sub.push(bx(1.6, 1.4, 1.0, -5.6 + i * 2.8, 15.0, 2.8, S));
+        sub.push(bx(1.6, 1.4, 1.0, -5.6 + i * 2.8, 15.0, -2.8, S));
+      }
+      placeAt(parts, sub, 0, 0, 0, Math.PI / 2);
+      // The apron the whole gate stands on.
+      parts.push(bx(9.0, 1.0, 26.0, 0.5, 0.5, 0, 0xe8e0cc));
+      return merge(parts);
+    },
+
+    /**
+     * An orange grove: the one thing VALENCIA's hint always owed the frame
+     * ("palms, orange groves, white stone") that nothing in the table
+     * delivered. Three ranks of low round crowns studded with fruit behind a
+     * whitewashed field wall. Fruit spheres sit ON the crown surface, all the
+     * way round -- the grove is passed at arm's length and seen from behind
+     * like everything else. Reach -5.0 (the wall), so x >= 17 keeps the
+     * first rank off the pavement.
+     */
+    orangeGrove: function () {
+      const parts = [];
+      const LEAF = 0x4e7a28, LEAF2 = 0x6a9c34, FRUIT = 0xff9a2a, TRUNK = 0x8a6a48;
+      // The low white wall along the road edge, with a gap for the gate.
+      parts.push(bx(0.8, 1.4, 15.0, -5.0, 0.7, -9.5, 0xfcf6e8));
+      parts.push(bx(0.8, 1.4, 15.0, -5.0, 0.7, 9.5, 0xfcf6e8));
+      for (const sz of [-1, 1]) {
+        parts.push(bx(1.1, 2.2, 1.1, -5.0, 1.1, sz * 2.0, 0xe8e0cc));
+      }
+      // Three ranks of trees on a planted grid, trunks clear of each other.
+      const r = lcg(41);
+      for (let row = 0; row < 3; row++) {
+        for (let i = 0; i < 4; i++) {
+          const x = -1.5 + row * 4.4;
+          const z = -12 + i * 8 + row * 2.6;
+          const s = 0.85 + r() * 0.3;
+          parts.push(cyl(0.22 * s, 0.34 * s, 1.6 * s, 6, x, 0.8 * s, z, TRUNK));
+          parts.push(sph(2.1 * s, 8, x, 3.0 * s, z, row % 2 ? LEAF : LEAF2));
+          parts.push(sph(1.5 * s, 7, x + 1.0, 2.4 * s, z + 0.9, LEAF2));
+          // The fruit: eight per crown, spread around the full sphere.
+          for (let f = 0; f < 8; f++) {
+            const a = r() * 6.2832;
+            const b = r() * 2.4 - 1.2;
+            parts.push(sph(0.30, 5,
+              x + Math.cos(a) * Math.cos(b) * 2.05 * s,
+              3.0 * s + Math.sin(b) * 2.05 * s,
+              z + Math.sin(a) * Math.cos(b) * 2.05 * s, FRUIT));
+          }
+        }
+      }
+      return merge(parts);
+    },
+
     // ---- AMSTERDAM -----------------------------------------------------
     /**
      * A canal running the length of the leg, with a humpback bridge on every
@@ -15637,6 +15744,69 @@ MR.World = (function () {
       return merge(parts);
     },
 
+    /**
+     * A smock windmill -- De Gooyer's silhouette: a brick base, a tapering
+     * eight-sided timber smock, the thatch-dark cap, a stelling gallery on
+     * posts, and four lattice sails in a diagonal cross. One-city-a-day
+     * content top-up: AMSTERDAM holds whole days alone now (7 kinds against
+     * a median 8), and a windmill is the one Dutch silhouette the table did
+     * not have.
+     *
+     * The sails stand in the z-y plane on the ROAD side of the cap, so the
+     * cross reads from the course; the smock, cap, gallery and tail beam are
+     * solids of revolution or closed boxes, so the mill is whole from every
+     * side as the runner passes it (rule 1). Reach -5.7 (the stelling ring,
+     * wider than the sail hub at -3.3), so the table places it at x >= 17.3.
+     */
+    windmill: function () {
+      const parts = [];
+      const BRICK = 0x8a5040, TIMBER = 0x4e4238, TRIM = 0xf4ece0, CAP = 0x3a332c;
+      const SAIL = 0xe8e0d0;
+      // Base, smock, cap.
+      parts.push(cyl(4.4, 5.0, 4.5, 8, 0, 2.25, 0, BRICK));
+      parts.push(cyl(2.6, 4.4, 9.5, 8, 0, 9.25, 0, TIMBER));
+      for (let i = 0; i < 8; i++) {
+        // The smock's corner battens, up the taper -- what makes eight sides
+        // read as carpentry rather than as a cone.
+        const a = (i / 8) * 6.2832 + 0.3927;
+        const rr = 3.55;
+        parts.push(bx(0.26, 9.5, 0.26, Math.cos(a) * rr, 9.25, Math.sin(a) * rr,
+          TRIM, 0, -a, (Math.cos(a) > 0 ? -1 : 1) * 0.10));
+      }
+      parts.push(cyl(2.75, 2.75, 0.6, 8, 0, 14.2, 0, TRIM));
+      parts.push(part(new THREE.SphereGeometry(2.7, 10, 6, 0, 6.2832, 0, Math.PI / 2),
+        CAP, 0, 14.4, 0));
+      // The stelling: the gallery the miller works the sails from.
+      parts.push(cyl(5.6, 5.6, 0.4, 10, 0, 5.0, 0, TIMBER));
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * 6.2832;
+        parts.push(bx(0.22, 4.6, 0.22, Math.cos(a) * 5.3, 2.6, Math.sin(a) * 5.3, TIMBER));
+        parts.push(bx(0.18, 1.0, 0.18, Math.cos(a) * 5.5, 5.9, Math.sin(a) * 5.5, TRIM));
+      }
+      parts.push(cyl(5.7, 5.7, 0.22, 10, 0, 6.4, 0, TRIM));
+      // The sails: four lattice frames in the diagonal cross Dutch mills
+      // park in, hub on the road side of the cap.
+      const HX = -3.1, HY = 14.6;
+      parts.push(cyl(0.5, 0.5, 1.6, 8, HX + 0.5, HY, 0, CAP, 0, 0, Math.PI / 2));
+      parts.push(sph(0.7, 6, HX, HY, 0, CAP));
+      for (let s = 0; s < 4; s++) {
+        const a = 0.7854 + s * 1.5708;
+        const dy = Math.cos(a), dz = Math.sin(a);
+        // The stock (the long arm)...
+        parts.push(bx(0.30, 8.6, 0.30, HX, HY + dy * 4.3, dz * 4.3, SAIL, a));
+        // ...and the lattice: a spar down one edge and five crossbars.
+        parts.push(bx(0.16, 7.0, 0.16, HX, HY + dy * 4.6 - dz * 0.9, dz * 4.6 + dy * 0.9, SAIL, a));
+        for (let i = 0; i < 5; i++) {
+          const t = 1.6 + i * 1.35;
+          parts.push(bx(0.14, 0.14, 1.9, HX, HY + dy * t - dz * 0.5, dz * t + dy * 0.5, SAIL, a));
+        }
+      }
+      // The tail beam bracing the cap to the gallery, on the far side from
+      // the sails -- the side the chase camera sees first.
+      parts.push(bx(0.4, 10.0, 0.4, 2.4, 10.0, 0, TIMBER, 0, 0, -0.38));
+      return merge(parts);
+    },
+
     // ---- fallbacks and remaining spans ---------------------------------
     /**
      * The Zakim: inverted-Y pylons straddling the deck with a cable fan.
@@ -15751,6 +15921,74 @@ MR.World = (function () {
       parts.push(cone(18, 26, 6, -6, 12, -L * 0.44, SCRUB));
       parts.push(cone(20, 38, 6, 0, 18, L * 0.40, ROCK2));
       parts.push(cone(13, 18, 6, -8, 8, L * 0.44, SCRUB));
+      return merge(parts);
+    },
+
+    /**
+     * The Green Point lighthouse: the red-and-white banded tower the real
+     * Cape Town marathon runs straight past on the coast road. One-city-a-day
+     * content top-up -- CAPE TOWN carries whole days alone now and leant on
+     * one massif for every leg (7 kinds against a median 8).
+     *
+     * Bands are stacked drums, so the stripes go all the way round; the
+     * gallery, lantern and keeper's cottage are closed solids (rule 1). The
+     * red is 0xd8503a, hue ~9 degrees -- nowhere near DUCK cyan or BLOCK
+     * magenta, the two hues scenery must not wear near the road. Reach -4.6
+     * (the cottage gable), so the table places it at x >= 16.5.
+     */
+    lighthouse: function () {
+      const parts = [];
+      const RED = 0xd8503a, WHT = 0xf8f4e8, DARK = 0x3a4048;
+      // Six bands up a gentle taper.
+      for (let i = 0; i < 6; i++) {
+        const r0 = 2.6 - i * 0.14, r1 = 2.74 - i * 0.14;
+        parts.push(cyl(r0, r1, 2.6, 12, 0, 1.3 + i * 2.6, 0, i % 2 ? RED : WHT));
+      }
+      // The gallery: floor ring, railing posts all the way round, handrail.
+      parts.push(cyl(2.9, 2.4, 0.6, 12, 0, 16.0, 0, WHT));
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * 6.2832;
+        parts.push(bx(0.14, 1.2, 0.14, Math.cos(a) * 2.65, 17.0, Math.sin(a) * 2.65, DARK));
+      }
+      parts.push(cyl(2.72, 2.72, 0.16, 12, 0, 17.6, 0, DARK));
+      // The lantern room and its dome.
+      parts.push(cyl(1.7, 1.7, 2.2, 10, 0, 17.5, 0, DARK));
+      parts.push(cyl(1.45, 1.45, 1.8, 10, 0, 17.6, 0, 0xfff2c8));
+      parts.push(part(new THREE.SphereGeometry(1.7, 10, 6, 0, 6.2832, 0, Math.PI / 2),
+        RED, 0, 18.6, 0));
+      parts.push(bx(0.18, 1.4, 0.18, 0, 20.2, 0, DARK));
+      // The keeper's cottage against the base, whitewashed, pitched roof
+      // built as two meeting slopes plus both gable ends.
+      parts.push(bx(4.6, 3.0, 6.4, 1.6, 1.5, 5.6, WHT));
+      for (const sx of [-1, 1]) {
+        parts.push(bx(2.9, 0.5, 6.8, 1.6 + sx * 1.15, 3.55, 5.6, 0x8a8078, 0, 0, -sx * 0.42));
+      }
+      parts.push(bx(0.5, 1.6, 0.5, 3.2, 4.2, 7.4, WHT));
+      return merge(parts);
+    },
+
+    /**
+     * Cape Town Stadium: the pale drum on the Green Point common where the
+     * real race finishes. A shallow flared bowl -- three stacked drums, a
+     * dark ring of openings, a floating white roof ring -- pale enough to
+     * read as the glass skin without a single transparent material. All
+     * drums are closed solids, whole from every bearing (rule 1). Radius
+     * 13.6 at the roof lip, so the table must place it at x >= 26 to keep
+     * the skirt a road-width off the pavement.
+     */
+    ctStadium: function () {
+      const parts = [];
+      const SKIN = 0xdce4ec, SKIN2 = 0xc8d4e0, DARK = 0x4a5460, ROOF = 0xf4f6f8;
+      parts.push(cyl(11.6, 10.2, 3.2, 16, 0, 1.6, 0, SKIN2));
+      parts.push(cyl(12.8, 11.6, 3.4, 16, 0, 4.9, 0, SKIN));
+      // The concourse ring of openings, in shadow.
+      parts.push(cyl(12.9, 12.9, 0.9, 16, 0, 5.2, 0, DARK));
+      parts.push(cyl(13.3, 12.8, 2.6, 16, 0, 7.9, 0, SKIN));
+      // The roof: a wide flat ring floating over the bowl rim, with the
+      // shallow saucer dip in the middle read as a darker infield disc.
+      parts.push(cyl(13.6, 13.6, 0.8, 16, 0, 9.6, 0, ROOF));
+      parts.push(cyl(9.6, 9.6, 0.5, 16, 0, 9.8, 0, SKIN2));
+      parts.push(cyl(6.4, 6.4, 0.4, 12, 0, 9.9, 0, 0x5f8f52));
       return merge(parts);
     },
   };
@@ -17586,7 +17824,9 @@ MR.World = (function () {
     // ---- the day's settings ----------------------------------------------
     /**
      * Where this race is being run, in world units, in the order it is run
-     * through. course.js draws three or four of the twelve and hands them over
+     * through. course.js deals ONE of the twelve per day (three or four
+     * before roadmap 73 -- the list shape and every seam below survive, kept
+     * dormant rather than deleted) and hands them over
      * as fractions of race distance; everything below works in units, exactly
      * like BI, so a road tile or a set piece can ask "which city am I in"
      * without reconstructing the fraction.
@@ -26309,7 +26549,7 @@ MR.World = (function () {
     // ---- per-setting content pools ---------------------------------------
     /**
      * Trees, groves and street rows, built once per setting the day drew --
-     * three or four of them, never twelve. A pool per setting rather than one
+     * one of them now, never twelve. A pool per setting rather than one
      * pool re-tinted, because these are different SHAPES: a palm is not a
      * recoloured conifer and no amount of material work would make it one.
      */

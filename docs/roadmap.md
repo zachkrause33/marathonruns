@@ -6787,3 +6787,152 @@ Fallback if the four-minute single vocabulary fails in play: two cities per
 day, pre-measured in the memo (H2), one seam per run, machinery already built.
 
   Roadmap 73 DECIDED by the owner 2026-08-26: one city per day, via the shuffled bag.
+
+## Roadmap 74 · Abundance and the 5% bar: countless pickups, one guard economy, and a record only rehearsal walks
+
+The owner's two changes, verbatim, and they pull against each other: *"1.
+Make the game tougher. Only 5% of first runs should result in a win. This
+should mean more obstacles and paths. 2. Adjust the water and bananas. We
+need countless of them similar to these other games that have coins. That
+keeps players engaged."* Endless aid feeding the guard pool at the old
+per-item value would have made contacts free and pushed the win rate the
+wrong way, so the two were tuned together, economy first.
+
+**The economy (item 2).** Aid goes from ~16 scarce bottles -- each a whole
+guard segment, each a priced decision behind an obstacle -- to **~580 small
+pickups a course** (measured 365 days: 585/course; 434 loose, 137 arc, 13
+roof), laid the way the reference game strews coins:
+
+- **TRAILS** down lanes that are CLEAR at their gate, vehicle-free over the
+  whole run, never leading into a lane the next gate walls off, ending 8u
+  short of the next gate line so the coin line never leads the eye into a
+  hazard read.
+- **ARCS** behind JUMP and DUCK obstacles, receipt-guarded at their gate
+  (the roadmap 50 machinery, unchanged), the JUMP strings hanging on the
+  falling half of the jump arc via the same `y` field roof items carry --
+  collected mid-flight, one action buys the string.
+- **CLUSTERS** after BLOCK trains and full-width gates -- the burst that
+  pays for coming through a hard section still moving. (Its first version
+  walked one item into FINISH_GRACE on day 44 of 60 -- the ramp run-in
+  defect's exact class -- caught by the rewritten aid.js and capped.)
+- **ROOF RUNS** of 3-5 along each deck instead of one bottle; collection
+  still requires standing on the ramp. Roof trails stay roof-only.
+
+A pickup is a **bite of a segment**: `PER_SEG = 24` fill one, the pool is
+fractional between whole segments so the fuel gauge fills visibly (no new
+HUD), and `GUARD_COST` stays one whole segment. Measured economy
+(tools/aid.js, now the guard of this contract): a flawless seeking line
+collects **14.7 segments** against the old ~13.7 collectable; a natural
+line collects 8.5 incidentally; the cut-in exploit bot still collects **0.0
+of 132** guarded items. Two consequences worth naming:
+
+- **A guarded contact now costs its stumble** (`GUARD_TIME` = 1.5 s, streak
+  kept). Total absolution was affordable when a segment cost an action to
+  collect; with the pool refilling for free, it made 0.96 play like 1.0 and
+  no pace number could hold the first-attempt bar.
+- **Roadmap 50's placement rule is retired for the loose classes**, and the
+  retirement is recorded at the site in generateAid. That rule solved free
+  insurance when a bottle was a whole segment; abundance is a different
+  design and the owner chose it for engagement. What survives is the
+  rule's point, moved up a level: the denomination, the guarded share and
+  the guard's residual cost price the economy as a whole, and aid.js fails
+  the build if collectable segments leave the 8-20 band.
+
+**The difficulty (item 1).** Density rose where roadmap 72 says it buys
+difficulty without spending reaction time -- hazards per gate, never gates
+per mile: makeGate's full-width table +0.06 a band
+(0.22/0.46/0.64/0.76), the mid-band second-hazard slope 1.40 -> 1.70, and
+closures 0.06 -> 0.08 ("more paths", the cheap version strategy-space
+ranks buildable; full geometric forks stay out of scope). The spacing
+floor, READ_NEAR and every guaranteed window are untouched; shoot.js,
+tempo (2911/2911 openings, 389/389 paired gates), footroom 96/96,
+deckdrop 24/24, kindread PROFILE 1 of 37 and calendar 32 all hold on the
+final state, and course-test proves 365 days solvable.
+
+**The bar, and the finding under it.** The first tuning landed
+first-attempt 2/30 with learned 1/15 -- knowing the course was worth
+nothing, and the number exposed a structural fact: **a lane change costs
+nothing and every mat covers a gate line, so a flawless stranger equals a
+flawless learner**. GRN CHAIN, the policy built on "position early for
+mats you know are coming", LOST to the myopic informed line at every
+skill; it is retired from the sweep with that finding written on it, and
+nothing at flawless execution can separate the two columns spatially.
+
+What separates them honestly is **chained demands** -- the currency the
+difficulty brief itself sanctions. A demanded action within 1.5 read
+windows of the previous one is a chain: the second read starts while the
+first action is still executing. The informed stranger's line meets **78
+of them a race** at the new density, and the sweep now clears an
+unrehearsed chain at skill x 0.979 (a 2.1% sight-read miss, first attempt
+only -- a modelling constant, stated as one); a learned line has run the
+day and pays no discount. Every chained gate keeps its full guaranteed
+window: what knowledge buys is execution of chains you know are coming,
+which is exactly what a daily-course game should reward. With the chain
+tax carrying the first-attempt bar, FLOOR_BASE settles at **259.1**
+(259.0 -> 259.7 -> 259.1 across the pass; the floor now prices what a
+REHEARSED line can do). The sweep also models two smaller honest
+asymmetries: strangers read paint and coins to READ_NEAR past the gate
+while learned lines know the whole gap, and a stranger switching lanes
+for a trail joins it 12u late.
+
+**The final distribution (tools/simulate.js, 8 dates x 14 seeds a cell):**
+
+| | cells | share |
+|---|---|---|
+| beats 1:59:30, all cells | 8/45 | 18% |
+| ...on a FIRST attempt | **2/30** | **6.7%** (the grid's nearest step to 5%) |
+| ...with the course learned | **6/15** | **40%** |
+| policy spread at perfect | 33.2 s | |
+
+The two first-attempt winners are both flawless-execution bounds (NO AID
+and READ ROAD at skill 1.0, by 3-5 s); real first runs sit far below the
+cell fraction. The learned winners: PLAN AID at perfect through 0.98,
+HARVEST (the deliberate coin line, GRN CHAIN's replacement) at perfect
+and 0.995 -- and HARVEST at 0.96 is the best line in the game at 1:59:44,
+still 14 s outside the record: the coin economy rescues a broken run
+without ever handing it the record. COIN CHASE, the naive newcomer line
+the abundance is for, is the most robust low-skill policy and never
+wins. Identity re-baselined in its own commit, old and new hashes stated
+there and in mechanics.js (gates 95e55c3c... -> dc33748a..., aid
+c40930a1... -> 6e39f138...).
+
+**The reader check on the trails** (frames through the live chase camera,
+scratch shots at skips 55/120/160/200; the reader was this session
+answering from pixels only -- no isolated fresh agent was available, and
+that limitation is stated rather than hidden). Asked "what must you react
+to": mile 6 -- *"Two vehicles ahead, the green skip and the rust
+container; I pick the gap between them. The green discs with white
+bottles are pickups running through that gap; I'd follow them. Nothing
+else needs an action."* Mile 17 -- *"The red carpet with the red
+diamonds is paint saying slow, I'd move off it; the bananas and the
+bottle say collect."* Mile 22 -- *"Yellow bar across the left says slide
+or move right; the mint discs low behind it say there is pickup under it
+after the slide."* Aid read as "collect" in every frame and as an
+obstacle in none; the mint disc-and-bottle family sits nowhere near the
+amber/cyan/pink hazard vocabulary, and shoot.js's occlusion and contrast
+gates stay clean with ~580 items live on the course.
+
+**How the abundant game feels** (playthrough, real page, end to end): the
+bot finishes 1:59:37, 0 unguarded hits, 3 cone-trips absorbed by guard,
+368 pickups collected, 196 wasted into a full tank, gauge at cap most of
+the race. The road reads collect-collect-collect -- a coin line threading
+the gap between two lorries at mile 6 is the reference frame's feel on
+this game's road -- while the record sits 8 s away from a clean informed
+line, which is the two halves of the owner's ask in one run. The 3
+cone-trips are the pre-existing bot blindness to deck cones (it rides
+ramps but has no cone timing), now visible because guard pays for it;
+noted here rather than fixed, since every policy shows exactly 3 and the
+mechanic under test is unaffected.
+
+**Where the brief was wrong, recorded:** it asked for abundant pickups
+whose "total collectable segments stay near today's ~13-16" AND
+first-attempt at 5% -- but with free collection, holding the old segment
+count makes guard riskless, which is why the guard now charges its
+stumble; the honest statement is "same segment supply, cheaper to gather,
+each guard slightly less absolute". It also implied course knowledge
+already had somewhere to live; it did not (the GRN CHAIN finding above)
+-- the learned axis had to be BUILT, out of chains, and the 40% learned
+column is real only under the stated sight-reading model. And its
+"~13-16 segments" framing conflated on-course supply (now 24) with
+line-collectable (14.7); this entry uses the second, which is the one
+that prices anything.

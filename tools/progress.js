@@ -67,7 +67,7 @@ const stat = (n, label, color) => `
     <div class="sv">${n}</div><div class="sl">${label}</div>
   </div>`;
 
-const html = `<title>Daily Marathon — build progress</title>
+const html = `<title>Marathon Miles — build progress</title>
 <style>
   /* Palette is lifted from the game's own broadcast HUD -- deep race-night
    * navy, warning-tape yellow, and the same ahead/behind green and red the
@@ -139,7 +139,7 @@ const html = `<title>Daily Marathon — build progress</title>
 </style>
 <div class="wrap">
   <div class="eyebrow">Build progress</div>
-  <h1>Daily Marathon</h1>
+  <h1>Marathon Miles</h1>
   <div class="sub">${esc(status.updated)} · wave ${status.wave} · <code>${esc(status.branch)}</code></div>
 
   <div class="banner">${status.headline}</div>

@@ -31,18 +31,20 @@
      and Twitter is not a browser, it fetches og:image over HTTP from its own
      servers, and every one of them rejects a data: URI.
 
-     SO THERE IS EXACTLY ONE THING THE OWNER HAS TO DO, and it is written here
-     rather than only in a report:
+     THAT IS NOW SETTLED: the card is committed at site/marathon-miles-og.png
+     and .github/workflows/pages.yml publishes site/ to marathon-miles.com, so
+     the image is served from the same origin as the page that references it.
+     The game is deployed to /game/, which is why og:url carries that path
+     while the landing page in site/index.html claims the root.
 
-       1. Host shots/share-og-1200x630.png (built by tools/ogimage.js) at a
-          public HTTPS URL.
-       2. Replace every REPLACE-WITH-YOUR-DOMAIN below with that domain.
-       3. node tools/build.js
+     Regenerate the card with node tools/ogimage.js (deterministic) and copy it
+     over site/marathon-miles-og.png if the wordmark or the target ever change.
 
-     Until then the placeholder is deliberately an unresolvable name rather
-     than an invented domain: a scraper that cannot fetch it falls back to the
-     title and the description, which is a correct preview minus a picture. A
-     made-up domain would eventually belong to somebody else, and the game
+     It was a placeholder until the domain existed, and deliberately an
+     unresolvable name rather than an invented domain: a scraper that cannot
+     fetch it falls back to the title and the description, which is a correct
+     preview minus a picture. A made-up domain would eventually belong to
+     somebody else, and the game
      would be advertising their image under its own name.
      ================================================================== -->
 
@@ -86,8 +88,8 @@
 <meta property="og:site_name" content="Marathon Miles">
 <meta property="og:title" content="MARATHON MILES">
 <meta property="og:description" content="One marathon a day. Everyone on the planet races the same date-seeded road: three lanes, 26.2 miles, and a world record of 1:59:30 to break.">
-<meta property="og:url" content="https://REPLACE-WITH-YOUR-DOMAIN/">
-<meta property="og:image" content="https://REPLACE-WITH-YOUR-DOMAIN/marathon-miles-og.png">
+<meta property="og:url" content="https://marathon-miles.com/game/">
+<meta property="og:image" content="https://marathon-miles.com/marathon-miles-og.png">
 <meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -95,7 +97,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="MARATHON MILES">
 <meta name="twitter:description" content="One marathon a day. Everyone on the planet races the same date-seeded road: three lanes, 26.2 miles, and a world record of 1:59:30 to break.">
-<meta name="twitter:image" content="https://REPLACE-WITH-YOUR-DOMAIN/marathon-miles-og.png">
+<meta name="twitter:image" content="https://marathon-miles.com/marathon-miles-og.png">
 <meta name="twitter:image:alt" content="MARATHON MILES over a night road, with the target 1:59:30 and a row of result blocks">
 <style>
 /*__CSS__*/

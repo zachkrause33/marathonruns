@@ -245,7 +245,7 @@ MR.HUD = (function () {
           gauge shows how full; PACE says how fast. Nothing else does.
         -->
         <div id="engine">
-          <div class="lab">FUEL</div>
+          <div class="lab">ENERGY</div>
           <!--
             THE GAUGE CARRIES THE POOL UNDER EFFORT, AND NOTHING ELSE MOVES.
 
@@ -1661,9 +1661,22 @@ MR.HUD = (function () {
         // is the whole difference between the two spends: a guard takes one
         // segment in a single step and reads as a notch going out, a surge
         // slides continuously down through the divisions.
-        const pool01 = clamp01(p.pool / MR.Pace.EFFORT_CFG.POOL_MAX);
-        n.gaugeFill.style.width = (pool01 * 100) + '%';
+        // ---- THE GAUGE IS ENERGY NOW, NOT THE GUARD POOL ------------------
+        //
+        // It used to count segments, which meant it only mattered to a player
+        // who was about to crash -- and a player who never crashes had no
+        // reason to look at it at all. Energy drains from the gun whether you
+        // crash or not and sets your top speed below the knee, so this is now
+        // the one number on screen that is always about to cost you something.
+        //
+        // Below the knee it turns, because a bar that only gets shorter does
+        // not say WHEN the slowing starts, and the whole mechanic is that
+        // there is a line you must stay above.
+        const energy01 = clamp01(p.energy);
+        n.gaugeFill.style.width = (energy01 * 100) + '%';
         n.gaugePace.style.left = (pace01 * 100) + '%';
+        cls(n.gaugeFill, 'fillCls',
+          'gaugeFill' + (p.energy < MR.Pace.EFFORT_CFG.ENERGY_KNEE ? ' dry' : ''));
         // The gauge is the POOL, counted, and it now has one spend: guard.
         // The 'surging' class it used to carry while a segment burned has no
         // state left to represent.

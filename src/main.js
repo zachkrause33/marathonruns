@@ -1068,12 +1068,20 @@ MR.unbail = function () {
             // A completed segment proves the player is collecting, so the
             // missed cue below is allowed to speak again. See its note.
             aidNagged = false;
-          } else if (!roomBefore && !tankToldOf) {
+          } else if (!roomBefore && !tankToldOf
+                     && pace.energy >= 1 - 1e-9) {
+            // WASTED means wasted, and since energy exists it almost never is.
+            // A pickup taken on a full guard pool still fills the tank, and
+            // the tank is what sets your top speed -- so the only genuinely
+            // discarded pickup is one taken with BOTH full, which is a rare
+            // and real thing to be told. Saying it whenever the pool was full
+            // would now be a lie, and it is the kind of lie that teaches a
+            // player to stop collecting.
             tankToldOf = true;
-            hud.toastAid('TANK FULL', 'WASTED');
+            hud.toastAid('ALL FULL', 'WASTED');
           }
         } else if (item.kind === 'banana') {
-          hud.toastAid('FUEL', '+' + item.gain + ' STREAK');
+          hud.toastAid('AID', '+' + item.gain + ' STREAK');
         }
         if (roomBefore) tankToldOf = false;
       }

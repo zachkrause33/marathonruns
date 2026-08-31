@@ -155,7 +155,7 @@ MR.Pace = (function () {
     // the best first-attempt line and the best learned line at perfect
     // execution, which the floor cannot touch because it lifts both equally.
     // That gap fell from 11 s to 6 s, and it fell in course.js.
-    FLOOR_BASE: 259.0,        // 4:19 /mi
+    FLOOR_BASE: 258.3,        // 4:19 /mi
     // FLOOR_SURGE STOOD HERE AT 244 (4:04/mi) and was the second floor an
     // elected surge ran toward. It is gone with the mechanic. The reasoning
     // that set it is worth keeping because it constrains any future second
@@ -180,6 +180,44 @@ MR.Pace = (function () {
     // roadmap rather than reaching for this one, because it is not here.
     POOL_MAX: 4,
     GUARD_COST: 1,
+
+    /**
+     * ================= ENERGY, AND WHY IT SETS THE SPEED =================
+     *
+     * The owner, after a run that missed by one second: "I think the energy is
+     * what you need to run the top speed as it decreases your speed does
+     * slightly. so it forces you to grab as much as possible. maybe once it is
+     * below half way you start slowing down a tad. start the game with full."
+     *
+     * The defect that fixes: aid was INSURANCE, and insurance is worth nothing
+     * to a player who does not crash. tools/playthrough.js measured a clean
+     * run collecting 335 pickups and pouring 141 of them -- thirty percent --
+     * into a pool that was already full. A third of the road's content was
+     * inert for exactly the players it was built to engage.
+     *
+     * Energy makes every pickup matter for all 26.2 miles: it drains whether
+     * you crash or not, so the road is a supply line rather than a first-aid
+     * kit. And it is the sport's own mechanic -- a runner who does not fuel
+     * depletes and slows, which is what hitting THE WALL is, a leg this course
+     * is already named after.
+     *
+     * KNEE is where it starts to bite. Above it there is no penalty at all, so
+     * a well-fuelled runner races exactly the game that shipped and nothing
+     * about the tuned difficulty above this line moves. Below it the penalty
+     * ramps to MAX_PENALTY seconds a mile at empty -- linearly, because a knee
+     * plus a curve is two things to feel and the owner asked for one.
+     *
+     * DRAIN is stated as the race-seconds a full tank lasts with nothing
+     * collected, because that is the number a person can reason about. At 2400
+     * against a 7170-second record, a runner who collects nothing is empty
+     * before the third of the race and spends the rest of it slowing.
+     */
+    ENERGY_START: 1,        // the owner asked to start full, and a marathon does
+    ENERGY_DRAIN_SECONDS: 5000,  // race-seconds a full tank lasts, uncollected
+    ENERGY_PER_PICKUP: 0.0045,     // 100 pickups is a whole tank
+    ENERGY_HIT: 0.08,            // what a contact costs: eight pickups of it
+    ENERGY_KNEE: 0.5,            // above this, no penalty whatsoever
+    ENERGY_MAX_PENALTY: 8,      // seconds a mile added at bone empty
     /**
      * ---- THE POOL IS FILLED IN SIPS NOW, AND THIS IS THE DENOMINATION ----
      *
@@ -393,6 +431,27 @@ MR.Pace = (function () {
     return EFFORT > 0 ? EFFORT_CFG.FLOOR_BASE - TEMPO.LIFT : K.FLOOR_PACE;
   }
 
+  /**
+   * The energy tax on a target pace, in seconds a mile. Pace is seconds per
+   * mile, so slower is LARGER and a tax is added rather than subtracted.
+   *
+   * Nothing above the knee. That is deliberate and it is what keeps this
+   * change from reopening every difficulty number this project has settled: a
+   * runner who fuels properly races the pace curve that shipped, unmodified,
+   * and only a runner who lets the tank fall past halfway meets a term that
+   * did not exist before.
+   *
+   * Inert at EFFORT = 0, like every other term the pool owns, so the
+   * before-the-pool build still measures as itself.
+   */
+  function energyTax(energy) {
+    if (EFFORT <= 0) return 0;
+    const knee = EFFORT_CFG.ENERGY_KNEE;
+    if (energy >= knee) return 0;
+    const shortfall = (knee - energy) / knee;      // 0 at the knee, 1 at empty
+    return shortfall * EFFORT_CFG.ENERGY_MAX_PENALTY;
+  }
+
   function targetPace(streak, floor) {
     // Two time constants. The fast term pays a weak player early; the slow
     // term is still unwinding at the finish, so late gates keep buying time
@@ -458,6 +517,10 @@ MR.Pace = (function () {
       pool: 0,           // segments in hand
       guards: 0,         // contacts a segment absorbed
       wasted: 0,         // items collected into a full pool
+      // Starts FULL, and drains from the gun. See ENERGY_* above.
+      energy: EFFORT > 0 ? EFFORT_CFG.ENERGY_START : 1,
+      energyFloor: 1,    // the lowest it ever got, for the finish card
+      drySeconds: 0,     // race-seconds spent under the knee, i.e. slowing
       // ---- the mats, and they are inert at EFFORT = 0 ---------------------
       tempo: 0,          // +1 on a forward mat, -1 on a backward one, set by main
       liftUnits: 0,      // world units run on forward mats
@@ -490,7 +553,22 @@ MR.Pace = (function () {
       // in tempoTarget means that even if one were laid there, the pace could
       // not go below K.FLOOR_PACE and the fastest the game can run would still
       // be FLOOR_SURGE exactly.
-      const tgt = tempoTarget(targetPace(s.streak, floorPace()), s.tempo);
+      // ---- ENERGY BURNS WHETHER YOU CRASH OR NOT -------------------------
+      // Drained on RACE seconds, not real ones, so the burn is the same on
+      // every device and in every harness -- the same reason raceTime, not
+      // realTime, drives everything else in this function.
+      if (EFFORT > 0) {
+        s.energy -= dRace / EFFORT_CFG.ENERGY_DRAIN_SECONDS;
+        if (s.energy < 0) s.energy = 0;
+        if (s.energy < s.energyFloor) s.energyFloor = s.energy;
+        if (s.energy < EFFORT_CFG.ENERGY_KNEE) s.drySeconds += dRace;
+      }
+
+      // ...and the tax it levies lands on the TARGET, in the same place and
+      // the same currency as the mat, so the pace still eases toward it at
+      // PACE_EASE and running dry is felt as a fade rather than a step.
+      const tgt = tempoTarget(targetPace(s.streak, floorPace()), s.tempo)
+        + energyTax(s.energy);
       const d = tgt - s.pace;
       const step = K.PACE_EASE * dRace;
       s.pace += Math.abs(d) <= step ? d : Math.sign(d) * step;
@@ -569,6 +647,18 @@ MR.Pace = (function () {
       // The epsilon is float slop only: the pool is a sum of 1/PER_SEG steps
       // and PER_SEG of them can land a hair under 1.0 in binary. Same slop,
       // same reason, in s.segments().
+      // ---- A CONTACT TAKES A BITE OUT OF THE TANK ------------------------
+      // The owner's choice, asked and answered: "one bar does everything."
+      // So a crash is paid in the same currency as the road, and the same bar
+      // that says how fast you can run says what the crash cost you. It hurts
+      // more when you are already low, which is both correct arithmetic --
+      // the tax below the knee is what converts it into seconds -- and how a
+      // marathon actually feels.
+      if (EFFORT > 0) {
+        s.energy -= EFFORT_CFG.ENERGY_HIT;
+        if (s.energy < 0) s.energy = 0;
+        if (s.energy < s.energyFloor) s.energyFloor = s.energy;
+      }
       if (EFFORT > 0 && s.pool >= EFFORT_CFG.GUARD_COST - 1e-9) {
         s.pool -= EFFORT_CFG.GUARD_COST;
         s.guards++;
@@ -610,6 +700,14 @@ MR.Pace = (function () {
       // come in. Only whole segments spend -- see s.segments() and onHit.
       if (EFFORT > 0) {
         s.aid++;
+        // ---- EVERY PICKUP NOW DOES SOMETHING, ALWAYS --------------------
+        // Energy is filled BEFORE the pool cap is consulted, which is the
+        // whole point of the change: a bottle taken on a flawless run used to
+        // be discarded outright (141 of 335 in a measured clean playthrough).
+        // It now buys back road you would otherwise fade on, so collecting is
+        // worth something to the best player in the game and not only to a
+        // damaged one.
+        s.energy = Math.min(1, s.energy + EFFORT_CFG.ENERGY_PER_PICKUP);
         if (s.pool >= EFFORT_CFG.POOL_MAX) { s.wasted++; return; }
         s.pool = Math.min(EFFORT_CFG.POOL_MAX, s.pool + 1 / EFFORT_CFG.PER_SEG);
         return;

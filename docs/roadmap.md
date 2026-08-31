@@ -7769,3 +7769,78 @@ node tools/simulate.js` all green, plus `course-test 365`, `playthrough`,
 32. **A reaction budget is not a visibility limit.** `READ_NEAR` was used as
     both in the sweep's sight model, and the two differ by a factor of eight
     on this road.
+
+## Roadmap 81 · Energy: the pickups stop being insurance and start being the race
+
+The owner, after missing by a second: *"I think the energy is what you need to
+run the top speed as it decreases your speed does slightly. so it forces you
+to grab as much as possible. maybe once it is below half way you start slowing
+down a tad. start the game with full."*
+
+**The defect it fixes was already measured and had been sitting there.** Aid
+was INSURANCE, and insurance is worth nothing to a player who does not crash:
+`playthrough` recorded a clean run collecting 335 pickups and pouring 141 of
+them -- thirty percent -- into a pool that was already full. A third of the
+road's content was inert for exactly the players the abundance pass was built
+to engage. Roadmap 77 named this and did not fix it.
+
+**The shape.** Energy starts full, drains on race seconds whether you crash or
+not, refills from every pickup, and above the knee (half a tank) levies
+nothing at all. Below the knee it adds up to ENERGY_MAX_PENALTY seconds a mile
+at empty, linearly. A contact costs a bite of it -- the owner's call, asked
+and answered: one bar does everything, so the meter that says how fast you can
+run is the same meter a crash takes from.
+
+Nothing above the knee is taxed, and that is what kept this from reopening
+every difficulty number the project has settled: a well-fuelled runner races
+the pace curve that shipped, unmodified.
+
+**Tuned against a stated acceptance criterion, not against taste.** The owner:
+*"if you collect everything and do not hit anything you should beat the record
+by more than 4 seconds. there needs to be slight room for error."*
+
+| | before | after |
+|---|---|---|
+| HARVEST (collect all), perfect | 1:59:14 | **1:59:11 -- 19 s under** |
+| HARVEST, at 0.960 execution | -- | **1:59:29, still wins** |
+| real page, clean bot run | 1:59:36 (+6) | **1:59:21 (-8)** |
+| first-attempt cells | 2/30 (7%) | 1/30 (3%) |
+| all cells | 8/45 (18%) | 8/45 (18%) |
+| spread across policies | 30.0 s | **62.6 s** |
+| policy order | flat-ish | HARVEST > COIN CHASE > PLAN AID > NO AID |
+
+The spread doubling is the point: collection now decides the race. HARVEST is
+the best line at every skill level, NO AID is near the bottom, and the gap
+between them is a minute.
+
+**Four dials, and the first three were wrong twice before they were right.**
+The first draft (drain 2400 s, 0.01 a pickup, 14 s/mi) took first-attempt wins
+to 0 of 30 and blew the policy spread to 251 s. Softening the penalty did not
+recover it, and the reason turned out to be a number nobody had looked up: a
+course carries 554 aid items and a realistic line takes 321 of them, a 58 per
+cent take rate, not the 100 per cent the tuning had assumed. Setting the
+break-even at the take rate a real line achieves put the clean playthrough
+back on its pre-energy time to the second, and the field was then restored
+with the project's own established dial, FLOOR_BASE 259.0 -> 258.3, at the
+measured 20.7 s of finish per s/mi.
+
+**The gauge changes meaning, so it changes colour.** It counted guard segments
+and therefore only mattered to a player about to crash. It is energy now,
+turns to the behind colour below the knee, and the track carries a notch at
+half so the line exists before you cross it -- a bar that only shrinks cannot
+say where the trouble starts.
+
+**And a toast had to be retired.** ENERGY FULL / WASTED fired whenever the
+guard pool was full. Since a pickup taken on a full pool still fills the tank,
+that message became a lie -- and the kind that teaches a player to stop
+collecting. It now fires only when both are full, which is rare and true.
+
+**Gates:** shoot clean, course-test 90 deterministic and solvable, playthrough
+end to end on the real page, mechanics --identity unmoved (this is all
+pace-side; no course stream is touched), dailystate 5/5, tempo PASS.
+
+**Corrections list, continued:**
+32. Tuning against an assumed collection rate. Three rounds of dials were
+    turned before anyone asked how many pickups a line actually takes; the
+    answer, 321 of 554, made the first two rounds meaningless. Look up the
+    denominator before turning the dial.

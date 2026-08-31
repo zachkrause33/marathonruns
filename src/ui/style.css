@@ -276,6 +276,24 @@ html, body {
    lost. Short, because it is a reassurance and not an alarm. */
 #engine.guarded { border-left-color: var(--ahead); background: rgba(14, 48, 38, 0.8); }
 .gaugeFill { position: absolute; inset: 0 auto 0 0; background: var(--accent); width: 0; }
+
+/* ---- ENERGY: THE KNEE, AND WHAT IT LOOKS LIKE TO CROSS IT ----------------
+   The bar is energy now. Above half it is the ordinary accent; below half the
+   runner is losing pace every stride, so it goes to the behind colour -- the
+   same red the HUD already uses for "you are losing time", rather than a new
+   colour nobody has been taught. The notch at 50% is drawn on the track
+   itself so the line exists before you cross it: a bar that only shrinks
+   cannot tell you where the trouble starts. */
+.gauge.tank.pool::after {
+  content: "";
+  position: absolute;
+  left: 50%; top: -2px; bottom: -2px;
+  width: 2px;
+  background: rgba(255, 253, 245, 0.55);
+  pointer-events: none;
+}
+.gaugeFill.dry { background: var(--behind); }
+
 /* Record pace as a mark on the range you are unlocking: once the fill passes
  * it, you are running faster than 1:59:30 needs. */
 .gaugeRec {

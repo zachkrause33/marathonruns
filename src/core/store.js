@@ -278,6 +278,31 @@ MR.Store = (function () {
     let rk = doneToday ? dateKey : shift(dateKey, -1);
     while (rk && byDate[rk] && byDate[rk].rec) { recStreak++; rk = shift(rk, -1); }
 
+    // THE SET, ALONGSIDE THE LOG.
+    //
+    // `hist` answers "what have I done lately" and the history tab reads it in
+    // date order. The city checklist asks a different question -- "where has
+    // the record fallen" -- which is a fact about a PLACE and not about a day,
+    // and reconstructing it from the log in the HUD would put a second walk of
+    // the same array in a file that should not own the arithmetic.
+    //
+    // Keyed by the city NAME the run was saved under, because that is the only
+    // field of a history row that names a place. Rows with no city (an old save
+    // from before the field existed, or a hand-edited blob) are skipped rather
+    // than bucketed under the empty string. Derived on every read rather than
+    // stored: a stored copy is a second source of truth that can disagree with
+    // the history, which is exactly the defect the record streak was rewritten
+    // to avoid.
+    const cities = {};
+    for (const e of s.hist) {
+      if (!e.city) continue;
+      const c = cities[e.city] || (cities[e.city] = { days: 0, rec: false, best: 0, last: null });
+      c.days++;
+      if (e.rec) c.rec = true;
+      if (!c.best || e.time < c.best) c.best = e.time;
+      if (!c.last || e.date > c.last) c.last = e.date;
+    }
+
     return {
       persistent: persistent,
       dateKey: dateKey,
@@ -293,6 +318,9 @@ MR.Store = (function () {
       // Newest first, because every reader of this list is a panel that leads
       // with the most recent day.
       history: s.hist.slice().reverse(),
+      // { CITY: { days, rec, best, last } } for every city with a finished
+      // day in the save. The checklist panel intersects this with the pool.
+      cities: cities,
       done: doneToday,                    // the record fell today: today is over
       doneTime: doneToday ? todayRow.time : 0,
       recordStreak: recStreak,

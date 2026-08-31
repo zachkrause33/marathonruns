@@ -7074,3 +7074,100 @@ number nobody measured, again.
     its gate line -- the same box-vs-plane error course.js's reachOf was
     written for, made independently on the render side. The two sides now
     agree: depth is charged everywhere a hazard is compared to a z.
+
+## Roadmap 77 · MARATHON MILES: the name, the record as the stated target, the day that closes, and the pickups that go
+
+Seven owner items in one pass, dispatched to two agents on separate file
+sets. Both agents were killed mid-flight by a spend limit -- the second
+while writing its own proof script -- so the implementations arrived
+complete and entirely unverified, and everything below was measured after
+the fact. That is recorded because it is the interesting part: the code was
+fine and the proofs were missing, which is the failure mode this project
+keeps rediscovering.
+
+**The name.** DAILY MARATHON becomes MARATHON MILES. The owner's brief was
+"it needs to include marathon" with the option of naming the character
+something starting with M; Miles does both jobs at once -- it is a person's
+name and it is the unit the game is counted in, so the wordmark states the
+distance without spending a word on it. The runner is Miles, which the
+locked panel now uses in the one place a character name earns its keep:
+MILES IS DONE FOR TODAY.
+
+**The target says what it is for.** The start panel's target line was a bare
+1:59:30. It now reads BREAK THE MARATHON WORLD RECORD over that number.
+Reworded in place rather than added as a row, because the owner had three
+lines cut from this panel two passes ago and the fix for "it does not say
+what this is" is not more text.
+
+**The day closes when the record falls.** Retries were already unlimited and
+stay that way; what is new is that breaking 1:59:30 ends the day. begin() is
+the single door every start path funnels through -- the button, RUN IT
+AGAIN, RESTART THIS RUN -- so the lockout holds one place. It keys off the
+same dateKey that seeds the course, so the road and the lock roll over on
+the same UTC midnight by construction rather than by agreement.
+
+It is bypassed for ?nosave=, ?bot= and ?skip=. That is not a convenience:
+nosave reads and writes nothing, and a bot that broke the record and then
+locked the harness out of the course it was measuring would take the entire
+gate suite with it on its best run.
+
+**PAST DAYS.** Every finished city, newest first, with the days the record
+fell marked, over a record streak, a days-finished count and a records-broken
+count. The streak is walked back from the history rather than kept as a
+counter, because a stored 5 whose last link is three days old is not a
+streak of 5 -- and a missed day then breaks the chain by construction,
+because a missed day has no row.
+
+**The end card loses three rows** at the owner's word -- contacts cost, aid
+taken, longest clean. Final time, the verdict, the fastest mile and the
+biome-leg chapter line stay.
+
+**The pickups.** Two reports one frame apart: "You kind of just run through
+them now" and "Take the circle out from under the bottles and banana."
+The mint pool-of-light discs are gone from both geometries -- same draw
+call either way, since each item is one merged mesh, so the cut is pure
+ground clutter removed. The pop is now the third version of that animation
+and the history is the argument for its brevity: v1 climbed into the lens
+and blinded the player, v2 collapsed and sank over 0.35s and still read as
+running through the item, and v3 runs the whole thing in 0.09s starting
+INSIDE the contact frame -- the first image after the touch is already
+crushed to sixty percent, so the touch itself visibly takes the item.
+
+**The instrument that had to be audited twice** (`tools/aidvanish.js`):
+its first draft reported the fix BROKEN, and both reasons were its own.
+It identified the item by matching whatever mesh stood near the right lane
+and z, and read a steady 1.00 off a piece of scenery; and it owned the rAF
+pump but not the clock, while the pop is timed off performance.now()
+directly -- so it stepped 24 frames in a few real milliseconds and watched
+an animation that had barely started. Both are fixed the same way: the file
+that owns the state reports it (aidState() now carries scale, y and footY)
+and the harness virtualises performance.now so the world and the animation
+run on one clock. This is the seventh instrument in this project to have
+flattered or maligned its subject, and the second to do it by inferring
+which object it was looking at.
+
+**The states nobody could have reached** (`tools/dailystate.js`): a
+four-day streak takes four days, a broken chain takes a missed day, and the
+lockout needs the record to actually fall -- which is the same thing as
+saying nobody would ever have checked them. It writes the save directly and
+reads back what the panels say. Five cases: a fresh save offers a run and
+claims no streak; four consecutive record days count; the same four with a
+hole two days back give a streak of 1, not 4 (the case a counter gets
+wrong); the record falling today removes the button, shows RECORD BROKEN and
+makes begin() refuse to change phase; and every harness door stays open
+whatever the save holds. A corrupt save still renders a start panel.
+
+**Gates on the shipped build:** build --check, shoot clean, playthrough end
+to end, ridehold 0 of 1042 on-deck samples, dailystate 5/5, and
+mechanics --identity bit-identical -- gate hash dc33748a, aid hash
+6e39f138, both unmoved, which is the guard that says none of this reached
+the course.
+
+**Corrections list, continued:**
+28. An instrument that infers WHICH OBJECT it is measuring will eventually
+    measure the wrong one. aidvanish picked its subject by proximity and
+    reported a working animation broken; the fix was to make the owning
+    file report the state rather than let the tool guess at it.
+29. A harness that takes the frame pump does not thereby own the clock.
+    Any animation timed off performance.now() runs on wall time no matter
+    how the frames are driven, so a stepped harness sees it frozen.

@@ -34,8 +34,12 @@
      THAT IS NOW SETTLED: the card is committed at site/marathon-miles-og.png
      and .github/workflows/pages.yml publishes site/ to marathon-miles.com, so
      the image is served from the same origin as the page that references it.
-     The game is deployed to /game/, which is why og:url carries that path
-     while the landing page in site/index.html claims the root.
+     THE GAME IS THE ROOT, so og:url is the bare domain. It was briefly at
+     /game/ with a landing page in front; the owner moved it, on the reasoning
+     a daily game lives or dies by: the URL should BE the game, so a returning
+     player is one tap from running. The explainer moved to /how-to-play/, the
+     start panel links out to it, and /game/ is kept as a redirect because
+     that URL was already shared.
 
      Regenerate the card with node tools/ogimage.js (deterministic) and copy it
      over site/marathon-miles-og.png if the wordmark or the target ever change.
@@ -88,7 +92,7 @@
 <meta property="og:site_name" content="Marathon Miles">
 <meta property="og:title" content="MARATHON MILES">
 <meta property="og:description" content="One marathon a day. Everyone on the planet races the same date-seeded road: three lanes, 26.2 miles, and a world record of 1:59:30 to break.">
-<meta property="og:url" content="https://marathon-miles.com/game/">
+<meta property="og:url" content="https://marathon-miles.com/">
 <meta property="og:image" content="https://marathon-miles.com/marathon-miles-og.png">
 <meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">
@@ -887,7 +891,7 @@ html, body {
 
 /* The generic .hidden rule only exists for .panel and #count; these two are
  * plain elements inside a panel, so they need their own. */
-#lockedBox.hidden, #histBtn.hidden { display: none; }
+#lockedBox.hidden, #histBtn.hidden, #endHistBtn.hidden { display: none; }
 
 /* THE LOCKED BOX replaces TOE THE LINE on a day the record has fallen. It
  * borrows #tomorrow's plate (the other "come back later" element) with the
@@ -923,7 +927,11 @@ html, body {
 
 /* The door to the history: a quiet text row under the CTA, never a rival to
  * it. Bordered like an .ebadge so it reads as interactive without weight. */
-#histBtn {
+/* The three text doors -- PAST DAYS from the line, PAST DAYS from the finish,
+   and HOW TO PLAY out to the site -- are one style. They are quiet on purpose:
+   none of them may compete with TOE THE LINE or RUN IT AGAIN, which are the
+   only things on either panel a player is meant to press by reflex. */
+#histBtn, #endHistBtn, #howBtn {
   display: inline-block; margin-top: 14px;
   background: none; border: 1px solid rgba(255, 253, 245, 0.28);
   color: #fffdf5; opacity: 0.75;
@@ -931,8 +939,12 @@ html, body {
   font-size: 10px; font-weight: 700; letter-spacing: 0.18em;
   padding: 7px 16px; cursor: pointer; pointer-events: auto;
 }
-#histBtn:active { transform: translateY(1px); }
-#histBtn:focus-visible { outline: 3px solid #fffdf5; outline-offset: 3px; }
+#histBtn:active, #endHistBtn:active, #howBtn:active { transform: translateY(1px); }
+#histBtn:focus-visible, #endHistBtn:focus-visible, #howBtn:focus-visible {
+  outline: 3px solid #fffdf5; outline-offset: 3px;
+}
+/* HOW TO PLAY is an anchor, so it has to be told not to look like body text. */
+#howBtn { text-decoration: none; margin-left: 8px; }
 
 #histSum {
   display: flex; flex-wrap: wrap; justify-content: center;
@@ -37466,6 +37478,18 @@ MR.HUD = (function () {
           plates follow.
         -->
         <button id="histBtn" type="button" class="hidden">PAST DAYS</button>
+        <!--
+          The door OUT to the explainer, which lives on the site rather than in
+          the game. Absolute rather than rooted, because this same file is
+          opened from file:// by every tool in tools/ and is published as a
+          standalone artifact -- a /how-to-play/ link is a dead link in both,
+          and a dead link on the start panel is worse than no link.
+          target=_blank so a player who taps it mid-session does not lose the
+          page they were about to run.
+        -->
+        <a id="howBtn" class="textBtn"
+           href="https://marathon-miles.com/how-to-play/"
+           target="_blank" rel="noopener">HOW TO PLAY</a>
       </div></div>
 
       <!--
@@ -37669,6 +37693,14 @@ MR.HUD = (function () {
           <div class="tomRoute" id="tomorrowRoute"></div>
         </div>
         <button class="cta" id="againBtn">RUN IT AGAIN</button>
+        <!--
+          The owner: "past days needs to be on the score page as well." The
+          finish is where a player has just produced a row for that log, so it
+          is the moment the log is most worth reading. Same panel, same button
+          class as the start panel's door -- and it hides on the same rule,
+          because a history of one run is not a history.
+        -->
+        <button id="endHistBtn" type="button" class="hidden">PAST DAYS</button>
       </div></div>
 
       <!--
@@ -37739,6 +37771,7 @@ MR.HUD = (function () {
       startMemory: q('startMemory'),
       lockedBox: q('lockedBox'), lockTime: q('lockTime'), lockNext: q('lockNext'),
       histBtn: q('histBtn'), histPanel: q('histPanel'),
+      endHistBtn: q('endHistBtn'),
       histSum: q('histSum'), histList: q('histList'), histBack: q('histBack'),
       endPanel: q('endPanel'), endTime: q('endTime'), endDate: q('endDate'),
       endVs: q('endVs'),
@@ -37957,6 +37990,7 @@ MR.HUD = (function () {
     api.setHistory = function (sum) {
       const rows = sum && sum.history ? sum.history : [];
       n.histBtn.classList.toggle('hidden', !rows.length);
+      n.endHistBtn.classList.toggle('hidden', !rows.length);
       if (!rows.length) {
         n.histSum.innerHTML = '';
         n.histList.innerHTML = '';
@@ -37988,15 +38022,23 @@ MR.HUD = (function () {
       }).join('');
     };
 
-    n.histBtn.addEventListener('click', function () {
-      n.startPanel.classList.add('hidden');
+    // WHICH PANEL OPENED THE LOG, because BACK has to go back. The history is
+    // now reachable from two places and the return path is not the same one:
+    // sending a player who opened it from the finish card back to the START
+    // panel would silently discard the result they were just looking at.
+    let histFrom = null;
+    const openHist = function (from) {
+      histFrom = from;
+      from.classList.add('hidden');
       n.histPanel.classList.remove('hidden');
       syncPanels();
       requestAnimationFrame(markScroll);
-    });
+    };
+    n.histBtn.addEventListener('click', function () { openHist(n.startPanel); });
+    n.endHistBtn.addEventListener('click', function () { openHist(n.endPanel); });
     n.histBack.addEventListener('click', function () {
       n.histPanel.classList.add('hidden');
-      n.startPanel.classList.remove('hidden');
+      (histFrom || n.startPanel).classList.remove('hidden');
       syncPanels();
       requestAnimationFrame(markScroll);
     });

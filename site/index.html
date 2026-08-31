@@ -169,6 +169,47 @@
     margin: 16px 0 0;
   }
 
+  /* The quiet second button. It must not compete with RUN TODAY'S COURSE --
+     the whole point of the landing page is that the run is one tap away -- so
+     it is an outline, not a fill. */
+  .cta.ghost {
+    background: transparent;
+    color: var(--ink);
+    box-shadow: inset 0 0 0 2px var(--line);
+    font-size: 19px;
+    padding: 13px 28px;
+  }
+  .cta.ghost:hover {
+    box-shadow: inset 0 0 0 2px var(--gold);
+    color: var(--gold);
+  }
+  .ctaRow {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* HOW TO PLAY, revealed by :target rather than by script. A modal would need
+     JavaScript to open and would leave the content unreachable without it;
+     this works with none, the back button closes it, and /#howto is a link
+     someone can send. */
+  #howto { display: none; }
+  #howto:target { display: block; }
+  #howto .closeRow { margin-top: 34px; }
+  .closeLink {
+    font-family: var(--display);
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    font-size: 14px;
+    color: var(--muted);
+    text-decoration: none;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 2px;
+  }
+  .closeLink:hover { color: var(--gold); border-bottom-color: var(--gold); }
+
   /* ---------- the target plate ---------- */
   .target {
     display: flex;
@@ -326,7 +367,7 @@
   }
 </style>
 </head>
-<body>
+<body id="top">
 
 <header class="hero">
   <div class="lanes" aria-hidden="true"></div>
@@ -346,9 +387,9 @@
   </div>
 </header>
 
-<section>
+<section id="howto">
   <div class="wrap">
-    <h2>How it works</h2>
+    <h2>How to play</h2>
     <p class="lead">Three lanes, one road, and everything on it is in your way. The controls take about five seconds to learn; the record takes rather longer.</p>
     <div class="grid">
       <div class="card">
@@ -367,13 +408,9 @@
         <p>Hit something unprotected and the record is gone for that run. Water and fruit along the road buy you a cushion — collect enough and a mistake costs you nothing.</p>
       </div>
     </div>
-  </div>
-</section>
 
-<section>
-  <div class="wrap">
-    <h2>The road decides your pace</h2>
-    <p class="lead">Coloured mats are laid along the course. They are the only thing that changes your speed, and they are placed where the decision is hardest — beside an obstacle, on top of a lorry, across the line you were already committed to.</p>
+    <h3 style="font-family:var(--display);text-transform:uppercase;letter-spacing:.05em;font-size:24px;margin:44px 0 8px">The road decides your pace</h3>
+    <p class="lead" style="margin-bottom:22px">Coloured mats are laid along the course. They are the only thing that changes your speed, and they are placed where the decision is hardest — beside an obstacle, on top of a lorry, across the line you were already committed to.</p>
     <div class="mats">
       <div class="mat">
         <strong>Green lifts you</strong>
@@ -384,6 +421,8 @@
         <span>A short loss. Sometimes the safe lane and the fast lane are not the same lane.</span>
       </div>
     </div>
+
+    <p class="closeRow"><a class="closeLink" href="#top">Close</a></p>
   </div>
 </section>
 
@@ -442,14 +481,17 @@
   <div class="wrap" style="text-align:center">
     <h2>Today's course is waiting</h2>
     <p class="lead" style="margin:0 auto 30px">Everyone is running the same road. See how close you get.</p>
-    <a class="cta" href="/game/">Run today's course</a>
+    <div class="ctaRow">
+      <a class="cta" href="/game/">Run today's course</a>
+      <a class="cta ghost" href="#howto">How to play</a>
+    </div>
   </div>
 </section>
 
 <footer>
   <div class="wrap">
     <span class="mark">Marathon Miles</span>
-    <span>26.2 miles · three lanes · one road a day</span>
+    <span><a href="#howto" style="color:var(--muted)">How to play</a> · 26.2 miles · three lanes · one road a day</span>
   </div>
 </footer>
 

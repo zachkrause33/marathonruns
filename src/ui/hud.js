@@ -442,6 +442,18 @@ MR.HUD = (function () {
           plates follow.
         -->
         <button id="histBtn" type="button" class="hidden">PAST DAYS</button>
+        <!--
+          The door OUT to the explainer, which lives on the site rather than in
+          the game. Absolute rather than rooted, because this same file is
+          opened from file:// by every tool in tools/ and is published as a
+          standalone artifact -- a /how-to-play/ link is a dead link in both,
+          and a dead link on the start panel is worse than no link.
+          target=_blank so a player who taps it mid-session does not lose the
+          page they were about to run.
+        -->
+        <a id="howBtn" class="textBtn"
+           href="https://marathon-miles.com/how-to-play/"
+           target="_blank" rel="noopener">HOW TO PLAY</a>
       </div></div>
 
       <!--
@@ -645,6 +657,14 @@ MR.HUD = (function () {
           <div class="tomRoute" id="tomorrowRoute"></div>
         </div>
         <button class="cta" id="againBtn">RUN IT AGAIN</button>
+        <!--
+          The owner: "past days needs to be on the score page as well." The
+          finish is where a player has just produced a row for that log, so it
+          is the moment the log is most worth reading. Same panel, same button
+          class as the start panel's door -- and it hides on the same rule,
+          because a history of one run is not a history.
+        -->
+        <button id="endHistBtn" type="button" class="hidden">PAST DAYS</button>
       </div></div>
 
       <!--
@@ -715,6 +735,7 @@ MR.HUD = (function () {
       startMemory: q('startMemory'),
       lockedBox: q('lockedBox'), lockTime: q('lockTime'), lockNext: q('lockNext'),
       histBtn: q('histBtn'), histPanel: q('histPanel'),
+      endHistBtn: q('endHistBtn'),
       histSum: q('histSum'), histList: q('histList'), histBack: q('histBack'),
       endPanel: q('endPanel'), endTime: q('endTime'), endDate: q('endDate'),
       endVs: q('endVs'),
@@ -933,6 +954,7 @@ MR.HUD = (function () {
     api.setHistory = function (sum) {
       const rows = sum && sum.history ? sum.history : [];
       n.histBtn.classList.toggle('hidden', !rows.length);
+      n.endHistBtn.classList.toggle('hidden', !rows.length);
       if (!rows.length) {
         n.histSum.innerHTML = '';
         n.histList.innerHTML = '';
@@ -964,15 +986,23 @@ MR.HUD = (function () {
       }).join('');
     };
 
-    n.histBtn.addEventListener('click', function () {
-      n.startPanel.classList.add('hidden');
+    // WHICH PANEL OPENED THE LOG, because BACK has to go back. The history is
+    // now reachable from two places and the return path is not the same one:
+    // sending a player who opened it from the finish card back to the START
+    // panel would silently discard the result they were just looking at.
+    let histFrom = null;
+    const openHist = function (from) {
+      histFrom = from;
+      from.classList.add('hidden');
       n.histPanel.classList.remove('hidden');
       syncPanels();
       requestAnimationFrame(markScroll);
-    });
+    };
+    n.histBtn.addEventListener('click', function () { openHist(n.startPanel); });
+    n.endHistBtn.addEventListener('click', function () { openHist(n.endPanel); });
     n.histBack.addEventListener('click', function () {
       n.histPanel.classList.add('hidden');
-      n.startPanel.classList.remove('hidden');
+      (histFrom || n.startPanel).classList.remove('hidden');
       syncPanels();
       requestAnimationFrame(markScroll);
     });

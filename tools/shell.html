@@ -34,8 +34,12 @@
      THAT IS NOW SETTLED: the card is committed at site/marathon-miles-og.png
      and .github/workflows/pages.yml publishes site/ to marathon-miles.com, so
      the image is served from the same origin as the page that references it.
-     The game is deployed to /game/, which is why og:url carries that path
-     while the landing page in site/index.html claims the root.
+     THE GAME IS THE ROOT, so og:url is the bare domain. It was briefly at
+     /game/ with a landing page in front; the owner moved it, on the reasoning
+     a daily game lives or dies by: the URL should BE the game, so a returning
+     player is one tap from running. The explainer moved to /how-to-play/, the
+     start panel links out to it, and /game/ is kept as a redirect because
+     that URL was already shared.
 
      Regenerate the card with node tools/ogimage.js (deterministic) and copy it
      over site/marathon-miles-og.png if the wordmark or the target ever change.
@@ -88,7 +92,7 @@
 <meta property="og:site_name" content="Marathon Miles">
 <meta property="og:title" content="MARATHON MILES">
 <meta property="og:description" content="One marathon a day. Everyone on the planet races the same date-seeded road: three lanes, 26.2 miles, and a world record of 1:59:30 to break.">
-<meta property="og:url" content="https://marathon-miles.com/game/">
+<meta property="og:url" content="https://marathon-miles.com/">
 <meta property="og:image" content="https://marathon-miles.com/marathon-miles-og.png">
 <meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">

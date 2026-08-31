@@ -53,11 +53,30 @@ jobs:
       - name: The committed game must match its source
         run: node tools/build.js --check
 
+      # THE GAME IS THE ROOT. The owner: "make this the landing page
+      # https://marathon-miles.com/game/". A daily game's URL should BE the
+      # game -- a returning player is one tap from running -- so the explainer
+      # moved to /how-to-play/ and the start panel links out to it.
+      #
+      # /game/ is kept as a redirect rather than deleted, because that URL has
+      # already been shared and a link someone sent a friend should not 404 to
+      # prove a point about site structure.
       - name: Assemble the site
         run: |
           mkdir -p _site/game
           cp -r site/. _site/
-          cp index.html _site/game/index.html
+          cp index.html _site/index.html
+          cat > _site/game/index.html <<'HTML'
+          <!DOCTYPE html>
+          <html lang="en"><head><meta charset="utf-8">
+          <title>Marathon Miles</title>
+          <link rel="canonical" href="https://marathon-miles.com/">
+          <meta http-equiv="refresh" content="0; url=/">
+          <meta name="robots" content="noindex">
+          <style>body{background:#0e1230;color:#f0f2fa;font-family:system-ui,sans-serif;
+          display:grid;place-items:center;height:100vh;margin:0}a{color:#ffd23f}</style>
+          </head><body><p>The game moved to <a href="/">marathon-miles.com</a>.</p></body></html>
+          HTML
 
       # enablement: true asks the API to turn Pages on and set its build type to
       # this workflow, so the repository does not have to be configured by hand

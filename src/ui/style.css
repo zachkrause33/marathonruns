@@ -773,7 +773,7 @@ html, body {
 
 /* The generic .hidden rule only exists for .panel and #count; these two are
  * plain elements inside a panel, so they need their own. */
-#lockedBox.hidden, #histBtn.hidden { display: none; }
+#lockedBox.hidden, #histBtn.hidden, #endHistBtn.hidden { display: none; }
 
 /* THE LOCKED BOX replaces TOE THE LINE on a day the record has fallen. It
  * borrows #tomorrow's plate (the other "come back later" element) with the
@@ -809,7 +809,11 @@ html, body {
 
 /* The door to the history: a quiet text row under the CTA, never a rival to
  * it. Bordered like an .ebadge so it reads as interactive without weight. */
-#histBtn {
+/* The three text doors -- PAST DAYS from the line, PAST DAYS from the finish,
+   and HOW TO PLAY out to the site -- are one style. They are quiet on purpose:
+   none of them may compete with TOE THE LINE or RUN IT AGAIN, which are the
+   only things on either panel a player is meant to press by reflex. */
+#histBtn, #endHistBtn, #howBtn {
   display: inline-block; margin-top: 14px;
   background: none; border: 1px solid rgba(255, 253, 245, 0.28);
   color: #fffdf5; opacity: 0.75;
@@ -817,8 +821,12 @@ html, body {
   font-size: 10px; font-weight: 700; letter-spacing: 0.18em;
   padding: 7px 16px; cursor: pointer; pointer-events: auto;
 }
-#histBtn:active { transform: translateY(1px); }
-#histBtn:focus-visible { outline: 3px solid #fffdf5; outline-offset: 3px; }
+#histBtn:active, #endHistBtn:active, #howBtn:active { transform: translateY(1px); }
+#histBtn:focus-visible, #endHistBtn:focus-visible, #howBtn:focus-visible {
+  outline: 3px solid #fffdf5; outline-offset: 3px;
+}
+/* HOW TO PLAY is an anchor, so it has to be told not to look like body text. */
+#howBtn { text-decoration: none; margin-left: 8px; }
 
 #histSum {
   display: flex; flex-wrap: wrap; justify-content: center;

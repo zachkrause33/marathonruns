@@ -7396,3 +7396,40 @@ converging. The runs themselves had finished; nothing was going to wake it.
 Long verification runs belong in the FOREGROUND with a timeout, where the
 result lands in the same turn. The tool it wrote is good; the way it waited
 was not.
+
+### 80a · The drain fix that made the instrument worse, reverted
+
+The touchinput tool passed 29 of 29 but needed a second attempt on one
+diagonal case, so its author proposed a stronger drain: after confirming the
+touchend had been observed, also hold for `K.INPUT_BUFFER + 0.2` of GAME
+time, so any action controls.js was still buffering had either been served or
+aged out before the next gesture.
+
+The reasoning is sound and the result was worse: **27 ok, 4 FAIL** -- up
+swipe to jump, down swipe to duck, the dy-dominant diagonal, and a bare tap
+that came back showing lane 0. Four hard failures against one soft retry.
+
+The defect is the oldest one in this document wearing new clothes: the
+instrument waits past the window in which the thing it measures exists.
+`airborne` and `ducking` are TRANSIENT -- the runner jumps and lands, ducks
+and stands -- so a drain that deliberately holds until the input buffer has
+aged out is holding until the jump is over, and then reports that no jump
+happened. The tap failure is the same clock running the other way: the extra
+hold let a straggler from the previous gesture land inside the tap's own
+observation window.
+
+Reverted to the committed version, which passes 29 of 29 with retries and
+whose --selftest still proves it can fail. The retry on the diagonal is real
+mild flakiness in the harness, not in the game, and it is recorded here
+rather than fixed, because the fix that was tried costs four true negatives
+to buy one flake and the honest trade is to keep the flake.
+
+The general rule, since this is now the third instrument in two days to be
+wrong about time: **a tool that waits for a stable state cannot measure a
+transient one.** If the drain is attempted again, it must sample the state at
+the moment the action resolves and assert on the sample, not on the world
+after the wait.
+
+The other cost, measured: the drained version took over 20 minutes against
+roughly 5 for the committed one, because it waits on a game clock that
+advances at the headless renderer's own 0.9 frames a second.

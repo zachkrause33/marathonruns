@@ -7,7 +7,7 @@
  * yesterday happened, so there was no reason for today to be a different
  * occasion from any other four minutes.
  *
- * Three facts are worth keeping, and only three:
+ * Four facts are worth keeping, and only four:
  *
  *   day    the best finish and the best clean streak for ONE date. Keyed by
  *          the date, so it expires by itself: tomorrow's first load simply
@@ -18,6 +18,10 @@
  *   best   the all-time marks. Finish and streak are tracked separately
  *          because they are different achievements: a player's fastest race
  *          is very often not the race with their longest clean line.
+ *   hist   one row per finished date: the city, the day's best time, and
+ *          whether 1:59:30 fell there. This is the calendar the history tab
+ *          reads, the source of the record streak, and the fact the daily
+ *          lockout keys off -- a day whose row says rec is a day that is over.
  *
  * ---- why this cannot break the game ----
  *
@@ -138,7 +142,39 @@ MR.Store = (function () {
       prev: null,   // { date, time, streak, tier }        the previous date played
       days: { count: 0, last: null },
       best: null,   // { time, tier, date, streak, streakDate }
+      hist: [],     // [{ date, city, time, rec, runs }]   one row per finished date
     };
+  }
+
+  // The run history is bounded, because localStorage is not. At one row a day
+  // this is over a year of play; the oldest rows fall off first, which is the
+  // only honest order for a list whose job is "what have I done lately".
+  const HIST_MAX = 400;
+
+  /**
+   * The history, sanitised: one row per date, sorted ascending, every field
+   * type-guarded so a hand-edited blob yields fewer rows rather than a throw.
+   */
+  function cleanHist(a) {
+    if (!Array.isArray(a)) return [];
+    const rows = [];
+    for (const e of a) {
+      if (!e || isNaN(parseKey(e.date)) || !pos(e.time)) continue;
+      rows.push({
+        date: e.date,
+        city: str(e.city),
+        time: pos(e.time),
+        rec: e.rec === true,
+        runs: Math.max(1, Math.round(num(e.runs, 1))),
+      });
+    }
+    rows.sort(function (x, y) { return x.date < y.date ? -1 : x.date > y.date ? 1 : 0; });
+    const out = [];
+    for (const e of rows) {
+      if (out.length && out[out.length - 1].date === e.date) out[out.length - 1] = e;
+      else out.push(e);
+    }
+    return out.slice(-HIST_MAX);
   }
 
   /** A run record, sanitised. Returns null if it is not a usable result. */
@@ -179,6 +215,7 @@ MR.Store = (function () {
       s.days.last = key(o.days.last);
       s.days.count = s.days.last ? Math.max(0, Math.round(num(o.days.count, 0))) : 0;
     }
+    s.hist = cleanHist(o.hist);
     if (o.best && pos(o.best.time)) {
       s.best = {
         time: pos(o.best.time),
@@ -227,6 +264,20 @@ MR.Store = (function () {
     // will extend it). Anything else is a broken chain.
     const alive = d === 0 || d === 1;
 
+    // The RECORD streak: consecutive dates on which 1:59:30 fell, counted off
+    // the history itself rather than off a second counter that could desync
+    // from it. Walked back from today if today already broke it, otherwise
+    // from yesterday -- a chain whose last link is two days old is not a
+    // streak, it is a streak that used to be one, and a missed day breaks it
+    // by construction because a missed day has no row.
+    const byDate = {};
+    for (const e of s.hist) byDate[e.date] = e;
+    const todayRow = byDate[dateKey] || null;
+    const doneToday = !!(todayRow && todayRow.rec);
+    let recStreak = 0;
+    let rk = doneToday ? dateKey : shift(dateKey, -1);
+    while (rk && byDate[rk] && byDate[rk].rec) { recStreak++; rk = shift(rk, -1); }
+
     return {
       persistent: persistent,
       dateKey: dateKey,
@@ -239,6 +290,13 @@ MR.Store = (function () {
         s.best ? s.best.streak : 0,
         today ? today.streak : 0
       ),
+      // Newest first, because every reader of this list is a panel that leads
+      // with the most recent day.
+      history: s.hist.slice().reverse(),
+      done: doneToday,                    // the record fell today: today is over
+      doneTime: doneToday ? todayRow.time : 0,
+      recordStreak: recStreak,
+      recordStreakCounted: doneToday,     // today already counts toward it
     };
   }
 
@@ -276,6 +334,7 @@ MR.Store = (function () {
       allTimeStreak: false,
       dayStreak: before.dayStreak,
       dayStreakGained: false,
+      recordBroken: false,
       today: before.today,
       best: before.best,
       pbStreak: before.pbStreak,
@@ -315,6 +374,28 @@ MR.Store = (function () {
       }
       out.dayStreak = s.days.count;
       out.today = s.day;
+
+      // The history row for this date. One per date, best time kept, and
+      // `rec` is a latch: a day on which the record fell stays a record day
+      // however many slower runs follow -- which is also what locks the day.
+      // Whether THIS run broke it is the caller's fact (it owns
+      // RECORD_SECONDS); this file only remembers it.
+      const rec = !!(run && run.record === true);
+      const city = str(run && run.city);
+      let h = null;
+      for (const e of s.hist) if (e.date === dateKey) { h = e; break; }
+      if (!h) {
+        h = { date: dateKey, city: city, time: r.time, rec: rec, runs: 1 };
+        s.hist.push(h);
+        s.hist.sort(function (x, y) { return x.date < y.date ? -1 : x.date > y.date ? 1 : 0; });
+        if (s.hist.length > HIST_MAX) s.hist = s.hist.slice(-HIST_MAX);
+      } else {
+        h.runs++;
+        if (r.time < h.time) h.time = r.time;
+        if (rec) h.rec = true;
+        if (city && !h.city) h.city = city;
+      }
+      out.recordBroken = rec;
     }
 
     if (!s.best) {

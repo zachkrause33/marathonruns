@@ -371,7 +371,7 @@ MR.HUD = (function () {
       <div class="panel" id="startPanel" role="dialog" aria-modal="true"
            aria-labelledby="startTitle"><div class="panelInner">
         <div class="date" id="startDate"></div>
-        <h1 id="startTitle">DAILY MARATHON</h1>
+        <h1 id="startTitle">MARATHON MILES</h1>
         <div class="route" id="startRoute"></div>
 
         <div class="blurb">
@@ -394,9 +394,14 @@ MR.HUD = (function () {
 
           The target keeps its number because that IS the wager. What it loses
           is the gloss under it.
+
+          The label names the wager in full -- the owner: the target "needs to
+          mention you are trying to break the marathon record". Same single
+          line, same figure; only the word TARGET grew into the claim it was
+          abbreviating.
         -->
         <div class="target">
-          <span class="targetLab">TARGET</span>
+          <span class="targetLab">BREAK THE MARATHON WORLD RECORD</span>
           <b class="num">${K.RECORD_LABEL}</b>
         </div>
 
@@ -410,8 +415,52 @@ MR.HUD = (function () {
         -->
         <div id="startMemory"></div>
 
+        <!--
+          THE DAY IS WON, AND THE PANEL SAYS SO INSTEAD OF OFFERING A START.
+
+          The owner: "You can play the game as many times as you want until
+          you break the record. After that you wait until the next day."
+          Retries stay unlimited on every other day; on a day the record fell
+          this box replaces the button, and it carries the four facts that
+          state of affairs consists of: the record is broken, the time that
+          broke it, that today is over, and when the next road opens. The
+          city and the streak are already on the panel above it.
+        -->
+        <div id="lockedBox" class="hidden">
+          <div class="lockChip">RECORD BROKEN</div>
+          <div class="lockTime num" id="lockTime"></div>
+          <div class="lockSub">MILES IS DONE FOR TODAY</div>
+          <div class="lockNext num" id="lockNext"></div>
+        </div>
+
         <div class="keys" id="startKeys"></div>
         <button class="cta" id="startBtn" type="button">TOE THE LINE</button>
+        <!--
+          The door to the run history. A text row rather than a second CTA --
+          it must not compete with TOE THE LINE -- and it renders only once
+          there is a history to show, the same empty-state rule the memory
+          plates follow.
+        -->
+        <button id="histBtn" type="button" class="hidden">PAST DAYS</button>
+      </div></div>
+
+      <!--
+        THE HISTORY TAB. The owner: "Maybe a tab that shows all the cities
+        you've completed and where you broke the record."
+
+        One row per finished date, newest first: when, where, the day's best
+        time, and a WR mark where 1:59:30 fell. WR is typeset, not iconed,
+        because the embedded face is subset to the characters this HUD prints
+        and a star would arrive in the system font. Reached only from the
+        start panel, and it goes back there, so it can never strand a race.
+      -->
+      <div class="panel hidden" id="histPanel" role="dialog" aria-modal="true"
+           aria-labelledby="histTitle"><div class="panelInner">
+        <div class="date">RUN HISTORY</div>
+        <h1 id="histTitle">PAST DAYS</h1>
+        <div id="histSum"></div>
+        <div id="histList"></div>
+        <button class="cta" id="histBack" type="button">BACK TO THE LINE</button>
       </div></div>
 
       <!--
@@ -480,16 +529,19 @@ MR.HUD = (function () {
       <div class="panel hidden" id="endPanel"><div class="panelInner">
         <div class="endDate" id="endDate"></div>
 
+        <!--
+          THE THIRD PASS TOOK THREE MORE ROWS, on the owner's word: "X contacts
+          cost, aid taken, longest clean" are out. The LONGEST CLEAN
+          co-headline, the contacts-cost plate and its counterfactual line, and
+          the AID TAKEN note all go; the finish time, the grade, the badges,
+          the best-today comparison, the turn line, the biome-leg chapter line
+          and TOMORROW stay. The card is one headline again.
+        -->
         <div id="endHead">
           <div class="endCell">
             <div class="lab">FINAL TIME</div>
             <h1 class="endBig num" id="endTime">&mdash;</h1>
             <div class="endSub num" id="endVs"></div>
-          </div>
-          <div class="endCell">
-            <div class="lab">LONGEST CLEAN</div>
-            <div class="endBig num" id="endStreak">0</div>
-            <div class="endSub num" id="endStreakSub"></div>
           </div>
         </div>
 
@@ -500,12 +552,6 @@ MR.HUD = (function () {
 
         <div id="endBadges"></div>
         <div id="endMem" class="num"></div>
-
-        <div id="endCost">
-          <div class="lab" id="endCostLab">WHAT THE CONTACTS COST</div>
-          <div class="endBig num" id="endCostVal">0:00</div>
-          <div class="endSub" id="endCostSub"></div>
-        </div>
 
         <div id="endTurn"></div>
 
@@ -591,12 +637,13 @@ MR.HUD = (function () {
       startPanel: q('startPanel'), startBtn: q('startBtn'), startDate: q('startDate'),
       startRoute: q('startRoute'), startKeys: q('startKeys'),
       startMemory: q('startMemory'),
+      lockedBox: q('lockedBox'), lockTime: q('lockTime'), lockNext: q('lockNext'),
+      histBtn: q('histBtn'), histPanel: q('histPanel'),
+      histSum: q('histSum'), histList: q('histList'), histBack: q('histBack'),
       endPanel: q('endPanel'), endTime: q('endTime'), endDate: q('endDate'),
-      endVs: q('endVs'), endStreak: q('endStreak'), endStreakSub: q('endStreakSub'),
+      endVs: q('endVs'),
       verdict: q('verdict'), tierNext: q('tierNext'),
       endBadges: q('endBadges'), endMem: q('endMem'),
-      endCost: q('endCost'), endCostLab: q('endCostLab'),
-      endCostVal: q('endCostVal'), endCostSub: q('endCostSub'),
       endTurn: q('endTurn'), tomorrow: q('tomorrow'), tomorrowRoute: q('tomorrowRoute'),
       againBtn: q('againBtn'),
       count: q('count'), countVal: q('countVal'),
@@ -640,6 +687,7 @@ MR.HUD = (function () {
     function syncPanels() {
       const open = !n.startPanel.classList.contains('hidden')
                 || !n.endPanel.classList.contains('hidden')
+                || !n.histPanel.classList.contains('hidden')
                 || !n.pausePanel.classList.contains('hidden');
       root.classList.toggle('panelOpen', open);
     }
@@ -647,7 +695,6 @@ MR.HUD = (function () {
     let hintUntil = 0;     // while set, the why-line shows the streak-cut message
     let dateKey = '';
     let course = null;
-    let cleanTime = null;  // this course's flawless finish, computed once
     let chapterCost = null; // per-city counterfactual, computed once at the tape
     let hitZ = null;       // z of every gate this run made contact with
 
@@ -715,6 +762,15 @@ MR.HUD = (function () {
         html += plate("TODAY'S BEST", Pace.clock(sum.today.time),
           Tier.of(sum.today.time).name + ' · ' + sum.today.streak + ' CLEAN');
       }
+      // The record streak -- consecutive days on which 1:59:30 fell. The win
+      // condition's own streak, so it outranks the played-days one, and it is
+      // held back until 2: a streak of one is just yesterday wearing a label.
+      if ((sum.recordStreak | 0) >= 2) {
+        html += plate('RECORD STREAK', String(sum.recordStreak),
+          sum.recordStreakCounted
+            ? 'RECORDS IN A ROW'
+            : 'BREAK TODAY FOR ' + (sum.recordStreak + 1));
+      }
       if (sum.dayStreak > 0) {
         html += plate('DAY STREAK', String(sum.dayStreak),
           sum.dayStreakCounted
@@ -733,35 +789,113 @@ MR.HUD = (function () {
       if (api.markScroll) requestAnimationFrame(api.markScroll);
     };
 
-    /**
-     * The flawless finish for THIS course, simulated once.
-     *
-     * This is the counterfactual the finish card is missing, and it cannot be
-     * approximated: `projectClean()` from a cold start models gates as
-     * arriving continuously and lands 50 seconds optimistic, because the real
-     * course opens with 150 units of empty runway during which the streak
-     * cannot grow. So this rolls the real pace model over the real gate
-     * positions -- the same code the race runs -- and takes the finish time.
-     *
-     * ~14400 steps, measured at 8.7ms, done once and cached. Aid is ignored on
-     * purpose: aid tops a streak up to a ceiling a flawless run is already
-     * above, so it is worth exactly zero to this hypothetical player.
-     */
-    function cleanFinish() {
-      if (cleanTime !== null) return cleanTime;
-      cleanTime = 0;
-      if (!course || !course.gates || !course.gates.length) return cleanTime;
-      const p = Pace.create();
-      let gi = 0, guard = 0;
-      while (!p.finished && guard++ < 40000) {
-        p.update(1 / 60);
-        while (gi < course.gates.length && p.units >= course.gates[gi].z) {
-          gi++; p.onClean();
-        }
-      }
-      cleanTime = p.finished ? p.finishTime : 0;
-      return cleanTime;
+    // ---- the run history ------------------------------------------------
+
+    /** 2026-08-05 -> "AUG 5", with the year only when it is not this one. */
+    function histDay(key, today) {
+      const t = Store ? Store.parseKey(key) : NaN;
+      if (isNaN(t)) return key;
+      const dt = new Date(t);
+      const M = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
+                 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+      const s = M[dt.getUTCMonth()] + ' ' + dt.getUTCDate();
+      const ty = Store ? Store.parseKey(today) : NaN;
+      return (!isNaN(ty) && new Date(ty).getUTCFullYear() !== dt.getUTCFullYear())
+        ? s + ' ' + dt.getUTCFullYear() : s;
     }
+
+    /**
+     * Fill the history tab, and show its door only when there is something
+     * behind it -- the same empty-state rule the memory plates follow, so a
+     * first-ever visit still gets exactly the panel a stranger has always got.
+     */
+    api.setHistory = function (sum) {
+      const rows = sum && sum.history ? sum.history : [];
+      n.histBtn.classList.toggle('hidden', !rows.length);
+      if (!rows.length) { n.histSum.innerHTML = ''; n.histList.innerHTML = ''; return; }
+
+      let wr = 0;
+      for (const e of rows) if (e.rec) wr++;
+      let html = '';
+      if ((sum.recordStreak | 0) >= 2) {
+        html += plate('RECORD STREAK', String(sum.recordStreak),
+          sum.recordStreakCounted ? 'RECORDS IN A ROW'
+                                  : 'BREAK TODAY FOR ' + (sum.recordStreak + 1));
+      }
+      html += plate('DAYS FINISHED', String(rows.length), 'ONE CITY EACH');
+      html += plate('RECORDS BROKEN', String(wr), wr ? 'MARKED WR BELOW' : 'NONE YET');
+      n.histSum.innerHTML = html;
+
+      n.histList.innerHTML = rows.map(function (e) {
+        return '<div class="hrow' + (e.rec ? ' rec' : '') + '">'
+          + '<span class="hdate">' + histDay(e.date, sum.dateKey) + '</span>'
+          + '<span class="hcity">' + (e.city || '&mdash;') + '</span>'
+          + '<span class="hwr">' + (e.rec ? 'WR' : '') + '</span>'
+          + '<span class="htime num">' + Pace.clock(e.time) + '</span>'
+          + '</div>';
+      }).join('');
+    };
+
+    n.histBtn.addEventListener('click', function () {
+      n.startPanel.classList.add('hidden');
+      n.histPanel.classList.remove('hidden');
+      syncPanels();
+      requestAnimationFrame(markScroll);
+    });
+    n.histBack.addEventListener('click', function () {
+      n.histPanel.classList.add('hidden');
+      n.startPanel.classList.remove('hidden');
+      syncPanels();
+      requestAnimationFrame(markScroll);
+    });
+
+    // ---- the daily lockout ----------------------------------------------
+
+    /**
+     * Put the start panel into (or out of) its day-is-won state.
+     *
+     * The panel keeps its masthead, city, wager and memory; what changes is
+     * the offer: TOE THE LINE and the key legend step out, the RECORD BROKEN
+     * box steps in, and the finish card's RUN IT AGAIN relabels to say the
+     * road is closed. main.js owns WHETHER today is locked (it holds the save
+     * and the nosave flag); this only draws it.
+     *
+     * The countdown to the next course is re-derived on a slow tick rather
+     * than counted down, so a laptop waking from sleep shows the truth. When
+     * it reaches zero the page cannot roll the course without a reload --
+     * the seed is read at boot -- so the line says exactly that.
+     */
+    let lockTimer = null;
+    api.setLocked = function (info) {
+      n.startPanel.classList.toggle('locked', !!info);
+      n.lockedBox.classList.toggle('hidden', !info);
+      n.againBtn.textContent = info ? 'DONE FOR TODAY' : 'RUN IT AGAIN';
+      if (lockTimer) { clearInterval(lockTimer); lockTimer = null; }
+      if (!info) return;
+      n.lockTime.textContent = Pace.clock(info.time);
+      const tick = function () {
+        const t0 = Store ? Store.parseKey(info.dateKey) : NaN;
+        const left = isNaN(t0) ? NaN : (t0 + 86400000) - Date.now();
+        let s = '';
+        if (isFinite(left)) {
+          if (left <= 0) s = 'A NEW ROAD IS READY · RELOAD';
+          else {
+            const mins = Math.ceil(left / 60000);
+            const h = Math.floor(mins / 60), m = mins - h * 60;
+            s = 'NEXT COURSE IN ' + (h > 0 ? h + 'H ' : '') + m + 'M';
+          }
+        }
+        n.lockNext.textContent = s;
+      };
+      tick();
+      lockTimer = setInterval(tick, 30000);
+      if (api.markScroll) requestAnimationFrame(api.markScroll);
+    };
+
+    // cleanFinish() -- the flawless-run counterfactual that priced the
+    // contacts-cost plate -- went with that plate: the owner removed the row,
+    // and this was its only reader. chapterCosts() below never used it; its
+    // baseline is its own run(-1), differenced against itself.
 
     /**
      * WHICH LEG THE RUN WAS LOST IN.
@@ -838,9 +972,10 @@ MR.HUD = (function () {
         return i;
       };
 
-      // The hill is not modelled here for the same reason cleanFinish() does
-      // not model it: pace.js integrates the grade term to zero over the race,
-      // and it measures 0.01s on a flawless finish. Both sides of every
+      // The hill is not modelled here because pace.js integrates the grade
+      // term to zero over the race: it measures 0.01s on a flawless finish
+      // (established when the retired cleanFinish() counterfactual was built,
+      // and unchanged by its retirement). Both sides of every
       // subtraction below use the identical model anyway, so anything it did
       // contribute would cancel.
       const run = function (skip) {
@@ -994,7 +1129,6 @@ MR.HUD = (function () {
     api.setCourse = function (c) {
       if (!c) return;
       course = c;
-      cleanTime = null;
       chapterCost = null;
       const set = course.settings;
       n.startRoute.textContent = set && set.length
@@ -1040,7 +1174,7 @@ MR.HUD = (function () {
      * about is not a recovery.
      */
     function markScroll() {
-      for (const el of [n.startPanel, n.endPanel]) {
+      for (const el of [n.startPanel, n.endPanel, n.histPanel]) {
         if (!el) continue;
         el.classList.toggle('canScroll', el.scrollHeight - el.clientHeight > 4);
       }
@@ -1051,7 +1185,7 @@ MR.HUD = (function () {
     // changes -- a phone turned on its side is the common case, and the row it
     // lands in is the one the runner stands on.
     window.addEventListener('resize', fitRoute);
-    for (const el of [n.startPanel, n.endPanel]) {
+    for (const el of [n.startPanel, n.endPanel, n.histPanel]) {
       el.addEventListener('scroll', function () {
         el.classList.toggle('canScroll',
           el.scrollHeight - el.clientHeight - el.scrollTop > 4);
@@ -1475,21 +1609,16 @@ MR.HUD = (function () {
       const rung = Tier.of(t);
       const up = Tier.next(t);
 
-      // ---- headline: the time, and the streak beside it ------------------
-      // Two numbers, not one. The finish time is the result; the longest clean
-      // line is the SKILL, and unlike the time it cannot be taken away by a
-      // single contact in mile 3. It is monotone, it has 189 points of
-      // resolution, and it is still worth chasing on a day the record died
-      // ninety seconds in -- which is most days.
+      // ---- headline: the time ---------------------------------------------
+      // One number. The LONGEST CLEAN co-headline that stood beside it was
+      // removed on the owner's word, with the contacts-cost plate and the aid
+      // note ("the following ... can be removed: X contacts cost, aid taken,
+      // longest clean").
       n.endTime.textContent = Pace.clock(t);
       const vs = t - K.RECORD_SECONDS;
       n.endVs.textContent = (vs <= 0 ? '-' : '+') + Pace.clock(Math.abs(vs))
                           + ' VS ' + K.RECORD_LABEL;
       cls(n.endVs, 'endVsCls', 'endSub num' + (vs <= 0 ? ' ahead' : ''));
-
-      n.endStreak.textContent = String(p.bestStreak);
-      const gates = course && course.gates ? course.gates.length : p.gatesSeen;
-      n.endStreakSub.textContent = 'OF ' + gates + ' GATES';
 
       // ---- the grade -----------------------------------------------------
       n.verdict.textContent = rung.name;
@@ -1524,40 +1653,11 @@ MR.HUD = (function () {
         // is the same rule on the other side of the run.
         : '';
 
-      // ---- the true cost of contact --------------------------------------
-      // This row used to print hits * HIT_TIME_PENALTY. On a twelve-contact
-      // run that is +0:18 against a real cost of over thirteen minutes -- the
-      // stopwatch penalty is a rounding error next to the speed those twelve
-      // contacts took away for the rest of the race. The screen understated
-      // the player's own causal contribution by a factor of forty-five and
-      // left an unexplained twelve-minute hole, which invites exactly one
-      // conclusion: "my mistakes cost 18 seconds, the game did the rest."
-      //
-      // The counterfactual is computable and is now computed. See
-      // cleanFinish(): the same pace model, over the same gates, cleared.
-      const clean = cleanFinish();
-      const lost = clean ? Math.max(0, t - clean) : p.hits * K.HIT_TIME_PENALTY;
-      n.endCost.classList.toggle('clean', !p.hits);
-      if (!p.hits) {
-        n.endCostLab.textContent = 'CLEAN LINE';
-        n.endCostVal.textContent = '0:00';
-        n.endCostSub.textContent = 'NOTHING LEFT ON THE ROAD';
-      } else {
-        n.endCostLab.textContent = p.hits + (p.hits === 1 ? ' CONTACT COST' : ' CONTACTS COST');
-        n.endCostVal.textContent = Pace.clock(lost);
-        n.endCostSub.textContent = clean
-          ? 'CLEAN, YOU FINISH ' + Pace.clock(clean) + ' ON THIS COURSE'
-          : 'AGAINST A FLAWLESS LINE';
-      }
-
       // ---- the two notes ---------------------------------------------------
-      // What is left of the summary and the split table. The turn names one
-      // actual moment in the race, which is the job the six-block table could
-      // not do; AID TAKEN is the one number from the summary that was not
-      // arithmetic on something else already printed here -- and on the runs
-      // the mechanic exists for, a broken race, it is very often 0 of 14,
-      // which is the only line on the card that tells a player there was help
-      // on the road they ran past.
+      // The turn names one actual moment in the race, which is the job the
+      // six-block split table could not do. The contacts-cost plate and the
+      // AID TAKEN note that used to sit between here and the badges were
+      // removed on the owner's word.
       const notes = [];
       const turn = turnLine(p);
       if (turn) notes.push(turn);
@@ -1567,16 +1667,6 @@ MR.HUD = (function () {
       // did carry the run ("CLEAN THROUGH THE WALL").
       const where = p.hits ? decisiveChapter(t) : null;
       if (where) notes.push('CLEAN THROUGH ' + where.name + ' · ' + Pace.clock(where.would));
-      // Not on a flawless line. cleanFinish() spells out why aid is worth
-      // exactly zero to a run that never broke -- it tops a streak up to a
-      // ceiling that run is already above -- so "AID TAKEN · 0 OF 14" under a
-      // 205-of-205 card reports a miss that was not one. It is printed when
-      // the player took some, or when there were contacts it could have
-      // answered.
-      const aidN = course && course.aid ? course.aid.length : 0;
-      if (aidN && (p.aid > 0 || p.hits > 0)) {
-        notes.push('AID TAKEN · ' + p.aid + ' OF ' + aidN);
-      }
       n.endTurn.innerHTML = notes
         .map(function (x) { return '<div>' + x + '</div>'; }).join('');
       const tom = tomorrowLine();

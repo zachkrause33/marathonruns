@@ -9,7 +9,8 @@
  *   ?skip=SECONDS     fast-forward this many race seconds before rendering
  *   ?debug=1          FPS and draw-call readout
  *   ?nocount=1        skip the countdown
- *   ?nosave=1         play without writing to the save
+ *   ?nosave=1         play without the save: reads nothing, writes nothing,
+ *                     and the record-broken daily lockout never engages
  *   ?polish=0         run the character animation with the polish terms off
  *   ?effort=0         the game before the pool, the guard and the surge zones
  *   ?surge=POLICY     which zones the autopilot elects: all (default), none,
@@ -231,12 +232,46 @@
   const LAUNCH = 0.72;        // seconds for the pose to leave the line
   const LAUNCH_SPEED = 0.34;  // ...and for the stride to reach full rate
 
+  // ---- THE DAILY LOCKOUT --------------------------------------------------
+  //
+  // The owner: "You can play the game as many times as you want until you
+  // break the record. After that you wait until the next day." So retries stay
+  // unlimited on every other day, and the one thing that closes today is
+  // 1:59:30 falling on it -- recorded by the store as the date row's `rec`
+  // latch, which is keyed by the SAME dateKey that seeds the course, so the
+  // lockout and the road roll over on the same UTC midnight by construction.
+  //
+  // Bypassed for every automated boot, not just for ?nosave=: nosave reads and
+  // writes nothing (so the gate suite can never see a locked page), and ?bot=
+  // drives pages the harnesses own -- a bot that broke the record and then
+  // locked the harness out of the course it was measuring would take the whole
+  // suite with it on its best run.
+  // ?skip= is in the list for the same reason: it is a harness door (it force
+  // -starts a race below begin()'s guard), and a skipped race on a locked page
+  // would be a tool measuring a panel instead of a run.
+  const LOCKOUT = !NOSAVE && !BOT && !(SKIP > 0);
+  let locked = false;
+
+  /**
+   * Re-read the save and redraw everything that hangs off it: the memory
+   * plates, the history tab, and whether today's start button still exists.
+   * Under ?nosave= this passes null everywhere -- reads nothing, shows
+   * nothing, locks nothing.
+   */
+  function refreshDaily() {
+    const sum = NOSAVE ? null : MR.Store.summary(dateKey);
+    hud.setMemory(sum);
+    hud.setHistory(sum);
+    locked = !!(LOCKOUT && sum && sum.done);
+    hud.setLocked(locked ? { time: sum.doneTime, dateKey: dateKey } : null);
+  }
+
   function reset() {
     clearTimeout(endTimer);
     showCard = null;
     // Re-read the save before every run, not once at boot: a second run in the
     // same session has to chase the streak the first one just set.
-    hud.setMemory(MR.Store.summary(dateKey));
+    refreshDaily();
     hud.reset();
     pace = Pace.create(elev);
     player.reset();
@@ -267,6 +302,11 @@
   }
 
   function begin() {
+    // Today is won and closed. Every path that starts a run funnels through
+    // here -- the start button, RUN IT AGAIN, RESTART THIS RUN -- so this is
+    // the one door the lockout has to hold. It routes back to the start
+    // panel, which is showing the completed state rather than a button.
+    if (locked) { hud.hideEnd(); hud.showStart(true); return; }
     reset();
     audio.unlock();
     hud.showStart(false);
@@ -1029,7 +1069,17 @@
           time: pace.finishTime,
           streak: pace.bestStreak,
           tier: MR.Tier.of(pace.finishTime).name,
+          // The history row's facts. The city names today's road on the
+          // history tab; `record` is the fact the daily lockout keys off,
+          // decided here because this file owns RECORD_SECONDS and the store
+          // deliberately does not. Same comparison the celebration uses.
+          city: course.settings && course.settings.length ? course.settings[0].name : '',
+          record: pace.finishTime <= K.RECORD_SECONDS,
         });
+        // The save just changed; the panels that hang off it follow, and if
+        // the record fell this is the moment today locks -- the finish card's
+        // RUN IT AGAIN relabels and routes back to the completed start panel.
+        if (saved) refreshDaily();
         // See finishJoy above. Read here, once, off the result that is now a
         // fact -- never off the projection, which is still twitching a quarter
         // of a second before the line.

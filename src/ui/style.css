@@ -743,6 +743,109 @@ html, body {
   opacity: 0.58; margin-top: 2px; line-height: 1.35;
 }
 
+/* ---- the day-is-won state, and the history tab ----
+ *
+ * Both live in the panel language the rest of this sheet already speaks:
+ * plates, a 9px tracked label, one accent, tabular figures. Neither invents
+ * a colour or a shape. */
+
+/* The generic .hidden rule only exists for .panel and #count; these two are
+ * plain elements inside a panel, so they need their own. */
+#lockedBox.hidden, #histBtn.hidden { display: none; }
+
+/* THE LOCKED BOX replaces TOE THE LINE on a day the record has fallen. It
+ * borrows #tomorrow's plate (the other "come back later" element) with the
+ * win chip on top, so the state reads as a result rather than as a missing
+ * button. */
+#startPanel.locked #startBtn,
+#startPanel.locked #startKeys { display: none; }
+#lockedBox {
+  margin-top: 20px; padding: 12px 14px 13px;
+  border: 1px solid rgba(77, 251, 160, 0.45);
+  background: rgba(77, 251, 160, 0.07);
+}
+.lockChip {
+  display: inline-block;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.14em;
+  padding: 3px 8px;
+  background: var(--ahead); color: #06301c;
+}
+.lockTime {
+  font-size: clamp(30px, 7vw, 40px); font-weight: 700;
+  letter-spacing: -0.03em; line-height: 1.02; margin-top: 7px;
+  color: var(--ahead);
+}
+.lockSub {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
+  opacity: 0.85; margin-top: 5px;
+}
+.lockNext {
+  font-size: 10px; font-weight: 500; letter-spacing: 0.14em;
+  color: var(--accent); margin-top: 4px;
+}
+.lockNext:empty { display: none; }
+
+/* The door to the history: a quiet text row under the CTA, never a rival to
+ * it. Bordered like an .ebadge so it reads as interactive without weight. */
+#histBtn {
+  display: inline-block; margin-top: 14px;
+  background: none; border: 1px solid rgba(255, 253, 245, 0.28);
+  color: #fffdf5; opacity: 0.75;
+  font-family: inherit;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.18em;
+  padding: 7px 16px; cursor: pointer; pointer-events: auto;
+}
+#histBtn:active { transform: translateY(1px); }
+#histBtn:focus-visible { outline: 3px solid #fffdf5; outline-offset: 3px; }
+
+#histSum {
+  display: flex; flex-wrap: wrap; justify-content: center;
+  align-items: stretch; gap: 7px;
+  margin-top: 16px;
+}
+
+/* One row per day: when, where, the mark, the time. The city gets the slack
+ * and the ellipsis; the date and time columns are fixed so forty rows scan as
+ * two clean rails, which is what makes the WR marks findable at a glance. At
+ * the 320px floor the four columns measure 246px against 284 available. */
+#histList {
+  max-width: 360px; margin: 14px auto 0;
+  text-align: left;
+}
+.hrow {
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 5px 2px 4px;
+  border-bottom: 1px solid rgba(255, 253, 245, 0.1);
+  font-size: 12px; font-weight: 500;
+}
+.hrow:first-child { border-top: 1px solid rgba(255, 253, 245, 0.1); }
+.hdate {
+  flex: 0 0 66px;
+  font-size: 10px; font-weight: 500; letter-spacing: 0.08em;
+  opacity: 0.6; white-space: nowrap;
+}
+.hcity {
+  flex: 1 1 auto; min-width: 0;
+  font-weight: 700; letter-spacing: 0.06em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.hwr {
+  flex: 0 0 26px; text-align: center;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.08em;
+}
+.hrow.rec .hwr {
+  color: #06301c; background: var(--ahead); padding: 1px 0;
+}
+.htime {
+  flex: 0 0 58px; text-align: right;
+  font-size: 13px; font-weight: 700;
+}
+/* A record day is the row the tab exists for, so it is the bright one; the
+ * others step back the way past cities do on the rail. */
+.hrow { opacity: 0.78; }
+.hrow.rec { opacity: 1; }
+.hrow.rec .htime { color: var(--ahead); }
+
 /* ---- finish panel ----
  *
  * Rebuilt out of the HUD's own parts. The card was a spreadsheet dropped on a
@@ -834,25 +937,10 @@ html, body {
 }
 #endMem:empty { display: none; }
 
-/* THE CAUSAL LINE.
- *
- * This is where the card used to print TIME LOST +0:18 for twelve contacts
- * that really cost thirteen and a half minutes. The number is now measured
- * against a flawless run of this exact course, and it is set in plain ink
- * rather than in pink: the colour system reserves red for losing the record,
- * and this is not a grade, it is the player's own arithmetic. The line under
- * it -- the time they would have run -- is the one that has to be attractive,
- * so it is the one in accent. */
-#endCost {
-  margin-top: 17px; padding: 5px 0 5px 11px;
-  border-left: 4px solid rgba(255, 107, 132, 0.8);
-}
-#endCost.clean { border-left-color: var(--ahead); }
-#endCost .endBig { font-size: clamp(24px, 5.5vw, 32px); }
-#endCost .endSub {
-  color: var(--accent); opacity: 0.88;
-  font-weight: 700; letter-spacing: 0.05em;
-}
+/* The contacts-cost plate (#endCost) and the LONGEST CLEAN co-headline that
+ * used to sit here were removed on the owner's word, with the AID TAKEN note:
+ * "X contacts cost, aid taken, longest clean ... can be removed". The card is
+ * one headline again and the remaining blocks close up. */
 
 /* THE NOTES.
  *
@@ -1022,6 +1110,16 @@ html, body {
   .mplate .mv { font-size: 25px; }
   .mplate .ms { font-size: 10px; }
 
+  #histBtn { font-size: 12px; padding: 9px 20px; }
+  #histList { max-width: 460px; }
+  .hrow { font-size: 14px; }
+  .hdate { flex-basis: 86px; font-size: 12px; }
+  .htime { flex-basis: 72px; font-size: 15px; }
+  #lockedBox { padding: 15px 18px 16px; }
+  .lockTime { font-size: 48px; }
+  .lockSub { font-size: 13px; }
+  .lockNext { font-size: 12px; }
+
   .endDate { font-size: 11px; }
   #endHead { gap: 16px 44px; }
   .endSub { font-size: 12px; }
@@ -1115,14 +1213,18 @@ html, body {
   #startMemory { margin-top: 10px; gap: 6px; }
   .mplate { padding: 4px 8px 5px; }
   .mplate .mv { font-size: 15px; }
+  #lockedBox { margin-top: 8px; padding: 7px 10px 8px; }
+  .lockTime { font-size: 24px; margin-top: 4px; }
+  .lockSub { margin-top: 3px; }
+  #histBtn { margin-top: 8px; padding: 5px 12px; }
+  #histSum { margin-top: 8px; gap: 6px; }
+  #histList { margin-top: 8px; }
   .endDate { margin-bottom: 4px; }
   .panel .endBig { font-size: clamp(26px, 6vh, 38px); }
   #endHead { gap: 8px 24px; }
   .endSub { margin-top: 2px; }
   #tierRow { margin-top: 6px; }
   #endBadges, #endMem { margin-top: 4px; }
-  #endCost { margin-top: 6px; padding-top: 3px; padding-bottom: 3px; }
-  #endCost .endBig { font-size: 22px; }
   #endTurn { margin-top: 6px; font-size: 10px; line-height: 1.4; }
   #tomorrow { margin-top: 6px; padding: 5px 9px 5px; }
   #tomorrow .tomRoute { font-size: 11px; margin-top: 2px; }

@@ -53,7 +53,17 @@ jobs:
           cp -r site/. _site/
           cp index.html _site/game/index.html
 
+      # enablement: true asks the API to turn Pages on and set its build type to
+      # this workflow, so the repository does not have to be configured by hand
+      # first. It needs admin rights on the repo; when the token does not have
+      # them this step still fails with "Get Pages site failed", which is the
+      # signal to switch Pages on manually under Settings > Pages > Build and
+      # deployment > Source: GitHub Actions. Everything before this point --
+      # including the build --check that guards against shipping a stale game --
+      # has already run and passed by then.
       - uses: actions/configure-pages@v4
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

@@ -7171,3 +7171,176 @@ the course.
 29. A harness that takes the frame pump does not thereby own the clock.
     Any animation timed off performance.now() runs on wall time no matter
     how the frames are driven, so a stepped harness sees it frozen.
+
+## Roadmap 79 · The share card, the head it travels with, the city checklist, and the blank page that is no longer blank
+
+Numbered 79 and not 78 on purpose: another agent is landing in this
+window and 78 is left for it.
+
+Four owner items, dispatched to one agent on the UI file set. The course
+generator was not touched at all, and that is the guard rather than the
+claim -- `mechanics --identity` returns gate hash `dc33748a` and aid hash
+`6e39f138`, both unmoved, measured against a tree carrying every file in
+this pass. (Run in the shared working tree the hashes read `8f2937f2` /
+`4781033d`, because a second agent has `src/core/course.js` open; the
+identity run for this pass was therefore done against HEAD's course.js
+with all of this pass's files copied over it, which is the only way to
+attribute a hash in a tree several agents are writing to.)
+
+**THE BLANK PAGE, first, because it was the only thing here that could
+lose a player outright.** `src/main.js` created the WebGL renderer with no
+try/catch, and there was no window error handler and no context-loss
+listener anywhere in `src/`. Measured on the shipped build in Chromium
+with WebGL disabled: **`document.body.innerText` was the empty string** and
+the canvas sat at its 300x150 default. A visitor on a locked-down browser,
+an enterprise-policy device or a low-memory Android got a dark rectangle
+and no way to find out why. Three fixes, one family: the constructor is
+caught (and a renderer that hands back no context is treated as a
+refusal); a last-resort `error` / `unhandledrejection` listener covers any
+other boot throw, gated on `MR.game.ready` so a working race is never
+covered by an error card; and `webglcontextlost` calls preventDefault --
+which is the whole mechanism, not politeness, because without it the
+browser is under no obligation to ever restore -- stops the loop, and
+pauses the race rather than abandoning it. Before the fix the loop went on
+calling rAF and `renderer.render` against a dead context forever.
+
+`tools/failstate.js` is the guard, and it can fail: pointed at a build
+with the renderer guard and the error listener neutered (`MR_PAGE=`) it
+reports the empty body verbatim. **It also corrected itself twice.** Its
+first draft counted `requestAnimationFrame` callbacks and read 0 frames in
+300ms on a page that was plainly running -- software-rasterised Chromium
+renders this scene at about **0.9 FPS**, so the window was a fifth of one
+frame -- and then read 2 frames after the loss, which looked like the loop
+refusing to stop and was in fact hud.js scheduling layout callbacks
+through the same wrapper. Both readings were flattering to the tool and
+damning to the fix. It now counts `renderer.render`, which the whole game
+calls from exactly one place, and it counts from the moment the handler
+ran rather than from the call, because a frame already in flight is
+scheduled and is not the loop refusing to stop. Result: 0 renders in the
+3s after the handler, and the loop turns again after `restoreContext`.
+
+**THE SHARE CARD.** The owner: *"Share artifact is important. work on that
+and add that"* and *"no leaderboard is needed. individual game. share card
+is more important"*. Those are one decision: the comparison happens
+outside the game, and what the game owes it is a result that survives
+being pasted. Four lines, the fourth only when it is true:
+
+    MARATHON MILES · CAPE TOWN
+    SUB-2:02 · 2:01:47 (+2:17)
+    [six blocks]
+    Day streak: 6
+
+Six blocks, **one per biome leg** -- the same cut `chapterCosts` already
+makes, so the tallies are a byproduct rather than new bookkeeping. Green
+clean, yellow a contact the pool paid for, red a contact nothing paid for,
+worst outcome wins the leg. It describes the RUN and never the road, which
+is what keeps it spoiler-free, and `tools/sharecard.js` asserts that as a
+property rather than by eye: no lane, no mile, no gate or obstacle
+vocabulary, no leg name, no course count may appear in the string.
+
+**One thing had to be added to make it possible**: `hitAt` records only
+UNGUARDED contacts, correctly, because a counterfactual that erased a
+guarded one would measure zero. The card is not a counterfactual, so
+`main.js` now also records `guardAt` -- the same gate-z key, cleared by
+the same reset, resolved in the same order in the live loop and the
+fast-forward. The yellow block is the first thing in this game that ever
+needed that fact.
+
+The blocks on the card are **divs, and the emoji live only in the copied
+text**: the embedded face is subset to what this HUD prints (mkfont.py:
+digits, latin, twelve marks) and has no block glyph at all, so a rendered
+square would have arrived from the system font at three different sizes on
+three different phones.
+
+**COPY RESULT**, four paths deep and it may never fail silently: the
+native share sheet on `pointer: coarse` only (desktop Chrome has
+`navigator.share` and opens a dialog nobody wants), then
+`clipboard.writeText` inside the click gesture, then `execCommand` off an
+off-screen textarea, then -- and this one cannot be taken away -- the text
+shown, selected, with SELECT AND COPY under it. A cancelled share sheet is
+answered with silence, not a fallback the player did not ask for.
+
+Proved on the running page, not by building the string: `sharecard.js`
+clicks the real button and **pastes the clipboard back out with a real key
+press**, comparing what came back. The four literal strings it produced
+are in the tool's own output.
+
+**THE HEAD IT TRAVELS WITH.** A share string is wasted on a link that
+renders as a bare URL, and the page carried a charset, a viewport, a
+theme-color and a title and nothing else -- zero og:, twitter:, favicon,
+manifest or apple-touch tags. Added to `tools/shell.html`: a description,
+Open Graph and Twitter (`summary_large_image`, with the 1200x630 declared
+because several scrapers lay out before the image lands), an inline SVG
+favicon, an inline PNG apple-touch-icon drawn edge to edge (iOS masks its
+own corners and renders a transparent PNG as a black square), and an
+inline web app manifest.
+
+**The manifest was checked rather than assumed**, through
+`Page.getAppManifest` on the built page: Chrome does fetch and parse a
+`data:` manifest, and the first version's `start_url` and `scope` both
+came back *"URL is invalid"* -- relative URLs resolve against the
+MANIFEST's URL and a data: URI has no directory. Both were removed;
+Chrome then falls back to the document URL, which is what a single-file
+game wants, and the manifest parses with zero errors.
+
+**What the owner still has to do, and it is exactly one thing.** An
+og:image cannot be a data URI -- the scraper behind Slack, iMessage,
+WhatsApp and Twitter fetches it over HTTP from its own servers. So
+`tools/ogimage.js` draws the card (1200x630, the game's own typeface, the
+wager, and the six blocks) and the owner must host it and replace
+`REPLACE-WITH-YOUR-DOMAIN` in the shell. The placeholder is deliberately
+an unresolvable name rather than an invented domain: a scraper that cannot
+fetch it falls back to the title and description, which is a correct
+preview minus a picture, whereas a made-up domain will one day belong to
+somebody else and the game would be advertising their image under its own
+name. `sharecard.js` prints the outstanding handover on every run.
+
+**THE CITY LIST.** The owner paused the map: *"lets put a pause on the
+map. for now, its a list of all available cities and then shows where you
+have completed the record."* It sits above PAST DAYS as a companion, not
+a replacement, because the two answer different questions: the log is what
+happened and can only ever show the days that did; the checklist is the
+SET, so the cities not yet drawn are on the screen too, which is the only
+way a checklist can be a thing to finish. Three states -- record fallen,
+raced without it, not yet drawn -- told apart three ways (left rule,
+opacity, typeset mark), because a colour alone collapses for anyone who
+cannot see it and an opacity alone reads as a rendering fault.
+
+Derived from `MR.Course.SETTINGS`, never a copy: the count is
+`SETTINGS.length` and the order is the table's, so a thirteenth city
+appears the day it is added. `store.js` grows one derived field --
+`summary().cities`, walked off the history on every read rather than
+stored, because a stored copy is a second source of truth that can
+disagree with the log, which is the exact defect the record streak was
+rewritten to avoid. The grid auto-fills from a 118px minimum: two columns
+in the 284px a 320px panel actually has, three at 390, four on a desktop,
+with no breakpoint and no column count to revisit.
+
+**Gates on this build:** build, shoot 8/8 clean, playthrough end to end
+(1:59:44, 0 hits, 4 guards), dailystate 5/5, failstate 12/12 (and failing
+correctly against a neutered build), sharecard 40 checks including the
+clipboard paste-back, and `mechanics --identity` bit-identical as above.
+Frames in `shots/`: `share-clean`, `share-guarded`, `share-hit`,
+`share-record`, `share-copied`, `share-lastresort`, `share-320`,
+`share-land`, `cities-some`, `cities-all`, `cities-320`, `cities-land`,
+`fail-nowebgl`, `fail-contextlost`, `fail-contextback`, and the hostable
+`share-og-1200x630`.
+
+**Two decisions the owner may want to reverse, stated rather than buried:**
+- **No date on the share string.** The agreed design has four lines and no
+  date, and the city plus the day it is posted identify the course. A
+  `2026-08-31` on line one would make a pasted result verifiable weeks
+  later, at twelve characters.
+- **A history city that is not in the pool is not on the checklist.** If a
+  city is ever renamed or retired, a record on it keeps its row in PAST
+  DAYS and drops out of the count. The alternative -- appending strays to
+  the grid -- makes "4 OF 12" mean two different things.
+
+**Corrections list, continued:**
+30. A harness that samples a fixed time window is measuring its own guess
+    at the frame rate. failstate read "0 frames in 300ms" off a running
+    loop at 0.9 FPS. Wait for a CONDITION, and count something the code
+    under test calls from exactly one place.
+31. Counting an event from the moment you REQUEST it charges the fix for
+    work already scheduled. The loop-stop assertion counts from the
+    moment the handler ran, and only then is zero the honest answer.

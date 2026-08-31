@@ -11,6 +11,92 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0e1230">
 <title>MARATHON MILES</title>
+
+<!-- ==================== WHAT THE LINK LOOKS LIKE ====================
+
+     Everything from here to the closing rule exists for the moment the game
+     stops being a private URL. The page had a charset, a viewport, a
+     theme-color and a title, and nothing else -- so a pasted link rendered as
+     a bare URL in every messenger, the tab carried the browser's default
+     document glyph, and Add to Home Screen produced an unnamed icon
+     containing a screenshot of a dark canvas.
+
+     A share string is wasted on a link that renders as nothing, and the share
+     string is now the point of the finish card, so the two ship together.
+
+     SELF-CONTAINED, WITH ONE STATED EXCEPTION. The favicon, the home-screen
+     icon and the web app manifest are all data: URIs, because the premise of
+     this project is one file that runs from file:// with nothing fetched. The
+     Open Graph image CANNOT be: the scraper behind Slack, iMessage, WhatsApp
+     and Twitter is not a browser, it fetches og:image over HTTP from its own
+     servers, and every one of them rejects a data: URI.
+
+     SO THERE IS EXACTLY ONE THING THE OWNER HAS TO DO, and it is written here
+     rather than only in a report:
+
+       1. Host shots/share-og-1200x630.png (built by tools/ogimage.js) at a
+          public HTTPS URL.
+       2. Replace every REPLACE-WITH-YOUR-DOMAIN below with that domain.
+       3. node tools/build.js
+
+     Until then the placeholder is deliberately an unresolvable name rather
+     than an invented domain: a scraper that cannot fetch it falls back to the
+     title and the description, which is a correct preview minus a picture. A
+     made-up domain would eventually belong to somebody else, and the game
+     would be advertising their image under its own name.
+     ================================================================== -->
+
+<meta name="description" content="One marathon a day. Everyone on the planet races the same date-seeded road: three lanes, 26.2 miles, and a world record of 1:59:30 to break.">
+
+<!-- The tab mark. An inline SVG, so nothing is fetched and it is sharp at
+     every size: the wordmark's own M in the wordmark's own yellow, over the
+     game's navy, on the record-green bar the finish card uses. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230e1230'/%3E%3Cpath d='M10 52V12h12l10 22 10-22h12v40H44V28l-8 18h-8l-8-18v24z' fill='%23ffe45e'/%3E%3Crect x='11' y='54' width='42' height='5' fill='%234dfba0'/%3E%3C/svg%3E">
+
+<!-- Add to Home Screen. Two mechanisms, because the two platforms have never
+     agreed on one: iOS reads apple-touch-icon and the apple-mobile-web-app-*
+     pair, Android and desktop Chrome read the manifest. Both are inlined.
+     The icon is a real PNG rather than the SVG above because iOS does not
+     accept an SVG here, and it is drawn edge to edge because iOS masks the
+     corners itself and renders a transparent PNG as a black square.
+
+     THE MANIFEST IS A data: URI AND IT WAS CHECKED RATHER THAN ASSUMED.
+     Chrome fetches and parses it -- read back through the DevTools protocol
+     (Page.getAppManifest) on the real built page. It carries NO start_url and
+     NO scope, and that is the finding rather than an omission: relative URLs
+     in a manifest resolve against the MANIFEST's own URL, and the base of a
+     data: URI is not a directory, so both properties came back as "URL is
+     invalid" and were dropped. Left out, Chrome falls back to the document's
+     own URL for scope and start_url, which is what a single-file game wants
+     anyway, and the manifest parses with zero errors. If this game ever gets
+     a real hosted URL those two lines can come back with absolute values. -->
+<link rel="apple-touch-icon" href="data:image/png;base64,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">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Marathon Miles">
+<link rel="manifest" href="data:application/manifest+json;base64,eyJuYW1lIjoiTWFyYXRob24gTWlsZXMiLCJzaG9ydF9uYW1lIjoiTWFyYXRob24iLCJkZXNjcmlwdGlvbiI6Ik9uZSBtYXJhdGhvbiBhIGRheS4gU2FtZSByb2FkIGZvciBldmVyeW9uZS4gQnJlYWsgMTo1OTozMC4iLCJkaXNwbGF5IjoiZnVsbHNjcmVlbiIsIm9yaWVudGF0aW9uIjoiYW55IiwiYmFja2dyb3VuZF9jb2xvciI6IiMwZTEyMzAiLCJ0aGVtZV9jb2xvciI6IiMwZTEyMzAiLCJpY29ucyI6W3sic3JjIjoiZGF0YTppbWFnZS9wbmc7YmFzZTY0LGlWQk9SdzBLR2dvQUFBQU5TVWhFVWdBQUFMUUFBQUMwQ0FJQUFBQ3lyNUZsQUFBTGgwbEVRVlI0bk95ZDIzSlR5UldHMjlLV0xjQnhKbEF1UWpFTXNRZWZUL0l3d0ZBNTN1WXVWWG1JM09aUlVubUtQRUR1VTdsSkpnUmlQTUpIR2R2Z0pCTW1TYzBVdzFqSExjOFdZb1FzN2RYcVh0MjkzZDc4M3dYRkJSZEMrOWRhLzFxOWV1MWc3SEpCQUJCSElBQWdnRGdBQ2NRQlNDQU9RQUp4QUJLSUE1QkFISUFFNGdBa0VBY2dnVGdBQ2NRQlNDQU9RQUp4QUJLSUE1QkFISUFFNGdBa0VBY2dnVGdBQ2NRQlNDQU9RQUp4QUJLSUE1QkFISUFFNGdBa0VBY2dnVGdBQ2NRQlNDQU9RQUp4QUJLSUE1QkFISURFVTNGTWZqQzg5c2RaWVp2TlV2bityMHZDS24vNC9jMWYvdUw3d2lxLytzMytuLzc2U3B3MUdlRWx1ZHlRY01EMHhFZzJLK3d5UDNWQjJDYklPUG52NitLcE9JWURKOTlPRUdRK1hyb283REYrSlh2eityQ3dUVzRZNHFBSkFsZmZUbUhPNWcvOS91b2w0WURBZG5qajRhbm55RGtUeCtKTVh0aWpNRzgvcDRpV09MeUlISjZLdzEza21MdGxVeHpMTTI3RUVVQWNORGxubjJ0bWNrVFlZM0U2emVMd3RWcHg5dTJNalFhekg5clJSK1JHcjEzTkNRZmsvRWdybm9vajYvTGJXVjJ3VTdEODdNNm9jRVBnUjBEM3RaVE5PUlRIc2lWUDZzaU5DaGhTT1U1ck9WdWVkSG5XbVRoZ1NDWGtYSDQ3czVOMnhMRXdaYlB3NmNhVFBvZXZuaU53K01FaUYzbDEzUFJYY2VOYWJ2eUtFemNxbkowZTZPSnJ0ZUk0NmQ1ZE52V2tQLzdZU1crMFRSQjQ4Vnk4Ylo4THB5eE9tMmFFVldkdU5DTHJ4Mk41RnoySHNORzhjdFQrYXVOSktldXBPTEtPUDlmc2g2YVJZMlhPcFRqUUJKTVFPQTZza3g4TTUwZjREeURxc1g1djFHRkZrWVBua09BNnJXUXlRL2NLZkU5Nlo4WG1VRWcvR1Q4ZXl6dHFTSVZaQzZ2Z01xY0liMHBaWHoySCt6azVrNEpsYWNhdE9ERHNJeU9CeUdIaVNlZHZ1ZXFOdHNuNk1VUDZqcGF5d3FDSnZqeWJkK3BHUlNML2ZSVzhyVmFjZnp2NWZJWjNySHBuMmEwYkZhMUtIdUtneVNaUzZQTzZuQ3VPM2FpQTU1Q1RUSXR3Z2RYbGROb2JiWU41RGhuSkpOMkZLZTE1d1d6VzRVbDlCOHh6eUVqR3JqT3VLYXd1WElqTWluQk1Gdk1jRXBMNTZZeU5CaE0zOU82cjNWNTA3a1lGemxia0pCWlhkUjkyWVE3aU9Hc1NHMmpRelN4Mkw4eFJ3SFBJU0t3THBPVXVJeXN3Zjh2bW5TZ0tsTEl5c2tuRjFSbWRQdW05d3FWa0J2aHdLaXNqc1ZHb205ZUgzeHRUL1JKdUx6cnZjTFRKNVREUFFaT2tJN3V6ckRvcTdPNmlTZytlekpCQ0hLSXdyNXBaek1lU0ZVR0hWRWFTZGwxeGIxTitaR2g2SWdrM0ttQkk1U1RaSXB4Vlc4cnd5ZXFseEs2VFpERkRLaUhKcEt1NFJlNmpoWVFNaDhBdGV6bEpYdmxTM0NLM1BKZWNPUHl3SEttTEhGKy9Dc3ZsVUdpaU12V3pPSldRR3hXNERpbUg3Y2dhalpPZGc2clFaR0FaTWphYW1aclFFOGZlWWJWV2F3b1dPSldWd2Y3cDFCc24yMDhyUXBPQkE4UDNWclN2VGU4ZVZHcjFFOEVDNHBDUjVVY09zVm5TRnNmMG9JTGxveVZ0dzdHOVg2bHp4WUdkWURMWWZZNTZlRkxjMVJiSDJHZ3dKejFSVzlJZkRkemFxeHBFRG9pREpqdkVGVWY5NU5PMWI0USs4aTF5UzdQYWJyUzRVNjQxbUo0RHF5WmxESFAzaVlkaDg3aDhjdmhQYlU4cVdUY2J1ZEVmdmEvWEc0MHFwaWh5MUd2TXlKSEJZbndKN0crbi9ycU0zZG5YRm9ja3JmejBydlpLeWRLeld2Um5yU0hZbUN3QnNFWGFER203ZXR6YTA3WWRNM1NseXJnMkhaVXEwWjlWYnVRUUVJY0V0bDBQWDJmNWpkMnkwRVN5Ulk1eGk2a2R1dXAxcHVjUWZ0aU90TjE0YTFlUGp6YTB4U0hvTFhJTCtpZjFtNjlERjd0YWlSanhZTjRuYmFWcyszazhmVlo3K1VvNzRjY3VWaGkva24zL2g5cjIrR0h4V0ppSkkrZHFqYVVHYVRPa2pmRE44OWgrcXUxSlk0ZU5mM0pidXpmNi95L3IvL21pSlUwVGNmalE2dkJSSEJjdjhMK1h4bmZ4Z3RGRWoxMTdYWmpYdnFoU09xeTEvMUl6TUtUREhpejM4VkVjSnQ5TDU2enJpWDZmZE9KR3pCWTV4aEtmZHFuUytqQU5nN1FDUXhxTHlVYXNUay95czIxdFR4cmxzay82M3RuR21CdmQraTVvc1U5bGhSOXJ3YnlNSEFiVERKMnpyZ2ZyeDgybTlnKzNaNzc4eHJXb3Z0VjJocHVsTjNiSHBNL2h3NHl4bCtJd2VIRm1SeHhoMkpxb0VKcjB4SW43cTV5YnNRL1czeHp1Vk9FNXJHUFMvNm1IYjU4SHc1UDJiSkZqdk5QcCtiOXIwZUhPbXc5ajREblFCSXZIWkRDL3UwRFk1RFRSVDUyd0xPcTcwZTV3VlRYd0hENjhsRHB0MVVxakszSnM2RS85NVBPWjFhNHA4eVY5TjlvcFZVUkxxWUtORHkrbFRsMWE2ZW83L1czOVdPalRPV2FibWhqNXdYdmFkd1E2YmxTWU5jRjh1TmZrWlNscklJN3U1L0hpdjQwdi9sY1htblEyY054ZDRkeEZlRko2VzBLYnBCWDBPZUl4K1Y2NjAwb0VZeEs5TTJ5OE1xdnRScU80OVhqVGpqalFQby9IcFAvVE05UExHT3pvUkk1bC9kSEEvZWVWc092U1RGVmJtVzlCdFJLUHlTckJualRQR093WUd3MG1YMitSWSt3YjdaeXF0S2thekhQNE1JRHU0MFZxb3liWTZkYkMrcloyNUlpNHZYVHg0b1VNWThINTl1bnhSSlAydVEvWFpYMFVoMG5udUNldHJMR21maGFtODVkWUo4TTlXYXlxN1liZmdyUVNqMUcxMHRlVUxPNW82Mk5oS2w5Z3ZlOSsvZlJwbjFFVERJWTBGcFBMZ1AyWHpEakR4cE41UnZ1clhBNUxwNHVqYXZWOEg5bDdtVllNUGxSL21tZU1oTjI4UGp4K1dmdERiUFVkNVpTcjU3dVU5VkVjSmthOTNyZCtnVEhZSVZyVGFOb3h0YWRVRVlhUnc0TlRXVDhqQnovWjlVZU92My9HdVIzSm9QOG1sVkhrOENEaHArNXNwVy9tL0t1WHphUFBEYnBSeWp6cDY2bVlSQTRmU3RtMEhkbkh6dGN3YmtjeWVQQzROMFNWejdraFRWc3BHN3NTZytGSmRZbE8rTDU4Mlp0RXloWHRCVlFkQWcveVN1cXFsYmlPTldNU1haZFMzRWhpWnlTTWdRL3J6LzFNSy94UEZadFcxalk0Z3gxYVVNZS83QTQ2cHMvak1XbUMxWWkwVXFud0N3Y1ZxSGxWOW93eGhuM2lNV3FmRXcrRE1US294UWFSdWRnenhqNTRqclNWc2hVaWpETW0wZFZwTmsvK1FXUXVkbHJ4SVhMNGVTb3IySnhKNU9pK2p0RDdlYmpMZlFKMFNHUEpHa1JVcWluSk9KdFZwMFFQSTdLM1RhSkRHbzlKS1ZzblJpZ2VGam0zSXhXUlRLcXlCOUJ4WkI4UCsrQk5rdUJiS3dhUFhMWEN0bWhEd3hjSE9xU3hzRXRaZVdtdzdheUpYcVFQZnRscndYelljSjJxYXFVdWRYK2JlMDdFRWJtSzlTMHljaGowT1dCSTQyRFB1WVNoN0dmS21FUlhvWFFvcTRQT3RlZEkxYkNQL0c3cTJxWVRjZXhLNzAzQmMxaUdYYTNVUTltVE9EamlyQmdjaUx5OVZrUDczQzdzaU5vWTFLdmVjSEE4TzBBYzNQWTVUbVhqeVRvVHg1YUR3UTZKR3hWR3A3S1k1NGpEVVNrckhFU09LRS90SDhtY1R1MDhkMGk5TktUOFVuYkFrMWpmc3V4SmR3ZjFUaXJjU1VHTUNjYmpMcTFFWjZkMWc0VXEvZXdlREZqZXd6Nnl4OWxLUEd4RE92Qkp0RllNUHJOcE83YWZEZ2hGN0J1UlByeVVPbVh0ODhIL1pzdnFZTWZBU1lBNjl5NDFidG5Idy9jY0NpbkQ3dFRQbytLQTZWUis1UERnUlY2cGFwK3JKUGppampWeGZQNGk1anBDRCt5ekZWeUhqTWRkRXl6aUw0OWVDVXZzSGc3V1dZMTdLdXZET3dCVDVUbFUycEZmdld4R3YzaGhnNEdsaWpCWUM0WWorM2o0cGF4YW1icHpZQ2V6cU5pWENydERpa213V0hJdVBZZXc1MGxWNWxMUDlVdXAwOVUrRDVXZXhCTWJrK2pONXNuRDR1Q0xkUHhoSDJ6MmlZWC85aisxSi9GNHcwSVQvZUNvRmlwY2syYVhzakNrOFJoTWdpbjlzNmlhTmI4ZFdWSjdtVXZGWUF1RHlidnVySkNxL1J6cUNYNTczelN6S083OE1Ga29lT2J2NDBuVkJtUDFwb0w1T3BmTlBhWGNaTGJjQitMb2cvMiszVkI1VjRyNXNIRlJiVGZ5c1VIK092T1hVcWZxT3FSNldpbWFUZjJVeTZIaTVWdXpoWUxpYlBGT0hDTWpKbHZ4VlgrbW42NFpyUmpjZTY3NkRpYVR5SEhtazRMZXBSVVRGMVpYbmkwL0xwODgreGYvSlZ1N3lxOXhLVmRNTmx5THMyVm83SEpCdU9IbkwzNHJnSHYrZlBWM3dnMCtlZzdnQ1JBSElJRTRBQW5FQVVnZ0RrQUNjUUFTaUFPUVFCeUFCT0lBSkE0N3BPQzhnOGdCU0NBT1FBSnhBQktJQTVCQUhJQUU0Z0FrRUFjZ2dUZ0FDY1FCU0NBT1FBSnhBQktJQTVCQUhJQUU0Z0FrRUFjZ2dUZ0FDY1FCU0NBT1FBSnhBQktJQTVCQUhJQUU0Z0FrRUFjZ2dUZ0FDY1FCU0w0RkFBRC8vNFk4S2wwQUFBQUdTVVJCVkFNQVhzT3cvRjZYSzJrQUFBQUFTVVZPUks1Q1lJST0iLCJzaXplcyI6IjE4MHgxODAiLCJ0eXBlIjoiaW1hZ2UvcG5nIiwicHVycG9zZSI6ImFueSJ9XX0=">
+
+<!-- Open Graph, and Twitter's dialect of it. og:image:width and :height are
+     not decoration: several scrapers lay the card out before the image has
+     finished downloading and fall back to a small square without them.
+     summary_large_image is the card that shows a 1200x630 picture; the
+     default summary card crops it to a square thumbnail. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Marathon Miles">
+<meta property="og:title" content="MARATHON MILES">
+<meta property="og:description" content="One marathon a day. Everyone on the planet races the same date-seeded road: three lanes, 26.2 miles, and a world record of 1:59:30 to break.">
+<meta property="og:url" content="https://REPLACE-WITH-YOUR-DOMAIN/">
+<meta property="og:image" content="https://REPLACE-WITH-YOUR-DOMAIN/marathon-miles-og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="MARATHON MILES over a night road, with the target 1:59:30 and a row of result blocks">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="MARATHON MILES">
+<meta name="twitter:description" content="One marathon a day. Everyone on the planet races the same date-seeded road: three lanes, 26.2 miles, and a world record of 1:59:30 to break.">
+<meta name="twitter:image" content="https://REPLACE-WITH-YOUR-DOMAIN/marathon-miles-og.png">
+<meta name="twitter:image:alt" content="MARATHON MILES over a night road, with the target 1:59:30 and a row of result blocks">
 <style>
 /*__CSS__*/
 </style>

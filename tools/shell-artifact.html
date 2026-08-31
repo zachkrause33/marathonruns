@@ -1,4 +1,34 @@
 <title>Marathon Miles</title>
+
+<!-- ==================== WHAT THIS SHELL CAN AND CANNOT CARRY ============
+
+     tools/shell.html grew a full head this pass -- description, Open Graph,
+     Twitter card, favicon, apple-touch-icon and a web app manifest. Almost
+     none of it belongs here, and the reason is structural rather than a
+     matter of taste, so it is written down instead of being rediscovered.
+
+     THIS FILE HAS NO DOCUMENT SKELETON. The artifact host supplies the
+     doctype, the head and the body and drops this content INSIDE the body.
+     Checked on the real build rather than assumed: loaded standalone the
+     parser hoists the title above into <head> (head children: TITLE, STYLE),
+     which is why the title works in both places -- but under the host it is
+     body content, and body content is not the document head.
+
+     SO: og: and twitter: tags added here would be inert. A link unfurler
+     reads the head of the URL it was given, which is the HOST's head, not
+     this fragment; nothing written in this file can reach it. Adding them
+     would be markup that looks like it is doing something and is not, which
+     is worse than their absence.
+
+     WHAT DOES SURVIVE is the pair below. A title element is read by
+     document.title wherever it appears, and the host also scans this file's
+     first 8KB for it. A link rel=icon is in-body metadata that browsers do
+     honour, and it is harmless where the host sets its own tab icon -- the
+     host simply wins. Both are the same data: URI the full shell uses, so
+     there is one mark and not two.
+     ================================================================== -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230e1230'/%3E%3Cpath d='M10 52V12h12l10 22 10-22h12v40H44V28l-8 18h-8l-8-18v24z' fill='%23ffe45e'/%3E%3Crect x='11' y='54' width='42' height='5' fill='%234dfba0'/%3E%3C/svg%3E">
+
 <style>
 /* The artifact host supplies the document skeleton and its own reset, so this
  * variant ships no doctype/html/head/body of its own. It also renders inside a

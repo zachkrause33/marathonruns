@@ -131,7 +131,31 @@ MR.Pace = (function () {
     //   finishes seconds apart depending on whether the chains were known.
     //
     // Swept together, not picked; the grid is in roadmap 74.
-    FLOOR_BASE: 259.1,        // 4:19 /mi
+    //
+    // ---- 259.1 -> 259.0, AND IT IS A REFUND RATHER THAN A RETUNE --------
+    //
+    // course.js now caps how many gates in a row may deny the player a lane
+    // through (FORCED_RUN_MAX). That was done for the axis, not the level --
+    // it cuts the chained demands the informed stranger's line meets from 78
+    // a race to 61 -- but it also takes 4% of the hazards off the road and
+    // widens the spacing a fraction, and a course with fewer gates on it is
+    // a SLOWER course, because pace follows a streak that counts cleared
+    // gates. Measured on the shipped grid, the first-attempt column fell
+    // from 2 of 30 to 1 of 30 at an unchanged floor: below the band the
+    // owner set, for a reason that has nothing to do with difficulty.
+    //
+    // 0.1 s/mi is 2.07 s of finish time, and it is what puts the bar back
+    // exactly where roadmap 74 left it -- 2 of 30 first attempt (6.7%), 6 of
+    // 15 learned, 8 of 45 overall. Swept at 259.1 / 259.05 / 259.0 / 258.95
+    // / 258.9 / 258.7 / 258.5 through the whole policy x skill grid; the
+    // column is steep (258.9 gives 10% first-attempt and 258.7 gives 20%),
+    // so this is the notch and not a range. The grid is in roadmap 78.
+    //
+    // WHAT DID NOT MOVE, and it is the point of the pass: the gap between
+    // the best first-attempt line and the best learned line at perfect
+    // execution, which the floor cannot touch because it lifts both equally.
+    // That gap fell from 11 s to 6 s, and it fell in course.js.
+    FLOOR_BASE: 259.0,        // 4:19 /mi
     // FLOOR_SURGE STOOD HERE AT 244 (4:04/mi) and was the second floor an
     // elected surge ran toward. It is gone with the mechanic. The reasoning
     // that set it is worth keeping because it constrains any future second

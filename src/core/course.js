@@ -570,7 +570,12 @@ MR.Course = (function () {
 
   function planTempo(key) {
     if (!(TEMPO > 0) || !(MR.Pace.EFFORT > 0)) return [];
-    const rnd = MR.rng.stream(key, 'tempo/v1');
+    // v2: the DIRECTION of a mark is no longer an independent coin per mark,
+    // so the draw pattern of this stream has changed and the name is bumped
+    // rather than silently reused -- the same convention aid/v4 -> aid/v5
+    // followed when the placement rule changed. See the stratification note
+    // at the foot of this function for what moved and why.
+    const rnd = MR.rng.stream(key, 'tempo/v2');
     const total = K.TOTAL_UNITS;
     const lo = TEMPO_F0 * total, hi = TEMPO_F1 * total;
     const marks = [];
@@ -621,9 +626,52 @@ MR.Course = (function () {
       // with, and the road that clause reserved -- better than half the course
       // once the exclusion bands were counted -- is now available to marks.
       if (clash) continue;
-      marks.push({ z0, z1, dir: rnd.chance(TEMPO_DRAG_SHARE) ? -1 : 1 });
+      marks.push({ z0, z1 });
     }
     marks.sort(function (a, b) { return a.z0 - b.z0; });
+    /**
+     * ---- THE DIRECTION IS STRATIFIED, NOT FLIPPED -----------------------
+     *
+     * This used to read dir: rnd.chance(TEMPO_DRAG_SHARE) ? -1 : 1 at the
+     * push above -- an independent coin per mark. It is the single largest
+     * source of day-to-day unfairness this game had, and it took a new
+     * instrument to see it, so the number is written down here.
+     *
+     * The packing loop saturates at about 44 marks a course, so the forward
+     * count was Binomial(44, 1 - 0.57): mean 18.8, standard deviation 3.3,
+     * and measured over 90 dates it ran from NINE forward mats to THIRTY.
+     * Forward paint is the only route currency in this game -- a lift is
+     * worth TEMPO.LIFT over its length and there is nothing else on the road
+     * a line can choose to gain seconds from -- so that spread is a spread in
+     * how fast the day can be run at all.
+     *
+     * Measured with tools/sightread.js, the ORACLE line (the best any player
+     * could run, flawless, with the whole course known) over 90 dates:
+     *
+     *   forward-mat count       9 .. 30      sd 3.53
+     *   best possible finish    1:58:58 .. 1:59:37   sd 7.1 s
+     *   correlation of the two  -0.89
+     *
+     * and on THREE of those ninety dates the best possible line did not beat
+     * 1:59:30 at all. The day closes when the record falls (roadmap 77), so
+     * those were days that could not be closed by anyone, for no reason but a
+     * coin landing the same way forty times.
+     *
+     * Stratifying removes the binomial and keeps everything else: the same
+     * share, the same seeded shuffle deciding WHICH marks are backward, the
+     * same mandated forward first mark (excluded here, it is already dir 1).
+     * After: forward 15 .. 21, sd 1.15; best possible 1:59:08 .. 1:59:25,
+     * sd 3.9 s; unwinnable days 0 of 90. The MEAN is unchanged at 1:59:17 --
+     * this is not a difficulty change, it is the same difficulty every day.
+     */
+    const ord = [];
+    for (let i = 0; i < marks.length; i++) if (!marks[i].first) ord.push(i);
+    for (let i = ord.length - 1; i > 0; i--) {
+      const j = rnd.int(0, i);
+      const t = ord[i]; ord[i] = ord[j]; ord[j] = t;
+    }
+    const nBack = Math.round(ord.length * TEMPO_DRAG_SHARE);
+    for (let i = 0; i < ord.length; i++) marks[ord[i]].dir = i < nBack ? -1 : 1;
     for (let i = 0; i < marks.length; i++) marks[i].n = i + 1;
     return marks;
   }
@@ -1485,7 +1533,7 @@ MR.Course = (function () {
    * Build one gate's three lanes. Guarantees at least one non-BLOCK lane and
    * never fills all three with demanding hazards early on.
    */
-  function makeGate(rnd, f) {
+  function makeGate(rnd, f, noFull) {
     const d = difficulty(f);
     const lanes = [K.CLEAR, K.CLEAR, K.CLEAR];
 
@@ -1525,7 +1573,14 @@ MR.Course = (function () {
     // demand without adding streak: this table (+0.06 a band) and the
     // mid-band slope below. Measured either side with the policy x skill
     // sweep; numbers in roadmap 73.
-    const full = d < 0.14 ? 0
+    // ---- AND IT IS ZERO WHEN THE RUN OF FORCED GATES IS ALREADY LONG -----
+    //
+    // See the FORCED_RUN_MAX note at the call site. `noFull` is the course
+    // telling this gate that the last FORCED_RUN_MAX gates all denied the
+    // player a lane through, so this one may not. The chance() below is
+    // still DRAWN when noFull is set -- one draw either way, so the stream
+    // walks at the same rate whatever the road behind looks like.
+    const full = noFull ? 0 : d < 0.14 ? 0
       : d < 0.34 ? 0.22
       : d < 0.58 ? 0.46
       : d < 0.80 ? 0.64
@@ -1604,6 +1659,67 @@ MR.Course = (function () {
     // Hard invariant: never three blocks.
     if (lanes.every((l) => l === K.BLOCK)) lanes[order[0]] = K.CLEAR;
     return lanes;
+  }
+
+  /**
+   * ---- HOW MANY GATES IN A ROW MAY DENY A LANE THROUGH --------------------
+   *
+   * A gate with no CLEAR lane FORCES an action: every lane is answerable (a
+   * BLOCK is never rolled onto a full-width gate) but none of them can be
+   * declined. That is the game's execution pressure and it is not being
+   * reduced here. What is bounded is how many of them may arrive BACK TO
+   * BACK, and the reason is the owner's:
+   *
+   *   "it is really hard to learn the map. I'd argue you really dont, its
+   *    skill and focus that gets you to the end. you need to be able to do it
+   *    multiple ways"
+   *
+   * Measured over 40 dates before this rule existed: 57% of gates were
+   * forced, and they arrived in runs of up to TWENTY-FOUR -- 4.7 runs longer
+   * than five per course. A run of twenty-four forced gates is roughly 750
+   * units, half a minute of race, during which the player has no route
+   * decision of any kind: every lane demands something and the only variable
+   * left is whether the hands are perfect. It is the one structure on this
+   * road where "do it multiple ways" is simply false, and it is also where
+   * the sight-reading tax in tools/simulate.js does nearly all of its work,
+   * because a demand inside CHAIN_NEAR of the last one is a chain and a run
+   * of forced gates is a chain that never ends.
+   *
+   * THREE, and the number is measured rather than felt (tools/sightread.js,
+   * 40 dates for the structure, 20 x 6 races for the times):
+   *
+   *   cap   forced gates   hazards   longest run   runs over 5
+   *    --      105.7 (57%)     466        24          4.7 / course
+   *     2       83.9 (46%)     439         5          0
+   *     3       91.8 (50%)     447         5          0
+   *     4       96.3 (52%)     453         7          0.3
+   *     5       99.0 (54%)     457         7          0.5
+   *
+   * (Runs can still reach five past a cap of three because a carried train or
+   * a narrow closure shuts a lane AFTER makeGate has rolled it. The rule
+   * bounds what the generator ASKS for; the course may still hand out a
+   * little more, and that is the honest statement of it.)
+   *
+   * Three costs 4% of the hazards and the whole tail. It does NOT make the
+   * game faster: measured on the same 20 dates, the best possible line went
+   * from 1:59:17 to 1:59:19 -- two seconds SLOWER, because a gate that is not
+   * forced is usually also a gate carrying fewer hazards and the spacing
+   * widens a little. What it does buy is the thing that was asked for: the
+   * informed line meets 58 chained demands a race instead of 78, so the gap
+   * between a player who has rehearsed today's chains and one reading them
+   * off the road closes by a quarter without a single guaranteed window
+   * moving.
+   */
+  const FORCED_RUN_MAX = 3;
+
+  /** How many gates at the tail of the course deny a lane through. */
+  function forcedRun(gates) {
+    let n = 0;
+    for (let i = gates.length - 1; i >= 0 && n < FORCED_RUN_MAX; i--) {
+      if (!gates[i].lanes.every(function (l) { return l !== K.CLEAR; })) break;
+      n++;
+    }
+    return n;
   }
 
   /**
@@ -2080,7 +2196,7 @@ MR.Course = (function () {
         const closed = pass === 0 ? narrowClosed : null;
         if (pass === 1 && narrowClosed) { narrowClosed = null; tally.narrowAbandoned++; }
         for (let attempt = 0; attempt < 24; attempt++) {
-          const cand = makeGate(rnd, f);
+          const cand = makeGate(rnd, f, forcedRun(gates) >= FORCED_RUN_MAX);
 
           // Carry active trains through.
           for (let l = 0; l < 3; l++) if (idx < trainUntil[l]) cand[l] = K.BLOCK;

@@ -199,7 +199,30 @@ console.log(`\n=== identity: flags off must be the generator that shipped ===\n`
 // 95e55c3cdbae17988b36ca57aa8f0a59f480b618; re-taken in its own commit with
 // the sweep measured either side (first-attempt 2/30, learned 6/15).
 // Recorded in docs/roadmap.md entry 74.
-const BASELINE_GATES = 'dc33748a788cd4c2756da24208e8428181f2efd3';
+//
+// ---- RE-TAKEN A FOURTH TIME, DELIBERATELY, FOR THE SIGHT-READING PASS ----
+//
+// The owner, on roadmap 74's 6.7%-first-attempt / 40%-learned split: "it is
+// really hard to learn the map. I'd argue you really dont, its skill and
+// focus that gets you to the end. you need to be able to do it multiple
+// ways." Two deliberate generation changes came out of measuring that
+// (tools/sightread.js, and roadmap 78 for the numbers):
+//
+//   makeGate now takes a `noFull` argument and the call site passes it when
+//   the last FORCED_RUN_MAX gates all denied a lane through -- runs of
+//   forced gates ran to TWENTY-FOUR before this and now cap at three asked
+//   for. The chance() draw is still taken either way, so the stream walks at
+//   the same rate; what changes is the gate it produces.
+//
+//   planTempo's stream is bumped tempo/v1 -> tempo/v2 because the DIRECTION
+//   of a mark stopped being an independent coin per mark. It was
+//   Binomial(44, 0.43): forward mats ran 9 to 30 across 90 dates and three
+//   of those dates could not be won by any line at all.
+//
+// It was dc33748a788cd4c2756da24208e8428181f2efd3; re-taken in its own
+// commit with the sweep measured either side (first-attempt held at 2/30,
+// learned 6/15, spread 30.0s).
+const BASELINE_GATES = '8f2937f2f246b2ebe89400fb4bbe292715a6d2bf';
 // Re-taken twice. Once deliberately, when the aid placement rule was rewritten
 // so a bottle stands behind an obstacle rather than in open road (it was
 // 7f17eb4893b067571344191ddd6478b4f8da3329); and once here, for the same reason
@@ -232,7 +255,14 @@ const BASELINE_GATES = 'dc33748a788cd4c2756da24208e8428181f2efd3';
 // c40930a11001c3e86039e55dd25e77a3775c0d22. The receipt machinery the old
 // rule ran on is untouched and tools/aid.js proves it on the new course:
 // the cut-in bot collects 0.0 of 132 guarded items.
-const BASELINE_AID = '6e39f1380d8372f6e1816006ea8d782ae07593f6';
+//
+// ...and a sixth time, for the DEPENDENT reason only, with the sight-reading
+// pass: generateAid is untouched (still v5, same rule, same stream) and the
+// gate table it hangs off moved, so this followed. It was
+// 6e39f1380d8372f6e1816006ea8d782ae07593f6. tools/aid.js proves the rule on
+// the new course: a seeking line still collects 14.4 segments, inside the
+// 8-20 band the economy is held to.
+const BASELINE_AID = '4781033d440c843d7623a022eb24366f21039e2d';
 /**
  * ---- THE FLAGS ARE FORCED OFF HERE, AND THAT IS NOT A WEAKENING ----------
  *

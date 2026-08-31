@@ -2614,11 +2614,40 @@ MR.Pace = (function () {
      * before the third of the race and spends the rest of it slowing.
      */
     ENERGY_START: 1,        // the owner asked to start full, and a marathon does
-    ENERGY_DRAIN_SECONDS: 5000,  // race-seconds a full tank lasts, uncollected
+    ENERGY_DRAIN_SECONDS: 7500,  // see ENERGY_FATIGUE: this is the rate AT THE GUN
     ENERGY_PER_PICKUP: 0.0045,     // 100 pickups is a whole tank
     ENERGY_HIT: 0.08,            // what a contact costs: eight pickups of it
     ENERGY_KNEE: 0.5,            // above this, no penalty whatsoever
     ENERGY_MAX_PENALTY: 8,      // seconds a mile added at bone empty
+
+    /**
+     * ---- YOU GET TIRED FASTER THE LONGER YOU HAVE BEEN RUNNING -----------
+     *
+     * The owner: "energy needs to drain quicker as the game progresses. just
+     * how you get tired faster through a race."
+     *
+     * So the burn is not flat. It scales with how far you have come:
+     *
+     *     rate(u) = (1 / DRAIN_SECONDS) * (1 + FATIGUE * u)
+     *
+     * where u is the fraction of the marathon completed. At FATIGUE = 1 the
+     * last mile burns at exactly twice the rate of the first.
+     *
+     * DRAIN_SECONDS WAS RE-BASED RATHER THAN LEFT ALONE, and that is the
+     * whole reason the tuning below this line survives. The integral of the
+     * expression above over a whole race is (1 + FATIGUE/2) times the flat
+     * rate, so a fatigue curve bolted onto the old constant would have
+     * silently drained half a tank more than the number every dial was set
+     * against. 5000 became 7500 = 5000 * 1.5, which leaves the TOTAL burn of
+     * a race exactly what it was and changes only its SHAPE.
+     *
+     * What that buys, and it is the point: the early miles are cheap and the
+     * late ones are dear, so a tank that looks comfortable at halfway is not.
+     * The player who banks energy early is the one who still has legs at mile
+     * 24 -- which is the actual sport, and it lands the danger squarely in
+     * THE WALL, the leg this course was already named after.
+     */
+    ENERGY_FATIGUE: 1,           // last mile burns 2x the first
     /**
      * ---- THE POOL IS FILLED IN SIPS NOW, AND THIS IS THE DENOMINATION ----
      *
@@ -2959,7 +2988,15 @@ MR.Pace = (function () {
       // every device and in every harness -- the same reason raceTime, not
       // realTime, drives everything else in this function.
       if (EFFORT > 0) {
-        s.energy -= dRace / EFFORT_CFG.ENERGY_DRAIN_SECONDS;
+        // Fatigue: the burn climbs with the distance already run, so the last
+        // mile costs twice the first. Read off miles rather than the clock so
+        // a slow runner is not punished twice for being slow -- they are
+        // already paying in seconds, and charging them extra energy for the
+        // same stretch of road would compound a bad run into an unrunnable
+        // one. See ENERGY_FATIGUE.
+        const done = s.miles / K.MARATHON_MILES;
+        const fatigue = 1 + EFFORT_CFG.ENERGY_FATIGUE * (done > 1 ? 1 : done);
+        s.energy -= (dRace / EFFORT_CFG.ENERGY_DRAIN_SECONDS) * fatigue;
         if (s.energy < 0) s.energy = 0;
         if (s.energy < s.energyFloor) s.energyFloor = s.energy;
         if (s.energy < EFFORT_CFG.ENERGY_KNEE) s.drySeconds += dRace;

@@ -7844,3 +7844,33 @@ pace-side; no course stream is touched), dailystate 5/5, tempo PASS.
     turned before anyone asked how many pickups a line actually takes; the
     answer, 321 of 554, made the first two rounds meaningless. Look up the
     denominator before turning the dial.
+
+### 81a · Fatigue: the burn is not flat
+
+The owner: *"energy needs to drain quicker as the game progresses. just how
+you get tired faster through a race."*
+
+    rate(u) = (1 / DRAIN_SECONDS) * (1 + FATIGUE * u)
+
+with u the fraction of the marathon run and FATIGUE = 1, so the last mile
+burns twice the first. Measured on the running engine with collection off:
+1.359e-4 tanks a race-second at mile 0.5 against 2.640e-4 at mile 25.7, a
+ratio of **1.943** against 1.96 predicted.
+
+**DRAIN_SECONDS was re-based in the same commit, 5000 -> 7500, and that is the
+only reason 81's tuning survived.** The integral of the curve above is
+(1 + FATIGUE/2) times the flat rate, so bolting a fatigue term onto the old
+constant would have drained half a tank more than every dial had been set
+against -- silently, with nothing failing. 7500 = 5000 * 1.5 leaves the TOTAL
+burn of a race exactly what it was and changes only its shape. The totals
+confirm it: the real-page clean run is 1:59:21 before and after, HARVEST at
+perfect is 1:59:11 before and after, first-attempt cells 1 of 30 both times.
+
+What moved is where the difficulty sits. The opening is cheaper, so NO AID
+improves 1:59:56 -> 1:59:42; the back half is dearer, so a tank that reads
+comfortable at halfway is not. The danger now lands in THE WALL, which is the
+leg this course was already named after.
+
+Drain is read off MILES rather than the clock, deliberately: a slow runner is
+already paying in seconds, and charging them extra energy for the same stretch
+of road would compound a bad run into an unrunnable one.

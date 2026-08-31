@@ -7344,3 +7344,55 @@ Frames in `shots/`: `share-clean`, `share-guarded`, `share-hit`,
 31. Counting an event from the moment you REQUEST it charges the fix for
     work already scheduled. The loop-stop assertion counts from the
     moment the handler ran, and only then is zero the honest answer.
+
+## Roadmap 80 · The swipe finally gets tested, and it was fine all along
+
+The most-executed piece of player-facing code in this game was the one path
+no instrument touched. `src/game/controls.js` holds the real
+touchstart/touchmove/touchend listeners, but every tool in the suite --
+shoot, course-test, simulate, playthrough, ridehold, dailystate, aidvanish
+-- drives the game through `?bot=`, which writes straight into the internal
+action queue and never dispatches a DOM event at all. A CSS change, a
+viewport quirk, a touch-action or passive-listener conflict could have
+broken input entirely on a real phone and every gate would still have
+printed green.
+
+That is the same shape as the defect that shipped in roadmap 76: two bugs
+found only by the owner playing on a phone, "neither by the gate suite --
+every instrument was aimed elsewhere". This entry closes the gap before a
+public launch turns a rare failure into a common one.
+
+`tools/touchinput.js` drives the real page with a touch-enabled context and
+dispatches genuine touch events, then asserts the game did what the gesture
+asked. 29 checks: lane changes left and right from every lane, a swipe into
+the wall from an edge lane, jump and duck, both diagonals resolving to the
+dominant axis without firing two actions, a swipe under SWIPE_MIN (25px
+against the real 26px, read from the page rather than assumed), a swipe held
+past SWIPE_MAX_TIME, a tap with no move, the same gestures at 320x568,
+430x926 and landscape, the start panel correctly swallowing a swipe that
+must not reach the canvas, `touch-action` resolving to `none` on the body and
+`pan-y pinch-zoom` on the panel, and the keyboard path that shares the action
+queue.
+
+**The result is clean, and that is a real result rather than a shrug**
+because the tool was proved able to fail first. `--selftest` dispatches a
+10px swipe -- comfortably under the 26px threshold -- and asserts, wrongly
+and on purpose, that it changed lane. The checker reports FAIL, as it must.
+A test that has never failed has not been tested; this project has shipped
+six defects in one instrument that every one of them flattered, and had a
+tool call a working fix broken twice in a single day.
+
+**What it does not prove, stated in its own header:** a synthetic touch
+event is not a finger, and it cannot catch a defect living in a specific
+real device's own gesture handling. It also needed a retry on one diagonal
+case (attempt 2 of 3), which is timing sensitivity in the harness rather
+than in the game, and is worth watching if that case ever starts costing
+more attempts.
+
+**Process note, recorded because it cost real budget:** the agent that wrote
+this tool stalled four separate times waiting for a completion notification
+for its own backgrounded run, burning over 100 tool calls without
+converging. The runs themselves had finished; nothing was going to wake it.
+Long verification runs belong in the FOREGROUND with a timeout, where the
+result lands in the same turn. The tool it wrote is good; the way it waited
+was not.

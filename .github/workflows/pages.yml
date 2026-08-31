@@ -1,0 +1,61 @@
+# Publish marathon-miles.com to GitHub Pages.
+#
+# The site is assembled rather than committed: site/ holds the landing page,
+# the CNAME and the social card, and the GAME is the repo's own index.html
+# copied in at deploy time. That copy is deliberate -- index.html is a 2.8 MB
+# build artifact and committing a second copy of it under site/game/ would
+# double it in every commit that touches the build.
+#
+# The landing page is at /, the game at /game/, which is what the PLAY links
+# point at.
+name: Deploy site
+
+on:
+  push:
+    branches: [main, master, claude/effort-estimation-emdxm8]
+    paths:
+      - 'site/**'
+      - 'index.html'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # index.html is committed, so there is nothing to build here. It is
+      # verified instead: build --check fails if the committed artifact is not
+      # what the source produces, which is the one thing that could silently
+      # ship a stale game.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: The committed game must match its source
+        run: node tools/build.js --check
+
+      - name: Assemble the site
+        run: |
+          mkdir -p _site/game
+          cp -r site/. _site/
+          cp index.html _site/game/index.html
+
+      - uses: actions/configure-pages@v4
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

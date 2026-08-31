@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Marathon Miles — a new marathon course every day</title>
+<meta name="description" content="One 26.2-mile course a day, the same road for everyone. Break the marathon world record of 1:59:30 and your day is done.">
+<meta name="theme-color" content="#0e1230">
+
+<link rel="canonical" href="https://marathon-miles.com/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Marathon Miles">
+<meta property="og:title" content="Marathon Miles — a new marathon course every day">
+<meta property="og:description" content="One 26.2-mile course a day, the same road for everyone. Break 1:59:30 and your day is done.">
+<meta property="og:url" content="https://marathon-miles.com/">
+<meta property="og:image" content="https://marathon-miles.com/marathon-miles-og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="MARATHON MILES over a night road, with the target 1:59:30 and a row of result blocks">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Marathon Miles — a new marathon course every day">
+<meta name="twitter:description" content="One 26.2-mile course a day, the same road for everyone. Break 1:59:30 and your day is done.">
+<meta name="twitter:image" content="https://marathon-miles.com/marathon-miles-og.png">
+<meta name="twitter:image:alt" content="MARATHON MILES over a night road, with the target 1:59:30 and a row of result blocks">
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230e1230'/%3E%3Crect x='27' y='8' width='10' height='12' fill='%23ffd23f'/%3E%3Crect x='27' y='26' width='10' height='30' fill='%233ff0a8'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Barlow:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    --ground:  #0b0e22;
+    --deep:    #0e1230;
+    --panel:   #151a38;
+    --line:    #262d52;
+    --ink:     #f0f2fa;
+    --muted:   #a2aac6;
+    --faint:   #737b9c;
+    --gold:    #ffd23f;
+    --mint:    #3ff0a8;
+    --red:     #ff6b7a;
+    --display: "Barlow Condensed", "Oswald", Impact, sans-serif;
+    --body:    "Barlow", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { animation: none !important; transition: none !important; }
+  }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { width: 100%; max-width: 1060px; margin: 0 auto; padding: 0 22px; }
+
+  a { color: var(--gold); }
+  a:focus-visible, button:focus-visible {
+    outline: 3px solid var(--gold);
+    outline-offset: 3px;
+  }
+
+  /* ---------- the road: lane markings receding into the hero ---------- */
+  .hero {
+    position: relative;
+    overflow: hidden;
+    padding: 72px 0 84px;
+    background:
+      radial-gradient(120% 90% at 50% 108%, rgba(63,240,168,.10), transparent 60%),
+      linear-gradient(180deg, var(--deep) 0%, var(--ground) 100%);
+    border-bottom: 1px solid var(--line);
+  }
+  .lanes {
+    position: absolute;
+    left: 50%; bottom: -10%;
+    width: 150%; height: 62%;
+    transform: translateX(-50%);
+    background:
+      repeating-linear-gradient(90deg,
+        transparent 0 calc(50% - 1px),
+        rgba(240,242,250,.16) calc(50% - 1px) calc(50% + 1px),
+        transparent calc(50% + 1px) 100%);
+    background-size: 33.33% 100%;
+    -webkit-mask-image: linear-gradient(180deg, transparent, #000 70%);
+            mask-image: linear-gradient(180deg, transparent, #000 70%);
+    pointer-events: none;
+  }
+  /* The hero is centred on the road that runs up behind it -- the wordmark
+     sits on the centre lane. Everything in the block centres with it, because
+     a centred headline over left-aligned body copy reads as a mistake rather
+     than a choice. The measure-limited paragraphs need auto margins to centre
+     at all; text-align alone only moves the lines inside their box. */
+  .hero .wrap { position: relative; text-align: center; }
+  .hero .tagline, .hero .sub { margin-left: auto; margin-right: auto; }
+  .hero .target { justify-content: center; }
+
+  .eyebrow {
+    font-family: var(--display);
+    text-transform: uppercase;
+    letter-spacing: .22em;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--mint);
+    margin: 0 0 14px;
+  }
+  h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: clamp(58px, 13vw, 132px);
+    line-height: .86;
+    letter-spacing: -.005em;
+    margin: 0 0 22px;
+  }
+  .tagline {
+    font-size: clamp(19px, 2.6vw, 25px);
+    line-height: 1.34;
+    color: var(--ink);
+    max-width: 21ch;
+    margin: 0 0 8px;
+    font-weight: 500;
+  }
+  .sub {
+    color: var(--muted);
+    max-width: 52ch;
+    margin: 0 0 34px;
+  }
+
+  .cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--gold);
+    color: #14183a;
+    font-family: var(--display);
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    font-size: 25px;
+    font-weight: 700;
+    padding: 15px 38px;
+    border-radius: 3px;
+    text-decoration: none;
+    transition: transform .12s ease, box-shadow .12s ease;
+    box-shadow: 0 0 0 rgba(255,210,63,0);
+  }
+  .cta:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(255,210,63,.22); }
+  /* The button is the most-tapped thing on the page and it must not wrap:
+     "RUN TODAY'S COURSE" breaks after the apostrophe at 390px otherwise, which
+     reads as two buttons stacked. Shrink the type and the padding instead. */
+  @media (max-width: 430px) {
+    .cta { font-size: 21px; padding: 14px 22px; letter-spacing: .05em; }
+  }
+  @media (max-width: 340px) {
+    .cta { font-size: 19px; padding: 13px 16px; }
+  }
+  .ctaNote {
+    font-family: var(--display);
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    font-size: 13px;
+    color: var(--faint);
+    margin: 16px 0 0;
+  }
+
+  /* ---------- the target plate ---------- */
+  .target {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin: 40px 0 0;
+    padding: 18px 0 0;
+    border-top: 1px solid var(--line);
+  }
+  .target .lab {
+    font-family: var(--display);
+    text-transform: uppercase;
+    letter-spacing: .13em;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .target .time {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(38px, 7vw, 60px);
+    line-height: 1;
+    color: var(--gold);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- sections ---------- */
+  section { padding: 78px 0; border-bottom: 1px solid var(--line); }
+  h2 {
+    font-family: var(--display);
+    text-transform: uppercase;
+    font-weight: 700;
+    font-size: clamp(30px, 5vw, 44px);
+    line-height: 1.02;
+    margin: 0 0 10px;
+    text-wrap: balance;
+  }
+  .lead { color: var(--muted); max-width: 58ch; margin: 0 0 40px; font-size: 18px; }
+
+  .grid {
+    display: grid;
+    gap: 18px;
+    grid-template-columns: repeat(auto-fit, minmax(232px, 1fr));
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 24px 24px 22px;
+  }
+  .card h3 {
+    font-family: var(--display);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 0 8px;
+  }
+  .card p { margin: 0; color: var(--muted); font-size: 16px; }
+  .card .key {
+    font-family: var(--display);
+    font-size: 13px;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--mint);
+    margin: 0 0 12px;
+  }
+
+  /* ---------- mats ---------- */
+  .mats { display: flex; gap: 14px; flex-wrap: wrap; margin: 0 0 6px; }
+  .mat {
+    flex: 1 1 220px;
+    border-left: 4px solid var(--mint);
+    background: var(--panel);
+    padding: 16px 18px;
+    border-radius: 0 4px 4px 0;
+  }
+  .mat.slow { border-left-color: var(--red); }
+  .mat strong {
+    font-family: var(--display);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    font-size: 17px;
+    display: block;
+    margin-bottom: 2px;
+  }
+  .mat span { color: var(--muted); font-size: 15px; }
+
+  /* ---------- cities ---------- */
+  .cities {
+    display: grid;
+    gap: 8px 20px;
+    grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .cities li {
+    font-family: var(--display);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    font-size: 19px;
+    color: var(--ink);
+    padding: 7px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  /* ---------- share block ---------- */
+  .share {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 26px 28px;
+    max-width: 430px;
+  }
+  .share .t1 {
+    font-family: var(--display);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    font-size: 15px;
+    color: var(--muted);
+    margin: 0;
+  }
+  .share .t2 {
+    font-family: var(--display);
+    font-size: 27px;
+    font-weight: 700;
+    margin: 2px 0 14px;
+    color: var(--gold);
+    font-variant-numeric: tabular-nums;
+  }
+  .blocks { display: flex; gap: 7px; margin: 0 0 14px; }
+  .blocks i {
+    width: 34px; height: 34px;
+    border-radius: 3px;
+    background: var(--mint);
+    display: block;
+  }
+  .blocks i.g { background: var(--gold); }
+  .blocks i.r { background: var(--red); }
+  .share .t3 { margin: 0; color: var(--muted); font-size: 15px; }
+
+  footer {
+    padding: 46px 0 66px;
+    color: var(--faint);
+    font-size: 15px;
+  }
+  footer .wrap { display: flex; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
+  .mark {
+    font-family: var(--display);
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--muted);
+    font-size: 15px;
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="lanes" aria-hidden="true"></div>
+  <div class="wrap">
+    <p class="eyebrow">One course a day · everyone runs the same road</p>
+    <h1>Marathon<br>Miles</h1>
+    <p class="tagline">A new 26.2-mile course every day.</p>
+    <p class="sub">Every runner in the world gets the same road on the same day. Run it as many times as you like — the day is only over when you break the record.</p>
+    <a class="cta" href="/game/">Run today's course</a>
+    <p class="ctaNote">Free · no sign-up · plays in your browser</p>
+
+    <div class="target">
+      <span class="lab">The time to beat</span>
+      <span class="time">1:59:30</span>
+      <span class="lab">the marathon world record</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <h2>How it works</h2>
+    <p class="lead">Three lanes, one road, and everything on it is in your way. The controls take about five seconds to learn; the record takes rather longer.</p>
+    <div class="grid">
+      <div class="card">
+        <p class="key">Move</p>
+        <h3>Left and right</h3>
+        <p>Swipe or use the arrow keys to change lane. You can move as often as you like — choosing the right lane early is most of the game.</p>
+      </div>
+      <div class="card">
+        <p class="key">Clear</p>
+        <h3>Jump and slide</h3>
+        <p>Swipe up to jump a barrier, down to slide under one. Some obstacles can be ridden over the top of, if you find the ramp.</p>
+      </div>
+      <div class="card">
+        <p class="key">Cost</p>
+        <h3>One contact ends it</h3>
+        <p>Hit something unprotected and the record is gone for that run. Water and fruit along the road buy you a cushion — collect enough and a mistake costs you nothing.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>The road decides your pace</h2>
+    <p class="lead">Coloured mats are laid along the course. They are the only thing that changes your speed, and they are placed where the decision is hardest — beside an obstacle, on top of a lorry, across the line you were already committed to.</p>
+    <div class="mats">
+      <div class="mat">
+        <strong>Green lifts you</strong>
+        <span>A short burst of pace. Worth going out of your way for — usually.</span>
+      </div>
+      <div class="mat slow">
+        <strong>Red drags you</strong>
+        <span>A short loss. Sometimes the safe lane and the fast lane are not the same lane.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Break it and you're done for the day</h2>
+    <p class="lead">Run today's course as many times as you want. The moment you finish under 1:59:30, the day closes and the next course unlocks at midnight UTC. Your record cities are kept, and so is your streak.</p>
+    <div class="grid">
+      <div class="card">
+        <p class="key">Unlimited</p>
+        <h3>Retries are free</h3>
+        <p>There is no life system and nothing to wait for. If a run ends, start another one immediately.</p>
+      </div>
+      <div class="card">
+        <p class="key">Twelve</p>
+        <h3>A city a day</h3>
+        <p>Each day's course is set in one real marathon city, drawn so you see every one of them before any repeats.</p>
+      </div>
+      <div class="card">
+        <p class="key">Kept</p>
+        <h3>Streaks and record cities</h3>
+        <p>Every city where you have broken the record is marked, and consecutive record days build a streak.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Twelve cities</h2>
+    <p class="lead">Every course is set somewhere real, built from that city's own landmarks — the Colosseum, Tower Bridge, Table Mountain, the Skytree.</p>
+    <ul class="cities">
+      <li>Boston</li><li>London</li><li>Berlin</li><li>Chicago</li>
+      <li>New York</li><li>Tokyo</li><li>Sydney</li><li>Paris</li>
+      <li>Valencia</li><li>Amsterdam</li><li>Rome</li><li>Cape Town</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Six blocks, no spoilers</h2>
+    <p class="lead">Your finish gives you a result you can paste anywhere. One block for each leg of the course: green if you ran it clean, yellow if something clipped you and your cushion took it, red if it cost you. It says how your run went, never where the obstacles are.</p>
+    <div class="share">
+      <p class="t1">Marathon Miles · Cape Town</p>
+      <p class="t2">2:01:47 <span style="color:var(--muted);font-size:19px">(+2:17)</span></p>
+      <div class="blocks" aria-label="Green, green, yellow, green, red, green">
+        <i></i><i></i><i class="g"></i><i></i><i class="r"></i><i></i>
+      </div>
+      <p class="t3">Day streak: 6</p>
+    </div>
+  </div>
+</section>
+
+<section style="border-bottom:none">
+  <div class="wrap" style="text-align:center">
+    <h2>Today's course is waiting</h2>
+    <p class="lead" style="margin:0 auto 30px">Everyone is running the same road. See how close you get.</p>
+    <a class="cta" href="/game/">Run today's course</a>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span class="mark">Marathon Miles</span>
+    <span>26.2 miles · three lanes · one road a day</span>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -245,7 +245,7 @@ MR.HUD = (function () {
           gauge shows how full; PACE says how fast. Nothing else does.
         -->
         <div id="engine">
-          <div class="lab">ENERGY</div>
+          <div class="lab" id="engLab">ENERGY</div>
           <!--
             THE GAUGE CARRIES THE POOL UNDER EFFORT, AND NOTHING ELSE MOVES.
 
@@ -701,7 +701,7 @@ MR.HUD = (function () {
     const n = {
       clock: q('clock'),
       projCell: q('projCell'), projVal: q('projVal'), margin: q('margin'), status: q('status'),
-      engine: q('engine'), why: q('why'),
+      engine: q('engine'), why: q('why'), engLab: q('engLab'),
       gaugeFill: q('gaugeFill'), gaugePace: q('gaugePace'),
       paceGauge: q('paceGauge'), paceVal: q('paceVal'),
       distVal: q('distVal'),
@@ -1675,8 +1675,17 @@ MR.HUD = (function () {
         const energy01 = clamp01(p.energy);
         n.gaugeFill.style.width = (energy01 * 100) + '%';
         n.gaugePace.style.left = (pace01 * 100) + '%';
-        cls(n.gaugeFill, 'fillCls',
-          'gaugeFill' + (p.energy < MR.Pace.EFFORT_CFG.ENERGY_KNEE ? ' dry' : ''));
+        // ---- AND THE LAST 385 YARDS SAY SO --------------------------
+        // The kick is the fastest ground in the game and it is over in about
+        // a minute; without a word on screen it reads as the pace gauge
+        // glitching. The label is the cheapest place to say it -- the plate,
+        // the box and the bar all stay exactly where they were, so nothing
+        // moves under the player at the one moment they are threading
+        // obstacles at full speed.
+        set(n.engLab, 'engLab', p.kicking ? 'KICK' : 'ENERGY');
+        cls(n.gaugeFill, 'fillCls', 'gaugeFill'
+          + (p.kicking ? ' kick'
+             : p.energy < MR.Pace.EFFORT_CFG.ENERGY_KNEE ? ' dry' : ''));
         // The gauge is the POOL, counted, and it now has one spend: guard.
         // The 'surging' class it used to carry while a segment burned has no
         // state left to represent.

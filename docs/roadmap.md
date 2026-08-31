@@ -7874,3 +7874,76 @@ leg this course was already named after.
 Drain is read off MILES rather than the clock, deliberately: a slow runner is
 already paying in seconds, and charging them extra energy for the same stretch
 of road would compound a bad run into an unrunnable one.
+
+## Roadmap 82 · Fatigue and the Kick: the tank empties faster, and the last 385 yards spend it
+
+Two owner requests a few minutes apart, both about the same feeling. First,
+after a near-perfect run: *"i hit one obstacle and was 1 second off... i would
+love if we added some challenges at the end to potentially get people to beat
+the record."* Then: *"energy needs to drain quicker as the game progresses.
+just how you get tired faster through a race."*
+
+**FATIGUE.** The burn is no longer flat. rate(u) = (1/DRAIN_SECONDS) * (1 +
+FATIGUE * u), u being the fraction of the marathon run, so at FATIGUE = 1 the
+last mile costs exactly twice the first. Measured on the running engine with
+collection switched off: 1.359e-4 tanks a race-second at mile 0.5 against
+2.640e-4 at mile 25.7, a ratio of **1.943** against a predicted 1.96.
+
+**DRAIN_SECONDS was re-based in the same edit, 5000 to 7500, and that is the
+only reason the tuning underneath survived.** The integral of the curve over a
+race is (1 + FATIGUE/2) times the flat rate, so bolting a fatigue curve onto
+the old constant would have drained half a tank more than every dial had been
+set against -- silently, with no gate failing. 7500 = 5000 * 1.5 leaves the
+TOTAL burn of a race exactly what it was and moves only its shape. Proof it
+worked: the clean playthrough came back at 1:59:21 and HARVEST at 1:59:11,
+both unmoved to the second.
+
+What the shape buys: the opening is cheap and the closing dear, so a tank that
+reads comfortable at halfway is not, and the danger lands in THE WALL. One
+honest side effect -- NO AID actually IMPROVED, 1:59:56 to 1:59:42, because
+the early race got gentler. The punishment moved later rather than growing.
+
+**THE KICK.** Over the final 385 yards -- 0.21875 miles, the marathon's own
+closing distance, not a number chosen for feel -- the tank dumps into pace:
+the target drops by KICK_LIFT * energy and the energy burns away as it is
+spent, so the sprint fades toward the tape rather than ending on a cliff.
+
+It is deliberately NOT a timed input sequence. That would add a verb to a game
+whose control story is "about five seconds to learn", and it would reward
+reflexes at the exact moment rule 4 is most dangerous to break. The challenge
+is ARRIVING with energy, which is a claim on the whole 26 miles rather than on
+the last twenty seconds. It is still a test, and a sharper one: the closing
+stretch keeps its obstacles, the runner is moving faster through them than
+anywhere else in the game, and a contact costs ENERGY_HIT out of the very tank
+being spent -- so the fastest ground in the game is also the least forgiving.
+
+**And it pays exactly in proportion to how well you fuelled**, which is the
+whole design in one column:
+
+| line | before the kick | with it | gain |
+|---|---|---|---|
+| NO AID (arrives empty) | 1:59:42 | 1:59:42 | **0 s** |
+| COIN CHASE | 1:59:29 | 1:59:27 | 2 s |
+| HARVEST (arrives full) | 1:59:11 | **1:59:07** | 4 s |
+| PLAN AID | 1:59:22 | 1:59:14 | 8 s |
+
+A line that ignored the road gets nothing at the tape. There is no way to
+arrive empty and be rescued.
+
+**KICK_FLOOR is explicit rather than inherited.** Every other pace term is
+clamped by tempoTarget at K.FLOOR_PACE; the kick deliberately goes under it,
+which is what makes it a sprint. So the hard bound on the fastest pace the
+game can ever produce is now a named constant at the site rather than
+whatever an unclamped subtraction happens to reach.
+
+**The bar held:** first-attempt 1 of 30 (3%), all cells 10 of 45 (22%),
+learned 9 of 15 (60%), spread 52.0 s, simulate PASS. The owner's acceptance
+criterion -- *"if you collect everything and do not hit anything you should
+beat the record by more than 4 seconds"* -- is met at 23 seconds, and that
+line still wins at 0.960 execution.
+
+**The HUD says it.** The gauge label reads KICK for the final stretch and the
+bar turns to the ahead colour: the tank is emptying faster than at any other
+point in the race and it must read as gain rather than as loss. Nothing moves
+position, because the player is threading obstacles at full speed at that
+moment and the plate is not allowed to jump under them.

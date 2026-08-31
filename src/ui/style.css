@@ -293,6 +293,10 @@ html, body {
   pointer-events: none;
 }
 .gaugeFill.dry { background: var(--behind); }
+/* The kick: the tank is being spent, so the bar reads as gain rather than as
+   loss even though it is emptying faster than at any other point in the race. */
+.gaugeFill.kick { background: var(--ahead); }
+#engine .lab { transition: none; }
 
 /* Record pace as a mark on the range you are unlocking: once the fill passes
  * it, you are running faster than 1:59:30 needs. */

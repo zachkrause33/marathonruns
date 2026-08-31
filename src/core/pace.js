@@ -247,6 +247,46 @@ MR.Pace = (function () {
      * THE WALL, the leg this course was already named after.
      */
     ENERGY_FATIGUE: 1,           // last mile burns 2x the first
+
+    /**
+     * ================= THE KICK: 385 YARDS, AND THE TANK =================
+     *
+     * A marathon is 26 miles and 385 yards, and the 385 is where a runner
+     * empties whatever is left. This is that, and it exists because the owner
+     * ran a near-perfect race and lost it by a second: "i hit one obstacle and
+     * was 1 second off... i would love if we added some challenges at the end
+     * to potentially get people to beat the record."
+     *
+     * WHAT IT IS. Over the final KICK_MILES the tank dumps into pace: the
+     * target drops by KICK_LIFT seconds a mile scaled by how much energy is
+     * left, and the energy burns away as it is spent. Arrive full and the last
+     * quarter mile is run at a sprint; arrive empty and nothing happens at
+     * all, because there is nothing left to spend.
+     *
+     * WHY IT IS NOT A NEW BUTTON. The obvious version is a timed input
+     * sequence at the tape. That would add a verb to a game whose whole
+     * control story is "the controls take about five seconds to learn", and it
+     * would reward reflexes at the exact moment CLAUDE.md rule 4 is most
+     * dangerous to break. This rewards the 26 miles instead: the challenge is
+     * ARRIVING with energy, which means collecting well the whole way.
+     *
+     * IT IS STILL A TEST, and a sharper one than the rest of the race. The
+     * final stretch keeps its obstacles, the runner is moving faster through
+     * them than anywhere else on the course, and a contact here costs
+     * ENERGY_HIT out of the very tank being spent -- so it takes the sprint
+     * away at the one moment it cannot be earned back. The fastest ground in
+     * the game is also the least forgiving.
+     *
+     * THE FLOOR IS EXPLICIT rather than inherited. Every other pace term is
+     * clamped by tempoTarget at K.FLOOR_PACE, and the kick deliberately goes
+     * under it -- that is what makes it a sprint. KICK_FLOOR is therefore the
+     * hard bound on the fastest the game can ever run, and it is stated here
+     * rather than left to fall out of an unclamped subtraction.
+     */
+    KICK_MILES: 385 / 1760,      // 0.21875 -- the 385 yards, exactly
+    KICK_LIFT: 50,               // seconds a mile off the target, at a full tank
+    KICK_BURN_SECONDS: 55,       // race-seconds a full tank lasts once kicking
+    KICK_FLOOR: 215,             // the fastest pace the game can ever produce
     /**
      * ---- THE POOL IS FILLED IN SIPS NOW, AND THIS IS THE DENOMINATION ----
      *
@@ -550,6 +590,7 @@ MR.Pace = (function () {
       energy: EFFORT > 0 ? EFFORT_CFG.ENERGY_START : 1,
       energyFloor: 1,    // the lowest it ever got, for the finish card
       drySeconds: 0,     // race-seconds spent under the knee, i.e. slowing
+      kicking: false,    // inside the final 385 yards, spending the tank
       // ---- the mats, and they are inert at EFFORT = 0 ---------------------
       tempo: 0,          // +1 on a forward mat, -1 on a backward one, set by main
       liftUnits: 0,      // world units run on forward mats
@@ -601,11 +642,27 @@ MR.Pace = (function () {
         if (s.energy < EFFORT_CFG.ENERGY_KNEE) s.drySeconds += dRace;
       }
 
+      // ---- THE KICK: the last 385 yards spend whatever is left ------------
+      // Entered on distance, so it is the same stretch of road for everybody
+      // regardless of how the race went. Once inside, the tank burns down and
+      // the lift it buys shrinks with it, which is why the sprint fades toward
+      // the tape rather than ending on a cliff.
+      s.kicking = EFFORT > 0 && s.miles >= K.MARATHON_MILES - EFFORT_CFG.KICK_MILES;
+      let kick = 0;
+      if (s.kicking) {
+        kick = EFFORT_CFG.KICK_LIFT * s.energy;
+        s.energy -= dRace / EFFORT_CFG.KICK_BURN_SECONDS;
+        if (s.energy < 0) s.energy = 0;
+      }
+
       // ...and the tax it levies lands on the TARGET, in the same place and
       // the same currency as the mat, so the pace still eases toward it at
       // PACE_EASE and running dry is felt as a fade rather than a step.
-      const tgt = tempoTarget(targetPace(s.streak, floorPace()), s.tempo)
-        + energyTax(s.energy);
+      let tgt = tempoTarget(targetPace(s.streak, floorPace()), s.tempo)
+        + energyTax(s.energy) - kick;
+      // The kick is the one term allowed under tempoTarget's clamp, so it gets
+      // its own explicit bound rather than an unclamped subtraction.
+      if (tgt < EFFORT_CFG.KICK_FLOOR) tgt = EFFORT_CFG.KICK_FLOOR;
       const d = tgt - s.pace;
       const step = K.PACE_EASE * dRace;
       s.pace += Math.abs(d) <= step ? d : Math.sign(d) * step;

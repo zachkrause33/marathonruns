@@ -459,6 +459,34 @@ MR.HUD = (function () {
         <div class="date">RUN HISTORY</div>
         <h1 id="histTitle">PAST DAYS</h1>
         <div id="histSum"></div>
+
+        <!--
+          EVERY CITY IN THE POOL, AND WHERE THE RECORD HAS FALLEN.
+
+          The owner paused the map: "lets put a pause on the map. for now, its
+          a list of all available cities and then shows where you have
+          completed the record."
+
+          It is a COMPANION to the list below, not a replacement, because the
+          two answer different questions. PAST DAYS is chronological -- what
+          did I do lately -- and it can only ever show the days that happened.
+          This is the SET: the whole pool at once, so the cities you have not
+          reached are on the screen as well as the ones you have, which is the
+          only way a checklist can be a thing to finish.
+
+          Three states, and they are three because two would collapse the
+          question: a city where 1:59:30 fell, a city raced without it, and a
+          city not yet drawn. The third is the one a chronological log cannot
+          express at all.
+
+          DERIVED FROM course.js's SETTINGS, never a copy of it. The owner has
+          said more cities and landmarks are coming, so the count is
+          SETTINGS.length and the rows are the table's own order; adding a
+          thirteenth city updates this panel by existing.
+        -->
+        <div class="rule" id="cityRule"></div>
+        <div id="cityGrid"></div>
+
         <div id="histList"></div>
         <button class="cta" id="histBack" type="button">BACK TO THE LINE</button>
       </div></div>
@@ -556,6 +584,54 @@ MR.HUD = (function () {
         <div id="endTurn"></div>
 
         <!--
+          THE SHARE CARD.
+
+          The owner: "Share artifact is important. work on that and add that",
+          and "no leaderboard is needed. individual game. share card is more
+          important". Those two sentences are one decision: the comparison
+          between players happens OUTSIDE the game, in a message thread, and
+          what the game owes it is a result that survives being pasted.
+
+          WHY A RESULT IS WORTH SHARING AT ALL, which is the load-bearing fact
+          and not a marketing line: the day's course is byte-identical for
+          everyone. rng.dateKey is pure UTC year/month/day and pickSettings
+          deals the city from a bag keyed on the UTC epoch-day, so two people
+          on opposite sides of the world race the same road on the same date.
+          A time with no shared course behind it is a number about a stranger.
+
+          SIX BLOCKS, ONE PER BIOME LEG -- the same cut the chapter verdict
+          above already uses, so this is a byproduct of machinery that was
+          here rather than new bookkeeping. Green: the leg was run clean.
+          Yellow: a contact, and the pool paid for it. Red: a contact nothing
+          paid for. That describes THE RUN and not the road, which is what
+          keeps it spoiler-free -- nothing here leaks where a hazard stood,
+          which lane cleared it, or what the layout was. A reader who has not
+          run yet learns only how their friend's day went.
+
+          The blocks on the card are DIVS, not glyphs, and the emoji live only
+          in the copied text. The embedded typeface is subset to the characters
+          this HUD prints (see tools/mkfont.py) and has no block glyphs at all,
+          so a rendered square would arrive in whatever the system font felt
+          like -- three different sizes on three different phones, inside the
+          one element whose whole job is to look like a row.
+        -->
+        <div id="shareBox">
+          <div class="lab">TODAY'S RESULT</div>
+          <div id="shareLegs" aria-hidden="true"></div>
+          <div id="shareLine" class="num"></div>
+          <button id="shareBtn" type="button">COPY RESULT</button>
+          <div id="shareNote" role="status"></div>
+          <!--
+            THE LAST RESORT, AND THE REASON IT EXISTS: the button must never
+            fail silently. If the share sheet is absent, the async clipboard is
+            blocked by permissions policy and execCommand is gone, there is
+            still one thing that always works -- showing the player the text
+            with it already selected. It is hidden until that happens.
+          -->
+          <textarea id="shareText" readonly aria-label="Your result, to copy"></textarea>
+        </div>
+
+        <!--
           THE RETURN HOOK, next to the button it is competing with.
 
           This was the faintest line on the card, below every stat, which is
@@ -645,6 +721,9 @@ MR.HUD = (function () {
       verdict: q('verdict'), tierNext: q('tierNext'),
       endBadges: q('endBadges'), endMem: q('endMem'),
       endTurn: q('endTurn'), tomorrow: q('tomorrow'), tomorrowRoute: q('tomorrowRoute'),
+      shareBox: q('shareBox'), shareLegs: q('shareLegs'), shareLine: q('shareLine'),
+      shareBtn: q('shareBtn'), shareNote: q('shareNote'), shareText: q('shareText'),
+      cityRule: q('cityRule'), cityGrid: q('cityGrid'),
       againBtn: q('againBtn'),
       count: q('count'), countVal: q('countVal'),
       pauseBtn: q('pauseBtn'), pausePanel: q('pausePanel'),
@@ -697,6 +776,8 @@ MR.HUD = (function () {
     let course = null;
     let chapterCost = null; // per-city counterfactual, computed once at the tape
     let hitZ = null;       // z of every gate this run made contact with
+    let guardZ = null;     // ...and of every contact the guard pool paid for
+    let shareStr = '';     // the copyable result, built once at the tape
 
     // Latched, and deliberately so. `recordPossible()` is a bound, not a
     // guess, but at the exact boundary it can flicker: a player holding
@@ -809,10 +890,57 @@ MR.HUD = (function () {
      * behind it -- the same empty-state rule the memory plates follow, so a
      * first-ever visit still gets exactly the panel a stranger has always got.
      */
+    /**
+     * THE WHOLE POOL, WITH THE RECORD CITIES MARKED.
+     *
+     * Read off MR.Course.SETTINGS rather than a list typed here, so a city
+     * added to that table appears in this panel the same day, in the table's
+     * own order, and the count moves with it. Nothing below knows or cares
+     * that there are currently twelve.
+     *
+     * A history row's city is matched by NAME, because that is what main.js
+     * writes into the save (course.settings[0].name) and it is the only field
+     * of the two lists that is guaranteed to be there -- an old row predating
+     * a tag rename still matches on the word the player saw. A row whose city
+     * is not in the pool at all is simply not represented here; it keeps its
+     * place in PAST DAYS below, which is the log and is meant to hold
+     * everything that happened.
+     */
+    function drawCities(sum) {
+      const pool = (MR.Course && MR.Course.SETTINGS) ? MR.Course.SETTINGS : [];
+      if (!pool.length) { n.cityRule.textContent = ''; n.cityGrid.innerHTML = ''; return; }
+      const seen = (sum && sum.cities) || {};
+      let done = 0;
+      const html = pool.map(function (s) {
+        const c = seen[s.name];
+        const state = (c && c.rec) ? 'rec' : c ? 'ran' : 'new';
+        if (state === 'rec') done++;
+        // A mark as well as a colour and an opacity: the three states have to
+        // be told apart by someone who cannot see the difference between the
+        // green and the cream, and by anyone reading this on a phone in the
+        // sun. Typeset, not iconed, for the reason the WR mark below is -- the
+        // embedded face is subset to what this HUD prints and a symbol would
+        // arrive in the system font.
+        const mark = state === 'rec' ? 'WR' : state === 'ran' ? 'RAN' : '&mdash;';
+        return '<span class="ccity ' + state + '">'
+          + '<span class="cname">' + s.name + '</span>'
+          + '<span class="cmark">' + mark + '</span></span>';
+      }).join('');
+      n.cityRule.textContent = 'RECORD CITIES · ' + done + ' OF ' + pool.length;
+      n.cityGrid.innerHTML = html;
+    }
+
     api.setHistory = function (sum) {
       const rows = sum && sum.history ? sum.history : [];
       n.histBtn.classList.toggle('hidden', !rows.length);
-      if (!rows.length) { n.histSum.innerHTML = ''; n.histList.innerHTML = ''; return; }
+      if (!rows.length) {
+        n.histSum.innerHTML = '';
+        n.histList.innerHTML = '';
+        n.cityRule.textContent = '';
+        n.cityGrid.innerHTML = '';
+        return;
+      }
+      drawCities(sum);
 
       let wr = 0;
       for (const e of rows) if (e.rec) wr++;
@@ -953,24 +1081,43 @@ MR.HUD = (function () {
      * unless one chapter genuinely carried the run, which is the same rule
      * the memory plates, the best-today line and the aid note already follow.
      */
+    /**
+     * Which biome leg a gate z falls in.
+     *
+     * A gate's leg is decided by the gate's own z, not by where the runner
+     * happened to be on the frame that resolved it. Frame-rate independent,
+     * and it is the same test world.js uses to decide which leg to build.
+     *
+     * Shared by the chapter counterfactual below and the share card's six
+     * blocks, so the two can never disagree about which leg a contact was in
+     * -- a card saying the run was clean through THE WALL over a row of blocks
+     * with THE WALL in red would be the game contradicting itself in ninety
+     * pixels.
+     */
+    function legCut() {
+      const legs = course && course.biomes;
+      if (!legs || !legs.length) return null;
+      const cut = legs.map(function (b) { return b.from * K.TOTAL_UNITS; });
+      return {
+        legs: legs,
+        of: function (z) {
+          let i = 0;
+          for (let k = 0; k < cut.length; k++) if (z >= cut[k]) i = k;
+          return i;
+        },
+      };
+    }
+
     function chapterCosts() {
       if (chapterCost !== null) return chapterCost;
       chapterCost = [];
       // The biome legs are course.js's BIOMES: six of them, every day, by
       // design -- so unlike the settings cut this one never degenerates.
-      const legs = course && course.biomes;
+      const cutter = legCut();
+      const legs = cutter && cutter.legs;
       if (!legs || legs.length < 2 || !hitZ || !hitZ.size
           || !course.gates || !course.gates.length) return chapterCost;
-
-      // A gate's leg is decided by the gate's own z, not by where the runner
-      // happened to be on the frame that resolved it. Frame-rate independent,
-      // and it is the same test world.js uses to decide which leg to build.
-      const cut = legs.map(function (b) { return b.from * K.TOTAL_UNITS; });
-      const legOf = function (z) {
-        let i = 0;
-        for (let k = 0; k < cut.length; k++) if (z >= cut[k]) i = k;
-        return i;
-      };
+      const legOf = cutter.of;
 
       // The hill is not modelled here because pace.js integrates the grade
       // term to zero over the race: it measures 0.01s on a flawless finish
@@ -1025,6 +1172,197 @@ MR.HUD = (function () {
       // card are commensurable even where the reconstruction drifted.
       return { name: top.name, would: actualFinish - top.cost };
     }
+
+    // ---- the share card --------------------------------------------------
+
+    // 0 the leg was run clean, 1 a contact the pool paid for, 2 a contact
+    // nothing paid for. Ordered so the worse outcome always wins the leg: a
+    // leg with one guard and one real hit is red, because the run lost time
+    // there and that is what the row is reporting.
+    const LEG_CLEAN = 0, LEG_GUARD = 1, LEG_HIT = 2;
+
+    // Written as escapes rather than as the characters themselves so the build
+    // pipeline, the linters and every editor this file passes through cannot
+    // silently mangle them: U+1F7E9 green square, U+1F7E8 yellow, U+1F7E5 red,
+    // U+1F3C6 trophy.
+    const BLOCK = ['\uD83D\uDFE9', '\uD83D\uDFE8', '\uD83D\uDFE5'];
+    const TROPHY = '\uD83C\uDFC6';
+
+    /**
+     * One mark per biome leg, worst outcome wins.
+     *
+     * This is a BYPRODUCT and not new bookkeeping: main.js already recorded
+     * the z of every contact for the chapter counterfactual, and the only
+     * thing added for this card was recording the guarded ones too -- the
+     * counterfactual could not use them (a guard costs no time, so erasing one
+     * measures zero) and the card is the first thing that ever needed them.
+     *
+     * A leg with no gates in it reads clean, which is correct: nothing was hit
+     * there. Every leg of every real course carries gates, so this is a
+     * statement about the degenerate case rather than about any shipped day.
+     */
+    function legMarks() {
+      const cutter = legCut();
+      if (!cutter) return [];
+      const marks = cutter.legs.map(function () { return LEG_CLEAN; });
+      if (guardZ) {
+        for (const z of guardZ) {
+          const i = cutter.of(z);
+          if (marks[i] < LEG_GUARD) marks[i] = LEG_GUARD;
+        }
+      }
+      if (hitZ) {
+        for (const z of hitZ) marks[cutter.of(z)] = LEG_HIT;
+      }
+      return marks;
+    }
+
+    /**
+     * The result as text, and the whole design is in what it does NOT carry.
+     *
+     * Four lines, and the fourth only when it has something true to say:
+     *
+     *   MARATHON MILES · CAPE TOWN
+     *   SUB-2:02 · 2:01:47 (+2:17)
+     *   [six blocks]
+     *   Day streak: 6
+     *
+     * NO URL. The game has no domain yet and a share string that invents one
+     * is a broken link travelling under the game's name; the line goes in the
+     * day the owner has somewhere to point it, and not before.
+     *
+     * NO SPOILERS, which is a constraint on every field and not a note on one.
+     * The city is the day's public name -- it is on the start panel before a
+     * stroke is played, and every player on the date gets the same one -- and
+     * the blocks describe the RUN. Nothing here names a gate, a lane, a mile,
+     * an obstacle or a count of them.
+     *
+     * A RECORD READS AS A RECORD. The trophy and a negative delta, in the same
+     * line, so it cannot be mistaken for a good-but-not-record run at a
+     * glance. The grade word does the rest: RECORD is the only rung whose name
+     * is not a time.
+     *
+     * The day streak is held back until 2 for the reason the memory plate
+     * holds it back: a streak of one is just today wearing a label -- and on
+     * a shared result it would be a boast about having turned up once.
+     */
+    function buildShare(p, rec, marks) {
+      const t = p.finishTime;
+      const set = course && course.settings;
+      const city = set && set.length ? set[0].name : '';
+      const vs = t - K.RECORD_SECONDS;
+      const isRec = t <= K.RECORD_SECONDS;
+
+      const out = [];
+      out.push('MARATHON MILES' + (city ? ' · ' + city : ''));
+      out.push((isRec ? TROPHY + ' ' : '') + Tier.of(t).name
+        + ' · ' + Pace.clock(t)
+        + ' (' + (vs <= 0 ? '-' : '+') + Pace.clock(Math.abs(vs)) + ')');
+      if (marks.length) out.push(marks.map(function (m) { return BLOCK[m]; }).join(''));
+      const streak = rec && rec.dayStreak ? rec.dayStreak | 0 : 0;
+      if (streak >= 2) out.push('Day streak: ' + streak);
+      return out.join('\n');
+    }
+
+    /**
+     * Say what happened, every time, and never nothing.
+     *
+     * A copy button that reports nothing is worse than no button: the player
+     * cannot tell a working copy from a blocked one without leaving the game
+     * to go and paste somewhere. `hold` keeps the last-resort message up --
+     * that one is an instruction, not a receipt, and it has to survive until
+     * the player has acted on it.
+     */
+    let noteTimer = null;
+    function shareNote(text, hold) {
+      n.shareNote.textContent = text;
+      clearTimeout(noteTimer);
+      if (text && !hold) {
+        noteTimer = setTimeout(function () { n.shareNote.textContent = ''; }, 2600);
+      }
+    }
+
+    /**
+     * The four ways a browser will let a page hand text to a person, in the
+     * order they are worth trying.
+     *
+     * 1. THE NATIVE SHARE SHEET, on touch devices only. navigator.share exists
+     *    on desktop Chrome and Edge too, where it opens a Windows share dialog
+     *    most people have never used and cannot cancel back out of gracefully;
+     *    on a phone it is the whole point, because it reaches the messaging
+     *    app the result is going to anyway. So the test is the same one the
+     *    key legend uses -- pointer: coarse -- rather than a width, which is
+     *    not an input type.
+     * 2. THE ASYNC CLIPBOARD, called from inside the click. That is a real
+     *    user gesture, which is what keeps it from prompting for permission,
+     *    and it is why none of this is done anywhere but the handler.
+     * 3. execCommand('copy') off an off-screen textarea, for old webviews that
+     *    have no navigator.clipboard at all. Deprecated, still the only thing
+     *    that works there.
+     * 4. SHOW THE PLAYER THE TEXT, selected, and say so. Nothing can take this
+     *    one away.
+     */
+    function shareLast(text) {
+      let ok = false;
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        // Fixed and inside the viewport rather than parked at -1000px: iOS
+        // scrolls to a selection, and a selection off the top of the document
+        // takes the finish card with it.
+        ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;'
+          + 'padding:0;border:0;opacity:0;';
+        document.body.appendChild(ta);
+        ta.select();
+        if (ta.setSelectionRange) ta.setSelectionRange(0, text.length);
+        ok = document.execCommand && document.execCommand('copy');
+        document.body.removeChild(ta);
+      } catch (e) { ok = false; }
+      if (ok) { shareNote('COPIED'); return; }
+      n.shareText.value = text;
+      n.shareBox.classList.add('revealed');
+      try { n.shareText.focus(); n.shareText.select(); } catch (e) { /* still visible */ }
+      shareNote('SELECT AND COPY', true);
+      if (api.markScroll) requestAnimationFrame(api.markScroll);
+    }
+
+    function shareCopy(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(
+          function () { shareNote('COPIED'); },
+          function () { shareLast(text); }
+        );
+        return;
+      }
+      shareLast(text);
+    }
+
+    n.shareBtn.addEventListener('click', function () {
+      const text = shareStr;
+      if (!text) return;
+      const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+      if (coarse && navigator.share) {
+        let p = null;
+        try { p = navigator.share({ text: text }); } catch (e) { p = null; }
+        if (p && p.then) {
+          p.then(function () { shareNote('SHARED'); }, function (e) {
+            // A cancelled share sheet is the player changing their mind, not a
+            // failure, and must not be answered with a fallback they did not
+            // ask for. Anything else means the sheet could not open at all.
+            if (e && e.name === 'AbortError') shareNote('');
+            else shareCopy(text);
+          });
+          return;
+        }
+      }
+      shareCopy(text);
+    });
+
+    // Exposed so tools/sharecard.js reads the string the button copies rather
+    // than rebuilding it -- an instrument that recomputes its subject is
+    // measuring itself. See correction 28 in docs/roadmap.md.
+    api.shareString = function () { return shareStr; };
 
     /**
      * Draw the day's route along the rail.
@@ -1601,9 +1939,10 @@ MR.HUD = (function () {
      *             Optional: without it the chapter line simply does not print,
      *             which is the same thing that happens on a flawless run.
      */
-    api.showEnd = function (p, rec, hits) {
+    api.showEnd = function (p, rec, hits, guards) {
       rec = rec || {};
       hitZ = hits && hits.length ? new Set(hits) : null;
+      guardZ = guards && guards.length ? guards.slice() : null;
       chapterCost = null;
       const t = p.finishTime;
       const rung = Tier.of(t);
@@ -1669,6 +2008,37 @@ MR.HUD = (function () {
       if (where) notes.push('CLEAN THROUGH ' + where.name + ' · ' + Pace.clock(where.would));
       n.endTurn.innerHTML = notes
         .map(function (x) { return '<div>' + x + '</div>'; }).join('');
+      // ---- the share card --------------------------------------------------
+      // Built once, here, off the same finished run everything above was read
+      // from -- so the string the button copies is the card the player is
+      // looking at, and cannot drift from it by being rebuilt later against a
+      // reset() that has already emptied the contact lists.
+      const marks = legMarks();
+      shareStr = buildShare(p, rec, marks);
+      const CLS = ['clean', 'guard', 'hit'];
+      n.shareLegs.innerHTML = marks.map(function (m, i) {
+        // The leg's name is the accessible label and nothing more: it is not
+        // drawn, because six names would be a table and the row is deliberately
+        // a shape you can take in at once.
+        const nm = (course && course.biomes && course.biomes[i]) ? course.biomes[i].name : '';
+        return '<span class="sblock ' + CLS[m] + '" title="' + nm + '"></span>';
+      }).join('');
+      // THE ROW NEEDS A KEY AND NOTHING ELSE.
+      //
+      // The first draft printed the first two lines of the share string here,
+      // so the player could see what they were about to copy -- and those two
+      // lines are the city, the grade and the finish time, all three of which
+      // are already on this card in larger type. That is the duplication this
+      // card has been cut twice to remove, so it went.
+      //
+      // What is genuinely new is the row itself, and six coloured squares with
+      // no key are a cipher. One line, fixed, naming the three states.
+      n.shareLine.textContent = marks.length
+        ? 'ONE BLOCK PER LEG · GREEN CLEAN · YELLOW GUARDED · RED HIT' : '';
+      n.shareBox.classList.remove('revealed');
+      n.shareText.value = '';
+      shareNote('');
+
       const tom = tomorrowLine();
       n.tomorrowRoute.textContent = tom;
       n.tomorrow.classList.toggle('empty', !tom);

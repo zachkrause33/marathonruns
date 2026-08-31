@@ -846,6 +846,58 @@ html, body {
 .hrow.rec { opacity: 1; }
 .hrow.rec .htime { color: var(--ahead); }
 
+/* ---- THE CITY CHECKLIST ----
+ *
+ * The whole pool at once, above the chronological log, because the two answer
+ * different questions: PAST DAYS is what happened, this is what is left.
+ *
+ * The grid auto-fills from a 118px minimum, which is what puts TWO columns in
+ * the 284px a 320px panel actually has, three at 390 and four on a desktop --
+ * without a breakpoint, and without a column count this file would have to
+ * revisit every time a city is added to course.js. AMSTERDAM, the longest name
+ * in the pool, measures ~78px at 11px/0.05em, so the name and its mark clear
+ * the narrowest cell with room.
+ *
+ * THREE STATES, TOLD APART THREE WAYS -- the left rule, the opacity, and a
+ * typeset mark -- because a colour alone would collapse the distinction for
+ * anyone who cannot see it, and an opacity alone reads as a rendering fault
+ * rather than as a state. */
+#cityRule:empty { display: none; }
+#cityRule + #cityGrid:empty { display: none; }
+#cityGrid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 4px 8px;
+  max-width: 360px; margin: 0 auto;
+  text-align: left;
+}
+.ccity {
+  display: flex; align-items: baseline; gap: 6px;
+  min-width: 0;
+  padding: 3px 0 3px 7px;
+  border-left: 3px solid rgba(255, 253, 245, 0.4);
+}
+.cname {
+  flex: 1 1 auto; min-width: 0;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.05em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cmark {
+  flex: 0 0 auto;
+  font-size: 8px; font-weight: 700; letter-spacing: 0.08em;
+  opacity: 0.75;
+}
+/* Where 1:59:30 fell. The bright one, in the green the WR rows below already
+ * own, because it is the state this whole panel exists to count. */
+.ccity.rec { border-left-color: var(--ahead); }
+.ccity.rec .cname { color: var(--ahead); }
+.ccity.rec .cmark { color: #06301c; background: var(--ahead); padding: 1px 3px; opacity: 1; }
+/* Raced, record still standing. Full ink, no colour: it is a real day, and the
+ * only thing it is not is finished. */
+.ccity.ran { opacity: 0.9; }
+/* Not yet drawn. A dashed rule rather than a solid one, so the row reads as an
+ * empty slot at a glance instead of as a dimmed result. */
+.ccity.new { opacity: 0.42; border-left-style: dashed; }
+
 /* ---- finish panel ----
  *
  * Rebuilt out of the HUD's own parts. The card was a spreadsheet dropped on a
@@ -954,6 +1006,82 @@ html, body {
   line-height: 1.5; opacity: 0.7; margin-top: 15px;
 }
 #endTurn:empty { display: none; }
+
+/* ---- THE SHARE CARD ----
+ *
+ * A plate in the card's own language, sitting between the notes and TOMORROW:
+ * the run just described, in the form it travels in.
+ *
+ * THE BLOCKS ARE DIVS AND THE EMOJI ARE ONLY IN THE COPIED TEXT. The embedded
+ * face is subset to the characters this HUD prints (tools/mkfont.py: digits,
+ * latin, and a dozen marks) and carries no block glyphs, so a rendered square
+ * would arrive from the system font at whatever size and baseline that font
+ * felt like -- three different rows on three different phones, in the one
+ * element whose whole job is to be a shape read at a glance. Drawn here, the
+ * row is the same six squares everywhere, in the three colours the rest of
+ * this sheet already uses for the same three meanings: --ahead for clean,
+ * --accent for the tank paying, --behind for a contact that cost time. */
+#shareBox {
+  margin-top: 15px; padding: 10px 12px 11px;
+  border: 1px solid rgba(255, 253, 245, 0.22);
+  background: rgba(255, 253, 245, 0.045);
+}
+#shareLegs {
+  display: flex; gap: 5px; margin-top: 6px;
+}
+.sblock {
+  flex: 0 0 auto;
+  width: 22px; height: 22px;
+  background: var(--ahead);
+}
+.sblock.guard { background: var(--accent); }
+.sblock.hit { background: var(--behind); }
+/* The key. Six coloured squares with nothing naming them are a cipher, and
+ * this is the only line on the card that is about the row rather than about
+ * the race. Deliberately the quietest thing in the plate. */
+#shareLine {
+  font-size: 8.5px; font-weight: 500; letter-spacing: 0.09em;
+  opacity: 0.55; margin-top: 7px; line-height: 1.4;
+}
+#shareLine:empty { display: none; }
+/* Not a rival to RUN IT AGAIN, and not a text row either: it is a real action
+ * with a real result, so it gets a bordered button in the accent rather than
+ * the filled CTA or the near-invisible #histBtn treatment. 44px tall, because
+ * it is a tap target on the same screen as the CTA and the near-miss that
+ * cost .cta three pixels applies here identically. */
+#shareBtn {
+  display: inline-block; margin-top: 9px;
+  background: none; border: 1px solid rgba(255, 228, 94, 0.6);
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.16em;
+  padding: 11px 20px; min-height: 44px; cursor: pointer; pointer-events: auto;
+}
+#shareBtn:active { transform: translateY(1px); }
+#shareBtn:focus-visible { outline: 3px solid #fffdf5; outline-offset: 3px; }
+/* THE RECEIPT. It is inline-block beside the button rather than under it so a
+ * COPIED that lands in a 320px column cannot push the card's last block down
+ * the page and move the button out from under the thumb that just pressed it. */
+#shareNote {
+  display: inline-block; margin-left: 10px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.14em;
+  color: var(--ahead);
+}
+#shareNote:empty { display: none; }
+/* The last resort: shown only when every copy path has failed, with the text
+ * already selected. Monospaced-by-tabular-figures is not the point here --
+ * being readable and selectable is. */
+#shareText {
+  display: none;
+  width: 100%; box-sizing: border-box; margin-top: 9px;
+  min-height: 84px; resize: none;
+  background: rgba(10, 13, 36, 0.75); color: #fffdf5;
+  border: 1px solid rgba(255, 253, 245, 0.3);
+  font-family: inherit; font-size: 12px; line-height: 1.5;
+  padding: 8px; pointer-events: auto;
+}
+#shareBox.revealed #shareText { display: block; }
+#shareBox.revealed #shareNote { color: var(--accent); }
 
 /* TOMORROW.
  *
@@ -1111,6 +1239,9 @@ html, body {
   .mplate .ms { font-size: 10px; }
 
   #histBtn { font-size: 12px; padding: 9px 20px; }
+  #cityGrid { max-width: 460px; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  .cname { font-size: 13px; }
+  .cmark { font-size: 10px; }
   #histList { max-width: 460px; }
   .hrow { font-size: 14px; }
   .hdate { flex-basis: 86px; font-size: 12px; }
@@ -1128,6 +1259,11 @@ html, body {
   .ebadge { font-size: 11px; padding: 4px 9px; }
   #endMem { font-size: 13px; }
   #endTurn { font-size: 13px; }
+  #shareBox { padding: 13px 16px 14px; }
+  .sblock { width: 28px; height: 28px; }
+  #shareLine { font-size: 10px; }
+  #shareBtn { font-size: 13px; padding: 13px 26px; }
+  #shareNote { font-size: 12px; }
   #tomorrow { padding: 12px 16px 13px; }
   #tomorrow .tomRoute { font-size: 16px; }
   #endPanel .cta { margin-top: 22px; }
@@ -1185,6 +1321,11 @@ html, body {
    * step down from its portrait size but still the loudest line under the
    * wordmark. */
   .panel .blurb, .rule, .mech { display: none; }
+  /* ...except the one rule that is not a section heading. #cityRule carries
+   * the count -- "RECORD CITIES · 4 OF 12" -- which is the fact the checklist
+   * exists to state, and dropping it in landscape would leave a grid of city
+   * names with nothing saying what the marks mean or how many are left. */
+  #cityRule { display: flex; margin: 9px 0 5px; font-size: 8px; }
   .panel .route { font-size: 17px; margin-top: 5px; }
   .target { margin-top: 10px; }
   .target b { font-size: 22px; }
@@ -1226,6 +1367,23 @@ html, body {
   #tierRow { margin-top: 6px; }
   #endBadges, #endMem { margin-top: 4px; }
   #endTurn { margin-top: 6px; font-size: 10px; line-height: 1.4; }
+  /* LANDSCAPE PAYS FOR THE SHARE PLATE OUT OF ITS OWN AIR, not out of a block.
+   * This card was already ~21px past the fold at 800x360 and the note above
+   * says why that was left to the scroll fade rather than bought by hiding
+   * something. The same rule applies to what has just been added: the plate
+   * keeps every part -- the blocks, the key and the button -- and gives up
+   * padding, block size and leading instead. The button holds 44px, because a
+   * tap target is not air. */
+  #shareBox { margin-top: 6px; padding: 5px 9px 6px; }
+  #shareLegs { gap: 4px; margin-top: 4px; }
+  .sblock { width: 16px; height: 16px; }
+  #shareLine { font-size: 8px; margin-top: 4px; }
+  #shareBtn { margin-top: 5px; padding: 12px 16px; font-size: 10px; }
+  #shareNote { font-size: 9px; margin-left: 7px; }
+  #shareText { min-height: 60px; font-size: 10px; margin-top: 5px; }
+  #cityGrid { gap: 2px 8px; }
+  .ccity { padding: 1px 0 1px 6px; }
+  .cname { font-size: 10px; }
   #tomorrow { margin-top: 6px; padding: 5px 9px 5px; }
   #tomorrow .tomRoute { font-size: 11px; margin-top: 2px; }
   #endPanel .cta { margin-top: 7px; padding: 10px; }

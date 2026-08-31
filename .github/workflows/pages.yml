@@ -10,9 +10,15 @@
 # point at.
 name: Deploy site
 
+# main ONLY, and the reason is on the record rather than assumed. The first
+# draft also listed the working branch, and the two raced: run 3 (main) was
+# CANCELLED three seconds in by run 4 (the branch), because they share the
+# concurrency group below. Feature work must never be able to cancel -- or
+# publish over -- a production deploy. Development happens on branches; the
+# live site is whatever is on main.
 on:
   push:
-    branches: [main, master, claude/effort-estimation-emdxm8]
+    branches: [main]
     paths:
       - 'site/**'
       - 'index.html'

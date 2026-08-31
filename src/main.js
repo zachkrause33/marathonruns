@@ -25,6 +25,126 @@
  * new one. A checked-in "before" screenshot goes stale the first time
  * something else on the character changes; this cannot.
  */
+
+/**
+ * THE PAGE THAT CANNOT RUN THE GAME.
+ *
+ * Everything below the boot assumes a WebGL context. Getting one is the first
+ * thing this file does and it is the one step with no fallback: a locked-down
+ * browser, an enterprise policy, a Chrome that has blocklisted the GPU driver,
+ * or a low-memory Android that simply refuses the context all end the same
+ * way. Before this existed they ended it SILENTLY -- the constructor threw out
+ * of the boot IIFE, nothing caught it, and the visitor got a 300x150 default
+ * canvas on a dark ground with an empty document body. Measured on the real
+ * built page in Chromium with WebGL disabled: document.body.innerText was the
+ * empty string. No message, no cause, no next step.
+ *
+ * That is survivable while a link is private and unacceptable the moment it is
+ * not, because the people it happens to are exactly the people arriving for the
+ * first time, and a blank rectangle is indistinguishable from a broken game.
+ *
+ * THREE PROPERTIES THIS HAS TO HAVE, and each one is why it is written here
+ * rather than inside the boot:
+ *
+ *   IT MUST NOT NEED THE BOOT. It is declared before the IIFE runs, builds its
+ *   DOM node by node rather than through any helper, and carries its own inline
+ *   styling -- so it works when the stylesheet, the HUD, the font and the
+ *   renderer are all absent or broken. The one thing it borrows is #ui, and it
+ *   falls through to document.body when even that is missing.
+ *
+ *   IT MUST SPEAK ONCE. Three separate paths call it (the constructor guard,
+ *   the last-resort error listener, and a lost GPU context) and a page that has
+ *   already failed will often fail again a frame later. The first message is
+ *   the true one; the rest are echoes, so they are dropped.
+ *
+ *   IT MUST BE FAILABLE. tools/failstate.js drives it on the real page with
+ *   WebGL switched off and with the context deliberately lost, and asserts that
+ *   the body says something a person can act on. A guard nobody can fail is not
+ *   a guard.
+ */
+MR.bail = function (head, lines) {
+  try {
+    if (MR.bail.shown) return;
+    MR.bail.shown = true;
+    MR.bail.head = head;
+    const host = document.getElementById('ui') || document.body;
+    if (!host) return;
+    const box = document.createElement('div');
+    box.id = 'bail';
+    box.setAttribute('role', 'alert');
+    // Inline, and every value spelled out: this is the one element on the page
+    // whose job is to render when nothing else did.
+    box.style.cssText = 'position:absolute;inset:0;z-index:99;display:flex;'
+      + 'flex-direction:column;align-items:center;justify-content:center;'
+      + 'gap:14px;padding:28px;box-sizing:border-box;text-align:center;'
+      + 'background:#0e1230;color:#fffdf5;pointer-events:auto;'
+      + "font-family:'MRCond',ui-sans-serif,system-ui,-apple-system,"
+      + 'Segoe UI,Roboto,Arial,sans-serif;';
+
+    const mark = document.createElement('div');
+    mark.textContent = 'MARATHON MILES';
+    mark.style.cssText = 'font-size:11px;font-weight:700;letter-spacing:0.28em;'
+      + 'opacity:0.5;';
+    box.appendChild(mark);
+
+    const h = document.createElement('div');
+    h.textContent = head;
+    h.style.cssText = 'font-size:26px;font-weight:700;letter-spacing:0.06em;'
+      + 'line-height:1.1;max-width:16em;color:#ffe45e;';
+    box.appendChild(h);
+
+    for (const t of (lines || [])) {
+      const p = document.createElement('div');
+      p.textContent = t;
+      p.style.cssText = 'font-size:13px;font-weight:500;letter-spacing:0.06em;'
+        + 'line-height:1.6;max-width:26em;opacity:0.82;';
+      box.appendChild(p);
+    }
+    host.appendChild(box);
+  } catch (e) {
+    // The guard itself must never be the thing that throws. A page with a
+    // half-built DOM still gets the plainest possible statement.
+    try { document.body.textContent = head; } catch (e2) { /* nothing left */ }
+  }
+};
+MR.bail.shown = false;
+
+/** Take the message down again -- used when a lost GPU context comes back. */
+MR.unbail = function () {
+  try {
+    const el = document.getElementById('bail');
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+  } catch (e) { /* it was already gone */ }
+  MR.bail.shown = false;
+  MR.bail.head = '';
+};
+
+/**
+ * THE LAST RESORT.
+ *
+ * Anything that throws out of the boot before the game is ready leaves the
+ * same blank page the missing context did, and there is no way to enumerate
+ * the causes in advance -- that is what makes it the last resort. So the test
+ * is not WHAT failed, it is WHETHER the game ever came up: once MR.game.ready
+ * is true the page is running and a later exception is a bug to be logged, not
+ * a reason to cover a working race with an error card.
+ */
+(function () {
+  const booted = function () { return !!(MR.game && MR.game.ready); };
+  const caught = function (what) {
+    if (booted()) return;
+    MR.bail('THE GAME DID NOT START', [
+      'SOMETHING WENT WRONG WHILE LOADING THE ROAD.',
+      'RELOAD THE PAGE, OR TRY A DIFFERENT BROWSER.',
+      what ? String(what).slice(0, 160) : '',
+    ].filter(Boolean));
+  };
+  window.addEventListener('error', function (e) { caught(e && e.message); });
+  window.addEventListener('unhandledrejection', function (e) {
+    caught(e && e.reason && e.reason.message);
+  });
+})();
+
 (function () {
   const K = MR.K;
   const Pace = MR.Pace;
@@ -75,12 +195,38 @@
   const JOY_FORCED = JOY !== null && isFinite(JOY);
 
   // ---- renderer ---------------------------------------------------------
+  //
+  // THE ONE STEP WITH NO FALLBACK, so it is the one step that is caught. See
+  // MR.bail at the top of this file for what the failure used to look like
+  // (an empty document body) and why the message is built the way it is.
+  //
+  // Both halves are needed. THREE.WebGLRenderer throws when createContext
+  // returns null, which is the common refusal; but a browser can also hand
+  // back a context object that is immediately unusable, and a renderer whose
+  // getContext() answers nothing will fail later, further from the cause and
+  // with the boot half-finished behind it. Neither case may reach the loop.
   const canvas = document.getElementById('gl');
-  const renderer = new THREE.WebGLRenderer({
-    canvas,
-    antialias: true,
-    powerPreference: 'high-performance',
-  });
+  let renderer = null;
+  try {
+    renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      powerPreference: 'high-performance',
+    });
+    if (!renderer.getContext || !renderer.getContext()) renderer = null;
+  } catch (e) {
+    renderer = null;
+  }
+  if (!renderer) {
+    MR.bail('THIS BROWSER WILL NOT DRAW THE ROAD', [
+      'MARATHON MILES IS RENDERED WITH WEBGL, AND THIS BROWSER '
+        + 'WOULD NOT GIVE THE PAGE A GRAPHICS CONTEXT.',
+      'TRY CHROME, SAFARI, FIREFOX OR EDGE ON THIS DEVICE.',
+      'OR TURN HARDWARE ACCELERATION BACK ON IN THE BROWSER SETTINGS '
+        + 'AND RELOAD.',
+    ]);
+    return;
+  }
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -190,6 +336,14 @@
   // erased. Gate z is the key because it is stable, unique per gate and is
   // already what every other part of the game indexes a gate by.
   let hitAt = [];
+  // ...and where the pool PAID for a contact, which is a different event and
+  // until now was recorded nowhere at all. hitAt deliberately excludes guarded
+  // contacts -- a guard costs no time, so a counterfactual that erased one
+  // would measure zero -- but the share card is not a counterfactual: it
+  // reports what happened, and "a leg where the guard saved you" is exactly
+  // the middle state its yellow block stands for. Same key as hitAt (gate z)
+  // for the same reasons, and cleared by the same reset().
+  let guardAt = [];
 
   // ---- THE STANDING START -------------------------------------------------
   //
@@ -287,6 +441,7 @@
     finishJoy = 0;
     celClock = 0;
     hitAt = [];
+    guardAt = [];
     runner.phase = 0;
     standT = 1;
     resuming = false;
@@ -740,7 +895,16 @@
   let fps = 60, fpsAcc = 0, fpsN = 0;
   let lastFlash = 0;   // edge-detect the ghost crossover for its audio cue
 
+  // THE LOOP HAS AN OFF SWITCH NOW, and it exists for one reason: a lost GPU
+  // context. Mobile Safari and Chrome reclaim contexts under memory pressure
+  // and when a tab is backgrounded -- the older phones this game is aimed at,
+  // exactly -- and without this the loop went on calling requestAnimationFrame
+  // and renderer.render against a dead context forever: a frozen last frame
+  // burning battery in a tight loop, with nothing on screen to say why.
+  let looping = true;
+
   function frame(now) {
+    if (!looping) return;
     requestAnimationFrame(frame);
 
     let dt = (now - last) / 1000;
@@ -858,7 +1022,7 @@
       function charge(z, shake) {
         const how = pace.onHit();
         cam.impact(shake);
-        if (how === 'guard') { hud.flashGuard(); audio.aid(false); return; }
+        if (how === 'guard') { guardAt.push(z); hud.flashGuard(); audio.aid(false); return; }
         hitAt.push(z);
         hud.flashBroken();
       }
@@ -1116,10 +1280,11 @@
         // for the next run, and the card is still on screen when RUN IT AGAIN
         // is pressed.
         const where = hitAt.slice();
+        const saves = guardAt.slice();
         showCard = function () {
           clearTimeout(endTimer);
           showCard = null;
-          hud.showEnd(pace, saved, where);
+          hud.showEnd(pace, saved, where, saves);
         };
         endTimer = setTimeout(function () { if (showCard) showCard(); }, 4900);
       }
@@ -1280,6 +1445,40 @@
   }
   window.addEventListener('resize', resize);
   window.addEventListener('orientationchange', () => setTimeout(resize, 120));
+
+  // ---- the GPU taking its context back ------------------------------------
+  //
+  // preventDefault on the lost event is not politeness, it is the whole
+  // mechanism: without it the browser is under no obligation to ever fire
+  // webglcontextrestored, so a page that does not call it can never come back.
+  //
+  // The race is PAUSED rather than abandoned. A context is usually lost
+  // through no fault of the player -- a background tab, another app taking the
+  // memory -- and this game charges a whole run for one contact, so resuming
+  // deliberately is the only fair ending. The pause panel is also already the
+  // one screen in this game that stops the clock, the road and the ghost
+  // together, which is precisely what a dead context has just done anyway.
+  canvas.addEventListener('webglcontextlost', function (e) {
+    e.preventDefault();
+    looping = false;
+    pause();
+    MR.bail('THE GRAPHICS CONTEXT WAS LOST', [
+      'THE BROWSER TOOK THE GRAPHICS BACK, USUALLY TO FREE MEMORY.',
+      'YOUR RACE IS PAUSED. IF IT DOES NOT COME BACK BY ITSELF, '
+        + 'RELOAD THE PAGE.',
+    ]);
+  }, false);
+
+  // Three.js re-initialises its own GPU state on this event and re-uploads
+  // what it needs on the next render, so the loop can simply start again --
+  // but it starts against a clock that has been standing still, so `last` is
+  // re-based or the first frame back integrates the whole outage in one step.
+  canvas.addEventListener('webglcontextrestored', function () {
+    MR.unbail();
+    resize();
+    last = performance.now();
+    if (!looping) { looping = true; requestAnimationFrame(frame); }
+  }, false);
   // The plate is sized in px by the stylesheet, so a late webfont cannot change
   // its height -- but the baseline-aligned row inside it can shift a pixel or
   // two, and this costs nothing. Guarded: document.fonts is absent on nothing
@@ -1304,6 +1503,9 @@
     // would put a wrong city on the card with nothing to catch it -- so the
     // harness is given the same array the card is given.
     get hitAt() { return hitAt; },
+    // ...and where the pool paid for one. The share card's yellow blocks are
+    // computed from this, so the harness is handed the same array the card is.
+    get guardAt() { return guardAt; },
     // The celebration clock, and it is SETTABLE. A harness that pumps rAF owns
     // every other clock in this file, and would own this one too except that a
     // page opened at ?skip=250 is already several real seconds past the tape
@@ -1320,6 +1522,10 @@
     // 1 is the start line, 0 is full stride.
     get stand() { return standT; },
     set stand(v) { standT = Math.max(0, Math.min(1, +v || 0)); },
+    // Whether the render loop is still turning. It is not a diagnostic: a lost
+    // GPU context stops it, and tools/failstate.js asserts that it actually
+    // stops rather than that a handler was merely registered.
+    get looping() { return looping; },
     pause, resume,
     course, world, runner, ghost, cam, hud, audio, renderer, scene,
     begin,
@@ -1378,14 +1584,21 @@
       // live loop's charge() already draws that line, and the fast-forward has
       // to draw it in the same place or a skipped race and a played one
       // disagree about what happened.
-      if (fd && fd.hit && pace.onHit() !== 'guard') hitAt.push(fd.z);
+      // Both outcomes recorded, in the live loop's own order: onHit() is called
+      // exactly once and its answer decides which list the z lands in. The
+      // earlier form short-circuited on 'guard' and threw the fact away, which
+      // was correct while hitAt was the only list and is not any more.
+      if (fd && fd.hit) {
+        if (pace.onHit() === 'guard') guardAt.push(fd.z); else hitAt.push(fd.z);
+      }
       for (const r of player.resolveGates(course, b, pace.units)) {
         // Recorded here as well as in the live loop. This fast-forward exists
         // so tooling can photograph the game deep into a race, and a debug
         // path that quietly drops a fact the finish card is computed from
         // would make the card lie on exactly the runs the harness inspects.
         if (r.clean) pace.onClean();
-        else if (pace.onHit() !== 'guard') hitAt.push(r.gate.z);
+        else if (pace.onHit() === 'guard') guardAt.push(r.gate.z);
+        else hitAt.push(r.gate.z);
       }
       // And the bottles, which fill the pool that everything above spends.
       for (const item of player.resolveAid(course, b, pace.units)) pace.onAid(item.gain);

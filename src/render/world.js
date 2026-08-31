@@ -14940,7 +14940,7 @@ MR.World = (function () {
      *   fills its lane                  small, a fifth of a lane wide
      *   sits on the road, or overhead   hovers at hip height, between the two
      *   saturated amber/cyan/pink       white and mint, the "go" family
-     *   hard-edged icon mat, 14 units   a soft pale pool of light, 1 unit
+     *   hard-edged icon mat on road     floats clear of the road, no mat
      *   dead still                      turning
      *
      * The turn is doing more work than it looks like. Nothing else in this
@@ -14950,8 +14950,11 @@ MR.World = (function () {
      *
      * Collection asks for no vertical accuracy and no action (see player.js),
      * so nothing here is allowed to imply otherwise: the item never rises above
-     * 1.2, never spans the lane, and the pool of light beneath it says that
-     * touching it is not a thing you have to aim at.
+     * 1.2 and never spans the lane, so touching it never reads as a thing you
+     * have to aim at. There used to be a mint disc of light on the road under
+     * each item saying the same thing; the owner cut it -- "not needed and
+     * take up space" -- and the floating, spinning silhouette carries the
+     * identity on its own.
      *
      * It is NOT lane-match any more, which this paragraph used to say. A road
      * item is bought at the gate it stands behind, so the bottle is a RECEIPT
@@ -14960,7 +14963,10 @@ MR.World = (function () {
      * and is why the art still must not suggest it has to be steered into.
      */
     const AID_Y = 0.95;   // hip height: not the ground (jump), not overhead (duck)
-    const AID_POP_TIME = 0.42;
+    // The whole vanish. 0.42 with a slow shrink read as running THROUGH the
+    // item (owner, twice); 0.09 is five-ish frames of collapse, gone before
+    // the camera overruns the spot. See the pop below.
+    const AID_POP_TIME = 0.09;
     // Released much sooner than BEHIND, because an uncollected bottle sitting
     // in the next lane back is only clutter -- and the pop needs the slot.
     const AID_BEHIND = 14;
@@ -15016,23 +15022,11 @@ MR.World = (function () {
       return it.roof ? (P.ramp === carrier && carrier !== null) : !P.onDeck;
     }
 
-    /**
-     * The pool of light under an item, as GEOMETRY rather than as a soft
-     * transparent sprite. A glow sprite is the obvious way to draw this and it
-     * is the wrong one here: large transparent surfaces are the single most
-     * expensive thing this renderer does. Two flat opaque discs of a pale mint
-     * cost nothing and read the same at the distance that matters.
-     *
-     * Both discs are rotationally symmetric on purpose -- the whole item is one
-     * mesh and one draw, so the spin below turns the pickup while leaving the
-     * pool looking planted on the road.
-     */
-    function aidPool(r) {
-      return [
-        cyl(r, r, 0.04, 14, 0, 0.03, 0, 0x86eec0),
-        cyl(r * 0.58, r * 0.58, 0.04, 14, 0, 0.06, 0, 0xf0fff8),
-      ];
-    }
+    // The mint pool-of-light discs that used to sit under each item (an
+    // aidPool helper merged into both geometries) are gone at the owner's
+    // request: "Take the circle out from under the bottles and banana. Not
+    // needed and take up space." Same draw-call count either way -- each item
+    // is one merged mesh -- so the cut is pure ground clutter removed.
 
     /**
      * A BOTTLE, and it has to actually look like one. Aid arrives alone now --
@@ -15053,13 +15047,13 @@ MR.World = (function () {
      * signal in this world that says "pickup, not obstacle" -- would be
      * invisible on it. A 0.34 x 0.26 section swings visibly.
      */
-    const waterGeo = merge(aidPool(0.54).concat([
+    const waterGeo = merge([
       bx(0.34, 0.42, 0.26, 0, 0.85, 0, 0xf6fffb),   // body, 0.64 -> 1.06
       bx(0.36, 0.14, 0.28, 0, 0.82, 0, 0x2fd39a),   // label band
       bx(0.24, 0.12, 0.19, 0, 1.12, 0, 0xf6fffb),   // shoulder
       bx(0.14, 0.10, 0.12, 0, 1.23, 0, 0xf6fffb),   // neck
       bx(0.20, 0.13, 0.17, 0, 1.345, 0, 0x2fd39a),  // cap, proud of the neck
-    ]));
+    ]);
 
     /**
      * A BANANA, and the curve is the whole identity -- a yellow box is a
@@ -15077,12 +15071,12 @@ MR.World = (function () {
      * is also why there is a dark blossom tip at one end and a stem at the
      * other rather than the old matching pair.
      *
-     * Fruit is the rare one and worth more than twice a bottle, so it is bigger
-     * and sits in a wider pool. Lemon yellow rather than the JUMP amber, and on
-     * a mint pool it never joins that family.
+     * Fruit is the rare one and worth more than twice a bottle, so it is
+     * bigger. Lemon yellow rather than the JUMP amber, so it never joins that
+     * hazard family.
      */
     const bananaGeo = (function () {
-      const parts = aidPool(0.70);
+      const parts = [];
       const R = 0.42, SPAN = 1.0, N = 5;
       // Centre of curvature above, so the arc hangs as a smile with the tips
       // lifted. The lowest point sits just under AID_Y.
@@ -18777,31 +18771,34 @@ MR.World = (function () {
             activeAid.splice(i, 1);
             continue;
           }
-          // Punch out, then away. Scale only: a fade would need a material per
+          // Punch out, gone. Scale only: a fade would need a material per
           // item, and transparent surfaces are the one thing this renderer
           // genuinely cannot spare.
           //
-          // THE POP USED TO CLIMB, AND THE CLIMB WAS THE BLINDFOLD. The old
-          // flourish lifted the item 3.4 units on a square-root curve while
-          // swelling it to 1.55x, on the reasoning that rising "out of the
-          // road read" cleared the view. It did the opposite, and the owner
-          // photographed it: collection happens at the runner's own z with
-          // the camera four units behind and its eye at 3.1, so a rising item
-          // crosses the eye line exactly where its angular size is largest --
-          // bottle, pool disc and all, dead centre of the frame, hiding the
-          // road at the one moment a trail-following player is mid-decision.
-          // Under the scarce economy that was a rare flash; at ~585 pickups a
-          // race it was a near-permanent obstruction.
+          // Third pass at this animation, and the history is the argument for
+          // its brevity. The FIRST pop climbed and swelled, and the climb was
+          // a blindfold: a rising item crossed the eye line dead centre of
+          // the frame at its largest. The SECOND collapsed and sank over
+          // 0.35s of a 0.42 slot -- and the owner still read it as running
+          // through the item: "The water bottles and banana need to somehow
+          // disappear after you capture them. You kind of just run through
+          // them now." At race pace the runner covers metres in those tenths,
+          // so a shrinking-but-present bottle rode the lower frame past the
+          // player's own feet. A CAPTURED thing is gone at the touch.
           //
-          // So the pop now does the opposite of climbing: it collapses fast
-          // and sinks. The item shrinks to nothing in the first third of the
-          // slot, drifts DOWN from hip height, and the camera simply passes
-          // over the spot -- at race speed the lens overruns the item's z in
-          // about a tenth of a second, so below the eye line means below the
-          // frame. No swell: a thing being absorbed should get smaller.
-          const s = Math.max(0.001, 1 - t / 0.35);
+          // So the whole slot is now 0.09s, and the collapse starts INSIDE
+          // the contact frame: the branch below runs on the same frame that
+          // sets e.pop, where t is 0, so the 0.6 factor means the very first
+          // image after contact is already crushed to sixty percent -- the
+          // touch itself visibly takes the item -- and four-ish frames later
+          // it is nothing, with a small sink so the last visible frames drop
+          // out of the eye line rather than hang at hip height. By the time
+          // the camera reaches the spot there is nothing there. Claim site 4
+          // restores scale and position on reuse, so the shrunk pooled mesh
+          // can never respawn tiny.
+          const s = Math.max(0.001, 0.6 * (1 - t));
           e.obj.scale.setScalar(s);
-          e.obj.position.y = e.y0 - 0.9 * t;
+          e.obj.position.y = e.y0 - 0.6 * t;
           e.obj.rotation.y += 0.3;
         }
       }
@@ -20055,14 +20052,30 @@ MR.World = (function () {
      * Read-only and derived, in the same family as crossings(), gateBoxes() and
      * fleetExtents(): the file that owns the state reports it, and the file
      * that owns the rule does the failing.
+     *
+     * `scale`, `y` and `footY` are here for the same reason the rest is, one
+     * defect later. The owner reported running THROUGH collected pickups, and
+     * the tool written to check the fix had no handle on the item -- so it
+     * guessed, matching whatever mesh stood near the item's lane and z, read a
+     * steady 1.00 off a piece of scenery and called the animation broken. An
+     * instrument that has to infer which object it is looking at will
+     * eventually look at the wrong one. `footY` is the world-space bottom of
+     * the item, which is what answers the OTHER half of that report: the mint
+     * disc the owner cut sat on the road at y 0.01-0.08, so anything reaching
+     * down there is the thing that was supposed to be gone.
      */
     api.aidState = function () {
+      const bb = new THREE.Box3();
       return activeAid.map(function (e) {
+        bb.setFromObject(e.obj);
         return {
           z: e.it.z, lane: e.it.lane,
           gate: e.it.gate === undefined ? null : e.it.gate,
           roof: !!e.it.roof,
           popped: e.pop >= 0,
+          scale: e.obj.scale.x,
+          y: e.obj.position.y,
+          footY: bb.min.y,
         };
       });
     };

@@ -7653,6 +7653,22 @@ first-attempt line and the best learned line at perfect execution went from
 PLAN AID 1:59:17), and the chained demands the informed stranger's line meets
 went **78.3 -> 60.6 a race**.
 
+**And the number that answers the owner's question directly: how often does a
+sight-reading line actually get under 1:59:30.** Not the cell mean -- the
+fraction of INDIVIDUAL RACES under the record, which is what a record is won
+by (20 dates x 8 seeds, the same racer either side):
+
+| skill | before | after |
+|---|---|---|
+| perfect | 85% | **93%** |
+| 0.995 | 65% | **78%** |
+| 0.99 | 60% | **71%** |
+| 0.98 | 47% | **59%** |
+
+The mean at 0.995 is 1:59:34, over the record, while 78% of the races behind
+it are under it. That gap between the mean and the fraction is the whole
+reason section 9 says this document has been reading the wrong statistic.
+
 **The bar is exactly where roadmap 74 left it**, which is the point -- the axis
 moved, the level did not:
 

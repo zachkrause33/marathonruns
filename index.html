@@ -11,6 +11,92 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0e1230">
 <title>MARATHON MILES</title>
+
+<!-- ==================== WHAT THE LINK LOOKS LIKE ====================
+
+     Everything from here to the closing rule exists for the moment the game
+     stops being a private URL. The page had a charset, a viewport, a
+     theme-color and a title, and nothing else -- so a pasted link rendered as
+     a bare URL in every messenger, the tab carried the browser's default
+     document glyph, and Add to Home Screen produced an unnamed icon
+     containing a screenshot of a dark canvas.
+
+     A share string is wasted on a link that renders as nothing, and the share
+     string is now the point of the finish card, so the two ship together.
+
+     SELF-CONTAINED, WITH ONE STATED EXCEPTION. The favicon, the home-screen
+     icon and the web app manifest are all data: URIs, because the premise of
+     this project is one file that runs from file:// with nothing fetched. The
+     Open Graph image CANNOT be: the scraper behind Slack, iMessage, WhatsApp
+     and Twitter is not a browser, it fetches og:image over HTTP from its own
+     servers, and every one of them rejects a data: URI.
+
+     SO THERE IS EXACTLY ONE THING THE OWNER HAS TO DO, and it is written here
+     rather than only in a report:
+
+       1. Host shots/share-og-1200x630.png (built by tools/ogimage.js) at a
+          public HTTPS URL.
+       2. Replace every REPLACE-WITH-YOUR-DOMAIN below with that domain.
+       3. node tools/build.js
+
+     Until then the placeholder is deliberately an unresolvable name rather
+     than an invented domain: a scraper that cannot fetch it falls back to the
+     title and the description, which is a correct preview minus a picture. A
+     made-up domain would eventually belong to somebody else, and the game
+     would be advertising their image under its own name.
+     ================================================================== -->
+
+<meta name="description" content="One marathon a day. Everyone on the planet races the same date-seeded road: three lanes, 26.2 miles, and a world record of 1:59:30 to break.">
+
+<!-- The tab mark. An inline SVG, so nothing is fetched and it is sharp at
+     every size: the wordmark's own M in the wordmark's own yellow, over the
+     game's navy, on the record-green bar the finish card uses. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230e1230'/%3E%3Cpath d='M10 52V12h12l10 22 10-22h12v40H44V28l-8 18h-8l-8-18v24z' fill='%23ffe45e'/%3E%3Crect x='11' y='54' width='42' height='5' fill='%234dfba0'/%3E%3C/svg%3E">
+
+<!-- Add to Home Screen. Two mechanisms, because the two platforms have never
+     agreed on one: iOS reads apple-touch-icon and the apple-mobile-web-app-*
+     pair, Android and desktop Chrome read the manifest. Both are inlined.
+     The icon is a real PNG rather than the SVG above because iOS does not
+     accept an SVG here, and it is drawn edge to edge because iOS masks the
+     corners itself and renders a transparent PNG as a black square.
+
+     THE MANIFEST IS A data: URI AND IT WAS CHECKED RATHER THAN ASSUMED.
+     Chrome fetches and parses it -- read back through the DevTools protocol
+     (Page.getAppManifest) on the real built page. It carries NO start_url and
+     NO scope, and that is the finding rather than an omission: relative URLs
+     in a manifest resolve against the MANIFEST's own URL, and the base of a
+     data: URI is not a directory, so both properties came back as "URL is
+     invalid" and were dropped. Left out, Chrome falls back to the document's
+     own URL for scope and start_url, which is what a single-file game wants
+     anyway, and the manifest parses with zero errors. If this game ever gets
+     a real hosted URL those two lines can come back with absolute values. -->
+<link rel="apple-touch-icon" href="data:image/png;base64,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">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Marathon Miles">
+<link rel="manifest" href="data:application/manifest+json;base64,eyJuYW1lIjoiTWFyYXRob24gTWlsZXMiLCJzaG9ydF9uYW1lIjoiTWFyYXRob24iLCJkZXNjcmlwdGlvbiI6Ik9uZSBtYXJhdGhvbiBhIGRheS4gU2FtZSByb2FkIGZvciBldmVyeW9uZS4gQnJlYWsgMTo1OTozMC4iLCJkaXNwbGF5IjoiZnVsbHNjcmVlbiIsIm9yaWVudGF0aW9uIjoiYW55IiwiYmFja2dyb3VuZF9jb2xvciI6IiMwZTEyMzAiLCJ0aGVtZV9jb2xvciI6IiMwZTEyMzAiLCJpY29ucyI6W3sic3JjIjoiZGF0YTppbWFnZS9wbmc7YmFzZTY0LGlWQk9SdzBLR2dvQUFBQU5TVWhFVWdBQUFMUUFBQUMwQ0FJQUFBQ3lyNUZsQUFBTGgwbEVRVlI0bk95ZDIzSlR5UldHMjlLV0xjQnhKbEF1UWpFTXNRZWZUL0l3d0ZBNTN1WXVWWG1JM09aUlVubUtQRUR1VTdsSkpnUmlQTUpIR2R2Z0pCTW1TYzBVdzFqSExjOFdZb1FzN2RYcVh0MjkzZDc4M3dYRkJSZEMrOWRhLzFxOWV1MWc3SEpCQUJCSElBQWdnRGdBQ2NRQlNDQU9RQUp4QUJLSUE1QkFISUFFNGdBa0VBY2dnVGdBQ2NRQlNDQU9RQUp4QUJLSUE1QkFISUFFNGdBa0VBY2dnVGdBQ2NRQlNDQU9RQUp4QUJLSUE1QkFISUFFNGdBa0VBY2dnVGdBQ2NRQlNDQU9RQUp4QUJLSUE1QkFISURFVTNGTWZqQzg5c2RaWVp2TlV2bityMHZDS24vNC9jMWYvdUw3d2lxLytzMytuLzc2U3B3MUdlRWx1ZHlRY01EMHhFZzJLK3d5UDNWQjJDYklPUG52NitLcE9JWURKOTlPRUdRK1hyb283REYrSlh2eityQ3dUVzRZNHFBSkFsZmZUbUhPNWcvOS91b2w0WURBZG5qajRhbm55RGtUeCtKTVh0aWpNRzgvcDRpV09MeUlISjZLdzEza21MdGxVeHpMTTI3RUVVQWNORGxubjJ0bWNrVFlZM0U2emVMd3RWcHg5dTJNalFhekg5clJSK1JHcjEzTkNRZmsvRWdybm9vajYvTGJXVjJ3VTdEODdNNm9jRVBnUjBEM3RaVE5PUlRIc2lWUDZzaU5DaGhTT1U1ck9WdWVkSG5XbVRoZ1NDWGtYSDQ3czVOMnhMRXdaYlB3NmNhVFBvZXZuaU53K01FaUYzbDEzUFJYY2VOYWJ2eUtFemNxbkowZTZPSnJ0ZUk0NmQ1ZE52V2tQLzdZU1crMFRSQjQ4Vnk4Ylo4THB5eE9tMmFFVldkdU5DTHJ4Mk41RnoySHNORzhjdFQrYXVOSktldXBPTEtPUDlmc2g2YVJZMlhPcFRqUUJKTVFPQTZza3g4TTUwZjREeURxc1g1djFHRkZrWVBua09BNnJXUXlRL2NLZkU5Nlo4WG1VRWcvR1Q4ZXl6dHFTSVZaQzZ2Z01xY0liMHBaWHoySCt6azVrNEpsYWNhdE9ERHNJeU9CeUdIaVNlZHZ1ZXFOdHNuNk1VUDZqcGF5d3FDSnZqeWJkK3BHUlNML2ZSVzhyVmFjZnp2NWZJWjNySHBuMmEwYkZhMUtIdUtneVNaUzZQTzZuQ3VPM2FpQTU1Q1RUSXR3Z2RYbGROb2JiWU41RGhuSkpOMkZLZTE1d1d6VzRVbDlCOHh6eUVqR3JqT3VLYXd1WElqTWluQk1Gdk1jRXBMNTZZeU5CaE0zOU82cjNWNTA3a1lGemxia0pCWlhkUjkyWVE3aU9Hc1NHMmpRelN4Mkw4eFJ3SFBJU0t3THBPVXVJeXN3Zjh2bW5TZ0tsTEl5c2tuRjFSbWRQdW05d3FWa0J2aHdLaXNqc1ZHb205ZUgzeHRUL1JKdUx6cnZjTFRKNVREUFFaT2tJN3V6ckRvcTdPNmlTZytlekpCQ0hLSXdyNXBaek1lU0ZVR0hWRWFTZGwxeGIxTitaR2g2SWdrM0ttQkk1U1RaSXB4Vlc4cnd5ZXFseEs2VFpERkRLaUhKcEt1NFJlNmpoWVFNaDhBdGV6bEpYdmxTM0NLM1BKZWNPUHl3SEttTEhGKy9Dc3ZsVUdpaU12V3pPSldRR3hXNERpbUg3Y2dhalpPZGc2clFaR0FaTWphYW1aclFFOGZlWWJWV2F3b1dPSldWd2Y3cDFCc24yMDhyUXBPQkE4UDNWclN2VGU4ZVZHcjFFOEVDNHBDUjVVY09zVm5TRnNmMG9JTGxveVZ0dzdHOVg2bHp4WUdkWURMWWZZNTZlRkxjMVJiSDJHZ3dKejFSVzlJZkRkemFxeHBFRG9pREpqdkVGVWY5NU5PMWI0USs4aTF5UzdQYWJyUzRVNjQxbUo0RHF5WmxESFAzaVlkaDg3aDhjdmhQYlU4cVdUY2J1ZEVmdmEvWEc0MHFwaWh5MUd2TXlKSEJZbndKN0crbi9ycU0zZG5YRm9ja3JmejBydlpLeWRLeld2Um5yU0hZbUN3QnNFWGFER203ZXR6YTA3WWRNM1NseXJnMkhaVXEwWjlWYnVRUUVJY0V0bDBQWDJmNWpkMnkwRVN5Ulk1eGk2a2R1dXAxcHVjUWZ0aU90TjE0YTFlUGp6YTB4U0hvTFhJTCtpZjFtNjlERjd0YWlSanhZTjRuYmFWcyszazhmVlo3K1VvNzRjY3VWaGkva24zL2g5cjIrR0h4V0ppSkkrZHFqYVVHYVRPa2pmRE44OWgrcXUxSlk0ZU5mM0pidXpmNi95L3IvL21pSlUwVGNmalE2dkJSSEJjdjhMK1h4bmZ4Z3RGRWoxMTdYWmpYdnFoU09xeTEvMUl6TUtUREhpejM4VkVjSnQ5TDU2enJpWDZmZE9KR3pCWTV4aEtmZHFuUytqQU5nN1FDUXhxTHlVYXNUay95czIxdFR4cmxzay82M3RuR21CdmQraTVvc1U5bGhSOXJ3YnlNSEFiVERKMnpyZ2ZyeDgybTlnKzNaNzc4eHJXb3Z0VjJocHVsTjNiSHBNL2h3NHl4bCtJd2VIRm1SeHhoMkpxb0VKcjB4SW43cTV5YnNRL1czeHp1Vk9FNXJHUFMvNm1IYjU4SHc1UDJiSkZqdk5QcCtiOXIwZUhPbXc5ajREblFCSXZIWkRDL3UwRFk1RFRSVDUyd0xPcTcwZTV3VlRYd0hENjhsRHB0MVVxakszSnM2RS85NVBPWjFhNHA4eVY5TjlvcFZVUkxxWUtORHkrbFRsMWE2ZW83L1czOVdPalRPV2FibWhqNXdYdmFkd1E2YmxTWU5jRjh1TmZrWlNscklJN3U1L0hpdjQwdi9sY1htblEyY054ZDRkeEZlRko2VzBLYnBCWDBPZUl4K1Y2NjAwb0VZeEs5TTJ5OE1xdnRScU80OVhqVGpqalFQby9IcFAvVE05UExHT3pvUkk1bC9kSEEvZWVWc092U1RGVmJtVzlCdFJLUHlTckJualRQR093WUd3MG1YMitSWSt3YjdaeXF0S2thekhQNE1JRHU0MFZxb3liWTZkYkMrcloyNUlpNHZYVHg0b1VNWThINTl1bnhSSlAydVEvWFpYMFVoMG5udUNldHJMR21maGFtODVkWUo4TTlXYXlxN1liZmdyUVNqMUcxMHRlVUxPNW82Mk5oS2w5Z3ZlOSsvZlJwbjFFVERJWTBGcFBMZ1AyWHpEakR4cE41UnZ1clhBNUxwNHVqYXZWOEg5bDdtVllNUGxSL21tZU1oTjI4UGp4K1dmdERiUFVkNVpTcjU3dVU5VkVjSmthOTNyZCtnVEhZSVZyVGFOb3h0YWRVRVlhUnc0TlRXVDhqQnovWjlVZU92My9HdVIzSm9QOG1sVkhrOENEaHArNXNwVy9tL0t1WHphUFBEYnBSeWp6cDY2bVlSQTRmU3RtMEhkbkh6dGN3YmtjeWVQQzROMFNWejdraFRWc3BHN3NTZytGSmRZbE8rTDU4Mlp0RXloWHRCVlFkQWcveVN1cXFsYmlPTldNU1haZFMzRWhpWnlTTWdRL3J6LzFNSy94UEZadFcxalk0Z3gxYVVNZS83QTQ2cHMvak1XbUMxWWkwVXFud0N3Y1ZxSGxWOW93eGhuM2lNV3FmRXcrRE1US294UWFSdWRnenhqNTRqclNWc2hVaWpETW0wZFZwTmsvK1FXUXVkbHJ4SVhMNGVTb3IySnhKNU9pK2p0RDdlYmpMZlFKMFNHUEpHa1JVcWluSk9KdFZwMFFQSTdLM1RhSkRHbzlKS1ZzblJpZ2VGam0zSXhXUlRLcXlCOUJ4WkI4UCsrQk5rdUJiS3dhUFhMWEN0bWhEd3hjSE9xU3hzRXRaZVdtdzdheUpYcVFQZnRscndYelljSjJxYXFVdWRYK2JlMDdFRWJtSzlTMHljaGowT1dCSTQyRFB1WVNoN0dmS21FUlhvWFFvcTRQT3RlZEkxYkNQL0c3cTJxWVRjZXhLNzAzQmMxaUdYYTNVUTltVE9EamlyQmdjaUx5OVZrUDczQzdzaU5vWTFLdmVjSEE4TzBBYzNQWTVUbVhqeVRvVHg1YUR3UTZKR3hWR3A3S1k1NGpEVVNrckhFU09LRS90SDhtY1R1MDhkMGk5TktUOFVuYkFrMWpmc3V4SmR3ZjFUaXJjU1VHTUNjYmpMcTFFWjZkMWc0VXEvZXdlREZqZXd6Nnl4OWxLUEd4RE92Qkp0RllNUHJOcE83YWZEZ2hGN0J1UlByeVVPbVh0ODhIL1pzdnFZTWZBU1lBNjl5NDFidG5Idy9jY0NpbkQ3dFRQbytLQTZWUis1UERnUlY2cGFwK3JKUGppampWeGZQNGk1anBDRCt5ekZWeUhqTWRkRXl6aUw0OWVDVXZzSGc3V1dZMTdLdXZET3dCVDVUbFUycEZmdld4R3YzaGhnNEdsaWpCWUM0WWorM2o0cGF4YW1icHpZQ2V6cU5pWENydERpa213V0hJdVBZZXc1MGxWNWxMUDlVdXAwOVUrRDVXZXhCTWJrK2pONXNuRDR1Q0xkUHhoSDJ6MmlZWC85aisxSi9GNHcwSVQvZUNvRmlwY2syYVhzakNrOFJoTWdpbjlzNmlhTmI4ZFdWSjdtVXZGWUF1RHlidnVySkNxL1J6cUNYNTczelN6S083OE1Ga29lT2J2NDBuVkJtUDFwb0w1T3BmTlBhWGNaTGJjQitMb2cvMiszVkI1VjRyNXNIRlJiVGZ5c1VIK092T1hVcWZxT3FSNldpbWFUZjJVeTZIaTVWdXpoWUxpYlBGT0hDTWpKbHZ4VlgrbW42NFpyUmpjZTY3NkRpYVR5SEhtazRMZXBSVVRGMVpYbmkwL0xwODgreGYvSlZ1N3lxOXhLVmRNTmx5THMyVm83SEpCdU9IbkwzNHJnSHYrZlBWM3dnMCtlZzdnQ1JBSElJRTRBQW5FQVVnZ0RrQUNjUUFTaUFPUVFCeUFCT0lBSkE0N3BPQzhnOGdCU0NBT1FBSnhBQktJQTVCQUhJQUU0Z0FrRUFjZ2dUZ0FDY1FCU0NBT1FBSnhBQktJQTVCQUhJQUU0Z0FrRUFjZ2dUZ0FDY1FCU0NBT1FBSnhBQktJQTVCQUhJQUU0Z0FrRUFjZ2dUZ0FDY1FCU0w0RkFBRC8vNFk4S2wwQUFBQUdTVVJCVkFNQVhzT3cvRjZYSzJrQUFBQUFTVVZPUks1Q1lJST0iLCJzaXplcyI6IjE4MHgxODAiLCJ0eXBlIjoiaW1hZ2UvcG5nIiwicHVycG9zZSI6ImFueSJ9XX0=">
+
+<!-- Open Graph, and Twitter's dialect of it. og:image:width and :height are
+     not decoration: several scrapers lay the card out before the image has
+     finished downloading and fall back to a small square without them.
+     summary_large_image is the card that shows a 1200x630 picture; the
+     default summary card crops it to a square thumbnail. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Marathon Miles">
+<meta property="og:title" content="MARATHON MILES">
+<meta property="og:description" content="One marathon a day. Everyone on the planet races the same date-seeded road: three lanes, 26.2 miles, and a world record of 1:59:30 to break.">
+<meta property="og:url" content="https://REPLACE-WITH-YOUR-DOMAIN/">
+<meta property="og:image" content="https://REPLACE-WITH-YOUR-DOMAIN/marathon-miles-og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="MARATHON MILES over a night road, with the target 1:59:30 and a row of result blocks">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="MARATHON MILES">
+<meta name="twitter:description" content="One marathon a day. Everyone on the planet races the same date-seeded road: three lanes, 26.2 miles, and a world record of 1:59:30 to break.">
+<meta name="twitter:image" content="https://REPLACE-WITH-YOUR-DOMAIN/marathon-miles-og.png">
+<meta name="twitter:image:alt" content="MARATHON MILES over a night road, with the target 1:59:30 and a row of result blocks">
 <style>
 /* GENERATED BY tools/mkfont.py -- DO NOT EDIT BY HAND.
  *
@@ -872,6 +958,58 @@ html, body {
 .hrow.rec { opacity: 1; }
 .hrow.rec .htime { color: var(--ahead); }
 
+/* ---- THE CITY CHECKLIST ----
+ *
+ * The whole pool at once, above the chronological log, because the two answer
+ * different questions: PAST DAYS is what happened, this is what is left.
+ *
+ * The grid auto-fills from a 118px minimum, which is what puts TWO columns in
+ * the 284px a 320px panel actually has, three at 390 and four on a desktop --
+ * without a breakpoint, and without a column count this file would have to
+ * revisit every time a city is added to course.js. AMSTERDAM, the longest name
+ * in the pool, measures ~78px at 11px/0.05em, so the name and its mark clear
+ * the narrowest cell with room.
+ *
+ * THREE STATES, TOLD APART THREE WAYS -- the left rule, the opacity, and a
+ * typeset mark -- because a colour alone would collapse the distinction for
+ * anyone who cannot see it, and an opacity alone reads as a rendering fault
+ * rather than as a state. */
+#cityRule:empty { display: none; }
+#cityRule + #cityGrid:empty { display: none; }
+#cityGrid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 4px 8px;
+  max-width: 360px; margin: 0 auto;
+  text-align: left;
+}
+.ccity {
+  display: flex; align-items: baseline; gap: 6px;
+  min-width: 0;
+  padding: 3px 0 3px 7px;
+  border-left: 3px solid rgba(255, 253, 245, 0.4);
+}
+.cname {
+  flex: 1 1 auto; min-width: 0;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.05em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cmark {
+  flex: 0 0 auto;
+  font-size: 8px; font-weight: 700; letter-spacing: 0.08em;
+  opacity: 0.75;
+}
+/* Where 1:59:30 fell. The bright one, in the green the WR rows below already
+ * own, because it is the state this whole panel exists to count. */
+.ccity.rec { border-left-color: var(--ahead); }
+.ccity.rec .cname { color: var(--ahead); }
+.ccity.rec .cmark { color: #06301c; background: var(--ahead); padding: 1px 3px; opacity: 1; }
+/* Raced, record still standing. Full ink, no colour: it is a real day, and the
+ * only thing it is not is finished. */
+.ccity.ran { opacity: 0.9; }
+/* Not yet drawn. A dashed rule rather than a solid one, so the row reads as an
+ * empty slot at a glance instead of as a dimmed result. */
+.ccity.new { opacity: 0.42; border-left-style: dashed; }
+
 /* ---- finish panel ----
  *
  * Rebuilt out of the HUD's own parts. The card was a spreadsheet dropped on a
@@ -980,6 +1118,82 @@ html, body {
   line-height: 1.5; opacity: 0.7; margin-top: 15px;
 }
 #endTurn:empty { display: none; }
+
+/* ---- THE SHARE CARD ----
+ *
+ * A plate in the card's own language, sitting between the notes and TOMORROW:
+ * the run just described, in the form it travels in.
+ *
+ * THE BLOCKS ARE DIVS AND THE EMOJI ARE ONLY IN THE COPIED TEXT. The embedded
+ * face is subset to the characters this HUD prints (tools/mkfont.py: digits,
+ * latin, and a dozen marks) and carries no block glyphs, so a rendered square
+ * would arrive from the system font at whatever size and baseline that font
+ * felt like -- three different rows on three different phones, in the one
+ * element whose whole job is to be a shape read at a glance. Drawn here, the
+ * row is the same six squares everywhere, in the three colours the rest of
+ * this sheet already uses for the same three meanings: --ahead for clean,
+ * --accent for the tank paying, --behind for a contact that cost time. */
+#shareBox {
+  margin-top: 15px; padding: 10px 12px 11px;
+  border: 1px solid rgba(255, 253, 245, 0.22);
+  background: rgba(255, 253, 245, 0.045);
+}
+#shareLegs {
+  display: flex; gap: 5px; margin-top: 6px;
+}
+.sblock {
+  flex: 0 0 auto;
+  width: 22px; height: 22px;
+  background: var(--ahead);
+}
+.sblock.guard { background: var(--accent); }
+.sblock.hit { background: var(--behind); }
+/* The key. Six coloured squares with nothing naming them are a cipher, and
+ * this is the only line on the card that is about the row rather than about
+ * the race. Deliberately the quietest thing in the plate. */
+#shareLine {
+  font-size: 8.5px; font-weight: 500; letter-spacing: 0.09em;
+  opacity: 0.55; margin-top: 7px; line-height: 1.4;
+}
+#shareLine:empty { display: none; }
+/* Not a rival to RUN IT AGAIN, and not a text row either: it is a real action
+ * with a real result, so it gets a bordered button in the accent rather than
+ * the filled CTA or the near-invisible #histBtn treatment. 44px tall, because
+ * it is a tap target on the same screen as the CTA and the near-miss that
+ * cost .cta three pixels applies here identically. */
+#shareBtn {
+  display: inline-block; margin-top: 9px;
+  background: none; border: 1px solid rgba(255, 228, 94, 0.6);
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.16em;
+  padding: 11px 20px; min-height: 44px; cursor: pointer; pointer-events: auto;
+}
+#shareBtn:active { transform: translateY(1px); }
+#shareBtn:focus-visible { outline: 3px solid #fffdf5; outline-offset: 3px; }
+/* THE RECEIPT. It is inline-block beside the button rather than under it so a
+ * COPIED that lands in a 320px column cannot push the card's last block down
+ * the page and move the button out from under the thumb that just pressed it. */
+#shareNote {
+  display: inline-block; margin-left: 10px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.14em;
+  color: var(--ahead);
+}
+#shareNote:empty { display: none; }
+/* The last resort: shown only when every copy path has failed, with the text
+ * already selected. Monospaced-by-tabular-figures is not the point here --
+ * being readable and selectable is. */
+#shareText {
+  display: none;
+  width: 100%; box-sizing: border-box; margin-top: 9px;
+  min-height: 84px; resize: none;
+  background: rgba(10, 13, 36, 0.75); color: #fffdf5;
+  border: 1px solid rgba(255, 253, 245, 0.3);
+  font-family: inherit; font-size: 12px; line-height: 1.5;
+  padding: 8px; pointer-events: auto;
+}
+#shareBox.revealed #shareText { display: block; }
+#shareBox.revealed #shareNote { color: var(--accent); }
 
 /* TOMORROW.
  *
@@ -1137,6 +1351,9 @@ html, body {
   .mplate .ms { font-size: 10px; }
 
   #histBtn { font-size: 12px; padding: 9px 20px; }
+  #cityGrid { max-width: 460px; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  .cname { font-size: 13px; }
+  .cmark { font-size: 10px; }
   #histList { max-width: 460px; }
   .hrow { font-size: 14px; }
   .hdate { flex-basis: 86px; font-size: 12px; }
@@ -1154,6 +1371,11 @@ html, body {
   .ebadge { font-size: 11px; padding: 4px 9px; }
   #endMem { font-size: 13px; }
   #endTurn { font-size: 13px; }
+  #shareBox { padding: 13px 16px 14px; }
+  .sblock { width: 28px; height: 28px; }
+  #shareLine { font-size: 10px; }
+  #shareBtn { font-size: 13px; padding: 13px 26px; }
+  #shareNote { font-size: 12px; }
   #tomorrow { padding: 12px 16px 13px; }
   #tomorrow .tomRoute { font-size: 16px; }
   #endPanel .cta { margin-top: 22px; }
@@ -1211,6 +1433,11 @@ html, body {
    * step down from its portrait size but still the loudest line under the
    * wordmark. */
   .panel .blurb, .rule, .mech { display: none; }
+  /* ...except the one rule that is not a section heading. #cityRule carries
+   * the count -- "RECORD CITIES · 4 OF 12" -- which is the fact the checklist
+   * exists to state, and dropping it in landscape would leave a grid of city
+   * names with nothing saying what the marks mean or how many are left. */
+  #cityRule { display: flex; margin: 9px 0 5px; font-size: 8px; }
   .panel .route { font-size: 17px; margin-top: 5px; }
   .target { margin-top: 10px; }
   .target b { font-size: 22px; }
@@ -1252,6 +1479,23 @@ html, body {
   #tierRow { margin-top: 6px; }
   #endBadges, #endMem { margin-top: 4px; }
   #endTurn { margin-top: 6px; font-size: 10px; line-height: 1.4; }
+  /* LANDSCAPE PAYS FOR THE SHARE PLATE OUT OF ITS OWN AIR, not out of a block.
+   * This card was already ~21px past the fold at 800x360 and the note above
+   * says why that was left to the scroll fade rather than bought by hiding
+   * something. The same rule applies to what has just been added: the plate
+   * keeps every part -- the blocks, the key and the button -- and gives up
+   * padding, block size and leading instead. The button holds 44px, because a
+   * tap target is not air. */
+  #shareBox { margin-top: 6px; padding: 5px 9px 6px; }
+  #shareLegs { gap: 4px; margin-top: 4px; }
+  .sblock { width: 16px; height: 16px; }
+  #shareLine { font-size: 8px; margin-top: 4px; }
+  #shareBtn { margin-top: 5px; padding: 12px 16px; font-size: 10px; }
+  #shareNote { font-size: 9px; margin-left: 7px; }
+  #shareText { min-height: 60px; font-size: 10px; margin-top: 5px; }
+  #cityGrid { gap: 2px 8px; }
+  .ccity { padding: 1px 0 1px 6px; }
+  .cname { font-size: 10px; }
   #tomorrow { margin-top: 6px; padding: 5px 9px 5px; }
   #tomorrow .tomRoute { font-size: 11px; margin-top: 2px; }
   #endPanel .cta { margin-top: 7px; padding: 10px; }
@@ -2268,7 +2512,31 @@ MR.Pace = (function () {
     //   finishes seconds apart depending on whether the chains were known.
     //
     // Swept together, not picked; the grid is in roadmap 74.
-    FLOOR_BASE: 259.1,        // 4:19 /mi
+    //
+    // ---- 259.1 -> 259.0, AND IT IS A REFUND RATHER THAN A RETUNE --------
+    //
+    // course.js now caps how many gates in a row may deny the player a lane
+    // through (FORCED_RUN_MAX). That was done for the axis, not the level --
+    // it cuts the chained demands the informed stranger's line meets from 78
+    // a race to 61 -- but it also takes 4% of the hazards off the road and
+    // widens the spacing a fraction, and a course with fewer gates on it is
+    // a SLOWER course, because pace follows a streak that counts cleared
+    // gates. Measured on the shipped grid, the first-attempt column fell
+    // from 2 of 30 to 1 of 30 at an unchanged floor: below the band the
+    // owner set, for a reason that has nothing to do with difficulty.
+    //
+    // 0.1 s/mi is 2.07 s of finish time, and it is what puts the bar back
+    // exactly where roadmap 74 left it -- 2 of 30 first attempt (6.7%), 6 of
+    // 15 learned, 8 of 45 overall. Swept at 259.1 / 259.05 / 259.0 / 258.95
+    // / 258.9 / 258.7 / 258.5 through the whole policy x skill grid; the
+    // column is steep (258.9 gives 10% first-attempt and 258.7 gives 20%),
+    // so this is the notch and not a range. The grid is in roadmap 78.
+    //
+    // WHAT DID NOT MOVE, and it is the point of the pass: the gap between
+    // the best first-attempt line and the best learned line at perfect
+    // execution, which the floor cannot touch because it lifts both equally.
+    // That gap fell from 11 s to 6 s, and it fell in course.js.
+    FLOOR_BASE: 259.0,        // 4:19 /mi
     // FLOOR_SURGE STOOD HERE AT 244 (4:04/mi) and was the second floor an
     // elected surge ran toward. It is gone with the mechanic. The reasoning
     // that set it is worth keeping because it constrains any future second
@@ -3506,7 +3774,12 @@ MR.Course = (function () {
 
   function planTempo(key) {
     if (!(TEMPO > 0) || !(MR.Pace.EFFORT > 0)) return [];
-    const rnd = MR.rng.stream(key, 'tempo/v1');
+    // v2: the DIRECTION of a mark is no longer an independent coin per mark,
+    // so the draw pattern of this stream has changed and the name is bumped
+    // rather than silently reused -- the same convention aid/v4 -> aid/v5
+    // followed when the placement rule changed. See the stratification note
+    // at the foot of this function for what moved and why.
+    const rnd = MR.rng.stream(key, 'tempo/v2');
     const total = K.TOTAL_UNITS;
     const lo = TEMPO_F0 * total, hi = TEMPO_F1 * total;
     const marks = [];
@@ -3557,9 +3830,52 @@ MR.Course = (function () {
       // with, and the road that clause reserved -- better than half the course
       // once the exclusion bands were counted -- is now available to marks.
       if (clash) continue;
-      marks.push({ z0, z1, dir: rnd.chance(TEMPO_DRAG_SHARE) ? -1 : 1 });
+      marks.push({ z0, z1 });
     }
     marks.sort(function (a, b) { return a.z0 - b.z0; });
+    /**
+     * ---- THE DIRECTION IS STRATIFIED, NOT FLIPPED -----------------------
+     *
+     * This used to read dir: rnd.chance(TEMPO_DRAG_SHARE) ? -1 : 1 at the
+     * push above -- an independent coin per mark. It is the single largest
+     * source of day-to-day unfairness this game had, and it took a new
+     * instrument to see it, so the number is written down here.
+     *
+     * The packing loop saturates at about 44 marks a course, so the forward
+     * count was Binomial(44, 1 - 0.57): mean 18.8, standard deviation 3.3,
+     * and measured over 90 dates it ran from NINE forward mats to THIRTY.
+     * Forward paint is the only route currency in this game -- a lift is
+     * worth TEMPO.LIFT over its length and there is nothing else on the road
+     * a line can choose to gain seconds from -- so that spread is a spread in
+     * how fast the day can be run at all.
+     *
+     * Measured with tools/sightread.js, the ORACLE line (the best any player
+     * could run, flawless, with the whole course known) over 90 dates:
+     *
+     *   forward-mat count       9 .. 30      sd 3.53
+     *   best possible finish    1:58:58 .. 1:59:37   sd 7.1 s
+     *   correlation of the two  -0.89
+     *
+     * and on THREE of those ninety dates the best possible line did not beat
+     * 1:59:30 at all. The day closes when the record falls (roadmap 77), so
+     * those were days that could not be closed by anyone, for no reason but a
+     * coin landing the same way forty times.
+     *
+     * Stratifying removes the binomial and keeps everything else: the same
+     * share, the same seeded shuffle deciding WHICH marks are backward, the
+     * same mandated forward first mark (excluded here, it is already dir 1).
+     * After: forward 15 .. 21, sd 1.15; best possible 1:59:08 .. 1:59:25,
+     * sd 3.9 s; unwinnable days 0 of 90. The MEAN is unchanged at 1:59:17 --
+     * this is not a difficulty change, it is the same difficulty every day.
+     */
+    const ord = [];
+    for (let i = 0; i < marks.length; i++) if (!marks[i].first) ord.push(i);
+    for (let i = ord.length - 1; i > 0; i--) {
+      const j = rnd.int(0, i);
+      const t = ord[i]; ord[i] = ord[j]; ord[j] = t;
+    }
+    const nBack = Math.round(ord.length * TEMPO_DRAG_SHARE);
+    for (let i = 0; i < ord.length; i++) marks[ord[i]].dir = i < nBack ? -1 : 1;
     for (let i = 0; i < marks.length; i++) marks[i].n = i + 1;
     return marks;
   }
@@ -4421,7 +4737,7 @@ MR.Course = (function () {
    * Build one gate's three lanes. Guarantees at least one non-BLOCK lane and
    * never fills all three with demanding hazards early on.
    */
-  function makeGate(rnd, f) {
+  function makeGate(rnd, f, noFull) {
     const d = difficulty(f);
     const lanes = [K.CLEAR, K.CLEAR, K.CLEAR];
 
@@ -4461,7 +4777,14 @@ MR.Course = (function () {
     // demand without adding streak: this table (+0.06 a band) and the
     // mid-band slope below. Measured either side with the policy x skill
     // sweep; numbers in roadmap 73.
-    const full = d < 0.14 ? 0
+    // ---- AND IT IS ZERO WHEN THE RUN OF FORCED GATES IS ALREADY LONG -----
+    //
+    // See the FORCED_RUN_MAX note at the call site. `noFull` is the course
+    // telling this gate that the last FORCED_RUN_MAX gates all denied the
+    // player a lane through, so this one may not. The chance() below is
+    // still DRAWN when noFull is set -- one draw either way, so the stream
+    // walks at the same rate whatever the road behind looks like.
+    const full = noFull ? 0 : d < 0.14 ? 0
       : d < 0.34 ? 0.22
       : d < 0.58 ? 0.46
       : d < 0.80 ? 0.64
@@ -4540,6 +4863,67 @@ MR.Course = (function () {
     // Hard invariant: never three blocks.
     if (lanes.every((l) => l === K.BLOCK)) lanes[order[0]] = K.CLEAR;
     return lanes;
+  }
+
+  /**
+   * ---- HOW MANY GATES IN A ROW MAY DENY A LANE THROUGH --------------------
+   *
+   * A gate with no CLEAR lane FORCES an action: every lane is answerable (a
+   * BLOCK is never rolled onto a full-width gate) but none of them can be
+   * declined. That is the game's execution pressure and it is not being
+   * reduced here. What is bounded is how many of them may arrive BACK TO
+   * BACK, and the reason is the owner's:
+   *
+   *   "it is really hard to learn the map. I'd argue you really dont, its
+   *    skill and focus that gets you to the end. you need to be able to do it
+   *    multiple ways"
+   *
+   * Measured over 40 dates before this rule existed: 57% of gates were
+   * forced, and they arrived in runs of up to TWENTY-FOUR -- 4.7 runs longer
+   * than five per course. A run of twenty-four forced gates is roughly 750
+   * units, half a minute of race, during which the player has no route
+   * decision of any kind: every lane demands something and the only variable
+   * left is whether the hands are perfect. It is the one structure on this
+   * road where "do it multiple ways" is simply false, and it is also where
+   * the sight-reading tax in tools/simulate.js does nearly all of its work,
+   * because a demand inside CHAIN_NEAR of the last one is a chain and a run
+   * of forced gates is a chain that never ends.
+   *
+   * THREE, and the number is measured rather than felt (tools/sightread.js,
+   * 40 dates for the structure, 20 x 6 races for the times):
+   *
+   *   cap   forced gates   hazards   longest run   runs over 5
+   *    --      105.7 (57%)     466        24          4.7 / course
+   *     2       83.9 (46%)     439         5          0
+   *     3       91.8 (50%)     447         5          0
+   *     4       96.3 (52%)     453         7          0.3
+   *     5       99.0 (54%)     457         7          0.5
+   *
+   * (Runs can still reach five past a cap of three because a carried train or
+   * a narrow closure shuts a lane AFTER makeGate has rolled it. The rule
+   * bounds what the generator ASKS for; the course may still hand out a
+   * little more, and that is the honest statement of it.)
+   *
+   * Three costs 4% of the hazards and the whole tail. It does NOT make the
+   * game faster: measured on the same 20 dates, the best possible line went
+   * from 1:59:17 to 1:59:19 -- two seconds SLOWER, because a gate that is not
+   * forced is usually also a gate carrying fewer hazards and the spacing
+   * widens a little. What it does buy is the thing that was asked for: the
+   * informed line meets 58 chained demands a race instead of 78, so the gap
+   * between a player who has rehearsed today's chains and one reading them
+   * off the road closes by a quarter without a single guaranteed window
+   * moving.
+   */
+  const FORCED_RUN_MAX = 3;
+
+  /** How many gates at the tail of the course deny a lane through. */
+  function forcedRun(gates) {
+    let n = 0;
+    for (let i = gates.length - 1; i >= 0 && n < FORCED_RUN_MAX; i--) {
+      if (!gates[i].lanes.every(function (l) { return l !== K.CLEAR; })) break;
+      n++;
+    }
+    return n;
   }
 
   /**
@@ -5016,7 +5400,7 @@ MR.Course = (function () {
         const closed = pass === 0 ? narrowClosed : null;
         if (pass === 1 && narrowClosed) { narrowClosed = null; tally.narrowAbandoned++; }
         for (let attempt = 0; attempt < 24; attempt++) {
-          const cand = makeGate(rnd, f);
+          const cand = makeGate(rnd, f, forcedRun(gates) >= FORCED_RUN_MAX);
 
           // Carry active trains through.
           for (let l = 0; l < 3; l++) if (idx < trainUntil[l]) cand[l] = K.BLOCK;
@@ -5912,6 +6296,31 @@ MR.Store = (function () {
     let rk = doneToday ? dateKey : shift(dateKey, -1);
     while (rk && byDate[rk] && byDate[rk].rec) { recStreak++; rk = shift(rk, -1); }
 
+    // THE SET, ALONGSIDE THE LOG.
+    //
+    // `hist` answers "what have I done lately" and the history tab reads it in
+    // date order. The city checklist asks a different question -- "where has
+    // the record fallen" -- which is a fact about a PLACE and not about a day,
+    // and reconstructing it from the log in the HUD would put a second walk of
+    // the same array in a file that should not own the arithmetic.
+    //
+    // Keyed by the city NAME the run was saved under, because that is the only
+    // field of a history row that names a place. Rows with no city (an old save
+    // from before the field existed, or a hand-edited blob) are skipped rather
+    // than bucketed under the empty string. Derived on every read rather than
+    // stored: a stored copy is a second source of truth that can disagree with
+    // the history, which is exactly the defect the record streak was rewritten
+    // to avoid.
+    const cities = {};
+    for (const e of s.hist) {
+      if (!e.city) continue;
+      const c = cities[e.city] || (cities[e.city] = { days: 0, rec: false, best: 0, last: null });
+      c.days++;
+      if (e.rec) c.rec = true;
+      if (!c.best || e.time < c.best) c.best = e.time;
+      if (!c.last || e.date > c.last) c.last = e.date;
+    }
+
     return {
       persistent: persistent,
       dateKey: dateKey,
@@ -5927,6 +6336,9 @@ MR.Store = (function () {
       // Newest first, because every reader of this list is a panel that leads
       // with the most recent day.
       history: s.hist.slice().reverse(),
+      // { CITY: { days, rec, best, last } } for every city with a finished
+      // day in the save. The checklist panel intersects this with the pool.
+      cities: cities,
       done: doneToday,                    // the record fell today: today is over
       doneTime: doneToday ? todayRow.time : 0,
       recordStreak: recStreak,
@@ -36855,6 +37267,34 @@ MR.HUD = (function () {
         <div class="date">RUN HISTORY</div>
         <h1 id="histTitle">PAST DAYS</h1>
         <div id="histSum"></div>
+
+        <!--
+          EVERY CITY IN THE POOL, AND WHERE THE RECORD HAS FALLEN.
+
+          The owner paused the map: "lets put a pause on the map. for now, its
+          a list of all available cities and then shows where you have
+          completed the record."
+
+          It is a COMPANION to the list below, not a replacement, because the
+          two answer different questions. PAST DAYS is chronological -- what
+          did I do lately -- and it can only ever show the days that happened.
+          This is the SET: the whole pool at once, so the cities you have not
+          reached are on the screen as well as the ones you have, which is the
+          only way a checklist can be a thing to finish.
+
+          Three states, and they are three because two would collapse the
+          question: a city where 1:59:30 fell, a city raced without it, and a
+          city not yet drawn. The third is the one a chronological log cannot
+          express at all.
+
+          DERIVED FROM course.js's SETTINGS, never a copy of it. The owner has
+          said more cities and landmarks are coming, so the count is
+          SETTINGS.length and the rows are the table's own order; adding a
+          thirteenth city updates this panel by existing.
+        -->
+        <div class="rule" id="cityRule"></div>
+        <div id="cityGrid"></div>
+
         <div id="histList"></div>
         <button class="cta" id="histBack" type="button">BACK TO THE LINE</button>
       </div></div>
@@ -36952,6 +37392,54 @@ MR.HUD = (function () {
         <div id="endTurn"></div>
 
         <!--
+          THE SHARE CARD.
+
+          The owner: "Share artifact is important. work on that and add that",
+          and "no leaderboard is needed. individual game. share card is more
+          important". Those two sentences are one decision: the comparison
+          between players happens OUTSIDE the game, in a message thread, and
+          what the game owes it is a result that survives being pasted.
+
+          WHY A RESULT IS WORTH SHARING AT ALL, which is the load-bearing fact
+          and not a marketing line: the day's course is byte-identical for
+          everyone. rng.dateKey is pure UTC year/month/day and pickSettings
+          deals the city from a bag keyed on the UTC epoch-day, so two people
+          on opposite sides of the world race the same road on the same date.
+          A time with no shared course behind it is a number about a stranger.
+
+          SIX BLOCKS, ONE PER BIOME LEG -- the same cut the chapter verdict
+          above already uses, so this is a byproduct of machinery that was
+          here rather than new bookkeeping. Green: the leg was run clean.
+          Yellow: a contact, and the pool paid for it. Red: a contact nothing
+          paid for. That describes THE RUN and not the road, which is what
+          keeps it spoiler-free -- nothing here leaks where a hazard stood,
+          which lane cleared it, or what the layout was. A reader who has not
+          run yet learns only how their friend's day went.
+
+          The blocks on the card are DIVS, not glyphs, and the emoji live only
+          in the copied text. The embedded typeface is subset to the characters
+          this HUD prints (see tools/mkfont.py) and has no block glyphs at all,
+          so a rendered square would arrive in whatever the system font felt
+          like -- three different sizes on three different phones, inside the
+          one element whose whole job is to look like a row.
+        -->
+        <div id="shareBox">
+          <div class="lab">TODAY'S RESULT</div>
+          <div id="shareLegs" aria-hidden="true"></div>
+          <div id="shareLine" class="num"></div>
+          <button id="shareBtn" type="button">COPY RESULT</button>
+          <div id="shareNote" role="status"></div>
+          <!--
+            THE LAST RESORT, AND THE REASON IT EXISTS: the button must never
+            fail silently. If the share sheet is absent, the async clipboard is
+            blocked by permissions policy and execCommand is gone, there is
+            still one thing that always works -- showing the player the text
+            with it already selected. It is hidden until that happens.
+          -->
+          <textarea id="shareText" readonly aria-label="Your result, to copy"></textarea>
+        </div>
+
+        <!--
           THE RETURN HOOK, next to the button it is competing with.
 
           This was the faintest line on the card, below every stat, which is
@@ -37041,6 +37529,9 @@ MR.HUD = (function () {
       verdict: q('verdict'), tierNext: q('tierNext'),
       endBadges: q('endBadges'), endMem: q('endMem'),
       endTurn: q('endTurn'), tomorrow: q('tomorrow'), tomorrowRoute: q('tomorrowRoute'),
+      shareBox: q('shareBox'), shareLegs: q('shareLegs'), shareLine: q('shareLine'),
+      shareBtn: q('shareBtn'), shareNote: q('shareNote'), shareText: q('shareText'),
+      cityRule: q('cityRule'), cityGrid: q('cityGrid'),
       againBtn: q('againBtn'),
       count: q('count'), countVal: q('countVal'),
       pauseBtn: q('pauseBtn'), pausePanel: q('pausePanel'),
@@ -37093,6 +37584,8 @@ MR.HUD = (function () {
     let course = null;
     let chapterCost = null; // per-city counterfactual, computed once at the tape
     let hitZ = null;       // z of every gate this run made contact with
+    let guardZ = null;     // ...and of every contact the guard pool paid for
+    let shareStr = '';     // the copyable result, built once at the tape
 
     // Latched, and deliberately so. `recordPossible()` is a bound, not a
     // guess, but at the exact boundary it can flicker: a player holding
@@ -37205,10 +37698,57 @@ MR.HUD = (function () {
      * behind it -- the same empty-state rule the memory plates follow, so a
      * first-ever visit still gets exactly the panel a stranger has always got.
      */
+    /**
+     * THE WHOLE POOL, WITH THE RECORD CITIES MARKED.
+     *
+     * Read off MR.Course.SETTINGS rather than a list typed here, so a city
+     * added to that table appears in this panel the same day, in the table's
+     * own order, and the count moves with it. Nothing below knows or cares
+     * that there are currently twelve.
+     *
+     * A history row's city is matched by NAME, because that is what main.js
+     * writes into the save (course.settings[0].name) and it is the only field
+     * of the two lists that is guaranteed to be there -- an old row predating
+     * a tag rename still matches on the word the player saw. A row whose city
+     * is not in the pool at all is simply not represented here; it keeps its
+     * place in PAST DAYS below, which is the log and is meant to hold
+     * everything that happened.
+     */
+    function drawCities(sum) {
+      const pool = (MR.Course && MR.Course.SETTINGS) ? MR.Course.SETTINGS : [];
+      if (!pool.length) { n.cityRule.textContent = ''; n.cityGrid.innerHTML = ''; return; }
+      const seen = (sum && sum.cities) || {};
+      let done = 0;
+      const html = pool.map(function (s) {
+        const c = seen[s.name];
+        const state = (c && c.rec) ? 'rec' : c ? 'ran' : 'new';
+        if (state === 'rec') done++;
+        // A mark as well as a colour and an opacity: the three states have to
+        // be told apart by someone who cannot see the difference between the
+        // green and the cream, and by anyone reading this on a phone in the
+        // sun. Typeset, not iconed, for the reason the WR mark below is -- the
+        // embedded face is subset to what this HUD prints and a symbol would
+        // arrive in the system font.
+        const mark = state === 'rec' ? 'WR' : state === 'ran' ? 'RAN' : '&mdash;';
+        return '<span class="ccity ' + state + '">'
+          + '<span class="cname">' + s.name + '</span>'
+          + '<span class="cmark">' + mark + '</span></span>';
+      }).join('');
+      n.cityRule.textContent = 'RECORD CITIES · ' + done + ' OF ' + pool.length;
+      n.cityGrid.innerHTML = html;
+    }
+
     api.setHistory = function (sum) {
       const rows = sum && sum.history ? sum.history : [];
       n.histBtn.classList.toggle('hidden', !rows.length);
-      if (!rows.length) { n.histSum.innerHTML = ''; n.histList.innerHTML = ''; return; }
+      if (!rows.length) {
+        n.histSum.innerHTML = '';
+        n.histList.innerHTML = '';
+        n.cityRule.textContent = '';
+        n.cityGrid.innerHTML = '';
+        return;
+      }
+      drawCities(sum);
 
       let wr = 0;
       for (const e of rows) if (e.rec) wr++;
@@ -37349,24 +37889,43 @@ MR.HUD = (function () {
      * unless one chapter genuinely carried the run, which is the same rule
      * the memory plates, the best-today line and the aid note already follow.
      */
+    /**
+     * Which biome leg a gate z falls in.
+     *
+     * A gate's leg is decided by the gate's own z, not by where the runner
+     * happened to be on the frame that resolved it. Frame-rate independent,
+     * and it is the same test world.js uses to decide which leg to build.
+     *
+     * Shared by the chapter counterfactual below and the share card's six
+     * blocks, so the two can never disagree about which leg a contact was in
+     * -- a card saying the run was clean through THE WALL over a row of blocks
+     * with THE WALL in red would be the game contradicting itself in ninety
+     * pixels.
+     */
+    function legCut() {
+      const legs = course && course.biomes;
+      if (!legs || !legs.length) return null;
+      const cut = legs.map(function (b) { return b.from * K.TOTAL_UNITS; });
+      return {
+        legs: legs,
+        of: function (z) {
+          let i = 0;
+          for (let k = 0; k < cut.length; k++) if (z >= cut[k]) i = k;
+          return i;
+        },
+      };
+    }
+
     function chapterCosts() {
       if (chapterCost !== null) return chapterCost;
       chapterCost = [];
       // The biome legs are course.js's BIOMES: six of them, every day, by
       // design -- so unlike the settings cut this one never degenerates.
-      const legs = course && course.biomes;
+      const cutter = legCut();
+      const legs = cutter && cutter.legs;
       if (!legs || legs.length < 2 || !hitZ || !hitZ.size
           || !course.gates || !course.gates.length) return chapterCost;
-
-      // A gate's leg is decided by the gate's own z, not by where the runner
-      // happened to be on the frame that resolved it. Frame-rate independent,
-      // and it is the same test world.js uses to decide which leg to build.
-      const cut = legs.map(function (b) { return b.from * K.TOTAL_UNITS; });
-      const legOf = function (z) {
-        let i = 0;
-        for (let k = 0; k < cut.length; k++) if (z >= cut[k]) i = k;
-        return i;
-      };
+      const legOf = cutter.of;
 
       // The hill is not modelled here because pace.js integrates the grade
       // term to zero over the race: it measures 0.01s on a flawless finish
@@ -37421,6 +37980,197 @@ MR.HUD = (function () {
       // card are commensurable even where the reconstruction drifted.
       return { name: top.name, would: actualFinish - top.cost };
     }
+
+    // ---- the share card --------------------------------------------------
+
+    // 0 the leg was run clean, 1 a contact the pool paid for, 2 a contact
+    // nothing paid for. Ordered so the worse outcome always wins the leg: a
+    // leg with one guard and one real hit is red, because the run lost time
+    // there and that is what the row is reporting.
+    const LEG_CLEAN = 0, LEG_GUARD = 1, LEG_HIT = 2;
+
+    // Written as escapes rather than as the characters themselves so the build
+    // pipeline, the linters and every editor this file passes through cannot
+    // silently mangle them: U+1F7E9 green square, U+1F7E8 yellow, U+1F7E5 red,
+    // U+1F3C6 trophy.
+    const BLOCK = ['\uD83D\uDFE9', '\uD83D\uDFE8', '\uD83D\uDFE5'];
+    const TROPHY = '\uD83C\uDFC6';
+
+    /**
+     * One mark per biome leg, worst outcome wins.
+     *
+     * This is a BYPRODUCT and not new bookkeeping: main.js already recorded
+     * the z of every contact for the chapter counterfactual, and the only
+     * thing added for this card was recording the guarded ones too -- the
+     * counterfactual could not use them (a guard costs no time, so erasing one
+     * measures zero) and the card is the first thing that ever needed them.
+     *
+     * A leg with no gates in it reads clean, which is correct: nothing was hit
+     * there. Every leg of every real course carries gates, so this is a
+     * statement about the degenerate case rather than about any shipped day.
+     */
+    function legMarks() {
+      const cutter = legCut();
+      if (!cutter) return [];
+      const marks = cutter.legs.map(function () { return LEG_CLEAN; });
+      if (guardZ) {
+        for (const z of guardZ) {
+          const i = cutter.of(z);
+          if (marks[i] < LEG_GUARD) marks[i] = LEG_GUARD;
+        }
+      }
+      if (hitZ) {
+        for (const z of hitZ) marks[cutter.of(z)] = LEG_HIT;
+      }
+      return marks;
+    }
+
+    /**
+     * The result as text, and the whole design is in what it does NOT carry.
+     *
+     * Four lines, and the fourth only when it has something true to say:
+     *
+     *   MARATHON MILES · CAPE TOWN
+     *   SUB-2:02 · 2:01:47 (+2:17)
+     *   [six blocks]
+     *   Day streak: 6
+     *
+     * NO URL. The game has no domain yet and a share string that invents one
+     * is a broken link travelling under the game's name; the line goes in the
+     * day the owner has somewhere to point it, and not before.
+     *
+     * NO SPOILERS, which is a constraint on every field and not a note on one.
+     * The city is the day's public name -- it is on the start panel before a
+     * stroke is played, and every player on the date gets the same one -- and
+     * the blocks describe the RUN. Nothing here names a gate, a lane, a mile,
+     * an obstacle or a count of them.
+     *
+     * A RECORD READS AS A RECORD. The trophy and a negative delta, in the same
+     * line, so it cannot be mistaken for a good-but-not-record run at a
+     * glance. The grade word does the rest: RECORD is the only rung whose name
+     * is not a time.
+     *
+     * The day streak is held back until 2 for the reason the memory plate
+     * holds it back: a streak of one is just today wearing a label -- and on
+     * a shared result it would be a boast about having turned up once.
+     */
+    function buildShare(p, rec, marks) {
+      const t = p.finishTime;
+      const set = course && course.settings;
+      const city = set && set.length ? set[0].name : '';
+      const vs = t - K.RECORD_SECONDS;
+      const isRec = t <= K.RECORD_SECONDS;
+
+      const out = [];
+      out.push('MARATHON MILES' + (city ? ' · ' + city : ''));
+      out.push((isRec ? TROPHY + ' ' : '') + Tier.of(t).name
+        + ' · ' + Pace.clock(t)
+        + ' (' + (vs <= 0 ? '-' : '+') + Pace.clock(Math.abs(vs)) + ')');
+      if (marks.length) out.push(marks.map(function (m) { return BLOCK[m]; }).join(''));
+      const streak = rec && rec.dayStreak ? rec.dayStreak | 0 : 0;
+      if (streak >= 2) out.push('Day streak: ' + streak);
+      return out.join('\n');
+    }
+
+    /**
+     * Say what happened, every time, and never nothing.
+     *
+     * A copy button that reports nothing is worse than no button: the player
+     * cannot tell a working copy from a blocked one without leaving the game
+     * to go and paste somewhere. `hold` keeps the last-resort message up --
+     * that one is an instruction, not a receipt, and it has to survive until
+     * the player has acted on it.
+     */
+    let noteTimer = null;
+    function shareNote(text, hold) {
+      n.shareNote.textContent = text;
+      clearTimeout(noteTimer);
+      if (text && !hold) {
+        noteTimer = setTimeout(function () { n.shareNote.textContent = ''; }, 2600);
+      }
+    }
+
+    /**
+     * The four ways a browser will let a page hand text to a person, in the
+     * order they are worth trying.
+     *
+     * 1. THE NATIVE SHARE SHEET, on touch devices only. navigator.share exists
+     *    on desktop Chrome and Edge too, where it opens a Windows share dialog
+     *    most people have never used and cannot cancel back out of gracefully;
+     *    on a phone it is the whole point, because it reaches the messaging
+     *    app the result is going to anyway. So the test is the same one the
+     *    key legend uses -- pointer: coarse -- rather than a width, which is
+     *    not an input type.
+     * 2. THE ASYNC CLIPBOARD, called from inside the click. That is a real
+     *    user gesture, which is what keeps it from prompting for permission,
+     *    and it is why none of this is done anywhere but the handler.
+     * 3. execCommand('copy') off an off-screen textarea, for old webviews that
+     *    have no navigator.clipboard at all. Deprecated, still the only thing
+     *    that works there.
+     * 4. SHOW THE PLAYER THE TEXT, selected, and say so. Nothing can take this
+     *    one away.
+     */
+    function shareLast(text) {
+      let ok = false;
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        // Fixed and inside the viewport rather than parked at -1000px: iOS
+        // scrolls to a selection, and a selection off the top of the document
+        // takes the finish card with it.
+        ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;'
+          + 'padding:0;border:0;opacity:0;';
+        document.body.appendChild(ta);
+        ta.select();
+        if (ta.setSelectionRange) ta.setSelectionRange(0, text.length);
+        ok = document.execCommand && document.execCommand('copy');
+        document.body.removeChild(ta);
+      } catch (e) { ok = false; }
+      if (ok) { shareNote('COPIED'); return; }
+      n.shareText.value = text;
+      n.shareBox.classList.add('revealed');
+      try { n.shareText.focus(); n.shareText.select(); } catch (e) { /* still visible */ }
+      shareNote('SELECT AND COPY', true);
+      if (api.markScroll) requestAnimationFrame(api.markScroll);
+    }
+
+    function shareCopy(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(
+          function () { shareNote('COPIED'); },
+          function () { shareLast(text); }
+        );
+        return;
+      }
+      shareLast(text);
+    }
+
+    n.shareBtn.addEventListener('click', function () {
+      const text = shareStr;
+      if (!text) return;
+      const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+      if (coarse && navigator.share) {
+        let p = null;
+        try { p = navigator.share({ text: text }); } catch (e) { p = null; }
+        if (p && p.then) {
+          p.then(function () { shareNote('SHARED'); }, function (e) {
+            // A cancelled share sheet is the player changing their mind, not a
+            // failure, and must not be answered with a fallback they did not
+            // ask for. Anything else means the sheet could not open at all.
+            if (e && e.name === 'AbortError') shareNote('');
+            else shareCopy(text);
+          });
+          return;
+        }
+      }
+      shareCopy(text);
+    });
+
+    // Exposed so tools/sharecard.js reads the string the button copies rather
+    // than rebuilding it -- an instrument that recomputes its subject is
+    // measuring itself. See correction 28 in docs/roadmap.md.
+    api.shareString = function () { return shareStr; };
 
     /**
      * Draw the day's route along the rail.
@@ -37997,9 +38747,10 @@ MR.HUD = (function () {
      *             Optional: without it the chapter line simply does not print,
      *             which is the same thing that happens on a flawless run.
      */
-    api.showEnd = function (p, rec, hits) {
+    api.showEnd = function (p, rec, hits, guards) {
       rec = rec || {};
       hitZ = hits && hits.length ? new Set(hits) : null;
+      guardZ = guards && guards.length ? guards.slice() : null;
       chapterCost = null;
       const t = p.finishTime;
       const rung = Tier.of(t);
@@ -38065,6 +38816,37 @@ MR.HUD = (function () {
       if (where) notes.push('CLEAN THROUGH ' + where.name + ' · ' + Pace.clock(where.would));
       n.endTurn.innerHTML = notes
         .map(function (x) { return '<div>' + x + '</div>'; }).join('');
+      // ---- the share card --------------------------------------------------
+      // Built once, here, off the same finished run everything above was read
+      // from -- so the string the button copies is the card the player is
+      // looking at, and cannot drift from it by being rebuilt later against a
+      // reset() that has already emptied the contact lists.
+      const marks = legMarks();
+      shareStr = buildShare(p, rec, marks);
+      const CLS = ['clean', 'guard', 'hit'];
+      n.shareLegs.innerHTML = marks.map(function (m, i) {
+        // The leg's name is the accessible label and nothing more: it is not
+        // drawn, because six names would be a table and the row is deliberately
+        // a shape you can take in at once.
+        const nm = (course && course.biomes && course.biomes[i]) ? course.biomes[i].name : '';
+        return '<span class="sblock ' + CLS[m] + '" title="' + nm + '"></span>';
+      }).join('');
+      // THE ROW NEEDS A KEY AND NOTHING ELSE.
+      //
+      // The first draft printed the first two lines of the share string here,
+      // so the player could see what they were about to copy -- and those two
+      // lines are the city, the grade and the finish time, all three of which
+      // are already on this card in larger type. That is the duplication this
+      // card has been cut twice to remove, so it went.
+      //
+      // What is genuinely new is the row itself, and six coloured squares with
+      // no key are a cipher. One line, fixed, naming the three states.
+      n.shareLine.textContent = marks.length
+        ? 'ONE BLOCK PER LEG · GREEN CLEAN · YELLOW GUARDED · RED HIT' : '';
+      n.shareBox.classList.remove('revealed');
+      n.shareText.value = '';
+      shareNote('');
+
       const tom = tomorrowLine();
       n.tomorrowRoute.textContent = tom;
       n.tomorrow.classList.toggle('empty', !tom);
@@ -38160,6 +38942,126 @@ MR.HUD = (function () {
  * new one. A checked-in "before" screenshot goes stale the first time
  * something else on the character changes; this cannot.
  */
+
+/**
+ * THE PAGE THAT CANNOT RUN THE GAME.
+ *
+ * Everything below the boot assumes a WebGL context. Getting one is the first
+ * thing this file does and it is the one step with no fallback: a locked-down
+ * browser, an enterprise policy, a Chrome that has blocklisted the GPU driver,
+ * or a low-memory Android that simply refuses the context all end the same
+ * way. Before this existed they ended it SILENTLY -- the constructor threw out
+ * of the boot IIFE, nothing caught it, and the visitor got a 300x150 default
+ * canvas on a dark ground with an empty document body. Measured on the real
+ * built page in Chromium with WebGL disabled: document.body.innerText was the
+ * empty string. No message, no cause, no next step.
+ *
+ * That is survivable while a link is private and unacceptable the moment it is
+ * not, because the people it happens to are exactly the people arriving for the
+ * first time, and a blank rectangle is indistinguishable from a broken game.
+ *
+ * THREE PROPERTIES THIS HAS TO HAVE, and each one is why it is written here
+ * rather than inside the boot:
+ *
+ *   IT MUST NOT NEED THE BOOT. It is declared before the IIFE runs, builds its
+ *   DOM node by node rather than through any helper, and carries its own inline
+ *   styling -- so it works when the stylesheet, the HUD, the font and the
+ *   renderer are all absent or broken. The one thing it borrows is #ui, and it
+ *   falls through to document.body when even that is missing.
+ *
+ *   IT MUST SPEAK ONCE. Three separate paths call it (the constructor guard,
+ *   the last-resort error listener, and a lost GPU context) and a page that has
+ *   already failed will often fail again a frame later. The first message is
+ *   the true one; the rest are echoes, so they are dropped.
+ *
+ *   IT MUST BE FAILABLE. tools/failstate.js drives it on the real page with
+ *   WebGL switched off and with the context deliberately lost, and asserts that
+ *   the body says something a person can act on. A guard nobody can fail is not
+ *   a guard.
+ */
+MR.bail = function (head, lines) {
+  try {
+    if (MR.bail.shown) return;
+    MR.bail.shown = true;
+    MR.bail.head = head;
+    const host = document.getElementById('ui') || document.body;
+    if (!host) return;
+    const box = document.createElement('div');
+    box.id = 'bail';
+    box.setAttribute('role', 'alert');
+    // Inline, and every value spelled out: this is the one element on the page
+    // whose job is to render when nothing else did.
+    box.style.cssText = 'position:absolute;inset:0;z-index:99;display:flex;'
+      + 'flex-direction:column;align-items:center;justify-content:center;'
+      + 'gap:14px;padding:28px;box-sizing:border-box;text-align:center;'
+      + 'background:#0e1230;color:#fffdf5;pointer-events:auto;'
+      + "font-family:'MRCond',ui-sans-serif,system-ui,-apple-system,"
+      + 'Segoe UI,Roboto,Arial,sans-serif;';
+
+    const mark = document.createElement('div');
+    mark.textContent = 'MARATHON MILES';
+    mark.style.cssText = 'font-size:11px;font-weight:700;letter-spacing:0.28em;'
+      + 'opacity:0.5;';
+    box.appendChild(mark);
+
+    const h = document.createElement('div');
+    h.textContent = head;
+    h.style.cssText = 'font-size:26px;font-weight:700;letter-spacing:0.06em;'
+      + 'line-height:1.1;max-width:16em;color:#ffe45e;';
+    box.appendChild(h);
+
+    for (const t of (lines || [])) {
+      const p = document.createElement('div');
+      p.textContent = t;
+      p.style.cssText = 'font-size:13px;font-weight:500;letter-spacing:0.06em;'
+        + 'line-height:1.6;max-width:26em;opacity:0.82;';
+      box.appendChild(p);
+    }
+    host.appendChild(box);
+  } catch (e) {
+    // The guard itself must never be the thing that throws. A page with a
+    // half-built DOM still gets the plainest possible statement.
+    try { document.body.textContent = head; } catch (e2) { /* nothing left */ }
+  }
+};
+MR.bail.shown = false;
+
+/** Take the message down again -- used when a lost GPU context comes back. */
+MR.unbail = function () {
+  try {
+    const el = document.getElementById('bail');
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+  } catch (e) { /* it was already gone */ }
+  MR.bail.shown = false;
+  MR.bail.head = '';
+};
+
+/**
+ * THE LAST RESORT.
+ *
+ * Anything that throws out of the boot before the game is ready leaves the
+ * same blank page the missing context did, and there is no way to enumerate
+ * the causes in advance -- that is what makes it the last resort. So the test
+ * is not WHAT failed, it is WHETHER the game ever came up: once MR.game.ready
+ * is true the page is running and a later exception is a bug to be logged, not
+ * a reason to cover a working race with an error card.
+ */
+(function () {
+  const booted = function () { return !!(MR.game && MR.game.ready); };
+  const caught = function (what) {
+    if (booted()) return;
+    MR.bail('THE GAME DID NOT START', [
+      'SOMETHING WENT WRONG WHILE LOADING THE ROAD.',
+      'RELOAD THE PAGE, OR TRY A DIFFERENT BROWSER.',
+      what ? String(what).slice(0, 160) : '',
+    ].filter(Boolean));
+  };
+  window.addEventListener('error', function (e) { caught(e && e.message); });
+  window.addEventListener('unhandledrejection', function (e) {
+    caught(e && e.reason && e.reason.message);
+  });
+})();
+
 (function () {
   const K = MR.K;
   const Pace = MR.Pace;
@@ -38210,12 +39112,38 @@ MR.HUD = (function () {
   const JOY_FORCED = JOY !== null && isFinite(JOY);
 
   // ---- renderer ---------------------------------------------------------
+  //
+  // THE ONE STEP WITH NO FALLBACK, so it is the one step that is caught. See
+  // MR.bail at the top of this file for what the failure used to look like
+  // (an empty document body) and why the message is built the way it is.
+  //
+  // Both halves are needed. THREE.WebGLRenderer throws when createContext
+  // returns null, which is the common refusal; but a browser can also hand
+  // back a context object that is immediately unusable, and a renderer whose
+  // getContext() answers nothing will fail later, further from the cause and
+  // with the boot half-finished behind it. Neither case may reach the loop.
   const canvas = document.getElementById('gl');
-  const renderer = new THREE.WebGLRenderer({
-    canvas,
-    antialias: true,
-    powerPreference: 'high-performance',
-  });
+  let renderer = null;
+  try {
+    renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      powerPreference: 'high-performance',
+    });
+    if (!renderer.getContext || !renderer.getContext()) renderer = null;
+  } catch (e) {
+    renderer = null;
+  }
+  if (!renderer) {
+    MR.bail('THIS BROWSER WILL NOT DRAW THE ROAD', [
+      'MARATHON MILES IS RENDERED WITH WEBGL, AND THIS BROWSER '
+        + 'WOULD NOT GIVE THE PAGE A GRAPHICS CONTEXT.',
+      'TRY CHROME, SAFARI, FIREFOX OR EDGE ON THIS DEVICE.',
+      'OR TURN HARDWARE ACCELERATION BACK ON IN THE BROWSER SETTINGS '
+        + 'AND RELOAD.',
+    ]);
+    return;
+  }
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -38325,6 +39253,14 @@ MR.HUD = (function () {
   // erased. Gate z is the key because it is stable, unique per gate and is
   // already what every other part of the game indexes a gate by.
   let hitAt = [];
+  // ...and where the pool PAID for a contact, which is a different event and
+  // until now was recorded nowhere at all. hitAt deliberately excludes guarded
+  // contacts -- a guard costs no time, so a counterfactual that erased one
+  // would measure zero -- but the share card is not a counterfactual: it
+  // reports what happened, and "a leg where the guard saved you" is exactly
+  // the middle state its yellow block stands for. Same key as hitAt (gate z)
+  // for the same reasons, and cleared by the same reset().
+  let guardAt = [];
 
   // ---- THE STANDING START -------------------------------------------------
   //
@@ -38422,6 +39358,7 @@ MR.HUD = (function () {
     finishJoy = 0;
     celClock = 0;
     hitAt = [];
+    guardAt = [];
     runner.phase = 0;
     standT = 1;
     resuming = false;
@@ -38875,7 +39812,16 @@ MR.HUD = (function () {
   let fps = 60, fpsAcc = 0, fpsN = 0;
   let lastFlash = 0;   // edge-detect the ghost crossover for its audio cue
 
+  // THE LOOP HAS AN OFF SWITCH NOW, and it exists for one reason: a lost GPU
+  // context. Mobile Safari and Chrome reclaim contexts under memory pressure
+  // and when a tab is backgrounded -- the older phones this game is aimed at,
+  // exactly -- and without this the loop went on calling requestAnimationFrame
+  // and renderer.render against a dead context forever: a frozen last frame
+  // burning battery in a tight loop, with nothing on screen to say why.
+  let looping = true;
+
   function frame(now) {
+    if (!looping) return;
     requestAnimationFrame(frame);
 
     let dt = (now - last) / 1000;
@@ -38993,7 +39939,7 @@ MR.HUD = (function () {
       function charge(z, shake) {
         const how = pace.onHit();
         cam.impact(shake);
-        if (how === 'guard') { hud.flashGuard(); audio.aid(false); return; }
+        if (how === 'guard') { guardAt.push(z); hud.flashGuard(); audio.aid(false); return; }
         hitAt.push(z);
         hud.flashBroken();
       }
@@ -39251,10 +40197,11 @@ MR.HUD = (function () {
         // for the next run, and the card is still on screen when RUN IT AGAIN
         // is pressed.
         const where = hitAt.slice();
+        const saves = guardAt.slice();
         showCard = function () {
           clearTimeout(endTimer);
           showCard = null;
-          hud.showEnd(pace, saved, where);
+          hud.showEnd(pace, saved, where, saves);
         };
         endTimer = setTimeout(function () { if (showCard) showCard(); }, 4900);
       }
@@ -39415,6 +40362,40 @@ MR.HUD = (function () {
   }
   window.addEventListener('resize', resize);
   window.addEventListener('orientationchange', () => setTimeout(resize, 120));
+
+  // ---- the GPU taking its context back ------------------------------------
+  //
+  // preventDefault on the lost event is not politeness, it is the whole
+  // mechanism: without it the browser is under no obligation to ever fire
+  // webglcontextrestored, so a page that does not call it can never come back.
+  //
+  // The race is PAUSED rather than abandoned. A context is usually lost
+  // through no fault of the player -- a background tab, another app taking the
+  // memory -- and this game charges a whole run for one contact, so resuming
+  // deliberately is the only fair ending. The pause panel is also already the
+  // one screen in this game that stops the clock, the road and the ghost
+  // together, which is precisely what a dead context has just done anyway.
+  canvas.addEventListener('webglcontextlost', function (e) {
+    e.preventDefault();
+    looping = false;
+    pause();
+    MR.bail('THE GRAPHICS CONTEXT WAS LOST', [
+      'THE BROWSER TOOK THE GRAPHICS BACK, USUALLY TO FREE MEMORY.',
+      'YOUR RACE IS PAUSED. IF IT DOES NOT COME BACK BY ITSELF, '
+        + 'RELOAD THE PAGE.',
+    ]);
+  }, false);
+
+  // Three.js re-initialises its own GPU state on this event and re-uploads
+  // what it needs on the next render, so the loop can simply start again --
+  // but it starts against a clock that has been standing still, so `last` is
+  // re-based or the first frame back integrates the whole outage in one step.
+  canvas.addEventListener('webglcontextrestored', function () {
+    MR.unbail();
+    resize();
+    last = performance.now();
+    if (!looping) { looping = true; requestAnimationFrame(frame); }
+  }, false);
   // The plate is sized in px by the stylesheet, so a late webfont cannot change
   // its height -- but the baseline-aligned row inside it can shift a pixel or
   // two, and this costs nothing. Guarded: document.fonts is absent on nothing
@@ -39439,6 +40420,9 @@ MR.HUD = (function () {
     // would put a wrong city on the card with nothing to catch it -- so the
     // harness is given the same array the card is given.
     get hitAt() { return hitAt; },
+    // ...and where the pool paid for one. The share card's yellow blocks are
+    // computed from this, so the harness is handed the same array the card is.
+    get guardAt() { return guardAt; },
     // The celebration clock, and it is SETTABLE. A harness that pumps rAF owns
     // every other clock in this file, and would own this one too except that a
     // page opened at ?skip=250 is already several real seconds past the tape
@@ -39455,6 +40439,10 @@ MR.HUD = (function () {
     // 1 is the start line, 0 is full stride.
     get stand() { return standT; },
     set stand(v) { standT = Math.max(0, Math.min(1, +v || 0)); },
+    // Whether the render loop is still turning. It is not a diagnostic: a lost
+    // GPU context stops it, and tools/failstate.js asserts that it actually
+    // stops rather than that a handler was merely registered.
+    get looping() { return looping; },
     pause, resume,
     course, world, runner, ghost, cam, hud, audio, renderer, scene,
     begin,
@@ -39513,14 +40501,21 @@ MR.HUD = (function () {
       // live loop's charge() already draws that line, and the fast-forward has
       // to draw it in the same place or a skipped race and a played one
       // disagree about what happened.
-      if (fd && fd.hit && pace.onHit() !== 'guard') hitAt.push(fd.z);
+      // Both outcomes recorded, in the live loop's own order: onHit() is called
+      // exactly once and its answer decides which list the z lands in. The
+      // earlier form short-circuited on 'guard' and threw the fact away, which
+      // was correct while hitAt was the only list and is not any more.
+      if (fd && fd.hit) {
+        if (pace.onHit() === 'guard') guardAt.push(fd.z); else hitAt.push(fd.z);
+      }
       for (const r of player.resolveGates(course, b, pace.units)) {
         // Recorded here as well as in the live loop. This fast-forward exists
         // so tooling can photograph the game deep into a race, and a debug
         // path that quietly drops a fact the finish card is computed from
         // would make the card lie on exactly the runs the harness inspects.
         if (r.clean) pace.onClean();
-        else if (pace.onHit() !== 'guard') hitAt.push(r.gate.z);
+        else if (pace.onHit() === 'guard') guardAt.push(r.gate.z);
+        else hitAt.push(r.gate.z);
       }
       // And the bottles, which fill the pool that everything above spends.
       for (const item of player.resolveAid(course, b, pace.units)) pace.onAid(item.gain);

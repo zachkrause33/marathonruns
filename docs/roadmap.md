@@ -7433,3 +7433,87 @@ after the wait.
 The other cost, measured: the drained version took over 20 minutes against
 roughly 5 for the committed one, because it waits on a game clock that
 advances at the headless renderer's own 0.9 frames a second.
+
+## Roadmap 78 · The record stops being a memory test
+
+The owner, on roadmap 74's 6.7%-first-attempt / 40%-learned split: *"it is
+really hard to learn the map. I'd argue you really dont, its skill and focus
+that gets you to the end. you need to be able to do it multiple ways."*
+
+He was right, and the first thing measuring it found was that **the number he
+was arguing with had never been measured.** `tools/simulate.js` separates its
+two columns with a POLICY FLAG -- a line is declared `learned: true` and then
+handed three discounts. That prices a design intention honestly enough, but
+it cannot say whether the intention is real, so "40% once learned" was an
+assumption wearing a measurement's clothes. It is still in the sweep and it
+still reads 40%, and it still is not a measurement; read the sightread
+numbers below instead.
+
+**The instrument** (`tools/sightread.js`) races ONE line under TWO
+PERCEPTIONS and subtracts. SIGHT sees the road to the world's own draw
+horizon (210u) and nothing past it; ORACLE sees the whole course. Same skill,
+same seed, same dice, same cost model. The difference in finish time IS the
+knowledge premium, in seconds.
+
+It audits itself before it reports, and the audit is the reason to believe
+it: the horizon actually BOUND the sight model 177 times while the oracle was
+never cut off once, the two disagree on lane choice at 24 of 183 gates (13%),
+a blind line is well behind a sighted one, and the same config twice differs
+by 0.0e+0 s. A sight model secretly handed the whole course would report a
+premium of zero and would have been believed.
+
+**What was wrong, in two places:**
+
+*Forced-gate runs.* A gate with no CLEAR lane forces an action in every lane.
+Runs of them reached **twenty-four in a row** -- half a minute of race during
+which the player has no route decision of any kind and the only way through
+is knowing what is coming. That is where the memorisation tax lived. Capped
+at three. `makeGate` takes a `noFull` argument and the call site passes it
+when the last FORCED_RUN_MAX gates all denied a lane through; the `chance()`
+draw is still taken either way, so the stream walks at the same rate and only
+the gate it produces changes.
+
+*The day lottery, and this one is a fairness bug of the worst kind.* The
+DIRECTION of each tempo mark was an independent coin -- Binomial(44, 0.43) --
+so the forward paint on a course, which is the only route currency the game
+has, ran from **9 to 30 across 90 dates by luck alone**. On the unluckiest
+days **no line could win at all: 3 of 90 dates were unwinnable.** In a game
+whose day only closes when the record falls, a player could run flawlessly
+for an hour against a course that could not be beaten, and nothing in the
+build could see it because nothing measured per-date spread. `planTempo`'s
+stream is bumped `tempo/v1` to `tempo/v2`, per the standing convention that a
+stream name is never reused for a different draw.
+
+**Measured after, independently re-run rather than taken on report:**
+
+| | before | after |
+|---|---|---|
+| sight-reading line, perfect skill | missed on every date | **1:59:26 -- wins** |
+| knowledge premium (oracle vs sight) | -- | **9 s** |
+| dates no line can win, of 90 | **3** | **0** |
+| forward mats a course | 9 .. 30 | 15 .. 21 (sd 1.11) |
+| gates with more than one record-capable lane | -- | **91%** |
+| sampled lines beating the record | -- | 32% |
+| distinct routes a day | -- | **19.3** |
+| first-attempt wins | 7% | **7%** |
+
+The bar did not move. The axis did: focus is now sufficient to break the
+record and foresight is worth nine seconds, where before perfect execution
+without foresight missed on every day measured.
+
+**Identity re-taken deliberately, fourth time**, documented inside
+`tools/mechanics.js` where the baseline lives rather than only here: gate
+hash `dc33748a` to `8f2937f2`. The aid hash is unmoved.
+
+**Gates:** build --check, shoot clean, course-test 90 AND 365 deterministic
+and solvable, simulate PASS with first-attempt 2 of 30, mechanics --identity
+PASS, sightread --audit PASS.
+
+**Corrections list, continued:**
+30. A difficulty split that is produced by a policy flag is not a measurement
+    of difficulty, and quoting it as one misled this project for three
+    entries. If two columns differ because a flag says they do, the number
+    between them is a design intention, not a finding.
+31. Per-date spread was never measured, only per-policy averages, and it hid
+    three unwinnable days in every ninety. An average over dates cannot see
+    a date that is impossible.

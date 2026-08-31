@@ -7434,86 +7434,322 @@ The other cost, measured: the drained version took over 20 minutes against
 roughly 5 for the committed one, because it waits on a game clock that
 advances at the headless renderer's own 0.9 frames a second.
 
-## Roadmap 78 · The record stops being a memory test
+## Roadmap 78 · The knowledge premium is one constant: what a first attempt actually cannot know, and the day lottery found on the way
 
-The owner, on roadmap 74's 6.7%-first-attempt / 40%-learned split: *"it is
-really hard to learn the map. I'd argue you really dont, its skill and focus
-that gets you to the end. you need to be able to do it multiple ways."*
+**Entry 78. Other agents are taking 79 and 80.**
 
-He was right, and the first thing measuring it found was that **the number he
-was arguing with had never been measured.** `tools/simulate.js` separates its
-two columns with a POLICY FLAG -- a line is declared `learned: true` and then
-handed three discounts. That prices a design intention honestly enough, but
-it cannot say whether the intention is real, so "40% once learned" was an
-assumption wearing a measurement's clothes. It is still in the sweep and it
-still reads 40%, and it still is not a measurement; read the sightread
-numbers below instead.
+The owner, on roadmap 74's headline:
 
-**The instrument** (`tools/sightread.js`) races ONE line under TWO
-PERCEPTIONS and subtracts. SIGHT sees the road to the world's own draw
-horizon (210u) and nothing past it; ORACLE sees the whole course. Same skill,
-same seed, same dice, same cost model. The difference in finish time IS the
-knowledge premium, in seconds.
+> *"The record is concerning especially this line 6.7% first attempt, 40% once
+> learned - it is really hard to learn the map. I'd argue you really dont, its
+> skill and focus that gets you to the end. you need to be able to do it
+> multiple ways"*
 
-It audits itself before it reports, and the audit is the reason to believe
-it: the horizon actually BOUND the sight model 177 times while the oracle was
-never cut off once, the two disagree on lane choice at 24 of 183 gates (13%),
-a blind line is well behind a sighted one, and the same config twice differs
-by 0.0e+0 s. A sight model secretly handed the whole course would report a
-premium of zero and would have been believed.
+He is right, and the measurement says so more strongly than he put it.
 
-**What was wrong, in two places:**
+### 1. The instrument, and why a new one was needed
 
-*Forced-gate runs.* A gate with no CLEAR lane forces an action in every lane.
-Runs of them reached **twenty-four in a row** -- half a minute of race during
-which the player has no route decision of any kind and the only way through
-is knowing what is coming. That is where the memorisation tax lived. Capped
-at three. `makeGate` takes a `noFull` argument and the call site passes it
-when the last FORCED_RUN_MAX gates all denied a lane through; the `chance()`
-draw is still taken either way, so the stream walks at the same rate and only
-the gate it produces changes.
+`tools/simulate.js` cannot answer this question. Its two columns are separated
+by a POLICY FLAG -- a policy is declared `learned: true` and then handed three
+discounts -- so "what does knowing the course buy" is answered by the same
+table that was written to assert it. Roadmap 74 says as much in its own words:
+the learned axis "had to be BUILT, out of chains".
 
-*The day lottery, and this one is a fairness bug of the worst kind.* The
-DIRECTION of each tempo mark was an independent coin -- Binomial(44, 0.43) --
-so the forward paint on a course, which is the only route currency the game
-has, ran from **9 to 30 across 90 dates by luck alone**. On the unluckiest
-days **no line could win at all: 3 of 90 dates were unwinnable.** In a game
-whose day only closes when the record falls, a player could run flawlessly
-for an hour against a course that could not be beaten, and nothing in the
-build could see it because nothing measured per-date spread. `planTempo`'s
-stream is bumped `tempo/v1` to `tempo/v2`, per the standing convention that a
-stream name is never reused for a different draw.
+`tools/sightread.js` races ONE line under TWO PERCEPTIONS and subtracts.
+Identical skill, identical seed, identical cost model, identical dice; the only
+difference is how much road the chooser may read:
 
-**Measured after, independently re-run rather than taken on report:**
+- **SIGHT** sees to a horizon and structurally cannot ask past it. Every
+  request is routed through a view object that CLIPS to the horizon and counts
+  the cut; nothing else can reach the course table.
+- **ORACLE** sees the whole course.
+
+It plans rather than grabs -- a receding-horizon DP over the visible gates,
+carrying the chain state, so lookahead gets its best shot rather than a greedy
+straw man.
+
+**The audit runs first and it is five checks, not an assertion.** SIGHT is cut
+off at its horizon 177 times a race and ORACLE zero times (if SIGHT were never
+cut off, the horizon would not be a horizon). A BLIND runner is 15 s behind a
+sighted one; an infinite-sight runner is never slower than a 210-unit one; the
+same config raced twice differs by 0.0e0 s; and configured as `simulate.js`'s
+own first-attempt perception it lands within 4 s of that tool's READ ROAD row,
+which is the cross-check that says the two instruments are looking at the same
+game.
+
+**What it does not capture, said plainly.** It has no hands, no reaction time
+and no panic; `skill` is one number standing in for all of that, exactly as in
+`simulate.js`. It does not ride ramps. It assumes a lane change is free. None
+of that biases the SUBTRACTION, which is the only number this file is for.
+
+### 2. THE KNOWLEDGE PREMIUM IS ZERO, AND WHAT IS LEFT IS A CONSTANT
+
+Over 16 dates x 10 seeds, before any change:
+
+| perception | perfect | 0.995 | 0.99 | 0.98 |
+|---|---|---|---|---|
+| ORACLE | 1:59:16 | 1:59:21 | 1:59:24 | 1:59:37 |
+| SIGHT (210u, chain tax, trail head) | 1:59:27 | 1:59:32 | 1:59:38 | 1:59:52 |
+| SIGHT with the chain tax removed | 1:59:16 | 1:59:24 | 1:59:27 | 1:59:41 |
+| SIGHT with infinite sight | 1:59:28 | 1:59:33 | 1:59:40 | 2:00:07 |
+
+Decomposed at perfect execution, the 11.1 s premium is **chain tax 11.1 s,
+trail head 4.6 s, horizon -0.6 s** (the terms overlap, so they do not sum).
+
+**Seeing the whole course, rather than the 210 units the game draws, is worth
+minus six tenths of a second.** That is the finding. Course knowledge has
+nowhere to live, and the reason is structural rather than a shortcoming of the
+search: a lane change is free, every mat covers a gate line, and pickups lie
+between gates -- so the cost of the stretch from gate *i* to gate *i+1* depends
+only on the lane chosen AT gate *i*, and the whole problem separates. Roadmap
+73 found this and called it "the structural cap on what course knowledge can be
+worth here"; roadmap 74 then priced the learned column anyway, out of a
+constant.
+
+That constant is `SWEEP_CHAIN_SIGHT = 0.979` in `tools/simulate.js`: a demand
+arriving within `CHAIN_NEAR` of the previous one is cleared at `skill x 0.979`
+on a first attempt and at `skill` once the day is learned. It is the entire
+premium. Remove it and an ORACLE that has memorised the course finishes
+**0.0 seconds** ahead of a stranger reading the road, at perfect execution.
+
+### 3. Two defects in the sight model, reported and NOT fixed here
+
+Rule 3 says the instrument gets the same scrutiny as the work, so both are
+written down with their numbers.
+
+**`READ_NEAR` is a reaction budget being used as a visibility limit.** It is
+`ACTION_WINDOW + CAM_BASE_BACK` = 25.35 units: the distance inside which a
+hazard must be DECIDED. `MR.World` spawns geometry at `VIEW` = 210 units and
+`MR.shading.FOG_FAR` is 215, so a player looking down the road sees about six
+gates. Measured over three dates, **0 of 553 gate gaps fit inside `READ_NEAR`**
+(median 31.1 units). The sweep therefore charges a first-attempt player for not
+seeing road that is drawn on their screen.
+
+**`CHAIN_NEAR` is wider than the road's own spacing.** It is `1.5 x READ_NEAR`
+= 38.0 units against a median gate gap of 31.1, and **446 of 553 consecutive
+gate pairs (81%) fall inside it**. A "chain" is not a structure on this road, it
+is the ordinary road. Applying a sight-reading discount to 78 of ~110 demanded
+gates a race is not modelling a rare back-to-back demand; it is a blanket skill
+penalty on strangers wearing a structural name, and it is circular: it defines
+the first-attempt player as worse and then reports that they are worse.
+
+**Neither was changed in this pass**, and that is a deliberate call rather than
+an oversight. `simulate.js` is the shipped difficulty gate; changing the
+instrument and the game in the same pass makes the before/after
+uninterpretable, and retuning the instrument until the number improves is the
+exact failure rule 3 exists to prevent. What was done instead is to change the
+GAME so that the informed stranger's line meets fewer chains -- the tax is
+unchanged, the road it is levied on is not.
+
+### 4. Route diversity was already plural. The premise's second half is wrong.
+
+*"you need to be able to do it multiple ways"* -- measured two ways, before any
+change:
+
+- **Gate freedom.** Force each lane at each gate, play the sight-read optimum
+  everywhere else, ask whether the run still beats 1:59:30. **853 of 1107 gates
+  (77%)** had more than one record-viable lane.
+- **Route clusters.** Sample 60 plausible lines a day (the per-gate cost with a
+  random surcharge of up to 2.5 race seconds, which is the size of the
+  decisions being made), keep the winners, and count lines that disagree at a
+  quarter of the gates or more. **14.5 distinct routes a day.**
+
+There is no dominant optimal route to be discovered. The honest caveat, which
+is why this is not simply good news: much of that freedom is INDIFFERENCE
+rather than choice -- most gates carry no mat and no coins, so the lanes are
+equivalent and any of them wins. The player is free; the freedom is not always
+a decision.
+
+And the metric had a hole in it that turned out to be the real story. On
+2026-08-08 the count was **7 of 186 and zero winning samples** -- not because
+that day had one route, but because it had none.
+
+### 5. THE DAY LOTTERY, which was not in the brief and mattered more than either
+
+The ORACLE at perfect execution is the fastest line the game can produce on a
+date: no dice, no misses, full knowledge. Its spread across dates is exactly
+how much the CALENDAR decides. Over 90 dates, before:
+
+- best possible finish **1:58:58 .. 1:59:37**, sd **7.1 s**
+- forward mats a course **9 .. 30**, sd **3.53**
+- correlation of the two: **-0.89**
+- **3 of 90 dates that NO line can win** (2026-09-08, 2026-09-28, 2026-10-01)
+
+Forward paint is the only route currency in this game -- a lift is worth
+`TEMPO.LIFT` over its length and there is nothing else on the road a line can
+choose to gain seconds from -- and its supply was a coin flipped once per mark:
+`dir: rnd.chance(TEMPO_DRAG_SHARE) ? -1 : 1`, about 44 times a course, i.e.
+Binomial(44, 0.43), mean 18.8 and sd 3.3. The observed sd was 3.53. It is the
+binomial, exactly.
+
+So a third of the difference between an easy day and an impossible one was a
+coin. And the day closes when the record falls (roadmap 77), so three days in
+ninety could not be closed by anyone, for no reason at all.
+
+### 6. What changed
+
+**`planTempo`: the direction is stratified, not flipped** (`src/core/course.js`).
+Marks are packed as before; then the non-mandated ones are shuffled from the
+same seeded stream and exactly `round(n x TEMPO_DRAG_SHARE)` of them are made
+backward. Same share, same seeded shuffle deciding WHICH, same mandated forward
+first mark. The stream is bumped `tempo/v1 -> tempo/v2` because the draw pattern
+changed, per the standing convention.
+
+**`makeGate` gains `noFull`, and the call site caps the run of forced gates**
+(`FORCED_RUN_MAX = 3`). A gate with no CLEAR lane forces an action; every lane
+is answerable, but none can be declined. Before this rule, 57% of gates were
+forced and they arrived in runs of up to **twenty-four** -- roughly 750 units,
+half a minute of race, with no route decision of any kind. That is the one
+structure on this road where "do it multiple ways" is simply false, and it is
+also where the sight-reading tax does nearly all of its work, because a run of
+forced gates is a chain that never ends. The `chance()` draw is still taken when
+`noFull` is set, so the stream walks at the same rate.
+
+The cap was swept over 40 dates:
+
+| cap | forced gates | hazards | longest run | runs over 5 |
+|---|---|---|---|---|
+| none | 105.7 (57%) | 466 | 24 | 4.7 / course |
+| 2 | 83.9 (46%) | 439 | 5 | 0 |
+| **3** | **91.8 (50%)** | **447** | **5** | **0** |
+| 4 | 96.3 (52%) | 453 | 7 | 0.3 |
+| 5 | 99.0 (54%) | 457 | 7 | 0.5 |
+
+Runs still reach five past a cap of three because a carried train or a narrow
+closure shuts a lane AFTER `makeGate` has rolled it. The rule bounds what the
+generator ASKS for; the course may still hand out a little more, and that is the
+honest statement of it.
+
+**`FLOOR_BASE` 259.1 -> 259.0** (`src/core/pace.js`), and it is a refund rather
+than a retune. The cap takes 4% of the hazards off the road and widens the
+spacing a fraction, and a course with fewer gates is a SLOWER course, because
+pace follows a streak that counts cleared gates. The first-attempt column fell
+to 1 of 30 at an unchanged floor -- below the band the owner set, for a reason
+that has nothing to do with difficulty. Swept at 259.1 / 259.05 / 259.0 /
+258.95 / 258.9 / 258.7 / 258.5 through the whole grid; the column is steep
+(258.9 gives 10% and 258.7 gives 20%), so 259.0 is a notch and not a range.
+
+### 7. What moved
+
+**The day lottery, one instrument, both trees, 90 dates:**
 
 | | before | after |
 |---|---|---|
-| sight-reading line, perfect skill | missed on every date | **1:59:26 -- wins** |
-| knowledge premium (oracle vs sight) | -- | **9 s** |
-| dates no line can win, of 90 | **3** | **0** |
-| forward mats a course | 9 .. 30 | 15 .. 21 (sd 1.11) |
-| gates with more than one record-capable lane | -- | **91%** |
-| sampled lines beating the record | -- | 32% |
-| distinct routes a day | -- | **19.3** |
-| first-attempt wins | 7% | **7%** |
+| best possible finish | 1:58:58 .. 1:59:37, sd 7.1 s | **1:59:06 .. 1:59:24, sd 4.3 s** |
+| forward mats a course | 9 .. 30, sd 3.53 | **15 .. 21, sd 1.11** |
+| correlation with forward paint | -0.89 | **-0.59** |
+| dates NO line can win | **3 of 90** | **0 of 90** |
 
-The bar did not move. The axis did: focus is now sufficient to break the
-record and foresight is worth nine seconds, where before perfect execution
-without foresight missed on every day measured.
+**Route diversity** (6 dates, the same measurements as section 4): gate freedom
+**77% -> 91%**, sampled lines beating the record **24% -> 32%**, distinct routes
+a day **14.5 -> 19.3**.
 
-**Identity re-taken deliberately, fourth time**, documented inside
-`tools/mechanics.js` where the baseline lives rather than only here: gate
-hash `dc33748a` to `8f2937f2`. The aid hash is unmoved.
+**The premium** (`tools/sightread.js`, 16 dates x 10 seeds, worst standard error
+5.9 s): total at perfect **11.1 s -> 9.0 s**, still made almost entirely of the
+chain tax (11.1 -> 9.0), with the horizon term still **-0.6 s -> -0.7 s**: zero,
+before and after. In `simulate.js`'s own currency, the gap between the best
+first-attempt line and the best learned line at perfect execution went from
+**15 s to 6 s** (READ ROAD 1:59:29 vs PLAN AID 1:59:14, to READ ROAD 1:59:23 vs
+PLAN AID 1:59:17), and the chained demands the informed stranger's line meets
+went **78.3 -> 60.6 a race**.
 
-**Gates:** build --check, shoot clean, course-test 90 AND 365 deterministic
-and solvable, simulate PASS with first-attempt 2 of 30, mechanics --identity
-PASS, sightread --audit PASS.
+**The bar is exactly where roadmap 74 left it**, which is the point -- the axis
+moved, the level did not:
+
+| | before | after |
+|---|---|---|
+| beats 1:59:30, all cells | 8/45 (18%) | 8/45 (18%) |
+| ...on a FIRST attempt | 2/30 (6.7%) | **2/30 (6.7%)** |
+| ...with the course learned | 6/15 (40%) | 6/15 (40%) |
+| policy spread at perfect | 33.2 s | 30.0 s |
+
+**Identity, re-baselined deliberately and stated in both places:** gates
+`dc33748a -> 8f2937f2`, aid `6e39f138 -> 4781033d`. The gate hash moved because
+both generation changes are real; the aid hash followed because aid hangs off
+the gate table and `generateAid` is untouched (still v5, same rule, same
+stream). `tools/aid.js` proves the economy on the new course: a seeking line
+collects 14.4 segments, inside the 8-20 band.
+
+### 8. Where this pass, and the brief, were wrong
+
+**The brief asked for the knowledge premium to be reduced and it is not
+reducible, because it does not exist.** The premium is a modelling constant, and
+the only thing the GAME can do about it is give it less road to be levied on --
+which is what `FORCED_RUN_MAX` does, and it is worth a quarter of the tax, not
+all of it. Saying the learned column fell would be false: it is 6 of 15 before
+and after. What fell is the seconds between the best line of each kind, 15 to 6.
+
+**The brief asked for several distinct routes and there already were.** 77% gate
+freedom and 14.5 route clusters a day is not "one dominant optimal route". The
+finding that justified the biggest change was the one nobody asked for: on 3
+days in 90 there were no routes at all.
+
+**Stratifying the mat direction was expected to fix the day lottery on its own
+and it did not.** Measured alone it took the per-date spread of the SIGHT line
+from 92 s to 60 s, which read as a poor result -- until the per-date measurement
+was re-cut on the ORACLE, which has no dice at perfect skill. The SIGHT line at
+"perfect" still misses 2.1% of its chained demands, so its per-date spread was
+mostly Poisson noise, not the date. **A measurement of how much the calendar
+decides must be taken with a runner who cannot miss**, and the first version of
+it was not.
+
+**Lowering the full-width table was tried first and refused by the measurement.**
+Dropping `full` to 0.14/0.30/0.44/0.56 cut chains from 76 to 49, but it also cut
+demanded gates from 146 to 132 and made every sub-perfect skill FASTER -- it
+flattens the execution gradient, which is the opposite of what the owner asked
+for. Difficulty on this road comes from forced actions; what is wrong with them
+is how many arrive in a row, not how many there are. `FORCED_RUN_MAX` keeps 87%
+of them and deletes the whole tail.
+
+**A dead helper shipped in the first draft of `sightread.js`** -- a `laneCost`
+that computed nothing and returned 0, superseded by `laneCostFor` while the file
+was being written. It was never called, and it was removed rather than left; it
+is recorded because a function that returns a plausible zero is exactly the kind
+of thing that gets called later by accident.
+
+### 9. Still open
+
+**Can a focused player win on sight? Yes, and the qualifier is the instrument's,
+not the game's.** With the chain constant applied, the sight-reading line beats
+1:59:30 on the mean at perfect execution and loses at 0.995. With it removed --
+which the measurement above says is the honest model -- the same line wins at
+perfect, 0.995 and 0.99. The thing standing between a focused sight-reader and
+the record is a 2.1% modelling penalty applied to 61 gates a race, and whoever
+takes 79 or 80 should decide whether that penalty is a claim about humans worth
+keeping. If it is kept, it should at least be levied on demands that are
+genuinely tighter than the road's own spacing, rather than on 81% of gate pairs.
+
+**Means are the wrong statistic for a record chase and this document has been
+using them.** `simulate.js` reports cell means with a worst standard error of
+7.2 s against cells 2-5 s apart, so 1/30 against 2/30 is close to a coin. The
+per-run win FRACTION is the better number and `sightread.js` prints it: at 0.995
+the sight-reading line's mean is over the record while 78% of its individual
+runs are under it. A record is won by a run, not by an average.
+
+**Indifference is not choice.** 91% gate freedom counts gates where more than
+one lane wins, and most of those are gates where the lanes are identical. A
+measure of how many gates hold a real DECISION -- two lanes within a second of
+each other, differing in what they demand or pay -- would be a better number
+and does not exist yet.
+
+### 10. The gate, and the corrections list
+
+`node tools/build.js && node tools/shoot.js && node tools/course-test.js &&
+node tools/simulate.js` all green, plus `course-test 365`, `playthrough`,
+`tempo`, `ridehold`, `calendar` (32 days clean), `aid`, `footroom` (96/96),
+`deckdrop` (24/24), `mechanics` and `mechanics --identity`, and
+`sightread --audit`.
 
 **Corrections list, continued:**
-30. A difficulty split that is produced by a policy flag is not a measurement
-    of difficulty, and quoting it as one misled this project for three
+
+30. **A difficulty split produced by a policy flag is not a measurement of
+    difficulty**, and quoting it as one has now misled this project for three
     entries. If two columns differ because a flag says they do, the number
-    between them is a design intention, not a finding.
-31. Per-date spread was never measured, only per-policy averages, and it hid
-    three unwinnable days in every ninety. An average over dates cannot see
-    a date that is impossible.
+    between them is a design intention, not a finding. Say which it is at the
+    site.
+31. **Per-date spread was never measured, only per-policy averages**, and it
+    hid three unwinnable days in every ninety. An average over dates cannot
+    see a date that is impossible; only a per-date minimum can.
+32. **A reaction budget is not a visibility limit.** `READ_NEAR` was used as
+    both in the sweep's sight model, and the two differ by a factor of eight
+    on this road.

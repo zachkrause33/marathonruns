@@ -8856,7 +8856,20 @@ MR.Runner = (function () {
   // colour as the thing it had to separate from. A step further down clears the
   // shoe at both ends of its own ramp and is still 1.8x the road's luminance,
   // so rule 3 -- the gloves flash against the road -- survives.
-  const MITT = 0xa8b6de;
+  // ---- HANDS, NOT MITTS (docs/miles.md, the anatomy pass) ----------------
+  // The blue was a measured decision -- gloves that flash against the road --
+  // and the owner's verdict on the portrait outranks it: "He still does not
+  // look like a human in those photos." Blue balls on the ends of the arms
+  // were the loudest single toy-read on the figure. The flash duty moves to
+  // the trim wristbands, which sit at the same height and were already the
+  // brighter mark; the hand itself goes to a skin a step deeper than the
+  // face, which is what the back of a real hand does.
+  // Deepened a second step in round three of the anatomy pass: at the first
+  // skin value the hand VANISHED against the thigh behind it in the portrait
+  // -- same tone, same light -- and the arm and leg fused into one column,
+  // which read as more of a balloon-man than the blue ever did. The back of
+  // a hand is tanned and shadowed against a thigh in life too.
+  const MITT = 0xe09c6a;
   // The curled fingers. Darker again, and it is the only interior detail the
   // hand gets: at 26px a knuckle line is the difference between a mitt and a
   // ball, and three separate fingers are three 8px lobes in the palm's own
@@ -8865,7 +8878,7 @@ MR.Runner = (function () {
   // aliasing argument ever did -- the three capsules that were here are drawn
   // at ZERO pixels in 45 of 48 frames, because they point down the view axis
   // and sit behind the palm. See the hand.
-  const MITT_DK = 0x6b74a0;
+  const MITT_DK = 0xc4854f;   // finger shadow, on skin now -- see MITT above
 
   // ---- the face's four tones ---------------------------------------------
   //
@@ -8960,13 +8973,13 @@ MR.Runner = (function () {
     for (const s of [-1, 1]) {
       const x = s * 0.100;
       out.push(
-        { g: new THREE.CircleGeometry(0.062, R_TORSO), c: SCLERA, x: x, y: y, z: 0.2610, sy: 0.82 },
-        { g: new THREE.CircleGeometry(0.052, R_TORSO), c: IRIS, x: x, y: y - 0.002, z: 0.2630 },
-        { g: new THREE.CircleGeometry(0.026, R_NUB), c: P.ink, x: x, y: y - 0.002, z: 0.2650 },
+        { g: new THREE.CircleGeometry(0.073, R_TORSO), c: SCLERA, x: x, y: y, z: 0.2610, sy: 0.82 },
+        { g: new THREE.CircleGeometry(0.061, R_TORSO), c: IRIS, x: x, y: y - 0.002, z: 0.2630 },
+        { g: new THREE.CircleGeometry(0.031, R_NUB), c: P.ink, x: x, y: y - 0.002, z: 0.2650 },
         // Inboard and high. Both catchlights have to be in frame together at
         // the three-quarter views or the near eye reads as alive and the far
         // one as a hole.
-        { g: new THREE.CircleGeometry(0.012, R_NUB), c: CATCH, x: x - s * 0.016, y: y + 0.018, z: 0.2670 }
+        { g: new THREE.CircleGeometry(0.014, R_NUB), c: CATCH, x: x - s * 0.019, y: y + 0.021, z: 0.2670 }
       );
     }
     return out;
@@ -8980,7 +8993,11 @@ MR.Runner = (function () {
   // The sclera's own half-height: CircleGeometry(0.062) squashed to 0.82. The
   // expression block needs it to hold the eye's TOP edge still while the lower
   // lid closes, and deriving it twice is how two numbers drift apart.
-  const EYE_SEMI = 0.062 * 0.82;
+  // Follows the sclera's radius: the anatomy pass grew the eye 18% (the
+  // features were lost on the head's acreage -- every reference character
+  // wears eyes twice this figure's old proportion) and a blink constant
+  // that lags its own eye pins the wrong edge.
+  const EYE_SEMI = 0.073 * 0.82;
 
   /**
    * The brows, and they exist because the owner moved the hat for them.
@@ -10096,7 +10113,10 @@ MR.Runner = (function () {
       // and the hair on the crown gave a light head sitting on a light neck --
       // one continuous mass with no pinch. Dark / light / saturated reads.
       // Long enough to start inside the vest so no gap opens on a head tilt.
-      { g: new THREE.CylinderGeometry(0.104, 0.122, 0.32, R_LIMB), c: P.runnerSkin, y: HY - 0.300 },
+      // Thicker than it was (0.104/0.122 -> 0.118/0.134): the portrait showed
+      // a dowel between collar and chin, and a neck that fills toward the jaw
+      // reads as anatomy where a thin cylinder reads as an axle.
+      { g: new THREE.CylinderGeometry(0.106, 0.124, 0.25, R_LIMB), c: P.runnerSkin, y: HY - 0.268 },
       // The fillet under the jaw, and it is the answer to "the neck is a plain
       // cylinder the head sits on top of".
       //
@@ -10140,6 +10160,27 @@ MR.Runner = (function () {
       { g: new THREE.SphereGeometry(0.052, R_NUB, 10), c: P.runnerSkin,
         x: 0.052, y: HY - 0.317, z: 0.078, sx: 0.60, sy: 1.70, sz: 0.55, rz: 0.16 },
       { g: new THREE.SphereGeometry(0.266, R_HEAD, 24), c: P.runnerSkin, y: HY, sy: 1.06, sz: 0.97 },
+      // ---- THE NOSE (the anatomy pass) --------------------------------
+      // The owner, on the portrait: "He still does not look like a human."
+      // This face had eyes, brows and a mouth and NO NOSE -- which no human
+      // face survives from the front, and no reference character omits. A
+      // small soft wedge under the eye line, proud of the skull by 0.024:
+      // enough to catch the ramp and break the face's flatness, small enough
+      // that from dead astern it is entirely inside the head's outline and
+      // every silhouette contract holds by construction.
+      { g: new THREE.SphereGeometry(0.049, R_NUB, 10), c: P.runnerSkin,
+        y: HY - 0.064, z: 0.254, sx: 0.74, sy: 1.05, sz: 0.66 },
+      // ---- THE EARS ---------------------------------------------------
+      // Same argument, same verdict. Two squashed discs seated against the
+      // skull's sides just under the cap line, slightly aft of centre the
+      // way ears are. They add 0.014 of half-width at a height where the
+      // figure's half-width is set by the SHOULDERS, so no lane or envelope
+      // number can see them -- and from behind they read as the cap sitting
+      // ON a head rather than being the head, which is its own small win.
+      { g: new THREE.SphereGeometry(0.062, R_NUB, 10), c: P.runnerSkin,
+        x: -0.252, y: HY - 0.042, z: -0.014, sx: 0.34, sy: 0.95, sz: 0.72 },
+      { g: new THREE.SphereGeometry(0.062, R_NUB, 10), c: P.runnerSkin,
+        x: 0.252, y: HY - 0.042, z: -0.014, sx: 0.34, sy: 0.95, sz: 0.72 },
       // The cap. Geometrically this is the same shell that used to be the hair
       // crown -- the fit was already right and the note below is still the
       // reason for every number in it -- but it is now the vest's red, which
@@ -10188,7 +10229,7 @@ MR.Runner = (function () {
       // 0.14 long, standing 0.018 proud of the neck cylinder so it is a shape
       // rather than a decal, and it is the single detail that most turns the
       // head/neck junction from an assembly into an anatomy.
-      { g: new THREE.SphereGeometry(0.090, R_NUB, 12), c: P.runnerHair, y: HY - 0.225, z: -0.058, sx: 0.62, sy: 1.05, sz: 0.85 },
+      { g: new THREE.SphereGeometry(0.074, R_NUB, 12), c: P.runnerHair, y: HY - 0.228, z: -0.052, sx: 0.55, sy: 1.00, sz: 0.80 },
       // Cap band, sitting above the eye line -- lower and it reads as goggles.
       // Unchanged: it was the headband and it is now the cap's sweatband, and
       // holding its exact geometry is what keeps the measured value ladder
@@ -10622,8 +10663,17 @@ MR.Runner = (function () {
       // trunk, because that is a garment and a garment is supposed to have an
       // edge -- what it stops being is the only thing between the neck and the
       // elbow with a line round it.
+            // ---- SLIMMED AND SHORTENED IN THE ANATOMY PASS ---------------------
+      // The owner, on the portrait: "He still does not look like a human."
+      // From the front the arms were the loudest reason: bead-columns nearly
+      // a head wide, hanging past the shorts. Every radius here came down
+      // ~18% and the elbow rose 0.026, which brings the wrists up to the
+      // hip line where a standing human's wrists are. Slimming only ever
+      // SHRINKS the figure's half-width and RAISES its lowest point, so
+      // both directions are the safe side of every silhouette contract --
+      // and tools/envelope.js re-measures them rather than trusting this.
       const upper = multi([
-        { g: new THREE.CapsuleGeometry(0.086, 0.095, 6, R_LIMB), c: P.runnerSkin, y: -0.122 },
+        { g: new THREE.CapsuleGeometry(0.070, 0.082, 6, R_LIMB), c: P.runnerSkin, y: -0.112 },
         // The deltoid, in skin, on the ARM. It emerges from under the vest's
         // own red shoulder 0.051 lower down, which is where a singlet's
         // shoulder seam is and where the muscle would show; and it is 0.022
@@ -10637,8 +10687,8 @@ MR.Runner = (function () {
         // own shoulder through the whole cycle -- see the envelope table in the
         // report for what it did to the jump's half-width, which is the number
         // the airborne silhouette is separated by.
-        { g: new THREE.SphereGeometry(0.108, R_LIMB, 14), c: P.runnerSkin, y: -0.058, sy: 0.86, sz: 0.92 },
-        { g: new THREE.SphereGeometry(0.088, R_NUB, 12), c: P.runnerSkin, y: -0.108, z: -0.016, sx: 0.90, sy: 1.15 },
+        { g: new THREE.SphereGeometry(0.092, R_LIMB, 14), c: P.runnerSkin, y: -0.052, sy: 0.86, sz: 0.92 },
+        { g: new THREE.SphereGeometry(0.070, R_NUB, 12), c: P.runnerSkin, y: -0.100, z: -0.014, sx: 0.90, sy: 1.15 },
       ]);
       shoulder.add(upper);
 
@@ -10648,7 +10698,7 @@ MR.Runner = (function () {
       // stubby arms cannot buy enough width to make the airborne state
       // unmistakable. At rest the extra is absorbed by the elbow's flexion and
       // never shows.
-      const elbow = pivot(shoulder, 0, -0.262, 0);
+      const elbow = pivot(shoulder, 0, -0.236, 0);
       // Forearm ending in a mitt over a trim wristband. Arms and thighs
       // are both skin, and from behind they overlap for most of the stride --
       // without a bright break at the wrist the whole lower half of the
@@ -10656,13 +10706,13 @@ MR.Runner = (function () {
       // against a 0.57 head, near the ratio Sonic's gloves run at, and it is
       // what makes both the arm swing and the spread jump pose land.
       const fore = multi([
-        { g: new THREE.CapsuleGeometry(0.078, 0.090, 6, R_LIMB), c: P.runnerSkin, y: -0.103 },
+        { g: new THREE.CapsuleGeometry(0.062, 0.078, 6, R_LIMB), c: P.runnerSkin, y: -0.094 },
         // Elbow, on the pivot, for the reason the knee has one: the flexion
         // reaches 1.78rad at the front of the swing and two capsules meeting
         // at a point open a notch there. This one shows more than the knee
         // does, because the run cycle drives the elbows LATERALLY -- they are
         // the joint the back view was built to watch.
-        { g: new THREE.SphereGeometry(0.088, R_NUB, 12), c: P.runnerSkin, y: -0.012, sy: 0.92, sz: 0.96 },
+        { g: new THREE.SphereGeometry(0.072, R_NUB, 12), c: P.runnerSkin, y: -0.012, sy: 0.92, sz: 0.96 },
         // The forearm's belly, and it is the elbow's other half. A forearm is
         // thickest just under the elbow and tapers to a wrist half its width;
         // this one was a constant 0.078 tube with a ball on the end of it, so
@@ -10675,7 +10725,7 @@ MR.Runner = (function () {
         // triceps'. Arm swing is almost entirely along the camera axis from
         // astern, so relief in z is what the ramp can shade; width in x is
         // what the jump's silhouette is measured on and it is not spent here.
-        { g: new THREE.SphereGeometry(0.098, R_NUB, 12), c: P.runnerSkin, y: -0.072, sx: 0.86, sy: 1.05 },
+        { g: new THREE.SphereGeometry(0.078, R_NUB, 12), c: P.runnerSkin, y: -0.064, sx: 0.86, sy: 1.05 },
         // The wristband, and it is 0.098 where it used to be 0.088. That is a
         // repair, not a flourish: the mitt's old wrist ball was r=0.094 and
         // spanned the band's whole height, so the third of TRIM's three hits on
@@ -10690,7 +10740,7 @@ MR.Runner = (function () {
         // and it clears the mitt below it by 0.018 -- comfortably over the ink's
         // own 0.014, which is the number that decides whether two welded
         // surfaces cross cleanly or grow teeth.
-        { g: new THREE.CylinderGeometry(0.098, 0.098, 0.052, R_LIMB), c: TRIM, y: -0.180 },
+        { g: new THREE.CylinderGeometry(0.082, 0.082, 0.046, R_LIMB), c: TRIM, y: -0.158 },
         // ---- the hand ------------------------------------------------------
         //
         // Sized to the frame that ships and not to a close-up. This pass took
@@ -10741,7 +10791,7 @@ MR.Runner = (function () {
         // (see below) without the airborne silhouette growing. Measured per
         // vertex across all 24 stride phases, the jump's half-width comes
         // through this rebuild on 0.8749 -- the same figure to four places.
-        { g: new THREE.SphereGeometry(0.104, R_LIMB, 16), c: MITT, y: -0.258, z: 0.014, sy: 0.78, sz: 0.84 },
+        { g: new THREE.SphereGeometry(0.088, R_LIMB, 16), c: MITT, y: -0.226, z: 0.012, sy: 0.78, sz: 0.84 },
         // The curled fingers: a knuckle row lying across the hand at its LOWER
         // REAR edge. Where the break sits matters far more than what it is, and
         // the old note had the rule right while the geometry had it backwards
@@ -10792,9 +10842,9 @@ MR.Runner = (function () {
         // lowest point is 0.006 HIGHER than it was -- so the fix costs the
         // airborne silhouette nothing, which is the constraint that made the
         // old pass shy of moving it in the first place.
-        { g: new THREE.SphereGeometry(0.039, R_NUB, 12), c: MITT_DK, x: -0.048, y: -0.2995, z: -0.055 },
-        { g: new THREE.SphereGeometry(0.042, R_NUB, 12), c: MITT_DK, x: 0.000, y: -0.3000, z: -0.055 },
-        { g: new THREE.SphereGeometry(0.038, R_NUB, 12), c: MITT_DK, x: 0.048, y: -0.2990, z: -0.055 },
+        { g: new THREE.SphereGeometry(0.034, R_NUB, 12), c: MITT_DK, x: -0.042, y: -0.264, z: -0.048 },
+        { g: new THREE.SphereGeometry(0.037, R_NUB, 12), c: MITT_DK, x: 0.000, y: -0.265, z: -0.048 },
+        { g: new THREE.SphereGeometry(0.033, R_NUB, 12), c: MITT_DK, x: 0.042, y: -0.263, z: -0.048 },
         // ---- the thumb ---------------------------------------------------
         //
         // The brief this pass was written against says the hands are mittens
@@ -10821,8 +10871,8 @@ MR.Runner = (function () {
         // outboard edge is already flashing against the road. It is also the
         // side that costs the figure's half-width NOTHING, because half-width
         // is measured from the spine and inboard is toward it.
-        { g: new THREE.CapsuleGeometry(0.041, 0.048, 4, 12), c: MITT,
-          x: -side * 0.085, y: -0.230, z: -0.040, rx: 0.30, rz: side * 0.62 },
+        { g: new THREE.CapsuleGeometry(0.036, 0.042, 4, 12), c: MITT,
+          x: -side * 0.074, y: -0.202, z: -0.036, rx: 0.30, rz: side * 0.62 },
         // ---- THE WATCH, and only on one wrist -----------------------------
         // His signature prop (docs/miles.md): a runner whose whole life is
         // one number wears the number on his arm. It rides the wristband the
@@ -10834,10 +10884,10 @@ MR.Runner = (function () {
         // whole prop costs zero draw calls. One wrist only, because a band on
         // each arm is trim and a watch on one is character.
         ...(side === -1 ? [
-          { g: new THREE.CylinderGeometry(0.036, 0.036, 0.020, 12), c: 0x1a2038,
-            x: side * 0.106, y: -0.180, rz: Math.PI / 2 },
-          { g: new THREE.CylinderGeometry(0.027, 0.027, 0.007, 12), c: 0xdff2ea,
-            x: side * 0.116, y: -0.180, rz: Math.PI / 2 },
+          { g: new THREE.CylinderGeometry(0.032, 0.032, 0.018, 12), c: 0x1a2038,
+            x: side * 0.090, y: -0.158, rz: Math.PI / 2 },
+          { g: new THREE.CylinderGeometry(0.024, 0.024, 0.007, 12), c: 0xdff2ea,
+            x: side * 0.099, y: -0.158, rz: Math.PI / 2 },
         ] : []),
       ]);
       elbow.add(fore);
@@ -12259,7 +12309,12 @@ MR.Runner = (function () {
           const A = arms[i];
           to(A.shoulder, 'x', 0.05, stand);
           to(A.shoulder, 'y', 0, stand);
-          to(A.shoulder, 'z', A.side * (0.17 + 0.02 * sway * A.side), stand);
+          // 0.24, from 0.17: at 0.17 the hands hung dead in front of the
+          // thighs and the tones merged (see MITT). A standing runner's
+          // hands ride just clear of the hips; the silhouette gets daylight
+          // between arm and leg, which is most of what makes two limbs read
+          // as two limbs from the front.
+          to(A.shoulder, 'z', A.side * (0.24 + 0.02 * sway * A.side), stand);
           to(A.elbow, 'x', -0.38, stand);
         }
 
@@ -13120,10 +13175,10 @@ MR.Runner = (function () {
       // change, because the lower lip travels with it and the opening between
       // them is what grows.
       mouthPivot.scale.y = mix(mix(1 + POLISH * (0.55 * effort + 0.30 * wince),
-        1 - POLISH * 0.08, standF),
+        1 - POLISH * 0.62, standF),
         1 + POLISH * mix(0.95 + 0.35 * celBreath, 0.70, celJoy), celF);
       mouthPivot.scale.x = mix(mix(1 + POLISH * (0.10 * effort + 0.22 * wince),
-        1 + POLISH * 0.04, standF),
+        1 + POLISH * 0.24, standF),
         1 + POLISH * mix(0.18, 0.52, celJoy), celF);
 
       // Ducking drops the whole body rather than only folding the spine, so

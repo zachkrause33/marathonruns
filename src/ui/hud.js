@@ -373,6 +373,14 @@ MR.HUD = (function () {
         <div class="date" id="startDate"></div>
         <h1 id="startTitle">MARATHON MILES</h1>
         <div class="route" id="startRoute"></div>
+        <!--
+          MILES SPEAKS, once a day (docs/miles.md). One terse line in the
+          masthead voice, chosen by the day's city -- the tater-tot lesson
+          from the owner's references: a single spoken line to the camera
+          builds more character than any mesh. Attributed, because the name
+          is new and the line is how the player learns whose name it is.
+        -->
+        <div id="milesLine"></div>
 
         <div class="blurb">
           Three lanes. Jump or slide past everything in the way.
@@ -587,6 +595,7 @@ MR.HUD = (function () {
 
         <div id="tierRow">
           <span id="verdict"></span>
+          <div id="milesEnd"></div>
           <span id="tierNext" class="num"></span>
         </div>
 
@@ -740,6 +749,7 @@ MR.HUD = (function () {
       endPanel: q('endPanel'), endTime: q('endTime'), endDate: q('endDate'),
       endVs: q('endVs'),
       verdict: q('verdict'), tierNext: q('tierNext'),
+      milesLine: q('milesLine'), milesEnd: q('milesEnd'),
       endBadges: q('endBadges'), endMem: q('endMem'),
       endTurn: q('endTurn'), tomorrow: q('tomorrow'), tomorrowRoute: q('tomorrowRoute'),
       shareBox: q('shareBox'), shareLegs: q('shareLegs'), shareLine: q('shareLine'),
@@ -998,6 +1008,43 @@ MR.HUD = (function () {
       syncPanels();
       requestAnimationFrame(markScroll);
     };
+    // ---- MILES'S LINES (docs/miles.md) ----------------------------------
+    // One a day before the gun, one at the tape. City lines are authored per
+    // SETTINGS tag rather than derived from the hints, because a voice is
+    // written and a hint is a contract with the renderer -- different jobs.
+    // Register: terse, no exclamation marks, a professional talking to
+    // himself. The result line at the tape is picked by what the run WAS:
+    // the record, a near miss inside fifteen seconds (his watch-check beat,
+    // in words), or a day the road won.
+    const MILES_CITY = {
+      BOSTON: 'RIGHT ON HEREFORD. LEFT ON BOYLSTON.',
+      LONDON: 'OVER THE THAMES. HOLD THE LINE.',
+      BERLIN: 'FLAT AND FAST. NO EXCUSES.',
+      CHICAGO: 'UNDER THE L. KEEP IT CLEAN.',
+      NEWYORK: 'THE VERRAZZANO FIRST. THEN WE TALK.',
+      TOKYO: 'THE MOAT, THEN THE NEON. FAST ROAD.',
+      SYDNEY: 'THE HARBOUR WIND IS REAL.',
+      PARIS: 'COBBLES LIE. STAY WIDE.',
+      VALENCIA: 'WHITE STONE. QUICK GROUND.',
+      AMSTERDAM: 'CANALS ON BOTH SIDES. PICK A LANE.',
+      ROME: 'OLD ROADS KNOW EVERYTHING.',
+      CAPETOWN: 'THE MOUNTAIN WATCHES. RUN.',
+    };
+    api.milesSpeaks = function (tag) {
+      const line = MILES_CITY[tag];
+      n.milesLine.innerHTML = line
+        ? '&ldquo;' + line + '&rdquo;<span class="who">&mdash; MILES</span>' : '';
+      n.milesLine.classList.toggle('hidden', !line);
+    };
+    api.milesFinish = function (finishTime) {
+      const over = finishTime - K.RECORD_SECONDS;
+      const line = over <= 0 ? 'THAT&rsquo;S THE ONE.'
+        : over <= 15 ? (over <= 1.5 ? 'ONE SECOND. TOMORROW.'
+          : Math.ceil(over) + ' SECONDS. TOMORROW.')
+        : 'THE ROAD WON TODAY.';
+      n.milesEnd.innerHTML = '&ldquo;' + line + '&rdquo;<span class="who">&mdash; MILES</span>';
+    };
+
     n.histBtn.addEventListener('click', function () { openHist(n.startPanel); });
     n.endHistBtn.addEventListener('click', function () { openHist(n.endPanel); });
     n.histBack.addEventListener('click', function () {
@@ -1503,6 +1550,7 @@ MR.HUD = (function () {
         ? set.map(function (x) { return x.name; }).join(' → ')
         : '';
       drawRoute(set);
+      api.milesSpeaks(set && set.length ? set[0].tag : null);
       // The route and the gate count arrive after the panel is first laid out
       // and both add height, so the overflow test has to run again here or it
       // measures a panel shorter than the one on screen.
@@ -2014,6 +2062,7 @@ MR.HUD = (function () {
       // ---- the grade -----------------------------------------------------
       n.verdict.textContent = rung.name;
       n.verdict.className = 'tier t' + rung.i;
+      api.milesFinish(p.finishTime);
       // Nothing above RECORD, so nothing to chase and nothing to print. This
       // slot used to say RECORD BEATEN BY 1:37 directly beneath an endVs
       // reading -1:37 VS 1:59:30, beside a chip reading RECORD: the same

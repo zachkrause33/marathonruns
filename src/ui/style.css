@@ -1458,3 +1458,24 @@ html, body {
   #gapLine { margin-bottom: 11px; }
   #railRoute { display: none; }
 }
+
+/* ---- MILES'S LINE (docs/miles.md) ----------------------------------------
+   One quoted sentence a day, set small under the headline so the city stays
+   the masthead and the voice reads as a voice -- italic against a page of
+   caps, the one place the game breaks its own typography on purpose. */
+#milesLine, #milesEnd {
+  font-style: italic;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: rgba(255, 253, 245, 0.78);
+  margin: 7px 0 2px;
+}
+#milesLine.hidden { display: none; }
+#milesLine .who, #milesEnd .who {
+  font-style: normal;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  opacity: 0.55;
+  margin-left: 8px;
+}
+#milesEnd { margin: 6px 0 0; }

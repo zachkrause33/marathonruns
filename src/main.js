@@ -329,6 +329,7 @@ MR.unbail = function () {
   // squeezed shut and a mouth gasping. Which is also a celebration -- it is
   // what the last third of a real finish line looks like.
   let finishJoy = 0;
+  let finishAgony = 0;
   // WHERE the contacts happened, not just how many. `pace` counts hits and
   // that is all the readout needs while running, but the finish card asks a
   // question a count cannot answer -- which city did this run go wrong in --
@@ -439,6 +440,7 @@ MR.unbail = function () {
     aidNagged = false;
     tankToldOf = false;
     finishJoy = 0;
+    finishAgony = 0;
     celClock = 0;
     hitAt = [];
     guardAt = [];
@@ -456,12 +458,19 @@ MR.unbail = function () {
     world.update(0);
   }
 
+  // THE PORTRAIT FLAG. 1 while the game is an attract screen -- Miles faces
+  // the player, per docs/miles.md -- and 0 from the moment a run begins, at
+  // which point runner.js turns him to face the road. The turn is the
+  // transition; nothing else announces the change.
+  let facing = 1;
+
   function begin() {
     // Today is won and closed. Every path that starts a run funnels through
     // here -- the start button, RUN IT AGAIN, RESTART THIS RUN -- so this is
     // the one door the lockout has to hold. It routes back to the start
     // panel, which is showing the completed state rather than a button.
     if (locked) { hud.hideEnd(); hud.showStart(true); return; }
+    facing = 0;
     reset();
     audio.unlock();
     hud.showStart(false);
@@ -1257,6 +1266,8 @@ MR.unbail = function () {
         // of a second before the line.
         const rung = MR.Tier.of(pace.finishTime);
         const rungs = MR.Tier.LADDER.length - 1;
+        const overRec = pace.finishTime - K.RECORD_SECONDS;
+        finishAgony = overRec > 0 && overRec <= 15 ? 1 : 0;
         finishJoy = JOY_FORCED ? Math.max(0, Math.min(1, JOY))
           : pace.finishTime <= K.RECORD_SECONDS ? 1 : Math.max(
           saved && saved.allTimeBest && !saved.firstEver ? 0.85 : 0,
@@ -1346,6 +1357,7 @@ MR.unbail = function () {
       // lets runner.js apply the standing pose as an override after the cycle
       // has posed rather than threading a ninth state through forty joints.
       stand: stand01,
+      face01: facing,
       grade,
       air01: player.airborne ? Math.sin(Math.min(1, player.airT) * Math.PI) : 0,
       duck01: player.duck01,
@@ -1358,6 +1370,15 @@ MR.unbail = function () {
       // runs on, and tools/envelope.js holds the eight play silhouettes to it.
       celT: celT,
       joy: finishJoy,
+      // The near miss, for the acting the owner lived through before it was
+      // designed: within fifteen seconds of the record and not under it.
+      // Zero everywhere else, including on a record run -- agony and joy are
+      // mutually exclusive by construction.
+      agony: finishAgony,
+      // The countdown, 0..1 across the three seconds, for the start-line
+      // ritual (docs/miles.md). Zero everywhere else, so the ritual is
+      // provably inert in every other state.
+      ritual01: state === COUNT ? Math.min(1, countT / 3) : 0,
       // Which side the camera will be on when it arrives. Read from camera.js
       // rather than recomputed, so the head cannot turn away from the lens.
       celSide: MR.Camera.celSideFor(player.x),
@@ -1394,6 +1415,7 @@ MR.unbail = function () {
       // whole race, so every celebration term in camera.js is inert until the
       // tape and the shipped chase framing is untouched by construction.
       celT: celT,
+      face01: facing,
     });
 
     // After the camera, never before: the ghost's tag is placed against this

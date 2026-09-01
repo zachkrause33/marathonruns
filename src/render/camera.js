@@ -600,6 +600,7 @@ MR.Camera = (function () {
      * @param dt  real seconds
      * @param p   { z, x, y, speed, lean, duck01 }
      */
+    const _port = new THREE.Vector3();
     s.update = function (dt, p) {
       // A long frame must not be allowed to detonate the springs -- and the
       // first frame can arrive with a *negative* dt, because the rAF timestamp
@@ -772,6 +773,25 @@ MR.Camera = (function () {
       // way through the move. One clock, unclamped, shared with the pose in
       // runner.js -- see the note over celClock in main.js.
       s.cel = p.celT || 0;
+      // ---- THE PORTRAIT (docs/miles.md) -----------------------------------
+      // While the game is an attract screen the runner has turned to face the
+      // lens, and the lens meets him: lower, closer, and slightly off-axis so
+      // it is a portrait rather than a mugshot. One eased weight; when the
+      // run begins main drops the flag, he turns away, and this camera pulls
+      // back up into the chase while he does -- the two motions together are
+      // the walk-on, and neither file needs to know about the other's half.
+      // Slightly slower than his turn (1.6 against 2.2), because a lens that
+      // trails its subject reads as following him and one that leads reads as
+      // already knowing the choreography.
+      {
+        const wantF = p.face01 || 0;
+        if (first) s.face = wantF;
+        else {
+          const stepF = d * 1.6;
+          s.face += Math.max(-stepF, Math.min(stepF, wantF - s.face));
+        }
+      }
+      const fw = s.face * s.face * (3 - 2 * s.face);
       // The celebration weight. Zero for the whole race and for the first
       // CEL_HOLD seconds after the tape, so the break, the confetti and the
       // wide astern shot all play exactly as they did before this pass.
@@ -1023,6 +1043,21 @@ MR.Camera = (function () {
           look.z + (pz - look.z) * rw
         );
       }
+      // The portrait pose, blended in last so it wins over every race term
+      // while fw is high and costs identically nothing at fw = 0. Constants
+      // borrow the celebration's grammar (its hero shot is the one framing in
+      // this file already proven on his face) but sit closer and lower: the
+      // attract screen is a character select, not a finish line.
+      if (fw > 0.001) {
+        const gy0 = elev.at(p.z) + s.dk;
+        // 2.95 and an aim at 1.03: the first cut sat at 2.55/0.97 and cropped
+        // his crown against the panel with his shoes off the bottom -- a
+        // portrait wants the whole figure and a little air over the cap.
+        _port.set((p.x || 0) + 0.30, 1.12 + gy0, p.z - 2.95);
+        cam.position.lerp(_port, fw);
+        _port.set(p.x || 0, 1.03 + gy0, p.z);
+        look.lerp(_port, fw);
+      }
       cam.lookAt(look);
 
       // Roll: the lean term is the body, the camera's own lateral velocity is
@@ -1070,7 +1105,11 @@ MR.Camera = (function () {
       // 34-degree narrowing through it would smear the push-in over half the
       // shot. cw is already smootherstep-shaped, so this needs no filter of
       // its own, and at cw = 0 the output is s.fov exactly.
-      const fovOut = s.fov + (CEL_FOV - s.fov) * cw;
+      let fovOut = s.fov + (CEL_FOV - s.fov) * cw;
+      // The portrait lens rides the same crossfade rule as the celebration's
+      // and for the same reason: fw is already eased, and folding a parked
+      // 44-degree frame through the stateful filter would smear the walk-on.
+      fovOut = fovOut + (44 - fovOut) * fw;
       if (Math.abs(cam.fov - fovOut) > 0.01) {
         cam.fov = fovOut;
         cam.updateProjectionMatrix();

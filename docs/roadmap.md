@@ -7947,3 +7947,67 @@ bar turns to the ahead colour: the tank is emptying faster than at any other
 point in the race and it must read as gain rather than as loss. Nothing moves
 position, because the player is threading obstacles at full speed at that
 moment and the plate is not allowed to jump under them.
+
+## Roadmap 83 · Miles becomes the focal point: the portrait, the ritual, the acting, and the voice
+
+The owner, with four reference screenshots: *"Now that he has a name, he
+needs a personality and needs to be the focal point of the game... Find ways
+for the camera to look at him."* The bible this shipped against is
+docs/miles.md; every future brief touching the runner carries it.
+
+**The finding that shaped the work:** Miles already had a face worth looking
+at -- a four-ring eye with a catchlight, a jaw-pivoted mouth, a brow rig, a
+composed stance with a 4.4-second blink -- and the game never looked at any
+of it. He was engineered as a stack of hems for a chase camera. The rework
+was therefore his PRESENTATION, not his mesh.
+
+**The portrait.** On the attract screen he turns to face the lens (the
+stand pose's own leveller had to learn his facing -- see the correction
+below) and the camera meets him: lower, closer, slightly off-axis, on the
+celebration's proven hero grammar. He breathes, blinks, glances aside every
+6.5 seconds and comes back to you; the eyes lead and the neck follows at a
+fifth of the amplitude, because a head that swings as far as the eyes reads
+as looking at something, and he is thinking, not looking.
+
+**The ritual.** Three beats across the countdown, same every day because
+that is what rituals are: the bow to the laces, the shake through the
+elbows, the left wrist raised to THE WATCH -- his signature prop, welded
+into the forearm mesh at zero extra draw calls, one wrist only, because a
+band on each arm is trim and a watch on one is character.
+
+**The walk-on.** At the gun he turns away from you to face the work while
+the camera pulls back up into the chase -- two motions, one cinematic, and
+neither file knows about the other's half. The lens trails his turn at 1.6
+against his 2.2, because a camera that follows reads as following and one
+that leads reads as already knowing the choreography.
+
+**The acting at the tape.** Joy already carried the record (arms up) and
+the ordinary day (spent, hands low). What was missing was the near miss --
+fifteen seconds or less the wrong side -- which is not a point on the joy
+axis but a different gesture, transcribed from the owner's own one-second
+miss: hands on head through the camera's swing, then the left arm comes
+down and he READS THE WATCH, head bowed to it, right arm dead at his side,
+holding through the card. Verified joint by joint on the running page:
+hands-on-head shoulder z -2.05 / elbow -2.30, watch read -0.42 / -1.55 with
+the neck bowed and turned to the wrist.
+
+**The voice.** One line a day, terse, city-aware, attributed -- the
+tater-tot lesson from the references: a single spoken line builds more
+character than any mesh. RIGHT ON HEREFORD. LEFT ON BOYLSTON. At the tape
+it answers the result: THAT'S THE ONE / ONE SECOND. TOMORROW. (seconds-aware
+above one) / THE ROAD WON TODAY. Italic against a page of caps -- the one
+deliberate break in the game's typography, because it is the one place
+someone is speaking.
+
+**Corrections list, continued:**
+33. A pose written before a leveller is a pose that was never on screen.
+    Twice in one day: the portrait turn was erased by to(root,'y',0) in the
+    stand block (caught by tapping the Euler's own change callback: the
+    writes inside one update read 0, pi, 0, 0), and the ritual's head beats
+    were erased by the stand block's closing neck lerps until the ritual
+    moved below them. Anything added to a posed rig goes AFTER that pose's
+    own last word, and both sites now carry the note.
+34. A cadence clock is not a liveness probe. The first "is the runner even
+    updating in attract" check read api.phase, concluded update never ran,
+    and was wrong -- phase advances with speed, and a standing man has none.
+    The wrapper tap that replaced it showed update running all along.

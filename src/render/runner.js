@@ -1912,6 +1912,14 @@ MR.Runner = (function () {
     // this rig has one other free-running clock (the bib) and it is free
     // running precisely because nothing ever has to reproduce it.
     let standT = 0;
+    // THE PORTRAIT. 0 facing the road, 1 facing the lens. The owner's brief
+    // (docs/miles.md): before the race, the camera should be looking at
+    // Miles, not at UI with his back in it. main.js sets the target; this
+    // file owns the motion, because a turn is a movement and not a state --
+    // he TURNS to face the road when the run begins, and the turn itself is
+    // the transition. Eased over about half a second, which is a person
+    // turning around, not a door swinging.
+    let faceT = 0;
 
     // ---- head -----------------------------------------------------------
     // The neck pivot sits at the top of the trunk so head tilt rotates from
@@ -2654,6 +2662,22 @@ MR.Runner = (function () {
         // is measured from the spine and inboard is toward it.
         { g: new THREE.CapsuleGeometry(0.041, 0.048, 4, 12), c: MITT,
           x: -side * 0.085, y: -0.230, z: -0.040, rx: 0.30, rz: side * 0.62 },
+        // ---- THE WATCH, and only on one wrist -----------------------------
+        // His signature prop (docs/miles.md): a runner whose whole life is
+        // one number wears the number on his arm. It rides the wristband the
+        // silhouette already owns -- a dark case proud of the band's outboard
+        // face with a pale dial on it -- so from gameplay distance it is a
+        // fleck on the band and from the portrait and the finish orbit it is
+        // unmistakably a watch. Case and dial are solid cylinders, built on
+        // all sides like everything else; welded into this same mesh, so the
+        // whole prop costs zero draw calls. One wrist only, because a band on
+        // each arm is trim and a watch on one is character.
+        ...(side === -1 ? [
+          { g: new THREE.CylinderGeometry(0.036, 0.036, 0.020, 12), c: 0x1a2038,
+            x: side * 0.106, y: -0.180, rz: Math.PI / 2 },
+          { g: new THREE.CylinderGeometry(0.027, 0.027, 0.007, 12), c: 0xdff2ea,
+            x: side * 0.116, y: -0.180, rz: Math.PI / 2 },
+        ] : []),
       ]);
       elbow.add(fore);
 
@@ -3173,6 +3197,14 @@ MR.Runner = (function () {
       // forward pitch) do not collapse into the same animation.
       const trip = st.trip || 0;
       const knock = st.bounce || 0;
+      // The portrait turn. Rate-limited rather than filtered so the turn
+      // takes the same half second whether the frame rate is 7 or 120.
+      {
+        const want = st.face01 || 0;
+        const step = dt * 2.2;
+        faceT += Math.max(-step, Math.min(step, want - faceT));
+      }
+      const faceE = faceT * faceT * (3 - 2 * faceT);
       // The road's grade at the runner, -1..1 against the steepest legal one.
       // It is the ONLY thing hills hand this file: the stride slows on the
       // climb and quickens on the descent for nothing, because cadence already
@@ -3951,7 +3983,11 @@ MR.Runner = (function () {
       root.rotation.z = -lean * 0.13 - knock * 0.16 - slid * 0.12;
       // Go in at an angle. See SLIDE_YAW -- this is the term that gives the
       // back view something lateral to measure.
-      root.rotation.y = slid * SLIDE_YAW;
+      // ...and the portrait turn rides the same axis. During any race state
+      // faceE is identically zero (main.js only raises it on the start
+      // panel), so every silhouette contract -- footroom, deckdrop, the
+      // envelope sheet -- measures the exact figure it always measured.
+      root.rotation.y = slid * SLIDE_YAW + Math.PI * faceE;
 
       // ---- THE START LINE: A POSE, NOT AN ABSENCE OF ONE --------------------
       //
@@ -4073,7 +4109,14 @@ MR.Runner = (function () {
         to(hips, 'y', 0, stand);
         to(chest, 'y', 0, stand);
         to(spine, 'x', 0.10, stand);
-        to(root, 'y', 0, stand);
+        // Square to his FACING, not to the road. This line used to level the
+        // yaw to zero -- correct when the only thing that ever yawed the root
+        // was a slide -- and it silently erased the portrait turn every frame:
+        // the write survived exactly one Euler callback before this lerp took
+        // it back (caught by tapping rotation._onChangeCallback: the writes
+        // inside one update read 0, pi, 0, 0). A man composed at the line is
+        // square to WHEREVER he is facing, and in the portrait that is you.
+        to(root, 'y', Math.PI * faceE, stand);
         to(root, 'z', 0, stand);
         hips.rotation.z += (sway * 0.014 - hips.rotation.z) * stand;
         chest.rotation.z += (-sway * 0.008 - chest.rotation.z) * stand;
@@ -4100,6 +4143,69 @@ MR.Runner = (function () {
         to(neck, 'x', -0.05, stand);
         to(neck, 'y', 0, stand);
         to(neck, 'z', 0, stand);
+        // (The ritual sits BELOW the head-level lerp above, and the order is
+        // load-bearing: those three to() calls are the stand block's last
+        // word on the neck, and the first placement of this block sat above
+        // them -- every head beat was written and then levelled away in the
+        // same frame, the same one-frame-erase the portrait turn hit against
+        // to(root). Anything added to this pose from here on goes AFTER the
+        // block's own levellers or it does not exist.)
+        // ---- THE RITUAL (docs/miles.md) ----------------------------------
+        //
+        // The owner named it before this file did: a world-class runner does
+        // the same things at every start line, and the sameness IS the
+        // character. Three beats across the three-second countdown, applied
+        // on top of the composed stance and inert everywhere else --
+        // ritual01 is nonzero only in the COUNT state, by construction in
+        // main.js.
+        //
+        //   1. THE BOW. He looks down at the laces: a decisive fold at the
+        //      spine with the arms reaching, held a beat, released. A full
+        //      crouch was tried on paper and rejected -- at this figure's
+        //      proportions a deep knee bend under a fixed camera reads as
+        //      sitting, and the read the beat needs is only "he checked".
+        //   2. THE SHAKE. Up out of the bow, hands loose at the sides, a
+        //      fast small flutter through the elbows. The one beat that is
+        //      motion rather than pose, which is why it sits in the middle.
+        //   3. THE WATCH. The left forearm comes up across the chest and the
+        //      head drops to it. His signature beat, on his signature prop,
+        //      and the last thing he does before the gun -- then it releases
+        //      into the stance and the race owns him.
+        //
+        // Each beat is a smooth triangular window; between them he passes
+        // through the plain stance, so the ritual reads as three deliberate
+        // acts rather than one continuous squirm.
+        const rit = st.ritual01 || 0;
+        if (rit > 0 && stand > 0.3) {
+          const win = function (a, b) {
+            if (rit <= a || rit >= b) return 0;
+            const t = (rit - a) / (b - a);
+            return Math.sin(t * Math.PI);
+          };
+          const w1 = win(0.04, 0.34);
+          const w2 = win(0.40, 0.62);
+          const w3 = win(0.68, 0.94);
+          const rw = stand;
+
+          // 1. the bow
+          spine.rotation.x += 0.52 * w1 * rw;
+          neck.rotation.x += 0.42 * w1 * rw;
+          // 2. the shake, through both elbows
+          const flut = Math.sin(standT * 34) * 0.14 * w2 * rw;
+          // 3. the watch, left arm only (side -1 -- the wrist the dial is on)
+          for (const A of arms) {
+            A.shoulder.rotation.x += -0.30 * w1 * rw + flut * 0.3;
+            A.elbow.rotation.x += -0.20 * w2 * rw + flut;
+            if (A.side === -1) {
+              A.shoulder.rotation.x += -0.52 * w3 * rw;
+              A.shoulder.rotation.z += A.side * -0.30 * w3 * rw;
+              A.elbow.rotation.x += -1.30 * w3 * rw;
+            }
+          }
+          neck.rotation.x += 0.34 * w3 * rw;
+          neck.rotation.y += 0.22 * w3 * rw;
+        }
+
       }
 
       // ---- THE FINISH: THE FIRST POSE ON THIS RIG BUILT TO BE SEEN FROM THE
@@ -4252,6 +4358,23 @@ MR.Runner = (function () {
         const armX = mix(0.15, -0.25, joy);
         const armZ = mix(1.15, 2.36, joy);
         const armE = mix(-0.75, -0.25, joy);
+        // ---- THE NEAR MISS (docs/miles.md) --------------------------------
+        //
+        // Fifteen seconds or less the wrong side of the record. Not a point
+        // on the joy axis: a different gesture entirely, and the one piece of
+        // acting in this game transcribed from life -- the owner ran a
+        // near-perfect race, hit one obstacle, and missed by one second.
+        //
+        // Two beats on the same celebration clock the pose already runs on:
+        // HANDS ON HEAD through the camera's swing to the front (both arms up
+        // and folded, mitts at the cap), then, as the shot settles, the left
+        // arm comes down to THE WATCH and the head follows it -- the same
+        // wrist, the same beat as the start-line ritual, because the question
+        // he asks it is the same one. The right arm drops. He holds there
+        // through the card: a man reading a number he already knows.
+        const agony = Math.max(0, Math.min(1, st.agony || 0));
+        const agHead = agony * celRamp(celT, 0.55, 0.90) * (1 - celRamp(celT, 2.30, 0.90));
+        const agWatch = agony * celRamp(celT, 2.45, 1.10);
         for (let i = 0; i < arms.length; i++) {
           const A = arms[i];
           // Standing: hanging, slightly bent, held a hair off the ribs.
@@ -4277,6 +4400,38 @@ MR.Runner = (function () {
           to(A.shoulder, 'y', -A.side * 0.30, settle);
           to(A.shoulder, 'z', A.side * (0.30 + 0.10 * (1 - joy)), settle);
           to(A.elbow, 'x', -1.62, settle);
+
+          // The near-miss gestures override whatever the joy pose chose,
+          // applied last inside the loop for the reason every late writer in
+          // this file now carries a note: a pose written before a to() with a
+          // live weight is a pose that was never on screen.
+          if (agHead > 0) {
+            // hands to the head: arms folded up, mitts at the cap sides
+            to(A.shoulder, 'x', -0.55, agHead);
+            to(A.shoulder, 'z', A.side * 2.05, agHead);
+            to(A.elbow, 'x', -2.30, agHead);
+          }
+          if (agWatch > 0) {
+            if (A.side === -1) {
+              // the left wrist rises to be read -- the ritual's beat, slower
+              to(A.shoulder, 'x', -0.42, agWatch);
+              to(A.shoulder, 'z', A.side * 0.42, agWatch);
+              to(A.elbow, 'x', -1.55, agWatch);
+            } else {
+              // the right arm just drops: all the attention is on the dial
+              to(A.shoulder, 'x', 0.10, agWatch);
+              to(A.shoulder, 'z', A.side * 0.20, agWatch);
+              to(A.elbow, 'x', -0.30, agWatch);
+            }
+          }
+        }
+        // ...and the head follows the beats: buried in the hands, then bowed
+        // to the watch. Applied to the neck AFTER the loop so both arms are
+        // already where the head believes them to be.
+        if (agony > 0) {
+          neck.rotation.x += 0.16 * agHead + 0.52 * agWatch;
+          neck.rotation.y += 0.20 * agWatch;
+          spine.rotation.x += 0.10 * agHead + 0.16 * agWatch;
         }
 
         // ---- trunk -------------------------------------------------------
@@ -4760,6 +4915,44 @@ MR.Runner = (function () {
       // zero, so the scale is 1 and the offset is 0 -- the A/B is untouched.
       eyePivot.position.y = EYE_PIVOT_Y + EYE_SEMI * eyeShut;
       eyePivot.scale.x = 1 - POLISH * 0.06 * wince;
+
+      // ---- THE GAZE, and it only exists in the portrait -------------------
+      //
+      // Facing the lens, a character whose eyes never move is a statue. The
+      // Talking Tom lesson from the owner's references is that idle time is
+      // where a character lives, and the highest-value motion an idle face
+      // has is attention: mostly on you, sometimes elsewhere, back to you.
+      //
+      // The pattern is a loop on the standing clock, not randomness: every
+      // 6.5 seconds he spends about 1.4 of them glancing aside -- alternating
+      // sides, road-ward, the direction his day is -- and the rest looking
+      // into the camera. The eyes lead and the neck follows at a fifth of the
+      // amplitude, which is how a real glance works; a head that swings as
+      // far as the eyes reads as looking AT something and he is not, he is
+      // thinking.
+      //
+      // Amplitude is bounded by the eye's own geometry: the sclera is 0.064
+      // across and the iris 0.048, so 0.011 of lateral travel keeps the iris
+      // inside the opening at full glance. The whole block is gated on faceE
+      // and POLISH, so during every race state and in the A/B build it is
+      // arithmetic times zero.
+      {
+        const g = POLISH * faceE;
+        const beat = standT % 6.5;
+        const aside = beat > 4.6 && beat < 6.0
+          ? Math.sin(((beat - 4.6) / 1.4) * Math.PI) : 0;
+        const dir = (Math.floor(standT / 6.5) % 2) * 2 - 1;
+        // A live gaze also drifts: a few thousandths of wander at two slow
+        // incommensurate rates, so the stare at the lens never fixes.
+        const wander = Math.sin(standT * 0.9) * 0.0035
+          + Math.sin(standT * 0.53 + 1.7) * 0.0025;
+        eyePivot.position.x = g * (dir * aside * 0.011 + wander);
+        neck.rotation.y += g * (dir * aside * 0.10 + wander * 6);
+        // The lens sits above his eye line (the chase camera's eye is at 3.1
+        // against his 1.1), so meeting it means looking slightly UP -- two
+        // degrees of neck, removed during the glance aside.
+        neck.rotation.x += g * (1 - aside) * -0.045;
+      }
       // The mouth opens downward about the upper lip. 0.62 at rest to 1.55 at
       // full effort, which on an aperture 0.046 tall is 0.029 to 0.071 -- four
       // to nine pixels at the face lens and a shape change rather than a size

@@ -10246,6 +10246,14 @@ MR.Runner = (function () {
     // the transition. Eased over about half a second, which is a person
     // turning around, not a door swinging.
     let faceT = 0;
+    // ---- the animation-quality pass's own state ---------------------------
+    // airPrev watches for the touchdown edge; landK is the landing impulse it
+    // throws (decaying, eased before use). leanC and leanN are two lagged
+    // copies of the bank input -- a lag filter and an underdamped spring --
+    // so a lane change reads hips-first, chest-then, head-last-with-a-settle
+    // instead of the whole figure translating as one rigid object.
+    let airPrev = 0, landK = 0;
+    let leanC = 0, leanN = 0, leanNV = 0;
 
     // ---- head -----------------------------------------------------------
     // The neck pivot sits at the top of the trunk so head tilt rotates from
@@ -11953,6 +11961,34 @@ MR.Runner = (function () {
       // at the bottom. See that block for why it is clamped and not raw dt.
       const hdt = Math.min(dt, 1 / 50);
 
+      // ---- weight events (the animation-quality pass) ---------------------
+      // THE LANDING. air01 collapsing to zero is the touchdown; the impulse
+      // it throws drives knee give, a hip drop, a chest nod and a one-beat
+      // squash, all decaying over ~0.25s -- the "feet contact, knees
+      // compress, hips drop, torso follows" chain the brief spells out.
+      // Edge-triggered, so the held airborne pose tools/envelope.js measures
+      // can never see it, and eased so it arrives and leaves without a tick.
+      if (airPrev > 0.25 && air <= 0.02) landK = 1;
+      airPrev = air;
+      landK = Math.max(0, landK - dt * 4.2);
+      const landE = sm(landK) * (1 - slid);
+      // SQUASH AND STRETCH, about the FEET (the body pivot sits at ground
+      // level, so scale.y compresses toward the road instead of lifting the
+      // shoes off it). Airborne the figure stretches 3.5%; on the landing
+      // beat it squashes 5%. Volume is roughly kept by counter-scaling the
+      // other two axes at half rate. Both terms are zero in every held
+      // silhouette state -- spread's stretch is the one exception, and it
+      // only ever RAISES the airborne crown, which no ground contract reads.
+      const sq = 1 + spread * 0.035 - landE * 0.050;
+      body.scale.y = sq;
+      body.scale.x = body.scale.z = 1 - (sq - 1) * 0.5;
+      // THE LANE-CHANGE CHAIN. leanC lags the bank at ~7/s; leanN chases it
+      // on an underdamped spring (omega 14, zeta 0.5) so the head settles
+      // with one small overshoot when the body arrives in the new lane.
+      leanC += (lean - leanC) * (1 - Math.pow(0.001, dt));
+      leanNV += ((lean - leanN) * 196 - leanNV * 14) * hdt;
+      leanN += leanNV * hdt;
+
       // ---- legs: contralateral swing with a knee tuck on the recovery leg
       //
       // THE KNEE RUNS ON ITS OWN PHASE, AND THAT IS THE LARGEST SINGLE THING IN
@@ -12100,9 +12136,18 @@ MR.Runner = (function () {
         // sinking rather than as driving.
         const kneeRun = bend * (1.22 + 0.26 * sp01)
           + POLISH * (0.14 * land - (0.22 + 0.18 * surgeUp) * push);
-        L.hip.rotation.x = hipRun * cyc + tuck * 0.70
+        // Natural asymmetry (the brief: "both sides should not move
+        // identically"): one side runs 2% hot and the other 2.5% cool.
+        // Applied to the CYCLE terms only -- the slide and tuck poses are
+        // measured silhouettes and stay exact -- and the ankle solve below
+        // reads the same scaled values, so the foot still plants flat.
+        const asym = i === 0 ? 1.020 : 0.975;
+        const hipRunA = hipRun * asym, kneeRunA = kneeRun * asym;
+        L.hip.rotation.x = hipRunA * cyc + tuck * 0.70
           - slid * (lead ? 1.80 : 1.66);
-        L.knee.rotation.x = 0.18 + kneeRun * cyc + tuck * 1.25
+        // landE folds the knee an extra 0.30 on the landing beat -- the
+        // knees absorbing the drop before the cycle takes back over.
+        L.knee.rotation.x = 0.18 + kneeRunA * cyc + tuck * 1.25 + landE * 0.30
           + slid * (lead ? 0.02 : 0.62);
         // Dorsiflex through recovery, plantarflex off the toe -- and hard
         // dorsiflexion in the slide, toes up, which is both what a slider
@@ -12129,7 +12174,7 @@ MR.Runner = (function () {
         // 0.16 and 0.18 are the two constants sitting outside the cycle (the
         // resting dorsiflexion, and the knee's standing flex); everything else
         // in the sum is `hipRun + kneeRun`.
-        const ankFlat = 0.16 - (hipRun + kneeRun + 0.18);
+        const ankFlat = 0.16 - (hipRunA + kneeRunA + 0.18);
         // ...and then the toe is allowed to leave last. `push` rolls the foot
         // over onto the ball through the drive, which is the one moment a
         // planted foot SHOULD be nose-down, and `airW` picks the toe up over the
@@ -12389,7 +12434,10 @@ MR.Runner = (function () {
       // A body on the ground does not bob -- the bob is the cost of landing on
       // alternate feet, and in a slide neither foot is carrying anything.
       const bob = -Math.abs(Math.cos(p)) * BOB * (1 - air) * (1 - slid * 0.90) + BOB;
-      body.position.y = bob + air * 0.09;
+      // landE: the hips drop 0.05 on the touchdown beat and recover -- the
+      // half of landing compression the silhouette reads. Downward only, so
+      // the crown-at-top-of-bob contract cannot be touched.
+      body.position.y = bob + air * 0.09 - landE * 0.05;
 
       // Straightens up in the air. A runner still folded forward at the apex
       // reads as a stumble, the reference jump is upright with the chest
@@ -12470,6 +12518,14 @@ MR.Runner = (function () {
       spine.position.z = -slid * 0.14;
       spine.rotation.z = -lean * 0.30 - knock * 0.34;
       spine.rotation.y = lean * 0.16;
+      // The lane-change chain (see the filters above). During the bank's
+      // onset (lean - leanC) is signed toward the new lane: the HIPS take an
+      // extra share immediately (they lead), the CHEST runs behind by the
+      // lag (it trails the spine's own bank), and both settle to exactly
+      // zero once the bank is held -- a held lean is untouched, only the
+      // ARRIVAL is choreographed.
+      hips.rotation.z += -(lean - leanC) * 0.12;
+      chest.rotation.z += (lean - leanC) * 0.10;
 
       // Counter-rotate the shoulders against the hips -- the single cue that
       // most separates a run cycle from a march, and the only thing the back
@@ -12498,7 +12554,10 @@ MR.Runner = (function () {
       // and the knees use. It is the term that puts the NECK PIVOT in motion --
       // and with it the head, which was travelling 0.0042 fore and aft, a
       // quarter of one percent of body height, on a character supposedly running.
-      chest.rotation.x = POLISH * 0.055 * (plantW - 0.156) * cycD;
+      chest.rotation.x = POLISH * 0.055 * (plantW - 0.156) * cycD
+        // ...plus the landing nod: the torso follows the hips down on the
+        // touchdown beat and straightens as the impulse decays.
+        + landE * 0.15;
       hips.rotation.y = -sP * (0.14 + POLISH * 0.12) * cycD;
       // Pelvic drop toward the swinging leg: small, but it stops the hips
       // from reading as a rigid block bolted to the spine.
@@ -12541,6 +12600,12 @@ MR.Runner = (function () {
       // the same 0.10 of counter-yaw reads as a head holding its line against a
       // torso doing more work, which is what it is for.
       neck.rotation.y = -sP * 0.10 - slid * SLIDE_YAW * 1.15;
+      // The head is last in the lane-change chain: it trails on the spring
+      // copy, so it arrives after the chest and settles with one small
+      // overshoot -- the "settling motion when the character reaches the new
+      // lane" the brief asks for, on the one joint whose settle a viewer
+      // actually watches.
+      neck.rotation.z += (lean - leanN) * 0.16 * (1 - slid);
       // ...and sink it. Rotation gets the crown down; only translation gets it
       // INSIDE. The neck pivot drops along the spine until the skull is seated
       // between the deltoids, so the welded neck column disappears into the
@@ -13451,6 +13516,18 @@ MR.Runner = (function () {
       // The gasp, on the same clock and the same rate as the chest that drives
       // it -- one breath, two places, so they cannot disagree.
       const celBreath = Math.sin((st.celT || 0) * (0.55 + 0.70 * (1 - celJoy)) * Math.PI * 2);
+      // ---- gameplay face beats (the animation-quality pass) ----------------
+      // The brief's core demand for the face: IT CHANGES WITH THE ACTION.
+      // Two transient states join the effort/wince drive:
+      //   shock   a contact or a trip -- brows fly up and level, lids snap
+      //           open, the eye widens past rest (the one moment the
+      //           "narrowing only" rule below is deliberately broken: he IS
+      //           surprised), the mouth drops open.
+      //   excite  airborne -- brows up a touch, mouth opens into the jump.
+      // Both are driven by inputs that are identically zero in every held
+      // measured state, so the envelope and the A/B cannot see them.
+      const shock = Math.min(1, trip * 1.6 + knock * 1.3);
+      const excite = spread;
       // ---- ...AND AT THE START LINE IT IS CHOSEN TOO -----------------------
       //
       // Exactly the argument two paragraphs up, at the other end of the race.
@@ -13486,10 +13563,16 @@ MR.Runner = (function () {
 
       const browLift = mix(mix(-POLISH * (0.0035 * effort + 0.0030 * wince),
         -POLISH * 0.0026, standF),
-        POLISH * mix(-0.0055, 0.0090, celJoy), celF);
+        POLISH * mix(-0.0055, 0.0090, celJoy), celF)
+        // Shock throws the brows UP well past the composure range; a jump
+        // lifts them a third of that. Both transients, both zero at rest.
+        + POLISH * (0.0085 * shock + 0.0030 * excite);
       const browTilt = mix(mix(POLISH * (0.0045 * effort + 0.0030 * wince),
         POLISH * 0.0008, standF),
-        POLISH * mix(0.0060, -0.0010, celJoy), celF);
+        POLISH * mix(0.0060, -0.0010, celJoy), celF)
+        // ...and levels them: raised-and-flat is surprise, raised-and-knit
+        // is strain, and a collision is the former.
+        - POLISH * 0.0038 * shock;
       {
         const ba = browGeo.pos.array, br = browGeo.rest, bu = browGeo.u;
         for (let i = 0; i < browGeo.pos.count; i++) {
@@ -13501,13 +13584,16 @@ MR.Runner = (function () {
       // their drawn size reads as startled, and he is running, not surprised.
       const eyeShut = Math.min(0.94, mix(mix(POLISH * (0.16 * effort + 0.34 * wince),
         0, standF),
-        POLISH * mix(0.52, 0.02, celJoy), celF) + POLISH * 0.94 * blink);
+        POLISH * mix(0.52, 0.02, celJoy), celF) + POLISH * 0.94 * blink)
+        // Shock overrides the squint: the lids snap OPEN on a contact.
+        * (1 - shock * 0.85);
       // The LID carries the closure now (phase 2 of the overhaul): from a
       // third-covered rest to fully drawn at eyeShut 1. The eyeball keeps a
       // quarter of the old squash as a squint, so effort still narrows the
       // eye underneath the descending lid instead of the two fighting.
-      lidPivot.scale.y = LID_REST + (2.05 - LID_REST) * eyeShut;
-      eyePivot.scale.y = 1 - eyeShut * 0.25;
+      // Shock also lifts the lid PAST its rest coverage -- wide eyes.
+      lidPivot.scale.y = (LID_REST + (2.05 - LID_REST) * eyeShut) * (1 - shock * 0.45);
+      eyePivot.scale.y = 1 - eyeShut * 0.25 + POLISH * 0.07 * shock;
       // EYE_SEMI is the sclera's own half-height. Translating by half of what
       // the scale takes away holds the TOP edge on the float and spends the
       // whole closure on the bottom one. At POLISH 0 eyeShut is identically
@@ -13559,10 +13645,13 @@ MR.Runner = (function () {
       // them is what grows.
       mouthPivot.scale.y = mix(mix(1 + POLISH * (0.55 * effort + 0.30 * wince),
         1 - POLISH * 0.62, standF),
-        1 + POLISH * mix(0.95 + 0.35 * celBreath, 0.70, celJoy), celF);
+        1 + POLISH * mix(0.95 + 0.35 * celBreath, 0.70, celJoy), celF)
+        // A contact drops the jaw; a jump opens the mouth into the leap.
+        + POLISH * (0.85 * shock + 0.22 * excite);
       mouthPivot.scale.x = mix(mix(1 + POLISH * (0.10 * effort + 0.22 * wince),
         1 + POLISH * 0.24, standF),
-        1 + POLISH * mix(0.18, 0.52, celJoy), celF);
+        1 + POLISH * mix(0.18, 0.52, celJoy), celF)
+        + POLISH * (0.10 * excite - 0.14 * shock);
 
       // Ducking drops the whole body rather than only folding the spine, so
       // the collision capsule and the silhouette agree. The 0.42 matches

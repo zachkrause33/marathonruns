@@ -1725,7 +1725,7 @@ MR.Runner = (function () {
     return mesh;
   }
 
-  function create() {
+  function create(opts) {
     const root = new THREE.Group();
     const body = pivot(root, 0, 0, 0);
 
@@ -1999,6 +1999,10 @@ MR.Runner = (function () {
     bib.position.y = -0.073;
     bib.scale.z = 0.78;
     chest.add(bib);
+    // The 26.2 bib survives the sculpted-costume swap (src/render/skin.js
+    // strips every other mesh under `body`): it is the one thing on the
+    // character that says MARATHON, and the chase camera reads it all race.
+    bib.userData.keep = true;
 
     // The bib's own flutter, precomputed. It is a paper panel pinned along its
     // top edge and held flat in the middle by the back behind it, so the free
@@ -2090,6 +2094,9 @@ MR.Runner = (function () {
     // instead of the whole figure translating as one rigid object.
     let airPrev = 0, landK = 0;
     let leanC = 0, leanN = 0, leanNV = 0;
+    // The sculpted costume's rig, once its async parse lands (see the
+    // attach at the bottom of create). Null means the code body is on.
+    let skinRig = null;
 
     // ---- head -----------------------------------------------------------
     // The neck pivot sits at the top of the trunk so head tilt rotates from
@@ -5533,8 +5540,19 @@ MR.Runner = (function () {
       // trail shin and the tucked head, which is a body resting on the road.
       if (duck > 0.01) {
         root.updateMatrixWorld(true);
-        _clampBox.setFromObject(body);
-        if (_clampBox.min.y < 0) body.position.y -= _clampBox.min.y;
+        if (skinRig) {
+          // A SkinnedMesh's geometry bounds are its REST pose -- the box
+          // would measure a standing man however deep the slide goes -- so
+          // the clamp reads the BONES instead: lowest limb tip less a
+          // flesh radius. Same contract, different instrument.
+          skinRig.sync();
+          root.updateMatrixWorld(true);
+          const lowY = skinRig.low();
+          if (lowY < 0) body.position.y -= lowY;
+        } else {
+          _clampBox.setFromObject(body);
+          if (_clampBox.min.y < 0) body.position.y -= _clampBox.min.y;
+        }
       }
       api.duckDrop = duck * 0.42;
 
@@ -5616,9 +5634,46 @@ MR.Runner = (function () {
       // The slide fades its dust out with the slide; a burst's dust has to
       // stay at full strength for its own short life or it never reads.
       dustMat.opacity = Math.max(fxLive, bLive);
+
+      // ---- the costume ---------------------------------------------------
+      // Mirror every joint onto the sculpted model's bones, LAST, so the
+      // skeleton wears the finished pose of this frame -- the cycle, the
+      // overrides, the acting, the lane-change chain, all of it. See
+      // src/render/skin.js for why the driver rig above never went away.
+      if (skinRig) skinRig.sync();
     };
 
     api.update(0, {});
+    // ---- the sculpted costume (src/render/skin.js) ---------------------
+    // Async: the code body stands in until the embedded model parses, then
+    // the swap happens between two frames. The ghost opts out (skin: false)
+    // -- it re-materials its meshes at create time, before any async model
+    // could land, and a translucent hologram of the code figure is a fine
+    // ghost. A missing or bad model changes nothing: skinRig stays null and
+    // the code body simply keeps running.
+    if (!(opts && opts.skin === false) && MR.Skin) {
+      MR.Skin.attach(api.parts, function (r) {
+        // Drop EVERY mesh under body that is not inside a keep-marked group
+        // -- not just outlined() groups. The first draft filtered on
+        // userData.fill and the face survived it: eyes, lids and brows are
+        // plain flat meshes with no ink shell, and they floated over the
+        // sculpted face like a mask.
+        const drop = [];
+        body.traverse(function (o) {
+          if (!o.isMesh || o === r.mesh) return;
+          let kept = false;
+          for (let a = o; a && a !== body; a = a.parent) {
+            if (a.userData && a.userData.keep) { kept = true; break; }
+          }
+          if (!kept) drop.push(o);
+        });
+        for (const g of drop) g.parent.remove(g);
+        skinRig = r;
+        api.skinned = true;
+        r.sync();
+      });
+    }
+
     return api;
   }
 

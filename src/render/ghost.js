@@ -357,7 +357,7 @@ MR.Ghost = (function () {
     // Reuse the real rig rather than authoring a second character: it is
     // procedural, it already animates from ground speed, and any future work
     // on the runner's silhouette lands on the ghost for free.
-    const body = MR.Runner.create();
+    const body = MR.Runner.create({ skin: false });
     // Off the player's beat, so two runners side by side at the crossover read
     // as two runners rather than as one figure and its reflection.
     body.phase = 0.37;

@@ -21,6 +21,7 @@ const MODULES = [
   'src/core/course.js',
   'src/core/store.js',
   'src/render/shading.js',
+  'src/render/skin.js',
   'src/render/runner.js',
   'src/render/world.js',
   'src/render/ghost.js',

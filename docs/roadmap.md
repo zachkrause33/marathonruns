@@ -8042,3 +8042,60 @@ What this pass does not claim: the figure is spheres and capsules with a
 chase-camera heritage, and it will not become Jake. The target is the
 references' actual property -- charming, specific, alive -- and the owner's
 eye remains the acceptance test.
+
+### 84 · The wipe: an entirely new Miles, and the animation-quality pass
+
+The owner ended the incremental era mid-edit: "Instead of adjusting the
+current character - can we wipe him and create an entirely new character
+based off the instructions provided and screenshots of comparable games."
+Then the definitive references arrived -- a rendered mascot at the start
+arch ("This is exactly what we want. Copy this") and a full character
+sheet: expressions, turnaround, action poses, prop close-ups. Everything
+visible was rebuilt; the sockets (the api contract, HEIGHT, the collision
+box, the shadow and reticle, the acting machinery) kept their names.
+
+What the rebuild is now: a lathe-drawn figure -- skull with brow ridge,
+cheeks and a chin; torso with trapezius slope, chest, waist and hem in one
+surface; single-column limbs with the deltoid, triceps, calf and forearm
+bellies in the profiles -- wearing the sheet's kit: open-top visor (red
+band on a yellow rim, red brim with a yellow underside), a spiky
+warm-brown mop, glossy brown eyes with two catchlights under block brows,
+a red tee with real sleeves and a white running-figure chest mark, navy
+shorts with side stripes, white crew socks, white/yellow/navy trainers,
+yellow wristbands and a square smartwatch.
+
+Corrections worth keeping:
+
+35. LatheGeometry winds by profile direction. Fed crown-down -- the natural
+    authoring order -- every solid came out INSIDE-OUT: silhouette intact,
+    front faces culled, so four inside-out solids shipped unnoticed until
+    the shorts drew OVER the vest (a nested part beats a culled front at
+    the depth test). lathe() now normalises direction. Found by hiding
+    parts one at a time on the live page, after three probes measured the
+    wrong thing.
+36. A world-space bounding box is not a local measurement. The "inflated
+    cloth" alarm -- trunk z at 0.45 against a built 0.21 -- was the portrait
+    turn's own yaw folded into the box. The cloth was innocent; twenty
+    minutes of spring forensics were spent on a frame of reference.
+37. The navy panel covering the chest was the HOOD: a flat torus with 0.25
+    of reach around the neck shows its whole underside to a camera below
+    it. The garment was a relic of the hooded costume; a race vest has no
+    hood. Elimination photography beat every argument that preceded it.
+38. The coin-of-scalp bug shipped a third time (hair shell pole landing on
+    the skull pole to the float). A shell over a shell needs its clearance
+    stated at the POLE, not at the equator.
+
+The animation-quality pass, on the owner's brief ("stop treating the
+player as a rigid 3D object"): a touchdown impulse (knees fold, hips drop,
+chest nods, 5% squash about the feet; 3.5% airborne stretch), a
+lane-change chain (hips lead on a lag filter, chest trails, head arrives
+last on an underdamped spring and settles), 2%/2.5% left-right asymmetry
+through the cycle terms with the ankle solve reading the same values, and
+gameplay face beats (contact: lids snap open, eyes widen, brows up and
+level, jaw drops; jump: brows up, mouth opens). All edge-driven or
+zero-input in every held state, so the measured silhouettes cannot see
+any of it -- and envelope, footroom (96/96), deckdrop (24/24), shoot,
+course-test (90/90) and simulate all pass on the finished figure.
+
+Still open from the owner's wider brief: NPC quality tiers, character
+variation, crowd animation states, and the living-world motion hierarchy.

@@ -55,7 +55,13 @@ function banner(rel) {
 // UMD deprecation notice with a regex and silently truncated the bundle into a
 // syntax error -- the page rendered a blank canvas and only the screenshot
 // harness caught it. The one-line console notice is not worth that risk.
-const three = read('vendor/three.min.js');
+//
+// gltfloader.js is r160's GLTFLoader adapted to the global build (imports
+// replaced with a THREE destructure; registers as THREE.GLTFLoader). It is
+// vendor code like three itself: outside MODULES, outside the backtick lint
+// (its template literals are code, not HTML), concatenated after THREE so
+// the global exists when its IIFE runs.
+const three = read('vendor/three.min.js') + '\n' + read('vendor/gltfloader.js');
 
 // `--artifact` swaps in a shell with no document skeleton, for hosts that
 // supply their own <head>/<body> and render the page inside a frame.
@@ -68,7 +74,25 @@ const shell = read(process.argv.includes('--artifact')
 // the stylesheet a human reads.
 const css = read('src/ui/font.css') + read('src/ui/style.css');
 
-let game = '';
+// Embedded binary assets. The game has always been one self-contained file,
+// and a sculpted character model keeps it that way by travelling INSIDE the
+// page: any .glb dropped in assets/ is base64-inlined under MR.EMBED, keyed
+// by its basename (assets/miles.glb -> MR.EMBED.miles). Runtime decodes with
+// atob and hands the ArrayBuffer to THREE.GLTFLoader.parse -- no fetch, no
+// asset server, file:// still works. Base64 costs 4/3 of the binary size,
+// which is the price of the single-file premise and is paid knowingly.
+let embed = 'window.MR = window.MR || {};\nMR.EMBED = {};\n';
+const assetDir = path.join(ROOT, 'assets');
+if (fs.existsSync(assetDir)) {
+  for (const f of fs.readdirSync(assetDir).sort()) {
+    if (!f.endsWith('.glb')) continue;
+    const key = f.replace(/\.glb$/, '').replace(/[^A-Za-z0-9_]/g, '_');
+    const b64 = fs.readFileSync(path.join(assetDir, f)).toString('base64');
+    embed += `MR.EMBED[${JSON.stringify(key)}] = ${JSON.stringify(b64)};\n`;
+  }
+}
+
+let game = banner('assets (embedded)') + embed;
 for (const m of MODULES) game += banner(m) + read(m);
 
 const out = shell

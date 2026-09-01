@@ -6778,7 +6778,10 @@ MR.shading = (function () {
     runnerVest: 0xff4d5e,
     runnerShort: 0x2b2f52,
     runnerShoe: 0xfff2e0,
-    runnerHair: 0x3a2b46,
+    // Warm brown, from the owner's character sheet -- the near-black violet
+    // it replaces belonged to the pre-sheet design. Only the runner (and his
+    // ghost, which is built by the same factory) reads this.
+    runnerHair: 0x5f3d22,
 
     road: 0x50557d,
     roadEdge: 0xf2f4ff,
@@ -8803,7 +8806,7 @@ MR.Runner = (function () {
   // What the freed budget bought is the hand -- see the mitt below.
   const JACKET = 0xd6394e;   // cap peak, vest collar, vest hem -- under the vest
   const WAIST = 0x434a80;    // hood and short cuff -- one step over the shorts
-  const SHOE_DK = 0x5f6796;  // heel counter
+  const SHOE_DK = 0x3a4270;  // heel counter and ankle collar -- the sheet's navy accents
   // The cap is the vest's own red rather than a new colour. It puts the
   // brightest garment tone at the top AND the middle of the figure, which is
   // the same "repeat one colour on a rhythm" trick TRIM runs, and it means the
@@ -8905,7 +8908,7 @@ MR.Runner = (function () {
   // replaces -- see the eye block in create() for why that matters -- and warm
   // enough to separate from the pupil sitting inside it. A brown eye, which is
   // what the reference frames all have and what the skin says he should.
-  const IRIS = 0x4a3040;
+  const IRIS = 0x6a3d1c;   // warm brown, per the character sheet
   const CATCH = 0xfdf7ef;
 
   /**
@@ -8974,12 +8977,17 @@ MR.Runner = (function () {
       const x = s * 0.100;
       out.push(
         { g: new THREE.CircleGeometry(0.073, R_TORSO), c: SCLERA, x: x, y: y, z: 0.2610, sy: 0.82 },
-        { g: new THREE.CircleGeometry(0.050, R_TORSO), c: IRIS, x: x, y: y - 0.006, z: 0.2630 },
-        { g: new THREE.CircleGeometry(0.026, R_NUB), c: P.ink, x: x, y: y - 0.006, z: 0.2650 },
+        // 0.054 against the sheet's giant glossy iris -- the eye is the
+        // sheet's single loudest feature and the iris is most of the eye.
+        { g: new THREE.CircleGeometry(0.054, R_TORSO), c: IRIS, x: x, y: y - 0.006, z: 0.2630 },
+        { g: new THREE.CircleGeometry(0.027, R_NUB), c: P.ink, x: x, y: y - 0.006, z: 0.2650 },
         // Inboard and high. Both catchlights have to be in frame together at
         // the three-quarter views or the near eye reads as alive and the far
-        // one as a hole.
-        { g: new THREE.CircleGeometry(0.014, R_NUB), c: CATCH, x: x - s * 0.019, y: y + 0.021, z: 0.2670 }
+        // one as a hole. The second, smaller dot low and opposite is the
+        // sheet's two-catchlight gloss -- it is what makes the iris a sphere
+        // of glass rather than a disc of paint.
+        { g: new THREE.CircleGeometry(0.016, R_NUB), c: CATCH, x: x - s * 0.019, y: y + 0.021, z: 0.2670 },
+        { g: new THREE.CircleGeometry(0.008, R_NUB), c: CATCH, x: x + s * 0.016, y: y - 0.026, z: 0.2670 }
       );
     }
     return out;
@@ -9041,8 +9049,10 @@ MR.Runner = (function () {
     const out = [];
     for (const s of [-1, 1]) {
       out.push({
-        g: new THREE.CircleGeometry(0.030, R_TORSO), c: P.runnerHair,
-        x: s * 0.100, y: 0, z: 0.2690, sx: 1.55, sy: 0.25, rz: s * 0.07,
+        // sy 0.25 -> 0.40 and a step darker than the hair: the sheet's brows
+        // are its heaviest facial mark, thick blocks rather than lines.
+        g: new THREE.CircleGeometry(0.030, R_TORSO), c: 0x452a12,
+        x: s * 0.100, y: 0, z: 0.2690, sx: 1.60, sy: 0.40, rz: s * 0.07,
       });
     }
     return out;
@@ -9898,6 +9908,9 @@ MR.Runner = (function () {
       // the navy surfaced through the red in the portrait. 0.012 of clearance
       // is real; the shorts still own everything below the hem.
       { g: new THREE.CylinderGeometry(0.222, 0.216, 0.25, R_TORSO), c: P.runnerShort, y: -0.020, sz: 0.78 },
+      // The sheet's shorts carry a bright side stripe down each hip.
+      { g: new THREE.BoxGeometry(0.010, 0.150, 0.052), c: TRIM, x: -0.2205, y: -0.038 },
+      { g: new THREE.BoxGeometry(0.010, 0.150, 0.052), c: TRIM, x: 0.2205, y: -0.038 },
       // There is no waistband here any more. It stays out -- but NOT for the
       // reason that was written here, and the difference is worth the space
       // because the old reason would have been overturned by the first agent
@@ -10023,6 +10036,16 @@ MR.Runner = (function () {
       // reads it from three-quarters. It still stands 0.0034 proud of the vest
       // in z and the full 0.004 in x, so the value break is untouched.
       { g: new THREE.CylinderGeometry(0.152, 0.146, 0.030, R_TORSO), c: JACKET, y: 0.118, sz: 0.86 },
+      // ---- the chest mark ----------------------------------------------
+      // The sheet's tee carries a small white running-figure on the right
+      // pec. Five welded pieces, 0.06 tall, standing 0.004-0.010 off the
+      // lathe's curvature -- a mark, not a decal, so it survives every
+      // angle. His right is -x (the panel faces +z with the face).
+      { g: new THREE.SphereGeometry(0.012, 10, 8), c: 0xfdfcf6, x: -0.076, y: 0.064, z: 0.202 },
+      { g: new THREE.BoxGeometry(0.011, 0.032, 0.005), c: 0xfdfcf6, x: -0.080, y: 0.038, z: 0.202, rz: 0.30 },
+      { g: new THREE.BoxGeometry(0.008, 0.026, 0.004), c: 0xfdfcf6, x: -0.064, y: 0.046, z: 0.202, rz: -1.15 },
+      { g: new THREE.BoxGeometry(0.008, 0.028, 0.004), c: 0xfdfcf6, x: -0.092, y: 0.016, z: 0.202, rz: 0.80 },
+      { g: new THREE.BoxGeometry(0.008, 0.024, 0.004), c: 0xfdfcf6, x: -0.066, y: 0.014, z: 0.202, rz: -0.45 },
       // Hem. The vest used to end on a hard cut into the shorts, which is what
       // made the trunk read as one moulded mass from the neck to the knees.
       // Resized against the LATHE rather than the cylinder it was tuned on:
@@ -10359,7 +10382,37 @@ MR.Runner = (function () {
       // HY + 0.023 to HY + 0.097 and is 0.007 under the underside of the band
       // once that moves to HY + 0.065. 0.3812pi puts the edge at HY + 0.105,
       // which is 0.040 inside the new band and 0.034 under its top.
-      { g: new THREE.SphereGeometry(0.268, R_HEAD, 12, 0, Math.PI * 2, 0, Math.PI * 0.3812), c: CAP, y: HY + 0.012 },
+      // ---- THE HAIR, AND THE CAP IS GONE -------------------------------
+      // The owner's character sheet settles the headwear question the cap
+      // was an answer to: he wears an OPEN-TOP VISOR, and the crown above it
+      // is a spiky brown mop. The red shell that used to be the cap's fabric
+      // is replaced by a hair base shell and a cluster of tilted lobes --
+      // every tip inside HY+0.29 (crown budget: world 1.559 at rest, 1.599
+      // at the top of the bob, under the 1.60 HEIGHT contract) and inside
+      // the band's 0.294 half-width, so no silhouette number moves.
+      // r 0.263, not 0.258: the skull's own pole is at HY+0.272 and a shell
+      // whose pole lands on exactly the same height z-fights there -- the
+      // coin-of-scalp bug's third appearance in this file. 0.263+0.014 puts
+      // the hair 0.005 proud at the pole and more everywhere else.
+      { g: new THREE.SphereGeometry(0.263, R_HEAD, 12, 0, Math.PI * 2, 0, Math.PI * 0.52), c: P.runnerHair, y: HY + 0.014 },
+      // The mop: a big crown mass, two front spikes leaning over the brim
+      // line, two swept back over the ears, one falling to the nape.
+      { g: new THREE.SphereGeometry(0.105, R_NUB, 12), c: P.runnerHair,
+        y: HY + 0.208, z: 0.018, sx: 1.15, sy: 0.72, sz: 1.05 },
+      { g: new THREE.SphereGeometry(0.085, R_NUB, 10), c: P.runnerHair,
+        x: -0.100, y: HY + 0.198, z: 0.112, sy: 0.80, rx: 0.42, rz: 0.48 },
+      { g: new THREE.SphereGeometry(0.085, R_NUB, 10), c: P.runnerHair,
+        x: 0.100, y: HY + 0.198, z: 0.112, sy: 0.80, rx: 0.42, rz: -0.48 },
+      { g: new THREE.SphereGeometry(0.090, R_NUB, 10), c: P.runnerHair,
+        x: -0.132, y: HY + 0.192, z: -0.085, sy: 0.85, rz: 0.55 },
+      { g: new THREE.SphereGeometry(0.090, R_NUB, 10), c: P.runnerHair,
+        x: 0.132, y: HY + 0.192, z: -0.085, sy: 0.85, rz: -0.55 },
+      { g: new THREE.SphereGeometry(0.095, R_NUB, 10), c: P.runnerHair,
+        y: HY + 0.182, z: -0.148, sy: 0.90, rx: -0.48 },
+      { g: new THREE.SphereGeometry(0.060, R_NUB, 10), c: P.runnerHair,
+        x: -0.040, y: HY + 0.238, z: 0.055, sy: 0.78, rz: 0.30 },
+      { g: new THREE.SphereGeometry(0.060, R_NUB, 10), c: P.runnerHair,
+        x: 0.055, y: HY + 0.236, z: -0.030, sy: 0.78, rz: -0.35 },
       // ...and a rear-only shell that carries the hair down to the nape but
       // leaves the face clear. Restricting phi to the back 210 degrees is
       // what lets one primitive do a haircut. It now reads as the hair showing
@@ -10387,14 +10440,18 @@ MR.Runner = (function () {
       // the lane or envelope measures can see them. Each stands 0.02-0.03
       // proud of the skull at its own height -- the arithmetic the knuckle
       // row got wrong -- so they are shapes, not decals.
+      // Raised to meet the band's lower edge: hung lower they read as a
+      // second pair of eyebrows rather than as hair meeting the visor.
       { g: new THREE.SphereGeometry(0.070, R_NUB, 10), c: P.runnerHair,
-        x: -0.195, y: HY + 0.045, z: 0.145, sx: 0.55, sy: 0.42, sz: 0.50, rz: 0.35 },
+        x: -0.195, y: HY + 0.064, z: 0.140, sx: 0.60, sy: 0.48, sz: 0.50, rz: 0.35 },
       { g: new THREE.SphereGeometry(0.070, R_NUB, 10), c: P.runnerHair,
-        x: 0.195, y: HY + 0.045, z: 0.145, sx: 0.55, sy: 0.42, sz: 0.50, rz: -0.35 },
+        x: 0.195, y: HY + 0.064, z: 0.140, sx: 0.60, sy: 0.48, sz: 0.50, rz: -0.35 },
+      // Sideburns hug the skull (they floated off the cheek at the quarter
+      // view at x 0.228 / z 0.065 -- proud of the shape at their own height).
       { g: new THREE.SphereGeometry(0.050, R_NUB, 10), c: P.runnerHair,
-        x: -0.228, y: HY - 0.075, z: 0.065, sx: 0.30, sy: 0.85, sz: 0.45 },
+        x: -0.218, y: HY - 0.055, z: 0.042, sx: 0.32, sy: 0.80, sz: 0.42 },
       { g: new THREE.SphereGeometry(0.050, R_NUB, 10), c: P.runnerHair,
-        x: 0.228, y: HY - 0.075, z: 0.065, sx: 0.30, sy: 0.85, sz: 0.45 },
+        x: 0.218, y: HY - 0.055, z: 0.042, sx: 0.32, sy: 0.80, sz: 0.42 },
       // The hairline. The hair shell ends on a clean latitude arc, which is a
       // haircut no human has: what the back view of a real head shows is the
       // hair narrowing to a taper down the middle of the neck. 0.14 across and
@@ -10440,7 +10497,11 @@ MR.Runner = (function () {
       // HY + 0.139 is still 0.143 under the cap's pole, so the crown of the
       // figure is untouched too. tools/envelope.js confirms both across all
       // eight states.
-      { g: new THREE.CylinderGeometry(0.272, 0.272, 0.070, R_HEAD), c: TRIM, y: HY + 0.118 },
+      // Red now, with the yellow dropped to a strip along its lower edge --
+      // the sheet's visor is a red band over a yellow rim, not a yellow
+      // sweatband. Same cylinder, same contracts.
+      { g: new THREE.CylinderGeometry(0.272, 0.272, 0.070, R_HEAD), c: CAP, y: HY + 0.118 },
+      { g: new THREE.CylinderGeometry(0.2735, 0.2735, 0.026, R_HEAD), c: TRIM, y: HY + 0.092 },
       // The peak, and it is at the FRONT, where a running cap's peak is.
       //
       // It used to be worn backwards, on the argument that a forward peak
@@ -10506,14 +10567,21 @@ MR.Runner = (function () {
       // JACKET rather than the crown's own red, unchanged and for the
       // unchanged reason: the peak is a plane seen against the dome behind it
       // and a plane the same colour as its background is a shape with no edge.
-      { g: new THREE.CylinderGeometry(0.250, 0.250, 0.022, R_TORSO, 1, false, -Math.PI * 0.5, Math.PI), c: JACKET,
+      { g: new THREE.CylinderGeometry(0.250, 0.250, 0.022, R_TORSO, 1, false, -Math.PI * 0.5, Math.PI), c: CAP,
         //
         // y + 0.042, carried by the brim lift. Every clearance in the note
         // above is stated RELATIVE TO THE BAND -- the plate rides at the
         // band's own mid-height with 0.024 of clear air over it and 0.028
         // under it -- so moving the two together preserves all of them
         // exactly, and re-deriving them would have been the mistake.
+        //
+        // CAP red rather than JACKET, and a second, slightly larger yellow
+        // plate hung 0.015 beneath it: the sheet's brim is red on top with
+        // a yellow underside that shows as a rim from every angle below the
+        // eye line -- which the chase and portrait cameras both are.
         y: HY + 0.104, z: 0.080, rx: 0.06, sz: 1.40 },
+      { g: new THREE.CylinderGeometry(0.256, 0.256, 0.012, R_TORSO, 1, false, -Math.PI * 0.5, Math.PI), c: TRIM,
+        y: HY + 0.089, z: 0.080, rx: 0.06, sz: 1.42 },
       { g: new THREE.SphereGeometry(0.080, R_NUB, 12), c: P.runnerSkin, x: -0.254, y: HY - 0.020, z: -0.013, sx: 0.48, sz: 0.82 },
       { g: new THREE.SphereGeometry(0.080, R_NUB, 12), c: P.runnerSkin, x: 0.254, y: HY - 0.020, z: -0.013, sx: 0.48, sz: 0.82 },
       // THERE IS NO CONCHA IN THE EAR, and it is not for want of trying.
@@ -10758,7 +10826,9 @@ MR.Runner = (function () {
         // thigh's radius at rest so it only emerges as the knee bends, which
         // is exactly when a calf should show.
         // (The calf ball is folded into the lathe's own belly above.)
-        { g: new THREE.CylinderGeometry(0.110, 0.102, 0.085, R_LIMB), c: P.runnerShoe, y: -0.118 },
+        // True white and taller: the sheet's crew socks are a feature, not
+        // a cuff. Bottom edge kept at -0.161, deep inside the shoe collar.
+        { g: new THREE.CylinderGeometry(0.110, 0.102, 0.100, R_LIMB), c: 0xf7f5ee, y: -0.111 },
       ]);
       knee.add(shin);
 
@@ -10849,7 +10919,15 @@ MR.Runner = (function () {
         // be the widest point of the whole character in a SLIDE -- knocking it
         // off pulled the slide's half-width from 0.5609 to 0.5551, which is a
         // silhouette this game distinguishes states by.
-        { g: new THREE.BoxGeometry(0.196, 0.028, 0.240), c: TRIM, y: -0.100, z: 0.036 },
+        // White now, per the sheet: the midsole line is white over the pale
+        // outsole, and the YELLOW moved up into the side panels below --
+        // same geometry to the float, so the slide's half-width (which this
+        // piece's front corner owns) is untouched.
+        { g: new THREE.BoxGeometry(0.196, 0.028, 0.240), c: 0xf2efe6, y: -0.100, z: 0.036 },
+        // The sheet's yellow side flashes, inset 0.0065 from the stripe's
+        // own half-width so they can never take the silhouette from it.
+        { g: new THREE.BoxGeometry(0.008, 0.048, 0.130), c: TRIM, x: -0.0915, y: -0.052, z: 0.030 },
+        { g: new THREE.BoxGeometry(0.008, 0.048, 0.130), c: TRIM, x: 0.0915, y: -0.052, z: 0.030 },
         // Outsole as a squashed ellipsoid rather than a slab, so the face it
         // turns to the camera on the recovery swing is a rounded oval that
         // still reads as the bottom of a shoe.
@@ -10943,6 +11021,15 @@ MR.Runner = (function () {
             [0.060, -0.228],  // arriving at the elbow still tapering
             [0.001, -0.250],
           ], null, { seg: R_LIMB }), c: P.runnerSkin, ry: Math.PI },
+        // The tee's SLEEVE, on the arm so it swings with it. The old base-
+        // layer sleeve was cut for reading as a pale hole in the vest; this
+        // one is the tee's own red, so that failure mode does not exist --
+        // and the sheet's tee has real short sleeves ending mid-upper-arm.
+        // 0.099 over the lathe's 0.092 deltoid: a garment standing 0.007
+        // proud, with the trunk's red shoulder cap covering the joint above.
+        { g: new THREE.SphereGeometry(0.099, R_LIMB, 12), c: P.runnerVest, y: -0.020, sy: 0.72 },
+        { g: new THREE.CylinderGeometry(0.099, 0.091, 0.110, R_LIMB), c: P.runnerVest, y: -0.062 },
+        { g: new THREE.CylinderGeometry(0.093, 0.089, 0.020, R_LIMB), c: JACKET, y: -0.118 },
         // The old deltoid/triceps notes, kept for the record of the pass
         // that placed them; the masses live in the profile above now.
         //
@@ -11172,11 +11259,13 @@ MR.Runner = (function () {
         // all sides like everything else; welded into this same mesh, so the
         // whole prop costs zero draw calls. One wrist only, because a band on
         // each arm is trim and a watch on one is character.
+        // Square, per the sheet: a smartwatch case with a rounded-rect
+        // screen, riding the outboard face of the yellow band.
         ...(side === -1 ? [
-          { g: new THREE.CylinderGeometry(0.032, 0.032, 0.018, 12), c: 0x1a2038,
-            x: side * 0.090, y: -0.158, rz: Math.PI / 2 },
-          { g: new THREE.CylinderGeometry(0.024, 0.024, 0.007, 12), c: 0xdff2ea,
-            x: side * 0.099, y: -0.158, rz: Math.PI / 2 },
+          { g: roundedBox(0.020, 0.044, 0.038, 0.008, 12), c: 0x1a2038,
+            x: side * 0.088, y: -0.158 },
+          { g: roundedBox(0.007, 0.032, 0.027, 0.003, 8), c: 0x9fe8d8,
+            x: side * 0.0985, y: -0.158 },
         ] : []),
       ]);
       elbow.add(fore);

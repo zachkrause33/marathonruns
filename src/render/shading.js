@@ -46,7 +46,10 @@ MR.shading = (function () {
     runnerVest: 0xff4d5e,
     runnerShort: 0x2b2f52,
     runnerShoe: 0xfff2e0,
-    runnerHair: 0x3a2b46,
+    // Warm brown, from the owner's character sheet -- the near-black violet
+    // it replaces belonged to the pre-sheet design. Only the runner (and his
+    // ghost, which is built by the same factory) reads this.
+    runnerHair: 0x5f3d22,
 
     road: 0x50557d,
     roadEdge: 0xf2f4ff,

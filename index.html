@@ -8974,8 +8974,8 @@ MR.Runner = (function () {
       const x = s * 0.100;
       out.push(
         { g: new THREE.CircleGeometry(0.073, R_TORSO), c: SCLERA, x: x, y: y, z: 0.2610, sy: 0.82 },
-        { g: new THREE.CircleGeometry(0.061, R_TORSO), c: IRIS, x: x, y: y - 0.002, z: 0.2630 },
-        { g: new THREE.CircleGeometry(0.031, R_NUB), c: P.ink, x: x, y: y - 0.002, z: 0.2650 },
+        { g: new THREE.CircleGeometry(0.050, R_TORSO), c: IRIS, x: x, y: y - 0.006, z: 0.2630 },
+        { g: new THREE.CircleGeometry(0.026, R_NUB), c: P.ink, x: x, y: y - 0.006, z: 0.2650 },
         // Inboard and high. Both catchlights have to be in frame together at
         // the three-quarter views or the near eye reads as alive and the far
         // one as a hole.
@@ -9082,9 +9082,22 @@ MR.Runner = (function () {
    * work can scale it open and shut about its own top edge.
    */
   function mouthPieces() {
+    // Rebuilt for the new character: the rest face is CONFIDENT, not
+    // labouring, so the rest mouth is a small closed smile -- a thin arc
+    // bowed downward with its corners turned up by two dots of the same
+    // tube radius, which is the reference's own drawing. The expression
+    // machinery keeps working unchanged because it drives the PIVOT's
+    // scales: joy widens the arc (scale.x), effort deepens the bow into an
+    // open oval (scale.y), a wince narrows and deepens it -- one piece,
+    // four readable states.
+    const ARC = 1.35;
+    const cx = 0.052 * Math.cos(-Math.PI / 2 + ARC / 2);
+    const cy = 0.052 * Math.sin(-Math.PI / 2 + ARC / 2);
     return [
-      { g: new THREE.CircleGeometry(0.050, R_TORSO), c: MOUTH, y: -0.023, z: 0.036, sx: 1.30, sy: 0.46 },
-      { g: new THREE.CircleGeometry(0.050, R_TORSO), c: SKIN_SH, y: -0.040, z: 0.034, sx: 1.24, sy: 0.34 },
+      { g: new THREE.TorusGeometry(0.052, 0.0105, 8, 18, ARC), c: MOUTH,
+        rz: -Math.PI / 2 - ARC / 2, z: 0.040 },
+      { g: new THREE.SphereGeometry(0.0105, 10, 8), c: MOUTH, x: -cx, y: cy + 0.004, z: 0.040 },
+      { g: new THREE.SphereGeometry(0.0105, 10, 8), c: MOUTH, x: cx, y: cy + 0.004, z: 0.040 },
     ];
   }
 
@@ -9156,6 +9169,70 @@ MR.Runner = (function () {
    *
    * Piece: { g, c, x,y,z, rx,ry,rz, sx,sy,sz }.
    */
+  /**
+   * ================= LATHE: THE ORGANIC-FORM FOUNDATION ==================
+   *
+   * The owner's overhaul brief, condensed: "cartoon proportions + intentional
+   * character design", "the face must have a clear front-facing surface
+   * rather than being features attached to a ball", "avoid visible seams
+   * where primitive shapes meet". A figure assembled from spheres cannot
+   * comply, however carefully the spheres are placed -- the seams ARE the
+   * construction.
+   *
+   * This is the way out, and it is one function: a profile -- a hand-drawn
+   * list of (radius, height) pairs -- revolved into a single continuous
+   * solid. A head stops being a sphere and becomes a drawn line from crown
+   * to chin; a torso becomes shoulder-chest-waist-hip in one surface; a limb
+   * carries its elbow swell IN the curve, so there is no bead because there
+   * is no second shape. Smooth normals come from the revolution itself.
+   *
+   * The profile is resampled through a Catmull-Rom pass so the hand-authored
+   * points can be sparse -- eight points draw a skull -- and the surface
+   * still bends, not creases. Ends are capped by pinching the profile to
+   * r=0, which keeps every solid closed on all sides per the standing rule.
+   *
+   * `opts.sx/sz` squash the revolution off-round (a head is deeper than it
+   * is wide, a torso wider than deep); `opts.tint` darkens per-vertex colour
+   * toward the bottom of the form -- the cheap, bake-time ambient occlusion
+   * the shading phase of the brief asks for, in the same vertex-colour
+   * channel weld() already carries.
+   */
+  function lathe(profile, c, o) {
+    o = o || {};
+    const pts = [];
+    const P = profile;
+    const N = 4;                       // resample density between authored points
+    for (let i = 0; i < P.length - 1; i++) {
+      const p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1],
+        p3 = P[Math.min(P.length - 1, i + 2)];
+      for (let j = 0; j < N; j++) {
+        const t = j / N, t2 = t * t, t3 = t2 * t;
+        pts.push(new THREE.Vector2(
+          Math.max(0.0001,
+            0.5 * ((2 * p1[0]) + (-p0[0] + p2[0]) * t
+              + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2
+              + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3)),
+          0.5 * ((2 * p1[1]) + (-p0[1] + p2[1]) * t
+            + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2
+            + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3)));
+      }
+    }
+    pts.push(new THREE.Vector2(Math.max(0.0001, P[P.length - 1][0]), P[P.length - 1][1]));
+    // LatheGeometry's winding assumes the profile runs BOTTOM-TO-TOP; every
+    // profile in this file is authored crown-down because that is how a form
+    // is described, and fed in that order the whole revolution comes out
+    // INSIDE-OUT -- front faces culled, so the surface you see is the inner
+    // back wall. The silhouette is identical, which is what let four of these
+    // ship before the fault surfaced as the shorts drawing OVER the vest (a
+    // nested part beats a culled front at the depth test every time). Found
+    // by hiding parts on the live page, one at a time. Normalised here so
+    // authoring order stays free.
+    if (pts.length > 1 && pts[0].y > pts[pts.length - 1].y) pts.reverse();
+    const g = new THREE.LatheGeometry(pts, o.seg || 26);
+    g.computeVertexNormals();
+    return g;
+  }
+
   function weld(pieces) {
     const pos = [], nrm = [], col = [];
     const m = new THREE.Matrix4();
@@ -9373,15 +9450,21 @@ MR.Runner = (function () {
   // shell is culled, so the print gets no ink of its own (a 0.014 rim around a
   // 0.015 stroke would swallow it whole), and they cost no closed volume.
   const BIB_A = 0.50;          // half-arc, radians
-  const BIB_R0 = 0.268;        // radius at the top edge...
-  const BIB_R1 = 0.258;        // ...and at the bottom, matching the vest's taper
+  // Radii re-derived when the vest became a lathe (its own note). The card
+  // and the vest share the same 0.78 z-squash, so clearance is pure radius:
+  // the vest's front reaches 0.2607 at the card's top edge and 0.2366 at its
+  // bottom, which puts the card 0.015 proud at the top -- the old 0.268 was
+  // 0.007 INSIDE the new chest and the top rows z-fought as a white tear --
+  // and lets the bottom bow off the waist pull-in the way pinned paper does.
+  const BIB_R0 = 0.276;        // radius at the top edge...
+  const BIB_R1 = 0.264;        // ...and at the bottom, bridging the waist
   const BIB_H = 0.146;
   const BIB_T = 0.014;         // slab thickness
   const BIB_PROUD = 0.0035;    // how far the print stands off the face
   const BIB_NC = 12, BIB_NR = 3;
   // Nominal radius, so an amplitude in world units can be turned into the
   // radial scale that produces it.
-  const BIB_R = 0.263;
+  const BIB_R = 0.270;
   const BIB_PAPER = 0xfffdf5;
   const BIB_BACK = 0xd9d3c2;   // the reverse of the card; only ever edge-on
   const BIB_INK = 0x232046;
@@ -9809,7 +9892,12 @@ MR.Runner = (function () {
     const spine = pivot(hips, 0, 0, 0);
 
     const pelvis = multi([
-      { g: new THREE.CylinderGeometry(0.228, 0.220, 0.25, R_TORSO), c: P.runnerShort, y: -0.020, sz: 0.78 },
+      // 0.222/0.216, from 0.228/0.220: the shorts are worn UNDER the vest and
+      // the vest lathe's waist is 0.234, so the old 0.228 left 0.006 between
+      // two 24-segment surfaces -- inside facet-interpenetration range -- and
+      // the navy surfaced through the red in the portrait. 0.012 of clearance
+      // is real; the shorts still own everything below the hem.
+      { g: new THREE.CylinderGeometry(0.222, 0.216, 0.25, R_TORSO), c: P.runnerShort, y: -0.020, sz: 0.78 },
       // There is no waistband here any more. It stays out -- but NOT for the
       // reason that was written here, and the difference is worth the space
       // because the old reason would have been overturned by the first agent
@@ -9869,14 +9957,48 @@ MR.Runner = (function () {
       // sitting on the shoulders. Short and barely tapered on purpose: a
       // singlet worn over the shorts, so the red reads as one wide squat
       // block the way the reference shirts do rather than as a torso.
-      { g: new THREE.CylinderGeometry(0.262, 0.238, 0.28, R_TORSO), c: P.runnerVest, y: -0.037, sz: 0.78 },
+      // ---- PHASE 5 OF THE OVERHAUL: THE TORSO IS ONE DRAWN SURFACE ------
+      // Trapezius slope into shoulder width, chest, a real waist pull-in,
+      // then the vest hem flaring back over the hips -- the brief's own
+      // list, as one lathe. The old cylinder read as the rounded block the
+      // brief named. Widest point stays 0.262, exactly the cylinder's own,
+      // so the trunk's contribution to every half-width contract is pinned.
+      // Two of these numbers were wrong the first time and both faults were
+      // photographed before they were reasoned about:
+      //   THE WAIST WAS 0.220, and the pelvis cylinder under it is 0.228 --
+      //     so the "waist pull-in" pulled the vest INSIDE the shorts and the
+      //     navy punched through the red across the whole midriff. A vest is
+      //     worn OVER the shorts; its narrowest point must still clear the
+      //     widest thing beneath it. 0.234 keeps a real pull-in from the
+      //     0.262 shoulder while staying 0.006 outside the pelvis.
+      //   THE SPLINE OVERSHOOTS. Catmull-Rom through trapezius 0.192 ->
+      //     shoulder 0.262 arrives at the shoulder still climbing, and the
+      //     curve peaked at 0.266 -- past the pinned width, and within a
+      //     float of the bib's card. The extra point at [0.256, 0.070] hands
+      //     the shoulder a flat tangent so the profile crests ON the stated
+      //     number instead of after it.
+      // sz 0.78 rather than 0.80: the bib's slab and the pelvis both squash
+      // z by 0.78, and sharing the ellipse is what lets the bib's clearance
+      // be checked as pure radius at every angle instead of at three.
+      { g: lathe([
+          [0.100, 0.138],   // collar opening, seating the new short neck
+          [0.192, 0.106],   // trapezius slope
+          [0.256, 0.070],   // pre-shoulder, pinning the tangent (see above)
+          [0.262, 0.044],   // shoulder line -- the old cylinder's own width
+          [0.253, -0.010],  // upper chest
+          [0.244, -0.058],  // chest
+          [0.234, -0.098],  // the waist -- outside the pelvis, see above
+          [0.238, -0.158],  // hem flaring over the hips
+          [0.148, -0.186],  // under-hem tuck
+          [0.001, -0.196],  // closed underneath, all sides built
+        ], null, { seg: 24 }), c: P.runnerVest, y: -0.030, sz: 0.78, ry: Math.PI },
       // Deltoids. These are what make the shoulder line read wider than the
       // head; without them the trunk cone tapers into the skull. Flattened
       // hard in Y so they widen the shoulders without raising them. Their
       // outer edge is the 0.78 shoulder measurement constants.js cuts the
       // lane width from -- move them and the whole track has to move.
-      { g: new THREE.SphereGeometry(0.140, R_LIMB, 16), c: P.runnerVest, x: -0.244, y: 0.002, sy: 0.76, sz: 0.84 },
-      { g: new THREE.SphereGeometry(0.140, R_LIMB, 16), c: P.runnerVest, x: 0.244, y: 0.002, sy: 0.76, sz: 0.84 },
+      { g: new THREE.SphereGeometry(0.130, R_LIMB, 16), c: P.runnerVest, x: -0.240, y: 0.008, sy: 0.74, sz: 0.82 },
+      { g: new THREE.SphereGeometry(0.130, R_LIMB, 16), c: P.runnerVest, x: 0.240, y: 0.008, sy: 0.74, sz: 0.82 },
       // No shoulder-blade bumps: the race bib is a panel standing proud of
       // the vest and it covers the entire area they would have shown in.
       //
@@ -9900,10 +10022,16 @@ MR.Runner = (function () {
       // ever sees: the chase view reads its back and its sides, and the finish
       // reads it from three-quarters. It still stands 0.0034 proud of the vest
       // in z and the full 0.004 in x, so the value break is untouched.
-      { g: new THREE.CylinderGeometry(0.266, 0.259, 0.026, R_TORSO), c: JACKET, y: 0.088, sz: 0.7812 },
+      { g: new THREE.CylinderGeometry(0.152, 0.146, 0.030, R_TORSO), c: JACKET, y: 0.118, sz: 0.86 },
       // Hem. The vest used to end on a hard cut into the shorts, which is what
       // made the trunk read as one moulded mass from the neck to the knees.
-      { g: new THREE.CylinderGeometry(0.244, 0.242, 0.030, R_TORSO), c: JACKET, y: -0.166, sz: 0.79 },
+      // Resized against the LATHE rather than the cylinder it was tuned on:
+      // at its own height the new surface is r 0.236, and the old 0.240 ring
+      // sat 0.004 off it -- under one ink width, which is the teeth threshold
+      // this file keeps re-learning -- and rendered as a red band floating
+      // over the shorts. 0.250 stands a full 0.014 proud, and taller by
+      // 0.004 so the band still owns pixels over the flare below it.
+      { g: new THREE.CylinderGeometry(0.250, 0.246, 0.034, R_TORSO), c: JACKET, y: -0.166, sz: 0.82 },
     ]);
     chest.add(trunk);
 
@@ -9976,24 +10104,21 @@ MR.Runner = (function () {
     // were the heaviest thing in frame. One step up is still unambiguously
     // dark against the neck, and it pairs WAIST with the short cuff at the
     // other end of the figure, which is the rhythm TRIM already runs.
+    // THE HOOD IS GONE, and it was found by elimination rather than by taste.
+    // The character-overhaul portrait showed a navy panel covering the entire
+    // chest, and every plausible suspect was argued over -- the bib, the
+    // shorts, a z-fight -- until the parts were hidden one at a time on the
+    // live page: the panel was the hood. A torus with 0.25 of reach lying
+    // FLAT around the neck presents its whole underside to a portrait camera
+    // sitting below it, and 0.50 of navy annulus projected over the chest is
+    // a bib-shaped hole in the vest. The old vest cylinder happened to mask
+    // most of the sight line; the lathe's trapezius slope opened it.
+    //
+    // It does not come back smaller, because the garment itself was a relic:
+    // the runner wore a hooded top two costume passes ago, and a race vest
+    // has no hood. The pivot stays -- parts.hood is compared by name in
+    // tools/pose-diff.js and the spring code poses it -- it just poses air.
     const hoodPivot = pivot(chest, 0, 0.048, -0.045);
-    const hood = multi([
-      // sz, not sy: weld() composes T*R*S, so the squash lands on the geometry
-      // BEFORE it is laid flat, and the tube's axis is still the original z.
-      // Squashing y here would flatten the ring instead of the roll.
-      //
-      // 0.0704, not the 0.074 it was, and the change is exactly the inscribed-
-      // polygon correction the segment note warns about. The roll used five
-      // radial segments, so its highest vertex sat at 0.074*sin(72deg) = 0.0704
-      // and the crown of a slide -- the one pose where this roll IS the top of
-      // the character -- was measured against that. Ten segments put a vertex
-      // on the top of the tube for the first time and the slide's crown rose
-      // 0.0022 for free. The tube is shrunk back to what the pentagon actually
-      // measured, so the roll is round now at the same size it always was.
-      { g: new THREE.TorusGeometry(0.180, 0.0704, 10, 26, Math.PI * 1.30), c: WAIST,
-        rx: -Math.PI / 2, rz: -0.42, sz: 0.76 },
-    ]);
-    hoodPivot.add(hood);
 
     // Curved rather than a flat card so it hugs the vest at this size, tapered
     // to match the vest's own cone so the wider top of the vest cannot poke
@@ -10116,7 +10241,11 @@ MR.Runner = (function () {
       // Thicker than it was (0.104/0.122 -> 0.118/0.134): the portrait showed
       // a dowel between collar and chin, and a neck that fills toward the jaw
       // reads as anatomy where a thin cylinder reads as an axle.
-      { g: new THREE.CylinderGeometry(0.106, 0.124, 0.25, R_LIMB), c: P.runnerSkin, y: HY - 0.268 },
+      // Phase 4 of the overhaul: short and tapered, seated up under the jaw
+      // so head-jaw-neck-shoulder reads as one construction. The old SCM
+      // ridges and fillet ring below were sized for the tall dowel and now
+      // do their work against this shorter column.
+      { g: new THREE.CylinderGeometry(0.094, 0.126, 0.21, R_LIMB), c: P.runnerSkin, y: HY - 0.252 },
       // The fillet under the jaw, and it is the answer to "the neck is a plain
       // cylinder the head sits on top of".
       //
@@ -10147,19 +10276,50 @@ MR.Runner = (function () {
       // The arc's midpoint sits at half its span from +X, so rz carries that
       // to -Y, which rx = -pi/2 then maps to +Z. Get either wrong and the
       // fillet ends up round the NAPE, which is the one place it may not be.
-      { g: new THREE.TorusGeometry(0.111, 0.024, 8, 20, Math.PI * 1.11), c: P.runnerSkin,
-        y: HY - 0.244, rx: -Math.PI / 2, rz: Math.PI * 0.945 },
+      { g: new THREE.TorusGeometry(0.100, 0.022, 8, 20, Math.PI * 1.11), c: P.runnerSkin,
+        y: HY - 0.236, rx: -Math.PI / 2, rz: Math.PI * 0.945 },
       // The sternocleidomastoids. Two ridges running from behind the ear down
       // to the notch, which are the only muscles a neck shows at this size and
       // the reason a neck is not a dowel. 0.022 proud of the cylinder at their
       // widest and nowhere near its own outline: they reach x 0.083 on a neck
       // whose radius there is 0.114, so they are pure interior form and the
       // ramp is what draws them.
-      { g: new THREE.SphereGeometry(0.052, R_NUB, 10), c: P.runnerSkin,
-        x: -0.052, y: HY - 0.317, z: 0.078, sx: 0.60, sy: 1.70, sz: 0.55, rz: -0.16 },
-      { g: new THREE.SphereGeometry(0.052, R_NUB, 10), c: P.runnerSkin,
-        x: 0.052, y: HY - 0.317, z: 0.078, sx: 0.60, sy: 1.70, sz: 0.55, rz: 0.16 },
-      { g: new THREE.SphereGeometry(0.266, R_HEAD, 24), c: P.runnerSkin, y: HY, sy: 1.06, sz: 0.97 },
+      { g: new THREE.SphereGeometry(0.044, R_NUB, 10), c: P.runnerSkin,
+        x: -0.048, y: HY - 0.300, z: 0.066, sx: 0.58, sy: 1.35, sz: 0.50, rz: -0.16 },
+      { g: new THREE.SphereGeometry(0.044, R_NUB, 10), c: P.runnerSkin,
+        x: 0.048, y: HY - 0.300, z: 0.066, sx: 0.58, sy: 1.35, sz: 0.50, rz: 0.16 },
+      // ---- PHASE 1 OF THE OVERHAUL: A DESIGNED HEAD, NOT A SPHERE -------
+      // One lathe profile, crown to chin: forehead carries the widest point,
+      // the cheek pulls in under it, the jaw narrows deliberately toward a
+      // chin that ends in a pole so the solid is closed on all sides. Depth
+      // runs at 0.99 of width with the whole form shifted 0.012 forward,
+      // which lands the front surface exactly on the eye planes at the eye
+      // line -- the features sit ON the face instead of floating off a ball,
+      // which was the brief's first complaint. Crown tops out at HY+0.280,
+      // inside the old sphere's own 0.282, so no height contract can move.
+      // The crown region is drawn INSIDE the cap shell on purpose, and it
+      // was not the first time: the lathe's upper skull reached 0.228 at a
+      // height where the cap's own radius is 0.220, so the scalp surfaced
+      // through the fabric across the whole crown -- the coin-of-scalp bug
+      // at full size. Everything above the brow ridge now clears the cap's
+      // sphere (r 0.268 about HY+0.012) by at least 0.02; the face below the
+      // band is where the width lives.
+      { g: lathe([
+          [0.001, 0.272],   // crown pole, under the cap's 0.280
+          [0.130, 0.242],   // crown (cap radius there: 0.141)
+          [0.192, 0.168],   // upper skull (cap: 0.220)
+          [0.240, 0.080],   // upper forehead, tucking under the band
+          [0.256, 0.030],   // brow ridge -- the widest the head gets
+          [0.250, -0.040],  // temple easing in
+          [0.238, -0.120],  // cheekbone
+          [0.186, -0.200],  // jaw, narrowing with intent
+          [0.102, -0.256],  // chin
+          [0.001, -0.280],  // chin pole
+        // ry pi: LatheGeometry carries its wrap seam at the start angle and
+        // computeVertexNormals leaves a shading crease there -- it rendered
+        // as a line straight down the middle of the face. The seam now faces
+        // dead astern, under the hair, where a crease is a nape.
+        ]), c: P.runnerSkin, y: HY, z: 0.012, sz: 0.99, ry: Math.PI },
       // ---- THE NOSE (the anatomy pass) --------------------------------
       // The owner, on the portrait: "He still does not look like a human."
       // This face had eyes, brows and a mouth and NO NOSE -- which no human
@@ -10170,17 +10330,13 @@ MR.Runner = (function () {
       // every silhouette contract holds by construction.
       { g: new THREE.SphereGeometry(0.049, R_NUB, 10), c: P.runnerSkin,
         y: HY - 0.064, z: 0.254, sx: 0.74, sy: 1.05, sz: 0.66 },
-      // ---- THE EARS ---------------------------------------------------
-      // Same argument, same verdict. Two squashed discs seated against the
-      // skull's sides just under the cap line, slightly aft of centre the
-      // way ears are. They add 0.014 of half-width at a height where the
-      // figure's half-width is set by the SHOULDERS, so no lane or envelope
-      // number can see them -- and from behind they read as the cap sitting
-      // ON a head rather than being the head, which is its own small win.
-      { g: new THREE.SphereGeometry(0.062, R_NUB, 10), c: P.runnerSkin,
-        x: -0.252, y: HY - 0.042, z: -0.014, sx: 0.34, sy: 0.95, sz: 0.72 },
-      { g: new THREE.SphereGeometry(0.062, R_NUB, 10), c: P.runnerSkin,
-        x: 0.252, y: HY - 0.042, z: -0.014, sx: 0.34, sy: 0.95, sz: 0.72 },
+      // THE ANATOMY PASS'S EARS ARE GONE, because they had never been drawn.
+      // It added a second pair at r 0.062 / x 0.244 without noticing the
+      // original pair fifty lines down (r 0.080 / x 0.254, spanning x 0.2156
+      // to 0.2924): the new discs sat ENTIRELY inside the old ones -- every
+      // extent nested, to within 0.001 at the lobe -- which is the lace-panel
+      // class of part, argued into place and never counted. The original pair
+      // is the character's ears and always was.
       // The cap. Geometrically this is the same shell that used to be the hair
       // crown -- the fit was already right and the note below is still the
       // reason for every number in it -- but it is now the vest's red, which
@@ -10203,7 +10359,7 @@ MR.Runner = (function () {
       // HY + 0.023 to HY + 0.097 and is 0.007 under the underside of the band
       // once that moves to HY + 0.065. 0.3812pi puts the edge at HY + 0.105,
       // which is 0.040 inside the new band and 0.034 under its top.
-      { g: new THREE.SphereGeometry(0.288, R_HEAD, 12, 0, Math.PI * 2, 0, Math.PI * 0.3812), c: CAP, y: HY },
+      { g: new THREE.SphereGeometry(0.268, R_HEAD, 12, 0, Math.PI * 2, 0, Math.PI * 0.3812), c: CAP, y: HY + 0.012 },
       // ...and a rear-only shell that carries the hair down to the nape but
       // leaves the face clear. Restricting phi to the back 210 degrees is
       // what lets one primitive do a haircut. It now reads as the hair showing
@@ -10222,7 +10378,23 @@ MR.Runner = (function () {
       // error as the crown punching a coin of scalp through the hair; the
       // lesson is that a colour change can expose geometry that was always
       // wrong.
-      { g: new THREE.SphereGeometry(0.286, 24, 12, Math.PI * 1.5 - 1.83, 3.66, Math.PI * 0.40, Math.PI * 0.37), c: P.runnerHair, y: HY },
+      { g: new THREE.SphereGeometry(0.246, 24, 12, Math.PI * 1.5 - 1.34, 2.68, Math.PI * 0.44, Math.PI * 0.30), c: P.runnerHair, y: HY + 0.002, z: -0.030 },
+      // ---- the fringe -------------------------------------------------
+      // The reference character's single strongest identity cue is dark
+      // hair showing UNDER the headwear -- at the temples in front, and in
+      // front of the ears. Four wisps, all outboard of the brows (which own
+      // x up to 0.16) and all inside the figure's half-width, so nothing
+      // the lane or envelope measures can see them. Each stands 0.02-0.03
+      // proud of the skull at its own height -- the arithmetic the knuckle
+      // row got wrong -- so they are shapes, not decals.
+      { g: new THREE.SphereGeometry(0.070, R_NUB, 10), c: P.runnerHair,
+        x: -0.195, y: HY + 0.045, z: 0.145, sx: 0.55, sy: 0.42, sz: 0.50, rz: 0.35 },
+      { g: new THREE.SphereGeometry(0.070, R_NUB, 10), c: P.runnerHair,
+        x: 0.195, y: HY + 0.045, z: 0.145, sx: 0.55, sy: 0.42, sz: 0.50, rz: -0.35 },
+      { g: new THREE.SphereGeometry(0.050, R_NUB, 10), c: P.runnerHair,
+        x: -0.228, y: HY - 0.075, z: 0.065, sx: 0.30, sy: 0.85, sz: 0.45 },
+      { g: new THREE.SphereGeometry(0.050, R_NUB, 10), c: P.runnerHair,
+        x: 0.228, y: HY - 0.075, z: 0.065, sx: 0.30, sy: 0.85, sz: 0.45 },
       // The hairline. The hair shell ends on a clean latitude arc, which is a
       // haircut no human has: what the back view of a real head shows is the
       // hair narrowing to a taper down the middle of the neck. 0.14 across and
@@ -10268,7 +10440,7 @@ MR.Runner = (function () {
       // HY + 0.139 is still 0.143 under the cap's pole, so the crown of the
       // figure is untouched too. tools/envelope.js confirms both across all
       // eight states.
-      { g: new THREE.CylinderGeometry(0.294, 0.294, 0.074, R_HEAD), c: TRIM, y: HY + 0.102 },
+      { g: new THREE.CylinderGeometry(0.272, 0.272, 0.070, R_HEAD), c: TRIM, y: HY + 0.118 },
       // The peak, and it is at the FRONT, where a running cap's peak is.
       //
       // It used to be worn backwards, on the argument that a forward peak
@@ -10453,6 +10625,49 @@ MR.Runner = (function () {
     const eyes = new THREE.Mesh(weld(eyePieces()), S.flat(0xffffff, { vertexColors: true }));
     eyePivot.add(eyes);
 
+    // ---- PHASE 2 OF THE OVERHAUL: EYELIDS -------------------------------
+    //
+    // The brief: "The upper eyelids are extremely important. They should
+    // give the character personality... The normal gameplay expression
+    // should feel focused + confident + energetic."
+    //
+    // Two skin shells on their own pivot AT THE EYES' TOP EDGE, tilted a
+    // few degrees down toward the nose, resting a third of the way over the
+    // eye -- which is what reads as focus; a fully open circle reads as
+    // alarm. The same shells ARE the blink: the pivot's y-scale grows them
+    // down over the eye, so a blink is a lid closing rather than an eyeball
+    // squashing, and the old scale-squash drops to a supporting squint.
+    // Geometry is translated so the TOP edge sits at the pivot's origin --
+    // a lid must descend from its lash line, not inflate about its middle.
+    //
+    // A subtle static LOWER lid rides in the same weld at each eye's foot:
+    // the brief asks for it, and it seats the eye in the face.
+    const LID_TINT = 0xeab183;   // skin a step down: the lid shades its eye
+    // CURVED SHELLS, not boxes. The first cut used flat slabs at a fixed z
+    // and the three-quarter view called it immediately: the outer edge of
+    // the far lid floated off the cheek like a visor of skin. A lid is a
+    // contact-lens slice of the face's own curvature -- a sphere cap a hair
+    // wider than the eye, its shell just proud of the eye planes, so it
+    // wraps AND occludes from every angle the portrait or the finish orbit
+    // can take.
+    const lidPivot = pivot(head, 0, EYE_PIVOT_Y + 0.0512, 0);
+    const lids = new THREE.Mesh(weld([
+      { g: new THREE.SphereGeometry(0.086, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.52),
+        c: LID_TINT, x: -0.100, y: -0.052, z: 0.185, sz: 0.70, sy: 0.68, rz: -0.10 },
+      { g: new THREE.SphereGeometry(0.086, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.52),
+        c: LID_TINT, x: 0.100, y: -0.052, z: 0.185, sz: 0.70, sy: 0.68, rz: 0.10 },
+    ]), S.flat(0xffffff, { vertexColors: true }));
+    lidPivot.add(lids);
+    const lowerLids = new THREE.Mesh(weld([
+      { g: new THREE.SphereGeometry(0.080, 14, 8, 0, Math.PI * 2, Math.PI * 0.78, Math.PI * 0.22),
+        c: LID_TINT, x: -0.100, y: EYE_PIVOT_Y + 0.010, z: 0.186, sz: 0.70, sy: 0.85 },
+      { g: new THREE.SphereGeometry(0.080, 14, 8, 0, Math.PI * 2, Math.PI * 0.78, Math.PI * 0.22),
+        c: LID_TINT, x: 0.100, y: EYE_PIVOT_Y + 0.010, z: 0.186, sz: 0.70, sy: 0.85 },
+    ]), S.flat(0xffffff, { vertexColors: true }));
+    head.add(lowerLids);
+    const LID_REST = 0.34;
+    lidPivot.scale.y = LID_REST;
+
     // The mouth is its own flat mesh rather than a weld into the eyes, and the
     // reason is expression: the eyes narrow and the mouth opens, and those are
     // two different scales on two different pivots. One draw, and it is the
@@ -10461,7 +10676,11 @@ MR.Runner = (function () {
     // NOT ride the eye's aperture scale. Narrowing an eye does not squash the
     // brow above it, and welding the two into one mesh to save a draw call
     // would have tied them together permanently.
-    const browPivot = pivot(head, 0, HY + 0.0490, 0);
+    // Raised 0.016 in the overhaul: the new upper lids reach HY+0.058 and
+    // the brows were being swallowed by the very shells built to sit under
+    // them. The brow must always clear the lid -- it is the loudest line on
+    // the face and the one the expression system leans on hardest.
+    const browPivot = pivot(head, 0, HY + 0.0600, 0);
     const brows = new THREE.Mesh(weld(browPieces()), S.flat(0xffffff, { vertexColors: true }));
     browPivot.add(brows);
     const browGeo = browRig(brows);
@@ -10491,9 +10710,19 @@ MR.Runner = (function () {
       // only in z -- 0.026 proud at the back, nothing at the sides -- so it
       // adds form the ramp can shade without touching the width the lane
       // budget is measured on.
+      // ---- PHASE 5, THE LEG AS ONE DRAWN SURFACE ------------------------
+      // Capsule plus hamstring ball becomes one lathe: full through the quad
+      // and hamstring, tapering above the knee. The widest point keeps the
+      // capsule's 0.114 so the lane-width arithmetic sees the same thigh.
       const thigh = multi([
-        { g: new THREE.CapsuleGeometry(0.114, 0.100, 6, R_LIMB), c: P.runnerSkin },
-        { g: new THREE.SphereGeometry(0.120, R_NUB, 12), c: P.runnerSkin, y: 0.052, z: -0.020, sx: 0.93, sy: 1.02 },
+        { g: lathe([
+            [0.001, 0.172],
+            [0.088, 0.128],
+            [0.114, 0.040],   // quad/hamstring belly -- the capsule's own r
+            [0.104, -0.050],
+            [0.094, -0.120],  // arriving at the knee ball still tapering
+            [0.001, -0.164],
+          ], null, { seg: R_LIMB }), c: P.runnerSkin, ry: Math.PI },
       ]);
       thigh.position.y = -0.108;
       hip.add(thigh);
@@ -10502,7 +10731,19 @@ MR.Runner = (function () {
       // Sock welded onto the shin: a pale band low on the leg makes the
       // scissor of the run cycle legible from directly behind.
       const shin = multi([
-        { g: new THREE.CapsuleGeometry(0.096, 0.050, 6, R_LIMB), c: P.runnerSkin, y: -0.076 },
+        // One surface from under the knee to the sock: calf belly high and
+        // aft-of-nothing (a lathe is symmetric -- the belly's 0.100 sits
+        // inside the old calf ball's own 0.101), tapering hard to an ankle
+        // half its width, which is the taper that makes a shin a shin.
+        { g: lathe([
+            [0.001, 0.070],
+            [0.078, 0.038],
+            [0.100, -0.048],  // the calf's belly
+            [0.082, -0.108],
+            [0.068, -0.160],  // inside the sock
+            [0.058, -0.205],
+            [0.001, -0.224],
+          ], null, { seg: R_LIMB }), c: P.runnerSkin, ry: Math.PI },
         // The joint itself, sitting exactly on the pivot. The recovery knee
         // flexes to 1.48rad and at that angle two straight capsules meeting at
         // a point open a visible notch on the outside of the bend -- the leg
@@ -10516,7 +10757,7 @@ MR.Runner = (function () {
         // under the knee and tapers to nothing at the ankle. Kept inside the
         // thigh's radius at rest so it only emerges as the knee bends, which
         // is exactly when a calf should show.
-        { g: new THREE.SphereGeometry(0.101, R_NUB, 12), c: P.runnerSkin, y: -0.055, z: -0.012, sx: 0.92, sy: 1.20, sz: 0.94 },
+        // (The calf ball is folded into the lathe's own belly above.)
         { g: new THREE.CylinderGeometry(0.110, 0.102, 0.085, R_LIMB), c: P.runnerShoe, y: -0.118 },
       ]);
       knee.add(shin);
@@ -10539,7 +10780,18 @@ MR.Runner = (function () {
       // trainer into a pebble. The extents are unchanged to the float, so the
       // outsole still owns the slide's half-width by the same 0.003 it did.
       const foot = multi([
-        { g: roundedBox(0.190, 0.110, 0.225, 0.030, R_NUB), c: P.runnerShoe, y: -0.036, z: 0.036 },
+        // The ankle opening (Phase 7): a real trainer has a padded collar the
+        // leg disappears INTO, and its absence is what made these read as
+        // white blobs the legs rested on. A short dark ring at the top rear,
+        // inside the box's own footprint (0.092 against the box's 0.095 and
+        // the stripe's 0.098), so no silhouette number moves.
+        { g: new THREE.CylinderGeometry(0.084, 0.096, 0.055, R_LIMB), c: SHOE_DK, y: 0.012, z: -0.020 },
+        // Chamfer 0.030 -> 0.040: a third of the shoe's height rounded off,
+        // which is what moves the upper from "brick with domes" toward the
+        // puffy trainer volume every reference character wears. Extents are
+        // 0.185 x 0.105 -- INSIDE the old 0.190 x 0.110 -- so the stripe and
+        // outsole below keep owning the slide silhouette untouched.
+        { g: roundedBox(0.185, 0.105, 0.230, 0.040, R_NUB), c: P.runnerShoe, y: -0.033, z: 0.038 },
         { g: new THREE.SphereGeometry(0.095, R_LIMB, 16), c: P.runnerShoe, y: -0.036, z: 0.150, sy: 0.82, sz: 0.66 },
         { g: new THREE.SphereGeometry(0.092, R_NUB, 12), c: P.runnerShoe, y: -0.026, z: -0.072, sy: 0.86, sz: 0.74 },
         // Heel counter. The best-value detail on the whole character, because
@@ -10672,13 +10924,27 @@ MR.Runner = (function () {
       // SHRINKS the figure's half-width and RAISES its lowest point, so
       // both directions are the safe side of every silhouette contract --
       // and tools/envelope.js re-measures them rather than trusting this.
+      // ---- PHASE 5, THE ARM AS ONE DRAWN SURFACE ------------------------
+      // The upper arm was a capsule with a deltoid ball and a triceps ball
+      // welded on -- three overlapping primitives whose intersection curves
+      // the ramp shaded as seams, which is the "collection of primitive
+      // shapes" the overhaul brief opens with. One lathe now carries the
+      // whole segment: full at the deltoid, tapering through the triceps to
+      // the elbow, the way an arm actually narrows. Its widest point holds
+      // the old deltoid ball's 0.092, so the abducted jump silhouette that
+      // tools/envelope.js measures sees the same arm it measured before.
       const upper = multi([
-        { g: new THREE.CapsuleGeometry(0.070, 0.082, 6, R_LIMB), c: P.runnerSkin, y: -0.112 },
-        // The deltoid, in skin, on the ARM. It emerges from under the vest's
-        // own red shoulder 0.051 lower down, which is where a singlet's
-        // shoulder seam is and where the muscle would show; and it is 0.022
-        // proud of the upper arm's capsule, which clears the 0.014 ink so the
-        // two weld cleanly rather than growing teeth.
+        { g: lathe([
+            [0.001, 0.048],   // shoulder pole, buried in the vest's cap
+            [0.070, 0.020],
+            [0.092, -0.045],  // deltoid -- the old ball's own radius
+            [0.079, -0.110],
+            [0.068, -0.175],
+            [0.060, -0.228],  // arriving at the elbow still tapering
+            [0.001, -0.250],
+          ], null, { seg: R_LIMB }), c: P.runnerSkin, ry: Math.PI },
+        // The old deltoid/triceps notes, kept for the record of the pass
+        // that placed them; the masses live in the profile above now.
         //
         // It rotates with the shoulder, which is the one thing about it that
         // had to be measured rather than reasoned: the jump abducts this joint
@@ -10687,8 +10953,6 @@ MR.Runner = (function () {
         // own shoulder through the whole cycle -- see the envelope table in the
         // report for what it did to the jump's half-width, which is the number
         // the airborne silhouette is separated by.
-        { g: new THREE.SphereGeometry(0.092, R_LIMB, 14), c: P.runnerSkin, y: -0.052, sy: 0.86, sz: 0.92 },
-        { g: new THREE.SphereGeometry(0.070, R_NUB, 12), c: P.runnerSkin, y: -0.100, z: -0.014, sx: 0.90, sy: 1.15 },
       ]);
       shoulder.add(upper);
 
@@ -10706,7 +10970,20 @@ MR.Runner = (function () {
       // against a 0.57 head, near the ratio Sonic's gloves run at, and it is
       // what makes both the arm swing and the spread jump pose land.
       const fore = multi([
-        { g: new THREE.CapsuleGeometry(0.062, 0.078, 6, R_LIMB), c: P.runnerSkin, y: -0.094 },
+        // The same one-surface argument as the upper arm: capsule plus a
+        // welded belly ball read as two objects; a lathe that is thickest
+        // just under the elbow and tapers to the wrist reads as a forearm.
+        // 0.074 at the belly against the old ball's ellipsoid 0.067 in x --
+        // radial symmetry costs 0.007 of x there, bought back from a z that
+        // was already 0.078. The wrist dies into the band at -0.138.
+        { g: lathe([
+            [0.001, 0.052],
+            [0.066, 0.015],
+            [0.074, -0.045],  // the forearm's belly
+            [0.064, -0.100],
+            [0.054, -0.138],  // the wrist, inside the band
+            [0.001, -0.158],
+          ], null, { seg: R_LIMB }), c: P.runnerSkin, ry: Math.PI },
         // Elbow, on the pivot, for the reason the knee has one: the flexion
         // reaches 1.78rad at the front of the swing and two capsules meeting
         // at a point open a notch there. This one shows more than the knee
@@ -10725,7 +11002,9 @@ MR.Runner = (function () {
         // triceps'. Arm swing is almost entirely along the camera axis from
         // astern, so relief in z is what the ramp can shade; width in x is
         // what the jump's silhouette is measured on and it is not spent here.
-        { g: new THREE.SphereGeometry(0.078, R_NUB, 12), c: P.runnerSkin, y: -0.064, sx: 0.86, sy: 1.05 },
+        // (The forearm-belly ball this note argued for is folded into the
+        // lathe profile above -- the argument survives, the extra outline
+        // does not.)
         // The wristband, and it is 0.098 where it used to be 0.088. That is a
         // repair, not a flourish: the mitt's old wrist ball was r=0.094 and
         // spanned the band's whole height, so the third of TRIM's three hits on
@@ -10845,6 +11124,16 @@ MR.Runner = (function () {
         { g: new THREE.SphereGeometry(0.034, R_NUB, 12), c: MITT_DK, x: -0.042, y: -0.264, z: -0.048 },
         { g: new THREE.SphereGeometry(0.037, R_NUB, 12), c: MITT_DK, x: 0.000, y: -0.265, z: -0.048 },
         { g: new THREE.SphereGeometry(0.033, R_NUB, 12), c: MITT_DK, x: 0.042, y: -0.263, z: -0.048 },
+        // ---- the curled finger mass (Phase 6) ----------------------------
+        // The knuckle row above serves the chase camera; this serves the
+        // portrait and the finish orbit, which look at the FRONT of the hand
+        // and found a featureless ellipsoid there. One flattened lobe under
+        // the palm's leading edge -- the mass of four curled fingers, not
+        // four fingers -- in the hand's own skin so it reads as form, not
+        // trim. Its lowest point is -0.294 against the mitt's own -0.295,
+        // so the hand's reach (the jump silhouette's term) is untouched.
+        { g: new THREE.SphereGeometry(0.052, R_NUB, 12), c: MITT,
+          y: -0.262, z: 0.030, sx: 1.30, sy: 0.62, sz: 0.80 },
         // ---- the thumb ---------------------------------------------------
         //
         // The brief this pass was written against says the hands are mittens
@@ -13124,12 +13413,17 @@ MR.Runner = (function () {
       const eyeShut = Math.min(0.94, mix(mix(POLISH * (0.16 * effort + 0.34 * wince),
         0, standF),
         POLISH * mix(0.52, 0.02, celJoy), celF) + POLISH * 0.94 * blink);
-      eyePivot.scale.y = 1 - eyeShut;
+      // The LID carries the closure now (phase 2 of the overhaul): from a
+      // third-covered rest to fully drawn at eyeShut 1. The eyeball keeps a
+      // quarter of the old squash as a squint, so effort still narrows the
+      // eye underneath the descending lid instead of the two fighting.
+      lidPivot.scale.y = LID_REST + (2.05 - LID_REST) * eyeShut;
+      eyePivot.scale.y = 1 - eyeShut * 0.25;
       // EYE_SEMI is the sclera's own half-height. Translating by half of what
       // the scale takes away holds the TOP edge on the float and spends the
       // whole closure on the bottom one. At POLISH 0 eyeShut is identically
       // zero, so the scale is 1 and the offset is 0 -- the A/B is untouched.
-      eyePivot.position.y = EYE_PIVOT_Y + EYE_SEMI * eyeShut;
+      eyePivot.position.y = EYE_PIVOT_Y + EYE_SEMI * eyeShut * 0.25;
       eyePivot.scale.x = 1 - POLISH * 0.06 * wince;
 
       // ---- THE GAZE, and it only exists in the portrait -------------------

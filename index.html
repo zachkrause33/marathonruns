@@ -1577,6 +1577,27 @@ html, body {
   #railRoute { display: none; }
 }
 
+/* ---- MILES'S LINE (docs/miles.md) ----------------------------------------
+   One quoted sentence a day, set small under the headline so the city stays
+   the masthead and the voice reads as a voice -- italic against a page of
+   caps, the one place the game breaks its own typography on purpose. */
+#milesLine, #milesEnd {
+  font-style: italic;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: rgba(255, 253, 245, 0.78);
+  margin: 7px 0 2px;
+}
+#milesLine.hidden { display: none; }
+#milesLine .who, #milesEnd .who {
+  font-style: normal;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  opacity: 0.55;
+  margin-left: 8px;
+}
+#milesEnd { margin: 6px 0 0; }
+
 </style>
 </head>
 <body>
@@ -10052,6 +10073,14 @@ MR.Runner = (function () {
     // this rig has one other free-running clock (the bib) and it is free
     // running precisely because nothing ever has to reproduce it.
     let standT = 0;
+    // THE PORTRAIT. 0 facing the road, 1 facing the lens. The owner's brief
+    // (docs/miles.md): before the race, the camera should be looking at
+    // Miles, not at UI with his back in it. main.js sets the target; this
+    // file owns the motion, because a turn is a movement and not a state --
+    // he TURNS to face the road when the run begins, and the turn itself is
+    // the transition. Eased over about half a second, which is a person
+    // turning around, not a door swinging.
+    let faceT = 0;
 
     // ---- head -----------------------------------------------------------
     // The neck pivot sits at the top of the trunk so head tilt rotates from
@@ -10794,6 +10823,22 @@ MR.Runner = (function () {
         // is measured from the spine and inboard is toward it.
         { g: new THREE.CapsuleGeometry(0.041, 0.048, 4, 12), c: MITT,
           x: -side * 0.085, y: -0.230, z: -0.040, rx: 0.30, rz: side * 0.62 },
+        // ---- THE WATCH, and only on one wrist -----------------------------
+        // His signature prop (docs/miles.md): a runner whose whole life is
+        // one number wears the number on his arm. It rides the wristband the
+        // silhouette already owns -- a dark case proud of the band's outboard
+        // face with a pale dial on it -- so from gameplay distance it is a
+        // fleck on the band and from the portrait and the finish orbit it is
+        // unmistakably a watch. Case and dial are solid cylinders, built on
+        // all sides like everything else; welded into this same mesh, so the
+        // whole prop costs zero draw calls. One wrist only, because a band on
+        // each arm is trim and a watch on one is character.
+        ...(side === -1 ? [
+          { g: new THREE.CylinderGeometry(0.036, 0.036, 0.020, 12), c: 0x1a2038,
+            x: side * 0.106, y: -0.180, rz: Math.PI / 2 },
+          { g: new THREE.CylinderGeometry(0.027, 0.027, 0.007, 12), c: 0xdff2ea,
+            x: side * 0.116, y: -0.180, rz: Math.PI / 2 },
+        ] : []),
       ]);
       elbow.add(fore);
 
@@ -11313,6 +11358,14 @@ MR.Runner = (function () {
       // forward pitch) do not collapse into the same animation.
       const trip = st.trip || 0;
       const knock = st.bounce || 0;
+      // The portrait turn. Rate-limited rather than filtered so the turn
+      // takes the same half second whether the frame rate is 7 or 120.
+      {
+        const want = st.face01 || 0;
+        const step = dt * 2.2;
+        faceT += Math.max(-step, Math.min(step, want - faceT));
+      }
+      const faceE = faceT * faceT * (3 - 2 * faceT);
       // The road's grade at the runner, -1..1 against the steepest legal one.
       // It is the ONLY thing hills hand this file: the stride slows on the
       // climb and quickens on the descent for nothing, because cadence already
@@ -12091,7 +12144,11 @@ MR.Runner = (function () {
       root.rotation.z = -lean * 0.13 - knock * 0.16 - slid * 0.12;
       // Go in at an angle. See SLIDE_YAW -- this is the term that gives the
       // back view something lateral to measure.
-      root.rotation.y = slid * SLIDE_YAW;
+      // ...and the portrait turn rides the same axis. During any race state
+      // faceE is identically zero (main.js only raises it on the start
+      // panel), so every silhouette contract -- footroom, deckdrop, the
+      // envelope sheet -- measures the exact figure it always measured.
+      root.rotation.y = slid * SLIDE_YAW + Math.PI * faceE;
 
       // ---- THE START LINE: A POSE, NOT AN ABSENCE OF ONE --------------------
       //
@@ -12213,7 +12270,14 @@ MR.Runner = (function () {
         to(hips, 'y', 0, stand);
         to(chest, 'y', 0, stand);
         to(spine, 'x', 0.10, stand);
-        to(root, 'y', 0, stand);
+        // Square to his FACING, not to the road. This line used to level the
+        // yaw to zero -- correct when the only thing that ever yawed the root
+        // was a slide -- and it silently erased the portrait turn every frame:
+        // the write survived exactly one Euler callback before this lerp took
+        // it back (caught by tapping rotation._onChangeCallback: the writes
+        // inside one update read 0, pi, 0, 0). A man composed at the line is
+        // square to WHEREVER he is facing, and in the portrait that is you.
+        to(root, 'y', Math.PI * faceE, stand);
         to(root, 'z', 0, stand);
         hips.rotation.z += (sway * 0.014 - hips.rotation.z) * stand;
         chest.rotation.z += (-sway * 0.008 - chest.rotation.z) * stand;
@@ -12240,6 +12304,69 @@ MR.Runner = (function () {
         to(neck, 'x', -0.05, stand);
         to(neck, 'y', 0, stand);
         to(neck, 'z', 0, stand);
+        // (The ritual sits BELOW the head-level lerp above, and the order is
+        // load-bearing: those three to() calls are the stand block's last
+        // word on the neck, and the first placement of this block sat above
+        // them -- every head beat was written and then levelled away in the
+        // same frame, the same one-frame-erase the portrait turn hit against
+        // to(root). Anything added to this pose from here on goes AFTER the
+        // block's own levellers or it does not exist.)
+        // ---- THE RITUAL (docs/miles.md) ----------------------------------
+        //
+        // The owner named it before this file did: a world-class runner does
+        // the same things at every start line, and the sameness IS the
+        // character. Three beats across the three-second countdown, applied
+        // on top of the composed stance and inert everywhere else --
+        // ritual01 is nonzero only in the COUNT state, by construction in
+        // main.js.
+        //
+        //   1. THE BOW. He looks down at the laces: a decisive fold at the
+        //      spine with the arms reaching, held a beat, released. A full
+        //      crouch was tried on paper and rejected -- at this figure's
+        //      proportions a deep knee bend under a fixed camera reads as
+        //      sitting, and the read the beat needs is only "he checked".
+        //   2. THE SHAKE. Up out of the bow, hands loose at the sides, a
+        //      fast small flutter through the elbows. The one beat that is
+        //      motion rather than pose, which is why it sits in the middle.
+        //   3. THE WATCH. The left forearm comes up across the chest and the
+        //      head drops to it. His signature beat, on his signature prop,
+        //      and the last thing he does before the gun -- then it releases
+        //      into the stance and the race owns him.
+        //
+        // Each beat is a smooth triangular window; between them he passes
+        // through the plain stance, so the ritual reads as three deliberate
+        // acts rather than one continuous squirm.
+        const rit = st.ritual01 || 0;
+        if (rit > 0 && stand > 0.3) {
+          const win = function (a, b) {
+            if (rit <= a || rit >= b) return 0;
+            const t = (rit - a) / (b - a);
+            return Math.sin(t * Math.PI);
+          };
+          const w1 = win(0.04, 0.34);
+          const w2 = win(0.40, 0.62);
+          const w3 = win(0.68, 0.94);
+          const rw = stand;
+
+          // 1. the bow
+          spine.rotation.x += 0.52 * w1 * rw;
+          neck.rotation.x += 0.42 * w1 * rw;
+          // 2. the shake, through both elbows
+          const flut = Math.sin(standT * 34) * 0.14 * w2 * rw;
+          // 3. the watch, left arm only (side -1 -- the wrist the dial is on)
+          for (const A of arms) {
+            A.shoulder.rotation.x += -0.30 * w1 * rw + flut * 0.3;
+            A.elbow.rotation.x += -0.20 * w2 * rw + flut;
+            if (A.side === -1) {
+              A.shoulder.rotation.x += -0.52 * w3 * rw;
+              A.shoulder.rotation.z += A.side * -0.30 * w3 * rw;
+              A.elbow.rotation.x += -1.30 * w3 * rw;
+            }
+          }
+          neck.rotation.x += 0.34 * w3 * rw;
+          neck.rotation.y += 0.22 * w3 * rw;
+        }
+
       }
 
       // ---- THE FINISH: THE FIRST POSE ON THIS RIG BUILT TO BE SEEN FROM THE
@@ -12392,6 +12519,23 @@ MR.Runner = (function () {
         const armX = mix(0.15, -0.25, joy);
         const armZ = mix(1.15, 2.36, joy);
         const armE = mix(-0.75, -0.25, joy);
+        // ---- THE NEAR MISS (docs/miles.md) --------------------------------
+        //
+        // Fifteen seconds or less the wrong side of the record. Not a point
+        // on the joy axis: a different gesture entirely, and the one piece of
+        // acting in this game transcribed from life -- the owner ran a
+        // near-perfect race, hit one obstacle, and missed by one second.
+        //
+        // Two beats on the same celebration clock the pose already runs on:
+        // HANDS ON HEAD through the camera's swing to the front (both arms up
+        // and folded, mitts at the cap), then, as the shot settles, the left
+        // arm comes down to THE WATCH and the head follows it -- the same
+        // wrist, the same beat as the start-line ritual, because the question
+        // he asks it is the same one. The right arm drops. He holds there
+        // through the card: a man reading a number he already knows.
+        const agony = Math.max(0, Math.min(1, st.agony || 0));
+        const agHead = agony * celRamp(celT, 0.55, 0.90) * (1 - celRamp(celT, 2.30, 0.90));
+        const agWatch = agony * celRamp(celT, 2.45, 1.10);
         for (let i = 0; i < arms.length; i++) {
           const A = arms[i];
           // Standing: hanging, slightly bent, held a hair off the ribs.
@@ -12417,6 +12561,38 @@ MR.Runner = (function () {
           to(A.shoulder, 'y', -A.side * 0.30, settle);
           to(A.shoulder, 'z', A.side * (0.30 + 0.10 * (1 - joy)), settle);
           to(A.elbow, 'x', -1.62, settle);
+
+          // The near-miss gestures override whatever the joy pose chose,
+          // applied last inside the loop for the reason every late writer in
+          // this file now carries a note: a pose written before a to() with a
+          // live weight is a pose that was never on screen.
+          if (agHead > 0) {
+            // hands to the head: arms folded up, mitts at the cap sides
+            to(A.shoulder, 'x', -0.55, agHead);
+            to(A.shoulder, 'z', A.side * 2.05, agHead);
+            to(A.elbow, 'x', -2.30, agHead);
+          }
+          if (agWatch > 0) {
+            if (A.side === -1) {
+              // the left wrist rises to be read -- the ritual's beat, slower
+              to(A.shoulder, 'x', -0.42, agWatch);
+              to(A.shoulder, 'z', A.side * 0.42, agWatch);
+              to(A.elbow, 'x', -1.55, agWatch);
+            } else {
+              // the right arm just drops: all the attention is on the dial
+              to(A.shoulder, 'x', 0.10, agWatch);
+              to(A.shoulder, 'z', A.side * 0.20, agWatch);
+              to(A.elbow, 'x', -0.30, agWatch);
+            }
+          }
+        }
+        // ...and the head follows the beats: buried in the hands, then bowed
+        // to the watch. Applied to the neck AFTER the loop so both arms are
+        // already where the head believes them to be.
+        if (agony > 0) {
+          neck.rotation.x += 0.16 * agHead + 0.52 * agWatch;
+          neck.rotation.y += 0.20 * agWatch;
+          spine.rotation.x += 0.10 * agHead + 0.16 * agWatch;
         }
 
         // ---- trunk -------------------------------------------------------
@@ -12900,6 +13076,44 @@ MR.Runner = (function () {
       // zero, so the scale is 1 and the offset is 0 -- the A/B is untouched.
       eyePivot.position.y = EYE_PIVOT_Y + EYE_SEMI * eyeShut;
       eyePivot.scale.x = 1 - POLISH * 0.06 * wince;
+
+      // ---- THE GAZE, and it only exists in the portrait -------------------
+      //
+      // Facing the lens, a character whose eyes never move is a statue. The
+      // Talking Tom lesson from the owner's references is that idle time is
+      // where a character lives, and the highest-value motion an idle face
+      // has is attention: mostly on you, sometimes elsewhere, back to you.
+      //
+      // The pattern is a loop on the standing clock, not randomness: every
+      // 6.5 seconds he spends about 1.4 of them glancing aside -- alternating
+      // sides, road-ward, the direction his day is -- and the rest looking
+      // into the camera. The eyes lead and the neck follows at a fifth of the
+      // amplitude, which is how a real glance works; a head that swings as
+      // far as the eyes reads as looking AT something and he is not, he is
+      // thinking.
+      //
+      // Amplitude is bounded by the eye's own geometry: the sclera is 0.064
+      // across and the iris 0.048, so 0.011 of lateral travel keeps the iris
+      // inside the opening at full glance. The whole block is gated on faceE
+      // and POLISH, so during every race state and in the A/B build it is
+      // arithmetic times zero.
+      {
+        const g = POLISH * faceE;
+        const beat = standT % 6.5;
+        const aside = beat > 4.6 && beat < 6.0
+          ? Math.sin(((beat - 4.6) / 1.4) * Math.PI) : 0;
+        const dir = (Math.floor(standT / 6.5) % 2) * 2 - 1;
+        // A live gaze also drifts: a few thousandths of wander at two slow
+        // incommensurate rates, so the stare at the lens never fixes.
+        const wander = Math.sin(standT * 0.9) * 0.0035
+          + Math.sin(standT * 0.53 + 1.7) * 0.0025;
+        eyePivot.position.x = g * (dir * aside * 0.011 + wander);
+        neck.rotation.y += g * (dir * aside * 0.10 + wander * 6);
+        // The lens sits above his eye line (the chase camera's eye is at 3.1
+        // against his 1.1), so meeting it means looking slightly UP -- two
+        // degrees of neck, removed during the glance aside.
+        neck.rotation.x += g * (1 - aside) * -0.045;
+      }
       // The mouth opens downward about the upper lip. 0.62 at rest to 1.55 at
       // full effort, which on an aperture 0.046 tall is 0.029 to 0.071 -- four
       // to nine pixels at the face lens and a shape change rather than a size
@@ -34446,6 +34660,7 @@ MR.Camera = (function () {
      * @param dt  real seconds
      * @param p   { z, x, y, speed, lean, duck01 }
      */
+    const _port = new THREE.Vector3();
     s.update = function (dt, p) {
       // A long frame must not be allowed to detonate the springs -- and the
       // first frame can arrive with a *negative* dt, because the rAF timestamp
@@ -34618,6 +34833,25 @@ MR.Camera = (function () {
       // way through the move. One clock, unclamped, shared with the pose in
       // runner.js -- see the note over celClock in main.js.
       s.cel = p.celT || 0;
+      // ---- THE PORTRAIT (docs/miles.md) -----------------------------------
+      // While the game is an attract screen the runner has turned to face the
+      // lens, and the lens meets him: lower, closer, and slightly off-axis so
+      // it is a portrait rather than a mugshot. One eased weight; when the
+      // run begins main drops the flag, he turns away, and this camera pulls
+      // back up into the chase while he does -- the two motions together are
+      // the walk-on, and neither file needs to know about the other's half.
+      // Slightly slower than his turn (1.6 against 2.2), because a lens that
+      // trails its subject reads as following him and one that leads reads as
+      // already knowing the choreography.
+      {
+        const wantF = p.face01 || 0;
+        if (first) s.face = wantF;
+        else {
+          const stepF = d * 1.6;
+          s.face += Math.max(-stepF, Math.min(stepF, wantF - s.face));
+        }
+      }
+      const fw = s.face * s.face * (3 - 2 * s.face);
       // The celebration weight. Zero for the whole race and for the first
       // CEL_HOLD seconds after the tape, so the break, the confetti and the
       // wide astern shot all play exactly as they did before this pass.
@@ -34869,6 +35103,21 @@ MR.Camera = (function () {
           look.z + (pz - look.z) * rw
         );
       }
+      // The portrait pose, blended in last so it wins over every race term
+      // while fw is high and costs identically nothing at fw = 0. Constants
+      // borrow the celebration's grammar (its hero shot is the one framing in
+      // this file already proven on his face) but sit closer and lower: the
+      // attract screen is a character select, not a finish line.
+      if (fw > 0.001) {
+        const gy0 = elev.at(p.z) + s.dk;
+        // 2.95 and an aim at 1.03: the first cut sat at 2.55/0.97 and cropped
+        // his crown against the panel with his shoes off the bottom -- a
+        // portrait wants the whole figure and a little air over the cap.
+        _port.set((p.x || 0) + 0.30, 1.12 + gy0, p.z - 2.95);
+        cam.position.lerp(_port, fw);
+        _port.set(p.x || 0, 1.03 + gy0, p.z);
+        look.lerp(_port, fw);
+      }
       cam.lookAt(look);
 
       // Roll: the lean term is the body, the camera's own lateral velocity is
@@ -34916,7 +35165,11 @@ MR.Camera = (function () {
       // 34-degree narrowing through it would smear the push-in over half the
       // shot. cw is already smootherstep-shaped, so this needs no filter of
       // its own, and at cw = 0 the output is s.fov exactly.
-      const fovOut = s.fov + (CEL_FOV - s.fov) * cw;
+      let fovOut = s.fov + (CEL_FOV - s.fov) * cw;
+      // The portrait lens rides the same crossfade rule as the celebration's
+      // and for the same reason: fw is already eased, and folding a parked
+      // 44-degree frame through the stateful filter would smear the walk-on.
+      fovOut = fovOut + (44 - fovOut) * fw;
       if (Math.abs(cam.fov - fovOut) > 0.01) {
         cam.fov = fovOut;
         cam.updateProjectionMatrix();
@@ -37409,6 +37662,14 @@ MR.HUD = (function () {
         <div class="date" id="startDate"></div>
         <h1 id="startTitle">MARATHON MILES</h1>
         <div class="route" id="startRoute"></div>
+        <!--
+          MILES SPEAKS, once a day (docs/miles.md). One terse line in the
+          masthead voice, chosen by the day's city -- the tater-tot lesson
+          from the owner's references: a single spoken line to the camera
+          builds more character than any mesh. Attributed, because the name
+          is new and the line is how the player learns whose name it is.
+        -->
+        <div id="milesLine"></div>
 
         <div class="blurb">
           Three lanes. Jump or slide past everything in the way.
@@ -37623,6 +37884,7 @@ MR.HUD = (function () {
 
         <div id="tierRow">
           <span id="verdict"></span>
+          <div id="milesEnd"></div>
           <span id="tierNext" class="num"></span>
         </div>
 
@@ -37776,6 +38038,7 @@ MR.HUD = (function () {
       endPanel: q('endPanel'), endTime: q('endTime'), endDate: q('endDate'),
       endVs: q('endVs'),
       verdict: q('verdict'), tierNext: q('tierNext'),
+      milesLine: q('milesLine'), milesEnd: q('milesEnd'),
       endBadges: q('endBadges'), endMem: q('endMem'),
       endTurn: q('endTurn'), tomorrow: q('tomorrow'), tomorrowRoute: q('tomorrowRoute'),
       shareBox: q('shareBox'), shareLegs: q('shareLegs'), shareLine: q('shareLine'),
@@ -38034,6 +38297,43 @@ MR.HUD = (function () {
       syncPanels();
       requestAnimationFrame(markScroll);
     };
+    // ---- MILES'S LINES (docs/miles.md) ----------------------------------
+    // One a day before the gun, one at the tape. City lines are authored per
+    // SETTINGS tag rather than derived from the hints, because a voice is
+    // written and a hint is a contract with the renderer -- different jobs.
+    // Register: terse, no exclamation marks, a professional talking to
+    // himself. The result line at the tape is picked by what the run WAS:
+    // the record, a near miss inside fifteen seconds (his watch-check beat,
+    // in words), or a day the road won.
+    const MILES_CITY = {
+      BOSTON: 'RIGHT ON HEREFORD. LEFT ON BOYLSTON.',
+      LONDON: 'OVER THE THAMES. HOLD THE LINE.',
+      BERLIN: 'FLAT AND FAST. NO EXCUSES.',
+      CHICAGO: 'UNDER THE L. KEEP IT CLEAN.',
+      NEWYORK: 'THE VERRAZZANO FIRST. THEN WE TALK.',
+      TOKYO: 'THE MOAT, THEN THE NEON. FAST ROAD.',
+      SYDNEY: 'THE HARBOUR WIND IS REAL.',
+      PARIS: 'COBBLES LIE. STAY WIDE.',
+      VALENCIA: 'WHITE STONE. QUICK GROUND.',
+      AMSTERDAM: 'CANALS ON BOTH SIDES. PICK A LANE.',
+      ROME: 'OLD ROADS KNOW EVERYTHING.',
+      CAPETOWN: 'THE MOUNTAIN WATCHES. RUN.',
+    };
+    api.milesSpeaks = function (tag) {
+      const line = MILES_CITY[tag];
+      n.milesLine.innerHTML = line
+        ? '&ldquo;' + line + '&rdquo;<span class="who">&mdash; MILES</span>' : '';
+      n.milesLine.classList.toggle('hidden', !line);
+    };
+    api.milesFinish = function (finishTime) {
+      const over = finishTime - K.RECORD_SECONDS;
+      const line = over <= 0 ? 'THAT&rsquo;S THE ONE.'
+        : over <= 15 ? (over <= 1.5 ? 'ONE SECOND. TOMORROW.'
+          : Math.ceil(over) + ' SECONDS. TOMORROW.')
+        : 'THE ROAD WON TODAY.';
+      n.milesEnd.innerHTML = '&ldquo;' + line + '&rdquo;<span class="who">&mdash; MILES</span>';
+    };
+
     n.histBtn.addEventListener('click', function () { openHist(n.startPanel); });
     n.endHistBtn.addEventListener('click', function () { openHist(n.endPanel); });
     n.histBack.addEventListener('click', function () {
@@ -38539,6 +38839,7 @@ MR.HUD = (function () {
         ? set.map(function (x) { return x.name; }).join(' → ')
         : '';
       drawRoute(set);
+      api.milesSpeaks(set && set.length ? set[0].tag : null);
       // The route and the gate count arrive after the panel is first laid out
       // and both add height, so the overflow test has to run again here or it
       // measures a panel shorter than the one on screen.
@@ -39050,6 +39351,7 @@ MR.HUD = (function () {
       // ---- the grade -----------------------------------------------------
       n.verdict.textContent = rung.name;
       n.verdict.className = 'tier t' + rung.i;
+      api.milesFinish(p.finishTime);
       // Nothing above RECORD, so nothing to chase and nothing to print. This
       // slot used to say RECORD BEATEN BY 1:37 directly beneath an endVs
       // reading -1:37 VS 1:59:30, beside a chip reading RECORD: the same
@@ -39526,6 +39828,7 @@ MR.unbail = function () {
   // squeezed shut and a mouth gasping. Which is also a celebration -- it is
   // what the last third of a real finish line looks like.
   let finishJoy = 0;
+  let finishAgony = 0;
   // WHERE the contacts happened, not just how many. `pace` counts hits and
   // that is all the readout needs while running, but the finish card asks a
   // question a count cannot answer -- which city did this run go wrong in --
@@ -39636,6 +39939,7 @@ MR.unbail = function () {
     aidNagged = false;
     tankToldOf = false;
     finishJoy = 0;
+    finishAgony = 0;
     celClock = 0;
     hitAt = [];
     guardAt = [];
@@ -39653,12 +39957,19 @@ MR.unbail = function () {
     world.update(0);
   }
 
+  // THE PORTRAIT FLAG. 1 while the game is an attract screen -- Miles faces
+  // the player, per docs/miles.md -- and 0 from the moment a run begins, at
+  // which point runner.js turns him to face the road. The turn is the
+  // transition; nothing else announces the change.
+  let facing = 1;
+
   function begin() {
     // Today is won and closed. Every path that starts a run funnels through
     // here -- the start button, RUN IT AGAIN, RESTART THIS RUN -- so this is
     // the one door the lockout has to hold. It routes back to the start
     // panel, which is showing the completed state rather than a button.
     if (locked) { hud.hideEnd(); hud.showStart(true); return; }
+    facing = 0;
     reset();
     audio.unlock();
     hud.showStart(false);
@@ -40454,6 +40765,8 @@ MR.unbail = function () {
         // of a second before the line.
         const rung = MR.Tier.of(pace.finishTime);
         const rungs = MR.Tier.LADDER.length - 1;
+        const overRec = pace.finishTime - K.RECORD_SECONDS;
+        finishAgony = overRec > 0 && overRec <= 15 ? 1 : 0;
         finishJoy = JOY_FORCED ? Math.max(0, Math.min(1, JOY))
           : pace.finishTime <= K.RECORD_SECONDS ? 1 : Math.max(
           saved && saved.allTimeBest && !saved.firstEver ? 0.85 : 0,
@@ -40543,6 +40856,7 @@ MR.unbail = function () {
       // lets runner.js apply the standing pose as an override after the cycle
       // has posed rather than threading a ninth state through forty joints.
       stand: stand01,
+      face01: facing,
       grade,
       air01: player.airborne ? Math.sin(Math.min(1, player.airT) * Math.PI) : 0,
       duck01: player.duck01,
@@ -40555,6 +40869,15 @@ MR.unbail = function () {
       // runs on, and tools/envelope.js holds the eight play silhouettes to it.
       celT: celT,
       joy: finishJoy,
+      // The near miss, for the acting the owner lived through before it was
+      // designed: within fifteen seconds of the record and not under it.
+      // Zero everywhere else, including on a record run -- agony and joy are
+      // mutually exclusive by construction.
+      agony: finishAgony,
+      // The countdown, 0..1 across the three seconds, for the start-line
+      // ritual (docs/miles.md). Zero everywhere else, so the ritual is
+      // provably inert in every other state.
+      ritual01: state === COUNT ? Math.min(1, countT / 3) : 0,
       // Which side the camera will be on when it arrives. Read from camera.js
       // rather than recomputed, so the head cannot turn away from the lens.
       celSide: MR.Camera.celSideFor(player.x),
@@ -40591,6 +40914,7 @@ MR.unbail = function () {
       // whole race, so every celebration term in camera.js is inert until the
       // tape and the shipped chase framing is untouched by construction.
       celT: celT,
+      face01: facing,
     });
 
     // After the camera, never before: the ghost's tag is placed against this

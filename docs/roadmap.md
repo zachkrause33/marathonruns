@@ -8011,3 +8011,34 @@ someone is speaking.
     updating in attract" check read api.phase, concluded update never ran,
     and was wrong -- phase advances with speed, and a standing man has none.
     The wrapper tap that replaced it showed update running all along.
+
+### 83a · The anatomy pass: "He still does not look like a human"
+
+The owner's verdict on the first portrait, and the diagnosis it forced: the
+figure had NO NOSE and NO EARS, eyes lost on the head's acreage, a dowel
+neck, a resting mouth open like a gawp, arms as bead-columns hanging past
+the shorts, and blue glove-balls for hands. Four rounds, each judged by the
+portrait lens rather than by taste:
+
+1. Nose, ears, thicker neck, mouth toward closed, hands to skin -- the
+   glove-blue was a measured chase-view decision (roadmap's own note: the
+   gloves flash against the road) and the portrait outranks it; the flash
+   duty moved to the trim wristbands.
+2. The arms: every radius down ~18%, the elbow up 0.026, wrists to the hip
+   line. Slimming only shrinks half-width and raises the lowest point, both
+   the safe side of every contract -- and envelope, footroom and deckdrop
+   re-measured it rather than trusting the argument. All passed unchanged.
+3. The round-one hand VANISHED against the thigh behind it -- same skin,
+   same light, arm and leg fused into one column that read more balloon-man
+   than the blue ever did. Hands went a second step deeper and the stance
+   carries them 0.07 wider, and the silhouette got daylight between arm and
+   leg, which is most of what makes two limbs read as two limbs.
+4. The features grew: eyes +18% (with EYE_SEMI following, because a blink
+   constant that lags its own sclera pins the wrong edge), the nose with
+   them, the mouth wider and nearly shut, the chin slab receded, the neck
+   trimmed again.
+
+What this pass does not claim: the figure is spheres and capsules with a
+chase-camera heritage, and it will not become Jake. The target is the
+references' actual property -- charming, specific, alive -- and the owner's
+eye remains the acceptance test.

@@ -218,10 +218,27 @@ MR.Skin = (function () {
       return top;
     }
     for (const v of seedQ) hpush(0, v);
+    // Edge cost, with CONTACT-ZONE penalties. The sculpt's arms touch its
+    // flanks and its thighs touch each other, and the shrink pipeline's
+    // weld fused those contacts -- so the edge graph has bridges where the
+    // bodies merely lean together, and the geodesic flood leaks a strip of
+    // ribs onto the forearm through them. An edge whose midpoint lies in a
+    // contact shadow costs 8x, which keeps the flood on the limb it
+    // started on without forbidding anything outright.
+    const _pen = function (x, y, z) {
+      // arm-against-flank band, both sides
+      if (Math.abs(x) > 0.125 && Math.abs(x) < 0.20 && y > 0.52 && y < 1.06
+        && Math.abs(z) < 0.13) return 8;
+      // thigh-against-thigh, the inner crotch line
+      if (Math.abs(x) < 0.055 && y > 0.42 && y < 0.68) return 8;
+      return 1;
+    };
     const _dx = function (a, b) {
       const x = pos.getX(a) - pos.getX(b), y = pos.getY(a) - pos.getY(b),
         z = pos.getZ(a) - pos.getZ(b);
-      return Math.sqrt(x * x + y * y + z * z);
+      const mx = (pos.getX(a) + pos.getX(b)) / 2, my = (pos.getY(a) + pos.getY(b)) / 2,
+        mz = (pos.getZ(a) + pos.getZ(b)) / 2;
+      return Math.sqrt(x * x + y * y + z * z) * _pen(mx, my, mz);
     };
     while (hp.length) {
       const top = hpop();

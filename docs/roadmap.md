@@ -8198,3 +8198,21 @@ not, and each fix carries its lesson:
 - THE GHOST WEARS THE COSTUME. An onSkinned hook lets the ghost dress
   the async-arriving mesh in its cool glass; its create-time traverse
   had run long before any model existed.
+
+### 85c · The membrane: measured, then cut
+
+The jump webbing outlived four theories, and the instrument that ended
+it was edge-stretch measurement in the posed mesh (boneTransform per
+vertex, ratio of posed to rest edge length): the worst-stretched
+vertices were co-owned by the HAND bones and the THIGH-TWIST bones --
+the fists hang touching the thighs at rest and the auto-weights
+blended what touched -- at 29-64% of body height, BELOW the armpit
+band the first surgery treated. Three layers now hold: the shoulder
+cap applies through capQ to every chain containing the shoulder (the
+per-pair version capped the upper arm while the forearm inherited the
+rotation uncapped, and the membrane simply moved to the elbows); the
+mixed-ownership snap runs 22-80% of height; and what no weight can fix
+-- triangles physically fused fist-to-thigh by the sculpt and the
+shrink weld -- is cut (78 bridge triangles; the holes face each other
+inside the hand/hip contact shadow). The measurement, not any of the
+four theories, found the fix.

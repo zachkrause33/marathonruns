@@ -97,7 +97,20 @@ available today -- the one-moving-part rule per variant could be
 loosened deliberately. Motion that MOVES the kill box -- across lanes
 or along the road -- is a real project: time-dependent collision, a
 telegraph that shows where the hazard WILL be, a solver that models
-timing, and new instruments to prove fairness. If built, build ONE
-archetype first: a lane-sweeper crossing on a fixed deterministic
-schedule, telegraphed on the road like the tempo mats. Oncoming
-traffic ranks second; it strains the closed-course fiction.
+timing, and new instruments to prove fairness.
+
+THE LANE-SWEEPER IS BUILT (2026-09-02, owner: "I think the game needs
+to be harder so if the motion is possible I say lets do it"). It ships
+WITHOUT moving the kill box, which is what made it a day's work instead
+of the project above: the kill lane is ordinary course data and only
+the APPROACH animates -- the vehicle parks in an adjacent clear lane
+and drives into its own lane, locked there from twice READ_NEAR out.
+See markSweeps in course.js for the fairness argument and the
+eligibility census; ~3 a course past mile 6, always wearing a vehicle
+sculpt (bus, taxi, van, refuse truck, moped, hatchback, police).
+Tunables if the owner wants it harder still: SWEEP_RATE (0.40),
+SWEEP_LOCK (2x READ_NEAR -- the floor is 1x, where the crossing
+resolves exactly at the commit point), and the mile-6 opening gate.
+Oncoming traffic ranks second; it strains the closed-course fiction,
+and anything that genuinely moves the kill box is still the full
+project with new instruments.

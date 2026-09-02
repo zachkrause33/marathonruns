@@ -78,6 +78,10 @@ MR.Course = (function () {
   // ROOF: cones on a rideable deck, and two decks side by side to cross
   // between. See the note above rollRoof.
   let ROOF = 1;
+  // SWEEP: the lane-sweeper -- a vehicle that CROSSES into its lane during the
+  // approach. See markSweeps for the whole argument; the short form is that
+  // the kill lane is fixed course data and only the approach animation moves.
+  let SWEEP = 1;
 
   // A jump covers this much ground; two conflicting action gates closer than
   // this would demand being airborne and ducking at once.
@@ -2127,6 +2131,102 @@ MR.Course = (function () {
     };
   }
 
+  /**
+   * ---- THE LANE-SWEEPER ---------------------------------------------------
+   *
+   * The owner asked for the game to be harder and greenlit motion. This is the
+   * one archetype the backlog said to build first: a vehicle that CROSSES the
+   * road into its lane during the approach, so the early read lies and the
+   * player has to hold their commitment. It is built so that every proof this
+   * file already carries stays true without being touched:
+   *
+   * THE KILL LANE IS FIXED COURSE DATA. A sweep gate is an ordinary
+   * single-BLOCK gate; `gate.lanes` names the lane the vehicle ends in, and
+   * that is the lane it has ALWAYS been in as far as collision.js, solvable(),
+   * buildSpans, the bot and every audit are concerned. The annotation added
+   * here is read by the renderer alone, which parks the vehicle in `from`
+   * (a CLEAR lane) and slides it into its own lane as the player approaches.
+   * Nothing time-dependent enters the course model: the animation is a pure
+   * function of the runner's distance to the gate, so it is deterministic,
+   * pace-independent in the only way that matters (the LOCK guarantee below is
+   * a distance, not a time), and identical on every run of the day.
+   *
+   * THE LOCK IS THE FAIRNESS ARGUMENT, and both numbers are derived from the
+   * read-window contract rather than chosen. The eye-floor note above
+   * readWindowAt establishes READ_NEAR as the commit point: every gate must be
+   * fully readable from there in. The sweeper is REQUIRED to be standing in
+   * its final lane, yaw zero, from SWEEP_LOCK = 2 * READ_NEAR out -- twice the
+   * distance the game promises for any other gate -- so inside the window
+   * every instrument was proven for, a sweep gate is INDISTINGUISHABLE from a
+   * parked one. The difficulty is upstream of the contract, not a hole in it:
+   * between SWEEP_START = 4 * READ_NEAR and the lock the vehicle is visibly
+   * crossing, and a player who reads gates early has to watch it settle
+   * instead of committing to a lane that is about to stop being clear.
+   * (Distances are runner-to-gate; READ_NEAR is measured from the lens, which
+   * sits CAM_BASE_BACK further back, so both margins are understated.)
+   *
+   * WHY A POST-PASS, AND WHY ITS OWN HASH. Annotating after the loop draws
+   * NOTHING from the course stream, so every already-shipped day's gates are
+   * bit-identical -- consuming even one draw from `rnd` would reshuffle every
+   * course in the calendar. Each gate's decision is an independent
+   * hashString draw keyed on (day, gate index), the same pattern the variant
+   * casting uses and for the same reason.
+   *
+   * ELIGIBILITY, each clause with its reason:
+   *   - exactly one BLOCK, and a CLEAR lane ADJACENT to it: the vehicle parks
+   *     and drives only through the `from` lane, so that lane must hold no
+   *     art, and adjacency means the crossing never passes OVER a third lane
+   *     that might. Requiring all-but-final CLEAR was measured first and
+   *     refused by the calendar: 8 such gates in 66,798 past mile 6 -- the
+   *     mid-race difficulty that makes a sweeper worth having is exactly what
+   *     removes empty-flanked walls. The adjacent form yields 7.9 a course,
+   *     and its side effect is the point: the third lane holds a JUMP or DUCK
+   *     in ~100% of them, so a sweep gate is a real question, not a wall with
+   *     two exits. The kill lane still always has an adjacent CLEAR escape --
+   *     the `from` lane itself, by construction.
+   *   - no train, no ramp, no closure: a convoy owns its lane for a span, a
+   *     rideable deck is a running surface, and a corridor has no lane to
+   *     arrive from.
+   *   - the previous gate does not BLOCK the same lane: a lane the player
+   *     already reads as walled gains nothing from the misdirection, and a
+   *     convoy member arriving sideways breaks the queue fiction.
+   *   - past mile 6, and out of the run-in (f < 0.90): the difficulty ramp
+   *     owns the opening, and the last question of a race should not be a
+   *     novelty -- the same calendar reasoning the ramps and closures carry.
+   */
+  const SWEEP_LOCK = 2 * (ACTION_WINDOW + K.CAM_BASE_BACK);
+  const SWEEP_START = 4 * (ACTION_WINDOW + K.CAM_BASE_BACK);
+  const SWEEP_RATE = 0.40;
+  function markSweeps(key, gates, tally) {
+    if (!(SWEEP > 0)) return;
+    for (let i = 0; i < gates.length; i++) {
+      const gate = gates[i];
+      if (gate.train || gate.ramp !== undefined || gate.narrow) continue;
+      if (gate.z < 6 * K.UNITS_PER_MILE || gate.f > 0.90) continue;
+      let lane = -1, ok = true;
+      for (let l = 0; l < 3; l++) {
+        if (gate.lanes[l] === K.BLOCK) { ok = ok && lane < 0; lane = l; }
+      }
+      if (!ok || lane < 0) continue;
+      if (i > 0 && gates[i - 1].lanes[lane] === K.BLOCK) continue;
+      // The lane it arrives FROM: adjacent and CLEAR, nothing else. An edge
+      // wall is entered from the centre; a centre wall from whichever edge is
+      // open (a hash bit picks when both are, which the calendar says is 3
+      // gates a year).
+      let from = -1;
+      const h = MR.rng.hashString(key + '|sweep/v1|' + i);
+      if (lane !== 1) { if (gate.lanes[1] === K.CLEAR) from = 1; }
+      else {
+        const open = [0, 2].filter((l) => gate.lanes[l] === K.CLEAR);
+        if (open.length) from = open.length === 2 ? open[(h >>> 12) & 1] : open[0];
+      }
+      if (from < 0) continue;
+      if ((h % 4096) / 4096 >= SWEEP_RATE * SWEEP) continue;
+      gate.sweep = { from, lane };
+      tally.sweeps++;
+    }
+  }
+
   function generate(key) {
     // ELEVATION FIRST, AND THE ORDER IS THE POINT. actionWindowAt() reads the
     // profile, spacingAt() and solvable() both read actionWindowAt(), and the
@@ -2161,7 +2261,7 @@ MR.Course = (function () {
     // "solvable on all 365 days" is true by construction and proves nothing
     // about whether a new mechanic damaged the course -- the damage would show
     // up as the generator giving up more often, and nothing counted that.
-    const tally = { degraded: 0, attempts: 0, narrowings: 0, narrowAbandoned: 0 };
+    const tally = { degraded: 0, attempts: 0, narrowings: 0, narrowAbandoned: 0, sweeps: 0 };
 
     // A closure in flight: the lanes it holds shut, and the gate index it runs
     // to. Deliberately the same shape as trainUntil, because it is the same
@@ -2423,6 +2523,10 @@ MR.Course = (function () {
       // way further forward than its gate line says.
       z += spacingAt(f, rnd, z, elevation, lanes, span, tempoPlan);
     }
+
+    // The sweepers, annotated AFTER the loop so the pass reads finished gates
+    // and draws nothing from the course stream. See markSweeps.
+    markSweeps(key, gates, tally);
 
     const mileMarkers = [];
     for (let m = 1; m <= 26; m++) mileMarkers.push({ mile: m, z: m * K.UNITS_PER_MILE });
@@ -2787,6 +2891,11 @@ MR.Course = (function () {
            // The roof contract. CONE_LAND is the one the art has to respect:
            // nothing may stand on a deck inside it.
            CONE_LAND, ROOF_SPAN_MIN, ROOF_SPAN_MAX, rampSpanMax,
+           // The sweeper contract: the renderer must have the vehicle standing
+           // in its own lane by SWEEP_LOCK and parked in `from` beyond
+           // SWEEP_START. Exported so the animation reads the numbers from the
+           // file that derives them from the read window -- see markSweeps.
+           SWEEP_LOCK, SWEEP_START,
            elevationPlan };
 
   // Accessors rather than plain fields, so a nonsense value cannot be written
@@ -2806,6 +2915,10 @@ MR.Course = (function () {
   Object.defineProperty(api, 'ROOF', {
     get: function () { return ROOF; },
     set: function (v) { const n = parseFloat(v); if (isFinite(n)) ROOF = Math.max(0, Math.min(1, n)); },
+  });
+  Object.defineProperty(api, 'SWEEP', {
+    get: function () { return SWEEP; },
+    set: function (v) { const n = parseFloat(v); if (isFinite(n)) SWEEP = Math.max(0, Math.min(1, n)); },
   });
 
   return api;

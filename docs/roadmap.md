@@ -8447,3 +8447,41 @@ and taking the small JUMPs, the DUCK spans and the works trailers to
 256px textures, which is what objects that size resolve anyway. The
 committed page is 15.7 MiB; the deployed site is unaffected (models
 travel as separate cached files there).
+
+## 92. The lane-sweeper: motion without moving the contract
+
+The owner asked for harder and greenlit motion; the backlog said build
+the lane-sweeper first. Built so that no proof in the tree changes: a
+sweep gate is an ordinary single-BLOCK gate whose lane is fixed course
+data -- collision, solvable(), buildSpans, the bot and every audit read
+gate.lanes exactly as before -- and only the APPROACH animates. The
+vehicle parks in an adjacent CLEAR lane, drives into its own lane as
+the runner closes, and is locked there, yaw zero, from SWEEP_LOCK =
+2x READ_NEAR out: inside the window the game proves readable for every
+gate, a sweep gate IS a parked one. The difficulty is the early read
+lying, never the contract.
+
+Annotated in a post-pass that draws nothing from the course stream
+(hashString per gate index, the variant-casting pattern), so every
+shipped day's gates are bit-identical; SWEEP=0 restores them to the
+byte, and course-test's determinism check covers the annotation.
+
+The first eligibility draft demanded both other lanes CLEAR and the
+calendar refused it: 8 such gates in 66,798 past mile 6 -- mid-race
+difficulty is exactly what removes empty-flanked walls. The adjacent
+form (park one lane over, cross one lane) yields 7.9 eligible a course,
+and its side effect is the mechanic's teeth: the third lane holds a
+JUMP or DUCK in ~100% of them. The kill lane still always has an
+adjacent CLEAR escape -- the from lane itself, by construction. ~3
+sweeps a course at rate 0.40, mile 6 on, never on trains, ramps,
+closures, or a lane the previous gate already walls.
+
+Sweep gates wear vehicle sculpts only (bus through police, hash-dealt
+outside the bag so the fleet's anti-repetition deal is untouched), and
+the crossing shows their flanks at range -- rule 1's build-every-angle
+paying out again. The shadow now reads the group's live x rather than
+LANE_X, identical for every parked hazard, so the sweeper drags its
+shadow instead of the telegraph answering for the art. Verified against
+the running page: live x/yaw match the smoothstep contract to three
+decimals at seven distances, and all four gates pass (8/8 shots, 90/90
+courses, simulate).

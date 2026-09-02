@@ -14774,7 +14774,11 @@ MR.World = (function () {
           const fc = (foot[1] + foot[2]) * 0.5, fh = (foot[2] - foot[1]) * 0.56;
           const z0 = g.gate.z + span * (fc - fh + box.halfZ) - SHADOW_SPREAD;
           const z1 = g.gate.z + span * (fc + fh + box.halfZ) + SHADOW_SPREAD;
-          const cx = K.LANE_X[l];
+          // The GROUP's x, not LANE_X: the two are identical for every parked
+          // hazard, and a sweeper mid-crossing must drag its shadow with it --
+          // a shadow waiting in the kill lane before the vehicle arrives would
+          // be the telegraph answering for the art.
+          const cx = g.objs[l].position.x;
           // The variant's own half-width, never a difference of LANE_X.
           const hx = foot[0] * 1.12 + SHADOW_SPREAD;
           const p = n * 18;
@@ -14875,6 +14879,15 @@ MR.World = (function () {
         }
         return d.left.pop();
       }
+      // A sweep gate wears a VEHICLE, drawn from this list and never from the
+      // bag: the crossing animation is a thing driving across the road, and a
+      // traffic light or a stack of crates arriving sideways would break the
+      // one fiction that makes the motion readable. Indices into the BLOCK
+      // pool: bus, taxi, van, refuse truck, moped, hatchback, police. An
+      // independent hash rather than a bag draw -- sweeps are a handful per
+      // course, repetition is not the risk, and keeping them out of the deal
+      // leaves the bag's anti-repetition property intact for the fleet.
+      const SWEEP_CAST = [4, 5, 6, 7, 9, 12, 13];
       const cast = [];
       for (let g = 0; g < gates.length; g++) {
         const gate = gates[g];
@@ -14882,7 +14895,10 @@ MR.World = (function () {
         for (let l = 0; l < 3; l++) {
           const kind = gate.lanes[l];
           if (kind === K.CLEAR || !bags[kind]) continue;
-          row[l] = (kind === K.BLOCK && gate.train) ? 0 : draw(kind);
+          row[l] = (kind === K.BLOCK && gate.train) ? 0
+            : (kind === K.BLOCK && gate.sweep)
+              ? SWEEP_CAST[MR.rng.hashString((key || '') + '|sweep-skin|' + g) % SWEEP_CAST.length]
+              : draw(kind);
         }
         cast[g] = row;
       }
@@ -19112,6 +19128,11 @@ MR.World = (function () {
           // 4% grade would stand with one edge 10 cm off the tarmac.
           o.position.set(K.LANE_X[l], eAt(gate.z), gate.z);
           o.rotation.x = -Math.atan(EL.slope(gate.z));
+          // Written on EVERY claim for the reason everything else here is: the
+          // sweeper animation below writes yaw and x on its own gate, the pool
+          // recycles, and a parked taxi standing crooked in the wrong lane is
+          // the previous tenant's crossing left running.
+          o.rotation.y = 0;
           // Pick the skin. Pooled, so EVERY variant's visibility is written on
           // every claim -- a hazard inheriting the previous tenant's body is
           // the kind of defect that only shows up in one screenshot in twenty,
@@ -19706,7 +19727,36 @@ MR.World = (function () {
       // Hazard variants that move. Only the live ones, only the ones that asked
       // for it, and only ever a rotation on a single child -- a hazard's
       // POSITION is course data and nothing here is allowed to touch it.
+      //
+      // THE ONE EXCEPTION IS THE SWEEPER, and it is an exception in the letter
+      // and not the spirit: the kill lane IS still course data (gate.lanes
+      // names it, collision.js and every audit read it there, and nothing
+      // written here changes it). What animates is the APPROACH -- the vehicle
+      // parks in gate.sweep.from beyond SWEEP_START and is REQUIRED to be
+      // standing in its own lane, yaw zero, from SWEEP_LOCK out, which is
+      // twice READ_NEAR: inside the window the game proves readable for every
+      // other gate, a sweep gate is a parked one. Both numbers come from
+      // course.js, the file that derives them from the read-window contract;
+      // see markSweeps there for the whole argument. A pure function of
+      // distance, so it is deterministic and cannot drift with framerate.
       for (const g of activeGates) {
+        const sw = g.gate.sweep;
+        if (sw && g.objs[sw.lane]) {
+          const o = g.objs[sw.lane];
+          const d = g.gate.z - z;
+          const t = (MR.Course.SWEEP_START - d) / (MR.Course.SWEEP_START - MR.Course.SWEEP_LOCK);
+          const c = t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
+          const fx = K.LANE_X[sw.from], tx = K.LANE_X[sw.lane];
+          o.position.x = fx + (tx - fx) * c;
+          // The nose swings toward the direction of travel and straightens
+          // into the lane -- a car pulling across the road, not a car sliding
+          // sideways. 4c(1-c) is zero at both ends, so the parked pose and
+          // the locked pose are exactly the pose every other hazard holds.
+          // 0.35 rad and not more: the third lane usually holds art, adjacent
+          // boxes already stand shoulder to shoulder, and a wider swing puts
+          // the swung nose visibly inside the neighbour mid-crossing.
+          o.rotation.y = (tx > fx ? 1 : -1) * 4 * c * (1 - c) * 0.35;
+        }
         for (let l = 0; l < 3; l++) {
           const o = g.objs[l];
           if (!o) continue;

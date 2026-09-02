@@ -4,7 +4,8 @@
  * The owner generated a sculpted character from the concept render (Meshy),
  * and a sculpted mesh is the one thing primitives cannot become -- a single
  * continuous surface that BENDS at the joints. This module is the bridge:
- * it takes the embedded GLB (MR.EMBED.miles, base64 -- see tools/build.js),
+ * it takes the model GLB (embedded as MR.EMBED.miles base64, or fetched
+ * from MR.ASSETS.miles in the site flavor -- see tools/build.js),
  * builds a THREE.Skeleton whose topology mirrors runner.js's driver pivots,
  * computes per-vertex skin weights procedurally, and each frame copies the
  * driver rig's joint rotations onto the bones.
@@ -129,13 +130,18 @@ MR.Skin = (function () {
     return Object.assign({}, J, out);
   }
 
+  /** Parse a GLB ArrayBuffer and hand the scene to cb(gltf, buf). */
+  function parseBuf(buf, cb, err) {
+    new THREE.GLTFLoader().parse(buf, '', function (gltf) { cb(gltf, buf); }, err);
+  }
+
   /** Decode the embed and hand the parsed scene to cb(gltf, buf). */
   function load(b64, cb, err) {
     const bin = atob(b64);
     const buf = new ArrayBuffer(bin.length);
     const u8 = new Uint8Array(buf);
     for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
-    new THREE.GLTFLoader().parse(buf, '', function (gltf) { cb(gltf, buf); }, err);
+    parseBuf(buf, cb, err);
   }
 
   /**
@@ -1061,9 +1067,11 @@ MR.Skin = (function () {
    * replaces it between two frames. A rigged model uses its own skeleton
    * and weights; an unrigged one gets the procedural rig.
    */
+  let fetchP = null;
+
   function attach(parts, onRigged) {
-    if (!MR.EMBED || !MR.EMBED.miles || !THREE.GLTFLoader) return;
-    load(MR.EMBED.miles, function (gltf, buf) {
+    if (!THREE.GLTFLoader) return;
+    const onParsed = function (gltf, buf) {
       try {
         // One material for either path: the game's own toon ramp carrying
         // the sculpt's basecolor, decoded through the iOS-proof route.
@@ -1084,9 +1092,33 @@ MR.Skin = (function () {
         // stays on. Reported, not thrown.
         console.error('MR.Skin: attach failed, keeping the code body', e);
       }
-    }, function (e) {
+    };
+    const onErr = function (e) {
       console.error('MR.Skin: GLB parse failed, keeping the code body', e);
-    });
+    };
+    if (MR.EMBED && MR.EMBED.miles) {
+      load(MR.EMBED.miles, onParsed, onErr);
+    } else if (MR.ASSETS && MR.ASSETS.miles && window.fetch) {
+      // The site flavor (tools/build.js --site): the model is a separate
+      // file next to the page, cached by the browser independently of the
+      // game code. Same parse path once the bytes land; a failed fetch
+      // keeps the code body, like any other bad model. The fetch promise is
+      // shared: the player and the ghost both dress here at boot, in
+      // parallel, and two in-flight requests for the same 2 MB file are one
+      // too many. Parsing twice from one buffer is fine -- GLTFLoader only
+      // reads it.
+      if (!fetchP) {
+        fetchP = fetch(MR.ASSETS.miles).then(function (r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.arrayBuffer();
+        });
+      }
+      fetchP
+        .then(function (buf) { parseBuf(buf, onParsed, onErr); })
+        .catch(function (e) {
+          console.error('MR.Skin: model fetch failed, keeping the code body', e);
+        });
+    }
   }
 
   return { attach: attach };

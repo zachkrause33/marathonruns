@@ -8248,3 +8248,34 @@ shader like every box person before it.
 
 Heaviest frame 390k of the 500k ceiling, draws 234 of ~400, shoot and
 course-test green.
+
+## 87. The asset split: the site fetches its models, everything else stays one file
+
+"lets do the asset split then the vehicles." The page had grown to 5.8 MB
+with the sculpted Miles riding inside as base64, and every code fix cost a
+returning phone its full re-download. The split is a DEPLOY flavor, not a
+repo change of heart: tools/build.js --site emits MR.ASSETS URLs (content-
+hashed for cache busting) instead of MR.EMBED base64 for .glb models, and
+pages.yml now builds that flavor at deploy time and ships assets/ next to
+it. The deployed page is 3.1 MB of game the browser re-downloads on a code
+change, plus 2.1 MB of model it re-downloads only when the model changes.
+
+The committed index.html stays fully embedded, on purpose: every tool in
+tools/ verifies against it from file://, where fetch does not work, and the
+artifact channel is self-contained by definition. Making the split a
+committed-page change would have silently pointed forty instruments at the
+code-body fallback and called it verification.
+
+skin.js takes either route into one parse path -- embed decoded, or
+MR.ASSETS.miles fetched, with the fetch promise SHARED because the player
+and the ghost both dress at boot and two in-flight copies of the same 2 MB
+file is one too many (the first sitecheck run photographed exactly that:
+miles.glb requested twice). A failed fetch keeps the code body, the same
+contract as a bad model. crowd.pack stays embedded in every flavor; world
+geometry builds synchronously and cannot await a fetch.
+
+The deploy flavor gets its own instrument, per rule 2: tools/sitecheck.js
+assembles _site the way pages.yml does, serves it over local HTTP, and
+fails unless the model request actually goes out, the costume actually
+attaches (api.skinned), the crowd pack decoded, and the console stayed
+clean. "The fetch path works" is now a measured claim.

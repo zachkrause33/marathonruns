@@ -1,10 +1,12 @@
 # Publish marathon-miles.com to GitHub Pages.
 #
 # The site is assembled rather than committed: site/ holds the landing page,
-# the CNAME and the social card, and the GAME is the repo's own index.html
-# copied in at deploy time. That copy is deliberate -- index.html is a 2.8 MB
-# build artifact and committing a second copy of it under site/game/ would
-# double it in every commit that touches the build.
+# the CNAME and the social card, and the GAME is built here as the --site
+# flavor of tools/build.js. The committed index.html stays fully
+# self-contained (every tool verifies against it from file://); the deployed
+# page instead references the models in assets/ as separate files, so a
+# returning player's browser re-downloads kilobytes of code, not megabytes of
+# model, and the models cache independently under their content-hashed URLs.
 #
 # The landing page is at /, the game at /game/, which is what the PLAY links
 # point at.
@@ -22,6 +24,7 @@ on:
     paths:
       - 'site/**'
       - 'index.html'
+      - 'assets/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -63,9 +66,10 @@ jobs:
       # prove a point about site structure.
       - name: Assemble the site
         run: |
-          mkdir -p _site/game
+          mkdir -p _site/game _site/assets
           cp -r site/. _site/
-          cp index.html _site/index.html
+          node tools/build.js --site --out _site/index.html
+          cp assets/*.glb _site/assets/
           cat > _site/game/index.html <<'HTML'
           <!DOCTYPE html>
           <html lang="en"><head><meta charset="utf-8">

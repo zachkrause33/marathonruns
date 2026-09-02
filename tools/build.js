@@ -2,6 +2,8 @@
 /**
  * Build: concatenate vendor/three.min.js + src modules + shell into one
  * self-contained index.html that runs from file:// with no assets.
+ * (`--site` is the one flavor that fetches instead of embeds -- see the
+ * assets section below.)
  *
  * Module contract: every file in MODULES is plain script text that attaches
  * to the global `MR` namespace. No imports, no exports, no bundler. Order in
@@ -75,14 +77,29 @@ const shell = read(process.argv.includes('--artifact')
 // the stylesheet a human reads.
 const css = read('src/ui/font.css') + read('src/ui/style.css');
 
-// Embedded binary assets. The game has always been one self-contained file,
-// and a sculpted character model keeps it that way by travelling INSIDE the
-// page: any .glb dropped in assets/ is base64-inlined under MR.EMBED, keyed
-// by its basename (assets/miles.glb -> MR.EMBED.miles). Runtime decodes with
-// atob and hands the ArrayBuffer to THREE.GLTFLoader.parse -- no fetch, no
-// asset server, file:// still works. Base64 costs 4/3 of the binary size,
-// which is the price of the single-file premise and is paid knowingly.
-let embed = 'window.MR = window.MR || {};\nMR.EMBED = {};\n';
+// Embedded binary assets. The committed index.html is one self-contained
+// file: any .glb or .pack dropped in assets/ is base64-inlined under
+// MR.EMBED, keyed by its basename (assets/miles.glb -> MR.EMBED.miles).
+// Runtime decodes with atob and hands the ArrayBuffer to
+// THREE.GLTFLoader.parse -- no fetch, no asset server, file:// still works,
+// which is what every tool in tools/ relies on. Base64 costs 4/3 of the
+// binary size.
+//
+// `--site` is the deploy flavor (built by .github/workflows/pages.yml, never
+// committed): .glb models are NOT embedded -- MR.ASSETS carries their URL
+// instead, and src/render/skin.js fetches them as separate files the browser
+// caches independently of the page. A code change then re-downloads kilobytes
+// of game, not megabytes of model. The URL carries a content hash so a model
+// update busts the cache. .pack files stay embedded in every flavor: world.js
+// decodes them synchronously at module load, before any fetch could land.
+// `--artifact` stays fully embedded -- the artifact is the self-contained
+// preview channel by definition.
+const SITE = process.argv.includes('--site');
+if (SITE && process.argv.includes('--artifact')) {
+  console.error('BUILD FAILED: --site and --artifact are different flavors; pick one');
+  process.exit(1);
+}
+let embed = 'window.MR = window.MR || {};\nMR.EMBED = {};\nMR.ASSETS = {};\n';
 const assetDir = path.join(ROOT, 'assets');
 if (fs.existsSync(assetDir)) {
   for (const f of fs.readdirSync(assetDir).sort()) {
@@ -91,8 +108,13 @@ if (fs.existsSync(assetDir)) {
     // must decode SYNCHRONOUSLY at world build.
     if (!f.endsWith('.glb') && !f.endsWith('.pack')) continue;
     const key = f.replace(/\.(glb|pack)$/, '').replace(/[^A-Za-z0-9_]/g, '_');
-    const b64 = fs.readFileSync(path.join(assetDir, f)).toString('base64');
-    embed += `MR.EMBED[${JSON.stringify(key)}] = ${JSON.stringify(b64)};\n`;
+    const bytes = fs.readFileSync(path.join(assetDir, f));
+    if (SITE && f.endsWith('.glb')) {
+      const hash = require('crypto').createHash('sha1').update(bytes).digest('hex').slice(0, 8);
+      embed += `MR.ASSETS[${JSON.stringify(key)}] = ${JSON.stringify('assets/' + f + '?v=' + hash)};\n`;
+    } else {
+      embed += `MR.EMBED[${JSON.stringify(key)}] = ${JSON.stringify(bytes.toString('base64'))};\n`;
+    }
   }
 }
 

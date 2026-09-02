@@ -79,3 +79,25 @@ ground, like the gantry.
   knots wear the props-v1 sculpts).
 - The sculpted Miles has a painted face; a facial rig (blink/gaze/brow)
   is a separate effort.
+
+## New obstacles, and motion (recorded 2026-09-02, to revisit)
+
+NEW VARIANTS are cheap by construction: a def entry plus a bag weight,
+zero extra draw calls, sculpt dress line optional. Constraints are
+readability, not tech -- a JUMP stays under 0.8, a DUCK hangs its mass
+at the bar, a BLOCK fills the lane, and every addition re-runs the
+gates. The identity test stands: would a person name it in one second?
+Candidates discussed: food truck, horse trailer, cement mixer (BLOCK);
+tipped shopping cart, hay bales, luggage pile (JUMP); banner span,
+tree branch, cherry-picker arm (DUCK).
+
+MOVING OBSTACLES are two different asks. Motion that never moves the
+kill box (animated parts, figures pacing inside their own envelope) is
+available today -- the one-moving-part rule per variant could be
+loosened deliberately. Motion that MOVES the kill box -- across lanes
+or along the road -- is a real project: time-dependent collision, a
+telegraph that shows where the hazard WILL be, a solver that models
+timing, and new instruments to prove fairness. If built, build ONE
+archetype first: a lane-sweeper crossing on a fixed deterministic
+schedule, telegraphed on the road like the tempo mats. Oncoming
+traffic ranks second; it strains the closed-course fiction.

@@ -8099,3 +8099,46 @@ course-test (90/90) and simulate all pass on the finished figure.
 
 Still open from the owner's wider brief: NPC quality tiers, character
 variation, crowd animation states, and the living-world motion hierarchy.
+
+### 85 · The sculpted Miles: a modelled costume over the code rig
+
+The owner's verdict on the wiped-and-rebuilt code character was the right
+one: "Are you able to make it look exactly the same? [as the concept
+render]" -- and the honest answer was no, because a sculpted continuous
+surface is the one thing welded primitives cannot become. So the owner
+generated one (Meshy, from the concept render: 56MB, 1.92M triangles,
+unrigged, textured), delivered it through a GitHub release after the
+sandbox's network policy refused every Google door, and the game grew an
+asset pipeline and a skinning bridge:
+
+- tools/build.js embeds any assets/*.glb into the page base64 under
+  MR.EMBED -- the single-file premise holds, the model travels inside
+  index.html. vendor/gltfloader.js is r160's loader adapted to the
+  global build.
+- The shrink pipeline (gltf-transform + meshoptimizer, in the
+  scratchpad) took the model to 28.7k triangles / 1.6MB with the
+  basecolor kept and the PBR maps stripped. A 67k variant was tried and
+  reverted: it crashed the harness tab and its border-locked shrink was
+  byte-identical, proving the texture flecks live in Meshy's own bake.
+- src/render/skin.js: a THREE.Skeleton mirroring the driver pivots at
+  the sculpt's own joints, GEODESIC weight assignment (multi-source
+  Dijkstra over the mesh edges -- two euclidean passes failed because
+  the sculpt's arms hang against its flanks, and space cannot tell an
+  arm from the torso it touches; the surface can), contact-weld edge
+  penalties, per-joint blend radii (a shoulder blends over 0.17 where
+  a wrist gets 0.08), and a per-frame sync copying every driver
+  rotation onto the bones.
+
+The driver rig never went away. Every measured behaviour -- the cycle,
+the foot-plant solve, the silhouettes, the ritual, the celebration, the
+landing squash, the lane-change chain -- poses invisible pivots exactly
+as before; the model is a costume those bones wear. Remove assets/ and
+the code body is still underneath, which is also the failure mode: a
+bad parse logs and keeps the code figure, never a blank runner.
+
+Known v1 limits, stated rather than discovered: the face is the
+sculpt's painted texture (no blink, gaze or brow acting -- those pose
+empty pivots until the model grows a facial rig); the mesh-measuring
+tools read a SkinnedMesh's REST geometry, so envelope/footroom/deckdrop
+describe the driver rig, not the costume, until they learn
+boneTransform(); and the ghost deliberately keeps the code body.

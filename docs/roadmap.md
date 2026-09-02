@@ -8216,3 +8216,35 @@ mixed-ownership snap runs 22-80% of height; and what no weight can fix
 shrink weld -- is cut (78 bridge triangles; the holes face each other
 inside the hand/hip contact shadow). The measurement, not any of the
 four theories, found the fix.
+
+### 86 · The sculpted crowd: four people, thirty-three kilobytes
+
+The owner's props-v1 release held one fused Tripo scene -- four cheering
+spectators and their base plate, 1.92M triangles, 60MB. The pipeline:
+sloppy decimation (the topological simplifier stalled at 166k against
+the sculpt's thousands of shell fragments; simplifySloppy ignores
+topology, which is what background quality is for), vertex compaction,
+the texture BAKED INTO VERTEX COLOURS (sloppy triangles span UV space
+and render camo noise; per-vertex sampling reads clean and deletes the
+texture from the page), the plate cut, the four people split by
+x-clustering, and the lot packed into the game's own 33KB binary format
+-- because world geometry builds synchronously and GLTFLoader cannot be
+awaited from it.
+
+In world.js: the pack decodes at module load (missing pack -> box
+people, the costume's own failure mode); merge() learned per-vertex
+part colours; vSpectator grew a model path the roadside knots opt into
+(the nearest crowd the camera sees, and the figures behind the start
+portrait) while grandstand masses stay boxes at their 1-2px distance.
+Every figure wears a fresh seeded wardrobe baked at build time: only
+confidently-cool saturated vertices spin the hue wheel (the first gate
+hunted for skin, missed shaded cheeks, and the crowd came out with
+green faces -- inverted, the warm band holds skin, hair and wood and
+rolls lightness instead, which is how skin tones actually vary), and a
+rotated garment may not land on the skin band (a blue shirt spun into
+tan read as a bare torso). Placards ride the sculpted cheerers
+unchanged; the whole figure takes one wave tag and sways on the crowd
+shader like every box person before it.
+
+Heaviest frame 390k of the 500k ceiling, draws 234 of ~400, shoot and
+course-test green.

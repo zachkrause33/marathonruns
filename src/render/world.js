@@ -1364,11 +1364,18 @@ MR.World = (function () {
       pos.set(g.attributes.position.array, o * 3);
       nor.set(g.attributes.normal.array, o * 3);
       if (g.attributes.uv) uv.set(g.attributes.uv.array, o * 2);
-      _cA.set(item.color === undefined ? 0xffffff : item.color);
-      for (let i = 0; i < count; i++) {
-        col[(o + i) * 3] = _cA.r;
-        col[(o + i) * 3 + 1] = _cA.g;
-        col[(o + i) * 3 + 2] = _cA.b;
+      if (item.color === undefined && g.attributes.color) {
+        // A part may arrive already painted per vertex -- the sculpted
+        // crowd people bake their texture into vertex colours -- and a
+        // uniform fill would flatten a whole person to one tone.
+        col.set(g.attributes.color.array, o * 3);
+      } else {
+        _cA.set(item.color === undefined ? 0xffffff : item.color);
+        for (let i = 0; i < count; i++) {
+          col[(o + i) * 3] = _cA.r;
+          col[(o + i) * 3 + 1] = _cA.g;
+          col[(o + i) * 3 + 2] = _cA.b;
+        }
       }
       if (wav && item.wave) {
         for (let i = 0; i < count; i++) {
@@ -5019,6 +5026,119 @@ MR.World = (function () {
    */
   const TROUSERS = [0x4f6fb0, 0x8a5a3c, 0x6a7a4a, 0x7a5570, 0x8f8fa0, 0x3f7f8a];
 
+  // ---- THE SCULPTED CROWD (assets/crowd.pack) ---------------------------
+  //
+  // The owner generated four cheering spectators (Tripo, from the game's own
+  // style), and the pipeline in the scratchpad decimated them to ~650
+  // triangles each, baked their textures into vertex colours, cut the base
+  // plate and split them into a 33KB binary pack. The format is the game's
+  // own -- per person: u32 vert count, u32 index count, f32 positions
+  // (feet at y=0, centred), u8 sRGB colours, u16 indices -- because it must
+  // decode SYNCHRONOUSLY here at module load: world geometry is built in one
+  // pass at create, and GLTFLoader's async parse cannot be awaited from it.
+  //
+  // Missing or corrupt pack -> null -> every spectator stays a box person,
+  // the same graceful failure the runner's costume runs on.
+  const crowdPeople = (function () {
+    try {
+      const b64 = (typeof MR !== 'undefined') && MR.EMBED && MR.EMBED.crowd;
+      if (!b64) return null;
+      const raw = atob(b64);
+      const buf = new ArrayBuffer(raw.length);
+      const u8 = new Uint8Array(buf);
+      for (let i = 0; i < raw.length; i++) u8[i] = raw.charCodeAt(i);
+      const dv = new DataView(buf);
+      const n = dv.getUint32(0, true);
+      let o = 4;
+      const people = [];
+      for (let pi = 0; pi < n; pi++) {
+        const nv = dv.getUint32(o, true), ni = dv.getUint32(o + 4, true);
+        o += 8;
+        const pos = new Float32Array(buf.slice(o, o + nv * 12)); o += nv * 12;
+        const colU = new Uint8Array(buf.slice(o, o + nv * 3)); o += nv * 3;
+        const idx = new Uint16Array(buf.slice(o, o + ni * 2)); o += ni * 2;
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        g.setIndex(new THREE.BufferAttribute(idx, 1));
+        g.computeVertexNormals();
+        let h = 0;
+        for (let i = 1; i < pos.length; i += 3) if (pos[i] > h) h = pos[i];
+        people.push({ geo: g, colU: colU, h: h });
+      }
+      return people.length ? people : null;
+    } catch (e) {
+      console.error('MR.World: crowd pack unreadable, box people stay', e);
+      return null;
+    }
+  })();
+
+  /**
+   * One figure's wardrobe, from the shared body: the owner asked that the
+   * background people differ -- clothing colour, skin colour. Garments are
+   * the SATURATED non-skin-hued vertices and get one seeded spin round the
+   * hue wheel; skin (the warm low-to-mid-sat band) keeps its hue and takes
+   * a lightness roll instead, deep to light; near-neutrals jitter. Baked
+   * per figure at build time into the merged knot, so a hundred different
+   * people cost exactly nothing per frame.
+   */
+  function crowdFigureGeo(variant, r) {
+    const g = variant.geo.clone();
+    const colU = variant.colU;
+    const n = colU.length / 3;
+    const out = new Float32Array(n * 3);
+    const hueShift = (r() - 0.5) * 2.0;
+    const skinL = 0.70 + r() * 0.45;
+    const neutralL = 0.88 + r() * 0.24;
+    for (let v = 0; v < n; v++) {
+      let rr = colU[v * 3] / 255, gg = colU[v * 3 + 1] / 255, bb = colU[v * 3 + 2] / 255;
+      const mx = Math.max(rr, gg, bb), mn = Math.min(rr, gg, bb);
+      const l = (mx + mn) / 2;
+      const d = mx - mn;
+      const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+      let h = 0;
+      if (d > 0) {
+        if (mx === rr) h = ((gg - bb) / d + 6) % 6;
+        else if (mx === gg) h = (bb - rr) / d + 2;
+        else h = (rr - gg) / d + 4;
+        h /= 6;
+      }
+      // The first gate tried to FIND skin and missed half of it -- shaded
+      // cheeks and hair fell to the garment branch and the crowd came out
+      // with green faces. This one is inverted: only confidently-COOL
+      // saturated vertices (true garments -- blues, greens, pinks) may
+      // spin the hue wheel; the whole warm band (skin, hair, wood, tan)
+      // keeps its hue and takes the lightness roll, which is how skin
+      // tones actually vary.
+      const warm = h < 0.105 || h > 0.95;
+      let h2 = h, s2 = s, l2 = l;
+      if (warm) {
+        l2 = Math.max(0.06, Math.min(0.92, l * skinL));
+      } else if (s > 0.35) {
+        h2 = (h + hueShift + 2) % 1;
+        // A rotated garment may not LAND on skin: a blue shirt spun into
+        // tan reads as a bare torso. The skin band is skipped over.
+        if (h2 > 0.0 && h2 < 0.14) h2 = (h2 + 0.17) % 1;
+      } else {
+        l2 = Math.max(0.04, Math.min(0.96, l * neutralL));
+      }
+      // hsl -> rgb
+      const c = (1 - Math.abs(2 * l2 - 1)) * s2;
+      const hp = h2 * 6;
+      const x = c * (1 - Math.abs((hp % 2) - 1));
+      let r3 = 0, g3 = 0, b3 = 0;
+      if (hp < 1) { r3 = c; g3 = x; } else if (hp < 2) { r3 = x; g3 = c; }
+      else if (hp < 3) { g3 = c; b3 = x; } else if (hp < 4) { g3 = x; b3 = c; }
+      else if (hp < 5) { r3 = x; b3 = c; } else { r3 = c; b3 = x; }
+      const m = l2 - c / 2;
+      // linearise: the merged crowd material reads working-space colours
+      out[v * 3] = Math.pow(r3 + m, 2.2);
+      out[v * 3 + 1] = Math.pow(g3 + m, 2.2);
+      out[v * 3 + 2] = Math.pow(b3 + m, 2.2);
+    }
+    g.setAttribute('color', new THREE.BufferAttribute(out, 3));
+    return g;
+  }
+
   function vSpectator(parts, o) {
     const r = o.r;
     const pick = (a) => a[Math.floor(r() * a.length)];
@@ -5038,16 +5158,34 @@ MR.World = (function () {
     else { arm = [-1.05, -1.05]; fore = [-0.35, -0.35]; lean = 0.34; }
 
     const before = parts.length;
-    vFigure(parts, {
-      x: o.x, y: o.y || 0, z: o.z, h: S, build: 0.88 + r() * 0.30,
-      tier: 0, fz: o.fz === undefined ? -1 : o.fz,
-      skin: pick(FIG.skin), hair: pick(FIG.hair), style: Math.floor(r() * 6),
-      top: pick(o.shirts), legCol: pick(o.trousers), shoe: 0x241f2c,
-      arm: arm, fore: fore, lean: lean,
-      leg: act === 3 ? [-0.30, 0.30] : [(r() - 0.5) * 0.22, (r() - 0.5) * 0.22],
-      knee: act === 3 ? [0.55, 0.55] : [0.05, 0.05],
-      wrap: function (p, role) { p.__role = role; return p; },
-    });
+    if (o.model && crowdPeople) {
+      // The sculpted crowd (see the pack decoder above): one ~650-triangle
+      // person from the owner's four, in a fresh seeded wardrobe, facing
+      // the road with a little scatter. The whole figure rides one wave
+      // tag -- the loop below applies it like any other part -- and the
+      // placard block still fires, because a placard over a sculpted
+      // cheerer is exactly the composite the reference crowds are made of.
+      const variant = crowdPeople[Math.floor(r() * crowdPeople.length)];
+      const g = crowdFigureGeo(variant, r);
+      const yaw = (o.x > 0 ? -1 : 1) * Math.PI / 2 + (r() - 0.5) * 0.8;
+      const sc = (1.74 * S) / variant.h;
+      const m = new THREE.Matrix4()
+        .makeTranslation(o.x, o.y || 0, o.z)
+        .multiply(new THREE.Matrix4().makeRotationY(yaw))
+        .multiply(new THREE.Matrix4().makeScale(sc, sc, sc));
+      parts.push({ geo: g, matrix: m });
+    } else {
+      vFigure(parts, {
+        x: o.x, y: o.y || 0, z: o.z, h: S, build: 0.88 + r() * 0.30,
+        tier: 0, fz: o.fz === undefined ? -1 : o.fz,
+        skin: pick(FIG.skin), hair: pick(FIG.hair), style: Math.floor(r() * 6),
+        top: pick(o.shirts), legCol: pick(o.trousers), shoe: 0x241f2c,
+        arm: arm, fore: fore, lean: lean,
+        leg: act === 3 ? [-0.30, 0.30] : [(r() - 0.5) * 0.22, (r() - 0.5) * 0.22],
+        knee: act === 3 ? [0.55, 0.55] : [0.05, 0.05],
+        wrap: function (p, role) { p.__role = role; return p; },
+      });
+    }
     // The clap is the one place a limb takes its own kind, and only the SIDE
     // can separate the pair because they share the figure's phase.
     let seen = 0;
@@ -14771,6 +14909,11 @@ MR.World = (function () {
           z: -2.6 + Math.floor(i / 3) * 2.4 + r() * 0.9,
           r: r, shirts: shirts, trousers: trousers, signs: signs,
           lo: 0.86, hi: 0.30, placard: 0.55,
+          // The roadside knots are the NEAREST crowd the chase camera sees
+          // (10.1px best) and the figures behind the start portrait, so
+          // they wear the sculpted people; the grandstand masses stay
+          // boxes at their 1-2.2px distance.
+          model: true,
         });
       }
       return merge(parts);

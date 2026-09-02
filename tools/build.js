@@ -86,8 +86,11 @@ let embed = 'window.MR = window.MR || {};\nMR.EMBED = {};\n';
 const assetDir = path.join(ROOT, 'assets');
 if (fs.existsSync(assetDir)) {
   for (const f of fs.readdirSync(assetDir).sort()) {
-    if (!f.endsWith('.glb')) continue;
-    const key = f.replace(/\.glb$/, '').replace(/[^A-Za-z0-9_]/g, '_');
+    // .glb rides GLTFLoader; .pack is the game's own compact binary (the
+    // crowd people -- see src/render/world.js's decoder) for content that
+    // must decode SYNCHRONOUSLY at world build.
+    if (!f.endsWith('.glb') && !f.endsWith('.pack')) continue;
+    const key = f.replace(/\.(glb|pack)$/, '').replace(/[^A-Za-z0-9_]/g, '_');
     const b64 = fs.readFileSync(path.join(assetDir, f)).toString('base64');
     embed += `MR.EMBED[${JSON.stringify(key)}] = ${JSON.stringify(b64)};\n`;
   }

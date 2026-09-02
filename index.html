@@ -13073,13 +13073,43 @@ MR.Skin = (function () {
     return Object.assign({}, J, out);
   }
 
-  /** Decode the embed and hand the parsed scene to cb(gltf). */
+  /** Decode the embed and hand the parsed scene to cb(gltf, buf). */
   function load(b64, cb, err) {
     const bin = atob(b64);
     const buf = new ArrayBuffer(bin.length);
     const u8 = new Uint8Array(buf);
     for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
-    new THREE.GLTFLoader().parse(buf, '', cb, err);
+    new THREE.GLTFLoader().parse(buf, '', function (gltf) { cb(gltf, buf); }, err);
+  }
+
+  /**
+   * The basecolor texture, extracted from the GLB by hand and decoded
+   * through an <img> data URL. The owner's first phone run reported "Miles
+   * has no color": GLTFLoader decodes embedded textures through
+   * createImageBitmap, which works in the desktop harness and has a long
+   * history of quietly failing on iOS Safari -- the material falls back to
+   * untextured white. An <img> tag decodes a JPEG on every browser ever
+   * shipped, so the texture goes through one. flipY false is the glTF UV
+   * convention; sRGB is what a basecolor is.
+   */
+  function baseColorTexture(buf) {
+    const dv = new DataView(buf);
+    const jsonLen = dv.getUint32(12, true);
+    const json = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, jsonLen)));
+    if (!json.images || !json.images.length) return null;
+    const img = json.images[0];   // the shrink pipeline strips all but basecolor
+    const view = json.bufferViews[img.bufferView];
+    const binStart = 20 + jsonLen + 8;
+    const bytes = new Uint8Array(buf, binStart + (view.byteOffset || 0), view.byteLength);
+    let s = '';
+    for (let i = 0; i < bytes.length; i += 8192) {
+      s += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+    }
+    const url = 'data:' + (img.mimeType || 'image/jpeg') + ';base64,' + btoa(s);
+    const tex = new THREE.TextureLoader().load(url);
+    tex.flipY = false;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
   }
 
   /**
@@ -13453,10 +13483,11 @@ MR.Skin = (function () {
    *   driver pivot has moved off its own rest, computed top-down so each
    *   bone's local is solved against its parent's already-solved world.
    */
-  function rigFromSkeleton(gltf, parts) {
+  function rigFromSkeleton(gltf, parts, mat) {
     let sm = null;
     gltf.scene.traverse(function (o) { if (o.isSkinnedMesh && !sm) sm = o; });
     if (!sm) return null;
+    if (mat) sm.material = mat;
 
     // Normalise the whole scene: feet to y=0, height to CROWN.
     gltf.scene.updateMatrixWorld(true);
@@ -13500,7 +13531,25 @@ MR.Skin = (function () {
       neck: find('necktwist01', 'neck'),
       head: find('head'),
     };
-    const sideMap = { '-1': ['right', 'r'], '1': ['left', 'l'] };
+    // WHICH SIDE IS LEFT is measured, not assumed. Driver side -1 sits at
+    // -x; gltf convention puts a +z-facing character's Left at +x -- but
+    // this rig's L_Thigh measured at x=-0.089, so its naming mirrors the
+    // convention and the first mapping ran each driver leg into the
+    // opposite thigh. Probe the actual bone x and map to whatever is
+    // really on that side.
+    let leftAtPlusX = true;
+    {
+      const lt = find('lthigh', 'leftupleg', 'leftthigh', 'lupleg');
+      if (lt) {
+        const wp = new THREE.Vector3();
+        lt.getWorldPosition(wp);
+        leftAtPlusX = wp.x >= 0;
+        console.log('MR.Skin: left-side bones sit at ' + (leftAtPlusX ? '+x' : '-x'));
+      }
+    }
+    const sideMap = leftAtPlusX
+      ? { '-1': ['right', 'r'], '1': ['left', 'l'] }
+      : { '-1': ['left', 'l'], '1': ['right', 'r'] };
     const findSide = function (side, tails) {
       for (const sn of sideMap[String(side)]) {
         for (const t of tails) {
@@ -13528,8 +13577,8 @@ MR.Skin = (function () {
     // Driver pairs. Chest carries the shoulder-adjacent spine bone; the
     // driver's shoulder maps to their upper arm, elbow to forearm.
     const pairs = [];
-    const add = function (pivot, bone, frac) {
-      if (pivot && bone) pairs.push([pivot, bone, frac === undefined ? 1 : frac]);
+    const add = function (pivot, bone, frac, cap) {
+      if (pivot && bone) pairs.push([pivot, bone, frac === undefined ? 1 : frac, cap || 0]);
     };
     add(parts.hips, M.hips);
     if (M.spine && M.spine !== M.hips) add(parts.spine, M.spine);
@@ -13547,9 +13596,16 @@ MR.Skin = (function () {
       // weighted to it stretched into a ribbon from elbow to waist in
       // the jump's full abduction. A real shoulder girdle travels with
       // the arm; a quarter is the classic share.
+      // The 1.05 cap is the jump: the driver spreads the arms 1.56rad for
+      // the airborne silhouette, and at that abduction the sculpt's armpit
+      // weights stretch into visible webbing -- the owner's phone report
+      // was "his arms are attached to him when he jumps". Capping the
+      // TRANSPLANTED angle leaves the run's swing untouched (it never
+      // exceeds ~0.8rad) and stops the jump short of the webbing zone;
+      // the driver's own silhouette, which gameplay reads, is unchanged.
       add(A.shoulder, M['clav' + A.side] ||
-        (M['clav' + A.side] = findSide(A.side, ['clavicle', 'shoulder'])), 0.40);
-      add(A.shoulder, M['upper' + A.side]);
+        (M['clav' + A.side] = findSide(A.side, ['clavicle', 'shoulder'])), 0.40, 1.05);
+      add(A.shoulder, M['upper' + A.side], 1, 1.05);
       add(A.elbow, M['fore' + A.side]);
     }
 
@@ -13576,11 +13632,75 @@ MR.Skin = (function () {
     }
     const driverOf = new Map(pairs.map(function (pr) { return [pr[1], pr[0]]; }));
 
+    // ---- symmetrise the limb anchors -----------------------------------
+    // Tripo rigged the sculpt in its natural stance -- one leg pitched
+    // ~13 degrees off the other -- and the transplant anchors each bone on
+    // its own rest, so a symmetric driver cycle landed asymmetrically:
+    // the owner's phone report, "left leg is good, right leg is not".
+    // Each left/right pair's anchors are replaced by their mirror-average
+    // (reflection across x=0 maps a quaternion (w,x,y,z) to (w,x,-y,-z)),
+    // so both limbs swing off the SAME straightened stance; the few
+    // degrees of offset this introduces against the bind pose is a
+    // constant the skin absorbs invisibly.
+    const mirrorQ = function (q) { return new THREE.Quaternion(q.x, -q.y, -q.z, q.w); };
+    for (const key of ['thigh', 'shin', 'foot', 'upper', 'fore', 'clav']) {
+      const a = M[key + '-1'], b2 = M[key + '1'];
+      if (!a || !b2 || !rest.get(a) || !rest.get(b2)) continue;
+      const qa = rest.get(a).worldRel, qb = rest.get(b2).worldRel;
+      const mb = mirrorQ(qb);
+      if (qa.dot(mb) < 0) mb.set(-mb.x, -mb.y, -mb.z, -mb.w);
+      const qs = qa.clone().slerp(mb, 0.5).normalize();
+      qa.copy(qs);
+      qb.copy(mirrorQ(qs));
+    }
+    // ...and the ATTACHMENT POINTS: the thigh and arm heads sit at
+    // different offsets on each side of the stance-rigged pelvis, so even
+    // symmetric anchors swung from asymmetric sockets. The chain heads are
+    // mirror-averaged in the body frame; children ride along untouched.
+    {
+      const bodyInvM = new THREE.Matrix4().copy(parts.body.matrixWorld).invert();
+      const rel = function (b2) {
+        const v = new THREE.Vector3();
+        b2.getWorldPosition(v);
+        return v.applyMatrix4(bodyInvM);
+      };
+      const put = function (b2, p) {
+        const w = p.clone().applyMatrix4(parts.body.matrixWorld);
+        const inv = new THREE.Matrix4().copy(b2.parent.matrixWorld).invert();
+        b2.position.copy(w.applyMatrix4(inv));
+      };
+      for (const key of ['thigh', 'clav', 'upper']) {
+        const a = M[key + '-1'], b2 = M[key + '1'];
+        if (!a || !b2) continue;
+        const pa = rel(a), pb = rel(b2);
+        const ps = new THREE.Vector3((pa.x - pb.x) / 2, (pa.y + pb.y) / 2, (pa.z + pb.z) / 2);
+        put(a, ps);
+        put(b2, new THREE.Vector3(-ps.x, ps.y, ps.z));
+        a.updateMatrixWorld(true);
+        b2.updateMatrixWorld(true);
+      }
+    }
+
     const _pw = new THREE.Quaternion(), _delta = new THREE.Quaternion(),
       _target = new THREE.Quaternion(), _parentW = new THREE.Quaternion(),
       _bw = new THREE.Quaternion(), _IDENT = new THREE.Quaternion();
     // solved world-relative rotations for this frame
     const solved = new Map();
+    // Non-bone ancestors (the Armature node between the scene and the
+    // bones) are STATIC but not identity -- this rig carries a transform
+    // there, and the first solver treated it as identity while the rest
+    // snapshot included it, so every bone's local got the armature's
+    // rotation baked in as error: the legs swung diagonally, one side
+    // worse than the other. Their world-relative rotation is cached once;
+    // they never animate.
+    const staticRel = new Map();
+    function staticRelOf(node) {
+      if (staticRel.has(node)) return staticRel.get(node);
+      const q = new THREE.Quaternion();
+      node.getWorldQuaternion(q).premultiply(bodyInv).normalize();
+      staticRel.set(node, q);
+      return q;
+    }
     function worldRelOf(b) {
       if (solved.has(b)) return solved.get(b);
       const r0 = rest.get(b);
@@ -13590,12 +13710,21 @@ MR.Skin = (function () {
         q = new THREE.Quaternion();
         b.getWorldQuaternion(q).premultiply(bodyInv);
       } else {
-        const parent = b.parent && (b.parent.isBone || b.parent === gltf.scene)
-          ? worldRelOf(b.parent) : new THREE.Quaternion();
+        const parent = b.parent
+          ? (b.parent.isBone ? worldRelOf(b.parent) : staticRelOf(b.parent))
+          : new THREE.Quaternion();
         q = parent.clone().multiply(b.quaternion);
       }
       solved.set(b, q);
       return q;
+    }
+    // The static-ancestor cache is filled NOW, while bodyInv matches the
+    // world state it was captured in -- a lazy first call mid-race would
+    // fold the portrait yaw of that moment into a "static" rotation.
+    for (const pr of pairs) {
+      for (let a = pr[1].parent; a && a !== parts.body; a = a.parent) {
+        if (!a.isBone) staticRelOf(a);
+      }
     }
     function sync() {
       solved.clear();
@@ -13611,13 +13740,18 @@ MR.Skin = (function () {
         const chain = [];
         for (let p2 = pivot; p2 && p2 !== parts.body; p2 = p2.parent) chain.push(p2);
         for (let i = chain.length - 1; i >= 0; i--) _delta.multiply(chain[i].quaternion);
+        if (pr[3]) {
+          const ang = 2 * Math.acos(Math.min(1, Math.abs(_delta.w)));
+          if (ang > pr[3]) _delta.slerp(_IDENT, 1 - pr[3] / ang);
+        }
         if (pr[2] < 1) _delta.slerp(_IDENT, 1 - pr[2]);
         // target world-rel = delta * restWorldRel
         _target.copy(_delta).multiply(r0.worldRel);
-        // parent's world-rel (already solved or rigid)
+        // parent's world-rel: solved bone, or the cached static ancestor
         const parent = bone.parent;
-        const pq = (parent && (parent.isBone || parent === gltf.scene))
-          ? worldRelOf(parent) : new THREE.Quaternion();
+        const pq = parent
+          ? (parent.isBone ? worldRelOf(parent) : staticRelOf(parent))
+          : new THREE.Quaternion();
         _parentW.copy(pq).invert();
         bone.quaternion.copy(_parentW.multiply(_target));
         solved.set(bone, _target.clone());
@@ -13648,11 +13782,20 @@ MR.Skin = (function () {
    */
   function attach(parts, onRigged) {
     if (!MR.EMBED || !MR.EMBED.miles || !THREE.GLTFLoader) return;
-    load(MR.EMBED.miles, function (gltf) {
+    load(MR.EMBED.miles, function (gltf, buf) {
       try {
-        const own = rigFromSkeleton(gltf, parts);
+        // One material for either path: the game's own toon ramp carrying
+        // the sculpt's basecolor, decoded through the iOS-proof route.
+        let mat = null;
+        const tex = baseColorTexture(buf);
+        if (tex) {
+          mat = MR.shading.toon(0xffffff, 3);
+          mat.map = tex;
+        }
+        const own = rigFromSkeleton(gltf, parts, mat);
         if (own) return onRigged(own);
         const norm = normalise(gltf.scene);
+        if (mat) norm.material = mat;
         const r = rig(norm, parts);
         onRigged(r);
       } catch (e) {
@@ -17655,7 +17798,11 @@ MR.Runner = (function () {
         // Applied to the CYCLE terms only -- the slide and tuck poses are
         // measured silhouettes and stay exact -- and the ankle solve below
         // reads the same scaled values, so the foot still plants flat.
-        const asym = i === 0 ? 1.020 : 0.975;
+        // Halved after the sculpted costume shipped: stacked on the rig's
+        // own rest asymmetry it stopped reading as "natural" and started
+        // reading as a bad leg. The rig is symmetrised in skin.js now, and
+        // subtle is the brief's own word.
+        const asym = i === 0 ? 1.012 : 0.988;
         const hipRunA = hipRun * asym, kneeRunA = kneeRun * asym;
         L.hip.rotation.x = hipRunA * cyc + tuck * 0.70
           - slid * (lead ? 1.80 : 1.66);
@@ -19342,6 +19489,10 @@ MR.Runner = (function () {
         skinRig = r;
         api.skinned = true;
         r.sync();
+        // The ghost (and anyone else wearing this rig) re-materials the
+        // costume here -- its create-time traverse ran before the async
+        // model existed.
+        if (api.onSkinned) api.onSkinned(r);
       });
     }
 
@@ -39852,7 +40003,15 @@ MR.Ghost = (function () {
     // Reuse the real rig rather than authoring a second character: it is
     // procedural, it already animates from ground speed, and any future work
     // on the runner's silhouette lands on the ghost for free.
-    const body = MR.Runner.create({ skin: false });
+    // The sculpted costume too -- the owner: "Yes it needs to be a ghost
+    // model." The create-time traverse below re-materials the CODE body
+    // (which stands in until the async model lands); the onSkinned hook
+    // then dresses the costume mesh in the same cool glass. The bib keeps
+    // its ghost material through the swap -- runner.js preserves it.
+    const body = MR.Runner.create();
+    body.onSkinned = function (r2) {
+      r2.mesh.material = mat;
+    };
     // Off the player's beat, so two runners side by side at the crossover read
     // as two runners rather than as one figure and its reflection.
     body.phase = 0.37;

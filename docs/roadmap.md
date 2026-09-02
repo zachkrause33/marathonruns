@@ -8142,3 +8142,24 @@ empty pivots until the model grows a facial rig); the mesh-measuring
 tools read a SkinnedMesh's REST geometry, so envelope/footroom/deckdrop
 describe the driver rig, not the costume, until they learn
 boneTransform(); and the ghost deliberately keeps the code body.
+
+### 85a · The rigged model: Tripo's skeleton, our animation
+
+The owner regenerated Miles in Tripo (cleaner than the Meshy pass and
+closer to the sheet) and ran its auto-rig: 41 joints with professional
+skin weights, delivered as a 77MB GLB through the release flow and
+shrunk to 2.06MB / 29.2k triangles with the skeleton intact. The
+procedural rig -- whose eyeballed joints shredded the mesh at full
+stride, and whose measured-joint rescue was defeated by touching thighs
+-- steps down to fallback; rigFromSkeleton() maps the driver onto
+Tripo's bones (Hip/Waist/Spine02/L_Thigh/R_Calf naming, exact-match
+before substring so R_Thigh's request cannot land on R_ThighTwist01)
+and transplants world-space deltas, so their T-ish rest and our
+arms-down rest coexist. The clavicles take 0.40 of the shoulder's
+motion -- left at rest they stretched the armpit into a ribbon at the
+jump's full abduction. Twist bones ride their parents, unanimated.
+
+At gameplay framing the sculpted runner is artifact-free through run,
+jump and slide; the armpit membrane at extreme abduction survives only
+in macro close-ups, which no shipped camera is. shoot, course-test and
+simulate all pass with the costume live.

@@ -531,32 +531,49 @@ MR.Skin = (function () {
       if (o.isBone) boneByName[o.name.toLowerCase().replace(/[^a-z0-9]/g, '')] = o;
     });
     function find() {
+      // Exact name first -- substring alone would hand R_Thigh's request
+      // to R_ThighTwist01 whenever the key order felt like it.
+      for (let i = 0; i < arguments.length; i++) {
+        if (boneByName[arguments[i]]) return boneByName[arguments[i]];
+      }
       for (let i = 0; i < arguments.length; i++) {
         const want = arguments[i];
         for (const k of Object.keys(boneByName)) {
-          if (k.indexOf(want) >= 0) return boneByName[k];
+          if (k.indexOf(want) >= 0 && k.indexOf('twist') < 0) return boneByName[k];
         }
       }
       return null;
     }
+    // Candidates cover the two families seen in the wild: Mixamo-style
+    // (LeftUpLeg, Spine2) and Tripo's (L_Thigh, R_Calf, Waist, Spine02).
+    // Names are normalised to bare lowercase alphanumerics before
+    // matching, so L_Thigh is "lthigh". Twist helper bones are never
+    // mapped -- unanimated, they simply follow their parents.
     const M = {
-      hips: find('hips', 'pelvis'),
-      spine: find('spine1', 'spine'),
-      chest: find('spine2', 'chest', 'spine1'),
-      neck: find('neck'),
+      hips: find('hip', 'hips', 'pelvis'),
+      spine: find('waist', 'spine01', 'spine1'),
+      chest: find('spine02', 'spine2', 'chest', 'spine01', 'spine1', 'spine'),
+      neck: find('necktwist01', 'neck'),
       head: find('head'),
     };
-    const sideMap = { '-1': 'right', '1': 'left' };
+    const sideMap = { '-1': ['right', 'r'], '1': ['left', 'l'] };
+    const findSide = function (side, tails) {
+      for (const sn of sideMap[String(side)]) {
+        for (const t of tails) {
+          const b = find(sn + t);
+          if (b) return b;
+        }
+      }
+      return null;
+    };
     for (const L of parts.legs) {
-      const sn = sideMap[String(L.side)];
-      M['thigh' + L.side] = find(sn + 'upleg', sn + 'upperleg', sn + 'thigh');
-      M['shin' + L.side] = find(sn + 'leg', sn + 'lowerleg', sn + 'shin', sn + 'calf');
-      M['foot' + L.side] = find(sn + 'foot');
+      M['thigh' + L.side] = findSide(L.side, ['upleg', 'upperleg', 'thigh']);
+      M['shin' + L.side] = findSide(L.side, ['calf', 'lowerleg', 'shin', 'leg']);
+      M['foot' + L.side] = findSide(L.side, ['foot']);
     }
     for (const A of parts.arms) {
-      const sn = sideMap[String(A.side)];
-      M['upper' + A.side] = find(sn + 'arm', sn + 'upperarm');
-      M['fore' + A.side] = find(sn + 'forearm', sn + 'lowerarm');
+      M['upper' + A.side] = findSide(A.side, ['upperarm', 'arm']);
+      M['fore' + A.side] = findSide(A.side, ['forearm', 'lowerarm']);
     }
     if (!M.hips || !M.head || !M['thigh-1'] || !M['upper-1']) {
       console.error('MR.Skin: rigged model missing expected bones',
@@ -567,7 +584,9 @@ MR.Skin = (function () {
     // Driver pairs. Chest carries the shoulder-adjacent spine bone; the
     // driver's shoulder maps to their upper arm, elbow to forearm.
     const pairs = [];
-    const add = function (pivot, bone) { if (pivot && bone) pairs.push([pivot, bone]); };
+    const add = function (pivot, bone, frac) {
+      if (pivot && bone) pairs.push([pivot, bone, frac === undefined ? 1 : frac]);
+    };
     add(parts.hips, M.hips);
     if (M.spine && M.spine !== M.hips) add(parts.spine, M.spine);
     if (M.chest && M.chest !== M.spine) add(parts.chest, M.chest);
@@ -579,6 +598,13 @@ MR.Skin = (function () {
       add(L.ankle, M['foot' + L.side]);
     }
     for (const A of parts.arms) {
+      // The clavicle takes a QUARTER of the shoulder's motion. Left at
+      // rest it stays behind while the arm flies, and the armpit verts
+      // weighted to it stretched into a ribbon from elbow to waist in
+      // the jump's full abduction. A real shoulder girdle travels with
+      // the arm; a quarter is the classic share.
+      add(A.shoulder, M['clav' + A.side] ||
+        (M['clav' + A.side] = findSide(A.side, ['clavicle', 'shoulder'])), 0.40);
       add(A.shoulder, M['upper' + A.side]);
       add(A.elbow, M['fore' + A.side]);
     }
@@ -608,7 +634,7 @@ MR.Skin = (function () {
 
     const _pw = new THREE.Quaternion(), _delta = new THREE.Quaternion(),
       _target = new THREE.Quaternion(), _parentW = new THREE.Quaternion(),
-      _bw = new THREE.Quaternion();
+      _bw = new THREE.Quaternion(), _IDENT = new THREE.Quaternion();
     // solved world-relative rotations for this frame
     const solved = new Map();
     function worldRelOf(b) {
@@ -641,6 +667,7 @@ MR.Skin = (function () {
         const chain = [];
         for (let p2 = pivot; p2 && p2 !== parts.body; p2 = p2.parent) chain.push(p2);
         for (let i = chain.length - 1; i >= 0; i--) _delta.multiply(chain[i].quaternion);
+        if (pr[2] < 1) _delta.slerp(_IDENT, 1 - pr[2]);
         // target world-rel = delta * restWorldRel
         _target.copy(_delta).multiply(r0.worldRel);
         // parent's world-rel (already solved or rigid)

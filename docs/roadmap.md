@@ -8279,3 +8279,41 @@ assembles _site the way pages.yml does, serves it over local HTTP, and
 fails unless the model request actually goes out, the costume actually
 attaches (api.skinned), the crowd pack decoded, and the console stayed
 clean. "The fetch path works" is now a measured claim.
+
+## 88. The sculpted fleet: five BLOCK hazards wear their Tripo heroes
+
+props-v2 delivered eight vehicle sculpts and five of them shipped: the
+road-works sign, the portable traffic light, the taxi, the cargo van and
+the garbage truck now dress BLOCK v1/v2/v5/v6/v7 the way the runner wears
+the sculpted Miles. THE CODE ART STAYS THE CONTRACT: each sculpt is
+scaled so its bounding box lands exactly on the def geometry's own box,
+so the collision box, the envelope guard, the shadow footprint and the
+caution face's mounting plane all still describe what the player sees.
+The swap is per-body -- face boards, moving parts, rideable tails and
+deck cones stay code vocabulary on top -- and a model that fails to
+arrive leaves the code art exactly as it was. skin.js grew the shared
+transport (MR.Skin.model): embed or site-fetch, one in-flight promise
+per key. Each raw 57 MB sculpt shrank to ~10k tris and a 1024 JPEG,
+360-650 KB apiece; the fit matrix lives on the mesh because the
+quantized geometry is shared by every pooled instance.
+
+Three of the eight were refused, each for a measured reason:
+
+- THE BUS matches the tarmac. Its az-0 mean is L 82 / S 0.041 against a
+  lane-0 road of L 80.9 / S 0.145 -- rule 4's gate failed the build, and
+  a tint sweep proved no material multiply can save it: under a PURE
+  BLACK multiply the mean still measures L 62 (the caution face and the
+  toon ramp's dark band hold it up) against a gate line of ~64.7. The
+  white livery is the defect; the fix is a regenerated texture.
+- THE CROSSING is a 0.28-wide WAIT beacon and the def box is a 2.17-wide
+  full-lane blocker: stretched it is a squashed slab, at its own aspect
+  it is a pole in a kill box seven times its width.
+- THE TRAM stretches body.scale.z up to ~11 carriages; a sculpt cannot
+  survive that until carriage instancing exists.
+
+The instruments follow the wardrobe: assembleVariant dresses what it
+assembles, so contrastAudit, fleetSheet and orbit photograph the sculpt,
+and shoot.js/orbit.js wait for api.sculptsPending() to reach zero so the
+gates measure the fleet that ships. Gates green: shoot clean (tightest
+JUMP v11 1.3x, unchanged), 90/90 courses, simulate pass, sitecheck pass
+with all six models fetched; heaviest frame 399k of 500k, draws 213.

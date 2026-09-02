@@ -1067,8 +1067,6 @@ MR.Skin = (function () {
    * replaces it between two frames. A rigged model uses its own skeleton
    * and weights; an unrigged one gets the procedural rig.
    */
-  let fetchP = null;
-
   function attach(parts, onRigged) {
     if (!THREE.GLTFLoader) return;
     const onParsed = function (gltf, buf) {
@@ -1096,30 +1094,44 @@ MR.Skin = (function () {
     const onErr = function (e) {
       console.error('MR.Skin: GLB parse failed, keeping the code body', e);
     };
-    if (MR.EMBED && MR.EMBED.miles) {
-      load(MR.EMBED.miles, onParsed, onErr);
-    } else if (MR.ASSETS && MR.ASSETS.miles && window.fetch) {
-      // The site flavor (tools/build.js --site): the model is a separate
-      // file next to the page, cached by the browser independently of the
-      // game code. Same parse path once the bytes land; a failed fetch
-      // keeps the code body, like any other bad model. The fetch promise is
-      // shared: the player and the ghost both dress here at boot, in
-      // parallel, and two in-flight requests for the same 2 MB file are one
-      // too many. Parsing twice from one buffer is fine -- GLTFLoader only
-      // reads it.
-      if (!fetchP) {
-        fetchP = fetch(MR.ASSETS.miles).then(function (r) {
+    model('miles', onParsed, onErr);
+  }
+
+  /**
+   * Shared model transport, for any module that dresses code art in a
+   * sculpt (the runner's costume here, the hazard fleet in world.js).
+   * Resolves a key against MR.EMBED (base64, decoded in place) or
+   * MR.ASSETS (the site flavor -- tools/build.js --site -- where the model
+   * is a separate file next to the page, cached by the browser
+   * independently of the game code), parses through GLTFLoader, and hands
+   * back cb(gltf, buf). The fetch promise is shared per key: the player
+   * and the ghost both dress at boot, in parallel, and two in-flight
+   * requests for the same 2 MB file is one too many. Parsing twice from
+   * one buffer is fine -- GLTFLoader only reads it.
+   *
+   * err fires on any failure -- missing key, failed fetch, bad parse --
+   * exactly once, so a caller counting outstanding models can settle.
+   * The caller's code art simply stays on; nothing here may throw.
+   */
+  const fetchPs = {};
+  function model(key, cb, err) {
+    if (!THREE.GLTFLoader) return err(new Error('no GLTFLoader'));
+    if (MR.EMBED && MR.EMBED[key]) {
+      load(MR.EMBED[key], cb, err);
+    } else if (MR.ASSETS && MR.ASSETS[key] && window.fetch) {
+      if (!fetchPs[key]) {
+        fetchPs[key] = fetch(MR.ASSETS[key]).then(function (r) {
           if (!r.ok) throw new Error('HTTP ' + r.status);
           return r.arrayBuffer();
         });
       }
-      fetchP
-        .then(function (buf) { parseBuf(buf, onParsed, onErr); })
-        .catch(function (e) {
-          console.error('MR.Skin: model fetch failed, keeping the code body', e);
-        });
+      fetchPs[key]
+        .then(function (buf) { parseBuf(buf, cb, err); })
+        .catch(err);
+    } else {
+      err(new Error('no model ' + key));
     }
   }
 
-  return { attach: attach };
+  return { attach: attach, model: model, baseColorTexture: baseColorTexture };
 })();

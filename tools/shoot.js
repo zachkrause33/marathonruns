@@ -217,6 +217,15 @@ const DEFAULT_SHOTS = [
     await page.goto(url, { waitUntil: 'load' });
     await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, { timeout: 15000 })
       .catch(() => { errors.push('MR.game never became ready'); failed = true; });
+    // The sculpted fleet dresses asynchronously (world.js, THE SCULPTED
+    // FLEET). Every audit below must measure the object the player meets,
+    // so wait for the wardrobe to settle; on the timeout the pending
+    // sculpts have failed and the code art IS what ships, which is then
+    // correctly what gets measured.
+    await page.waitForFunction(
+      () => !MR.game.world.sculptsPending || MR.game.world.sculptsPending() === 0,
+      { timeout: 20000 })
+      .catch(() => { errors.push('sculpted fleet never settled; auditing code art'); });
     await page.waitForTimeout(sh.settle);
 
     const stat = await page.evaluate(() => {

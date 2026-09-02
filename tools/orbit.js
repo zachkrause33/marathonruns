@@ -60,6 +60,12 @@ const FILE = path.resolve(String(arg('file', path.join(ROOT, 'index.html'))));
   page.on('pageerror', (e) => errs.push('pageerror: ' + e.message));
   await page.goto('file://' + FILE + '?bot=1&nocount=1&debug=1', { waitUntil: 'load' });
   await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, { timeout: 20000 });
+  // The sculpted fleet dresses asynchronously; the sheet must show the
+  // object the player meets. On timeout the code art is what ships and is
+  // what gets photographed.
+  await page.waitForFunction(
+    () => !MR.game.world.sculptsPending || MR.game.world.sculptsPending() === 0,
+    { timeout: 20000 }).catch(() => {});
   await page.waitForTimeout(600);
 
   const res = await page.evaluate(({ KIND, TILE, AZ }) => {

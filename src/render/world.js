@@ -8217,6 +8217,11 @@ MR.World = (function () {
             cz - hz, cz + hz,
           ];
           vg.userData.body = body;
+          // The sculpted fleet's register: a def whose model has landed
+          // dresses this body now; one that lands later walks this list.
+          // See THE SCULPTED FLEET below the block defs.
+          (d.bodies = d.bodies || []).push(body);
+          applySculpt(body, d);
           // An anim without a `moving` part is legal and is the cheapest thing
           // in this file: the variant group gets a y shudder and nothing else,
           // which is what an idling diesel looks like, for no mesh and no draw.
@@ -14077,6 +14082,140 @@ MR.World = (function () {
     ]);
 
     /**
+     * ============ THE SCULPTED FLEET ============
+     *
+     * The owner generated hero versions of the BLOCK vocabulary (Tripo,
+     * props-v2) and this dresses the code art in them, exactly the way the
+     * runner wears the sculpted Miles: THE CODE ART STAYS THE CONTRACT.
+     * A sculpt is scaled so its bounding box lands EXACTLY on the def
+     * geometry's own bounding box, so every measurement made about the old
+     * art -- MR.Collision.BOX clearances, the envelope guard, the shadow
+     * footprint, the caution face's mounting plane, the silhouette band
+     * profile -- still describes what the player sees. Art never decides
+     * clearance; here the art is not even allowed to decide its own size.
+     *
+     * The swap is per-BODY, not per-variant: the caution face, the moving
+     * part, the rideable tail and the deck cones are gameplay vocabulary
+     * and stay code art on top of the sculpt. The outlined code body is
+     * hidden, not removed -- an invisible mesh costs a matrix update and no
+     * draw call, and a model that fails to arrive (bad fetch, bad parse)
+     * leaves it exactly as it was. No ink shell on a sculpt: the texture
+     * carries its own edges, which is how the sculpted Miles ships too.
+     *
+     * The fit matrix lives on the MESH (matrixAutoUpdate false) rather than
+     * being baked into the geometry, because the geometry's attributes are
+     * quantized (KHR_mesh_quantization) and are shared by every pooled
+     * instance -- one geometry, one material, one texture per model,
+     * however many are live.
+     *
+     * The tram (v0) is deliberately NOT here: a train sets
+     * body.scale.z = span, up to ~11 carriages' worth, and a sculpted tram
+     * stretched eleven-fold is not a tram. It keeps the code art until
+     * carriage instancing exists.
+     */
+    // How many sculpts are still in flight. tools/shoot.js waits for zero
+    // before running the contrast audit, so the gate measures the fleet
+    // that actually ships, not the code art a fast audit happened to catch.
+    // (Exposed as api.sculptsPending where api is built, further down.)
+    let sculptsPending = 0;
+
+    function sculptMesh(d) {
+      const m = new THREE.Mesh(d.sculpt.geo, d.sculpt.mat);
+      m.matrixAutoUpdate = false;
+      m.matrix.copy(d.sculpt.fit);
+      return m;
+    }
+
+    function applySculpt(body, d) {
+      if (!d.sculpt || body.userData.sculpted) return;
+      body.userData.sculpted = true;
+      body.userData.fill.visible = false;
+      body.userData.line.visible = false;
+      body.add(sculptMesh(d));
+    }
+
+    function dressHazard(kind, vi, key, yaw) {
+      let grp = null;
+      for (const g2 of HAZARD_DEFS) if (g2.kind === kind) grp = g2;
+      const d = grp && grp.defs[vi];
+      if (!d) return;
+      sculptsPending++;
+      MR.Skin.model(key, function (gltf, buf) {
+        try {
+          let src = null;
+          gltf.scene.updateMatrixWorld(true);
+          gltf.scene.traverse(function (o) { if (o.isMesh && !src) src = o; });
+          if (!src) throw new Error('no mesh in ' + key);
+          const geo = src.geometry;
+          // Orient first: yaw turns the sculpt's own nose onto +z, the
+          // game's up-course axis, so vehicles show the player their rear
+          // and a sign shows the player its message. Then map the yawed
+          // bounding box onto the def geometry's, axis by axis. Per-axis
+          // rather than uniform, because the def box is the promise the
+          // rest of the file keeps: a sculpt that kept its own aspect
+          // would either poke out of the envelope or shrink from the lane
+          // edge the collision box says it owns.
+          const pre = new THREE.Matrix4().makeRotationY(yaw).multiply(src.matrixWorld);
+          geo.computeBoundingBox();
+          const sb = geo.boundingBox.clone().applyMatrix4(pre);
+          d.geo.computeBoundingBox();
+          const tb = d.geo.boundingBox;
+          const sx = (tb.max.x - tb.min.x) / Math.max(1e-6, sb.max.x - sb.min.x);
+          const sy = (tb.max.y - tb.min.y) / Math.max(1e-6, sb.max.y - sb.min.y);
+          const sz = (tb.max.z - tb.min.z) / Math.max(1e-6, sb.max.z - sb.min.z);
+          const fit = new THREE.Matrix4().makeTranslation(
+            (tb.max.x + tb.min.x) / 2 - (sb.max.x + sb.min.x) / 2 * sx,
+            (tb.max.y + tb.min.y) / 2 - (sb.max.y + sb.min.y) / 2 * sy,
+            (tb.max.z + tb.min.z) / 2 - (sb.max.z + sb.min.z) / 2 * sz)
+            .multiply(new THREE.Matrix4().makeScale(sx, sy, sz))
+            .multiply(pre);
+          // The game's own toon ramp carrying the sculpt's basecolor,
+          // decoded through the iOS-proof route skin.js owns.
+          const tex = MR.Skin.baseColorTexture(buf);
+          const smat = S.toon(0xffffff, 3);
+          if (tex) smat.map = tex;
+          d.sculpt = { geo: geo, mat: smat, fit: fit };
+          // Dress everything already built -- live and pooled-free alike --
+          // and the factory dresses everything built from now on.
+          for (const b of d.bodies || []) applySculpt(b, d);
+          console.log('MR.World: sculpted ' + key + ' on, x' + sx.toFixed(2)
+            + ' y' + sy.toFixed(2) + ' z' + sz.toFixed(2));
+        } catch (e) {
+          console.error('MR.World: ' + key + ' dress failed, code art stays', e);
+        }
+        sculptsPending--;
+      }, function (e) {
+        sculptsPending--;
+        console.log('MR.World: ' + key + ' unavailable, code art stays ('
+          + (e && e.message) + ')');
+      });
+    }
+
+    dressHazard(K.BLOCK, 1, 'veh_signworks', Math.PI);
+    dressHazard(K.BLOCK, 2, 'veh_lightworks', Math.PI);
+    // THE CROSSING (v3) IS NOT DRESSED. The sculpt is a pedestrian WAIT
+    // beacon -- a 0.28-wide pole -- and the def box is a 2.17-wide
+    // full-lane blocker. Stretched to fill it, the pole photographs as a
+    // squashed slab with the code paddle hiding its face; fitted at its
+    // own aspect it would be a slim pole in the middle of a kill box more
+    // than seven times its width, which is the "hazard the player cannot
+    // read" defect by construction. The code art is shaped like its own
+    // collision box; the beacon is not.
+    // THE BUS (v4) IS NOT DRESSED, and the reason is a measurement, not a
+    // preference. The sculpted bus is white over dark glass: its az-0 mean
+    // measured L 82 / S 0.041 against a lane-0 road of L 80.9 / S 0.145 --
+    // it matches the tarmac on both axes, and rule 4 fails the build for
+    // exactly that. A tint cannot save it: the mean's floor under a PURE
+    // BLACK material multiply is L 62 (the caution face and the toon
+    // ramp's dark band hold it up) against a gate line of ~64.7, so the
+    // best any tint achieves is a 3% margin that the next city's palette
+    // erases. The fix is a brighter livery in the texture -- a regenerated
+    // sculpt -- not a thumb on the material.
+    dressHazard(K.BLOCK, 5, 'veh_taxi', 0);
+    dressHazard(K.BLOCK, 6, 'veh_van', 0);
+    dressHazard(K.BLOCK, 7, 'veh_refusetruck', 0);
+
+    /**
      * ============ CONTACT SHADING UNDER EVERY HAZARD ============
      *
      * Measured off tgr-city.png and tgr-egypt.png, and the measurement is the
@@ -18121,6 +18260,8 @@ MR.World = (function () {
     function structPool(st) { return markPool(st); }
 
     const api = { group, sky, mats, course };
+    // See THE SCULPTED FLEET at the block defs.
+    api.sculptsPending = function () { return sculptsPending; };
 
     /**
      * ================== THE PALETTE, AND ITS TWO AXES ==================
@@ -19736,6 +19877,10 @@ MR.World = (function () {
       const body = S.outlined(d.geo, mats.propLit, S.INK.hazard);
       // Same tag the spawn site puts on, for the same reason -- see there.
       body.userData.people = 'hazard';
+      // The instruments photograph the sculpt the moment the game wears it
+      // -- contrastAudit, fleetSheet and orbit must describe the object the
+      // player meets, not the code art underneath it.
+      applySculpt(body, d);
       g.add(body);
       if (d.face) {
         const f = new THREE.Mesh(hplane(d.face[0], d.face[1]), faceMat[tint]);

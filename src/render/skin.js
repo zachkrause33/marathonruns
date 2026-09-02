@@ -285,6 +285,19 @@ MR.Skin = (function () {
     }
     joint(chestB, hipsB); joint(neckB, chestB); joint(headB, neckB);
 
+    // Blend radius PER JOINT: the shoulder is where the sleeve, the armpit
+    // and the flank all meet -- a 0.09 sphere left the sleeve hem tearing
+    // off the shirt at the stance's abduction -- so it blends over nearly
+    // twice the reach; the hip likewise. Fingers-to-forearm and the ankle
+    // stay tight or the blend turns the wrist to rubber.
+    const BR_OF = {};
+    for (const s of [-1, 1]) {
+      BR_OF[bi.get(sides[s].shoulder)] = 0.17;
+      BR_OF[bi.get(sides[s].elbow)] = 0.08;
+      BR_OF[bi.get(sides[s].thigh)] = 0.13;
+      BR_OF[bi.get(sides[s].shin)] = 0.09;
+      BR_OF[bi.get(sides[s].foot)] = 0.07;
+    }
     const BR = 0.09;
     const skinIndex = new Uint16Array(n * 4);
     const skinWeight = new Float32Array(n * 4);
@@ -296,7 +309,8 @@ MR.Skin = (function () {
         const px = pos.getX(v) - j[0][0], py = pos.getY(v) - j[0][1],
           pz = pos.getZ(v) - j[0][2];
         const e = Math.sqrt(px * px + py * py + pz * pz);
-        if (e < BR) { w2 = 0.5 * (1 - e / BR); b2i = j[1]; }
+        const br = BR_OF[a] || BR;
+        if (e < br) { w2 = 0.5 * (1 - e / br); b2i = j[1]; }
       }
       skinIndex[v * 4] = a; skinWeight[v * 4] = 1 - w2;
       skinIndex[v * 4 + 1] = b2i; skinWeight[v * 4 + 1] = w2;

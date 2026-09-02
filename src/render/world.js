@@ -14429,18 +14429,25 @@ MR.World = (function () {
           // pixels the audit measures are the pixels the player gets.
           const oneCoat = function () {
             MR.Skin.baseColorImage(buf, function (img) {
-              const m2 = S.toon(0xffffff, 3);
+              // floor 0.62 and cel spec -- the SAME numbers mats.propLit
+              // gives the code art, because the owner could see the seam:
+              // "you can tell the difference in lighting of the obstacles
+              // we changed and didnt." The sculpts had been dressed at the
+              // scenery floor of 0.38, so their shaded faces sat ~40%
+              // darker than every code hazard beside them, on top of the
+              // AO their textures bake in. Not the shadows -- the ramp.
+              const m2 = S.toon(0xffffff, 3, 0.62, true);
               m2.map = paintShift(img, 0);
               finish([m2]);
             }, function (e) {
               console.error('MR.World: ' + key + ' basecolor failed, untextured', e);
-              finish([S.toon(0xffffff, 3)]);
+              finish([S.toon(0xffffff, 3, 0.62, true)]);
             });
           };
           if (hues && hues.length) {
             MR.Skin.baseColorImage(buf, function (img) {
               finish(hues.map(function (coat) {
-                const m2 = S.toon(0xffffff, 3);
+                const m2 = S.toon(0xffffff, 3, 0.62, true);
                 m2.map = paintShift(img, coat);
                 return m2;
               }));
@@ -14548,9 +14555,18 @@ MR.World = (function () {
     // fallen-scooter pose the def box was authored for.
     dressHazard(K.JUMP, 3, 'veh_j_scooter', 0, null, false, Math.PI / 2);
     dressHazard(K.JUMP, 4, 'veh_j_barrier', 0, [{ h: 0, t: 0, l: 1.2 }]);   // +0.131
-    dressHazard(K.JUMP, 5, 'veh_j_pipe', 0, [{ h: 0, t: 0, s: 2.2, l: 1.1 }]);   // +0.214
+    // THE PIPE STACK (v5) IS NOT DRESSED: the sculpt sits at a
+    // 29k-triangle fragment floor (five times any other JUMP) and a
+    // 1.1 MB file, which together made it both the heaviest thing in
+    // the heaviest frame and the piece that pushed the embedded page
+    // past the artifact's 16 MB cap. The code art returns until a
+    // cleaner regeneration lands -- see the backlog.
     dressHazard(K.JUMP, 6, 'veh_j_planter', 0, [{ h: 0, t: 0, s: 2.4, l: 1.2 }]);   // +0.07
-    dressHazard(K.JUMP, 7, 'veh_j_crate', 0);
+    // The crate's wood sits in a narrow saturation window -- lanes ~0.23
+    // below it, tempo mats 0.75 above -- and the propLit ramp move left
+    // it 0.01 under the gate against lane 2 in two cities. A gentle
+    // saturation boost centres it: S 0.501, +0.106 at the tightest road.
+    dressHazard(K.JUMP, 7, 'veh_j_crate', 0, [{ h: 0, t: 0, s: 1.2 }]);
     dressHazard(K.JUMP, 8, 'veh_j_barricade', 0);
     dressHazard(K.JUMP, 9, 'veh_j_drum', 0);
     dressHazard(K.JUMP, 10, 'veh_j_lowbar', 0, [{ h: 0, t: 0, s: 3.0, l: 1.06 }]);   // s1.9 missed lane 2 by 0.003 in one city; clipped-saturation coat clears everywhere

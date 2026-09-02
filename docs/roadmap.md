@@ -8421,3 +8421,29 @@ back to code art there exactly as a failed fetch would.
 Gates green across all eight city shots; heaviest frame 460k of 500k
 (the pipe stack's 29k fragment floor is the first thing to regenerate
 if that ever tightens); 90/90 courses; sitecheck fetching 29 models.
+
+## 91. The lighting seam: sculpts join the propLit ramp
+
+The owner: "you can tell the difference in lighting of the obstacles we
+changed and didnt... maybe it is the shadows?" Not the shadows -- the
+ramp. Code hazards wear mats.propLit = vtoon(3, 0.62, true): a toon
+floor of 0.62 chosen long ago because the contrast gate wants bright
+shaded faces, plus the cel specular. The sculpts had been dressed at
+S.toon's scenery default -- floor 0.38, no spec -- so every sculpt's
+shaded side sat ~40% darker than the code art beside it, on top of the
+ambient occlusion its texture bakes in. One constructor change puts
+every sculpt on propLit's exact numbers.
+
+The brighter floor moved every measured coat; the full shoot found one
+regression -- the crate 0.01 under the saturation gate against lane 2
+in two cities -- fixed with a gentle s 1.2 coat that centres its wood
+in the narrow window between the lanes and the tempo mats.
+
+And the page had outgrown the artifact: 18.4 MB against the 16 MB cap.
+Reclaimed by parking the pipe-stack sculpt (a 29k-triangle fragment
+floor and 1.1 MB for one JUMP variant -- also the heaviest thing in
+the heaviest frame; the code art returns until a cleaner regeneration)
+and taking the small JUMPs, the DUCK spans and the works trailers to
+256px textures, which is what objects that size resolve anyway. The
+committed page is 15.7 MiB; the deployed site is unaffected (models
+travel as separate cached files there).

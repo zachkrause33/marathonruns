@@ -357,7 +357,15 @@ MR.Ghost = (function () {
     // Reuse the real rig rather than authoring a second character: it is
     // procedural, it already animates from ground speed, and any future work
     // on the runner's silhouette lands on the ghost for free.
-    const body = MR.Runner.create({ skin: false });
+    // The sculpted costume too -- the owner: "Yes it needs to be a ghost
+    // model." The create-time traverse below re-materials the CODE body
+    // (which stands in until the async model lands); the onSkinned hook
+    // then dresses the costume mesh in the same cool glass. The bib keeps
+    // its ghost material through the swap -- runner.js preserves it.
+    const body = MR.Runner.create();
+    body.onSkinned = function (r2) {
+      r2.mesh.material = mat;
+    };
     // Off the player's beat, so two runners side by side at the crossover read
     // as two runners rather than as one figure and its reflection.
     body.phase = 0.37;

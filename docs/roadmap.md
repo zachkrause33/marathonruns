@@ -8163,3 +8163,38 @@ At gameplay framing the sculpted runner is artifact-free through run,
 jump and slide; the armpit membrane at extreme abduction survives only
 in macro close-ups, which no shipped camera is. shoot, course-test and
 simulate all pass with the costume live.
+
+### 85b · The phone report: color, webbing, the bad leg, the ghost
+
+The owner's first device run found four things the desktop harness could
+not, and each fix carries its lesson:
+
+- "MILES HAS NO COLOR." GLTFLoader decodes embedded textures through
+  createImageBitmap, which works under SwiftShader and quietly fails on
+  iOS Safari -- the material fell back to untextured white. The
+  basecolor now bypasses it entirely: extracted from the GLB by hand,
+  decoded through an <img> data URL (works on every browser ever
+  shipped), and mounted on the game's own toon ramp, which also unifies
+  the costume's shading with the world's.
+- "HIS ARMS ARE ATTACHED TO HIM WHEN HE JUMPS." The armpit webbing: at
+  the jump's 1.56rad abduction the sculpt's armpit weights stretch into
+  a membrane. The TRANSPLANTED shoulder angle is capped at 1.05rad --
+  the run's swing never exceeds ~0.8 and is untouched, the driver's own
+  silhouette (which gameplay reads) is unchanged, and the clavicle's
+  0.40 share rides the same capped delta.
+- "LEFT LEG IS GOOD, RIGHT LEG IS NOT." Two real causes and one false
+  one. False: a probe measured bone positions while the character stood
+  turned 180 degrees and concluded the left/right mapping was crossed
+  -- correction 36's frame-of-reference trap, repeated within a day;
+  the mapping was right, and left/right is now MEASURED off the bones
+  at attach. Real: Tripo rigged the sculpt in its natural stance, one
+  leg pitched ~13 degrees off the other, and the transplant anchored
+  each limb on its own rest -- so a symmetric cycle landed asymmetric.
+  Limb anchors are now mirror-averaged (orientations AND attachment
+  points, clavicle before its own child arm), and the driver's
+  deliberate asymmetry halved -- stacked on a crooked rig it read as a
+  bad leg, not as life. Foot-trajectory mirror error: 0.13 before,
+  0.011 after, the survivor being the intentional half.
+- THE GHOST WEARS THE COSTUME. An onSkinned hook lets the ghost dress
+  the async-arriving mesh in its cool glass; its create-time traverse
+  had run long before any model existed.

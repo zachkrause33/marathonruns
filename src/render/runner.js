@@ -3984,7 +3984,11 @@ MR.Runner = (function () {
         // Applied to the CYCLE terms only -- the slide and tuck poses are
         // measured silhouettes and stay exact -- and the ankle solve below
         // reads the same scaled values, so the foot still plants flat.
-        const asym = i === 0 ? 1.020 : 0.975;
+        // Halved after the sculpted costume shipped: stacked on the rig's
+        // own rest asymmetry it stopped reading as "natural" and started
+        // reading as a bad leg. The rig is symmetrised in skin.js now, and
+        // subtle is the brief's own word.
+        const asym = i === 0 ? 1.012 : 0.988;
         const hipRunA = hipRun * asym, kneeRunA = kneeRun * asym;
         L.hip.rotation.x = hipRunA * cyc + tuck * 0.70
           - slid * (lead ? 1.80 : 1.66);
@@ -5671,6 +5675,10 @@ MR.Runner = (function () {
         skinRig = r;
         api.skinned = true;
         r.sync();
+        // The ghost (and anyone else wearing this rig) re-materials the
+        // costume here -- its create-time traverse ran before the async
+        // model existed.
+        if (api.onSkinned) api.onSkinned(r);
       });
     }
 

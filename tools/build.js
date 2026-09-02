@@ -101,12 +101,22 @@ if (SITE && process.argv.includes('--artifact')) {
 }
 let embed = 'window.MR = window.MR || {};\nMR.EMBED = {};\nMR.ASSETS = {};\n';
 const assetDir = path.join(ROOT, 'assets');
+// The artifact host caps a page at 16 MB, and with thirty sculpted models
+// the fully-embedded page is past it. The four heaviest props sit this
+// channel out -- their hazards fall back to the code art the sculpts
+// replaced, which is the same graceful path a failed fetch takes. The
+// committed index.html and the site keep everything; only the preview
+// frame loses these four.
+const ARTIFACT_SKIP = process.argv.includes('--artifact')
+  ? ['veh-j-pipe.glb', 'veh-d-walkway.glb', 'veh-j-crate.glb', 'veh-j-planter.glb']
+  : [];
 if (fs.existsSync(assetDir)) {
   for (const f of fs.readdirSync(assetDir).sort()) {
     // .glb rides GLTFLoader; .pack is the game's own compact binary (the
     // crowd people -- see src/render/world.js's decoder) for content that
     // must decode SYNCHRONOUSLY at world build.
     if (!f.endsWith('.glb') && !f.endsWith('.pack')) continue;
+    if (ARTIFACT_SKIP.includes(f)) continue;
     const key = f.replace(/\.(glb|pack)$/, '').replace(/[^A-Za-z0-9_]/g, '_');
     const bytes = fs.readFileSync(path.join(assetDir, f));
     if (SITE && f.endsWith('.glb')) {

@@ -14533,22 +14533,27 @@ MR.World = (function () {
     // US black-and-white averaged to road grey and had no lever. This
     // one is the battenburg the refusal note asked for -- yellow and
     // blue over white, a livery that exists to be seen.
-    dressHazard(K.BLOCK, 13, 'veh_police2', 0);
+    // Measured +0.095 with a brightening coat: the battenburg's mean
+    // sat a hair under lane 1 without it (L 114.9 vs 95.1, ratio 1.21).
+    dressHazard(K.BLOCK, 13, 'veh_police2', 0, [{ h: 0, t: 0, l: 1.18 }]);
 
     // ---- the JUMP vocabulary (props-v4) --------------------------------
-    dressHazard(K.JUMP, 0, 'veh_j_sandbags', 0);
-    dressHazard(K.JUMP, 1, 'veh_j_cones', 0);
-    dressHazard(K.JUMP, 2, 'veh_j_trench', 0);
+    // Every coat below was measured through contrastAudit; the margin
+    // at the tightest road tone is noted per line. t:0 means the whole
+    // texture takes the coat -- these props have no glass to protect.
+    dressHazard(K.JUMP, 0, 'veh_j_sandbags', 0, [{ h: 0, t: 0, s: 1.35 }]);   // +0.15
+    dressHazard(K.JUMP, 1, 'veh_j_cones', 0, [{ h: 0, t: 0, l: 1.2 }]);   // +0.147
+    dressHazard(K.JUMP, 2, 'veh_j_trench', 0, [{ h: 0, t: 0, l: 1.3 }]);   // +0.135
     // Generated standing; a quarter roll about x lays it down into the
     // fallen-scooter pose the def box was authored for.
     dressHazard(K.JUMP, 3, 'veh_j_scooter', 0, null, false, Math.PI / 2);
-    dressHazard(K.JUMP, 4, 'veh_j_barrier', 0);
-    dressHazard(K.JUMP, 5, 'veh_j_pipe', 0);
-    dressHazard(K.JUMP, 6, 'veh_j_planter', 0);
+    dressHazard(K.JUMP, 4, 'veh_j_barrier', 0, [{ h: 0, t: 0, l: 1.2 }]);   // +0.131
+    dressHazard(K.JUMP, 5, 'veh_j_pipe', 0, [{ h: 0, t: 0, s: 2.2, l: 1.1 }]);   // +0.214
+    dressHazard(K.JUMP, 6, 'veh_j_planter', 0, [{ h: 0, t: 0, s: 2.4, l: 1.2 }]);   // +0.07
     dressHazard(K.JUMP, 7, 'veh_j_crate', 0);
     dressHazard(K.JUMP, 8, 'veh_j_barricade', 0);
     dressHazard(K.JUMP, 9, 'veh_j_drum', 0);
-    dressHazard(K.JUMP, 10, 'veh_j_lowbar', 0);
+    dressHazard(K.JUMP, 10, 'veh_j_lowbar', 0, [{ h: 0, t: 0, s: 3.0, l: 1.06 }]);   // s1.9 missed lane 2 by 0.003 in one city; clipped-saturation coat clears everywhere
     dressHazard(K.JUMP, 11, 'veh_j_trash', 0);
 
     // ---- the DUCK vocabulary (props-v4, v6-v10 still code art) ---------
@@ -14556,7 +14561,11 @@ MR.World = (function () {
     // measurement in dressHazard.
     dressHazard(K.DUCK, 0, 'veh_d_gantry', 0);
     dressHazard(K.DUCK, 1, 'veh_d_scaffold', 0);
-    dressHazard(K.DUCK, 2, 'veh_d_sign', Math.PI);
+    // THE HANGING SIGN (v2) IS NOT DRESSED: the sculpt is only the sign
+    // assembly -- 0.33 of height against 0.98 of width, no posts to the
+    // ground -- and the bar-aware fit can only stretch it four-fold to
+    // reach the road, which mangles it. Needs a full-height regeneration:
+    // a roadwork sign gantry WITH legs, like the d-gantry model has.
     dressHazard(K.DUCK, 3, 'veh_d_boom', 0);
     dressHazard(K.DUCK, 4, 'veh_d_pipe', 0);
     dressHazard(K.DUCK, 5, 'veh_d_walkway', 0);

@@ -8388,3 +8388,36 @@ vivid tram ships by adding one dress line.
 The start-crowd rework is entry 89's sibling commit: the wardrobe moved
 onto the game's own shirt palette and the blob hunt ended at the street
 furniture -- see that commit message for the instrument story.
+
+## 91. props-v4: the JUMP dozen, five DUCK spans, and the bar-aware fit
+
+Twenty models in one release. Shipped: all twelve JUMP hazards, five of
+the six generated DUCK spans, the battenburg police car (the refusal
+note asked for exactly that livery, and it came) and the orange
+container. Eight variants took measured corrective coats -- real-world
+textures run tan-and-grey, and tan-and-grey is tarmac; every coat's
+margin at the tightest road tone is written at its dress line. The
+fallen e-scooter arrived standing and takes a quarter roll about x
+(the fit's new rotX) to lie down into the pose its box was authored
+for. The hanging sign was refused: the sculpt is only the sign
+assembly, no posts, and no fit can reach the road with it.
+
+THE DUCK FIT IS BAR-AWARE, and this is the entry's contract point: a
+DUCK's def geometry spans the whole structure while the hazard is the
+bar at MR.Collision.BOX[DUCK].yMin..yMax, so a bounding-box fit would
+put the sculpt's bar wherever its proportions landed it -- art
+deciding clearance. The sculpt's overhead underside is measured (a
+vertex histogram over height; the underside is the bottom of the
+dominant mass above 30%) and pinned to the box's yMin, clamped
+DOWNWARD when the crown would leave the envelope, because a bar drawn
+low costs an early duck and a bar drawn high costs the record.
+
+Page weight forced two calls: every model rebaked at 512 textures (the
+committed page is 18.4 MB; the site flavor stays ~3 MB plus cached
+files), and the artifact preview -- capped at 16 MB by its host --
+skips the four heaviest props via ARTIFACT_SKIP in build.js, falling
+back to code art there exactly as a failed fetch would.
+
+Gates green across all eight city shots; heaviest frame 460k of 500k
+(the pipe stack's 29k fragment floor is the first thing to regenerate
+if that ever tightens); 90/90 courses; sitecheck fetching 29 models.

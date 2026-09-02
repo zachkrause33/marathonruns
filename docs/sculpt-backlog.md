@@ -16,7 +16,7 @@ player sees. Every sculpt must clear the contrast gate (CLAUDE.md rule
 below are that gate doing its job, and the fix is a different texture,
 not a smaller standard.
 
-## BLOCK (swipe left/right) -- 10 of 14 sculpted
+## BLOCK (swipe left/right) -- 12 of 14 sculpted
 
 | v  | obstacle    | status                                             |
 |----|-------------|----------------------------------------------------|
@@ -30,52 +30,48 @@ not a smaller standard.
 | 7  | refusetruck | shipped (props-v2)                                 |
 | 8  | crateload   | shipped (props-v3, brightened + saturated coat)    |
 | 9  | moped       | shipped (props-v3 scooter + rider, green coat)     |
-| 10 | container   | TO DO -- needs a LIGHT regeneration: the weathered blue sits inside the finish carpet's tone (L 59 / S 0.53 vs L 56.6 / S 0.507) and no repaint reaches the gate (ceiling L 62.5 under 1.8x lightness). Generate a light one: white, orange or yellow livery. |
+| 10 | container   | shipped (props-v4 orange regeneration)             |
 | 11 | dumpster    | shipped (props-v3)                                 |
 | 12 | hatchback   | shipped (props-v3 blue car; ships in orange, gold, green, magenta -- blue itself is under the gate) |
-| 13 | police      | TO DO, MAYBE NEVER -- black-over-white averages to road grey (L 88 / S 0.02 vs lane 1's L 93 / S 0.18) and no tint has a lever. A sculpt only works with a strongly-coloured livery (e.g. a European blue-and-yellow battenburg pattern); classic US black-and-white cannot pass the gate in this palette. |
+| 13 | police      | shipped (props-v4 battenburg regeneration, +1.18 lightness coat) |
 
-## JUMP (leap over) -- 0 of 12 sculpted, NEXT UP
+## JUMP (leap over) -- 12 of 12 SCULPTED (props-v4)
 
 Low objects; the sculpt's silhouette matters at knee height. Best Tripo
 inputs marked: (photo) = screenshot a real-world photo, (card) = use
 the obstacle card rendered from the game (no real-world equivalent).
 
-| v  | obstacle  | input |
-|----|-----------|-------|
-| 0  | sandbags  | photo |
-| 1  | cones     | photo -- three orange traffic cones in a row |
-| 2  | trench    | card -- open roadworks trench with edge boards |
-| 3  | scooter   | photo -- fallen e-scooter lying on its side |
-| 4  | barrier   | photo -- low concrete jersey barrier |
-| 5  | pipe      | card -- pipe stack on chocks |
-| 6  | planter   | photo -- street planter box |
-| 7  | crate     | photo -- single wooden crate |
-| 8  | barricade | photo -- red/white works barricade |
-| 9  | drum      | photo -- oil drum pair |
-| 10 | lowbar    | card -- low crossbar on posts |
-| 11 | trash     | photo -- trash bag pile |
+All twelve shipped. Eight took measured corrective coats (margins at
+the dress lines); the e-scooter arrived standing and takes a quarter
+roll to lie down; the pipe stack sits at a 29k-triangle fragment floor
+and is the first candidate to regenerate if the triangle budget ever
+tightens (heaviest frame is 460k of the 500k ceiling).
 
-## DUCK (slide under) -- 0 of 11 sculpted
+## DUCK (slide under) -- 5 of 11 sculpted (props-v4)
 
 Overhead spans; the slide-under gap comes from MR.Collision.BOX, never
 from the art, so the sculpt is fitted with its underside on the box
 line. Wide, span-like generations work; tall or floor-standing ones
 will not fit the frame.
 
-| v  | obstacle   | input |
+| v  | obstacle   | status |
 |----|------------|-------|
-| 0  | gantry     | card |
-| 1  | scaffold   | photo or card -- scaffolding span |
-| 2  | sign       | card -- hanging roadwork sign frame |
-| 3  | boom       | photo -- lowered boom barrier arm |
-| 4  | pipe       | card -- overhead pipe run |
-| 5  | walkway    | card -- elevated pedestrian walkway |
-| 6  | floodlight | photo or card -- works floodlight rig |
-| 7  | bridge     | card -- low bridge underside |
-| 8  | awning     | photo -- shop awning |
-| 9  | shopsign   | photo or card -- projecting shop sign |
-| 10 | walkboard  | card -- scaffold walkboard span |
+| 0  | gantry     | shipped |
+| 1  | scaffold   | shipped |
+| 2  | sign       | TO DO -- the props-v4 sculpt is only the hanging-sign assembly (a third as tall as it is wide, no posts to the ground); the bar-aware fit can only stretch it four-fold, which mangles it. Regenerate FULL-HEIGHT: a roadwork sign gantry with legs. |
+| 3  | boom       | shipped |
+| 4  | pipe       | shipped |
+| 5  | walkway    | shipped |
+| 6  | floodlight | TO DO -- not yet generated (photo or card) |
+| 7  | bridge     | TO DO -- not yet generated (card) |
+| 8  | awning     | TO DO -- not yet generated (photo) |
+| 9  | shopsign   | TO DO -- not yet generated (photo or card) |
+| 10 | walkboard  | TO DO -- not yet generated (card) |
+
+The DUCK vertical fit is bar-aware: the sculpt's overhead underside is
+measured and pinned to MR.Collision.BOX[DUCK].yMin, so the visual gap
+is the collision gap. Generate DUCK models full-height, posts to the
+ground, like the gantry.
 
 ## Also waiting
 

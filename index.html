@@ -13596,17 +13596,228 @@ MR.Skin = (function () {
       // weighted to it stretched into a ribbon from elbow to waist in
       // the jump's full abduction. A real shoulder girdle travels with
       // the arm; a quarter is the classic share.
-      // The 1.05 cap is the jump: the driver spreads the arms 1.56rad for
-      // the airborne silhouette, and at that abduction the sculpt's armpit
-      // weights stretch into visible webbing -- the owner's phone report
-      // was "his arms are attached to him when he jumps". Capping the
-      // TRANSPLANTED angle leaves the run's swing untouched (it never
-      // exceeds ~0.8rad) and stops the jump short of the webbing zone;
-      // the driver's own silhouette, which gameplay reads, is unchanged.
+      // The clavicle takes 0.40 of the shoulder's motion; the shoulder's
+      // abduction cap lives in capQ below, where it applies to the WHOLE
+      // chain -- the first version capped only the upper-arm pair, the
+      // forearm inherited the shoulder's rotation uncapped through the
+      // chain walk, and the membrane simply moved to the elbows (the
+      // owner's second screenshot showed exactly that).
       add(A.shoulder, M['clav' + A.side] ||
-        (M['clav' + A.side] = findSide(A.side, ['clavicle', 'shoulder'])), 0.40, 1.05);
-      add(A.shoulder, M['upper' + A.side], 1, 1.05);
+        (M['clav' + A.side] = findSide(A.side, ['clavicle', 'shoulder'])), 0.40);
+      add(A.shoulder, M['upper' + A.side]);
       add(A.elbow, M['fore' + A.side]);
+    }
+
+    // ---- armpit weight surgery -----------------------------------------
+    // The membrane the owner photographed twice: vertices in the armpit
+    // whose weights MIX arm and torso stretch into webbing the moment the
+    // arm leaves the flank -- capping the arm's travel only moved the
+    // stretch to the elbow. So the mix itself goes: inside the armpit
+    // region, a vertex snaps to whichever side already owns most of it.
+    // A sharp crease where arm meets flank reads as a crease; a membrane
+    // reads as a wing.
+    {
+      const geo = sm.geometry;
+      const si = geo.getAttribute('skinIndex'), sw = geo.getAttribute('skinWeight');
+      const posA = geo.getAttribute('position');
+      if (si && sw && posA && sm.skeleton) {
+        const armIdx = new Set();
+        sm.skeleton.bones.forEach(function (b2, i) {
+          const nm = b2.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (/upperarm|forearm|hand/.test(nm)) armIdx.add(i);
+        });
+        // region bounds in the mesh's LOCAL space (pre-normalisation): use
+        // fractions of its own bbox height so the surgery is scale-free.
+        // 0.22..0.80, not the armpit-only 0.45..0.78 of the first draft:
+        // edge-stretch measurement in the jump pose put the worst verts at
+        // 29-64% of height, co-owned by the HAND and THIGH-TWIST bones --
+        // the fists hang touching the thighs at rest and the auto-weights
+        // blended them, so the membrane ran fist-to-thigh, below the band.
+        geo.computeBoundingBox();
+        const bb = geo.boundingBox, H = bb.max.y - bb.min.y;
+        const y0 = bb.min.y + H * 0.22, y1 = bb.min.y + H * 0.80;
+        // r160 BufferAttribute has no getComponent; go through the four
+        // named accessors instead.
+        const gets = [function (a, v2) { return a.getX(v2); }, function (a, v2) { return a.getY(v2); },
+          function (a, v2) { return a.getZ(v2); }, function (a, v2) { return a.getW(v2); }];
+        const sets = [function (a, v2, x) { a.setX(v2, x); }, function (a, v2, x) { a.setY(v2, x); },
+          function (a, v2, x) { a.setZ(v2, x); }, function (a, v2, x) { a.setW(v2, x); }];
+        let snapped = 0;
+        for (let v = 0; v < si.count; v++) {
+          const py = posA.getY(v);
+          if (py < y0 || py > y1) continue;
+          let wArm = 0, wTot = 0;
+          for (let k = 0; k < 4; k++) {
+            const w = gets[k](sw, v);
+            wTot += w;
+            if (armIdx.has(gets[k](si, v))) wArm += w;
+          }
+          if (wTot <= 0) continue;
+          const f = wArm / wTot;
+          if (f < 0.04 || f > 0.96) continue;   // already owned; leave it
+          const keepArm = f >= 0.5;
+          let kept = 0;
+          for (let k = 0; k < 4; k++) {
+            const isArm = armIdx.has(gets[k](si, v));
+            if (isArm !== keepArm) sets[k](sw, v, 0);
+            else kept += gets[k](sw, v);
+          }
+          if (kept > 0) {
+            for (let k = 0; k < 4; k++) {
+              sets[k](sw, v, gets[k](sw, v) / kept);
+            }
+            snapped++;
+          }
+        }
+        sw.needsUpdate = true;
+        console.log('MR.Skin: armpit surgery snapped ' + snapped + ' mixed vertices');
+
+        // ---- the stolen pouch --------------------------------------------
+        // The membrane's second body, found in the jump close-up: the hip
+        // pouches and a strip of flank are weighted to the FOREARM -- the
+        // fists hang touching them at rest, and the auto-rig's weights
+        // fused what touches. Limb flesh, by definition, hugs its bone:
+        // any arm-owned vertex farther from its arm's bone segments than
+        // the measured flesh radius is not arm flesh. It goes back to the
+        // body (remaining influences renormalised; wholly arm-owned verts
+        // hand themselves to the hips).
+        const armBones = [];
+        sm.skeleton.bones.forEach(function (b2, i) {
+          const nm = b2.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (/upperarm|forearm|hand/.test(nm) && !/twist/.test(nm)) armBones.push([i, b2]);
+        });
+        let hipsIdx = 0;
+        sm.skeleton.bones.forEach(function (b2, i) {
+          const nm = b2.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (nm === 'hip' || nm === 'hips' || nm === 'pelvis') hipsIdx = i;
+        });
+        gltf.scene.updateMatrixWorld(true);
+        const segPts = [];   // [x0,y0,z0, x1,y1,z1] per arm bone, bind space
+        const _wv = new THREE.Vector3(), _wv2 = new THREE.Vector3();
+        for (const ab of armBones) {
+          ab[1].getWorldPosition(_wv);
+          // segment end: the bone's first bone child, or 0.2H below
+          let end = null;
+          for (const c of ab[1].children) if (c.isBone) { end = c; break; }
+          if (end) end.getWorldPosition(_wv2);
+          else _wv2.set(_wv.x, _wv.y - H * 0.10, _wv.z);
+          segPts.push([ab[0], _wv.x, _wv.y, _wv.z, _wv2.x, _wv2.y, _wv2.z]);
+        }
+        const segD = function (px, py2, pz, s) {
+          const ax = s[1], ay = s[2], az = s[3];
+          const bx2 = s[4], by = s[5], bz = s[6];
+          const abx = bx2 - ax, aby = by - ay, abz = bz - az;
+          const l2 = abx * abx + aby * aby + abz * abz;
+          let t = l2 > 0 ? ((px - ax) * abx + (py2 - ay) * aby + (pz - az) * abz) / l2 : 0;
+          t = Math.max(0, Math.min(1, t));
+          const dx = px - ax - abx * t, dy = py2 - ay - aby * t, dz = pz - az - abz * t;
+          return Math.sqrt(dx * dx + dy * dy + dz * dz);
+        };
+        // flesh radius: measured as the median arm-vert distance, not guessed.
+        // Ownership counts TWIST bones too (their verts fly with the arm just
+        // the same); only the segments come from the main chain.
+        const dists = [];
+        const armSet = new Set();
+        sm.skeleton.bones.forEach(function (b2, i) {
+          const nm = b2.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (/upperarm|forearm|hand/.test(nm)) armSet.add(i);
+        });
+        // Vertices live in bind space; the bone segments in world. The
+        // first draft compared them raw, measured a 0.385 "flesh radius"
+        // and trimmed nothing -- transform each vertex through the mesh's
+        // own world matrix before measuring.
+        sm.updateWorldMatrix(true, false);
+        const _pv = new THREE.Vector3();
+        const vWorld = function (v2) {
+          return _pv.set(posA.getX(v2), posA.getY(v2), posA.getZ(v2))
+            .applyMatrix4(sm.matrixWorld);
+        };
+        for (let v = 0; v < si.count; v++) {
+          let wArm = 0;
+          for (let k = 0; k < 4; k++) if (armSet.has(gets[k](si, v))) wArm += gets[k](sw, v);
+          if (wArm < 0.5) continue;
+          const w2 = vWorld(v);
+          let d = 1e9;
+          for (const s of segPts) d = Math.min(d, segD(w2.x, w2.y, w2.z, s));
+          dists.push(d);
+        }
+        dists.sort(function (a2, b2) { return a2 - b2; });
+        const fleshR = dists.length ? dists[Math.floor(dists.length * 0.5)] * 2.4 : 0;
+        console.log('MR.Skin: arm-flesh median ' + (dists.length
+          ? dists[Math.floor(dists.length * 0.5)].toFixed(3) : 'n/a'));
+        let returned = 0;
+        if (fleshR > 0) {
+          for (let v = 0; v < si.count; v++) {
+            let wArm = 0, wTot = 0;
+            for (let k = 0; k < 4; k++) {
+              const w = gets[k](sw, v);
+              wTot += w;
+              if (armSet.has(gets[k](si, v))) wArm += w;
+            }
+            if (wArm <= 0 || wTot <= 0) continue;
+            const w2 = vWorld(v);
+            let d = 1e9;
+            for (const s of segPts) d = Math.min(d, segD(w2.x, w2.y, w2.z, s));
+            if (d <= fleshR) continue;
+            let kept = 0;
+            for (let k = 0; k < 4; k++) {
+              if (armSet.has(gets[k](si, v))) sets[k](sw, v, 0);
+              else kept += gets[k](sw, v);
+            }
+            if (kept > 0) {
+              for (let k = 0; k < 4; k++) sets[k](sw, v, gets[k](sw, v) / kept);
+            } else {
+              sets[0](si, v, hipsIdx); sets[0](sw, v, 1);
+              sets[1](sw, v, 0); sets[2](sw, v, 0); sets[3](sw, v, 0);
+            }
+            returned++;
+          }
+        }
+        console.log('MR.Skin: pouch surgery returned ' + returned
+          + ' far verts (flesh radius ' + fleshR.toFixed(3) + ')');
+
+        // ---- cut the fused bridges ---------------------------------------
+        // What survives every weight fix is TOPOLOGY: the sculpt's fists are
+        // fused to its thighs (they touch, and the shrink weld sealed the
+        // contact), so triangles physically span from arm flesh to leg
+        // flesh, and a spanning triangle must stretch whoever owns its
+        // corners. Those triangles are deleted: the holes sit inside the
+        // hand/hip contact shadow, facing each other, and the culled
+        // backfaces make them read as the natural gap between a fist and a
+        // hip rather than as geometry.
+        const legSet = new Set();
+        sm.skeleton.bones.forEach(function (b2, i) {
+          const nm = b2.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (/thigh|calf|foot|toe/.test(nm)) legSet.add(i);
+        });
+        const classOf = new Int8Array(si.count);   // 1 arm, 2 leg, 0 other
+        for (let v = 0; v < si.count; v++) {
+          let wa = 0, wl = 0, wt = 0;
+          for (let k = 0; k < 4; k++) {
+            const w = gets[k](sw, v), bi2 = gets[k](si, v);
+            wt += w;
+            if (armSet.has(bi2)) wa += w;
+            else if (legSet.has(bi2)) wl += w;
+          }
+          if (wt > 0 && wa / wt > 0.6) classOf[v] = 1;
+          else if (wt > 0 && wl / wt > 0.6) classOf[v] = 2;
+        }
+        const oldIdx = geo.index.array;
+        const kept2 = [];
+        let cut = 0;
+        for (let t = 0; t < oldIdx.length; t += 3) {
+          const c0 = classOf[oldIdx[t]], c1 = classOf[oldIdx[t + 1]], c2 = classOf[oldIdx[t + 2]];
+          const hasArm = c0 === 1 || c1 === 1 || c2 === 1;
+          const hasLeg = c0 === 2 || c1 === 2 || c2 === 2;
+          if (hasArm && hasLeg) { cut++; continue; }
+          kept2.push(oldIdx[t], oldIdx[t + 1], oldIdx[t + 2]);
+        }
+        if (cut > 0) {
+          geo.setIndex(new THREE.BufferAttribute(
+            (si.count > 65535 ? new Uint32Array(kept2) : new Uint16Array(kept2)), 1));
+        }
+        console.log('MR.Skin: cut ' + cut + ' arm/leg bridge triangles');
+      }
     }
 
     parts.body.add(gltf.scene);
@@ -13726,8 +13937,24 @@ MR.Skin = (function () {
         if (!a.isBone) staticRelOf(a);
       }
     }
+    // The shoulder cap, applied where it is CONSISTENT: every chain that
+    // contains a shoulder pivot -- the upper arm, the clavicle share AND
+    // the forearm -- reads the same capped rotation, so the arm bends as
+    // one limb held short of the webbing zone instead of a capped upper
+    // arm with an uncapped forearm tearing away from it. 1.05rad clears
+    // the run's ~0.8 swing untouched; only the jump's 1.56 spread is
+    // shortened, and the driver's own silhouette (which gameplay reads)
+    // never changes.
+    const SHOULDER_CAP = 1.05;
+    const capQ = new Map();
+    for (const A of parts.arms) capQ.set(A.shoulder, new THREE.Quaternion());
     function sync() {
       solved.clear();
+      for (const [pv, q] of capQ) {
+        q.copy(pv.quaternion);
+        const ang = 2 * Math.acos(Math.min(1, Math.abs(q.w)));
+        if (ang > SHOULDER_CAP) q.slerp(_IDENT, 1 - SHOULDER_CAP / ang);
+      }
       // top-down: order pairs so parents come first (pairs were added
       // roughly top-down already; resolve via recursion regardless).
       for (const pr of pairs) {
@@ -13739,10 +13966,8 @@ MR.Skin = (function () {
         _delta.identity();
         const chain = [];
         for (let p2 = pivot; p2 && p2 !== parts.body; p2 = p2.parent) chain.push(p2);
-        for (let i = chain.length - 1; i >= 0; i--) _delta.multiply(chain[i].quaternion);
-        if (pr[3]) {
-          const ang = 2 * Math.acos(Math.min(1, Math.abs(_delta.w)));
-          if (ang > pr[3]) _delta.slerp(_IDENT, 1 - pr[3] / ang);
+        for (let i = chain.length - 1; i >= 0; i--) {
+          _delta.multiply(capQ.get(chain[i]) || chain[i].quaternion);
         }
         if (pr[2] < 1) _delta.slerp(_IDENT, 1 - pr[2]);
         // target world-rel = delta * restWorldRel

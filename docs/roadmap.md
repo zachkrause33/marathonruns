@@ -8359,3 +8359,32 @@ Gates green across all eight city shots: every sculpt at or above
 1.29x/0.22, sitecheck fetching all ten models, 90/90 courses, simulate
 pass. The committed page carries the fleet at 11.5 MB; the site flavor
 stays ~3 MB of code plus ten cached model files.
+
+## 90. The carriage rake, and the tram the gate sent back
+
+The owner: "Work on the tram car. Also the crowd at the beginning could
+be better. Rework them."
+
+THE RAKE. A train stretches the tram body by span (up to ~11 carriages'
+worth), which the code art was authored to survive and a sculpt is not.
+The cast site now has a second path: a body dressed with carriages keeps
+scale 1 and lays out a rake of up to CARRIAGE_MAX sculpt instances to
+the same arithmetic the stretch used -- whole vehicle 2*halfZ*span deep,
+rear face on the gate line, each carriage the single-car fit squeezed by
+span/nCars -- so the collision box, the shadow (which reads gate.train)
+and the release timing never hear about it. Rideable trains keep the
+code tram (the deck walkway and the open ramp are one riding read the
+sculpt has no walkway for), as do trains beyond the rake.
+
+AND THE TRAM WAS REFUSED ANYWAY, by measurement: the props-v2 sculpt is
+white over navy, its az-0 mean is L 96.2 / S 0.049 against lane 1's
+L 92.9 / S 0.18 -- tarmac on both axes -- and the paint shop plateaus at
+S 0.32 / L 71 even with a new neutral-repaint lever, because windows and
+roof dilute the mean-colour saturation. The code tram passes by being
+BRIGHTER than the brightest lane (L ~123 vivid cyan), which no repaint
+of this texture reaches. The machinery ships and waits; a regenerated
+vivid tram ships by adding one dress line.
+
+The start-crowd rework is entry 89's sibling commit: the wardrobe moved
+onto the game's own shirt palette and the blob hunt ended at the street
+furniture -- see that commit message for the instrument story.

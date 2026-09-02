@@ -20,7 +20,7 @@ not a smaller standard.
 
 | v  | obstacle    | status                                             |
 |----|-------------|----------------------------------------------------|
-| 0  | tram        | TO DO -- blocked on carriage instancing: a train sets body.scale.z up to ~11x, and a sculpt cannot survive that stretch. Needs the cast site to repeat carriage instances instead of scaling one body; then the props-v2 tram model (already generated) can ship. |
+| 0  | tram        | TO DO -- carriage instancing is BUILT (the rake at the cast site; rideable trains and >4-car trains keep code art), but the props-v2 sculpt was refused by the contrast gate: white-over-navy measures L 96 / S 0.05 against lane 1's L 93 / S 0.18, and the paint shop plateaus at S 0.32. Needs a VIVID regeneration -- a red or yellow tram photo as Tripo input -- then one dress line ships it. |
 | 1  | signworks   | shipped (props-v2)                                 |
 | 2  | lightworks  | shipped (props-v2)                                 |
 | 3  | crossing    | TO DO -- needs a WIDE regeneration: the WAIT-beacon sculpt is a 0.28-wide pole in a 2.17-wide kill box. Generate something full-lane by nature: a pedestrian-crossing barrier assembly, a beacon PAIR on a works trailer, anything shaped like its own collision box. |

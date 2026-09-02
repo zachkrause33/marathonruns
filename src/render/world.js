@@ -14198,10 +14198,11 @@ MR.World = (function () {
      * instance -- one geometry, one material, one texture per model,
      * however many are live.
      *
-     * The tram (v0) is deliberately NOT here: a train sets
-     * body.scale.z = span, up to ~11 carriages' worth, and a sculpted tram
-     * stretched eleven-fold is not a tram. It keeps the code art until
-     * carriage instancing exists.
+     * The tram (v0) dresses as a RAKE OF CARRIAGES rather than a single
+     * mesh, because a train stretches the body by span and a sculpt
+     * stretched eleven-fold is not a tram -- see the carriage layout at
+     * the cast site. Rideable trains and trains beyond CARRIAGE_MAX keep
+     * the code art.
      */
     // How many sculpts are still in flight. tools/shoot.js waits for zero
     // before running the contrast audit, so the gate measures the fleet
@@ -14290,10 +14291,31 @@ MR.World = (function () {
       // same course deals the same colours. An instrument body carries
       // none and gets coat 0 -- the base paint, which is what the
       // contrast audit deterministically measures.
-      body.add(sculptMesh(d, body.userData.paint || 0));
+      if (d.sculpt.carriages) {
+        // THE TRAM'S WARDROBE IS A RAKE OF CARRIAGES, because a train
+        // stretches the body by span and a sculpt stretched eleven-fold
+        // is not a tram. The body carries CARRIAGE_MAX copies of the
+        // sculpt; the cast site lays them out per claim -- single car by
+        // default, a rake for a train that fits the budget, and the code
+        // art brought back (fill/line shown again) for rideable trains,
+        // whose deck walkway and ramp are one riding read the sculpt
+        // does not carry, and for trains longer than the rake.
+        const cars = [];
+        for (let k = 0; k < CARRIAGE_MAX; k++) {
+          const m = sculptMesh(d, 0);
+          m.visible = k === 0;
+          body.add(m);
+          cars.push(m);
+        }
+        body.userData.carriages = cars;
+        body.userData.carFit = d.sculpt.fit;
+      } else {
+        body.add(sculptMesh(d, body.userData.paint || 0));
+      }
     }
+    const CARRIAGE_MAX = 4;
 
-    function dressHazard(kind, vi, key, yaw, hues) {
+    function dressHazard(kind, vi, key, yaw, hues, carriages) {
       let grp = null;
       for (const g2 of HAZARD_DEFS) if (g2.kind === kind) grp = g2;
       const d = grp && grp.defs[vi];
@@ -14333,7 +14355,7 @@ MR.World = (function () {
           // the texture through the paint shop instead: one material per
           // coat, base coat first.
           const finish = function (mats) {
-            d.sculpt = { geo: geo, mats: mats, fit: fit };
+            d.sculpt = { geo: geo, mats: mats, fit: fit, carriages: !!carriages };
             // Dress everything already built -- live and pooled-free alike
             // -- and the factory dresses everything built from now on.
             for (const b of d.bodies || []) applySculpt(b, d);
@@ -14394,6 +14416,16 @@ MR.World = (function () {
     // than seven times its width, which is the "hazard the player cannot
     // read" defect by construction. The code art is shaped like its own
     // collision box; the beacon is not.
+    // THE TRAM (v0) IS NOT DRESSED YET, and this time the machinery is
+    // ready and the MODEL was refused: the props-v2 sculpt is white over
+    // navy, its az-0 mean measures L 96.2 / S 0.049 against lane 1's
+    // L 92.9 / S 0.18 -- tarmac on both axes -- and the paint shop
+    // plateaus at S 0.32 / L 71 (windows and roof dilute the mean-colour
+    // saturation; the code tram passes by being BRIGHTER than the
+    // brightest lane at L ~123, which no repaint of this texture can
+    // reach). The carriage rake at the cast site is built and waiting: a
+    // regenerated tram in a vivid livery ships by adding one dress line:
+    //   dressHazard(K.BLOCK, 0, 'veh_tram', Math.PI / 2, null, true);
     // The first bus (props-v2) was refused by measurement: white over dark
     // glass, L 82 against a lane-0 road of L 80.9 -- it matched the tarmac
     // and no tint could reach the gate (floor L 62 under a pure black
@@ -19054,8 +19086,54 @@ MR.World = (function () {
              * RAMP_SPAN_MIN is what keeps it that way.
              */
             const s = rideable ? span - MR.Course.RAMP_RUN / (2 * halfZ) : span;
-            o.userData.body.scale.z = s;
-            o.userData.body.position.z = (s - 1) * halfZ + (rideable ? MR.Course.RAMP_RUN : 0);
+            const body = o.userData.body;
+            const cars = body.userData.carriages;
+            const nCar = Math.max(1, Math.round(s));
+            if (cars && !rideable && nCar <= cars.length) {
+              /**
+               * THE SCULPTED TRAIN IS A RAKE OF CARRIAGES, NOT A STRETCH.
+               *
+               * The stretch was authored for the code tram, whose baked
+               * features are horizontal bands that survive it; the sculpt
+               * has doors, bogies and a pantograph, and stretched it is a
+               * taffy pull. So the body stays at scale 1 and the rake is
+               * laid out to the SAME arithmetic the stretch used: the
+               * whole vehicle is 2*halfZ*s deep with its rear face on the
+               * gate line, split into nCar equal carriages, each the
+               * single-car fit squeezed by s/nCar (at most a few percent).
+               * Same footprint to the centimetre, so the collision box,
+               * the shadow (which reads gate.train, not this scale) and
+               * the release arithmetic never hear about it.
+               *
+               * A RIDEABLE train keeps the code tram: its deck walkway
+               * and the open ramp are one riding read the sculpt has no
+               * walkway for. A train longer than the rake keeps it too --
+               * CARRIAGE_MAX * ~8k triangles is the budget line.
+               */
+              body.userData.fill.visible = false;
+              body.userData.line.visible = false;
+              body.scale.z = 1;
+              body.position.z = 0;
+              const depth = 2 * halfZ * s / nCar;
+              const squeeze = depth / (2 * halfZ);
+              const tmpS = new THREE.Matrix4();
+              for (let k = 0; k < cars.length; k++) {
+                cars[k].visible = k < nCar;
+                if (k < nCar) {
+                  cars[k].matrix.makeTranslation(0, 0, -halfZ + (k + 0.5) * depth)
+                    .multiply(tmpS.makeScale(1, 1, squeeze))
+                    .multiply(body.userData.carFit);
+                }
+              }
+            } else {
+              if (cars) {
+                body.userData.fill.visible = true;
+                body.userData.line.visible = true;
+                for (const m of cars) m.visible = false;
+              }
+              body.scale.z = s;
+              body.position.z = (s - 1) * halfZ + (rideable ? MR.Course.RAMP_RUN : 0);
+            }
           }
           // The contact shadow is not written here any more. It is one pooled
           // quad per live hazard, sized from this same userData.foot and this

@@ -5074,23 +5074,35 @@ MR.World = (function () {
 
   /**
    * One figure's wardrobe, from the shared body: the owner asked that the
-   * background people differ -- clothing colour, skin colour. Garments are
-   * the SATURATED non-skin-hued vertices and get one seeded spin round the
-   * hue wheel; skin (the warm low-to-mid-sat band) keeps its hue and takes
-   * a lightness roll instead, deep to light; near-neutrals jitter. Baked
-   * per figure at build time into the merged knot, so a hundred different
-   * people cost exactly nothing per frame.
+   * background people differ -- clothing colour, skin colour -- and then
+   * that the start crowd be REWORKED, because the first wardrobe's free
+   * spin round the hue wheel produced two defects the start line put at
+   * arm's length: garments landing in olive-and-khaki mud, and figures
+   * whose dark clothes under dark hair merged into featureless black
+   * blobs against the rail.
+   *
+   * So the wardrobe is now the GAME'S OWN: each figure's garments are
+   * rotated as a block so the dominant garment lands exactly on one of
+   * the box-crowd's shirt colours (the vivid palette every stand in the
+   * game already wears), keeping the hue DIFFERENCES between a figure's
+   * own garments so a two-tone outfit stays two-tone. Saturation is
+   * lifted toward the palette's vividness and garment lightness has a
+   * floor -- no more all-black spectators. Skin (the warm low-to-mid-sat
+   * band) keeps its hue and takes a lightness roll, deep to light;
+   * near-neutrals jitter, brightening only. Baked per figure at build
+   * time into the merged knot, so a hundred different people cost
+   * exactly nothing per frame.
    */
+  const CROWD_PAINT = [0.984, 0.53, 0.139, 0.38, 0.90, 0.108, 0.707];
   function crowdFigureGeo(variant, r) {
     const g = variant.geo.clone();
     const colU = variant.colU;
     const n = colU.length / 3;
     const out = new Float32Array(n * 3);
-    const hueShift = (r() - 0.5) * 2.0;
+    const target = CROWD_PAINT[Math.floor(r() * CROWD_PAINT.length)];
     const skinL = 0.70 + r() * 0.45;
-    const neutralL = 0.88 + r() * 0.24;
-    for (let v = 0; v < n; v++) {
-      let rr = colU[v * 3] / 255, gg = colU[v * 3 + 1] / 255, bb = colU[v * 3 + 2] / 255;
+    const neutralL = 1.0 + r() * 0.22;
+    const hslOf = function (rr, gg, bb) {
       const mx = Math.max(rr, gg, bb), mn = Math.min(rr, gg, bb);
       const l = (mx + mn) / 2;
       const d = mx - mn;
@@ -5102,24 +5114,76 @@ MR.World = (function () {
         else h = (rr - gg) / d + 4;
         h /= 6;
       }
+      return [h, s, l];
+    };
+    // Pass one: the dominant garment hue, as a circular mean over the
+    // cool saturated vertices, so pass two can rotate the whole outfit
+    // onto the palette target in one block -- and the garment CENSUS,
+    // because one of the four sculpted people wears a black jacket that
+    // has no saturation at all. Every earlier wardrobe pass slid off it
+    // (nothing to rotate) and the figure survived as a featureless black
+    // blob at the start-line rail. A figure with almost no saturated
+    // garment mass is dark-dressed, and its dark torso gets PAINTED with
+    // the palette colour instead -- by height, so hair stays hair and
+    // shoes stay shoes.
+    let sx = 0, sy = 0, garm = 0;
+    for (let v = 0; v < n; v++) {
+      const p = hslOf(colU[v * 3] / 255, colU[v * 3 + 1] / 255, colU[v * 3 + 2] / 255);
+      if ((p[0] < 0.105 || p[0] > 0.95) || p[1] <= 0.35) continue;
+      garm++;
+      sx += Math.cos(p[0] * 2 * Math.PI);
+      sy += Math.sin(p[0] * 2 * Math.PI);
+    }
+    const domH = (Math.atan2(sy, sx) / (2 * Math.PI) + 1) % 1;
+    const shift = (target - domH + 2) % 1;
+    // The census first gated the dark repaint to figures with almost no
+    // saturated garments, and the hooded figure slipped it: enough green
+    // legging to pass the census, a black hoodie that stayed a black
+    // hoodie -- and a black hoodie at the start rail is the blob all over
+    // again. So ANY near-black clothing in the torso band takes the
+    // paint; the height band still protects hair and shoes.
+    const pos = g.attributes.position.array;
+    const bodyLo = variant.h * 0.10, bodyHi = variant.h * 0.72;
+    for (let v = 0; v < n; v++) {
+      const p = hslOf(colU[v * 3] / 255, colU[v * 3 + 1] / 255, colU[v * 3 + 2] / 255);
+      const h = p[0], s = p[1], l = p[2];
+      if (s <= 0.35 && l < 0.30) {
+        const y = pos[v * 3 + 1];
+        if (y > bodyLo && y < bodyHi) {
+          const l2d = Math.min(0.80, 0.30 + l * 1.4);
+          const c2 = (1 - Math.abs(2 * l2d - 1)) * 0.55;
+          const hp2 = target * 6;
+          const x2 = c2 * (1 - Math.abs((hp2 % 2) - 1));
+          let r4 = 0, g4 = 0, b4 = 0;
+          if (hp2 < 1) { r4 = c2; g4 = x2; } else if (hp2 < 2) { r4 = x2; g4 = c2; }
+          else if (hp2 < 3) { g4 = c2; b4 = x2; } else if (hp2 < 4) { g4 = x2; b4 = c2; }
+          else if (hp2 < 5) { r4 = x2; b4 = c2; } else { r4 = c2; b4 = x2; }
+          const m2 = l2d - c2 / 2;
+          out[v * 3] = Math.pow(r4 + m2, 2.2);
+          out[v * 3 + 1] = Math.pow(g4 + m2, 2.2);
+          out[v * 3 + 2] = Math.pow(b4 + m2, 2.2);
+          continue;
+        }
+      }
       // The first gate tried to FIND skin and missed half of it -- shaded
       // cheeks and hair fell to the garment branch and the crowd came out
       // with green faces. This one is inverted: only confidently-COOL
-      // saturated vertices (true garments -- blues, greens, pinks) may
-      // spin the hue wheel; the whole warm band (skin, hair, wood, tan)
-      // keeps its hue and takes the lightness roll, which is how skin
-      // tones actually vary.
+      // saturated vertices (true garments -- blues, greens, pinks) may be
+      // repainted; the whole warm band (skin, hair, wood, tan) keeps its
+      // hue and takes the lightness roll, which is how skin tones vary.
       const warm = h < 0.105 || h > 0.95;
       let h2 = h, s2 = s, l2 = l;
       if (warm) {
-        l2 = Math.max(0.06, Math.min(0.92, l * skinL));
+        l2 = Math.max(0.10, Math.min(0.92, l * skinL));
       } else if (s > 0.35) {
-        h2 = (h + hueShift + 2) % 1;
+        h2 = (h + shift) % 1;
         // A rotated garment may not LAND on skin: a blue shirt spun into
         // tan reads as a bare torso. The skin band is skipped over.
-        if (h2 > 0.0 && h2 < 0.14) h2 = (h2 + 0.17) % 1;
+        if (h2 > 0.0 && h2 < 0.14 && Math.abs(h2 - target) > 0.02) h2 = (h2 + 0.17) % 1;
+        s2 = Math.min(1, s * 1.4 + 0.10);
+        l2 = Math.max(0.32, Math.min(0.85, l * 1.1 + 0.06));
       } else {
-        l2 = Math.max(0.04, Math.min(0.96, l * neutralL));
+        l2 = Math.max(0.15, Math.min(0.96, l * neutralL));
       }
       // hsl -> rgb
       const c = (1 - Math.abs(2 * l2 - 1)) * s2;
@@ -7200,17 +7264,32 @@ MR.World = (function () {
         // of the facade line.
         if (sx < 0) {
           // Two oil drums, one upright, one turned a little.
+          //
+          // LIFTED OUT OF THE VOID, with the trash bags below: these were
+          // navy-on-navy (0x3f4658 / 0x262c47) from before the start pens
+          // packed people around them, and standing waist-deep in the
+          // reworked vivid crowd they photographed as featureless BLACK
+          // BLOBS at the rail -- the owner's "the crowd at the beginning
+          // could be better" traced to this furniture, not to the people.
+          // The lift is lightness only: the pavement's no-amber-no-cyan
+          // rule holds, and nothing here may compete with a hazard read.
           for (const [dz, ry] of [[-3.6, 0], [-2.5, 0.7]]) {
-            parts.push(cyl(0.42, 0.42, 0.95, 8, sx * 5.0, 0.475, dz, 0x3f4658, 0, ry, 0));
-            parts.push(cyl(0.435, 0.435, 0.06, 8, sx * 5.0, 0.24, dz, 0x2b3145));
-            parts.push(cyl(0.435, 0.435, 0.06, 8, sx * 5.0, 0.72, dz, 0x2b3145));
+            parts.push(cyl(0.42, 0.42, 0.95, 8, sx * 5.0, 0.475, dz, 0x707a94, 0, ry, 0));
+            parts.push(cyl(0.435, 0.435, 0.06, 8, sx * 5.0, 0.24, dz, 0x5c6680));
+            parts.push(cyl(0.435, 0.435, 0.06, 8, sx * 5.0, 0.72, dz, 0x5c6680));
           }
           // Trash bags: three squashed dark spheres against the facade line.
+          // The bags are the proven start-line BLOBS: a 0x26-family navy
+          // under the toon shade band renders indistinguishable from black,
+          // and the first timid lift (to 0x3d4560) was crushed right back.
+          // Verified by raycast: the two rounded masses at the rail were
+          // these spheres, in vertex colours, at local z -10.6. Slate now,
+          // bright enough to keep its shape in shade.
           for (const [bz, r] of [[8.6, 0.46], [9.4, 0.38], [8.9, 0.33]]) {
-            const s = sph(r, 6, sx * 7.7, r * 0.72, bz, 0x262c47);
+            const s = sph(r, 6, sx * 7.7, r * 0.72, bz, 0x6a7390);
             parts.push(s);
           }
-          parts.push(sph(0.30, 6, sx * 7.1, 0.22, 9.0, 0x323a58));
+          parts.push(sph(0.30, 6, sx * 7.1, 0.22, 9.0, 0x7681a0));
           // THE WATER COOLER AND ITS CHALKBOARD, straight off item 13 of the
           // citylook gap list: "a blue water-cooler-like object with a
           // chalkboard sign near the shops". A muted blue cabinet on a squat
@@ -7221,7 +7300,7 @@ MR.World = (function () {
           // must never read as the DUCK family's old cyan.
           {
             const cz2 = 5.6, cx2 = sx * 6.4;
-            parts.push(bx(0.56, 0.18, 0.56, cx2, 0.09, cz2, 0x2e3644));       // stand
+            parts.push(bx(0.56, 0.18, 0.56, cx2, 0.09, cz2, 0x5a6378));       // stand
             parts.push(bx(0.50, 0.88, 0.50, cx2, 0.62, cz2, 0x3a639e));       // cabinet
             parts.push(bx(0.52, 0.10, 0.52, cx2, 1.10, cz2, 0x2f5183));       // collar
             parts.push(cyl(0.17, 0.19, 0.34, 8, cx2, 1.32, cz2, 0x9fc3dd));   // bottle
@@ -7229,9 +7308,12 @@ MR.World = (function () {
             parts.push(bx(0.10, 0.08, 0.10, cx2 - sx * 0.22, 0.78, cz2 + 0.28, 0xd8dde4)); // tap
             // The chalkboard: two dark boards leaning into an A, a wooden
             // top bar, and a chalk-pale strip on the road face.
+            // The A-board's boards were 0x30333a -- near-black, and inside
+            // the reworked start pens the whole cluster photographed as a
+            // blob at the rail. Slate now, chalk-pale strip unchanged.
             const bz2 = cz2 + 1.1;
-            parts.push(bx(0.05, 0.78, 0.52, cx2 - sx * 0.44, 0.38, bz2, 0x30333a, 0, 0, sx * 0.24));
-            parts.push(bx(0.05, 0.78, 0.52, cx2 - sx * 0.16, 0.38, bz2, 0x30333a, 0, 0, -sx * 0.24));
+            parts.push(bx(0.05, 0.78, 0.52, cx2 - sx * 0.44, 0.38, bz2, 0x6a7183, 0, 0, sx * 0.24));
+            parts.push(bx(0.05, 0.78, 0.52, cx2 - sx * 0.16, 0.38, bz2, 0x6a7183, 0, 0, -sx * 0.24));
             parts.push(bx(0.22, 0.06, 0.56, cx2 - sx * 0.30, 0.76, bz2, 0x6b5138));
             parts.push(bx(0.03, 0.30, 0.36, cx2 - sx * 0.51, 0.46, bz2, 0xd9d4c2, 0, 0, sx * 0.24));
           }
@@ -7245,18 +7327,23 @@ MR.World = (function () {
           // and a top bar, cream faces both sides.
           parts.push(bx(0.06, 0.74, 0.56, sx * 6.15, 0.36, -7.8, 0xf2ead8, 0, 0, sx * 0.26));
           parts.push(bx(0.06, 0.74, 0.56, sx * 6.45, 0.36, -7.8, 0xf2ead8, 0, 0, -sx * 0.26));
-          parts.push(bx(0.24, 0.07, 0.60, sx * 6.30, 0.72, -7.8, 0x3a3550));
-          // And a bag pair of its own further down the tile.
-          parts.push(sph(0.40, 6, sx * 7.8, 0.30, -10.6, 0x262c47));
-          parts.push(sph(0.30, 6, sx * 7.2, 0.22, -10.1, 0x323a58));
-          // THE BLACK TRASH BIN, the gap list's other named prop: a
-          // near-black barrel by the shops with a lipped rim and a domed
-          // lid. Closed cylinders on every side; near-black held off pure
-          // so the toon ramp still turns it.
-          parts.push(cyl(0.36, 0.40, 0.86, 8, sx * 5.1, 0.43, 1.9, 0x272a31));
-          parts.push(cyl(0.42, 0.42, 0.08, 8, sx * 5.1, 0.88, 1.9, 0x34383f));
-          parts.push(sph(0.34, 8, sx * 5.1, 0.94, 1.9, 0x2c2f36));
-          parts.push(bx(0.10, 0.16, 0.10, sx * 5.1, 1.24, 1.9, 0x34383f));
+          parts.push(bx(0.24, 0.07, 0.60, sx * 6.30, 0.72, -7.8, 0x5c5a75));
+          // And a bag pair of its own further down the tile -- the same
+          // proven blobs as the trio above; same slate lift.
+          parts.push(sph(0.40, 6, sx * 7.8, 0.30, -10.6, 0x6a7390));
+          parts.push(sph(0.30, 6, sx * 7.2, 0.22, -10.1, 0x7681a0));
+          // THE TRASH BIN, the gap list's other named prop: a barrel by
+          // the shops with a lipped rim and a domed lid. It was near-black
+          // (0x272a31), and when the reworked start pens packed people
+          // around it, its dome at rail height photographed as a
+          // featureless dark BLOB among the crowd -- traced by hiding the
+          // canyon edge, whose bake it rides in. Charcoal-slate now: still
+          // unmistakably the bin, no longer a hole in the frame. The
+          // pavement's no-amber-no-cyan rule holds.
+          parts.push(cyl(0.36, 0.40, 0.86, 8, sx * 5.1, 0.43, 1.9, 0x767d92));
+          parts.push(cyl(0.42, 0.42, 0.08, 8, sx * 5.1, 0.88, 1.9, 0x848b9f));
+          parts.push(sph(0.34, 8, sx * 5.1, 0.94, 1.9, 0x7d8496));
+          parts.push(bx(0.10, 0.16, 0.10, sx * 5.1, 1.24, 1.9, 0x848b9f));
         }
       }
       return parts;
@@ -17337,7 +17424,9 @@ MR.World = (function () {
       const legTop = 6.85 + TRUSS_LIFT + 0.40;
       for (const sx of [-1, 1]) {
         parts.push(bx(0.42, legTop, 0.42, sx * GANTRY, legTop / 2, 0, 0x2b2f52));
-        parts.push(bx(0.90, 0.30, 0.90, sx * GANTRY, 0.15, 0, 0x1b1633));
+        // Concrete, not the old 0x1b1633 near-black: these feet stand
+        // inside crowd pens and read as blobs -- see the arch plinths.
+        parts.push(bx(0.90, 0.30, 0.90, sx * GANTRY, 0.15, 0, 0x9096ad));
         parts.push(bx(0.30, 0.30, 1.8, sx * GANTRY, 6.20 + TRUSS_LIFT, 0, 0x2b2f52, 0, 0, 0));
       }
       // Header above the plate and a rail under it. The truss reads as a truss
@@ -17385,8 +17474,16 @@ MR.World = (function () {
       return merge([
         bx(1.5, legTop, 1.5, -ARCH, legTop / 2, 0, 0xff3b6b),
         bx(1.5, legTop, 1.5, ARCH, legTop / 2, 0, 0xff3b6b),
-        bx(2.3, 0.6, 2.3, -ARCH, 0.3, 0, 0x1b1633),
-        bx(2.3, 0.6, 2.3, ARCH, 0.3, 0, 0x1b1633),
+        // The plinths were 0x1b1633 -- near-black, and with the reworked
+        // vivid crowd packed around the START arch they photographed as
+        // featureless dark blobs at the rail. A first lift to slate
+        // (0x454b6b) was still crushed to black on the shaded faces the
+        // chase camera actually sees -- measured, not assumed: the toon
+        // shade band multiplies to ~0.35. So they are CONCRETE now, the
+        // material a real ballast block is, and a step narrower so the
+        // pylon hides most of the footprint.
+        bx(1.9, 0.6, 1.9, -ARCH, 0.3, 0, 0x9096ad),
+        bx(1.9, 0.6, 1.9, ARCH, 0.3, 0, 0x9096ad),
         bx(ARCH * 2 + 2.4, 1.3, 1.6, 0, ARCH_HEAD + L, 0, 0xff3b6b),
         bx(ARCH * 2 + 2.4, 0.5, 1.2, 0, 6.2 + L, 0, 0xd42a55),
         // The finials came down from 4.2 to 2.8 to pay for the lift. A finish

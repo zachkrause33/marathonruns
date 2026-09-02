@@ -154,7 +154,7 @@ MR.Skin = (function () {
    * shipped, so the texture goes through one. flipY false is the glTF UV
    * convention; sRGB is what a basecolor is.
    */
-  function baseColorTexture(buf) {
+  function baseColorURL(buf) {
     const dv = new DataView(buf);
     const jsonLen = dv.getUint32(12, true);
     const json = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, jsonLen)));
@@ -167,11 +167,32 @@ MR.Skin = (function () {
     for (let i = 0; i < bytes.length; i += 8192) {
       s += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
     }
-    const url = 'data:' + (img.mimeType || 'image/jpeg') + ';base64,' + btoa(s);
+    return 'data:' + (img.mimeType || 'image/jpeg') + ';base64,' + btoa(s);
+  }
+
+  function baseColorTexture(buf) {
+    const url = baseColorURL(buf);
+    if (!url) return null;
     const tex = new THREE.TextureLoader().load(url);
     tex.flipY = false;
     tex.colorSpace = THREE.SRGBColorSpace;
     return tex;
+  }
+
+  /**
+   * The basecolor as a decoded <img>, for callers that repaint pixels
+   * before making textures (the fleet's paint shop in world.js). Same
+   * extraction and the same iOS-proof <img> route as baseColorTexture;
+   * err fires on a missing or undecodable image so a caller counting
+   * outstanding work can settle.
+   */
+  function baseColorImage(buf, cb, err) {
+    const url = baseColorURL(buf);
+    if (!url) return err(new Error('no basecolor image'));
+    const img = new Image();
+    img.onload = function () { cb(img); };
+    img.onerror = function () { err(new Error('basecolor image failed to decode')); };
+    img.src = url;
   }
 
   /**
@@ -1133,5 +1154,6 @@ MR.Skin = (function () {
     }
   }
 
-  return { attach: attach, model: model, baseColorTexture: baseColorTexture };
+  return { attach: attach, model: model,
+    baseColorTexture: baseColorTexture, baseColorImage: baseColorImage };
 })();

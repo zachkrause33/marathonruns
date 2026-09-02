@@ -8317,3 +8317,45 @@ and shoot.js/orbit.js wait for api.sculptsPending() to reach zero so the
 gates measure the fleet that ships. Gates green: shoot clean (tightest
 JUMP v11 1.3x, unchanged), 90/90 courses, simulate pass, sitecheck pass
 with all six models fetched; heaviest frame 399k of 500k, draws 213.
+
+## 89. props-v3: the red bus, the paint shop, and the audit audited twice
+
+The regenerated red double-decker replaced the tarmac-grey bus that
+entry 88 refused, and four more sculpts landed with it: the crate
+pallet, the delivery scooter with its rider, the waste dumpster and the
+owner's blue car. Two were refused by measurement: the shipping
+container's weathered blue sits inside the finish carpet's tone and no
+repaint can move it (lightness 1.8x with no threshold lifts the mean
+only to L 62.5 -- the toon ramp's response to a dark-dominant texture
+is a ceiling), and the police car's black-over-white averages to road
+grey with no lever a tint can reach. Both keep their code art.
+
+THE PAINT SHOP. The owner: "please make it different colors so it is
+not only a blue car throughout the whole game." world.js now bakes N
+coats per model at boot -- per-pixel HSL on the decoded basecolor, hue
+turn plus optional threshold/saturation/lightness, neutral pixels
+(glass, tyres, plates) untouched -- and deals them to pooled bodies in
+claim order, so the same course deals the same colours. The car ships
+in orange, gold, green and magenta; none of them is blue, because the
+blue base measures -0.086 under the contrast gate and brightening only
+walks it along the road tones. The red bus (too deep: the tempo mats'
+saturation at carpet luminance), the crate pallet and the scooter each
+ship one corrective coat. Every shipped coat's margin is written at its
+dress line, measured through contrastAudit at the tightest road tone.
+
+THE INSTRUMENT WAS WRONG TWICE, which is the entry's real lesson
+(rule 3). First: sculptsPending reached zero while TextureLoader was
+still decoding, so the audit measured a WHITE bus that ships red -- the
+gate passed a vehicle the player could not tell from tarmac. Textures
+now route through the decoded image and a canvas, and pending holds
+until the audited pixels are the shipped pixels. Second: the coat probe
+repainted "the last textured mesh in the assembly", which is the
+striped caution FACE, not the car; an entire hue map was garbage, and
+its successor shifted hues on top of an already-shipped coat. The
+final numbers were taken on a coatless build, absolutely, and the probe
+targets the sculpt mesh by its matrixAutoUpdate=false signature.
+
+Gates green across all eight city shots: every sculpt at or above
+1.29x/0.22, sitecheck fetching all ten models, 90/90 courses, simulate
+pass. The committed page carries the fleet at 11.5 MB; the site flavor
+stays ~3 MB of code plus ten cached model files.

@@ -8219,7 +8219,10 @@ MR.World = (function () {
           vg.userData.body = body;
           // The sculpted fleet's register: a def whose model has landed
           // dresses this body now; one that lands later walks this list.
+          // The paint index is dealt here, in claim order, so a def with
+          // several coats spreads them across its pooled bodies.
           // See THE SCULPTED FLEET below the block defs.
+          body.userData.paint = (d.paint = (d.paint || 0) + 1) - 1;
           (d.bodies = d.bodies || []).push(body);
           applySculpt(body, d);
           // An anim without a `moving` part is legal and is the cheapest thing
@@ -14119,8 +14122,72 @@ MR.World = (function () {
     // (Exposed as api.sculptsPending where api is built, further down.)
     let sculptsPending = 0;
 
-    function sculptMesh(d) {
-      const m = new THREE.Mesh(d.sculpt.geo, d.sculpt.mat);
+    /**
+     * THE PAINT SHOP. The owner: "please make it different colors so it is
+     * not only a blue car throughout the whole game." One sculpt, one
+     * geometry, one texture -- and several paint jobs made at boot by
+     * rotating the hue of SATURATED pixels only, so the paint changes
+     * while glass, tyres, chrome and number plates stay exactly what they
+     * are (the crowd's wardrobe trick, at hero scale). Per-pixel
+     * arithmetic rather than ctx.filter hue-rotate, because canvas
+     * filters are the kind of thing iOS Safari has shipped late; this
+     * runs everywhere getImageData does.
+     *
+     * A coat is a hue turn in degrees, or a spec {h, t, s, l}: hue turn,
+     * paint-detection threshold (HSV saturation, default 0.25), and
+     * saturation/lightness multipliers on the paint. EVERY SHIPPED COAT'S
+     * L/S WAS MEASURED against every road tone through contrastAudit
+     * before its numbers were written below -- rule 4 applies to each
+     * coat, not only to the base coat the audit gates.
+     */
+    function paintShift(img, spec) {
+      if (typeof spec === 'number') spec = { h: spec };
+      const cv = canvas(img.width, img.height);
+      const cg = cv.getContext('2d');
+      cg.drawImage(img, 0, 0);
+      const deg = spec.h || 0;
+      const thr = spec.t !== undefined ? spec.t : 0.25;
+      const sMul = spec.s || 1, lMul = spec.l || 1;
+      if (deg || sMul !== 1 || lMul !== 1) {
+        const id = cg.getImageData(0, 0, cv.width, cv.height);
+        const px = id.data;
+        const t = deg / 360;
+        const h2c = function (p, q, h) {
+          h = (h + 1) % 1;
+          if (h < 1 / 6) return p + (q - p) * 6 * h;
+          if (h < 1 / 2) return q;
+          if (h < 2 / 3) return p + (q - p) * (2 / 3 - h) * 6;
+          return p;
+        };
+        for (let i = 0; i < px.length; i += 4) {
+          const r = px[i] / 255, g2 = px[i + 1] / 255, b = px[i + 2] / 255;
+          const mx = Math.max(r, g2, b), mn = Math.min(r, g2, b);
+          if (!mx || (mx - mn) / mx < thr) continue;   // neutral: not paint
+          let l = (mx + mn) / 2;
+          const dl = mx - mn;
+          let s = dl / (l < 0.5 ? mx + mn : 2 - mx - mn);
+          let h = mx === r ? ((g2 - b) / dl + (g2 < b ? 6 : 0))
+            : mx === g2 ? (b - r) / dl + 2 : (r - g2) / dl + 4;
+          h = (h / 6 + t) % 1;
+          s = Math.min(1, s * sMul);
+          l = Math.min(1, l * lMul);
+          const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+          const p = 2 * l - q;
+          px[i] = Math.round(h2c(p, q, h + 1 / 3) * 255);
+          px[i + 1] = Math.round(h2c(p, q, h) * 255);
+          px[i + 2] = Math.round(h2c(p, q, h - 1 / 3) * 255);
+        }
+        cg.putImageData(id, 0, 0);
+      }
+      const tex = new THREE.CanvasTexture(cv);
+      tex.flipY = false;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+
+    function sculptMesh(d, paint) {
+      const mats = d.sculpt.mats;
+      const m = new THREE.Mesh(d.sculpt.geo, mats[(paint || 0) % mats.length]);
       m.matrixAutoUpdate = false;
       m.matrix.copy(d.sculpt.fit);
       return m;
@@ -14131,10 +14198,15 @@ MR.World = (function () {
       body.userData.sculpted = true;
       body.userData.fill.visible = false;
       body.userData.line.visible = false;
-      body.add(sculptMesh(d));
+      // The paint index was assigned at the body's registration, in claim
+      // order, so it is stable for the pooled body's whole life and the
+      // same course deals the same colours. An instrument body carries
+      // none and gets coat 0 -- the base paint, which is what the
+      // contrast audit deterministically measures.
+      body.add(sculptMesh(d, body.userData.paint || 0));
     }
 
-    function dressHazard(kind, vi, key, yaw) {
+    function dressHazard(kind, vi, key, yaw, hues) {
       let grp = null;
       for (const g2 of HAZARD_DEFS) if (g2.kind === kind) grp = g2;
       const d = grp && grp.defs[vi];
@@ -14170,20 +14242,54 @@ MR.World = (function () {
             .multiply(new THREE.Matrix4().makeScale(sx, sy, sz))
             .multiply(pre);
           // The game's own toon ramp carrying the sculpt's basecolor,
-          // decoded through the iOS-proof route skin.js owns.
-          const tex = MR.Skin.baseColorTexture(buf);
-          const smat = S.toon(0xffffff, 3);
-          if (tex) smat.map = tex;
-          d.sculpt = { geo: geo, mat: smat, fit: fit };
-          // Dress everything already built -- live and pooled-free alike --
-          // and the factory dresses everything built from now on.
-          for (const b of d.bodies || []) applySculpt(b, d);
-          console.log('MR.World: sculpted ' + key + ' on, x' + sx.toFixed(2)
-            + ' y' + sy.toFixed(2) + ' z' + sz.toFixed(2));
+          // decoded through the iOS-proof route skin.js owns. `hues` sends
+          // the texture through the paint shop instead: one material per
+          // coat, base coat first.
+          const finish = function (mats) {
+            d.sculpt = { geo: geo, mats: mats, fit: fit };
+            // Dress everything already built -- live and pooled-free alike
+            // -- and the factory dresses everything built from now on.
+            for (const b of d.bodies || []) applySculpt(b, d);
+            console.log('MR.World: sculpted ' + key + ' on, x' + sx.toFixed(2)
+              + ' y' + sy.toFixed(2) + ' z' + sz.toFixed(2)
+              + (mats.length > 1 ? ', ' + mats.length + ' paints' : ''));
+            sculptsPending--;
+          };
+          // Even a single coat goes through the decoded <img> and a canvas
+          // rather than TextureLoader: TextureLoader's material is usable
+          // before its image has decoded, and sculptsPending reaching zero
+          // with undecoded textures let contrastAudit measure a WHITE bus
+          // that render as red -- the gate passed a vehicle the player
+          // could not tell from the road. Pending now holds until the
+          // pixels the audit measures are the pixels the player gets.
+          const oneCoat = function () {
+            MR.Skin.baseColorImage(buf, function (img) {
+              const m2 = S.toon(0xffffff, 3);
+              m2.map = paintShift(img, 0);
+              finish([m2]);
+            }, function (e) {
+              console.error('MR.World: ' + key + ' basecolor failed, untextured', e);
+              finish([S.toon(0xffffff, 3)]);
+            });
+          };
+          if (hues && hues.length) {
+            MR.Skin.baseColorImage(buf, function (img) {
+              finish(hues.map(function (coat) {
+                const m2 = S.toon(0xffffff, 3);
+                m2.map = paintShift(img, coat);
+                return m2;
+              }));
+            }, function (e) {
+              console.error('MR.World: ' + key + ' paint shop failed, one coat', e);
+              oneCoat();
+            });
+          } else {
+            oneCoat();
+          }
         } catch (e) {
           console.error('MR.World: ' + key + ' dress failed, code art stays', e);
+          sculptsPending--;
         }
-        sculptsPending--;
       }, function (e) {
         sculptsPending--;
         console.log('MR.World: ' + key + ' unavailable, code art stays ('
@@ -14201,19 +14307,63 @@ MR.World = (function () {
     // than seven times its width, which is the "hazard the player cannot
     // read" defect by construction. The code art is shaped like its own
     // collision box; the beacon is not.
-    // THE BUS (v4) IS NOT DRESSED, and the reason is a measurement, not a
-    // preference. The sculpted bus is white over dark glass: its az-0 mean
-    // measured L 82 / S 0.041 against a lane-0 road of L 80.9 / S 0.145 --
-    // it matches the tarmac on both axes, and rule 4 fails the build for
-    // exactly that. A tint cannot save it: the mean's floor under a PURE
-    // BLACK material multiply is L 62 (the caution face and the toon
-    // ramp's dark band hold it up) against a gate line of ~64.7, so the
-    // best any tint achieves is a 3% margin that the next city's palette
-    // erases. The fix is a brighter livery in the texture -- a regenerated
-    // sculpt -- not a thumb on the material.
+    // The first bus (props-v2) was refused by measurement: white over dark
+    // glass, L 82 against a lane-0 road of L 80.9 -- it matched the tarmac
+    // and no tint could reach the gate (floor L 62 under a pure black
+    // multiply, gate line ~64.7). This one is the owner's regenerated red
+    // double-decker, which is what the fix was always going to be: a
+    // brighter livery in the texture, not a thumb on the material.
+    // The double-decker's red is measured too deep: L 59.7 with the
+    // saturation of the tempo mats (S 0.708 vs their 0.75), so it hid
+    // against drag mats on both axes (-0.193). One brightening coat
+    // (paint lightness 1.7x) lifts it to L 83.5 and +0.11 clear.
+    dressHazard(K.BLOCK, 4, 'veh_bus', 0, [{ h: 0, l: 1.7 }]);
     dressHazard(K.BLOCK, 5, 'veh_taxi', 0);
     dressHazard(K.BLOCK, 6, 'veh_van', 0);
     dressHazard(K.BLOCK, 7, 'veh_refusetruck', 0);
+    // The crate load's woodgrain mean sat between the finish carpet and
+    // the lanes (-0.104 vs carpet1); brightened and saturated
+    // (l 1.35, s 1.5) it measures L 81.7 / S 0.481, +0.151 clear.
+    dressHazard(K.BLOCK, 8, 'veh_crateload', 0, [{ h: 0, l: 1.35, s: 1.5 }]);
+    // The delivery scooter as sculpted measures L 69.7 / S 0.12 -- under
+    // the gate against lane 0 in every city shot (-0.051 at best). Its
+    // one shipped coat repaints moped and jacket alike (low threshold),
+    // doubles the paint's saturation, turns it green and lifts it:
+    // measured L 86.3 / S 0.545, +0.147 clear at the tightest road.
+    dressHazard(K.BLOCK, 9, 'veh_scooter', Math.PI / 2,
+      [{ h: 250, t: 0.08, s: 2.0, l: 1.1 }]);
+    // THE CONTAINER (v10) IS NOT DRESSED. Its weathered blue mean sits at
+    // L 59 / S 0.53 -- inside the finish carpet's L 56.6 / S 0.507 and
+    // hemmed by the tempo mats on the other axis -- and the paint shop
+    // cannot move it: with NO saturation threshold and lightness pushed
+    // 1.8x the mean rises only to L 62.5 (the toon ramp's response to a
+    // dark-dominant texture is the ceiling), still -0.12 under the gate.
+    // The code container clears at 1.32x. Sculpting it needs a texture
+    // that is actually light -- a regeneration, not a multiplier.
+    dressHazard(K.BLOCK, 11, 'veh_dumpster', Math.PI / 2);
+    // The owner's blue car takes four coats through the paint shop --
+    // "please make it different colors so it is not only a blue car
+    // throughout the whole game" -- and none of them is blue, because the
+    // gate said so: the blue base measures L 74.6 / S 0.376, -0.086 under
+    // the gate against lane 2, and brightening it only walks it along the
+    // road tones. Every coat below was measured ABSOLUTELY through
+    // contrastAudit on a build with no coats applied -- two earlier probe
+    // rounds produced garbage numbers, first by repainting the striped
+    // caution face instead of the car (the sculpt mesh is the one with
+    // matrixAutoUpdate false), then by shifting hues on top of an
+    // already-shipped coat. Audit the instrument, then audit it again.
+    // The four coats, with measured gate margins at the tightest road:
+    // orange (h170, +0.07), gold (h200, +0.273), green (h260, +0.155)
+    // and magenta (h80 l1.15, +0.146).
+    dressHazard(K.BLOCK, 12, 'veh_hatchback', 0,
+      [{ h: 170 }, { h: 200 }, { h: 260 }, { h: 80, l: 1.15 }]);
+    // THE POLICE CAR (v13) IS NOT DRESSED. Black over white averages to
+    // road grey: L 88.1 / S 0.02 against lane 1's L 93 / S 0.18, and a
+    // material tint has no lever -- the black mass is fixed, and tinting
+    // the white doors only walks the mean ALONG the road tones (best
+    // probe -0.106). Its identity is the defect: a black-and-white car
+    // reads as tarmac in a game whose roads are grey. The code police car
+    // keeps the slot.
 
     /**
      * ============ CONTACT SHADING UNDER EVERY HAZARD ============

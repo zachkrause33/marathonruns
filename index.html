@@ -12981,12 +12981,97 @@ MR.Skin = (function () {
   // Driver ROTATIONS applied at these positions read correctly regardless
   // of the ladder mismatch: an angle is an angle.
   const CROWN = 1.545;      // rest crown; the +0.04 bob top stays under 1.60
+  // Fallback joints, used only if measurement fails. The first rig ran on
+  // these eyeballed numbers alone and the run cycle SHREDDED the mesh --
+  // rotations pivoted flesh around centres that were not the sculpt's own
+  // joints. measureJoints() below derives them from the geometry instead.
   const J = {
     hipsY: 0.700, hipX: 0.100, kneeY: 0.385, ankleY: 0.095, footZ: 0.150,
     chestY: 0.960, neckY: 1.130, headY: 1.240,
     shoulderX: 0.200, shoulderY: 1.080, elbowY: 0.850, wristY: 0.640,
     handY: 0.540,
   };
+
+  /**
+   * Measure the sculpt's own joints from its geometry, in place of the
+   * guesses above. The method is cross-sections: a knee is where a leg is
+   * thinnest between hip and ankle, an elbow where an arm narrows between
+   * deltoid and fist, the crotch is the lowest point of the inner-thigh
+   * gap. Every number is logged so a bad read is visible, and any read
+   * that lands outside sane bounds keeps the fallback.
+   */
+  function measureJoints(pos, n) {
+    const BIN = 0.02;
+    const bins = Math.ceil(CROWN / BIN) + 1;
+    // z-extent per y-bin for three vertex classes: leg, arm, torso
+    const mk = () => ({ lo: new Float32Array(bins).fill(1e9),
+      hi: new Float32Array(bins).fill(-1e9), cnt: new Uint32Array(bins),
+      xs: new Float32Array(bins) });
+    const leg = mk(), arm = mk();
+    let crotch = 1e9;
+    for (let v = 0; v < n; v++) {
+      const x = pos.getX(v), y = pos.getY(v), z = pos.getZ(v);
+      if (y < 0 || y > CROWN) continue;
+      const b = Math.floor(y / BIN);
+      const ax = Math.abs(x);
+      if (y < 0.80 && ax > 0.02 && ax < 0.17) {
+        if (z < leg.lo[b]) leg.lo[b] = z;
+        if (z > leg.hi[b]) leg.hi[b] = z;
+        leg.cnt[b]++; leg.xs[b] += ax;
+      }
+      if (ax > 0.15 && y > 0.30 && y < 1.15) {
+        if (z < arm.lo[b]) arm.lo[b] = z;
+        if (z > arm.hi[b]) arm.hi[b] = z;
+        arm.cnt[b]++; arm.xs[b] += ax;
+      }
+      // inner-thigh gap: central verts below the waist
+      if (ax < 0.025 && y > 0.25 && y < 0.85 && y < crotch) crotch = y;
+    }
+    const width = (m, b) => (m.cnt[b] > 3 ? m.hi[b] - m.lo[b] : 1e9);
+    const minIn = (m, y0, y1) => {
+      let bb = -1, bw = 1e9;
+      for (let b = Math.floor(y0 / BIN); b <= Math.floor(y1 / BIN); b++) {
+        const w = width(m, b);
+        if (w < bw) { bw = w; bb = b; }
+      }
+      return bb < 0 ? null : { y: (bb + 0.5) * BIN, w: bw };
+    };
+    const maxTopOf = (m) => {
+      for (let b = bins - 1; b >= 0; b--) if (m.cnt[b] > 3) return (b + 0.5) * BIN;
+      return null;
+    };
+    const out = {};
+    if (crotch < 1) out.hipsY = crotch + 0.045;
+    const knee = minIn(leg, 0.22, Math.min(0.60, (out.hipsY || J.hipsY) - 0.10));
+    if (knee) out.kneeY = knee.y;
+    const ankle = minIn(leg, 0.06, (out.kneeY || J.kneeY) - 0.08);
+    if (ankle) out.ankleY = ankle.y;
+    const armTop = maxTopOf(arm);
+    if (armTop) out.shoulderY = armTop - 0.055;
+    const elbow = minIn(arm, 0.55, (out.shoulderY || J.shoulderY) - 0.06);
+    if (elbow) out.elbowY = elbow.y;
+    const wrist = minIn(arm, 0.42, (out.elbowY || J.elbowY) - 0.05);
+    if (wrist) out.wristY = wrist.y;
+    // lateral centres at the measured heights
+    const bAt = (y) => Math.max(0, Math.min(bins - 1, Math.floor(y / BIN)));
+    const kb = bAt(out.kneeY || J.kneeY);
+    if (leg.cnt[kb] > 3) out.hipX = leg.xs[kb] / leg.cnt[kb];
+    const eb = bAt(out.elbowY || J.elbowY);
+    if (arm.cnt[eb] > 3) out.shoulderX = arm.xs[eb] / arm.cnt[eb];
+    if (out.hipsY) out.chestY = out.hipsY + 0.26;
+    // sanity gates: a read outside these keeps the fallback for that key
+    const sane = {
+      hipsY: [0.50, 0.85], kneeY: [0.20, 0.55], ankleY: [0.05, 0.22],
+      shoulderY: [0.90, 1.25], elbowY: [0.60, 1.00], wristY: [0.45, 0.85],
+      hipX: [0.05, 0.16], shoulderX: [0.15, 0.30], chestY: [0.80, 1.10],
+    };
+    for (const k of Object.keys(out)) {
+      const s = sane[k];
+      if (s && (out[k] < s[0] || out[k] > s[1])) delete out[k];
+    }
+    console.log('MR.Skin joints measured:', JSON.stringify(out));
+    return Object.assign({}, J, out);
+  }
 
   /** Decode the embed and hand the parsed scene to cb(gltf). */
   function load(b64, cb, err) {
@@ -13047,6 +13132,10 @@ MR.Skin = (function () {
    * reports the lowest limb tip for the road clamp.
    */
   function rig(norm, parts) {
+    // Shadow the module fallback with the sculpt's own measured joints:
+    // every J.* below reads the measured table.
+    const J = measureJoints(norm.geom.attributes.position,
+      norm.geom.attributes.position.count);
     const B = function (x, y, z) {
       const b = new THREE.Bone();
       b.position.set(x, y, z);
@@ -13347,14 +13436,195 @@ MR.Skin = (function () {
   }
 
   /**
+   * A model that arrives ALREADY RIGGED (Meshy's auto-rig, Mixamo, any
+   * humanoid skeleton) uses its own professional skin weights, and this
+   * maps the driver onto its bones. Two problems the procedural path
+   * never had:
+   *
+   *   NAMES. Their bones are found by pattern (mixamorig:LeftUpLeg,
+   *   Hips, Spine2...), our sides by sign: driver side -1 sits at -x,
+   *   which on a character facing +z is HIS RIGHT.
+   *
+   *   REST POSE. Their rest is a T- or A-pose with bone axes pointing
+   *   along the limbs; the driver's rest is arms-down with identity
+   *   orientations. So rotations cannot be copied -- they are TRANSPLANTED
+   *   as world-space deltas: the bone's world rotation (relative to the
+   *   shared body pivot) is moved off its rest by exactly the delta the
+   *   driver pivot has moved off its own rest, computed top-down so each
+   *   bone's local is solved against its parent's already-solved world.
+   */
+  function rigFromSkeleton(gltf, parts) {
+    let sm = null;
+    gltf.scene.traverse(function (o) { if (o.isSkinnedMesh && !sm) sm = o; });
+    if (!sm) return null;
+
+    // Normalise the whole scene: feet to y=0, height to CROWN.
+    gltf.scene.updateMatrixWorld(true);
+    const bb = new THREE.Box3().setFromObject(gltf.scene);
+    const s = CROWN / (bb.max.y - bb.min.y);
+    gltf.scene.scale.setScalar(s);
+    gltf.scene.position.set(0, 0, 0);
+    gltf.scene.updateMatrixWorld(true);
+    const bb2 = new THREE.Box3().setFromObject(gltf.scene);
+    gltf.scene.position.set(-(bb2.min.x + bb2.max.x) / 2, -bb2.min.y,
+      -(bb2.min.z + bb2.max.z) / 2);
+
+    // Find their bones by name pattern.
+    const boneByName = {};
+    gltf.scene.traverse(function (o) {
+      if (o.isBone) boneByName[o.name.toLowerCase().replace(/[^a-z0-9]/g, '')] = o;
+    });
+    function find() {
+      for (let i = 0; i < arguments.length; i++) {
+        const want = arguments[i];
+        for (const k of Object.keys(boneByName)) {
+          if (k.indexOf(want) >= 0) return boneByName[k];
+        }
+      }
+      return null;
+    }
+    const M = {
+      hips: find('hips', 'pelvis'),
+      spine: find('spine1', 'spine'),
+      chest: find('spine2', 'chest', 'spine1'),
+      neck: find('neck'),
+      head: find('head'),
+    };
+    const sideMap = { '-1': 'right', '1': 'left' };
+    for (const L of parts.legs) {
+      const sn = sideMap[String(L.side)];
+      M['thigh' + L.side] = find(sn + 'upleg', sn + 'upperleg', sn + 'thigh');
+      M['shin' + L.side] = find(sn + 'leg', sn + 'lowerleg', sn + 'shin', sn + 'calf');
+      M['foot' + L.side] = find(sn + 'foot');
+    }
+    for (const A of parts.arms) {
+      const sn = sideMap[String(A.side)];
+      M['upper' + A.side] = find(sn + 'arm', sn + 'upperarm');
+      M['fore' + A.side] = find(sn + 'forearm', sn + 'lowerarm');
+    }
+    if (!M.hips || !M.head || !M['thigh-1'] || !M['upper-1']) {
+      console.error('MR.Skin: rigged model missing expected bones',
+        Object.keys(boneByName).join(','));
+      return null;
+    }
+
+    // Driver pairs. Chest carries the shoulder-adjacent spine bone; the
+    // driver's shoulder maps to their upper arm, elbow to forearm.
+    const pairs = [];
+    const add = function (pivot, bone) { if (pivot && bone) pairs.push([pivot, bone]); };
+    add(parts.hips, M.hips);
+    if (M.spine && M.spine !== M.hips) add(parts.spine, M.spine);
+    if (M.chest && M.chest !== M.spine) add(parts.chest, M.chest);
+    add(parts.neck, M.neck);
+    add(parts.head, M.head);
+    for (const L of parts.legs) {
+      add(L.hip, M['thigh' + L.side]);
+      add(L.knee, M['shin' + L.side]);
+      add(L.ankle, M['foot' + L.side]);
+    }
+    for (const A of parts.arms) {
+      add(A.shoulder, M['upper' + A.side]);
+      add(A.elbow, M['fore' + A.side]);
+    }
+
+    parts.body.add(gltf.scene);
+    parts.body.updateMatrixWorld(true);
+
+    // Rest snapshot, all relative to the body pivot so everything the
+    // driver does above body (yaw, bob, squash) cancels out of the math.
+    const bodyInv = new THREE.Quaternion();
+    parts.body.getWorldQuaternion(bodyInv).invert();
+    const rest = new Map();   // bone -> { local: Q, worldRel: Q }
+    const _q = new THREE.Quaternion();
+    // include every ancestor bone of mapped bones so parents resolve
+    const all = new Set();
+    for (const pr of pairs) {
+      for (let b = pr[1]; b && (b.isBone || b === gltf.scene); b = b.parent) all.add(b);
+    }
+    for (const b of all) {
+      b.getWorldQuaternion(_q);
+      rest.set(b, {
+        local: b.quaternion.clone(),
+        worldRel: bodyInv.clone().multiply(_q).normalize(),
+      });
+    }
+    const driverOf = new Map(pairs.map(function (pr) { return [pr[1], pr[0]]; }));
+
+    const _pw = new THREE.Quaternion(), _delta = new THREE.Quaternion(),
+      _target = new THREE.Quaternion(), _parentW = new THREE.Quaternion(),
+      _bw = new THREE.Quaternion();
+    // solved world-relative rotations for this frame
+    const solved = new Map();
+    function worldRelOf(b) {
+      if (solved.has(b)) return solved.get(b);
+      const r0 = rest.get(b);
+      let q;
+      if (!r0) {
+        // outside the snapshot: treat as rigid at rest
+        q = new THREE.Quaternion();
+        b.getWorldQuaternion(q).premultiply(bodyInv);
+      } else {
+        const parent = b.parent && (b.parent.isBone || b.parent === gltf.scene)
+          ? worldRelOf(b.parent) : new THREE.Quaternion();
+        q = parent.clone().multiply(b.quaternion);
+      }
+      solved.set(b, q);
+      return q;
+    }
+    function sync() {
+      solved.clear();
+      // top-down: order pairs so parents come first (pairs were added
+      // roughly top-down already; resolve via recursion regardless).
+      for (const pr of pairs) {
+        const pivot = pr[0], bone = pr[1];
+        const r0 = rest.get(bone);
+        // driver delta relative to body: pivot world rel = product of
+        // pivot-chain quaternions below body (all rest-identity), so the
+        // chain product IS the delta.
+        _delta.identity();
+        const chain = [];
+        for (let p2 = pivot; p2 && p2 !== parts.body; p2 = p2.parent) chain.push(p2);
+        for (let i = chain.length - 1; i >= 0; i--) _delta.multiply(chain[i].quaternion);
+        // target world-rel = delta * restWorldRel
+        _target.copy(_delta).multiply(r0.worldRel);
+        // parent's world-rel (already solved or rigid)
+        const parent = bone.parent;
+        const pq = (parent && (parent.isBone || parent === gltf.scene))
+          ? worldRelOf(parent) : new THREE.Quaternion();
+        _parentW.copy(pq).invert();
+        bone.quaternion.copy(_parentW.multiply(_target));
+        solved.set(bone, _target.clone());
+      }
+    }
+
+    const _v = new THREE.Vector3();
+    const tips = [M['foot-1'], M['foot1'], M['fore-1'], M['fore1'], M.head]
+      .filter(Boolean);
+    function low() {
+      let min = 1e9;
+      for (const t of tips) {
+        t.getWorldPosition(_v);
+        if (_v.y < min) min = _v.y;
+      }
+      return min - 0.10;
+    }
+
+    console.log('MR.Skin: using the model\'s own rig (' + pairs.length + ' joints mapped)');
+    return { sync: sync, low: low, mesh: sm };
+  }
+
+  /**
    * Entry point. Called by runner.js's create() when a model is embedded.
    * Async: the code body runs until the parse lands, then the costume
-   * replaces it between two frames.
+   * replaces it between two frames. A rigged model uses its own skeleton
+   * and weights; an unrigged one gets the procedural rig.
    */
   function attach(parts, onRigged) {
     if (!MR.EMBED || !MR.EMBED.miles || !THREE.GLTFLoader) return;
     load(MR.EMBED.miles, function (gltf) {
       try {
+        const own = rigFromSkeleton(gltf, parts);
+        if (own) return onRigged(own);
         const norm = normalise(gltf.scene);
         const r = rig(norm, parts);
         onRigged(r);

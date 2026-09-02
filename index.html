@@ -34137,7 +34137,7 @@ MR.World = (function () {
     }
     const CARRIAGE_MAX = 4;
 
-    function dressHazard(kind, vi, key, yaw, hues, carriages) {
+    function dressHazard(kind, vi, key, yaw, hues, carriages, rotX) {
       let grp = null;
       for (const g2 of HAZARD_DEFS) if (g2.kind === kind) grp = g2;
       const d = grp && grp.defs[vi];
@@ -34158,17 +34158,73 @@ MR.World = (function () {
           // rest of the file keeps: a sculpt that kept its own aspect
           // would either poke out of the envelope or shrink from the lane
           // edge the collision box says it owns.
-          const pre = new THREE.Matrix4().makeRotationY(yaw).multiply(src.matrixWorld);
+          // `rotX` first, for the one model generated in the wrong POSE
+          // rather than the wrong heading: the fallen e-scooter arrived
+          // standing, and a quarter roll about x lays it down before the
+          // fit reads its box.
+          const pre = new THREE.Matrix4().makeRotationY(yaw);
+          if (rotX) pre.multiply(new THREE.Matrix4().makeRotationX(rotX));
+          pre.multiply(src.matrixWorld);
           geo.computeBoundingBox();
           const sb = geo.boundingBox.clone().applyMatrix4(pre);
           d.geo.computeBoundingBox();
           const tb = d.geo.boundingBox;
           const sx = (tb.max.x - tb.min.x) / Math.max(1e-6, sb.max.x - sb.min.x);
-          const sy = (tb.max.y - tb.min.y) / Math.max(1e-6, sb.max.y - sb.min.y);
+          let sy = (tb.max.y - tb.min.y) / Math.max(1e-6, sb.max.y - sb.min.y);
           const sz = (tb.max.z - tb.min.z) / Math.max(1e-6, sb.max.z - sb.min.z);
+          let ty = (tb.max.y + tb.min.y) / 2 - (sb.max.y + sb.min.y) / 2 * sy;
+          if (kind === K.DUCK) {
+            /**
+             * A DUCK'S VERTICAL FIT IS NOT A BOUNDING-BOX FIT, because the
+             * box is not the hazard: the def spans the whole structure
+             * (posts to the ground, header above), while the thing that
+             * kills is the bar at MR.Collision.BOX[DUCK].yMin..yMax. A
+             * bbox fit puts the sculpt's bar wherever its own proportions
+             * land it -- which is art deciding clearance, the exact thing
+             * rule 4 forbids. So the sculpt's overhead UNDERSIDE is
+             * MEASURED -- a vertex-count histogram over height; the
+             * underside is the bottom of the dominant mass above 30% of
+             * the sculpt's height -- and the y scale is chosen to pin
+             * that underside on the box's yMin, ground to ground. If that
+             * scale would push the sculpt's crown out of the def
+             * envelope, it clamps down: the bar then sits LOW, which is
+             * the safe direction -- a player who ducks early loses
+             * nothing; one who runs under a bar drawn too high loses the
+             * record.
+             */
+            const posA = geo.attributes.position;
+            const h = sb.max.y - sb.min.y;
+            const BINS = 48;
+            const hist = new Array(BINS).fill(0);
+            const v3 = new THREE.Vector3();
+            for (let i = 0; i < posA.count; i += 3) {
+              v3.set(posA.getX(i), posA.getY(i), posA.getZ(i)).applyMatrix4(pre);
+              const b2 = Math.min(BINS - 1, Math.max(0,
+                Math.floor((v3.y - sb.min.y) / h * BINS)));
+              hist[b2]++;
+            }
+            const lo = Math.floor(BINS * 0.30);
+            let peak = lo;
+            for (let b2 = lo; b2 < BINS; b2++) if (hist[b2] > hist[peak]) peak = b2;
+            // walk down from the peak to the bottom of its mass block
+            const floor2 = hist[peak] * 0.25;
+            let under = peak;
+            while (under > lo && hist[under - 1] > floor2) under--;
+            const underY = sb.min.y + (under / BINS) * h;
+            const box = MR.Collision.BOX[K.DUCK];
+            sy = box.yMin / Math.max(1e-6, underY - sb.min.y);
+            const crown = (sb.max.y - sb.min.y) * sy;
+            if (crown > tb.max.y - tb.min.y) {
+              sy = (tb.max.y - tb.min.y) / (sb.max.y - sb.min.y);
+            }
+            ty = tb.min.y - sb.min.y * sy;
+            console.log('MR.World: ' + key + ' underside at '
+              + (underY - sb.min.y).toFixed(2) + '/' + h.toFixed(2)
+              + ' of the sculpt, pinned to y ' + (sb.min.y * sy + ty + (underY - sb.min.y) * sy).toFixed(2));
+          }
           const fit = new THREE.Matrix4().makeTranslation(
             (tb.max.x + tb.min.x) / 2 - (sb.max.x + sb.min.x) / 2 * sx,
-            (tb.max.y + tb.min.y) / 2 - (sb.max.y + sb.min.y) / 2 * sy,
+            ty,
             (tb.max.z + tb.min.z) / 2 - (sb.max.z + sb.min.z) / 2 * sz)
             .multiply(new THREE.Matrix4().makeScale(sx, sy, sz))
             .multiply(pre);
@@ -34273,14 +34329,11 @@ MR.World = (function () {
     // measured L 86.3 / S 0.545, +0.147 clear at the tightest road.
     dressHazard(K.BLOCK, 9, 'veh_scooter', Math.PI / 2,
       [{ h: 250, t: 0.08, s: 2.0, l: 1.1 }]);
-    // THE CONTAINER (v10) IS NOT DRESSED. Its weathered blue mean sits at
-    // L 59 / S 0.53 -- inside the finish carpet's L 56.6 / S 0.507 and
-    // hemmed by the tempo mats on the other axis -- and the paint shop
-    // cannot move it: with NO saturation threshold and lightness pushed
-    // 1.8x the mean rises only to L 62.5 (the toon ramp's response to a
-    // dark-dominant texture is the ceiling), still -0.12 under the gate.
-    // The code container clears at 1.32x. Sculpting it needs a texture
-    // that is actually light -- a regeneration, not a multiplier.
+    // The first container (props-v3) was refused by measurement: its
+    // weathered blue sat inside the finish carpet's tone and no repaint
+    // could move it. This is the owner's regenerated ORANGE one -- the
+    // fix was always a lighter texture, not a multiplier.
+    dressHazard(K.BLOCK, 10, 'veh_container2', Math.PI);
     dressHazard(K.BLOCK, 11, 'veh_dumpster', Math.PI / 2);
     // The owner's blue car takes four coats through the paint shop --
     // "please make it different colors so it is not only a blue car
@@ -34298,13 +34351,37 @@ MR.World = (function () {
     // and magenta (h80 l1.15, +0.146).
     dressHazard(K.BLOCK, 12, 'veh_hatchback', 0,
       [{ h: 170 }, { h: 200 }, { h: 260 }, { h: 80, l: 1.15 }]);
-    // THE POLICE CAR (v13) IS NOT DRESSED. Black over white averages to
-    // road grey: L 88.1 / S 0.02 against lane 1's L 93 / S 0.18, and a
-    // material tint has no lever -- the black mass is fixed, and tinting
-    // the white doors only walks the mean ALONG the road tones (best
-    // probe -0.106). Its identity is the defect: a black-and-white car
-    // reads as tarmac in a game whose roads are grey. The code police car
-    // keeps the slot.
+    // The first police car (props-v4 retry of the props-v3 refusal): the
+    // US black-and-white averaged to road grey and had no lever. This
+    // one is the battenburg the refusal note asked for -- yellow and
+    // blue over white, a livery that exists to be seen.
+    dressHazard(K.BLOCK, 13, 'veh_police2', 0);
+
+    // ---- the JUMP vocabulary (props-v4) --------------------------------
+    dressHazard(K.JUMP, 0, 'veh_j_sandbags', 0);
+    dressHazard(K.JUMP, 1, 'veh_j_cones', 0);
+    dressHazard(K.JUMP, 2, 'veh_j_trench', 0);
+    // Generated standing; a quarter roll about x lays it down into the
+    // fallen-scooter pose the def box was authored for.
+    dressHazard(K.JUMP, 3, 'veh_j_scooter', 0, null, false, Math.PI / 2);
+    dressHazard(K.JUMP, 4, 'veh_j_barrier', 0);
+    dressHazard(K.JUMP, 5, 'veh_j_pipe', 0);
+    dressHazard(K.JUMP, 6, 'veh_j_planter', 0);
+    dressHazard(K.JUMP, 7, 'veh_j_crate', 0);
+    dressHazard(K.JUMP, 8, 'veh_j_barricade', 0);
+    dressHazard(K.JUMP, 9, 'veh_j_drum', 0);
+    dressHazard(K.JUMP, 10, 'veh_j_lowbar', 0);
+    dressHazard(K.JUMP, 11, 'veh_j_trash', 0);
+
+    // ---- the DUCK vocabulary (props-v4, v6-v10 still code art) ---------
+    // The vertical fit is bar-aware for this kind -- see the underside
+    // measurement in dressHazard.
+    dressHazard(K.DUCK, 0, 'veh_d_gantry', 0);
+    dressHazard(K.DUCK, 1, 'veh_d_scaffold', 0);
+    dressHazard(K.DUCK, 2, 'veh_d_sign', Math.PI);
+    dressHazard(K.DUCK, 3, 'veh_d_boom', 0);
+    dressHazard(K.DUCK, 4, 'veh_d_pipe', 0);
+    dressHazard(K.DUCK, 5, 'veh_d_walkway', 0);
 
     /**
      * ============ CONTACT SHADING UNDER EVERY HAZARD ============

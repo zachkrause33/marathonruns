@@ -8700,3 +8700,43 @@ the collision line -- verified live against the box), and the contact
 shadow's zOff, which follows the drive the way cx follows the sweep.
 
 Gates: 8/8 shots, 90/90 courses, simulate PASS.
+
+## 100. Cross-street cars: the dart, and the swipe decision
+
+The owner: "adding cross streets where as you approach a car comes
+across the street that you have to avoid. What we need to decide is
+if you can jump over there or need to swipe across." Decided: SWIPE.
+No vehicle in this game is jumpable -- JUMP tops out at 0.80 units of
+crate and sandbag, and a car the player hurdles would teach that cars
+are sometimes jumpable, which is a lie everywhere else on the course.
+The dart ends as an ordinary BLOCK on the gate line, and BLOCK means
+swipe. That decision cost nothing to implement and keeps the grammar.
+
+Built on the sweeper's contract, third verse: the kill lane is fixed
+course data, and only the approach animates. The car waits OFF the
+carriageway on the verge (x = +/-3.6, hidden until it moves), then
+darts across the road into its lane, turning from sideways to
+straight as it arrives (yaw pi/2 -> 0), locked from SWEEP_LOCK out.
+CROSS_START = SWEEP_LOCK + 22: the whole crossing happens inside the
+window where the sweep already proved a moving approach is readable.
+markMotion rotates eligible gates three ways by hash -- oncoming /
+cross / sweep, with fallback chains when a gate's geometry disallows
+the preferred kind (a centre-lane dart needs a clear adjacent edge to
+enter through; an edge dart needs nothing). Census: ~4.1 oncoming,
+~2.5 cross, ~1.6 sweeps a course. Wardrobe is CROSS_CAST -- taxi,
+hatchback, police -- the three sculpts that read as "a car" in the
+half second they are seen side-on.
+
+The side street is PAINTED, not built: a transverse asphalt band with
+dashed give-way edges at the gate line (crossPaintPool), claimed and
+released with the gate. A marking on the road, single flat quad, per
+the rule-1 exception. It shipped invisible on the first pass and the
+fix is worth recording: renderOrder -2 with depthWrite off draws the
+band BEFORE the road, and the opaque road paints straight over it.
+The finish carpet knew the answer all along -- on-road overlays draw
+AFTER the road (renderOrder 1, y +0.016). Verified in-frame this time:
+the projection probe (crossshot.js) computes the car's screen pixel
+through the live camera and crops there, so "vis: true" and "visible
+in the shot" stopped being the same claim taken on faith.
+
+Gates: 8/8 shots, 90/90 courses, simulate PASS.

@@ -2298,17 +2298,41 @@ MR.Course = (function () {
       }
       range = Math.min(range, K.TOTAL_UNITS - FINISH_GRACE - gate.z);
       const corridor = range >= 25;
-      // Rotate: both possible -> a hash bit decides; one -> that one.
-      // 40/60 rather than a coin: oncoming's corridor is satisfied more
-      // often than the sweep's adjacent-clear lane, and an even bit let it
-      // crowd the sweep out (5.6 to 2.7 on the census). This keeps the mix.
-      const wantOn = ((h >>> 16) % 5) < 2;
-      if (corridor && (wantOn || from < 0)) {
-        gate.on = { lane, range };
-        tally.oncoming++;
-      } else if (from >= 0) {
-        gate.sweep = { from, lane };
-        tally.sweeps++;
+      /**
+       * THE CROSS-STREET CAR -- the owner: "adding cross streets where as
+       * you approach a car comes across the street that you have to
+       * avoid. What we need to decide is if you can jump over there or
+       * need to swipe across." DECIDED: swipe. A car is never jumpable in
+       * this game's grammar -- JUMP tops out at 0.80 and every vehicle
+       * teaches "swipe, never leap"; one jumpable car would poison that
+       * read everywhere else. So the cross car is a BLOCK like its
+       * siblings, and the dodge is the swipe the player already knows.
+       *
+       * It enters from the VERGE beside its own lane, which is what makes
+       * it cheap where the full-width crossing was calendar-rare (0.08 a
+       * course needs both other lanes clear): an edge wall's verge is
+       * adjacent, so there is NO transit lane to demand; a centre wall
+       * crosses the adjacent edge, the sweep's own from-condition. The
+       * renderer hides the car until the dart begins and lays the
+       * crossing-street paint at the gate, so the fiction is a side
+       * street; the kill lane is fixed course data and the car stands in
+       * it from SWEEP_LOCK out -- same lock, same proof, as everything
+       * else that moves.
+       */
+      let crossSide = 0;
+      if (lane !== 1) crossSide = lane === 0 ? 1 : -1;
+      else if (from >= 0) crossSide = from === 0 ? 1 : -1;
+      // Rotate oncoming / cross / sweep on a hash trit with fallback, so a
+      // gate that cannot host its first pick takes its second rather than
+      // going still. The 4/3/3 split leans against oncoming, whose
+      // corridor is satisfied more often than the others' conditions.
+      const roll = (h >>> 16) % 10;
+      const prefer = roll < 4 ? ['on', 'cross', 'sweep']
+        : roll < 7 ? ['cross', 'on', 'sweep'] : ['sweep', 'on', 'cross'];
+      for (const p of prefer) {
+        if (p === 'on' && corridor) { gate.on = { lane, range }; tally.oncoming++; break; }
+        if (p === 'cross' && crossSide) { gate.cross = { side: crossSide, lane }; tally.cross++; break; }
+        if (p === 'sweep' && from >= 0) { gate.sweep = { from, lane }; tally.sweeps++; break; }
       }
     }
   }
@@ -2347,7 +2371,7 @@ MR.Course = (function () {
     // "solvable on all 365 days" is true by construction and proves nothing
     // about whether a new mechanic damaged the course -- the damage would show
     // up as the generator giving up more often, and nothing counted that.
-    const tally = { degraded: 0, attempts: 0, narrowings: 0, narrowAbandoned: 0, sweeps: 0, oncoming: 0 };
+    const tally = { degraded: 0, attempts: 0, narrowings: 0, narrowAbandoned: 0, sweeps: 0, oncoming: 0, cross: 0 };
 
     // A closure in flight: the lanes it holds shut, and the gate index it runs
     // to. Deliberately the same shape as trainUntil, because it is the same
@@ -2983,6 +3007,8 @@ MR.Course = (function () {
            // SWEEP_START. Exported so the animation reads the numbers from the
            // file that derives them from the read window -- see markSweeps.
            SWEEP_LOCK, SWEEP_START, ONCOMING_RANGE, ONCOMING_RATIO,
+           // The cross-street dart: begins here, locks at SWEEP_LOCK.
+           CROSS_START: SWEEP_LOCK + 22,
            elevationPlan };
 
   // Accessors rather than plain fields, so a nonsense value cannot be written

@@ -14969,7 +14969,7 @@ MR.World = (function () {
       for (const g of activeGates) {
         for (let l = 0; l < 3 && n < SHADOW_MAX; l++) {
           const kind = g.gate.lanes[l];
-          if (kind === K.CLEAR || !g.objs[l]) continue;
+          if (kind === K.CLEAR || !g.objs[l] || !g.objs[l].visible) continue;
           const box = B[kind];
           if (!box) continue;
           // Only what actually rests on the road. See the header.
@@ -15226,6 +15226,9 @@ MR.World = (function () {
       // course, repetition is not the risk, and keeping them out of the deal
       // leaves the bag's anti-repetition property intact for the fleet.
       const SWEEP_CAST = [4, 5, 6, 7, 9, 12, 13, 14];
+      // The dart is a CAR: a bus or a lorry shooting out of a side street
+      // reads as a physics error, a taxi or a hatchback reads as traffic.
+      const CROSS_CAST = [5, 12, 13];
       const cast = [];
       for (let g = 0; g < gates.length; g++) {
         const gate = gates[g];
@@ -15234,6 +15237,8 @@ MR.World = (function () {
           const kind = gate.lanes[l];
           if (kind === K.CLEAR || !bags[kind]) continue;
           row[l] = (kind === K.BLOCK && gate.train) ? 0
+            : (kind === K.BLOCK && gate.cross)
+              ? CROSS_CAST[MR.rng.hashString((key || '') + '|sweep-skin|' + g) % CROSS_CAST.length]
             : (kind === K.BLOCK && (gate.sweep || gate.on))
               ? SWEEP_CAST[MR.rng.hashString((key || '') + '|sweep-skin|' + g) % SWEEP_CAST.length]
               : draw(kind);
@@ -18958,6 +18963,34 @@ MR.World = (function () {
      * most of a second of start-up for geometry nine tenths of which never
      * appears.
      */
+    /**
+     * The cross-street paint: a transverse band of asphalt with dashed
+     * edge lines, laid across the whole road (and a little into both
+     * verges) at a cross gate, so the car darting in from the side reads
+     * as coming out of a SIDE STREET rather than out of the scenery. Road
+     * marking, not an object -- a single flat quad is correct here per
+     * the rule-1 exception, because the player can never get under it.
+     * One draw per live cross gate, claimed and released with the gate.
+     */
+    const crossPaintPool = Pool(function () {
+      const cv = canvas(128, 64);
+      const cg = cv.getContext('2d');
+      cg.fillStyle = '#4a4d57';
+      cg.fillRect(0, 0, 128, 64);
+      cg.fillStyle = '#c9ccd4';
+      for (let x = 0; x < 128; x += 16) { cg.fillRect(x, 3, 9, 3); cg.fillRect(x, 58, 9, 3); }
+      const tex = new THREE.CanvasTexture(cv);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const g = new THREE.Mesh(
+        new THREE.PlaneGeometry(9.4, 4.6).rotateX(-Math.PI / 2),
+        new THREE.MeshBasicMaterial({ map: tex }));
+      // AFTER the road, like the finish carpet (renderOrder 1): a band at
+      // renderOrder -2 with depthWrite off is drawn first and the opaque
+      // road then paints straight over it -- it shipped invisible that way.
+      g.renderOrder = 1;
+      return g;
+    }, group);
+
     const markPools = {};
     function markPool(st) {
       const kind = st.kind;
@@ -19469,8 +19502,12 @@ MR.World = (function () {
           // Written on EVERY claim for the reason everything else here is: the
           // sweeper animation below writes yaw and x on its own gate, the pool
           // recycles, and a parked taxi standing crooked in the wrong lane is
-          // the previous tenant's crossing left running.
+          // the previous tenant's crossing left running. `visible` the same:
+          // the cross-street car hides itself until its dart begins, and a
+          // recycled group that stayed hidden would be an invisible wall --
+          // the worst direction a pooling defect can point.
           o.rotation.y = 0;
+          o.visible = true;
           // Pick the skin. Pooled, so EVERY variant's visibility is written on
           // every claim -- a hazard inheriting the previous tenant's body is
           // the kind of defect that only shows up in one screenshot in twenty,
@@ -19524,7 +19561,14 @@ MR.World = (function () {
           // shadow system rather than two.
           objs.push(o);
         }
-        activeGates.push({ gate, objs });
+        const entry = { gate, objs };
+        if (gate.cross) {
+          const p = crossPaintPool.claim();
+          p.position.set(0, eAt(gate.z) + 0.016, gate.z);
+          p.rotation.x = -Math.atan(EL.slope(gate.z));
+          entry.paint = p;
+        }
+        activeGates.push(entry);
       }
       // A gate releases when it is BEHIND -- but "it" is the gate LINE, and a
       // train is one gate carrying up to 60.1 units of vehicle FORWARD of
@@ -19549,6 +19593,7 @@ MR.World = (function () {
           && activeGates[0].gate.z + trainDepth(activeGates[0].gate) < back) {
         const g = activeGates.shift();
         for (let l = 0; l < 3; l++) if (g.objs[l]) releaseHazard(g.gate.lanes[l], g.objs[l]);
+        if (g.paint) crossPaintPool.release(g.paint);
       }
 
       // roadside props
@@ -20032,6 +20077,23 @@ MR.World = (function () {
           o.position.y = eAt(vz);
           o.rotation.x = -Math.atan(EL.slope(vz));
           o.rotation.y = Math.PI;
+        }
+        // THE CROSS-STREET DART: hidden until it moves, then in from the
+        // verge beside its lane, fully sideways, straightening as it brakes
+        // into place. Same lock as its siblings; the crossing-street paint
+        // under it (claimed with the gate) is what its entry drives over.
+        const cr = g.gate.cross;
+        if (cr && g.objs[cr.lane]) {
+          const o = g.objs[cr.lane];
+          const d = g.gate.z - z;
+          const t = (MR.Course.CROSS_START - d)
+            / (MR.Course.CROSS_START - MR.Course.SWEEP_LOCK);
+          const c = t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
+          const fx = cr.side * (Math.abs(K.LANE_X[0]) + 1.9);
+          const tx = K.LANE_X[cr.lane];
+          o.position.x = fx + (tx - fx) * c;
+          o.rotation.y = (tx > fx ? 1 : -1) * (Math.PI / 2) * (1 - c);
+          o.visible = c > 0.001;
         }
         const sw = g.gate.sweep;
         if (sw && g.objs[sw.lane]) {

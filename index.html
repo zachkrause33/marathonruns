@@ -10574,7 +10574,33 @@ MR.Course = (function () {
   const SWEEP_LOCK = 1.5 * (ACTION_WINDOW + K.CAM_BASE_BACK);
   const SWEEP_START = 3 * (ACTION_WINDOW + K.CAM_BASE_BACK);
   const SWEEP_RATE = 0.60;
-  function markSweeps(key, gates, tally) {
+  /**
+   * ---- AND THE ONCOMING VEHICLE, THE SAME CONTRACT ROTATED 90 DEGREES ----
+   *
+   * The owner: "Can vehicles move towards you on the road? Potentially
+   * multiple at one time... It could rotate between standing objects and
+   * ones that move towards you." Same construction as the sweeper, on the
+   * OTHER axis: the kill line is the gate line and never moves; what
+   * animates is the approach, a vehicle driving DOWN its own lane toward
+   * the player and braking to a stop exactly on its gate line, locked
+   * there from SWEEP_LOCK out like everything else that moves. Multiple
+   * gates' vehicles run at once because each is a pure function of the
+   * player's distance to its own gate.
+   *
+   * THE CORRIDOR IS THE ELIGIBILITY. The vehicle occupies its lane from
+   * gate.z up to gate.z + ONCOMING_RANGE during the approach, so every
+   * gate line inside that span must hold CLEAR in that lane -- it may not
+   * drive through a crate, a gantry post, or another wall. Trains need no
+   * separate clause: a vehicle deep enough to reach the corridor is a
+   * BLOCK at some gate inside it. The hash rotates eligible gates between
+   * parked, sweeping and oncoming, which is the owner's "rotate" verbatim.
+   */
+  // 90 -> 55: the calendar refused 90 (0.1 a course -- three consecutive
+  // gates with one lane clear barely exist mid-race). At 55 the corridor
+  // is one-to-two gates and the approach still starts ~84 units out.
+  const ONCOMING_RANGE = 55;
+  const ONCOMING_RATIO = 1.2;   // approach units per player unit: closure ~2.2x
+  function markMotion(key, gates, tally) {
     if (!(SWEEP > 0)) return;
     for (let i = 0; i < gates.length; i++) {
       const gate = gates[i];
@@ -10589,21 +10615,43 @@ MR.Course = (function () {
       }
       if (!ok || lane < 0) continue;
       if (i > 0 && gates[i - 1].lanes[lane] === K.BLOCK) continue;
-      // The lane it arrives FROM: adjacent and CLEAR, nothing else. An edge
-      // wall is entered from the centre; a centre wall from whichever edge is
-      // open (a hash bit picks when both are, which the calendar says is 3
-      // gates a year).
-      let from = -1;
       const h = MR.rng.hashString(key + '|sweep/v1|' + i);
+      if ((h % 4096) / 4096 >= SWEEP_RATE * SWEEP) continue;
+      // The sweep's arrival lane: adjacent and CLEAR, nothing else. An edge
+      // wall is entered from the centre; a centre wall from whichever edge
+      // is open (a hash bit picks when both are).
+      let from = -1;
       if (lane !== 1) { if (gate.lanes[1] === K.CLEAR) from = 1; }
       else {
         const open = [0, 2].filter((l) => gate.lanes[l] === K.CLEAR);
         if (open.length) from = open.length === 2 ? open[(h >>> 12) & 1] : open[0];
       }
-      if (from < 0) continue;
-      if ((h % 4096) / 4096 >= SWEEP_RATE * SWEEP) continue;
-      gate.sweep = { from, lane };
-      tally.sweeps++;
+      // The oncoming corridor is ADAPTIVE: the vehicle takes whatever clear
+      // run its lane actually has, up to ONCOMING_RANGE, stopping short of
+      // the first gate ahead that stands anything in the lane. A fixed
+      // 90-unit demand fired 0.1 times a course and a fixed 55 fired 0.9 --
+      // three-in-a-row and two-in-a-row clear lanes barely exist mid-race
+      // -- so the corridor bends to the course instead of asking it to be
+      // emptier than it is. Below 25 units the drive is too short to read
+      // as motion and the gate falls back to the sweep.
+      let range = ONCOMING_RANGE;
+      for (let j = i + 1; j < gates.length && gates[j].z <= gate.z + range; j++) {
+        if (gates[j].lanes[lane] !== K.CLEAR) { range = gates[j].z - gate.z - 4; break; }
+      }
+      range = Math.min(range, K.TOTAL_UNITS - FINISH_GRACE - gate.z);
+      const corridor = range >= 25;
+      // Rotate: both possible -> a hash bit decides; one -> that one.
+      // 40/60 rather than a coin: oncoming's corridor is satisfied more
+      // often than the sweep's adjacent-clear lane, and an even bit let it
+      // crowd the sweep out (5.6 to 2.7 on the census). This keeps the mix.
+      const wantOn = ((h >>> 16) % 5) < 2;
+      if (corridor && (wantOn || from < 0)) {
+        gate.on = { lane, range };
+        tally.oncoming++;
+      } else if (from >= 0) {
+        gate.sweep = { from, lane };
+        tally.sweeps++;
+      }
     }
   }
 
@@ -10641,7 +10689,7 @@ MR.Course = (function () {
     // "solvable on all 365 days" is true by construction and proves nothing
     // about whether a new mechanic damaged the course -- the damage would show
     // up as the generator giving up more often, and nothing counted that.
-    const tally = { degraded: 0, attempts: 0, narrowings: 0, narrowAbandoned: 0, sweeps: 0 };
+    const tally = { degraded: 0, attempts: 0, narrowings: 0, narrowAbandoned: 0, sweeps: 0, oncoming: 0 };
 
     // A closure in flight: the lanes it holds shut, and the gate index it runs
     // to. Deliberately the same shape as trainUntil, because it is the same
@@ -10904,9 +10952,10 @@ MR.Course = (function () {
       z += spacingAt(f, rnd, z, elevation, lanes, span, tempoPlan);
     }
 
-    // The sweepers, annotated AFTER the loop so the pass reads finished gates
-    // and draws nothing from the course stream. See markSweeps.
-    markSweeps(key, gates, tally);
+    // The moving vehicles -- sweepers and oncoming -- annotated AFTER the
+    // loop so the pass reads finished gates and draws nothing from the
+    // course stream. See markMotion.
+    markMotion(key, gates, tally);
 
     const mileMarkers = [];
     for (let m = 1; m <= 26; m++) mileMarkers.push({ mile: m, z: m * K.UNITS_PER_MILE });
@@ -11275,7 +11324,7 @@ MR.Course = (function () {
            // in its own lane by SWEEP_LOCK and parked in `from` beyond
            // SWEEP_START. Exported so the animation reads the numbers from the
            // file that derives them from the read window -- see markSweeps.
-           SWEEP_LOCK, SWEEP_START,
+           SWEEP_LOCK, SWEEP_START, ONCOMING_RANGE, ONCOMING_RATIO,
            elevationPlan };
 
   // Accessors rather than plain fields, so a nonsense value cannot be written
@@ -35078,12 +35127,17 @@ MR.World = (function () {
           // scales the body about its own origin, which composes to exactly
           // span * (local z + halfZ). Do not re-derive it anywhere else.
           const fc = (foot[1] + foot[2]) * 0.5, fh = (foot[2] - foot[1]) * 0.56;
-          const z0 = g.gate.z + span * (fc - fh + box.halfZ) - SHADOW_SPREAD;
-          const z1 = g.gate.z + span * (fc + fh + box.halfZ) + SHADOW_SPREAD;
+          // The oncoming vehicle's z advance, as an offset from the gate
+          // line the span arithmetic is anchored to; zero for everything
+          // parked. Declared here because z0/z1 read it.
+          const zOff = g.objs[l].position.z - g.gate.z;
+          const z0 = g.gate.z + zOff + span * (fc - fh + box.halfZ) - SHADOW_SPREAD;
+          const z1 = g.gate.z + zOff + span * (fc + fh + box.halfZ) + SHADOW_SPREAD;
           // The GROUP's x, not LANE_X: the two are identical for every parked
           // hazard, and a sweeper mid-crossing must drag its shadow with it --
           // a shadow waiting in the kill lane before the vehicle arrives would
-          // be the telegraph answering for the art.
+          // be the telegraph answering for the art (and zOff above, the same
+          // again in z for the oncoming vehicle).
           const cx = g.objs[l].position.x;
           // The variant's own half-width, never a difference of LANE_X.
           const hx = foot[0] * 1.12 + SHADOW_SPREAD;
@@ -35321,7 +35375,7 @@ MR.World = (function () {
           const kind = gate.lanes[l];
           if (kind === K.CLEAR || !bags[kind]) continue;
           row[l] = (kind === K.BLOCK && gate.train) ? 0
-            : (kind === K.BLOCK && gate.sweep)
+            : (kind === K.BLOCK && (gate.sweep || gate.on))
               ? SWEEP_CAST[MR.rng.hashString((key || '') + '|sweep-skin|' + g) % SWEEP_CAST.length]
               : draw(kind);
         }
@@ -40086,6 +40140,40 @@ MR.World = (function () {
       // see markSweeps there for the whole argument. A pure function of
       // distance, so it is deterministic and cannot drift with framerate.
       for (const g of activeGates) {
+        // THE ONCOMING VEHICLE -- the sweeper's contract on the z axis. It
+        // drives down its own lane toward the player at ONCOMING_RATIO
+        // approach-units per player-unit and brakes to a stop exactly on
+        // its gate line, standing there from SWEEP_LOCK out. It stays
+        // nose-to-player when parked -- a car that drove up and stopped --
+        // so the caution face is on its far side; the mat telegraph and
+        // the contrast gate carry the kind read, as they do for the four
+        // JUMPs that ship with no face at all. y and pitch are resampled
+        // at the vehicle's own z each frame, or a car cresting a hill
+        // toward you would swim above the road.
+        const on = g.gate.on;
+        if (on && g.objs[on.lane]) {
+          const o = g.objs[on.lane];
+          const d = g.gate.z - z;
+          const hzB = MR.Collision.BOX[K.BLOCK].halfZ;
+          // The yaw-PI anchor correction, and it is the collision contract
+          // speaking: the variant is authored halfZ FORWARD of its group
+          // origin (the near-face anchor), so turning the group to face
+          // the player mirrors the body BEHIND the origin -- locked at the
+          // bare gate line the art would sit 2*halfZ short of the box the
+          // player actually hits. The group therefore parks at gate.z +
+          // 2*halfZ, which puts the nose exactly ON the gate line and the
+          // body exactly inside [gate.z, gate.z + 2*halfZ]. The advance is
+          // capped at range - 2*halfZ so the far end of the drive stays
+          // inside the corridor the course proved clear.
+          const cap = Math.max(0, (on.range || MR.Course.ONCOMING_RANGE) - 2 * hzB);
+          const a = d <= MR.Course.SWEEP_LOCK ? 0
+            : Math.min(cap, (d - MR.Course.SWEEP_LOCK) * MR.Course.ONCOMING_RATIO);
+          const vz = g.gate.z + 2 * hzB + a;
+          o.position.z = vz;
+          o.position.y = eAt(vz);
+          o.rotation.x = -Math.atan(EL.slope(vz));
+          o.rotation.y = Math.PI;
+        }
         const sw = g.gate.sweep;
         if (sw && g.objs[sw.lane]) {
           const o = g.objs[sw.lane];

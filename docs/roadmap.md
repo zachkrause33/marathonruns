@@ -8636,3 +8636,40 @@ machinery stay behind a commented line for a clean flat regeneration.
 
 Coats re-probed on the wide mesh (+0.377 to +0.923); 8/8 shots, 90/90
 courses, simulate PASS.
+
+## 98. The speed economy changes hands: energy is the pace
+
+The owner: "Clearing gates does not increase speed. Only your energy
+does... increase the water and banana... strategically positioned so
+that you gain most of them by clearing gates. A lot early in the run so
+people can build up speed."
+
+The target pace now follows the TANK -- target = FLOOR + gap*(1-e),
+linear, one thing to feel -- instead of the clean streak. Water,
+bananas and the green mats are the only speed sources; the drain (with
+fatigue), contact and the finishing kick are the only sinks. The streak
+survives as a stat and the guard pool's insurance target; the old curve
+still runs the EFFORT=0 build bit for bit. ENERGY_START 0.55 (a
+warm-up, so the opening is a build instead of a decay), DRAIN 3800
+(swept: 7500 pegged the tank and HARVEST beat the record by five
+minutes in every cell; 3600 killed the record), PER_PICKUP 0.0065.
+
+The aid stream is v6: 683 items a course (was 582), 32% in the opening
+quarter (was 21%), arcs -- the gate-clearing paycheck -- at 0.68 base
+and 0.80 early, and the one-feature-per-gate governor loosened in the
+opening quarter so a gate can pay its arc AND a trail. PER_SEG 24->30
+holds the guard economy inside tools/aid.js's band (14.3 collectable
+segments on a seeking line).
+
+THE BAR MOVED WITH THE RULE, and it is stated rather than buried: the
+record now lives on the LEARNED collecting line (HARVEST beats it at
+4 of 5 skill columns; 1381 s of spread across policies), and no first
+attempt beats it in the swept grid -- harder than the old 5% bar,
+consistent with "the game still needs more challenges", and one dial
+(PER_PICKUP) away from softer if the owner wants first-attempt wins
+back. The simulate wall-clock contract widened 280->295 for its
+no-collection "perfect" row, which the rule change made the slowest
+clean line in the game rather than the reference pace. The music still
+ramps with the clean line rather than the tank -- a follow-up.
+
+Gates: simulate PASS, aid PASS, 90/90 courses, 8/8 shots.

@@ -275,7 +275,7 @@ MR.HUD = (function () {
           </div>
           <div class="lab" id="paceLab">PACE</div>
           <div><span class="val num" id="paceVal">5:30</span><span class="unit">/MI</span></div>
-          <div id="why">EACH CLEAN GATE BUYS SPEED</div>
+          <div id="why">FUEL BUYS SPEED &middot; GRAB WATER + BANANAS</div>
         </div>
 
         <!--
@@ -1782,8 +1782,8 @@ MR.HUD = (function () {
       if (cache.hint !== hint) {
         cache.hint = hint;
         n.why.textContent = hint === 'cut'
-          ? 'STREAK CUT · +' + K.HIT_TIME_PENALTY + 'S · SPEED BLEEDING'
-          : 'EACH CLEAN GATE BUYS SPEED';
+          ? 'HIT · +' + K.HIT_TIME_PENALTY + 'S · ENERGY DOWN'
+          : 'FUEL BUYS SPEED · GRAB WATER + BANANAS';
         n.why.className = hint === 'off' ? 'off' : hint;
       }
 

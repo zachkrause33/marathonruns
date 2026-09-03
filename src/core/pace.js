@@ -1,16 +1,29 @@
 /**
  * The race engine: pace, distance, race clock, and the record ghost.
  *
- * The rule the whole game hangs on is "only an unbroken clean line makes you
- * faster". That is expressed as a target pace driven purely by the current
- * clean streak:
+ * THE RULE CHANGED HANDS on 2026-09-03, by the owner's direct instruction:
+ * "Clearing gates does not increase speed. Only your energy does." For the
+ * whole life of this file the target pace followed the clean streak; it now
+ * follows the TANK:
  *
- *     target(streak) = FLOOR + (START - FLOOR) * exp(-streak / K)
+ *     target(energy) = FLOOR + (START - FLOOR) * (1 - energy)
  *
- * Actual pace eases toward that target instead of snapping, so speed changes
- * are felt rather than teleported. Contact keeps only HIT_STREAK_KEEP of the
- * streak, which pulls the target back up and bleeds the pace away over the
- * next few seconds -- the punishment is a slow slide, not an instant number.
+ * Full tank, floor pace; empty tank, jogging. Energy comes from exactly three
+ * places -- water, bananas, and the green mats -- and leaves through the
+ * drain (with fatigue), through contact, and through the finishing kick. The
+ * road is the fuel line: gates stop paying speed directly, and instead the
+ * aid is LAID ON the gates (arcs bought by clearing, clusters after hard
+ * sections), so clearing well is still how the tank stays full -- the reward
+ * moved from an abstract counter into objects on the road.
+ *
+ * Actual pace still eases toward the target instead of snapping, so speed
+ * changes are felt rather than teleported. A contact bites ENERGY_HIT out of
+ * the tank, which raises the target and bleeds the pace away over the next
+ * few seconds -- the punishment is a slow slide, not an instant number. The
+ * streak survives as a stat (the finish card, the ghost, the guard pool's
+ * insurance target) but buys no pace.
+ *
+ * The old streak curve still runs the EFFORT = 0 build, bit for bit.
  */
 MR.Pace = (function () {
   const K = MR.K;
@@ -212,12 +225,46 @@ MR.Pace = (function () {
      * against a 7170-second record, a runner who collects nothing is empty
      * before the third of the race and spends the rest of it slowing.
      */
-    ENERGY_START: 1,        // the owner asked to start full, and a marathon does
-    ENERGY_DRAIN_SECONDS: 7500,  // see ENERGY_FATIGUE: this is the rate AT THE GUN
-    ENERGY_PER_PICKUP: 0.0045,     // 100 pickups is a whole tank
-    ENERGY_HIT: 0.08,            // what a contact costs: eight pickups of it
-    ENERGY_KNEE: 0.5,            // above this, no penalty whatsoever
-    ENERGY_MAX_PENALTY: 8,      // seconds a mile added at bone empty
+    /**
+     * ---- ENERGY IS THE SPEED NOW, AND THE CONSTANTS MOVED WITH THE JOB --
+     *
+     * When energy was a tax below a knee, starting full was right (the
+     * owner asked, a marathon does). With energy AS the pace -- see
+     * energyTarget -- starting full would put the gun at floor pace and
+     * make the opening a decay instead of a build. The owner's new brief
+     * is the opposite shape: "A lot [of aid] early in the run so people
+     * can build up speed." So the tank starts at a warm-up level and the
+     * front-loaded aid (generateAid's early band) is what buys the ramp
+     * the streak curve used to give away.
+     *
+     * PER_PICKUP is the economy's unit price and it is SWEPT, not picked:
+     * the budget is drain (~1.4 tanks with fatigue over a record-pace
+     * race) plus the build from START to cruising plus a few contacts,
+     * against what a seeking line actually collects (tools/simulate.js
+     * and tools/aid.js both count it). The knee's tax is gone -- the
+     * whole curve is the penalty now -- but ENERGY_KNEE survives as the
+     * stat line (drySeconds, the HUD's dry tint): below half a tank you
+     * are visibly fading and the number says how long you were.
+     */
+    ENERGY_START: 0.55,
+    /**
+     * 7500 -> 3600 WITH THE ECONOMY, and the budget is the argument: when
+     * energy was a tax the drain only had to threaten the knee; as the
+     * pace itself it has to make fullness EARNABLE rather than default,
+     * or the tank pegs at 1.0 and every collecting line runs the floor --
+     * the first sweep measured exactly that, HARVEST beating the record
+     * by nearly five minutes in every cell. At 3600 (with fatigue) a race
+     * burns ~3 tanks; an excellent line collecting ~85% of the road banks
+     * ~3.5, so its AVERAGE tank rides near 0.8 -- whose target is record
+     * pace, by the linear curve's own arithmetic -- and the record is
+     * bought with the surplus: mats, the kick, and the last quarter spent
+     * near full. A mediocre line runs a deficit and fades. Swept, with
+     * the grid in the roadmap entry.
+     */
+    ENERGY_DRAIN_SECONDS: 3800,
+    ENERGY_PER_PICKUP: 0.0065,
+    ENERGY_HIT: 0.08,            // what a contact costs: thirteen pickups of it
+    ENERGY_KNEE: 0.5,            // the dry line: a stat threshold, no longer a tax
 
     /**
      * ---- YOU GET TIRED FASTER THE LONGER YOU HAVE BEEN RUNNING -----------
@@ -308,7 +355,10 @@ MR.Pace = (function () {
      * fails the build outside its band; tools/simulate.js holds the
      * difficulty bar. GUARD_COST stays 1: only a WHOLE segment guards.
      */
-    PER_SEG: 24,
+    // 24 -> 30 with the aid/v6 supply increase, so the GUARD economy stays
+    // where tools/aid.js's band holds it (~13-16 collectable segments a
+    // race) while the pickup count rises for the energy economy's sake.
+    PER_SEG: 30,
     /**
      * ---- A GUARDED CONTACT KEEPS THE STREAK, NOT THE STUMBLE -------------
      *
@@ -513,12 +563,25 @@ MR.Pace = (function () {
    * Inert at EFFORT = 0, like every other term the pool owns, so the
    * before-the-pool build still measures as itself.
    */
-  function energyTax(energy) {
-    if (EFFORT <= 0) return 0;
-    const knee = EFFORT_CFG.ENERGY_KNEE;
-    if (energy >= knee) return 0;
-    const shortfall = (knee - energy) / knee;      // 0 at the knee, 1 at empty
-    return shortfall * EFFORT_CFG.ENERGY_MAX_PENALTY;
+  /**
+   * The target pace the TANK sets -- the owner's rule, verbatim: "Clearing
+   * gates does not increase speed. Only your energy does."
+   *
+   * LINEAR, deliberately. The streak curve needed two exponentials because a
+   * counter has no natural ceiling; a tank is a bar on the screen, and a bar
+   * whose height IS the speed is one thing to feel (the same argument that
+   * chose "a knee plus a curve is two things to feel" when energy was a tax).
+   * Full tank runs at the floor; empty jogs at START_PACE; every pickup is
+   * worth the same second-per-mile wherever the needle is.
+   *
+   * What replaced the old energyTax: nothing needed to. The tax was a term
+   * bolted under a knee; this is the whole curve, and the knee survives only
+   * as the dry-line stat threshold.
+   */
+  function energyTarget(energy, floor) {
+    const F = floor === undefined ? floorPace() : floor;
+    const e = energy < 0 ? 0 : energy > 1 ? 1 : energy;
+    return F + (K.START_PACE - F) * (1 - e);
   }
 
   function targetPace(streak, floor) {
@@ -655,11 +718,14 @@ MR.Pace = (function () {
         if (s.energy < 0) s.energy = 0;
       }
 
-      // ...and the tax it levies lands on the TARGET, in the same place and
-      // the same currency as the mat, so the pace still eases toward it at
-      // PACE_EASE and running dry is felt as a fade rather than a step.
-      let tgt = tempoTarget(targetPace(s.streak, floorPace()), s.tempo)
-        + energyTax(s.energy) - kick;
+      // The target: under EFFORT the tank sets it (energyTarget -- the
+      // owner's one-source rule), the mat steps it, the kick dives under
+      // it. At EFFORT = 0 the shipped streak curve runs unchanged. Both
+      // land on the same easing, so running dry is felt as a fade rather
+      // than a step, exactly as the old tax was.
+      let tgt = (EFFORT > 0
+        ? tempoTarget(energyTarget(s.energy, floorPace()), s.tempo)
+        : tempoTarget(targetPace(s.streak, floorPace()), s.tempo)) - kick;
       // The kick is the one term allowed under tempoTarget's clamp, so it gets
       // its own explicit bound rather than an unclamped subtraction.
       if (tgt < EFFORT_CFG.KICK_FLOOR) tgt = EFFORT_CFG.KICK_FLOOR;
@@ -913,12 +979,19 @@ MR.Pace = (function () {
 
         // Same easing law as update(), applied over that span.
         //
-        // AT THE UNSURGED FLOOR, DELIBERATELY. "If you stay clean" is the
-        // question this answers, and staying clean is not the same promise as
-        // spending the rest of the pool on surge -- a projection that assumed
-        // the surge would print a finish the player has not bought yet, which
-        // is the exact defect projected() was replaced for.
-        const tgt = targetPace(streak, floorPace(false));
+        // UNDER EFFORT THE ASSUMPTION IS "THE TANK HOLDS": collection keeps
+        // matching the drain from here to the tape, so the target is the
+        // current energy's target, constant. That is the energy model's "if
+        // you stay clean" -- staying fuelled is the promise the projection
+        // prices, and assuming a FILLING tank would print a finish the
+        // player has not collected yet, the exact defect projected() was
+        // replaced for. The kick is left out for the same reason the old
+        // projection ran at the unsurged floor: it spends a tank the player
+        // still has to arrive with, so the number stays a touch pessimistic
+        // at the tape rather than optimistic anywhere.
+        const tgt = EFFORT > 0
+          ? energyTarget(s.energy, floorPace())
+          : targetPace(streak, floorPace(false));
         const d = tgt - pace;
         const step = K.PACE_EASE * dRace;
         pace += Math.abs(d) <= step ? d : Math.sign(d) * step;
@@ -958,7 +1031,9 @@ MR.Pace = (function () {
       return Math.min(K.MARATHON_MILES, s.raceTime / K.RECORD_PACE);
     };
 
-    s.targetPace = () => tempoTarget(targetPace(s.streak, floorPace()), s.tempo);
+    s.targetPace = () => tempoTarget(
+      EFFORT > 0 ? energyTarget(s.energy, floorPace())
+                 : targetPace(s.streak, floorPace()), s.tempo);
 
     /** Whole segments in hand -- what the gauge counts and guard spends. */
     s.segments = function () { return Math.floor(s.pool + 1e-9); };
@@ -999,8 +1074,8 @@ MR.Pace = (function () {
     return `${sign}${m}:${s.toFixed(1).padStart(4, '0')}`;
   }
 
-  const api = { create, targetPace, clock, pace, delta, EFFORT_CFG, TEMPO, tempoTarget,
-                floorPace, bestFloor };
+  const api = { create, targetPace, energyTarget, clock, pace, delta, EFFORT_CFG, TEMPO,
+                tempoTarget, floorPace, bestFloor };
 
   // Accessor rather than a plain field, so a nonsense value cannot be written
   // and the clamp lives with the flag. Same shape as MR.Course.RAMP.

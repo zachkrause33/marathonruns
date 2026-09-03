@@ -1930,7 +1930,15 @@ MR.Course = (function () {
     // stream is untouched by this function; only the aid identity baseline
     // moves, and tools/mechanics.js hashes the two separately for exactly
     // this moment.
-    const rnd = MR.rng.stream(key, 'aid/v5');
+    // v6: the SPEED ECONOMY changed hands (pace.js: energy is the pace now,
+    // the owner's rule), so the road became the fuel line: more of
+    // everything, front-loaded in the opening quarter so the tank -- which
+    // now starts at a warm-up level -- can be built up early, and biased
+    // toward the gate-attached shapes (arcs, clusters) so that CLEARING
+    // GATES is still how the speed is earned: "They need to be
+    // strategically positioned so that you gain most of them by clearing
+    // gates. A lot early in the run so people can build up speed."
+    const rnd = MR.rng.stream(key, 'aid/v6');
     const items = [];
     if (!gates.length) return items;
 
@@ -2002,8 +2010,13 @@ MR.Course = (function () {
       // box the gate stands in the road (reachOf), in a lane with no vehicle
       // over the whole burst and no wall at the next gate, so collecting it
       // never leads anywhere the player cannot leave.
+      // The opening quarter is the build-up band: every feature fires more
+      // often there, and a gate may carry BOTH its arc and a trail -- the
+      // one-feature governor is deliberately loosened where the tank has to
+      // be filled from its warm-up start.
+      const fEarly = g.z / K.TOTAL_UNITS < 0.25;
       const hard = g.train > 0 || g.lanes.every(function (l) { return l !== K.CLEAR; });
-      if (hard && rnd.chance(0.62)) {
+      if (hard && rnd.chance(fEarly ? 0.80 : 0.62)) {
         const z0 = g.z + reachOf(g.lanes, g.train) + 3;
         // Three caps, and the third was missing first time: the burst is
         // short, it stops before the next gate, and it stops before the
@@ -2053,7 +2066,9 @@ MR.Course = (function () {
       // unchanged -- so the whole string is bought by being in the hazard's
       // lane when the gate resolves, and a cut-in swerve still buys nothing.
       const arcLane = aidLaneAt(gates, gi, rnd);
-      if (arcLane >= 0 && rnd.chance(0.52)) {
+      // 0.52 -> 0.68 base: the arc is the gate-clearing reward, and under
+      // the energy economy it is the primary paycheck.
+      if (arcLane >= 0 && rnd.chance(fEarly ? 0.80 : 0.68)) {
         const kind = g.lanes[arcLane];
         const base = g.z + 2 * HAZARD_HALF_Z[kind] + AID_SETBACK;
         const n = kind === K.JUMP ? ARC_DZ.length : 4;
@@ -2070,7 +2085,7 @@ MR.Course = (function () {
           if (kind === K.JUMP && ARC_Y[i] > 0) it.y = ARC_Y[i];
           items.push(it);
         }
-        continue;
+        if (!fEarly) continue;
       }
 
       // ---- TRAIL: the line down the open lane ----------------------------
@@ -2080,7 +2095,7 @@ MR.Course = (function () {
       // gate, holds no vehicle over the run, and is not walled at the next,
       // ending well short of the next gate line so the line of pickups never
       // leads the eye into a hazard read.
-      if (next && nextZ - g.z >= 30 && rnd.chance(0.55)) {
+      if (next && nextZ - g.z >= 30 && rnd.chance(fEarly ? 0.85 : 0.55)) {
         const cands = [];
         for (let l = 0; l < 3; l++) {
           if (g.lanes[l] !== K.CLEAR || nextLanes[l] === K.BLOCK) continue;

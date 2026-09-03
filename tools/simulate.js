@@ -124,8 +124,16 @@ for (const [label, skill] of rows) {
     console.log('  FAIL: a flawless line that spent NOTHING still beats the record --');
     console.log('        there is nothing for the pool to buy, so there is no allocation');
   }
-  if (label === 'perfect' && (p.realTime < 210 || p.realTime > 280)) {
-    ok = false; console.log('  FAIL: perfect run is not ~4 minutes of wall clock');
+  // 280 -> 295 WITH THE ENERGY ECONOMY, and the row's meaning moved under
+  // the band: this "perfect" line collects NO aid, and under the owner's
+  // "only your energy increases speed" a never-fuelling runner is the
+  // SLOWEST clean line in the game (~2:19 race, ~279 s wall), not the
+  // reference pace. The band still catches a broken clock in either
+  // direction; the ~4-minute experience claim now belongs to the
+  // COLLECTING lines in the policy grid below, where the record actually
+  // lives.
+  if (label === 'perfect' && (p.realTime < 210 || p.realTime > 295)) {
+    ok = false; console.log('  FAIL: perfect run is not ~4-5 minutes of wall clock');
   }
   if (label === 'never' && vs <= 0) { ok = false; console.log('  FAIL: a broken run still beats the record'); }
 }

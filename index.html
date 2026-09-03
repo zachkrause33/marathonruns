@@ -7514,8 +7514,18 @@ MR.Pace = (function () {
      * the grid in the roadmap entry.
      */
     ENERGY_DRAIN_SECONDS: 3800,
-    ENERGY_PER_PICKUP: 0.0065,
-    ENERGY_HIT: 0.08,            // what a contact costs: thirteen pickups of it
+    /**
+     * 0.0065 -> 0.0085 on the owner's own verdict of the shipped economy:
+     * "it's impossible to beat the record now." The shipped price put a
+     * first attempt at 0 of 30 grid cells, which read as deliberately
+     * hard and played as a wall. Swept at 3800 drain: 0.0075 gives 10%
+     * first-attempt / 33% learned, 0.0085 gives 17% / 33% -- a strong
+     * first attempt has a real shot, a learned line wins a third of its
+     * cells, and the policy spread stays ~1400s so HOW you collect still
+     * decides everything. The no-collection row is untouched by price.
+     */
+    ENERGY_PER_PICKUP: 0.0085,
+    ENERGY_HIT: 0.08,            // what a contact costs: ten pickups of it
     ENERGY_KNEE: 0.5,            // the dry line: a stat threshold, no longer a tax
 
     /**

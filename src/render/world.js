@@ -15277,7 +15277,13 @@ MR.World = (function () {
             : (kind === K.BLOCK && gate.cross)
               ? CROSS_CAST[MR.rng.hashString((key || '') + '|sweep-skin|' + g) % CROSS_CAST.length]
             : (kind === K.BLOCK && (gate.sweep || gate.on))
-              ? SWEEP_CAST[MR.rng.hashString((key || '') + '|sweep-skin|' + g) % SWEEP_CAST.length]
+              // The escort salt: a two-wall oncoming gate casts BOTH block
+              // lanes off this row, and one hash per gate dressed them as
+              // identical twins. The lane that is not driving takes a
+              // salted draw; the moving lane's cast is unchanged, so every
+              // already-shipped single-wall gate wears what it wore.
+              ? SWEEP_CAST[MR.rng.hashString((key || '') + '|sweep-skin|' + g
+                  + (gate.on && gate.on.lane !== l ? '|escort' : '')) % SWEEP_CAST.length]
               : draw(kind);
         }
         cast[g] = row;
@@ -20084,7 +20090,7 @@ MR.World = (function () {
         // THE ONCOMING VEHICLE -- the sweeper's contract on the z axis. It
         // drives down its own lane toward the player at ONCOMING_RATIO
         // approach-units per player-unit and brakes to a stop exactly on
-        // its gate line, standing there from SWEEP_LOCK out. It stays
+        // its gate line, standing there from ONCOMING_LOCK out. It stays
         // nose-to-player when parked -- a car that drove up and stopped --
         // so the caution face is on its far side; the mat telegraph and
         // the contrast gate carry the kind read, as they do for the four
@@ -20106,9 +20112,12 @@ MR.World = (function () {
           // body exactly inside [gate.z, gate.z + 2*halfZ]. The advance is
           // capped at range - 2*halfZ so the far end of the drive stays
           // inside the corridor the course proved clear.
+          // ONCOMING_LOCK, not SWEEP_LOCK: this vehicle never changes
+          // lanes, so it is allowed to keep rolling until the commit
+          // window opens -- see the lock's derivation in course.js.
           const cap = Math.max(0, (on.range || MR.Course.ONCOMING_RANGE) - 2 * hzB);
-          const a = d <= MR.Course.SWEEP_LOCK ? 0
-            : Math.min(cap, (d - MR.Course.SWEEP_LOCK) * MR.Course.ONCOMING_RATIO);
+          const a = d <= MR.Course.ONCOMING_LOCK ? 0
+            : Math.min(cap, (d - MR.Course.ONCOMING_LOCK) * MR.Course.ONCOMING_RATIO);
           const vz = g.gate.z + 2 * hzB + a;
           o.position.z = vz;
           o.position.y = eAt(vz);

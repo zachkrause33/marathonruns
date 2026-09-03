@@ -8810,3 +8810,38 @@ triangles) and the body takes the whole 2.80. Tile against tile, the
 tram's roof now sits on the bus's roofline. No Tripo credits spent.
 
 Gates: 8/8 shots, 90/90 courses, simulate PASS.
+
+## 104. Oncoming, second pass: really multiple, really moving
+
+The owner: "We need more moving vehicles towards you. Multiple at a
+time. They move and stop before you even get close to them." Three
+faults, each with its own fix and its own measurement:
+
+STOP TOO EARLY -- the oncoming vehicle shared the sweep's 1.5x lock,
+but the sweep's margin exists because a sweep CHANGES LANES; the
+oncoming vehicle kills the lane it drives in, readable the whole way.
+It gets its own ONCOMING_LOCK at 1.05x READ_NEAR (~26.6): braking to
+a stop just as the commit window opens.
+
+NEVER MULTIPLE -- two causes, measured separately. Eligibility: the
+single-BLOCK-with-escort clauses protect lane-crossing mechanics;
+oncoming needs only a block lane with a clear corridor AHEAD, so it
+now accepts two-wall gates and walled-behind lanes (the drive lives
+entirely beyond its own gate, where the previous gate cannot reach).
+Time in motion: at ratio 1.2 a short-corridor drive moved for 22
+player-units -- less than one gate spacing -- so no two drives ever
+ran at once; at 0.6 the same drive rolls for 45 and a long one for
+~118, from beyond the fog to its lock. Plus the ECHO: the first block
+gate within a drive window of a naturally-rolled oncoming gate goes
+oncoming too, outranking its own rate roll -- one echo per natural
+roll, never a chain. Census over 365 days: oncoming 4.1 -> 15.2 a
+course, days with two drives in motion at the same instant 10 -> 356,
+overlapping pairs 0.0 -> 3.4 a course. Verified live: advance tracks
+(d - 26.6) * 0.6 to the decimal on both gates of today's first pair.
+
+MORE -- SWEEP_RATE 0.60 -> 0.65; the rest of the increase is the
+widened eligibility, not the rate. Rotation releaned 5/3/2 toward
+oncoming; the escort salt keeps a two-wall oncoming gate from casting
+identical twin vehicles.
+
+Gates: 8/8 shots, 90/90 courses, simulate PASS.

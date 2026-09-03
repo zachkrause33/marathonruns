@@ -2231,7 +2231,27 @@ MR.Course = (function () {
   // instead of 101 down to 51.
   const SWEEP_LOCK = 1.5 * (ACTION_WINDOW + K.CAM_BASE_BACK);
   const SWEEP_START = 3 * (ACTION_WINDOW + K.CAM_BASE_BACK);
-  const SWEEP_RATE = 0.60;
+  /**
+   * THE ONCOMING VEHICLE GETS ITS OWN, LATER LOCK. The owner, on the
+   * shipped drive: "They move and stop before you even get close to
+   * them." The sweep's 1.5x margin exists because a sweep CHANGES LANES
+   * -- the kill lane is not knowable until it settles. The oncoming
+   * vehicle never does: it occupies its kill lane for the entire drive,
+   * so the lane read is available the whole time and the only thing the
+   * lock protects is the NEAR FACE being settled on the gate line before
+   * the player commits. 1.05x READ_NEAR (~26.6 runner units) has it
+   * braking to a stop just as the commit window opens -- still driving
+   * when every other gate has long been frozen, parked by the point the
+   * contract needs it parked. The sweep and the cross dart keep the
+   * 1.5x lock; they are the ones that move across lanes.
+   */
+  const ONCOMING_LOCK = 1.05 * (ACTION_WINDOW + K.CAM_BASE_BACK);
+  // 0.60 -> 0.65 with the widened oncoming eligibility and the echo
+  // pairs (see markMotion): the rate stays near where the difficulty
+  // pass put it, and the extra motion comes from the gates the old
+  // eligibility threw away plus the seeded pairs, not from a blanket
+  // rate hike. Census in roadmap 104.
+  const SWEEP_RATE = 0.65;
   /**
    * ---- AND THE ONCOMING VEHICLE, THE SAME CONTRACT ROTATED 90 DEGREES ----
    *
@@ -2256,10 +2276,33 @@ MR.Course = (function () {
   // 90 -> 55: the calendar refused 90 (0.1 a course -- three consecutive
   // gates with one lane clear barely exist mid-race). At 55 the corridor
   // is one-to-two gates and the approach still starts ~84 units out.
-  const ONCOMING_RANGE = 55;
-  const ONCOMING_RATIO = 1.2;   // approach units per player unit: closure ~2.2x
+  // 55 -> 75 for "multiple at a time": the corridor is still ADAPTIVE
+  // (each vehicle takes whatever clear run its lane has, floor 25), so
+  // raising the ceiling only lengthens the drives the course can afford
+  // -- longer drives overlap more, and more of the road is in motion at
+  // once. The eligibility census barely moves; the visible motion does.
+  const ONCOMING_RANGE = 75;
+  // 1.2 -> 0.6, and the reason is TIME IN MOTION, not speed. At 1.2 a
+  // drive spends cap/1.2 player-units in motion -- a short-corridor
+  // vehicle (cap ~27) moved for 22 units and parked, less than one gate
+  // spacing, so two drives never ran at once and every car had stopped
+  // "before you even get close" (the owner's words). At 0.6 the same
+  // vehicle is in motion for 45 units, a long-corridor one for ~118 --
+  // rolling from beyond the fog to its lock -- so paired gates overlap
+  // in motion and closure still reads at 1.6x run speed.
+  const ONCOMING_RATIO = 0.6;
   function markMotion(key, gates, tally) {
     if (!(SWEEP > 0)) return;
+    // THE PAIR BIAS. "Potentially multiple at one time" shipped as a
+    // hope: independent per-gate hashes put two oncoming drives in motion
+    // at the same instant on 10 days of 365 (a drive window is ~59 units
+    // of player travel; unpaired oncoming gates rarely land that close).
+    // So a pair is seeded instead of wished for: the first eligible gate
+    // within one drive window after a naturally-rolled oncoming gate is
+    // biased oncoming too -- one echo per natural roll, never a chain
+    // (the echo does not arm another echo). Deterministic: a function of
+    // the same hashes and gate geometry as everything else in this pass.
+    let lastOnZ = -1e9, lastOnEcho = false;
     for (let i = 0; i < gates.length; i++) {
       const gate = gates[i];
       if (gate.train || gate.ramp !== undefined || gate.narrow) continue;
@@ -2267,22 +2310,50 @@ MR.Course = (function () {
       // the same opening family the closures use (narrowRate opens at
       // 0.12): past the learning stretch, before the race's hard middle.
       if (gate.f < 0.15 || gate.f > 0.90) continue;
-      let lane = -1, ok = true;
-      for (let l = 0; l < 3; l++) {
-        if (gate.lanes[l] === K.BLOCK) { ok = ok && lane < 0; lane = l; }
-      }
-      if (!ok || lane < 0) continue;
-      if (i > 0 && gates[i - 1].lanes[lane] === K.BLOCK) continue;
+      /**
+       * ELIGIBILITY SPLITS BY KIND HERE, because the clauses protect
+       * different things. The sweep and the cross dart CHANGE LANES, so
+       * they demand exactly one BLOCK with an adjacent CLEAR to arrive
+       * through, and refuse a lane the previous gate already walls (the
+       * misdirection is worthless and the queue fiction breaks). The
+       * oncoming vehicle does NEITHER of those things: it drives down
+       * the lane it kills, and its whole drive happens at z beyond its
+       * gate, where the previous gate cannot reach. So oncoming asks
+       * only for A block lane with a clear corridor ahead -- two-wall
+       * gates and walled-behind lanes included. That is what unlocked
+       * "multiple at one time": single-BLOCK-with-escort gates are ~13 a
+       * course, too sparse for two 59-unit drive windows to ever
+       * overlap; block-plus-corridor gates are several times that.
+       */
+      const blockLanes = [];
+      for (let l = 0; l < 3; l++) if (gate.lanes[l] === K.BLOCK) blockLanes.push(l);
+      if (!blockLanes.length) continue;
       const h = MR.rng.hashString(key + '|sweep/v1|' + i);
-      if ((h % 4096) / 4096 >= SWEEP_RATE * SWEEP) continue;
+      // THE ECHO OUTRANKS THE RATE ROLL. A pair is the point: after a
+      // naturally-rolled oncoming gate, the first block gate within one
+      // drive window (60 units) goes oncoming too, whether or not its
+      // own rate roll came up -- one echo per natural roll, never a
+      // chain. Behind the rate gate the echo fired on luck (24 of 365
+      // days had a simultaneous pair); in front of it, a pair follows
+      // nearly every natural roll that the course geometry can host.
+      const echoArm = !lastOnEcho && gate.z - lastOnZ < 60;
+      if (!echoArm && (h % 4096) / 4096 >= SWEEP_RATE * SWEEP) continue;
+      const single = blockLanes.length === 1
+        && !(i > 0 && gates[i - 1].lanes[blockLanes[0]] === K.BLOCK);
+      // The oncoming lane: any block lane (a hash bit picks between two);
+      // the lane-crossing kinds use the single wall or nothing.
+      const lane = blockLanes.length === 1 ? blockLanes[0]
+        : blockLanes[(h >>> 8) % blockLanes.length];
       // The sweep's arrival lane: adjacent and CLEAR, nothing else. An edge
       // wall is entered from the centre; a centre wall from whichever edge
       // is open (a hash bit picks when both are).
       let from = -1;
-      if (lane !== 1) { if (gate.lanes[1] === K.CLEAR) from = 1; }
-      else {
-        const open = [0, 2].filter((l) => gate.lanes[l] === K.CLEAR);
-        if (open.length) from = open.length === 2 ? open[(h >>> 12) & 1] : open[0];
+      if (single) {
+        if (lane !== 1) { if (gate.lanes[1] === K.CLEAR) from = 1; }
+        else {
+          const open = [0, 2].filter((l) => gate.lanes[l] === K.CLEAR);
+          if (open.length) from = open.length === 2 ? open[(h >>> 12) & 1] : open[0];
+        }
       }
       // The oncoming corridor is ADAPTIVE: the vehicle takes whatever clear
       // run its lane actually has, up to ONCOMING_RANGE, stopping short of
@@ -2320,17 +2391,31 @@ MR.Course = (function () {
        * else that moves.
        */
       let crossSide = 0;
-      if (lane !== 1) crossSide = lane === 0 ? 1 : -1;
-      else if (from >= 0) crossSide = from === 0 ? 1 : -1;
+      if (single) {
+        if (lane !== 1) crossSide = lane === 0 ? 1 : -1;
+        else if (from >= 0) crossSide = from === 0 ? 1 : -1;
+      }
       // Rotate oncoming / cross / sweep on a hash trit with fallback, so a
       // gate that cannot host its first pick takes its second rather than
-      // going still. The 4/3/3 split leans against oncoming, whose
-      // corridor is satisfied more often than the others' conditions.
+      // going still. 4/3/3 shipped leaning against oncoming; re-leant to
+      // 5/3/2 on the owner's "We need more moving vehicles towards you.
+      // Multiple at a time" -- oncoming is the ask, the sweep is the one
+      // that cedes (it reads most like a parked gate inside the window
+      // anyway, by its own contract).
       const roll = (h >>> 16) % 10;
-      const prefer = roll < 4 ? ['on', 'cross', 'sweep']
-        : roll < 7 ? ['cross', 'on', 'sweep'] : ['sweep', 'on', 'cross'];
+      const echo = echoArm && corridor;
+      // An armed echo whose corridor failed still only got here on its
+      // own rate roll (the arm bypassed the gate above) -- so a dead
+      // echo falls back to the ordinary rotation, not to silence.
+      if (echoArm && !corridor && (h % 4096) / 4096 >= SWEEP_RATE * SWEEP) continue;
+      const prefer = echo || roll < 5 ? ['on', 'cross', 'sweep']
+        : roll < 8 ? ['cross', 'on', 'sweep'] : ['sweep', 'on', 'cross'];
       for (const p of prefer) {
-        if (p === 'on' && corridor) { gate.on = { lane, range }; tally.oncoming++; break; }
+        if (p === 'on' && corridor) {
+          gate.on = { lane, range }; tally.oncoming++;
+          lastOnZ = gate.z; lastOnEcho = echo;
+          break;
+        }
         if (p === 'cross' && crossSide) { gate.cross = { side: crossSide, lane }; tally.cross++; break; }
         if (p === 'sweep' && from >= 0) { gate.sweep = { from, lane }; tally.sweeps++; break; }
       }
@@ -3006,7 +3091,7 @@ MR.Course = (function () {
            // in its own lane by SWEEP_LOCK and parked in `from` beyond
            // SWEEP_START. Exported so the animation reads the numbers from the
            // file that derives them from the read window -- see markSweeps.
-           SWEEP_LOCK, SWEEP_START, ONCOMING_RANGE, ONCOMING_RATIO,
+           SWEEP_LOCK, SWEEP_START, ONCOMING_LOCK, ONCOMING_RANGE, ONCOMING_RATIO,
            // The cross-street dart: begins here, locks at SWEEP_LOCK.
            CROSS_START: SWEEP_LOCK + 22,
            elevationPlan };

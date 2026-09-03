@@ -8534,3 +8534,27 @@ The van and hatchback idle like the rest of the stopped fleet.
 
 Gates: 8/8 city shots clean at 37 variants, 90/90 courses, simulate
 PASS, sweep census 365/365 deterministic with SWEEP=0 bit-identical.
+
+## 94. The cargo truck, and the ramp trucks held with a measurement
+
+The owner's props-v3 blue cargo trucks. The closed one is BLOCK v15's
+worth of new obstacle as v14 -- the first variant born straight from a
+sculpt, wearing the VAN's def as fit box, envelope row and fallback,
+and dealing four liveries (blue, red, yellow, green; the owner: "they
+do not need to be all blue"). Two finds on the way in: the raw
+generation held THREE copies of the truck -- Tripo modelled every view
+of the input image -- cut down by vehsplit.js (connected components,
+flood-merged by bbox proximity from the largest seed); and the split
+dropped the mesh's mean saturation enough that raw blue failed shot
+05's lane 1, so all four coats carry a saturation step, re-probed.
+
+The RAMP truck is deliberately held, with the two measurements that
+hold it: a rideable body is stretched 6.7-9.4x along z (the code art's
+plain bands survive that; a textured sculpt is taffy), and its cab roof
+sits below deck height exactly where the runner dismounts -- a dip in a
+RUNNING SURFACE, which MR.Course.deckAt promises is flat. It cannot
+serve as a plain wall either: an open ramp on a closed lane is the
+ramp-painted-on-a-wall misread the claim site guards against. What
+would work: a CABLESS flat-roofed trailer generation, plus rake-with-
+ramp machinery at the cast site -- its own project, recorded in the
+backlog.

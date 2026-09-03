@@ -120,3 +120,20 @@ pass (in-envelope motion only).
 Oncoming traffic ranks second; it strains the closed-course fiction,
 and anything that genuinely moves the kill box is still the full
 project with new instruments.
+
+## The rideable ramp trucks (recorded 2026-09-03)
+
+The owner generated a blue cargo truck pair for the rideable decks
+(props-v3). The CLOSED one ships as BLOCK v14, four liveries. The RAMP
+one is held: the rideable body stretches 6.7-9.4x with the train span
+(taffy on a sculpt), and the truck's cab roof is below deck height in
+the dismount path -- deckAt promises a flat running surface. To ship a
+sculpted rideable: regenerate as a CABLESS flat-roofed open trailer
+with the ramp, single-view input image, and budget a rake-with-ramp
+pass at the cast site. Until then rideable trains keep the code art on
+purpose.
+
+Tripo note for all future generations: feed ONE view of the object.
+A multi-view input image comes back as multiple copies baked into one
+mesh (the cargo truck held three); vehsplit.js in the scratchpad cuts
+them apart, but single-view input avoids the surgery.

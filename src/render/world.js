@@ -14178,6 +14178,19 @@ MR.World = (function () {
       { geo: blockDumpsterGeo, face: [2.10, 0.30, 0.60, -1.325], weight: 1 },
       { geo: blockHatchGeo, face: [1.90, 0.22, 0.42, -1.90], weight: 2, anim: 'idle' },
       { geo: blockPoliceGeo, face: [2.00, 0.22, 0.44, -1.90], weight: 1, anim: 'idle' },
+      /**
+       * THE CARGO TRUCK (v14), and it is the first variant born straight
+       * from a sculpt: the owner's props-v3 blue box lorry. A new variant
+       * is a def entry plus a bag weight -- zero extra draw calls -- and
+       * the def geometry here is the VAN's, deliberately: the def's one
+       * remaining job under a sculpt is to be the fit box, the envelope
+       * row and the seconds-long code fallback before the texture
+       * decodes, and the van is the fleet's closest silhouette. The face
+       * row is the van's for the same reason. Ships in four liveries
+       * dealt across the pool (the owner: "they do not need to be all
+       * blue"); margins at the dress line.
+       */
+      { geo: blockVanGeo, face: [2.10, 0.20, 1.06, -1.941], weight: 2, anim: 'idle' },
     ]);
 
     /**
@@ -14588,6 +14601,24 @@ MR.World = (function () {
     // Measured +0.095 with a brightening coat: the battenburg's mean
     // sat a hair under lane 1 without it (L 114.9 vs 95.1, ratio 1.21).
     dressHazard(K.BLOCK, 13, 'veh_police2', 0, [{ h: 0, t: 0, l: 1.18 }]);
+    // The cargo truck deals four liveries by claim order, hatchback-style
+    // (the owner: "they do not need to be all blue"). Probed margins at
+    // the tightest road: blue +0.401, red +0.258, yellow +1.005, green
+    // +0.664 -- the whole deal clears the gate before the 8-shot verify.
+    // Quarter turn: the truck arrived with its length along x, like the
+    // dumpster and the moped -- at yaw 0 the fit stretched it 3.91x deep.
+    // Negative, so the REAR faces the player per fleet convention. The
+    // raw generation held THREE copies of the truck (Tripo modelled every
+    // view in the input image); vehsplit.js keeps one -- single-view
+    // input photos avoid the surgery next time.
+    // The raw blue failed shot 05's lane 1 (1.18x / 0.214 -- tarmac on
+    // both axes) once the split dropped the mesh's mean saturation, so
+    // every coat is saturated a step: blue +0.282, red +0.507, yellow
+    // +0.736, green +0.327 at the tightest road, re-probed on the
+    // single-truck mesh.
+    dressHazard(K.BLOCK, 14, 'veh_cargotruck', -Math.PI / 2,
+      [{ h: 0, s: 1.5, l: 1.15 }, { h: 150, s: 1.4, l: 1.15 },
+       { h: 210 }, { h: 290, s: 1.4, l: 1.2 }]);
 
     // ---- the JUMP vocabulary (props-v4) --------------------------------
     // Every coat below was measured through contrastAudit; the margin
@@ -14940,7 +14971,7 @@ MR.World = (function () {
       // independent hash rather than a bag draw -- sweeps are a handful per
       // course, repetition is not the risk, and keeping them out of the deal
       // leaves the bag's anti-repetition property intact for the fleet.
-      const SWEEP_CAST = [4, 5, 6, 7, 9, 12, 13];
+      const SWEEP_CAST = [4, 5, 6, 7, 9, 12, 13, 14];
       const cast = [];
       for (let g = 0; g < gates.length; g++) {
         const gate = gates[g];

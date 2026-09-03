@@ -14986,12 +14986,17 @@ MR.World = (function () {
           // scales the body about its own origin, which composes to exactly
           // span * (local z + halfZ). Do not re-derive it anywhere else.
           const fc = (foot[1] + foot[2]) * 0.5, fh = (foot[2] - foot[1]) * 0.56;
-          const z0 = g.gate.z + span * (fc - fh + box.halfZ) - SHADOW_SPREAD;
-          const z1 = g.gate.z + span * (fc + fh + box.halfZ) + SHADOW_SPREAD;
+          // The oncoming vehicle's z advance, as an offset from the gate
+          // line the span arithmetic is anchored to; zero for everything
+          // parked. Declared here because z0/z1 read it.
+          const zOff = g.objs[l].position.z - g.gate.z;
+          const z0 = g.gate.z + zOff + span * (fc - fh + box.halfZ) - SHADOW_SPREAD;
+          const z1 = g.gate.z + zOff + span * (fc + fh + box.halfZ) + SHADOW_SPREAD;
           // The GROUP's x, not LANE_X: the two are identical for every parked
           // hazard, and a sweeper mid-crossing must drag its shadow with it --
           // a shadow waiting in the kill lane before the vehicle arrives would
-          // be the telegraph answering for the art.
+          // be the telegraph answering for the art (and zOff above, the same
+          // again in z for the oncoming vehicle).
           const cx = g.objs[l].position.x;
           // The variant's own half-width, never a difference of LANE_X.
           const hx = foot[0] * 1.12 + SHADOW_SPREAD;
@@ -15229,7 +15234,7 @@ MR.World = (function () {
           const kind = gate.lanes[l];
           if (kind === K.CLEAR || !bags[kind]) continue;
           row[l] = (kind === K.BLOCK && gate.train) ? 0
-            : (kind === K.BLOCK && gate.sweep)
+            : (kind === K.BLOCK && (gate.sweep || gate.on))
               ? SWEEP_CAST[MR.rng.hashString((key || '') + '|sweep-skin|' + g) % SWEEP_CAST.length]
               : draw(kind);
         }
@@ -19994,6 +19999,40 @@ MR.World = (function () {
       // see markSweeps there for the whole argument. A pure function of
       // distance, so it is deterministic and cannot drift with framerate.
       for (const g of activeGates) {
+        // THE ONCOMING VEHICLE -- the sweeper's contract on the z axis. It
+        // drives down its own lane toward the player at ONCOMING_RATIO
+        // approach-units per player-unit and brakes to a stop exactly on
+        // its gate line, standing there from SWEEP_LOCK out. It stays
+        // nose-to-player when parked -- a car that drove up and stopped --
+        // so the caution face is on its far side; the mat telegraph and
+        // the contrast gate carry the kind read, as they do for the four
+        // JUMPs that ship with no face at all. y and pitch are resampled
+        // at the vehicle's own z each frame, or a car cresting a hill
+        // toward you would swim above the road.
+        const on = g.gate.on;
+        if (on && g.objs[on.lane]) {
+          const o = g.objs[on.lane];
+          const d = g.gate.z - z;
+          const hzB = MR.Collision.BOX[K.BLOCK].halfZ;
+          // The yaw-PI anchor correction, and it is the collision contract
+          // speaking: the variant is authored halfZ FORWARD of its group
+          // origin (the near-face anchor), so turning the group to face
+          // the player mirrors the body BEHIND the origin -- locked at the
+          // bare gate line the art would sit 2*halfZ short of the box the
+          // player actually hits. The group therefore parks at gate.z +
+          // 2*halfZ, which puts the nose exactly ON the gate line and the
+          // body exactly inside [gate.z, gate.z + 2*halfZ]. The advance is
+          // capped at range - 2*halfZ so the far end of the drive stays
+          // inside the corridor the course proved clear.
+          const cap = Math.max(0, (on.range || MR.Course.ONCOMING_RANGE) - 2 * hzB);
+          const a = d <= MR.Course.SWEEP_LOCK ? 0
+            : Math.min(cap, (d - MR.Course.SWEEP_LOCK) * MR.Course.ONCOMING_RATIO);
+          const vz = g.gate.z + 2 * hzB + a;
+          o.position.z = vz;
+          o.position.y = eAt(vz);
+          o.rotation.x = -Math.atan(EL.slope(vz));
+          o.rotation.y = Math.PI;
+        }
         const sw = g.gate.sweep;
         if (sw && g.objs[sw.lane]) {
           const o = g.objs[sw.lane];

@@ -8673,3 +8673,30 @@ clean line in the game rather than the reference pace. The music still
 ramps with the clean line rather than the tank -- a follow-up.
 
 Gates: simulate PASS, aid PASS, 90/90 courses, 8/8 shots.
+
+## 99. Oncoming vehicles: the sweeper's contract on the z axis
+
+The owner: "Can vehicles move towards you on the road? Potentially
+multiple at one time... rotate between standing objects and ones that
+move towards you." Built as the sweeper was: the kill line is the gate
+line and never moves; the vehicle drives DOWN its own lane toward the
+player (closure ~2.2x run speed) and brakes to a stop exactly on it,
+locked from SWEEP_LOCK out, nose to the player -- a car that drove up
+and stopped. Several run at once because each is a pure function of
+the player's distance to its own gate.
+
+The corridor is the eligibility, and it is ADAPTIVE: a fixed 90-unit
+clear-lane demand fired 0.1 times a course and a fixed 55 fired 0.9
+(consecutive clear lanes barely exist mid-race), so the vehicle takes
+whatever clear run its lane has, floor 25 units. markSweeps grew into
+markMotion, rotating eligible single-BLOCK gates parked / sweeping /
+oncoming by hash (40/60 against oncoming, or the easier corridor
+crowds the sweep out): ~5.0 oncoming and ~3.3 sweeps a course.
+
+Two renderer facts worth their lines: the yaw-PI near-face anchor
+correction (a face-the-player group mirrors its art BEHIND the origin,
+so the group parks at gate.z + 2*halfZ and the nose lands exactly on
+the collision line -- verified live against the box), and the contact
+shadow's zOff, which follows the drive the way cx follows the sweep.
+
+Gates: 8/8 shots, 90/90 courses, simulate PASS.

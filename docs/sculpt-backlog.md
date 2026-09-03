@@ -22,7 +22,7 @@ not a smaller standard.
 
 | v  | obstacle    | status                                             |
 |----|-------------|----------------------------------------------------|
-| 0  | tram        | shipped (props-v2 sculpt + brightening coat, 2026-09-03). The old refusal was measured before the lighting-seam fix moved every sculpt's rendered ceiling; re-measured per rule 3, a hue-swung brightening coat reaches L 150 / S 0.24, +0.256 clear -- the same brighter-than-road route the code tram used. The carriage rake runs on every non-rideable train. A vivid red/yellow regeneration is still welcome and would replace the coat. |
+| 0  | tram        | shipped (props-v2 sculpt + brightening coat, 2026-09-03; pantograph cut offline 2026-09-03 so the body takes the full 2.80 -- the wire frame was 35% of the scan's height and the fit had parked the roof at 64% of the envelope). The old refusal was measured before the lighting-seam fix moved every sculpt's rendered ceiling; re-measured per rule 3, a hue-swung brightening coat reaches L 150 / S 0.24, +0.256 clear -- the same brighter-than-road route the code tram used. The carriage rake runs on every non-rideable train. A vivid red/yellow regeneration is still welcome and would replace the coat. |
 | 1  | signworks   | shipped (props-v2)                                 |
 | 2  | lightworks  | shipped (props-v2)                                 |
 | 3  | crossing    | shipped (props-v4 construction.workers regeneration, 2026-09-03) -- the full assembly the refusal asked for: two marshals, barrier boards, raised STOP paddle, cones, 1.15x as wide as tall. |

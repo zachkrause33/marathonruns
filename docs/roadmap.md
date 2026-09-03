@@ -8793,3 +8793,20 @@ also means a new pickup TYPE on the road, that is a separate, welcome
 build -- the aid field itself already tripled early-race in 98.
 
 Gates: simulate PASS, 90/90 courses, 8/8 shots.
+
+## 103. The tram loses its pantograph and gains its height
+
+The owner: "Review the tram car. It's too small and needs to be the
+same height as the bus." Measured: the tram WAS 2.80 to the box --
+taller than the bus's 2.76 -- but the box top was the PANTOGRAPH TIP.
+The raw scan's cross-section collapses from 0.71 wide to 0.03 above
+y 0.305 of 0.47: the top 35% of the sculpt's height is a wire frame,
+and the body-box fit dutifully parked the roof at ~64% of the
+envelope. Same disease as the hanging DUCK sign (a sculpt whose bbox
+is not its mass), different cure: the pantograph is CUT offline in
+float space (trambuild.js, the raw-first truckbuild order -- cut,
+then simplify, quantize last; it held 120k of the scan's 1.9M
+triangles) and the body takes the whole 2.80. Tile against tile, the
+tram's roof now sits on the bus's roofline. No Tripo credits spent.
+
+Gates: 8/8 shots, 90/90 courses, simulate PASS.

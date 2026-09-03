@@ -8845,3 +8845,39 @@ oncoming; the escort salt keeps a two-wall oncoming gate from casting
 identical twin vehicles.
 
 Gates: 8/8 shots, 90/90 courses, simulate PASS.
+
+## 105. The crossing minicar: the one car you jump
+
+The owner, reopening roadmap 100's swipe decision: "Can you build
+crossing roads so cars can actually cross the road as you run. If so,
+let's only do small cars. If that's the case maybe you can jump over
+them." Roadmap 100 refused a jumpable car because a full-size vehicle
+you sometimes hurdle poisons the swipe read on the whole fleet. The
+owner's "small" is the unpoisoning: JUMP v12 is a code-art minicar
+0.78 to the roof -- inside the JUMP box, a THIRD the height of any
+vehicle the player swipes past -- and the only vehicle in the game
+that sits SIDE-ON. Nothing about it matches a blocking vehicle:
+height says hop, mat says hop, silhouette says something new.
+
+Motion is the cross dart's, minus the straightening: it enters from
+the verge at CROSS_START, drives across the road over the side-street
+paint, and locks IN its lane still side-on, mid-crossing, from
+SWEEP_LOCK out (it crosses lanes, so it takes the lane-crossing
+margin, not the oncoming one). The kill lane is an ordinary JUMP in
+the course data; only the approach animates. Eligibility: any JUMP
+lane on an unanimated, un-trained gate; a centre lane needs its
+transit edge CLEAR because the dart drives through that gate plane.
+Censused at 4.5 a course (JCROSS_RATE 0.08 over 365 days).
+
+WEIGHT ZERO is load-bearing: the minicar never spawns parked -- a
+crossing car that did not cross is a prop -- so the jcross cast site
+is its only door, and the bag builder had to learn that weight: 0
+means zero tickets rather than defaulting to one. Verified live at
+gate 1188.7: mid-dart x -2.46 between verge and lane at d 47.6,
+locked side-on on its paint band at d 33.9. Gates: 39 variants in
+the contrast audit now, 8/8 shots clean, 90/90 courses, simulate
+PASS. Built all sides per rule 1 -- both flanks, both ends, roof and
+underside are all in ordinary shot.
+
+A Tripo generation can replace the code art later (single view, one
+small car, side-on fit) -- noted in the backlog, no credits spent.

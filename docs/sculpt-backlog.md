@@ -75,6 +75,15 @@ measured and pinned to MR.Collision.BOX[DUCK].yMin, so the visual gap
 is the collision gap. Generate DUCK models full-height, posts to the
 ground, like the gantry.
 
+## JUMP v12, the crossing minicar (added 2026-09-03)
+
+Code art, ships without a sculpt (weight 0 -- only the jcross cast
+site deals it, so it always arrives crossing). A Tripo generation is
+welcome when credits return: ONE small rounded city car, single view,
+side profile, bright red body with a cream roof; it will be fitted
+side-on into the JUMP box (0.78 tall), so a low, wide, simple shape
+survives the shrink best.
+
 ## Also waiting
 
 - Grandstand/arena crowds are still box people by design (the roadside

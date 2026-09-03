@@ -8176,7 +8176,10 @@ MR.World = (function () {
       // emergent property of an ad-hoc modulo. See castGates.
       const bag = [];
       defs.forEach(function (d, i) {
-        for (let k = 0; k < (d.weight || 1); k++) bag.push(i);
+        // weight: 0 is a real value -- a variant only a cast site can
+        // deal (the crossing minicar) -- so it must not default to 1.
+        const w = d.weight === 0 ? 0 : (d.weight || 1);
+        for (let k = 0; k < w; k++) bag.push(i);
       });
       const pool = Pool(function () {
         const g = new THREE.Group();
@@ -9811,6 +9814,66 @@ MR.World = (function () {
       return merge(parts);
     })();
 
+    /**
+     * ============ THE CROSSING MINICAR (JUMP v12) ============
+     *
+     * The one car in the game you jump, and the owner ordered it so:
+     * "let's only do small cars. If that's the case maybe you can jump
+     * over them." SMALL is what keeps the fleet's swipe read intact --
+     * 0.78 to the roof against 2.0+ for every blocking vehicle -- and
+     * SIDE-ON is what keeps its own read honest: it is authored nose
+     * along +x, mid-crossing, a silhouette no swipe vehicle ever shows.
+     * It never spawns from the bag (weight 0); the jcross cast site is
+     * the only door in, so it always ARRIVES crossing, wearing the
+     * crossing-street paint under it.
+     *
+     * Built on all sides per rule 1: the player jumps it, passes it in
+     * both adjacent lanes, and watches it drive in from either verge --
+     * both flanks, both ends, the roof and the underside are in shot in
+     * ordinary play. Envelope: MR.Collision.BOX[JUMP] is 0.80 tall,
+     * +/-1.12 wide, 0.52 halfZ; everything below stays inside 0.78 /
+     * +/-1.04 / +/-0.48, guarded like every other variant.
+     */
+    const jumpMiniGeo = (function () {
+      const BODY = 0xff5a48, ROOF = 0xf6f1e4, GLASS = 0x1a2934,
+        TYRE = 0x20242a, SKIRT = 0x2a1714, TRIM = 0xffd7cf;
+      const parts = [];
+      // The tub, nose at +x. A chamfered box so the little body reads
+      // rounded, sitting over its own dark underside -- the underbody
+      // rule: lit road is never seen through a vehicle.
+      parts.push(gl(hcbx(2.00, 0.32, 0.92, 0, 0.40, 0, BODY, 0.06), GLOSS.paint));
+      parts.push(gl(hbx(1.54, 0.22, 0.80, 0, 0.15, 0, SKIRT), GLOSS.matte));
+      // The greenhouse: cabin sides in body colour, and ONE glass band a
+      // hair proud of the cabin on all four faces, so side windows,
+      // windscreen and backlight are the same material seen from every
+      // angle the dart and the jump produce.
+      parts.push(gl(hcbx(1.34, 0.20, 0.82, -0.10, 0.66, 0, BODY, 0.04), GLOSS.paint));
+      parts.push(gl(hbx(1.24, 0.13, 0.84, -0.10, 0.665, 0, GLASS), GLOSS.chrome));
+      parts.push(gl(hbx(1.16, 0.02, 0.02, -0.10, 0.665, 0.43, TRIM), GLOSS.trim));
+      parts.push(gl(hbx(1.16, 0.02, 0.02, -0.10, 0.665, -0.43, TRIM), GLOSS.trim));
+      // The roof cap, cream, the brightest thing on it from above -- the
+      // face a jumping player actually sees.
+      parts.push(gl(hcbx(1.30, 0.055, 0.78, -0.10, 0.755, 0, ROOF, 0.02), GLOSS.paint));
+      // Wheels: axis along z (the car points along x), tyre barrel plus a
+      // rim disc on BOTH z faces -- the near flank and the far one.
+      for (const sx of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          const wx = sx * 0.62, wz = sz * 0.33;
+          parts.push(gl(cyl(0.155, 0.155, 0.14, 12, wx, 0.155, wz, TYRE, Math.PI / 2), GLOSS.trim));
+          parts.push(gl(cyl(0.09, 0.09, 0.03, 10, wx, 0.155, wz + sz * 0.075, WHEEL_RIM, Math.PI / 2), GLOSS.chrome));
+        }
+      }
+      // Bumpers, headlamps at the nose (+x), tail lamps at the back --
+      // the two ends lead and trail every crossing.
+      parts.push(gl(hbx(0.10, 0.10, 0.86, 1.00, 0.30, 0, TRIM), GLOSS.trim));
+      parts.push(gl(hbx(0.10, 0.10, 0.86, -1.00, 0.30, 0, TRIM), GLOSS.trim));
+      for (const sz of [-1, 1]) {
+        parts.push(gl(hbx(0.04, 0.09, 0.12, 1.03, 0.46, sz * 0.30, 0xfff2c0), GLOSS.chrome));
+        parts.push(gl(hbx(0.04, 0.08, 0.10, -1.03, 0.46, sz * 0.30, 0xd91c1c), GLOSS.chrome));
+      }
+      return merge(parts);
+    })();
+
     const jumpPool = hazardPool(K.JUMP, 'jump', [
       { geo: jumpSandGeo, face: null },
       /**
@@ -9855,6 +9918,10 @@ MR.World = (function () {
       { geo: jumpDrumGeo, face: null },
       { geo: jumpLowBarGeo, face: null },
       { geo: jumpTrashGeo, face: null },
+      // The crossing minicar. WEIGHT ZERO: it never spawns parked -- a
+      // crossing car that did not cross is a prop -- so the jcross cast
+      // site is its only door. See the geo header and castGates.
+      { geo: jumpMiniGeo, face: null, weight: 0 },
     ]);
 
     /**
@@ -15266,6 +15333,9 @@ MR.World = (function () {
       // The dart is a CAR: a bus or a lorry shooting out of a side street
       // reads as a physics error, a taxi or a hatchback reads as traffic.
       const CROSS_CAST = [5, 12, 13];
+      // The crossing minicar's JUMP variant index -- the last def in the
+      // jump vocabulary, dealt only here.
+      const JCROSS_VI = 12;
       const cast = [];
       for (let g = 0; g < gates.length; g++) {
         const gate = gates[g];
@@ -15274,6 +15344,10 @@ MR.World = (function () {
           const kind = gate.lanes[l];
           if (kind === K.CLEAR || !bags[kind]) continue;
           row[l] = (kind === K.BLOCK && gate.train) ? 0
+            // The crossing minicar: the only door to JUMP v12 (weight 0
+            // in the bag), and only on the lane that actually crosses.
+            : (kind === K.JUMP && gate.jcross && gate.jcross.lane === l)
+              ? JCROSS_VI
             : (kind === K.BLOCK && gate.cross)
               ? CROSS_CAST[MR.rng.hashString((key || '') + '|sweep-skin|' + g) % CROSS_CAST.length]
             : (kind === K.BLOCK && (gate.sweep || gate.on))
@@ -19605,7 +19679,9 @@ MR.World = (function () {
           objs.push(o);
         }
         const entry = { gate, objs };
-        if (gate.cross) {
+        // Both crossing kinds lay the side-street band: the swipe dart
+        // (gate.cross) and the jumpable minicar (gate.jcross).
+        if (gate.cross || gate.jcross) {
           const p = crossPaintPool.claim();
           p.position.set(0, eAt(gate.z) + 0.016, gate.z);
           p.rotation.x = -Math.atan(EL.slope(gate.z));
@@ -20139,6 +20215,25 @@ MR.World = (function () {
           const tx = K.LANE_X[cr.lane];
           o.position.x = fx + (tx - fx) * c;
           o.rotation.y = (tx > fx ? 1 : -1) * (Math.PI / 2) * (1 - c);
+          o.visible = c > 0.001;
+        }
+        // THE JUMPABLE CROSSING MINICAR: same dart as gate.cross, but it
+        // NEVER straightens -- it is authored side-on (nose along +x) and
+        // stays mid-crossing when it locks, which is the whole read: a
+        // little car caught crossing, hop it. Yaw only points the nose
+        // along the direction of travel; entering from +x it drives
+        // toward -x, so the body flips PI.
+        const jc = g.gate.jcross;
+        if (jc && g.objs[jc.lane]) {
+          const o = g.objs[jc.lane];
+          const d = g.gate.z - z;
+          const t = (MR.Course.CROSS_START - d)
+            / (MR.Course.CROSS_START - MR.Course.SWEEP_LOCK);
+          const c = t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
+          const fx = jc.side * (Math.abs(K.LANE_X[0]) + 1.9);
+          const tx = K.LANE_X[jc.lane];
+          o.position.x = fx + (tx - fx) * c;
+          o.rotation.y = jc.side > 0 ? Math.PI : 0;
           o.visible = c > 0.001;
         }
         const sw = g.gate.sweep;

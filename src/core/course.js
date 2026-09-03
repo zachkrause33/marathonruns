@@ -2252,6 +2252,9 @@ MR.Course = (function () {
   // eligibility threw away plus the seeded pairs, not from a blanket
   // rate hike. Census in roadmap 104.
   const SWEEP_RATE = 0.65;
+  // The crossing minicar's own rate, on JUMP gates -- see the jcross
+  // pass in markMotion. Censused at ~4 a course over 365 days.
+  const JCROSS_RATE = 0.08;
   /**
    * ---- AND THE ONCOMING VEHICLE, THE SAME CONTRACT ROTATED 90 DEGREES ----
    *
@@ -2420,6 +2423,53 @@ MR.Course = (function () {
         if (p === 'sweep' && from >= 0) { gate.sweep = { from, lane }; tally.sweeps++; break; }
       }
     }
+    /**
+     * ---- THE CROSSING MINICAR, THE ONE CAR YOU JUMP --------------------
+     *
+     * The owner, revisiting the swipe decision of roadmap 100: "Can you
+     * build crossing roads so cars can actually cross the road as you
+     * run. If so, let's only do small cars. If that's the case maybe you
+     * can jump over them." Roadmap 100 refused a jumpable car because a
+     * 2.0+ vehicle you sometimes hurdle poisons the swipe read on every
+     * other vehicle. The owner's "small" is what unpoisons it: this car
+     * is a JUMP hazard head to toe -- 0.78 to the roof against 2.0+ for
+     * every blocking vehicle, a THIRD of any car the player swipes past
+     * -- and it is the only vehicle in the game that sits SIDE-ON, mid-
+     * crossing, so nothing about its silhouette matches the fleet.
+     *
+     * Same motion contract, third verse: the kill lane is fixed course
+     * data (an ordinary JUMP lane), and only the approach animates. The
+     * car enters from the verge at CROSS_START and drives across the
+     * road into its lane, locked from SWEEP_LOCK out (it crosses lanes,
+     * so it takes the lane-crossing margin, not the oncoming one). An
+     * edge lane is entered from its own verge; a centre lane needs the
+     * transit edge CLEAR at this gate line, because the dart drives
+     * through that lane's gate plane on the way. Gates already animated
+     * by the block pass are skipped -- two vehicles arriving at one gate
+     * is noise, not challenge.
+     */
+    for (let i = 0; i < gates.length; i++) {
+      const gate = gates[i];
+      if (gate.train || gate.ramp !== undefined || gate.narrow) continue;
+      if (gate.on || gate.cross || gate.sweep) continue;
+      if (gate.f < 0.15 || gate.f > 0.90) continue;
+      const jumpLanes = [];
+      for (let l = 0; l < 3; l++) if (gate.lanes[l] === K.JUMP) jumpLanes.push(l);
+      if (!jumpLanes.length) continue;
+      const h = MR.rng.hashString(key + '|jcross/v1|' + i);
+      if ((h % 4096) / 4096 >= JCROSS_RATE * SWEEP) continue;
+      const lane = jumpLanes[(h >>> 8) % jumpLanes.length];
+      let side = 0;
+      if (lane !== 1) side = lane === 0 ? 1 : -1;
+      else {
+        const open = [0, 2].filter((l) => gate.lanes[l] === K.CLEAR);
+        if (!open.length) continue;
+        const enter = open.length === 2 ? open[(h >>> 12) & 1] : open[0];
+        side = enter === 0 ? 1 : -1;
+      }
+      gate.jcross = { side, lane };
+      tally.jcross++;
+    }
   }
 
   function generate(key) {
@@ -2456,7 +2506,7 @@ MR.Course = (function () {
     // "solvable on all 365 days" is true by construction and proves nothing
     // about whether a new mechanic damaged the course -- the damage would show
     // up as the generator giving up more often, and nothing counted that.
-    const tally = { degraded: 0, attempts: 0, narrowings: 0, narrowAbandoned: 0, sweeps: 0, oncoming: 0, cross: 0 };
+    const tally = { degraded: 0, attempts: 0, narrowings: 0, narrowAbandoned: 0, sweeps: 0, oncoming: 0, cross: 0, jcross: 0 };
 
     // A closure in flight: the lanes it holds shut, and the gate index it runs
     // to. Deliberately the same shape as trainUntil, because it is the same

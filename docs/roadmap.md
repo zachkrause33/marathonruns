@@ -8558,3 +8558,31 @@ ramp-painted-on-a-wall misread the claim site guards against. What
 would work: a CABLESS flat-roofed trailer generation, plus rake-with-
 ramp machinery at the cast site -- its own project, recorded in the
 backlog.
+
+## 95. The rideable deck wears the owner's truck
+
+"I think we need the rideable one." It could not be the ramp truck as
+generated -- cab below deck height in the dismount path, 6.7-9.4x span
+stretch -- so the deck is built the way the tram train is: the cab is
+CUT OFF the cargo-truck sculpt offline (strict plane cut found by
+roofline profile, wound capped with a flank texel, 2.5k triangles at
+256px), and the cast site lays up to six trailer copies over [RAMP_RUN,
+D] behind the code ramp mouth, each squeezed to its share. The trailer
+is fitted onto the tram def's bbox, whose roof IS DECK_Y = 2.80 -- the
+drawn surface is the computed surface, and deckAt/rampAt never hear
+about any of it. The mouth, posts and ramp stay code art: they are the
+enterable read and the geometry the course promises.
+
+THE FIND ON THE WAY IN, and it predates the deck: a body claimed
+before its wardrobe loads never had the TRAIN layout re-run when the
+model arrived -- every ?skip= shot and probe claims its whole
+neighbourhood before the first GLB decodes, and the walk-the-bodies
+redress swapped meshes without redoing the arithmetic, leaving a lone
+carriage on a body still stretched to train scale. The layout is now
+one function (layoutBlockBody), the claim site calls it, and every
+dresser calls relayoutActive() after a late load -- idempotent, reading
+only course data the claim already had. The deck merely made a hole
+visible that the tram rake has had since it shipped.
+
+Gates: 8/8 shots clean, 90/90 courses, simulate PASS; heaviest frame
+424k of 500k (the rake adds ~15k only where a ramp train is live).

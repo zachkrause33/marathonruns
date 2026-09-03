@@ -125,13 +125,14 @@ project with new instruments.
 
 The owner generated a blue cargo truck pair for the rideable decks
 (props-v3). The CLOSED one ships as BLOCK v14, four liveries. The RAMP
-one is held: the rideable body stretches 6.7-9.4x with the train span
-(taffy on a sculpt), and the truck's cab roof is below deck height in
-the dismount path -- deckAt promises a flat running surface. To ship a
-sculpted rideable: regenerate as a CABLESS flat-roofed open trailer
-with the ramp, single-view input image, and budget a rake-with-ramp
-pass at the cast site. Until then rideable trains keep the code art on
-purpose.
+one as generated could not serve (cab below deck height in the
+dismount path; 6.7-9.4x span stretch), so the deck SHIPPED ANOTHER WAY
+(2026-09-03, owner: "I think we need the rideable one"): the cab is
+cut off the cargo-truck sculpt offline and the cast site lays a rake
+of flat-roofed trailers over the deck behind the code ramp mouth --
+see roadmap 95. The mouth/ramp stay code art by design. A dedicated
+open-mouth trailer generation (cabless, flat roof, single-view input)
+would let the mouth go sculpted too; welcome but no longer blocking.
 
 Tripo note for all future generations: feed ONE view of the object.
 A multi-view input image comes back as multiple copies baked into one

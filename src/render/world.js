@@ -8312,6 +8312,7 @@ MR.World = (function () {
           body.userData.paint = (d.paint = (d.paint || 0) + 1) - 1;
           (d.bodies = d.bodies || []).push(body);
           applySculpt(body, d);
+          applyDeck(body, d);
           // An anim without a `moving` part is legal and is the cheapest thing
           // in this file: the variant group gets a y shudder and nothing else,
           // which is what an idling diesel looks like, for no mesh and no draw.
@@ -14467,6 +14468,9 @@ MR.World = (function () {
             // Dress everything already built -- live and pooled-free alike
             // -- and the factory dresses everything built from now on.
             for (const b of d.bodies || []) applySculpt(b, d);
+            // ...and re-run the TRAIN layout on live gates: a body claimed
+            // before this load was laid out for the wardrobe it had then.
+            relayoutActive();
             console.log('MR.World: sculpted ' + key + ' on, x' + sx.toFixed(2)
               + ' y' + sy.toFixed(2) + ' z' + sz.toFixed(2)
               + (mats.length > 1 ? ', ' + mats.length + ' paints' : ''));
@@ -14520,6 +14524,96 @@ MR.World = (function () {
           + (e && e.message) + ')');
       });
     }
+
+    /**
+     * ============ THE RIDEABLE DECK RAKE ============
+     *
+     * The owner: "I think we need the rideable one." The ramp truck he
+     * generated could not BE the rideable body -- its cab roof sits below
+     * deck height exactly where the runner dismounts, and a rideable body
+     * stretches 6.7-9.4x with the train span -- so the deck is built the
+     * way the tram train is: a RAKE. The cab is CUT OFF the cargo-truck
+     * sculpt offline (tools in the session scratchpad; the wound is
+     * capped), leaving a flat-roofed box trailer, and the cast site lays
+     * DECK_MAX copies over the deck span behind the code ramp, each
+     * squeezed to its share. The mouth -- open tail, posts, ramp -- stays
+     * code art: it is the enterable read and the ramp geometry the course
+     * promises.
+     *
+     * THE CONTRACT DOES NOT MOVE. deckAt/rampAt are course data; the
+     * trailer is fitted onto the TRAM DEF'S OWN BBOX, whose roof is
+     * exactly DECK_Y = 2.80, so the surface drawn under the runner's feet
+     * is the surface the course computes -- same argument as every other
+     * fit. The trailer's roof is flat by construction (that is WHY the
+     * cab came off). Its coat is v14's gated blue ({h:0,s:1.5,l:1.15},
+     * +0.282 at the tightest road), so the rake wears a measured paint.
+     */
+    const DECK_MAX = 6;
+    function applyDeck(body, d) {
+      if (!d.deck || body.userData.decked) return;
+      body.userData.decked = true;
+      const cars = [];
+      for (let k = 0; k < DECK_MAX; k++) {
+        const m = new THREE.Mesh(d.deck.geo, d.deck.mats[0]);
+        m.matrixAutoUpdate = false;
+        m.visible = false;
+        body.add(m);
+        cars.push(m);
+      }
+      body.userData.deckCars = cars;
+      body.userData.deckFit = d.deck.fit;
+    }
+    function dressDeck(vi, key, yaw, coat) {
+      let grp = null;
+      for (const g2 of HAZARD_DEFS) if (g2.kind === K.BLOCK) grp = g2;
+      const d = grp && grp.defs[vi];
+      if (!d) return;
+      sculptsPending++;
+      MR.Skin.model(key, function (gltf, buf) {
+        try {
+          let src = null;
+          gltf.scene.updateMatrixWorld(true);
+          gltf.scene.traverse(function (o) { if (o.isMesh && !src) src = o; });
+          if (!src) throw new Error('no mesh in ' + key);
+          const geo = src.geometry;
+          const pre = new THREE.Matrix4().makeRotationY(yaw);
+          pre.multiply(src.matrixWorld);
+          geo.computeBoundingBox();
+          const sb = geo.boundingBox.clone().applyMatrix4(pre);
+          d.geo.computeBoundingBox();
+          const tb = d.geo.boundingBox;
+          const sx = (tb.max.x - tb.min.x) / Math.max(1e-6, sb.max.x - sb.min.x);
+          const sy = (tb.max.y - tb.min.y) / Math.max(1e-6, sb.max.y - sb.min.y);
+          const sz = (tb.max.z - tb.min.z) / Math.max(1e-6, sb.max.z - sb.min.z);
+          const fit = new THREE.Matrix4().makeTranslation(
+            (tb.max.x + tb.min.x) / 2 - (sb.max.x + sb.min.x) / 2 * sx,
+            tb.min.y - sb.min.y * sy,
+            (tb.max.z + tb.min.z) / 2 - (sb.max.z + sb.min.z) / 2 * sz)
+            .multiply(new THREE.Matrix4().makeScale(sx, sy, sz))
+            .multiply(pre);
+          MR.Skin.baseColorImage(buf, function (img) {
+            const m2 = S.toon(0xffffff, 3, 0.62, true);
+            m2.map = paintShift(img, coat || 0);
+            d.deck = { geo: geo, mats: [m2], fit: fit };
+            for (const b of d.bodies || []) applyDeck(b, d);
+            relayoutActive();
+            console.log('MR.World: deck rake ' + key + ' on');
+            sculptsPending--;
+          }, function (e) {
+            console.error('MR.World: ' + key + ' basecolor failed, code deck stays', e);
+            sculptsPending--;
+          });
+        } catch (e) {
+          console.error('MR.World: ' + key + ' deck dress failed, code art stays', e);
+          sculptsPending--;
+        }
+      }, function (e) {
+        sculptsPending--;
+        console.log('MR.World: ' + key + ' unavailable, code deck stays ('
+          + (e && e.message) + ')');
+      });
+    }
+    dressDeck(0, 'veh_decktruck', -Math.PI / 2, { h: 0, s: 1.5, l: 1.15 });
 
     dressHazard(K.BLOCK, 1, 'veh_signworks', Math.PI);
     dressHazard(K.BLOCK, 2, 'veh_lightworks', Math.PI);
@@ -14941,6 +15035,125 @@ MR.World = (function () {
      * forced draw consume a card would leave the deal short and rot the
      * guarantee for the hazards after it.
      */
+    /**
+     * ---- THE BLOCK BODY LAYOUT, AS ONE FUNCTION -------------------------
+     *
+     * Stretch a train forward along z rather than repeating blocks, so its
+     * NEAR face and the telegraph mat stay put on the gate line whatever
+     * the span. A RIDEABLE train is shortened by its own ramp: the ramp is
+     * an unscaled child occupying the first RAMP_RUN units, so the body
+     * gives that length back (s = span - RUN / (2 * halfZ)) or the vehicle
+     * outgrows the collision box that decides whether it was hit.
+     *
+     * Extracted from the claim site so it can be RE-RUN. The claim lays a
+     * body out with whatever wardrobe has loaded; a sculpt or deck rake
+     * that lands later used to leave every already-claimed train wearing
+     * the wrong body -- a fast-forwarded page (every ?skip= shot, every
+     * probe) claims its whole neighbourhood before the first GLB decodes,
+     * and the walk-the-bodies redress switched meshes without redoing the
+     * TRAIN arithmetic. Now the dressers call relayoutActive() and this
+     * runs again with the same gate data, idempotently.
+     */
+    function layoutBlockBody(o, gate, rideable) {
+      const span = gate.train ? 1 + gate.train * 0.9 : 1;
+      const halfZ = MR.Collision.BOX[K.BLOCK].halfZ;
+      const s = rideable ? span - MR.Course.RAMP_RUN / (2 * halfZ) : span;
+      const body = o.userData.body;
+      const cars = body.userData.carriages;
+      const nCar = Math.max(1, Math.round(s));
+      if (cars && !rideable && nCar <= cars.length) {
+        /**
+         * THE SCULPTED TRAIN IS A RAKE OF CARRIAGES, NOT A STRETCH. The
+         * stretch was authored for the code tram, whose baked features
+         * are horizontal bands that survive it; the sculpt has doors,
+         * bogies and a pantograph, and stretched it is a taffy pull. The
+         * body stays at scale 1 and the rake is laid out to the SAME
+         * arithmetic the stretch used: 2*halfZ*s deep, rear face on the
+         * gate line, nCar equal carriages each squeezed by s/nCar. Same
+         * footprint to the centimetre, so the collision box, the shadow
+         * (which reads gate.train) and the release arithmetic never hear
+         * about it. Trains longer than the rake keep code art -- the
+         * budget line.
+         */
+        body.userData.fill.visible = false;
+        body.userData.line.visible = false;
+        body.scale.z = 1;
+        body.position.z = 0;
+        const depth = 2 * halfZ * s / nCar;
+        const squeeze = depth / (2 * halfZ);
+        const tmpS = new THREE.Matrix4();
+        for (let k = 0; k < cars.length; k++) {
+          cars[k].visible = k < nCar;
+          if (k < nCar) {
+            cars[k].matrix.makeTranslation(0, 0, -halfZ + (k + 0.5) * depth)
+              .multiply(tmpS.makeScale(1, 1, squeeze))
+              .multiply(body.userData.carFit);
+          }
+        }
+        const dk2 = body.userData.deckCars;
+        if (dk2) for (const m of dk2) m.visible = false;
+      } else if (rideable && body.userData.deckCars) {
+        /**
+         * THE RIDEABLE DECK IS A RAKE OF TRAILERS -- the owner: "I think
+         * we need the rideable one." Same arithmetic as the tram rake
+         * with one difference: the first RAMP_RUN units belong to the
+         * code ramp (the enterable mouth the course's deckAt promises),
+         * so the rake covers [RUN, D] of a D = 2*halfZ*span vehicle,
+         * rear face on the gate line. The trailer is fitted onto the
+         * tram def's bbox, whose roof IS DECK_Y -- the drawn surface is
+         * the computed surface. Up to DECK_MAX cars, each squeezed to
+         * its share (1.1x-2.3x across the legal span range; the trailer
+         * is plain banding and survives what would taffy-pull a
+         * detailed sculpt).
+         */
+        body.userData.fill.visible = false;
+        body.userData.line.visible = false;
+        if (cars) for (const m of cars) m.visible = false;
+        body.scale.z = 1;
+        body.position.z = 0;
+        const run = MR.Course.RAMP_RUN;
+        const D = 2 * halfZ * span;
+        const deckCars = body.userData.deckCars;
+        const nDk = Math.min(deckCars.length,
+          Math.max(1, Math.round((D - run) / (2 * halfZ))));
+        const dDepth = (D - run) / nDk;
+        const dSq = dDepth / (2 * halfZ);
+        const tmpS2 = new THREE.Matrix4();
+        for (let k = 0; k < deckCars.length; k++) {
+          deckCars[k].visible = k < nDk;
+          if (k < nDk) {
+            deckCars[k].matrix
+              .makeTranslation(0, 0, run - halfZ + (k + 0.5) * dDepth)
+              .multiply(tmpS2.makeScale(1, 1, dSq))
+              .multiply(body.userData.deckFit);
+          }
+        }
+      } else {
+        if (cars || body.userData.deckCars) {
+          body.userData.fill.visible = true;
+          body.userData.line.visible = true;
+          if (cars) for (const m of cars) m.visible = false;
+          const dk3 = body.userData.deckCars;
+          if (dk3) for (const m of dk3) m.visible = false;
+        }
+        body.scale.z = s;
+        body.position.z = (s - 1) * halfZ + (rideable ? MR.Course.RAMP_RUN : 0);
+      }
+      return span;
+    }
+
+    // Re-run the layout on every live BLOCK after a late wardrobe load.
+    // Idempotent; reads only course data the claim already had.
+    function relayoutActive() {
+      for (const g of activeGates) {
+        for (let l = 0; l < 3; l++) {
+          if (g.gate.lanes[l] !== K.BLOCK || !g.objs[l]) continue;
+          const rideable = g.gate.ramp === l || g.gate.ramp2 === l;
+          layoutBlockBody(g.objs[l], g.gate, rideable);
+        }
+      }
+    }
+
     function castGates(gates, key) {
       const bags = {};
       bags[K.JUMP] = jumpPool.bagOf(); bags[K.DUCK] = duckPool.bagOf();
@@ -19262,86 +19475,7 @@ MR.World = (function () {
           // the mouth the player is being invited into, so it comes down and
           // the tail's own door posts carry the mark instead.
           if (vs[vi].userData.face) vs[vi].userData.face.visible = !rideable;
-          if (kind === K.BLOCK) {
-            // Stretch a train forward along z rather than repeating blocks, so
-            // its NEAR face and the telegraph mat stay put on the gate line
-            // whatever the span. The offset is halfZ and not the literal 0.65
-            // it used to be: that literal was the old BLOCK half-depth, it was
-            // never updated when the envelope was renegotiated to 1.95, and it
-            // had been quietly anchoring every train 1.30 units too far back.
-            span = gate.train ? 1 + gate.train * 0.9 : 1;
-            const halfZ = MR.Collision.BOX[K.BLOCK].halfZ;
-            /**
-             * ---- A RIDEABLE TRAIN IS SHORTENED BY ITS OWN RAMP ------------
-             *
-             * The ramp is an unscaled child occupying the first RAMP_RUN units
-             * of the vehicle, so the SCALED body must give that length back or
-             * the tram is RAMP_RUN longer than the collision box that decides
-             * whether it was hit -- and a nose the player can see but cannot
-             * touch is the same class of defect as a flank they could not, in
-             * the other direction.
-             *
-             * The whole vehicle is 2 * halfZ * span deep. Take the ramp's 6.0
-             * off the front of that and the body scale is span - RUN / (2 *
-             * halfZ); its rear face then has to land on the ramp's top rather
-             * than on the gate line, which is the same offset it always had
-             * plus that same RUN. Both terms come out of the one subtraction,
-             * so they cannot disagree.
-             *
-             * A ramp's span is 8.2 to 10.9 (RAMP_SPAN 8 to 11), so the shortened
-             * scale is 6.66 to 9.36 -- never near zero, and the generator's
-             * RAMP_SPAN_MIN is what keeps it that way.
-             */
-            const s = rideable ? span - MR.Course.RAMP_RUN / (2 * halfZ) : span;
-            const body = o.userData.body;
-            const cars = body.userData.carriages;
-            const nCar = Math.max(1, Math.round(s));
-            if (cars && !rideable && nCar <= cars.length) {
-              /**
-               * THE SCULPTED TRAIN IS A RAKE OF CARRIAGES, NOT A STRETCH.
-               *
-               * The stretch was authored for the code tram, whose baked
-               * features are horizontal bands that survive it; the sculpt
-               * has doors, bogies and a pantograph, and stretched it is a
-               * taffy pull. So the body stays at scale 1 and the rake is
-               * laid out to the SAME arithmetic the stretch used: the
-               * whole vehicle is 2*halfZ*s deep with its rear face on the
-               * gate line, split into nCar equal carriages, each the
-               * single-car fit squeezed by s/nCar (at most a few percent).
-               * Same footprint to the centimetre, so the collision box,
-               * the shadow (which reads gate.train, not this scale) and
-               * the release arithmetic never hear about it.
-               *
-               * A RIDEABLE train keeps the code tram: its deck walkway
-               * and the open ramp are one riding read the sculpt has no
-               * walkway for. A train longer than the rake keeps it too --
-               * CARRIAGE_MAX * ~8k triangles is the budget line.
-               */
-              body.userData.fill.visible = false;
-              body.userData.line.visible = false;
-              body.scale.z = 1;
-              body.position.z = 0;
-              const depth = 2 * halfZ * s / nCar;
-              const squeeze = depth / (2 * halfZ);
-              const tmpS = new THREE.Matrix4();
-              for (let k = 0; k < cars.length; k++) {
-                cars[k].visible = k < nCar;
-                if (k < nCar) {
-                  cars[k].matrix.makeTranslation(0, 0, -halfZ + (k + 0.5) * depth)
-                    .multiply(tmpS.makeScale(1, 1, squeeze))
-                    .multiply(body.userData.carFit);
-                }
-              }
-            } else {
-              if (cars) {
-                body.userData.fill.visible = true;
-                body.userData.line.visible = true;
-                for (const m of cars) m.visible = false;
-              }
-              body.scale.z = s;
-              body.position.z = (s - 1) * halfZ + (rideable ? MR.Course.RAMP_RUN : 0);
-            }
-          }
+          if (kind === K.BLOCK) span = layoutBlockBody(o, gate, rideable);
           // The contact shadow is not written here any more. It is one pooled
           // quad per live hazard, sized from this same userData.foot and this
           // same span inside updateShadows() -- which reads userData.active,

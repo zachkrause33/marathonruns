@@ -14059,6 +14059,26 @@ MR.World = (function () {
       return merge(parts);
     })();
 
+    /**
+     * v14's fit box and pre-decode fallback: the WHOLE BLOCK envelope.
+     * The owner, twice: "the trucks are so small... they need to take up
+     * the entire space of the lane." The van def gave 2.59 of height,
+     * the tram def gave the height but only 1.66 of the 2.24-wide box --
+     * so the truck gets the box itself, hair-inset, and the per-axis fit
+     * stretches the sculpt to fill the lane the way the code slabs
+     * always did. As fallback art it is exactly that slab for the
+     * pre-decode moment.
+     */
+    const blockSlabGeo = (function () {
+      const g = new THREE.BoxGeometry(2.23, 2.79, 3.89);
+      g.translate(0, 1.395, 0);
+      const n = g.attributes.position.count;
+      const col = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) { col[i * 3] = 0.33; col[i * 3 + 1] = 0.45; col[i * 3 + 2] = 0.72; }
+      g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      return g;
+    })();
+
     const blockPool = hazardPool(K.BLOCK, 'block', [
       {
         // THE FACE MOVES TO THE TAIL, and its z is inside halfZ rather than
@@ -14194,12 +14214,11 @@ MR.World = (function () {
        * four liveries dealt across the pool (the owner: "they do not
        * need to be all blue"); margins at the dress line.
        */
-      // NO ANIM, and it lost it the moment it grew: the tram def tops out
-      // at exactly 2.80, so the idle's +/-0.022 bob would spend half of
-      // every cycle outside the collision box -- the same arithmetic that
-      // took the tram's pantograph sway. A vehicle at the ceiling stands
-      // still; the van and hatchback keep their shudder on their headroom.
-      { geo: blockTramGeo, face: [2.16, 0.30, 0.78, -1.945], weight: 2 },
+      // NO ANIM: the slab def sits a hair under the 2.80 ceiling, so the
+      // idle's +/-0.022 bob would leave the collision box -- the same
+      // arithmetic that took the tram's pantograph sway. A vehicle at
+      // the ceiling stands still.
+      { geo: blockSlabGeo, face: [2.16, 0.30, 0.78, -1.940], weight: 2 },
     ]);
 
     /**
@@ -14621,7 +14640,16 @@ MR.World = (function () {
           + (e && e.message) + ')');
       });
     }
-    dressDeck(0, 'veh_decktruck', -Math.PI / 2, { h: 0, s: 1.5, l: 1.15 });
+    // THE DECK RAKE IS PARKED, on the owner's eye the day it shipped:
+    // "They still don't look good... They are also weirdly tilted. They
+    // need to take up the entire space of the lane." The scanned trailer
+    // carries a baked taper and wheel gaps that the per-carriage squeeze
+    // amplifies, where the code body is a solid slab that fills its frame
+    // by construction -- and a running surface is the last place to trade
+    // solidity for texture. Rideable trains keep the code art, which is
+    // the look the owner pointed at as "before". The machinery stays: a
+    // clean flat generation re-ships by uncommenting this line.
+    // dressDeck(0, 'veh_decktruck', -Math.PI / 2, { h: 0, s: 1.5, l: 1.15 });
 
     dressHazard(K.BLOCK, 1, 'veh_signworks', Math.PI);
     dressHazard(K.BLOCK, 2, 'veh_lightworks', Math.PI);

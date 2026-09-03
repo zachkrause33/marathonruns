@@ -8610,3 +8610,29 @@ the idle bob to the envelope exactly as the tram lost its pantograph
 sway; and the raw-first mesh measures RICHER than the old one, so the
 blue livery ships uncoated at +0.409 (red +0.400, yellow +0.959, green
 +0.359, all re-probed).
+
+## 97. Lane-filling, level, and the deck rake parked
+
+Round three on the cargo truck, all three owner notes landed: "make
+them the same shape size as before... weirdly tilted... take up the
+entire space of the lane."
+
+THE LANE: v14's fit box is now the BLOCK envelope itself -- a
+hair-inset 2.23 x 2.79 x 3.89 slab def (blockSlabGeo) that doubles as
+the pre-decode fallback -- so the per-axis fit stretches the truck to
+the whole lane the way the code slabs always did. The van def gave up
+height, the tram def gave up width; the box gives up neither.
+
+THE TILT: measured, not argued -- the scan stands with a 1.8-degree
+baked lean across its width. truckbuild.js now fits a plane to the
+wheel-bottom band and rotates the mesh level before quantization.
+
+THE TRAINS: the rideable deck rake is parked on the owner's eye the
+day it shipped -- the scanned trailer's taper and wheel gaps, squeezed
+per carriage, read tilted and narrow where the code body is a solid
+slab that fills its frame by construction. Rideable trains keep the
+code art (the "before" the owner pointed at); dressDeck and the rake
+machinery stay behind a commented line for a clean flat regeneration.
+
+Coats re-probed on the wide mesh (+0.377 to +0.923); 8/8 shots, 90/90
+courses, simulate PASS.

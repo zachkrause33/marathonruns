@@ -8586,3 +8586,27 @@ visible that the tram rake has had since it shipped.
 
 Gates: 8/8 shots clean, 90/90 courses, simulate PASS; heaviest frame
 424k of 500k (the rake adds ~15k only where a ramp train is live).
+
+## 96. "The trucks are so small": the corrupt file, not the fit
+
+The cargo truck had been drawing at a fraction of its measured box from
+the day it shipped -- the owner saw it in play before any instrument
+did. The fit matrix decomposed perfectly (1.95 / 1.89 / 1.69 onto the
+def box), setFromObject agreed to the centimetre, and the GPU drew a
+16-pixel sliver anyway: the one artifact was the FILE, which had gone
+through a split-AFTER-quantize path (weld() run on an already-quantized
+GLB leaves attributes the loader and the bbox arithmetic read
+differently than the rasterizer does). Rebuilt raw-first -- split in
+float space, simplify, THEN quantize, the order deckbuild proved -- the
+truck stands shoulder to shoulder with the tram, bus and container in
+one controlled lineup render.
+
+Two durable rules out of it: never transform a quantized GLB (split
+first, quantize last -- vehsplit.js is retired in favour of the
+one-pass builders), and a bounding box is not a render -- the lineup
+render now exists as the instrument that would have caught this on day
+one. The def also moved van -> tram (full 2.80 against 2.59), losing
+the idle bob to the envelope exactly as the tram lost its pantograph
+sway; and the raw-first mesh measures RICHER than the old one, so the
+blue livery ships uncoated at +0.409 (red +0.400, yellow +0.959, green
++0.359, all re-probed).

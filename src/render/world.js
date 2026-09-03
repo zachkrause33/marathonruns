@@ -14183,15 +14183,23 @@ MR.World = (function () {
        * THE CARGO TRUCK (v14), and it is the first variant born straight
        * from a sculpt: the owner's props-v3 blue box lorry. A new variant
        * is a def entry plus a bag weight -- zero extra draw calls -- and
-       * the def geometry here is the VAN's, deliberately: the def's one
-       * remaining job under a sculpt is to be the fit box, the envelope
-       * row and the seconds-long code fallback before the texture
-       * decodes, and the van is the fleet's closest silhouette. The face
-       * row is the van's for the same reason. Ships in four liveries
-       * dealt across the pool (the owner: "they do not need to be all
-       * blue"); margins at the dress line.
+       * the def geometry's one remaining job under a sculpt is to be the
+       * fit box, the envelope row and the seconds-long code fallback
+       * before the texture decodes. It was the VAN's first, and the
+       * owner sent it back: "The trucks are so small, scale them to the
+       * size they were before." Before is the TRAM def -- the frame the
+       * big blue code vehicles always wore, the full 2.80 of the kill
+       * box against the van's 2.59 -- so a lorry now stands as tall as
+       * the wall it is. The face row is the tram's with it. Ships in
+       * four liveries dealt across the pool (the owner: "they do not
+       * need to be all blue"); margins at the dress line.
        */
-      { geo: blockVanGeo, face: [2.10, 0.20, 1.06, -1.941], weight: 2, anim: 'idle' },
+      // NO ANIM, and it lost it the moment it grew: the tram def tops out
+      // at exactly 2.80, so the idle's +/-0.022 bob would spend half of
+      // every cycle outside the collision box -- the same arithmetic that
+      // took the tram's pantograph sway. A vehicle at the ceiling stands
+      // still; the van and hatchback keep their shudder on their headroom.
+      { geo: blockTramGeo, face: [2.16, 0.30, 0.78, -1.945], weight: 2 },
     ]);
 
     /**
@@ -14705,13 +14713,13 @@ MR.World = (function () {
     // raw generation held THREE copies of the truck (Tripo modelled every
     // view in the input image); vehsplit.js keeps one -- single-view
     // input photos avoid the surgery next time.
-    // The raw blue failed shot 05's lane 1 (1.18x / 0.214 -- tarmac on
-    // both axes) once the split dropped the mesh's mean saturation, so
-    // every coat is saturated a step: blue +0.282, red +0.507, yellow
-    // +0.736, green +0.327 at the tightest road, re-probed on the
-    // single-truck mesh.
+    // Margins re-probed on the raw-first rebuild (the first file shipped
+    // through a split-after-quantize path that drew at a fraction of its
+    // measured box -- the owner's "the trucks are so small" verbatim; the
+    // pipeline rule is now split FIRST, quantize LAST): blue +0.409 raw,
+    // red +0.400, yellow +0.959, green +0.359 at the tightest road.
     dressHazard(K.BLOCK, 14, 'veh_cargotruck', -Math.PI / 2,
-      [{ h: 0, s: 1.5, l: 1.15 }, { h: 150, s: 1.4, l: 1.15 },
+      [{ h: 0 }, { h: 150, s: 1.4, l: 1.15 },
        { h: 210 }, { h: 290, s: 1.4, l: 1.2 }]);
 
     // ---- the JUMP vocabulary (props-v4) --------------------------------

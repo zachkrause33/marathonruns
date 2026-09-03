@@ -8740,3 +8740,40 @@ through the live camera and crops there, so "vis: true" and "visible
 in the shot" stopped being the same claim taken on faith.
 
 Gates: 8/8 shots, 90/90 courses, simulate PASS.
+
+## 101. The grade: sculpts and code art on one palette
+
+The owner: "the color, shading and overall tone of those animations
+looks a bit different than what was created previously (for example
+buildings, trees, road). Compare these differences and find ways to
+clean those up to make it look as crisp, clear and consistent as
+possible." Compared per rule 3 before anything was adjusted, and the
+instrument matters: a whole-frame band came back saying the world is
+LESS saturated than the sculpts, because the frame is mostly grey
+tarmac and concrete -- the same composition confounder that bit
+clarity.js. The honest seam is per variant: photograph every hazard
+in its code art and again in its sculpt, same lens, same framing
+(fleetSheet before and after decode -- gradesheet.js in the
+scratchpad). Measured that way, 25 sculpted variants render a mean
+26 L darker (of 255) and 0.12 less saturated than the code art they
+replaced: Tripo bakes ambient shadow into its albedo and its colours
+are photographic where the world's are poster-flat.
+
+The fix is one grade in the one door every sculpt texture passes
+through (paintShift): a gamma lift on lightness (L^0.82 -- the gap
+lives in the dark variants, and a flat multiplier would blow out the
+taxi and the police) and a flat 1.3x on saturation. Re-measured, the
+seam closes from -26.1 to -10.7 mean L and -0.124 to -0.094 mean S,
+with no bright variant overshooting.
+
+The gate then earned its keep twice: the shadow lift raised the
+uncoated dumpster from L 44.7 square onto the lane-carpet road
+(1.02x, fatal), and the first corrective coat parked it INSIDE the
+road band (L 72, between carpet 57 and city tarmac 85) -- brighter
+was not enough, it had to clear the whole band. l 1.55 / s 1.5 does,
+and the fleet's tightest margin ended ABOVE where it started
+(BLOCK v11 +0.073 over the gate, against JUMP v9's +0.044 before).
+The crowd knots and the sculpted Miles keep their own bake paths,
+untouched -- hazards were the seam the owner named.
+
+Gates: 8/8 shots, 90/90 courses, simulate PASS.

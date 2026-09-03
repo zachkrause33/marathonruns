@@ -14278,6 +14278,29 @@ MR.World = (function () {
      * before its numbers were written below -- rule 4 applies to each
      * coat, not only to the base coat the audit gates.
      */
+    /**
+     * THE GRADE, measured before it was chosen. The owner: "the color,
+     * shading and overall tone of those animations looks a bit different
+     * than what was created previously (for example buildings, trees,
+     * road). Compare these differences and find ways to clean those up."
+     * Compared per variant, same lens, same framing (gradesheet: each
+     * hazard photographed in its code art and again in its sculpt): the
+     * sculpts render a mean 26 L darker (of 255) and 0.12 less saturated
+     * than the code art they replaced -- Tripo bakes its own ambient
+     * shadow into the albedo and its colours arrive photographic where
+     * the world's are poster-flat. The shape of the gap picks the tool:
+     * dark variants sat 30-70 L under their code art while the bright
+     * ones were already level, so lightness takes a GAMMA lift (L^0.82
+     * raises 0.2 by ~38% and 0.7 by ~7%) rather than a flat multiplier
+     * that would blow the taxi and the police out, and saturation takes
+     * the flat 1.3x the mean gap asks for. Applied to EVERY sculpt texel
+     * here, the one door all sculpt textures pass through, so the
+     * per-variant corrective coats measured at the dress lines stack on
+     * a graded base -- and the contrast gate re-measured every variant
+     * after (its floor is 1.25x; the tightest margins moved up, not
+     * down, because nearly every sculpt sits brighter than its road).
+     */
+    const GRADE_GAMMA = 0.82, GRADE_SAT = 1.3;
     function paintShift(img, spec) {
       if (typeof spec === 'number') spec = { h: spec };
       const cv = canvas(img.width, img.height);
@@ -14286,7 +14309,7 @@ MR.World = (function () {
       const deg = spec.h || 0;
       const thr = spec.t !== undefined ? spec.t : 0.25;
       const sMul = spec.s || 1, lMul = spec.l || 1;
-      if (deg || sMul !== 1 || lMul !== 1) {
+      {
         const id = cg.getImageData(0, 0, cv.width, cv.height);
         const px = id.data;
         const t = deg / 360;
@@ -14300,15 +14323,20 @@ MR.World = (function () {
         for (let i = 0; i < px.length; i += 4) {
           const r = px[i] / 255, g2 = px[i + 1] / 255, b = px[i + 2] / 255;
           const mx = Math.max(r, g2, b), mn = Math.min(r, g2, b);
-          if (!mx || (mx - mn) / mx < thr) continue;   // neutral: not paint
           let l = (mx + mn) / 2;
           const dl = mx - mn;
-          let s = dl / (l < 0.5 ? mx + mn : 2 - mx - mn);
-          let h = mx === r ? ((g2 - b) / dl + (g2 < b ? 6 : 0))
-            : mx === g2 ? (b - r) / dl + 2 : (r - g2) / dl + 4;
-          h = (h / 6 + t) % 1;
-          s = Math.min(1, s * sMul);
-          l = Math.min(1, l * lMul);
+          let s = dl < 1e-6 ? 0 : dl / (l < 0.5 ? mx + mn : 2 - mx - mn);
+          let h = dl < 1e-6 ? 0
+            : mx === r ? ((g2 - b) / dl + (g2 < b ? 6 : 0))
+              : mx === g2 ? (b - r) / dl + 2 : (r - g2) / dl + 4;
+          h = h / 6;
+          l = Math.pow(l, GRADE_GAMMA);
+          s = Math.min(1, s * GRADE_SAT);
+          if (mx && dl / mx >= thr) {              // paint: the coat on top
+            h = (h + t) % 1;
+            s = Math.min(1, s * sMul);
+            l = Math.min(1, l * lMul);
+          }
           const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
           const p = 2 * l - q;
           px[i] = Math.round(h2c(p, q, h + 1 / 3) * 255);
@@ -14707,7 +14735,16 @@ MR.World = (function () {
     // could move it. This is the owner's regenerated ORANGE one -- the
     // fix was always a lighter texture, not a multiplier.
     dressHazard(K.BLOCK, 10, 'veh_container2', Math.PI);
-    dressHazard(K.BLOCK, 11, 'veh_dumpster', Math.PI / 2);
+    // The dumpster took no coat until the grade landed, and then needed
+    // one: the shadow lift raised its dark body from L 44.7 to 55.5 --
+    // square onto the lane-carpet road at L 56.8 -- and the gate failed it
+    // at 1.02x. Brightened PAST the whole road band rather than back under
+    // it, in two measured steps (l 1.45 landed it at L 72.1, between the
+    // carpet at 57 and the light city road at 85 -- inside the band is the
+    // one place it cannot stay): l 1.55 clears the dark roads on the L
+    // axis, and s 1.5 (t 0, the whole desaturated body) carries the light
+    // low-S roads on the S axis.
+    dressHazard(K.BLOCK, 11, 'veh_dumpster', Math.PI / 2, [{ h: 0, t: 0, l: 1.55, s: 1.5 }]);
     // The owner's blue car takes four coats through the paint shop --
     // "please make it different colors so it is not only a blue car
     // throughout the whole game" -- and none of them is blue, because the

@@ -8777,3 +8777,19 @@ The crowd knots and the sculpted Miles keep their own bake paths,
 untouched -- hazards were the seam the owner named.
 
 Gates: 8/8 shots, 90/90 courses, simulate PASS.
+
+## 102. The pickup price, repriced by the person it was for
+
+The owner, on the shipped economy: "We need more energy options. It's
+impossible to beat the record now." Roadmap 98 set the bar on purpose
+-- no first attempt beat the record in the grid -- and flagged that it
+was one dial from softer. This is that dial turned: PER_PICKUP 0.0065
+-> 0.0085, swept (0.0075 gives 10% first-attempt / 33% learned; 0.0085
+gives 17% / 33%). A strong first attempt now has a real shot, a
+learned collecting line wins a third of its cells, and the policy
+spread holds ~1400s -- the record is beatable and still not free. The
+no-collection contract row is untouched by price. If "more options"
+also means a new pickup TYPE on the road, that is a separate, welcome
+build -- the aid field itself already tripled early-race in 98.
+
+Gates: simulate PASS, 90/90 courses, 8/8 shots.

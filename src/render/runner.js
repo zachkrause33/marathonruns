@@ -4409,6 +4409,28 @@ MR.Runner = (function () {
       // Pelvic drop toward the swinging leg: small, but it stops the hips
       // from reading as a rigid block bolted to the spine.
       hips.rotation.z = sP * (0.055 + POLISH * 0.030) * cycD;
+      // ---- THE LEGS DO NOT INHERIT THE PELVIS YAW -------------------------
+      //
+      // The legs hang off `hips`, so that 0.26-radian yaw was rotating each
+      // thigh's whole SWING PLANE with it: a leg flexed 0.9 forward under a
+      // pelvis yawed 15 degrees puts the knee a fifth of a thigh-length out
+      // to the side, and the shin and shoe carry further. From the chase
+      // camera that is the owner's report verbatim -- "the legs are kicking
+      // out to the side awkwardly. make them go more forward and back."
+      // In a real runner the hip joint absorbs the pelvis rotation and the
+      // leg tracks the direction of travel, so each thigh counter-yaws by
+      // exactly the pelvis term, every frame, whatever cycD and the knob
+      // are doing. Euler order YXZ so the counter-yaw composes OUTSIDE the
+      // flexion (undoing the parent) rather than twisting a flexed thigh
+      // about its own length; with y at zero YXZ and XYZ agree, so the
+      // slide, tuck and stand poses are bit-identical.
+      // The pelvis still moves -- the torso above shows all of it -- and
+      // the roll (rotation.z) is deliberately NOT countered: pelvic drop
+      // angling the legs a few degrees is how legs actually hang.
+      for (const L of legs) {
+        L.hip.rotation.order = 'YXZ';
+        L.hip.rotation.y = -hips.rotation.y;
+      }
 
       // Head. Running and airborne it stays level: cancel most of the spine
       // lean, add a small lag, so the eyeline holds down the road and the dark

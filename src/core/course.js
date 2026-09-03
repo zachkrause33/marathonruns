@@ -1584,11 +1584,21 @@ MR.Course = (function () {
     // player a lane through, so this one may not. The chance() below is
     // still DRAWN when noFull is set -- one draw either way, so the stream
     // walks at the same rate whatever the road behind looks like.
+    // ---- RAISED A THIRD TIME, 2026-09-03 ---------------------------------
+    //
+    // The owner: "we need to make the game more difficult. more obstacles,
+    // more moving obstacles." Most of this pass's difficulty went into the
+    // moving side (the sweeper's rate, reach and opening), which the
+    // policy x skill sweep cannot feel -- the bot reads gate.lanes and the
+    // kill lane never moves -- so the record bar is not spent there. This
+    // is the obstacle half: +0.04 a band, a third of the earlier +0.06
+    // steps on the same dial, re-measured with the sweep either side as
+    // both earlier passes were.
     const full = noFull ? 0 : d < 0.14 ? 0
-      : d < 0.34 ? 0.22
-      : d < 0.58 ? 0.46
-      : d < 0.80 ? 0.64
-      : 0.76;
+      : d < 0.34 ? 0.26
+      : d < 0.58 ? 0.50
+      : d < 0.80 ? 0.68
+      : 0.80;
     // ---- AND THE SECOND HAZARD ARRIVES EARLIER THAN IT DID ---------------
     //
     // The owner: *"Add a few more obstacles to the beginning of the game."*
@@ -1638,9 +1648,11 @@ MR.Course = (function () {
     // through the mid-band. Continuous with the 0.50 coin at d = 0.09 as
     // before, so the opening two thirds of a mile and the learning stretch
     // stay untouched; the chance saturates near d = 0.38 instead of 0.42.
+    // 1.70 -> 1.90 with the 2026-09-03 pass, same shape, same anchor at the
+    // 0.50 coin -- see the band note on `full` above.
     const nHaz = rnd.chance(full) ? 3
       : d < 0.09 ? 1
-      : d < 0.42 ? (rnd.chance(0.50 + 1.70 * (d - 0.09)) ? 2 : 1)
+      : d < 0.42 ? (rnd.chance(0.50 + 1.90 * (d - 0.09)) ? 2 : 1)
       : 2;
 
     const order = [0, 1, 2];
@@ -2155,13 +2167,13 @@ MR.Course = (function () {
    * read-window contract rather than chosen. The eye-floor note above
    * readWindowAt establishes READ_NEAR as the commit point: every gate must be
    * fully readable from there in. The sweeper is REQUIRED to be standing in
-   * its final lane, yaw zero, from SWEEP_LOCK = 2 * READ_NEAR out -- twice the
-   * distance the game promises for any other gate -- so inside the window
-   * every instrument was proven for, a sweep gate is INDISTINGUISHABLE from a
-   * parked one. The difficulty is upstream of the contract, not a hole in it:
-   * between SWEEP_START = 4 * READ_NEAR and the lock the vehicle is visibly
-   * crossing, and a player who reads gates early has to watch it settle
-   * instead of committing to a lane that is about to stop being clear.
+   * its final lane, yaw zero, from SWEEP_LOCK out -- a multiple of READ_NEAR,
+   * beyond the distance the game promises for any other gate -- so inside the
+   * window every instrument was proven for, a sweep gate is INDISTINGUISHABLE
+   * from a parked one. The difficulty is upstream of the contract, not a hole
+   * in it: between SWEEP_START and the lock the vehicle is visibly crossing,
+   * and a player who reads gates early has to watch it settle instead of
+   * committing to a lane that is about to stop being clear.
    * (Distances are runner-to-gate; READ_NEAR is measured from the lens, which
    * sits CAM_BASE_BACK further back, so both margins are understated.)
    *
@@ -2190,19 +2202,30 @@ MR.Course = (function () {
    *   - the previous gate does not BLOCK the same lane: a lane the player
    *     already reads as walled gains nothing from the misdirection, and a
    *     convoy member arriving sideways breaks the queue fiction.
-   *   - past mile 6, and out of the run-in (f < 0.90): the difficulty ramp
-   *     owns the opening, and the last question of a race should not be a
-   *     novelty -- the same calendar reasoning the ramps and closures carry.
+   *   - past the learning stretch (f > 0.15), and out of the run-in
+   *     (f < 0.90): the difficulty ramp owns the opening, and the last
+   *     question of a race should not be a novelty -- the same calendar
+   *     reasoning the ramps and closures carry.
    */
-  const SWEEP_LOCK = 2 * (ACTION_WINDOW + K.CAM_BASE_BACK);
-  const SWEEP_START = 4 * (ACTION_WINDOW + K.CAM_BASE_BACK);
-  const SWEEP_RATE = 0.40;
+  // Tightened for the difficulty pass, one day after shipping at 2x / 4x
+  // (owner: "make the moves closer to the runner and not so far away").
+  // The lock keeps a 1.5x margin over the read-window promise -- plus
+  // CAM_BASE_BACK, since these are runner distances and the window is a
+  // lens distance -- so the contract argument in the header is unchanged;
+  // what moved is how near the crossing plays out: 76 down to 38 units
+  // instead of 101 down to 51.
+  const SWEEP_LOCK = 1.5 * (ACTION_WINDOW + K.CAM_BASE_BACK);
+  const SWEEP_START = 3 * (ACTION_WINDOW + K.CAM_BASE_BACK);
+  const SWEEP_RATE = 0.60;
   function markSweeps(key, gates, tally) {
     if (!(SWEEP > 0)) return;
     for (let i = 0; i < gates.length; i++) {
       const gate = gates[i];
       if (gate.train || gate.ramp !== undefined || gate.narrow) continue;
-      if (gate.z < 6 * K.UNITS_PER_MILE || gate.f > 0.90) continue;
+      // f 0.15 (~mile 3.9), down from mile 6 in the difficulty pass --
+      // the same opening family the closures use (narrowRate opens at
+      // 0.12): past the learning stretch, before the race's hard middle.
+      if (gate.f < 0.15 || gate.f > 0.90) continue;
       let lane = -1, ok = true;
       for (let l = 0; l < 3; l++) {
         if (gate.lanes[l] === K.BLOCK) { ok = ok && lane < 0; lane = l; }

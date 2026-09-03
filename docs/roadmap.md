@@ -8485,3 +8485,52 @@ shadow instead of the telegraph answering for the art. Verified against
 the running page: live x/yaw match the smoothstep contract to three
 decimals at seven distances, and all four gates pass (8/8 shots, 90/90
 courses, simulate).
+
+## 93. The work order: fleet closed, gait fixed, difficulty turned up
+
+Six owner asks in one message, all landed the same day.
+
+THE CROSSING (BLOCK v3) ships from props-v4's construction.workers
+regeneration -- the full marshal assembly the original refusal asked
+for, 1.15x as wide as tall, facing the player with the STOP paddle up.
+The fit gained a resting guard: a def geometry that ever dips under
+y 0 can no longer sink a sculpt's feet into the tarmac.
+
+THE TRAM (BLOCK v0) ships, and the reason is rule 3 applied to our own
+refusal: its numbers were measured before the lighting seam closed, and
+the brighter material moved the paint ceiling. Re-probed on today's
+build, a hue-swung brightening coat measures L 150.4 / S 0.242, +0.256
+clear -- the brighter-than-every-road route the code tram always used.
+The carriage rake finally runs in the live game. BLOCK is 14 of 14.
+
+THE MOPED (BLOCK v9) was standing 2.54 units tall -- the def box's
+fault, not the sculpt's -- so dressHazard gained a uniform post-fit
+`shrink` (about lane centre, ground and front plane, strictly inside
+the def bbox so the envelope proof holds). At 0.75 the rider is 1.91
+and human; the face row narrowed with him.
+
+THE E-SCOOTER (JUMP v3) was near-black and PASSING the gate -- darker
+than every road is a legal ratio and an unreadable object. Three
+bright coats now deal across the pool (yellow +0.225, orange +0.119,
+magenta +0.089), the owner's "lighter... or multi color" verbatim.
+
+THE GAIT: "the legs are kicking out to the side awkwardly." The pelvis
+yaw (0.26 rad at full polish) was rotating each thigh's whole swing
+plane with it. Each hip now counter-yaws by exactly the pelvis term
+(Euler YXZ so the cancel composes outside the flexion); the torso
+keeps every degree of the rotation, the legs track fore-and-aft, and
+the roll is deliberately kept. Verified frame-by-frame across a stride.
+
+THE DIFFICULTY PASS: most of the new demand went where the record bar
+cannot be spent -- the sweeper, which the bot cannot feel. Rate 0.40 ->
+0.60, lock 2x -> 1.5x READ_NEAR, start 4x -> 3x (the crossing now plays
+out 76 to 38 units from the runner), opening mile 6 -> f 0.15: ~5.4
+sweeps a course, earliest at mile 3.9. The obstacle half is +0.04 a
+band on the forced-gate table and 1.70 -> 1.90 on the mid-band slope --
+a third of earlier steps on the same dials. The policy x skill sweep
+was re-run either side: first-attempt cells 1/30 -> 2/30 (one-cell
+noise on this grid), record live, demands met 60.6 -> 63.8 a race.
+The van and hatchback idle like the rest of the stopped fleet.
+
+Gates: 8/8 city shots clean at 37 variants, 90/90 courses, simulate
+PASS, sweep census 365/365 deterministic with SWEEP=0 bit-identical.

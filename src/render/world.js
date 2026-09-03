@@ -14129,7 +14129,12 @@ MR.World = (function () {
       },
       { geo: blockBusGeo, face: [2.16, 0.28, 1.22, -1.941], weight: 2, anim: 'idle' },
       { geo: blockTaxiGeo, face: [2.02, 0.22, 0.98, -1.941], weight: 2, anim: 'idle' },
-      { geo: blockVanGeo, face: [2.10, 0.20, 1.06, -1.941], weight: 2 },
+      // `idle` added in the 2026-09-03 difficulty pass -- the backlog's
+      // "one-moving-part rule could be loosened deliberately", loosened:
+      // a van and a hatchback standing in a live race have engines
+      // running, and the shudder every other stopped vehicle carries was
+      // their absence reading as toy. Motion inside the envelope only.
+      { geo: blockVanGeo, face: [2.10, 0.20, 1.06, -1.941], weight: 2, anim: 'idle' },
       {
         // The chevron board goes ON THE TAILGATE, big, where a real refuse
         // truck carries it -- this is the one vehicle in the set whose real
@@ -14161,13 +14166,17 @@ MR.World = (function () {
         // vehicle carries would read as a landslide on a loaded pallet.
         geo: blockCrateLoadGeo, face: [1.90, 0.30, 0.40, -0.632], weight: 2,
       },
-      { geo: blockMopedGeo, face: [1.30, 0.24, 1.10, -0.921], weight: 2, anim: 'idle' },
+      // Face row shrunk 0.75x with the sculpt (see the `shrink` note in
+      // dressHazard): the moped's body is now 0.75 of the def box, and a
+      // 1.30-wide stripe across a 0.98-wide machine is the mid-air-mat
+      // defect this pool has now measured three times.
+      { geo: blockMopedGeo, face: [0.98, 0.20, 0.83, -0.921], weight: 2, anim: 'idle' },
       // The citylook batch. The container and the parked hatchback carry
       // double weight: they are the two objects the reference frames show
       // blocking lanes most often.
       { geo: blockContainerGeo, face: [2.16, 0.32, 0.50, -1.945], weight: 2 },
       { geo: blockDumpsterGeo, face: [2.10, 0.30, 0.60, -1.325], weight: 1 },
-      { geo: blockHatchGeo, face: [1.90, 0.22, 0.42, -1.90], weight: 2 },
+      { geo: blockHatchGeo, face: [1.90, 0.22, 0.42, -1.90], weight: 2, anim: 'idle' },
       { geo: blockPoliceGeo, face: [2.00, 0.22, 0.44, -1.90], weight: 1, anim: 'idle' },
     ]);
 
@@ -14315,7 +14324,7 @@ MR.World = (function () {
     }
     const CARRIAGE_MAX = 4;
 
-    function dressHazard(kind, vi, key, yaw, hues, carriages, rotX) {
+    function dressHazard(kind, vi, key, yaw, hues, carriages, rotX, shrink) {
       let grp = null;
       for (const g2 of HAZARD_DEFS) if (g2.kind === kind) grp = g2;
       const d = grp && grp.defs[vi];
@@ -14400,12 +14409,42 @@ MR.World = (function () {
               + (underY - sb.min.y).toFixed(2) + '/' + h.toFixed(2)
               + ' of the sculpt, pinned to y ' + (sb.min.y * sy + ty + (underY - sb.min.y) * sy).toFixed(2));
           }
+          // ART RESTS ON THE ROAD. The negative yMin rows in fleetExtents
+          // are the CODE art's swept anim arcs, not sculpts -- the fit maps
+          // onto the raw def bbox, whose floor is 0 on every current def --
+          // but a def whose geometry ever did dip under y 0 would sink the
+          // sculpt's feet into the tarmac through this map with nothing
+          // watching. A pure lift, never a sink, and not for DUCK, whose ty
+          // is the bar pin and already lands posts on the ground.
+          if (kind !== K.DUCK) {
+            const bottom = sb.min.y * sy + ty;
+            if (bottom < 0) ty -= bottom;
+          }
           const fit = new THREE.Matrix4().makeTranslation(
             (tb.max.x + tb.min.x) / 2 - (sb.max.x + sb.min.x) / 2 * sx,
             ty,
             (tb.max.z + tb.min.z) / 2 - (sb.max.z + sb.min.z) / 2 * sz)
             .multiply(new THREE.Matrix4().makeScale(sx, sy, sz))
             .multiply(pre);
+          /**
+           * `shrink`: a uniform scale AFTER the fit, for the def whose own
+           * box is outsized. The moped def is 2.54 units tall -- the rider
+           * stood eye to eye with the double-decker, and the owner said so:
+           * "the obstacle with the guy on the bike is the same size as the
+           * bus. please scale him down to size." Shrinking the DEF would
+           * resize the code fallback art with nothing watching, so the
+           * sculpt is shrunk instead, about the lane centre, the GROUND
+           * (feet stay on the road) and the def's FRONT plane (the caution
+           * face row keeps describing the surface it is painted on).
+           * Strictly inside the def bbox, so the envelope proof is kept.
+           * The kill box is untouched -- MR.Collision.BOX owns clearance --
+           * and the def's face row must be narrowed by the same factor at
+           * the def, or the stripe hangs in mid-air past the smaller body.
+           */
+          if (shrink) {
+            fit.premultiply(new THREE.Matrix4().makeTranslation(0, 0, tb.min.z * (1 - shrink))
+              .multiply(new THREE.Matrix4().makeScale(shrink, shrink, shrink)));
+          }
           // The game's own toon ramp carrying the sculpt's basecolor,
           // decoded through the iOS-proof route skin.js owns. `hues` sends
           // the texture through the paint shop instead: one material per
@@ -14471,24 +14510,27 @@ MR.World = (function () {
 
     dressHazard(K.BLOCK, 1, 'veh_signworks', Math.PI);
     dressHazard(K.BLOCK, 2, 'veh_lightworks', Math.PI);
-    // THE CROSSING (v3) IS NOT DRESSED. The sculpt is a pedestrian WAIT
-    // beacon -- a 0.28-wide pole -- and the def box is a 2.17-wide
-    // full-lane blocker. Stretched to fill it, the pole photographs as a
-    // squashed slab with the code paddle hiding its face; fitted at its
-    // own aspect it would be a slim pole in the middle of a kill box more
-    // than seven times its width, which is the "hazard the player cannot
-    // read" defect by construction. The code art is shaped like its own
-    // collision box; the beacon is not.
-    // THE TRAM (v0) IS NOT DRESSED YET, and this time the machinery is
-    // ready and the MODEL was refused: the props-v2 sculpt is white over
-    // navy, its az-0 mean measures L 96.2 / S 0.049 against lane 1's
-    // L 92.9 / S 0.18 -- tarmac on both axes -- and the paint shop
-    // plateaus at S 0.32 / L 71 (windows and roof dilute the mean-colour
-    // saturation; the code tram passes by being BRIGHTER than the
-    // brightest lane at L ~123, which no repaint of this texture can
-    // reach). The carriage rake at the cast site is built and waiting: a
-    // regenerated tram in a vivid livery ships by adding one dress line:
-    //   dressHazard(K.BLOCK, 0, 'veh_tram', Math.PI / 2, null, true);
+    dressHazard(K.BLOCK, 3, 'veh_crossing', Math.PI);
+    // THE CROSSING, second generation. The first sculpt for this slot was
+    // refused as a 0.28-wide WAIT beacon in a 2.17-wide kill box; the
+    // owner regenerated it as the full assembly -- two marshals, the
+    // barrier boards, the raised paddle, cones at both ends -- 1.15 times
+    // as wide as it is tall, shaped like its own collision box, which is
+    // what the refusal asked for. Faces the player like signworks does.
+    // THE TRAM, and the story of why it ships NOW after being refused:
+    // the refusal (base L 97.6 / S 0.047, -0.185 under the gate, and a
+    // paint ceiling around L 71 under the old material) was measured
+    // BEFORE the lighting-seam fix. Floor 0.62 plus cel spec moved every
+    // sculpt's rendered mean, so the instrument was re-run on today's
+    // build -- rule 3 -- and the brightness route the CODE tram always
+    // used (pass by being brighter than the brightest lane) is now
+    // reachable: this coat measures L 150.4 / S 0.242, +0.256 clear at
+    // the tightest road, hue-swinging the navy trim warm while the
+    // whites lift. The carriage rake at the cast site takes it from here.
+    // A vivid red/yellow regeneration remains welcome and would replace
+    // the coat, not the machinery.
+    dressHazard(K.BLOCK, 0, 'veh_tram', Math.PI / 2,
+      [{ h: 130, t: 0, s: 2.2, l: 2.2 }], true);
     // The first bus (props-v2) was refused by measurement: white over dark
     // glass, L 82 against a lane-0 road of L 80.9 -- it matched the tarmac
     // and no tint could reach the gate (floor L 62 under a pure black
@@ -14512,8 +14554,11 @@ MR.World = (function () {
     // one shipped coat repaints moped and jacket alike (low threshold),
     // doubles the paint's saturation, turns it green and lifts it:
     // measured L 86.3 / S 0.545, +0.147 clear at the tightest road.
+    // Shrunk 0.75 -- see the `shrink` note in dressHazard: the def box
+    // stands 2.54 tall and the fitted rider measured eye to eye with the
+    // bus. At 0.75 he is 1.91 with the helmet, human against the fleet.
     dressHazard(K.BLOCK, 9, 'veh_scooter', Math.PI / 2,
-      [{ h: 250, t: 0.08, s: 2.0, l: 1.1 }]);
+      [{ h: 250, t: 0.08, s: 2.0, l: 1.1 }], null, 0, 0.75);
     // The first container (props-v3) was refused by measurement: its
     // weathered blue sat inside the finish carpet's tone and no repaint
     // could move it. This is the owner's regenerated ORANGE one -- the
@@ -14553,7 +14598,15 @@ MR.World = (function () {
     dressHazard(K.JUMP, 2, 'veh_j_trench', 0, [{ h: 0, t: 0, l: 1.3 }]);   // +0.135
     // Generated standing; a quarter roll about x lays it down into the
     // fallen-scooter pose the def box was authored for.
-    dressHazard(K.JUMP, 3, 'veh_j_scooter', 0, null, false, Math.PI / 2);
+    // The e-scooter arrived near-black (L 40.5) and PASSED the gate -- by
+    // being darker than every road tone, which is a legal ratio and an
+    // unreadable object; the owner: "the scooter is hard to see being
+    // black. can we change to a lighter color? or make them multi color".
+    // So three bright coats dealt across the pool, all probed: yellow
+    // +0.225, orange +0.119, magenta +0.089 at the tightest road.
+    dressHazard(K.JUMP, 3, 'veh_j_scooter', 0,
+      [{ h: 55, t: 0, s: 3, l: 3.5 }, { h: 20, t: 0, s: 3, l: 3 },
+       { h: 330, t: 0, s: 3, l: 3 }], false, Math.PI / 2);
     dressHazard(K.JUMP, 4, 'veh_j_barrier', 0, [{ h: 0, t: 0, l: 1.2 }]);   // +0.131
     // THE PIPE STACK (v5) IS NOT DRESSED: the sculpt sits at a
     // 29k-triangle fragment floor (five times any other JUMP) and a
@@ -19733,9 +19786,9 @@ MR.World = (function () {
       // names it, collision.js and every audit read it there, and nothing
       // written here changes it). What animates is the APPROACH -- the vehicle
       // parks in gate.sweep.from beyond SWEEP_START and is REQUIRED to be
-      // standing in its own lane, yaw zero, from SWEEP_LOCK out, which is
-      // twice READ_NEAR: inside the window the game proves readable for every
-      // other gate, a sweep gate is a parked one. Both numbers come from
+      // standing in its own lane, yaw zero, from SWEEP_LOCK out, a margin
+      // beyond READ_NEAR: inside the window the game proves readable for
+      // every other gate, a sweep gate is a parked one. Both numbers come from
       // course.js, the file that derives them from the read-window contract;
       // see markSweeps there for the whole argument. A pure function of
       // distance, so it is deterministic and cannot drift with framerate.

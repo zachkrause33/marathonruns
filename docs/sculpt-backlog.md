@@ -1,5 +1,7 @@
 # The sculpt backlog
 
+BLOCK is now 14 of 14 sculpted (crossing and tram closed 2026-09-03).
+
 The fleet ledger: what wears a Tripo sculpt, what is waiting on one, and
 what was refused with a measurement. The owner (2026-09-02): "Add those
 you skipped to the list of next to dos. Outside of the ones that need
@@ -16,14 +18,14 @@ player sees. Every sculpt must clear the contrast gate (CLAUDE.md rule
 below are that gate doing its job, and the fix is a different texture,
 not a smaller standard.
 
-## BLOCK (swipe left/right) -- 12 of 14 sculpted
+## BLOCK (swipe left/right) -- 14 of 14 sculpted
 
 | v  | obstacle    | status                                             |
 |----|-------------|----------------------------------------------------|
-| 0  | tram        | TO DO -- carriage instancing is BUILT (the rake at the cast site; rideable trains and >4-car trains keep code art), but the props-v2 sculpt was refused by the contrast gate: white-over-navy measures L 96 / S 0.05 against lane 1's L 93 / S 0.18, and the paint shop plateaus at S 0.32. Needs a VIVID regeneration -- a red or yellow tram photo as Tripo input -- then one dress line ships it. |
+| 0  | tram        | shipped (props-v2 sculpt + brightening coat, 2026-09-03). The old refusal was measured before the lighting-seam fix moved every sculpt's rendered ceiling; re-measured per rule 3, a hue-swung brightening coat reaches L 150 / S 0.24, +0.256 clear -- the same brighter-than-road route the code tram used. The carriage rake runs on every non-rideable train. A vivid red/yellow regeneration is still welcome and would replace the coat. |
 | 1  | signworks   | shipped (props-v2)                                 |
 | 2  | lightworks  | shipped (props-v2)                                 |
-| 3  | crossing    | TO DO -- needs a WIDE regeneration: the WAIT-beacon sculpt is a 0.28-wide pole in a 2.17-wide kill box. Generate something full-lane by nature: a pedestrian-crossing barrier assembly, a beacon PAIR on a works trailer, anything shaped like its own collision box. |
+| 3  | crossing    | shipped (props-v4 construction.workers regeneration, 2026-09-03) -- the full assembly the refusal asked for: two marshals, barrier boards, raised STOP paddle, cones, 1.15x as wide as tall. |
 | 4  | bus         | shipped (props-v3, red double-decker, +1.7 lightness coat) |
 | 5  | taxi        | shipped (props-v2)                                 |
 | 6  | van         | shipped (props-v2)                                 |
@@ -108,9 +110,13 @@ and drives into its own lane, locked there from twice READ_NEAR out.
 See markSweeps in course.js for the fairness argument and the
 eligibility census; ~3 a course past mile 6, always wearing a vehicle
 sculpt (bus, taxi, van, refuse truck, moped, hatchback, police).
-Tunables if the owner wants it harder still: SWEEP_RATE (0.40),
-SWEEP_LOCK (2x READ_NEAR -- the floor is 1x, where the crossing
-resolves exactly at the commit point), and the mile-6 opening gate.
+Tightened 2026-09-03 on the owner's "more moving obstacles... closer
+to the runner": SWEEP_RATE 0.60, SWEEP_LOCK 1.5x READ_NEAR, SWEEP_START
+3x, opening f 0.15 (~mile 3.9) -- about 5.4 sweeps a course. The floor
+on the lock is 1x READ_NEAR, where the crossing resolves exactly at the
+commit point; the remaining headroom is the last difficulty notch.
+The van and the hatchback gained the idle engine shudder in the same
+pass (in-envelope motion only).
 Oncoming traffic ranks second; it strains the closed-course fiction,
 and anything that genuinely moves the kill box is still the full
 project with new instruments.

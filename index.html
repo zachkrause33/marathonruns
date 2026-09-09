@@ -1094,6 +1094,29 @@ button.stampC:active { transform: scale(0.96); }
 .stampC.bronze .sTier, .stampC.bronze .sCity { color: #eda56a; }
 .stampC.gold { border-color: var(--accent); background: rgba(255, 228, 94, 0.07); }
 .stampC.gold .sTier, .stampC.gold .sCity { color: var(--accent); }
+/* A stamp that is a live door today: slightly lifted, and it says so. */
+.stampC.open { background: rgba(255, 253, 245, 0.06); }
+.stampC.open .sDays { color: var(--accent); opacity: 1; }
+.stampC .sFeat {
+  color: #14183a; background: var(--accent);
+  padding: 1px 4px; border-radius: 2px;
+  font-size: 7px; letter-spacing: 0.14em; vertical-align: 1px;
+}
+/* Region headers span the wall's grid and keep their own score. */
+.regHead {
+  grid-column: 1 / -1;
+  margin-top: 6px;
+  font-size: 9px; font-weight: 800; letter-spacing: 0.2em;
+  color: rgba(255, 253, 245, 0.75);
+  border-bottom: 1px solid var(--hair);
+  padding-bottom: 3px;
+}
+.regHead:first-child { margin-top: 0; }
+#pickLine {
+  margin: 5px auto 0; max-width: 340px;
+  font-size: 9px; font-weight: 800; letter-spacing: 0.12em;
+  color: var(--accent); opacity: 0.9;
+}
 
 /* ---- the finish stamp ----
  * A rubber stamp pressed onto the card: double ring, tilted, and the press
@@ -9786,29 +9809,29 @@ MR.Course = (function () {
    * dot on the passport's world map.
    */
   const SETTINGS = [
-    { tag: 'BOSTON',    name: 'BOSTON',        rec: 7312, holder: 'KORIR 2026',      latlon: [42.36, -71.06],
+    { tag: 'BOSTON', region: 'AMERICAS',    name: 'BOSTON',        rec: 7312, holder: 'KORIR 2026',      latlon: [42.36, -71.06],
       hint: 'brownstones, autumn maples, the Citgo sign, a right on Hereford and a left on Boylston' },
-    { tag: 'LONDON',    name: 'LONDON',        rec: 7170, holder: 'SAWE 2026 · WR',  latlon: [51.51, -0.13],
+    { tag: 'LONDON', region: 'EUROPE',    name: 'LONDON',        rec: 7170, holder: 'SAWE 2026 · WR',  latlon: [51.51, -0.13],
       hint: 'Tower Bridge, red buses, black cabs, plane trees, the Thames' },
-    { tag: 'BERLIN',    name: 'BERLIN',        rec: 7269, holder: 'KIPCHOGE 2022',   latlon: [52.52, 13.41],
+    { tag: 'BERLIN', region: 'EUROPE',    name: 'BERLIN',        rec: 7269, holder: 'KIPCHOGE 2022',   latlon: [52.52, 13.41],
       hint: 'the Brandenburg Gate, the Fernsehturm, linden avenues, the Spree' },
-    { tag: 'CHICAGO',   name: 'CHICAGO',       rec: 7235, holder: 'KIPTUM 2023',     latlon: [41.88, -87.63],
+    { tag: 'CHICAGO', region: 'AMERICAS',   name: 'CHICAGO',       rec: 7235, holder: 'KIPTUM 2023',     latlon: [41.88, -87.63],
       hint: 'elevated L track over the road, river bascule bridges, a black glass skyline' },
-    { tag: 'NEWYORK',   name: 'NEW YORK',      rec: 7498, holder: 'TOLA 2023',       latlon: [40.71, -74.01],
+    { tag: 'NEWYORK', region: 'AMERICAS',   name: 'NEW YORK',      rec: 7498, holder: 'TOLA 2023',       latlon: [40.71, -74.01],
       hint: 'the Verrazzano span, brownstones, yellow cabs, Central Park stone walls' },
-    { tag: 'TOKYO',     name: 'TOKYO',         rec: 7336, holder: 'KIPRUTO 2024',    latlon: [35.68, 139.69],
+    { tag: 'TOKYO', region: 'ASIA-PACIFIC',     name: 'TOKYO',         rec: 7336, holder: 'KIPRUTO 2024',    latlon: [35.68, 139.69],
       hint: 'the Imperial Palace moat, torii, neon signage, the Skytree' },
-    { tag: 'SYDNEY',    name: 'SYDNEY',        rec: 7482, holder: 'GOBENA 2026',     latlon: [-33.87, 151.21],
+    { tag: 'SYDNEY', region: 'ASIA-PACIFIC',    name: 'SYDNEY',        rec: 7482, holder: 'GOBENA 2026',     latlon: [-33.87, 151.21],
       hint: 'the Harbour Bridge, the Opera House shells, ferries, harbour water' },
-    { tag: 'PARIS',     name: 'PARIS',         rec: 7461, holder: 'ROTICH 2021',     latlon: [48.86, 2.35],
+    { tag: 'PARIS', region: 'EUROPE',     name: 'PARIS',         rec: 7461, holder: 'ROTICH 2021',     latlon: [48.86, 2.35],
       hint: 'the Eiffel Tower, Haussmann facades, Seine bridges, kiosks' },
-    { tag: 'VALENCIA',  name: 'VALENCIA',      rec: 7308, holder: 'LEMMA 2023',      latlon: [39.47, -0.38],
+    { tag: 'VALENCIA', region: 'EUROPE',  name: 'VALENCIA',      rec: 7308, holder: 'LEMMA 2023',      latlon: [39.47, -0.38],
       hint: 'the City of Arts and Sciences, the Serranos gate, palms, orange groves, white stone' },
-    { tag: 'AMSTERDAM', name: 'AMSTERDAM',     rec: 7411, holder: 'TOROITICH 2025',  latlon: [52.37, 4.90],
+    { tag: 'AMSTERDAM', region: 'EUROPE', name: 'AMSTERDAM',     rec: 7411, holder: 'TOROITICH 2025',  latlon: [52.37, 4.90],
       hint: 'canals, gabled houses, bicycle racks, humpback bridges, a smock windmill' },
-    { tag: 'ROME',      name: 'ROME',          rec: 7584, holder: 'RUTTO 2024',      latlon: [41.90, 12.50],
+    { tag: 'ROME', region: 'EUROPE',      name: 'ROME',          rec: 7584, holder: 'RUTTO 2024',      latlon: [41.90, 12.50],
       hint: 'the Colosseum, an aqueduct, umbrella pines, ochre walls' },
-    { tag: 'CAPETOWN',  name: 'CAPE TOWN',     rec: 7495, holder: 'ESA 2026',        latlon: [-33.92, 18.42],
+    { tag: 'CAPETOWN', region: 'AFRICA',  name: 'CAPE TOWN',     rec: 7495, holder: 'ESA 2026',        latlon: [-33.92, 18.42],
       hint: 'Table Mountain, the coast road, the Green Point lighthouse, the stadium, fynbos' },
   ];
 
@@ -9853,6 +9876,36 @@ MR.Course = (function () {
    * must not.
    */
   function pickSettings(key) {
+    /**
+     * ---- EVERY CITY, EVERY DAY (2026-09-09) ------------------------------
+     *
+     * The owner: "What if all locations were available everyday. You got
+     * to pick one to play each day... Key is only one a day." A course
+     * key is now either a bare date -- the FEATURED city, dealt from the
+     * calendar bag exactly as it always was, bit-identical for every date
+     * that has ever shipped -- or 'YYYY-MM-DD|TAG', the same date run in
+     * a CHOSEN city. The tag picks the setting; the whole key seeds every
+     * stream, so Rome-today and Rome-tomorrow are different courses, and
+     * every player who picks Rome today runs the same Rome. main.js owns
+     * the one-a-day rule (the save enforces it); this file only answers
+     * what road a key names.
+     */
+    const bar = key.indexOf('|');
+    if (bar >= 0) {
+      const tag = key.slice(bar + 1);
+      for (const c of SETTINGS) {
+        if (c.tag === tag) {
+          return [{
+            tag: c.tag, name: c.name, hint: c.hint,
+            rec: c.rec, holder: c.holder, latlon: c.latlon, region: c.region,
+            from: 0, to: 1, first: true, last: true,
+          }];
+        }
+      }
+      // An unknown tag (a hand-edited URL, a city later removed) falls
+      // through to the featured pick rather than throwing at boot.
+      key = key.slice(0, bar);
+    }
     const p = key.split('-');
     const day = Math.floor(Date.UTC(+p[0], +p[1] - 1, +p[2]) / 86400000);
     const cycle = Math.floor(day / SETTINGS.length);
@@ -9868,7 +9921,7 @@ MR.Course = (function () {
     const s = bag[pos];
     return [{
       tag: s.tag, name: s.name, hint: s.hint,
-      rec: s.rec, holder: s.holder, latlon: s.latlon,
+      rec: s.rec, holder: s.holder, latlon: s.latlon, region: s.region,
       from: 0, to: 1, first: true, last: true,
     }];
   }
@@ -12008,6 +12061,10 @@ MR.Store = (function () {
       totalDays: s.hist.length,
       totalRuns: totalRuns,
       totalRecs: totalRecs,
+      // The city today's choice was spent on, or null while the day is
+      // still open. main.js resolves every load through this: one city a
+      // day, and the first finished run is what chooses it.
+      todayCity: todayRow ? (todayRow.city || null) : null,
       done: doneToday,                    // the record fell today: today is over
       doneTime: doneToday ? todayRow.time : 0,
       recordStreak: recStreak,
@@ -12067,7 +12124,21 @@ MR.Store = (function () {
     const backwards = (s.day && dateKey < s.day.date)
                    || (s.days.last && dateKey < s.days.last);
 
-    if (!backwards) {
+    /**
+     * ONE CITY A DAY, enforced here as well as at boot. main.js already
+     * routes every load back to the city a date was spent in, so a run
+     * from a DIFFERENT city arriving for the same date means a forced
+     * URL or a second tab racing the save -- and folding a Tokyo time
+     * into Cape Town's row would corrupt the passport. Such a run keeps
+     * its date-independent all-time marks below and writes nothing else.
+     */
+    const cityNow = str(run && run.city);
+    let clashRow = null;
+    for (const e of s.hist) if (e.date === dateKey) { clashRow = e; break; }
+    const cityClash = !!(clashRow && cityNow && clashRow.city && clashRow.city !== cityNow);
+    if (cityClash) out.cityClash = true;
+
+    if (!backwards && !cityClash) {
       const newDay = !s.day || s.day.date !== dateKey;
       if (newDay) {
         if (s.day) s.prev = { date: s.day.date, time: s.day.time, streak: s.day.streak, tier: s.day.tier };
@@ -12111,7 +12182,7 @@ MR.Store = (function () {
         if (city && !h.city) h.city = city;
       }
       out.recordBroken = rec;
-    } else {
+    } else if (!cityClash) {
       /**
        * THE REVISIT DOOR. A backwards date used to fall through with only
        * the all-time marks -- which also meant an old city's stamp could
@@ -46259,6 +46330,14 @@ MR.HUD = (function () {
           <span id="cityBarLab"></span>
           <b class="num" id="cityBarTime"></b>
         </div>
+        <!--
+          PICK YOUR OWN ADVENTURE. Every city is open every day and the
+          player spends ONE on it; this is the door to the picker, and the
+          line under it says which state the day is in -- running the
+          world's race, running your own pick, or spent until tomorrow.
+        -->
+        <div id="pickLine" class="hidden"></div>
+        <button id="pickBtn" type="button" class="textBtn hidden">CHOOSE YOUR CITY · WORLD MAP</button>
 
         <!--
           WHAT THE GAME REMEMBERS.
@@ -46649,6 +46728,7 @@ MR.HUD = (function () {
       stampCity: q('stampCity'), stampWord: q('stampWord'),
       stampDate: q('stampDate'), stampCtx: q('stampCtx'),
       cityBar: q('cityBar'), cityBarLab: q('cityBarLab'), cityBarTime: q('cityBarTime'),
+      pickLine: q('pickLine'), pickBtn: q('pickBtn'),
       againBtn: q('againBtn'),
       count: q('count'), countVal: q('countVal'),
       pauseBtn: q('pauseBtn'), pausePanel: q('pausePanel'),
@@ -46919,70 +46999,110 @@ MR.HUD = (function () {
         + land + trail + dots + '</svg>';
     }
 
+    /**
+     * ---- THE PICKER (2026-09-09) -----------------------------------------
+     *
+     * "All locations available everyday. You got to pick one to play each
+     * day. Can only play one a day." The wall is grouped by REGION -- the
+     * owner: "Some might want to tackle the biggest cities first, while
+     * others may want to tackle regions. We want to group cities by
+     * regions so this is the goal" -- each region carrying its own tally,
+     * so 'finish Europe' is a goal the panel itself keeps score of.
+     *
+     * The one-a-day rule, as the wall draws it: on a FREE day every stamp
+     * is a door (RUN IT TODAY) except the city already at the line; once
+     * today's choice is SPENT -- the save has a finished run -- every
+     * other door closes to TOMORROW, and when the record falls the whole
+     * day seals. The featured city wears the day's-race chip: picking it
+     * is running with everyone else in the world.
+     */
     function drawPassport(sum) {
       const pool = (MR.Course && MR.Course.SETTINGS) ? MR.Course.SETTINGS : [];
-      if (!pool.length) { n.cityRule.textContent = ''; n.stampWall.innerHTML = ''; n.mapBox.innerHTML = ''; return { gold: 0, run: 0 }; }
+      if (!pool.length) { n.cityRule.textContent = ''; n.stampWall.innerHTML = ''; n.mapBox.innerHTML = ''; return; }
       const seen = (sum && sum.cities) || {};
-      const todayTag = course && course.settings && course.settings.length ? course.settings[0].tag : null;
-      drawMap(sum, pool, todayTag);
-      let gold = 0, run = 0;
-      const html = pool.map(function (s) {
-        const c = seen[s.name];
-        const tier = stampTier(s, c);
-        if (tier === 'gold') gold++;
-        if (c) run++;
-        const word = tier === 'gold' ? 'GOLD' : tier === 'bronze' ? 'BRONZE' : tier === 'ink' ? 'RUN' : 'NOT YET DRAWN';
-        const cr = s.rec ? 'CR ' + Pace.clock(s.rec) + ' · ' + s.holder : '';
-        // A visited stamp is a door: its most recent course, rerunnable --
-        // that is how a bronze becomes gold. Today's city routes through
-        // the ordinary start instead (its door is TOE THE LINE), and a
-        // GOLD stamp is not a door at all: there is nothing above gold,
-        // and the day behind it is locked by the record anyway.
-        const door = c && c.last && s.tag !== todayTag && tier !== 'gold';
-        return '<' + (door ? 'button type="button"' : 'div') + ' class="stampC ' + tier + '"'
-          + (door ? ' data-date="' + c.last + '"' : '') + '>'
-          + '<span class="sCity">' + s.name + '</span>'
-          + '<span class="sTier">' + word + '</span>'
-          + (c ? '<span class="sBest num">' + Pace.clock(c.best) + '</span>' : '<span class="sBest num">&mdash;</span>')
-          + '<span class="sCr num">' + cr + '</span>'
-          + (c ? '<span class="sDays">' + c.runs + (c.runs === 1 ? ' RUN' : ' RUNS')
-              + (door ? ' · TAP TO RUN IT'
-                : s.tag === todayTag ? ' · TODAY'
-                  : tier === 'gold' ? ' · SEALED' : '') + '</span>'
-             : '<span class="sDays"></span>')
-          + '</' + (door ? 'button' : 'div') + '>';
-      }).join('');
-      n.cityRule.textContent = 'STAMPS · ' + run + ' OF ' + pool.length + ' CITIES · ' + gold + ' GOLD';
+      const loadedTag = course && course.settings && course.settings.length ? course.settings[0].tag : null;
+      const featTag = sum && sum.dateKey && MR.Course.pickSettings
+        ? MR.Course.pickSettings(sum.dateKey)[0].tag : null;
+      drawMap(sum, pool, loadedTag);
+      const spent = !!(sum && sum.todayCity);
+      const dayDone = !!(sum && sum.done);
+      const regions = [];
+      const byReg = {};
+      for (const s of pool) {
+        const r = s.region || 'THE WORLD';
+        if (!byReg[r]) { byReg[r] = []; regions.push(r); }
+        byReg[r].push(s);
+      }
+      let gold = 0, run = 0, html = '';
+      for (const reg of regions) {
+        let rGold = 0, rRun = 0;
+        const cards = byReg[reg].map(function (s) {
+          const c = seen[s.name];
+          const tier = stampTier(s, c);
+          if (tier === 'gold') { gold++; rGold++; }
+          if (c) { run++; rRun++; }
+          const word = tier === 'gold' ? 'GOLD' : tier === 'bronze' ? 'BRONZE' : tier === 'ink' ? 'RUN' : 'NEW ROAD';
+          const cr = s.rec ? 'CR ' + Pace.clock(s.rec) + ' · ' + s.holder : '';
+          const isLoaded = s.tag === loadedTag;
+          const isSpent = spent && sum.todayCity === s.name;
+          const door = !dayDone && !spent && !isLoaded;
+          const note = isLoaded ? (dayDone ? 'TODAY · SEALED' : spent ? 'TODAY' : 'AT THE LINE')
+            : isSpent ? 'TODAY'
+              : door ? 'RUN IT TODAY' : 'TOMORROW';
+          return '<' + (door ? 'button type="button"' : 'div') + ' class="stampC ' + tier
+            + (door ? ' open' : '') + '"'
+            + (door ? ' data-city="' + s.tag + '"' : '') + '>'
+            + '<span class="sCity">' + s.name + '</span>'
+            + '<span class="sTier">' + word
+            + (s.tag === featTag ? ' <span class="sFeat">TODAY\'S RACE</span>' : '') + '</span>'
+            + (c ? '<span class="sBest num">' + Pace.clock(c.best) + '</span>' : '<span class="sBest num">&mdash;</span>')
+            + '<span class="sCr num">' + cr + '</span>'
+            + '<span class="sDays">' + (c ? c.runs + (c.runs === 1 ? ' RUN · ' : ' RUNS · ') : '') + note + '</span>'
+            + '</' + (door ? 'button' : 'div') + '>';
+        }).join('');
+        html += '<div class="regHead">' + reg + ' · ' + rRun + ' OF ' + byReg[reg].length + ' RUN'
+          + (rGold ? ' · ' + rGold + ' GOLD' : '')
+          + (rGold === byReg[reg].length ? ' · COMPLETE' : '') + '</div>' + cards;
+      }
+      n.cityRule.textContent = 'PICK A CITY · ONE A DAY · ' + run + ' OF ' + pool.length + ' RUN · ' + gold + ' GOLD';
       n.stampWall.innerHTML = html;
-      return { gold: gold, run: run };
     }
 
     /**
-     * THE REVISIT DOOR. One delegated listener; the reload carries the
-     * date and nothing else, so a bot flag from a tool session cannot leak
-     * into a player's rerun. store.js treats the backwards date as a
-     * revisit: the stamp can improve, the calendar cannot move.
+     * The picker's door: reload into the chosen city. Only the date (a
+     * tool's business) survives the reload -- a bot flag from a probe
+     * session must not leak into a player's run.
      */
     n.stampWall.addEventListener('click', function (ev) {
       let el = ev.target;
-      while (el && el !== n.stampWall && !el.getAttribute('data-date')) el = el.parentElement;
-      const d = el && el !== n.stampWall && el.getAttribute('data-date');
-      if (d) location.href = location.pathname + '?date=' + d;
+      while (el && el !== n.stampWall && !el.getAttribute('data-city')) el = el.parentElement;
+      const tag = el && el !== n.stampWall && el.getAttribute('data-city');
+      if (!tag) return;
+      const cur = new URLSearchParams(location.search);
+      const next = new URLSearchParams();
+      if (cur.get('date')) next.set('date', cur.get('date'));
+      next.set('city', tag);
+      location.href = location.pathname + '?' + next.toString();
     });
 
     api.setHistory = function (sum) {
+      lastSum = sum || null;
+      syncChoice();
       const rows = sum && sum.history ? sum.history : [];
       n.histBtn.classList.toggle('hidden', !rows.length);
       n.endHistBtn.classList.toggle('hidden', !rows.length);
+      // The empty-state rule changed hands with the picker: a passport
+      // with no stamps used to be nothing to show, but the panel is now
+      // where a day's city is CHOSEN, and the choice exists before the
+      // first run does. So the map and the wall always draw; only the
+      // ledger and the log keep the old rule (a history of zero runs is
+      // still not a history).
+      drawPassport(sum);
       if (!rows.length) {
         n.histSum.innerHTML = '';
         n.histList.innerHTML = '';
-        n.cityRule.textContent = '';
-        n.stampWall.innerHTML = '';
-        n.mapBox.innerHTML = '';
         return;
       }
-      drawPassport(sum);
 
       let wr = 0;
       for (const e of rows) if (e.rec) wr++;
@@ -47062,6 +47182,32 @@ MR.HUD = (function () {
     };
 
     n.histBtn.addEventListener('click', function () { openHist(n.startPanel); });
+    n.pickBtn.addEventListener('click', function () { openHist(n.startPanel); });
+
+    /**
+     * The start panel's one line about the day's choice: whose race the
+     * loaded city is, or that the day is already spent. Re-derived when
+     * either input arrives (the course at boot, the save after it), so
+     * the order they land in cannot leave the line stale.
+     */
+    let lastSum = null;
+    function syncChoice() {
+      if (!n.pickBtn) return;
+      const set = course && course.settings;
+      const loaded = set && set.length ? set[0] : null;
+      const feat = lastSum && lastSum.dateKey && MR.Course.pickSettings
+        ? MR.Course.pickSettings(lastSum.dateKey)[0] : null;
+      const spent = !!(lastSum && lastSum.todayCity);
+      const done = !!(lastSum && lastSum.done);
+      n.pickBtn.classList.toggle('hidden', !loaded || spent || done);
+      let line = '';
+      if (loaded && feat && !done) {
+        if (spent) line = 'TODAY IS ' + (lastSum.todayCity || loaded.name) + ' · NEW PICK TOMORROW';
+        else if (loaded.tag !== feat.tag) line = 'YOUR PICK · THE WORLD RUNS ' + feat.name + ' TODAY';
+      }
+      n.pickLine.textContent = line;
+      n.pickLine.classList.toggle('hidden', !line);
+    }
     n.endHistBtn.addEventListener('click', function () { openHist(n.endPanel); });
     n.histBack.addEventListener('click', function () {
       n.histPanel.classList.add('hidden');
@@ -47347,10 +47493,14 @@ MR.HUD = (function () {
       const isRec = t <= K.RECORD_SECONDS;
 
       const out = [];
+      // The medal travels: a bronze names the real record it beat, which
+      // is the line a group chat actually asks about.
+      const medal = set && set.length && MR.Course.tierFor ? MR.Course.tierFor(t, set[0].tag) : '';
       out.push('MARATHON MILES' + (city ? ' · ' + city : ''));
       out.push((isRec ? TROPHY + ' ' : '') + Tier.of(t).name
         + ' · ' + Pace.clock(t)
-        + ' (' + (vs <= 0 ? '-' : '+') + Pace.clock(Math.abs(vs)) + ')');
+        + ' (' + (vs <= 0 ? '-' : '+') + Pace.clock(Math.abs(vs)) + ')'
+        + (medal === 'bronze' ? ' · CITY RECORD BEATEN' : ''));
       if (marks.length) out.push(marks.map(function (m) { return BLOCK[m]; }).join(''));
       const streak = rec && rec.dayStreak ? rec.dayStreak | 0 : 0;
       if (streak >= 2) out.push('Day streak: ' + streak);
@@ -47578,6 +47728,7 @@ MR.HUD = (function () {
       }
       drawRoute(set);
       api.milesSpeaks(set && set.length ? set[0].tag : null);
+      syncChoice();
       // The route and the gate count arrive after the panel is first laid out
       // and both add height, so the overflow test has to run again here or it
       // measures a panel shorter than the one on screen.
@@ -48466,6 +48617,35 @@ MR.unbail = function () {
 
   const params = new URLSearchParams(location.search);
   const dateKey = params.get('date') || MR.rng.dateKey();
+  /**
+   * ---- EVERY CITY, EVERY DAY -- AND ONLY ONE A DAY ----------------------
+   *
+   * The owner: "all locations available everyday. You got to pick one to
+   * play each day. Can only play one a day... you just get to pick your
+   * own adventure." Resolution order is the rule made executable:
+   *
+   *   1. the city ALREADY RUN today -- the save is the law. Once a city
+   *      has a run on today's date, every load lands back in it whatever
+   *      the URL says; the choice was spent at the first tape.
+   *   2. ?city=TAG -- the picker's door.
+   *   3. the featured city the calendar deals -- the default, the shared
+   *      race, and exactly the course that date always had: the course
+   *      key carries the tag only when it DIFFERS from the featured pick,
+   *      so every bare-date course ever shipped is bit-identical.
+   */
+  const featuredTag = MR.Course.pickSettings(dateKey)[0].tag;
+  let cityTag = featuredTag;
+  {
+    const pool = MR.Course.SETTINGS;
+    const want = (params.get('city') || '').toUpperCase();
+    const sum0 = params.get('nosave') === '1' ? null : MR.Store.summary(dateKey);
+    const spentName = sum0 && sum0.todayCity;
+    let spentTag = null;
+    if (spentName) for (const c of pool) if (c.name === spentName) spentTag = c.tag;
+    if (spentTag) cityTag = spentTag;
+    else if (want) for (const c of pool) if (c.tag === want) cityTag = want;
+  }
+  const courseKey = cityTag === featuredTag ? dateKey : dateKey + '|' + cityTag;
   const botParam = params.get('bot');
   const BOT = botParam !== null;
   const BOT_SKILL = BOT ? (botParam === '1' || botParam === '' ? 1 : parseFloat(botParam)) : 0;
@@ -48551,7 +48731,7 @@ MR.unbail = function () {
 
   MR.shading.lights(scene);
 
-  const course = MR.Course.generate(dateKey);
+  const course = MR.Course.generate(courseKey);
   if (!course.valid.ok) console.error('COURSE INVALID', course.valid.errors);
 
   const world = MR.World.create(course);

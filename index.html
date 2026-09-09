@@ -613,6 +613,15 @@ html, body {
 #railGap.behind { background: rgba(255, 107, 132, 0.42); }
 #railGap.ahead  { background: rgba(77, 251, 160, 0.42); }
 #railGap.level  { background: rgba(255, 253, 245, 0.26); }
+/* ON YOUR SHOULDER: within a tenth of a mile of the ghost the gap value and
+ * the sliver of road between you both breathe. A slow opacity pulse and
+ * nothing else -- no size, no colour change -- so the moment is felt without
+ * the rail ever contradicting its own tone system. */
+#railGap.near, #gapVal.near { animation: shoulder 1.1s ease-in-out infinite; }
+@keyframes shoulder {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
 
 #railGhost {
   position: absolute; top: -5px; bottom: -5px;
@@ -35098,7 +35107,19 @@ MR.World = (function () {
     // The crate load's woodgrain mean sat between the finish carpet and
     // the lanes (-0.104 vs carpet1); brightened and saturated
     // (l 1.35, s 1.5) it measures L 81.7 / S 0.481, +0.151 clear.
-    dressHazard(K.BLOCK, 8, 'veh_crateload', 0, [{ h: 0, l: 1.35, s: 1.5 }]);
+    // s 1.5 -> 1.8 AND t 0 (2026-09-09): the crateload cleared the S gate
+    // by 0.005 and the next day's road palette (S 0.239 on lane 2) spent
+    // it. s alone bought 0.005 of the shortfall -- the default t 0.25
+    // leaves every near-neutral wood texel out of the coat, and the area
+    // mean is mostly wood -- so the whole body takes it, like the
+    // dumpster and the police car. That still only bought 0.002: the
+    // colorful texels are already at the S ceiling and wood times 1.8 is
+    // still wood, so the AREA MEAN tops out near 0.45 and the S axis is
+    // spent. The margin comes from L instead, and it must clear the
+    // BRIGHTEST road in the pool (lane 1, L 95-103 by city): l 1.62 left
+    // one city at +0.002 over the gate -- thin is a fail on a timer, per
+    // the dumpster -- so 1.7, which holds 1.3x+ in every city shot.
+    dressHazard(K.BLOCK, 8, 'veh_crateload', 0, [{ h: 0, t: 0, l: 1.7, s: 1.8 }]);
     // The delivery scooter as sculpted measures L 69.7 / S 0.12 -- under
     // the gate against lane 0 in every city shot (-0.051 at best). Its
     // one shipped coat repaints moped and jacket alike (low threshold),
@@ -35121,9 +35142,12 @@ MR.World = (function () {
     // it, in two measured steps (l 1.45 landed it at L 72.1, between the
     // carpet at 57 and the light city road at 85 -- inside the band is the
     // one place it cannot stay): l 1.55 clears the dark roads on the L
-    // axis, and s 1.5 (t 0, the whole desaturated body) carries the light
-    // low-S roads on the S axis.
-    dressHazard(K.BLOCK, 11, 'veh_dumpster', Math.PI / 2, [{ h: 0, t: 0, l: 1.55, s: 1.5 }]);
+    // axis, and s (t 0, the whole desaturated body) carries the light
+    // low-S roads on the S axis. s 1.5 shipped with 0.003 of S margin on
+    // one road and the NEXT DAY'S palette spent it (S 0.446 on a road of
+    // 0.229, gate 0.22) -- a margin that thin is a fail on a timer, so
+    // 1.75 buys ~0.07 of real slack on the S axis it depends on.
+    dressHazard(K.BLOCK, 11, 'veh_dumpster', Math.PI / 2, [{ h: 0, t: 0, l: 1.55, s: 1.75 }]);
     // The owner's blue car takes four coats through the paint shop --
     // "please make it different colors so it is not only a blue car
     // throughout the whole game" -- and none of them is blue, because the
@@ -44763,7 +44787,7 @@ MR.Audio = (function () {
   // Every method the game may call. The silent stub is generated from this,
   // so adding a cue below can never leave the no-audio path short of one.
   const API = [
-    'unlock', 'setMuted', 'setPaused', 'ambient', 'setIntensity',
+    'unlock', 'setMuted', 'setPaused', 'ambient', 'setIntensity', 'chase',
     'footstep', 'jump', 'land', 'duck', 'hit', 'clean', 'crossover', 'aid',
     'mile', 'roar', 'finish', 'countdown',
     'aidMissed', 'recordLost', 'tier',
@@ -45000,9 +45024,48 @@ MR.Audio = (function () {
       rsrc.connect(rf); rf.connect(rg); rg.connect(evt);
       rsrc.start(ctx.currentTime + 0.02);
 
-      amb = { src, f, g, gq, rsrc, rf, rg };
+      /**
+       * THE CHASE. Pure state, like the rush: it says nothing about any
+       * event, it is just HOW CLOSE THE RECORD IS, and it is silent
+       * whenever the ghost is out of arm's reach. A low sine at 57 Hz
+       * under a slow 2.3 Hz tremolo -- a pulse felt more than heard --
+       * whose level rises with physical proximity to the ghost on the
+       * road. Honest by the grade section's own rule: the game charges
+       * nothing for being near the ghost, and this implies nothing --
+       * it states presence, which is exactly the fact the rail's ON
+       * YOUR SHOULDER line prints at the same moment. main.js drives it
+       * every frame from the same geography the rail draws.
+       */
+      const csrc = ctx.createOscillator();
+      csrc.type = 'sine'; csrc.frequency.value = 57;
+      const cg = ctx.createGain(); cg.gain.value = 0;
+      const clfo = ctx.createOscillator();
+      clfo.type = 'sine'; clfo.frequency.value = 2.3;
+      const clg = ctx.createGain(); clg.gain.value = 0;
+      clfo.connect(clg); clg.connect(cg.gain);
+      csrc.connect(cg); cg.connect(evt);
+      csrc.start(); clfo.start();
+
+      amb = { src, f, g, gq, rsrc, rf, rg, cg, clg };
       applyBed();
     }
+
+    /**
+     * Proximity to the ghost, 0 (far) to 1 (level). Squared into gain so
+     * the pulse blooms in the last stretch of the approach rather than
+     * fading in from half a mile out.
+     */
+    let lastChase = -1;
+    s.chase = function (nearness) {
+      if (!amb) return;
+      const v = Math.max(0, Math.min(1, nearness || 0));
+      if (Math.abs(v - lastChase) < 0.02) return;
+      lastChase = v;
+      const t = ctx.currentTime;
+      const base = 0.050 * v * v;
+      amb.cg.gain.setTargetAtTime(base, t, 0.5);
+      amb.clg.gain.setTargetAtTime(base * 0.55, t, 0.5);
+    };
 
     // ---- THE GRADE ------------------------------------------------------
     //
@@ -47456,11 +47519,58 @@ MR.HUD = (function () {
       }
 
       const tone = ahead ? 'ahead' : state === 'off' ? 'behind' : 'level';
+      /**
+       * THE CHASE, AS MOTION AND NOT ONLY POSITION. The feedback that
+       * commissioned this said the emotional arc should be "I'm gaining ->
+       * shoulder-to-shoulder -> he's disappearing down the road", and the
+       * rail already draws two of those three -- what it never said was
+       * which way the road between you is CHANGING. The old GAINING/LOSING
+       * tag was removed for reading pace against RECORD_PACE (wrong for
+       * three quarters of a clean run -- see the header above); this one is
+       * the derivative of the positional gap itself, which is geography
+       * over time and cannot disagree with the map it annotates. Smoothed
+       * over ~2s of wall clock so a jump or a mat cannot flicker it.
+       *
+       * ON YOUR SHOULDER outranks both trend words: within a tenth of a
+       * mile of the ghost the question is not which way the gap drifts,
+       * it is that the record is PHYSICALLY BESIDE YOU -- the one moment
+       * the whole rail exists to build toward, so it gets the line.
+       */
+      const nowMs = performance.now();
+      if (cache.gapT === undefined) {
+        cache.gapPrev = d; cache.gapT = nowMs; cache.gapVel = 0;
+      } else {
+        const dt = (nowMs - cache.gapT) / 1000;
+        if (dt > 0.08) {
+          const v = (d - cache.gapPrev) / dt;
+          cache.gapVel += (v - cache.gapVel) * Math.min(1, dt / 2);
+          cache.gapPrev = d; cache.gapT = nowMs;
+        }
+      }
+      // Past the first half mile only: everyone is shoulder to shoulder at
+      // the gun, and a moment that fires at every start is not a moment.
+      // 0.04 mi is ~10 road units -- the ghost large in frame beside you,
+      // not merely visible up the road (0.10 read SHOULDER at 19 units out,
+      // which is a sighting, not a shoulder). The trend threshold is a
+      // REAL-MACHINE constant, and it cannot be tuned by watching the
+      // headless probe: swiftshader runs the whole game ~10x slow, so its
+      // live drift is a tenth of a player's (the EMA was verified against
+      // measured drift to two decimals at that speed). Rates at full speed,
+      // read from the bot's own d(t) across ?skip points: mild drift
+      // +-0.3 s/s, a real mid-race surge -3.4, the long late chase -0.8.
+      // 0.5 sits between: surges and chases read, pacing wobble stays
+      // quiet.
+      const nearGh = p.miles > 0.5 && Math.abs(p.ghostMiles() - p.miles) < 0.04;
+      const vel = cache.gapVel || 0;
+      const drift = vel < -0.5 ? ' · CLOSING' : vel > 0.5 ? ' · SLIPPING' : '';
       set(n.gapLabel, 'gapLab', 'RECORD GHOST');
       set(n.gapVal, 'gap', Pace.delta(d));
-      cls(n.gapVal, 'gapCls', 'num ' + tone);
-      cls(n.railGap, 'railGapCls', tone);
-      set(n.gapTrend, 'trend', Math.abs(d) < 1 ? 'LEVEL' : ahead ? 'BEHIND YOU' : 'UP THE ROAD');
+      cls(n.gapVal, 'gapCls', 'num ' + tone + (nearGh ? ' near' : ''));
+      cls(n.railGap, 'railGapCls', tone + (nearGh ? ' near' : ''));
+      set(n.gapTrend, 'trend', nearGh ? 'ON YOUR SHOULDER'
+        : Math.abs(d) < 1 ? 'LEVEL'
+          : ahead ? 'BEHIND YOU' + (vel > 0.5 ? ' · GAINING' : '')
+            : 'UP THE ROAD' + drift);
       cls(n.gapTrend, 'trendCls', tone);
 
       if (extra && extra.fps !== undefined) {
@@ -49030,6 +49140,13 @@ MR.unbail = function () {
       // layer of the mix is silent -- the hills are audible only through
       // cadence, which falls out of a grade-inclusive speed for free.
       audio.setIntensity(pace.streak / 70, pace.grade);
+      // The chase pulse: proximity to the ghost as the rail draws it --
+      // silent beyond 0.12 mi, full when shoulder to shoulder. The same
+      // geography the ON YOUR SHOULDER line prints, in the mix's terms.
+      // Past the first half mile only, same guard as the rail's shoulder
+      // line: the gun has everyone level, and that is not the moment.
+      audio.chase(pace.miles > 0.5
+        ? 1 - Math.min(1, Math.abs(pace.ghostMiles() - pace.miles) / 0.08) : 0);
 
       // The record slipping out of reach, and the ladder moving under you.
       // Both are changes of situation rather than events, both are currently

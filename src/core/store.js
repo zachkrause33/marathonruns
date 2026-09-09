@@ -165,6 +165,11 @@ MR.Store = (function () {
         city: str(e.city),
         time: pos(e.time),
         rec: e.rec === true,
+        // `recDay` is the honest half of the rec latch: the record fell ON
+        // this calendar day, not on a later revisit. Rows written before
+        // revisits existed were all live, so an absent field inherits rec.
+        recDay: e.recDay === true || (e.recDay === undefined && e.rec === true),
+        rv: e.rv === true,
         runs: Math.max(1, Math.round(num(e.runs, 1))),
       });
     }
@@ -274,9 +279,12 @@ MR.Store = (function () {
     for (const e of s.hist) byDate[e.date] = e;
     const todayRow = byDate[dateKey] || null;
     const doneToday = !!(todayRow && todayRow.rec);
+    // Walked on `recDay`, not `rec`: a revisit that finally breaks the
+    // record in a city you raced last month upgrades that city's stamp,
+    // but it cannot fabricate a streak you did not run on the day.
     let recStreak = 0;
     let rk = doneToday ? dateKey : shift(dateKey, -1);
-    while (rk && byDate[rk] && byDate[rk].rec) { recStreak++; rk = shift(rk, -1); }
+    while (rk && byDate[rk] && byDate[rk].recDay) { recStreak++; rk = shift(rk, -1); }
 
     // THE SET, ALONGSIDE THE LOG.
     //
@@ -294,13 +302,18 @@ MR.Store = (function () {
     // the history, which is exactly the defect the record streak was rewritten
     // to avoid.
     const cities = {};
+    let totalRuns = 0, totalRecs = 0;
     for (const e of s.hist) {
+      totalRuns += e.runs;
+      if (e.rec) totalRecs++;
       if (!e.city) continue;
-      const c = cities[e.city] || (cities[e.city] = { days: 0, rec: false, best: 0, last: null });
+      const c = cities[e.city] || (cities[e.city] = { days: 0, rec: false, best: 0, last: null, runs: 0, first: null });
       c.days++;
+      c.runs += e.runs;
       if (e.rec) c.rec = true;
       if (!c.best || e.time < c.best) c.best = e.time;
       if (!c.last || e.date > c.last) c.last = e.date;
+      if (!c.first || e.date < c.first) c.first = e.date;
     }
 
     return {
@@ -321,6 +334,12 @@ MR.Store = (function () {
       // { CITY: { days, rec, best, last } } for every city with a finished
       // day in the save. The checklist panel intersects this with the pool.
       cities: cities,
+      // The passport ledger: days finished, marathons run (every rerun is
+      // its own 26.2), records fallen. Derived on every read, same as the
+      // city set and for the same reason.
+      totalDays: s.hist.length,
+      totalRuns: totalRuns,
+      totalRecs: totalRecs,
       done: doneToday,                    // the record fell today: today is over
       doneTime: doneToday ? todayRow.time : 0,
       recordStreak: recStreak,
@@ -413,16 +432,47 @@ MR.Store = (function () {
       let h = null;
       for (const e of s.hist) if (e.date === dateKey) { h = e; break; }
       if (!h) {
-        h = { date: dateKey, city: city, time: r.time, rec: rec, runs: 1 };
+        h = { date: dateKey, city: city, time: r.time, rec: rec, recDay: rec, runs: 1 };
         s.hist.push(h);
         s.hist.sort(function (x, y) { return x.date < y.date ? -1 : x.date > y.date ? 1 : 0; });
         if (s.hist.length > HIST_MAX) s.hist = s.hist.slice(-HIST_MAX);
       } else {
         h.runs++;
         if (r.time < h.time) h.time = r.time;
+        if (rec) { h.rec = true; h.recDay = true; }
+        if (city && !h.city) h.city = city;
+      }
+      out.recordBroken = rec;
+    } else {
+      /**
+       * THE REVISIT DOOR. A backwards date used to fall through with only
+       * the all-time marks -- which also meant an old city's stamp could
+       * never improve, and a passport whose imperfections cannot be fixed
+       * is a list of regrets. So a revisit now folds into the HISTORY ROW
+       * for its date -- best time, the rec latch, the run count -- and
+       * into nothing else: the day record, the previous-day rotation and
+       * the day streak still belong to the calendar, exactly as the guard
+       * above argues. `recDay` is never set here (see the streak walk),
+       * and the row is marked `rv` so every reader can say REVISITED.
+       */
+      const rec = !!(run && run.record === true);
+      const city = str(run && run.city);
+      let h = null;
+      for (const e of s.hist) if (e.date === dateKey) { h = e; break; }
+      if (!h) {
+        h = { date: dateKey, city: city, time: r.time, rec: rec, recDay: false, rv: true, runs: 1 };
+        s.hist.push(h);
+        s.hist.sort(function (x, y) { return x.date < y.date ? -1 : x.date > y.date ? 1 : 0; });
+        if (s.hist.length > HIST_MAX) s.hist = s.hist.slice(-HIST_MAX);
+        out.beatToday = true;
+      } else {
+        h.runs++;
+        h.rv = true;
+        if (r.time < h.time) { h.time = r.time; out.beatToday = true; }
         if (rec) h.rec = true;
         if (city && !h.city) h.city = city;
       }
+      out.revisit = true;
       out.recordBroken = rec;
     }
 

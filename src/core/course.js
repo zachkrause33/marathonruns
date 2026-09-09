@@ -1321,19 +1321,45 @@ MR.Course = (function () {
    * frame, so a renderer pass can be judged against something written down
    * rather than against taste.
    */
+  /**
+   * `rec` is each city's REAL men's course record in seconds, with holder
+   * and year for the passport line -- beating it is the BRONZE tier
+   * (owner, 2026-09-09: "Can we pull the winning record at each marathon?
+   * Maybe beating that is bronze and beating the world record is gold").
+   * Looked up 2026-09-09, not remembered: Boston fell to Korir this
+   * spring, Sydney to Gobena, Cape Town to Esa. LONDON IS THE SPECIAL
+   * CASE AND THE BEST FLAVOR IN THE SET: its course record IS the world
+   * record -- Sebastian Sawe's 1:59:30, the first official sub-two, run
+   * at London in April 2026 -- so K.RECORD_SECONDS (7170) and London's
+   * rec coincide, there is no bronze in London, and the ghost the whole
+   * game chases is a real run on a real course. `latlon` places the city
+   * dot on the passport's world map.
+   */
   const SETTINGS = [
-    { tag: 'BOSTON',    name: 'BOSTON',        hint: 'brownstones, autumn maples, the Citgo sign, a right on Hereford and a left on Boylston' },
-    { tag: 'LONDON',    name: 'LONDON',        hint: 'Tower Bridge, red buses, black cabs, plane trees, the Thames' },
-    { tag: 'BERLIN',    name: 'BERLIN',        hint: 'the Brandenburg Gate, the Fernsehturm, linden avenues, the Spree' },
-    { tag: 'CHICAGO',   name: 'CHICAGO',       hint: 'elevated L track over the road, river bascule bridges, a black glass skyline' },
-    { tag: 'NEWYORK',   name: 'NEW YORK',      hint: 'the Verrazzano span, brownstones, yellow cabs, Central Park stone walls' },
-    { tag: 'TOKYO',     name: 'TOKYO',         hint: 'the Imperial Palace moat, torii, neon signage, the Skytree' },
-    { tag: 'SYDNEY',    name: 'SYDNEY',        hint: 'the Harbour Bridge, the Opera House shells, ferries, harbour water' },
-    { tag: 'PARIS',     name: 'PARIS',         hint: 'the Eiffel Tower, Haussmann facades, Seine bridges, kiosks' },
-    { tag: 'VALENCIA',  name: 'VALENCIA',      hint: 'the City of Arts and Sciences, the Serranos gate, palms, orange groves, white stone' },
-    { tag: 'AMSTERDAM', name: 'AMSTERDAM',     hint: 'canals, gabled houses, bicycle racks, humpback bridges, a smock windmill' },
-    { tag: 'ROME',      name: 'ROME',          hint: 'the Colosseum, an aqueduct, umbrella pines, ochre walls' },
-    { tag: 'CAPETOWN',  name: 'CAPE TOWN',     hint: 'Table Mountain, the coast road, the Green Point lighthouse, the stadium, fynbos' },
+    { tag: 'BOSTON',    name: 'BOSTON',        rec: 7312, holder: 'KORIR 2026',      latlon: [42.36, -71.06],
+      hint: 'brownstones, autumn maples, the Citgo sign, a right on Hereford and a left on Boylston' },
+    { tag: 'LONDON',    name: 'LONDON',        rec: 7170, holder: 'SAWE 2026 · WR',  latlon: [51.51, -0.13],
+      hint: 'Tower Bridge, red buses, black cabs, plane trees, the Thames' },
+    { tag: 'BERLIN',    name: 'BERLIN',        rec: 7269, holder: 'KIPCHOGE 2022',   latlon: [52.52, 13.41],
+      hint: 'the Brandenburg Gate, the Fernsehturm, linden avenues, the Spree' },
+    { tag: 'CHICAGO',   name: 'CHICAGO',       rec: 7235, holder: 'KIPTUM 2023',     latlon: [41.88, -87.63],
+      hint: 'elevated L track over the road, river bascule bridges, a black glass skyline' },
+    { tag: 'NEWYORK',   name: 'NEW YORK',      rec: 7498, holder: 'TOLA 2023',       latlon: [40.71, -74.01],
+      hint: 'the Verrazzano span, brownstones, yellow cabs, Central Park stone walls' },
+    { tag: 'TOKYO',     name: 'TOKYO',         rec: 7336, holder: 'KIPRUTO 2024',    latlon: [35.68, 139.69],
+      hint: 'the Imperial Palace moat, torii, neon signage, the Skytree' },
+    { tag: 'SYDNEY',    name: 'SYDNEY',        rec: 7482, holder: 'GOBENA 2026',     latlon: [-33.87, 151.21],
+      hint: 'the Harbour Bridge, the Opera House shells, ferries, harbour water' },
+    { tag: 'PARIS',     name: 'PARIS',         rec: 7461, holder: 'ROTICH 2021',     latlon: [48.86, 2.35],
+      hint: 'the Eiffel Tower, Haussmann facades, Seine bridges, kiosks' },
+    { tag: 'VALENCIA',  name: 'VALENCIA',      rec: 7308, holder: 'LEMMA 2023',      latlon: [39.47, -0.38],
+      hint: 'the City of Arts and Sciences, the Serranos gate, palms, orange groves, white stone' },
+    { tag: 'AMSTERDAM', name: 'AMSTERDAM',     rec: 7411, holder: 'TOROITICH 2025',  latlon: [52.37, 4.90],
+      hint: 'canals, gabled houses, bicycle racks, humpback bridges, a smock windmill' },
+    { tag: 'ROME',      name: 'ROME',          rec: 7584, holder: 'RUTTO 2024',      latlon: [41.90, 12.50],
+      hint: 'the Colosseum, an aqueduct, umbrella pines, ochre walls' },
+    { tag: 'CAPETOWN',  name: 'CAPE TOWN',     rec: 7495, holder: 'ESA 2026',        latlon: [-33.92, 18.42],
+      hint: 'Table Mountain, the coast road, the Green Point lighthouse, the stadium, fynbos' },
   ];
 
   /**
@@ -1392,6 +1418,7 @@ MR.Course = (function () {
     const s = bag[pos];
     return [{
       tag: s.tag, name: s.name, hint: s.hint,
+      rec: s.rec, holder: s.holder, latlon: s.latlon,
       from: 0, to: 1, first: true, last: true,
     }];
   }
@@ -3118,8 +3145,24 @@ MR.Course = (function () {
     return { ok: errors.length === 0, errors, gates: g.length };
   }
 
+  /**
+   * The finish tier, computed from the one file that owns the city data.
+   * GOLD is the world record; BRONZE is the day's city's own course
+   * record. London is the deliberate degenerate case: its rec IS the
+   * world record, so there is no bronze in London -- you match Sawe or
+   * you take the ink stamp, which is the truth of that course.
+   */
+  function tierFor(seconds, tag) {
+    if (!(seconds > 0)) return '';
+    if (seconds < K.RECORD_SECONDS) return 'gold';
+    for (const s of SETTINGS) {
+      if (s.tag === tag) return seconds < s.rec ? 'bronze' : '';
+    }
+    return '';
+  }
+
   const api = { generate, generateAid, validate, solvable, biomeAt, difficulty,
-           BIOMES, SETTINGS, pickSettings, ACTION_WINDOW, actionWindowAt,
+           BIOMES, SETTINGS, pickSettings, tierFor, ACTION_WINDOW, actionWindowAt,
            // Exported so tools/shoot.js reads the read window from the file
            // that enforces it instead of recomputing the same sum. The two
            // cannot drift, which is the whole point of the invariant.

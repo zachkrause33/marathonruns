@@ -263,16 +263,28 @@ MR.Pace = (function () {
      */
     ENERGY_DRAIN_SECONDS: 3800,
     /**
-     * 0.0065 -> 0.0085 on the owner's own verdict of the shipped economy:
-     * "it's impossible to beat the record now." The shipped price put a
-     * first attempt at 0 of 30 grid cells, which read as deliberately
-     * hard and played as a wall. Swept at 3800 drain: 0.0075 gives 10%
-     * first-attempt / 33% learned, 0.0085 gives 17% / 33% -- a strong
-     * first attempt has a real shot, a learned line wins a third of its
-     * cells, and the policy spread stays ~1400s so HOW you collect still
-     * decides everything. The no-collection row is untouched by price.
+     * THE PRICE MOVED THREE TIMES AND EACH MOVE WAS A DIFFERENT GAME.
+     * 0.0065 shipped with the economy and played as a wall (first attempt
+     * 0 of 30 grid cells; the owner: "it's impossible to beat the record
+     * now"). 0.0085 answered that (17% first attempt) -- and then the
+     * TIER LADDER arrived (2026-09-09) and changed what the number is
+     * for: each city's real course record is now BRONZE and 1:59:30 is
+     * GOLD, and the owner re-set the top bar in the same breath: "we
+     * need to make the world record a close to perfect run." At 0.0085
+     * the grid is BIMODAL -- collectors run 1:55-1:58 (gold outright)
+     * and everyone else 2:12+ -- so the whole bronze band (2:00:35 to
+     * 2:06:24, the real records) was a dead zone no line ever landed in.
+     *
+     * 0.0070, swept: HARVEST (the learned line) runs 1:55:54-1:58:49 --
+     * gold belongs to the prepared; COIN CHASE (an honest first-attempt
+     * greedy collector) runs 1:58:50 at perfect execution down to
+     * 2:05:04 at 0.96 -- exactly across the bronze band, so the city
+     * gradient is real: 2:00:11 takes bronze even in Kiptum's Chicago,
+     * 2:05:04 only in Rome. First-attempt GOLD is 1 cell of 30 (3%):
+     * close to perfect, as ordered. Non-collectors stay 2:12+ and earn
+     * ink, which is the truth of a marathon run on no fuel.
      */
-    ENERGY_PER_PICKUP: 0.0085,
+    ENERGY_PER_PICKUP: 0.0070,
     ENERGY_HIT: 0.08,            // what a contact costs: ten pickups of it
     ENERGY_KNEE: 0.5,            // the dry line: a stat threshold, no longer a tax
 

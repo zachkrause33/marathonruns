@@ -412,6 +412,17 @@ MR.HUD = (function () {
           <span class="targetLab">BREAK THE MARATHON WORLD RECORD</span>
           <b class="num">${K.RECORD_LABEL}</b>
         </div>
+        <!--
+          THE SECOND WAGER, under the first. Each city carries its REAL
+          course record now, and beating it is the bronze stamp -- so the
+          panel states both bars the day can be won at. One line, set with
+          the city, hidden in London where the two bars are the same bar
+          (Sawe's 1:59:30 IS London's course record).
+        -->
+        <div id="cityBar" class="hidden">
+          <span id="cityBarLab"></span>
+          <b class="num" id="cityBarTime"></b>
+        </div>
 
         <!--
           WHAT THE GAME REMEMBERS.
@@ -449,7 +460,7 @@ MR.HUD = (function () {
           there is a history to show, the same empty-state rule the memory
           plates follow.
         -->
-        <button id="histBtn" type="button" class="hidden">PAST DAYS</button>
+        <button id="histBtn" type="button" class="hidden">PASSPORT · WORLD MAP</button>
         <!--
           The door OUT to the explainer, which lives on the site rather than in
           the game. Absolute rather than rooted, because this same file is
@@ -476,8 +487,20 @@ MR.HUD = (function () {
       -->
       <div class="panel hidden" id="histPanel" role="dialog" aria-modal="true"
            aria-labelledby="histTitle"><div class="panelInner">
-        <div class="date">RUN HISTORY</div>
-        <h1 id="histTitle">PAST DAYS</h1>
+        <div class="date">WORLD TOUR</div>
+        <h1 id="histTitle">PASSPORT</h1>
+        <!--
+          THE WORLD MAP, un-paused on the owner's word ("The map/passport is
+          very important"). One glanceable visual and no stats of its own --
+          the stats live on the stamps below, so the two halves never say
+          the same thing twice. Land is hand-drawn low-poly in the game's
+          own idiom (a literal atlas would be the one realistic object in a
+          toon world); each dot is a city in the pool, colored by the same
+          three-state language the stamps use, with today's city pulsing
+          and the route so far drawn through the visited dots in the order
+          they were first run.
+        -->
+        <div id="mapBox"></div>
         <div id="histSum"></div>
 
         <!--
@@ -505,7 +528,18 @@ MR.HUD = (function () {
           thirteenth city updates this panel by existing.
         -->
         <div class="rule" id="cityRule"></div>
-        <div id="cityGrid"></div>
+        <!--
+          THE STAMP WALL. One stamp per city in the pool, four states: an
+          empty outline for a city the calendar has not dealt you, ink for
+          a finish, BRONZE for beating that city's real course record, GOLD
+          for beating the world record there. Each stamp carries the facts
+          a collector wants at a glance -- best time, the record it is
+          chasing, days run -- and a visited stamp is a DOOR: tapping it
+          reruns that city's most recent course, which is how a bronze
+          becomes gold. The daily ritual is untouched: a revisit can polish
+          a stamp, never extend a streak (see store.js).
+        -->
+        <div id="stampWall"></div>
 
         <div id="histList"></div>
         <button class="cta" id="histBack" type="button">BACK TO THE LINE</button>
@@ -599,6 +633,26 @@ MR.HUD = (function () {
           <span id="tierNext" class="num"></span>
         </div>
 
+        <!--
+          THE STAMP. "Every time a player finishes a marathon, something
+          permanent should happen to their collection. The four-minute race
+          disappears at midnight. The accomplishment stays." This is that
+          something, made visible: the moment the card opens, the day's
+          passport stamp PRESSES onto it -- gold if the world record fell,
+          bronze if the city's real course record did, plain ink for a
+          finish -- with the record it was measured against printed under
+          it. The press replays on every finish because every finish writes
+          the passport; what changes is the metal.
+        -->
+        <div id="stampMoment" class="hidden">
+          <div id="stampInk">
+            <span id="stampCity"></span>
+            <span id="stampWord"></span>
+            <span id="stampDate" class="num"></span>
+          </div>
+          <div id="stampCtx" class="num"></div>
+        </div>
+
         <div id="endBadges"></div>
         <div id="endMem" class="num"></div>
 
@@ -673,7 +727,7 @@ MR.HUD = (function () {
           class as the start panel's door -- and it hides on the same rule,
           because a history of one run is not a history.
         -->
-        <button id="endHistBtn" type="button" class="hidden">PAST DAYS</button>
+        <button id="endHistBtn" type="button" class="hidden">PASSPORT · WORLD MAP</button>
       </div></div>
 
       <!--
@@ -754,7 +808,11 @@ MR.HUD = (function () {
       endTurn: q('endTurn'), tomorrow: q('tomorrow'), tomorrowRoute: q('tomorrowRoute'),
       shareBox: q('shareBox'), shareLegs: q('shareLegs'), shareLine: q('shareLine'),
       shareBtn: q('shareBtn'), shareNote: q('shareNote'), shareText: q('shareText'),
-      cityRule: q('cityRule'), cityGrid: q('cityGrid'),
+      cityRule: q('cityRule'), stampWall: q('stampWall'), mapBox: q('mapBox'),
+      stampMoment: q('stampMoment'), stampInk: q('stampInk'),
+      stampCity: q('stampCity'), stampWord: q('stampWord'),
+      stampDate: q('stampDate'), stampCtx: q('stampCtx'),
+      cityBar: q('cityBar'), cityBarLab: q('cityBarLab'), cityBarTime: q('cityBarTime'),
       againBtn: q('againBtn'),
       count: q('count'), countVal: q('countVal'),
       pauseBtn: q('pauseBtn'), pausePanel: q('pausePanel'),
@@ -937,29 +995,144 @@ MR.HUD = (function () {
      * place in PAST DAYS below, which is the log and is meant to hold
      * everything that happened.
      */
-    function drawCities(sum) {
-      const pool = (MR.Course && MR.Course.SETTINGS) ? MR.Course.SETTINGS : [];
-      if (!pool.length) { n.cityRule.textContent = ''; n.cityGrid.innerHTML = ''; return; }
+    /**
+     * The tier a city's stamp wears, from the same two bars the finish
+     * card grades against: the rec LATCH answers gold (a record day stays
+     * a record day), the best time answers bronze against the city's real
+     * course record carried on the pool entry.
+     */
+    function stampTier(s, c) {
+      if (!c) return 'new';
+      if (c.rec || (c.best && c.best < K.RECORD_SECONDS)) return 'gold';
+      if (s.rec && c.best && c.best < s.rec) return 'bronze';
+      return 'ink';
+    }
+
+    /**
+     * ---- THE WORLD, AS SEVEN BLOBS AND TWELVE DOTS -----------------------
+     *
+     * Land is authored in lon/lat and projected here (x = lon + 180,
+     * y = 90 - lat, poles cropped by the viewBox), so a thirteenth city is
+     * one dot from its latlon and no redrawing. The shapes are DELIBERATELY
+     * low-poly -- ten to twenty vertices a continent, the same budget a
+     * hazard's silhouette gets -- because a survey-accurate coastline would
+     * be the one realistic object in a toon world. They only have to be
+     * true enough that Cape Town sits at the bottom of Africa and Sydney
+     * hangs off the far right, which is what makes the trail readable as A
+     * JOURNEY rather than as a chart.
+     */
+    const LAND = [
+      // North America, with the Central American taper the trail crosses.
+      [[-165, 66], [-150, 71], [-125, 72], [-95, 73], [-80, 72], [-68, 62], [-55, 52], [-65, 45],
+       [-70, 42], [-76, 36], [-81, 30], [-81, 25], [-89, 30], [-97, 27], [-106, 22], [-97, 16],
+       [-84, 10], [-79, 8], [-92, 14], [-110, 22], [-118, 32], [-125, 42], [-127, 50], [-140, 59], [-158, 57]],
+      // South America.
+      [[-79, 8], [-70, 12], [-61, 9], [-52, 4], [-35, -6], [-39, -14], [-48, -26], [-54, -35],
+       [-63, -42], [-70, -46], [-72, -34], [-70, -19], [-77, -12], [-81, -4]],
+      // Eurasia, one mass -- the map does not owe the Urals a border.
+      [[-9, 43], [-9, 37], [0, 36], [10, 38], [16, 38], [22, 36], [27, 37], [36, 36], [44, 38],
+       [52, 37], [58, 25], [67, 24], [72, 20], [77, 7], [81, 15], [89, 21], [95, 16], [105, 9],
+       [109, 13], [110, 21], [122, 30], [122, 40], [135, 44], [142, 53], [156, 60], [170, 64],
+       [178, 66], [160, 70], [140, 73], [110, 76], [80, 72], [60, 69], [45, 67], [40, 65],
+       [30, 70], [22, 70], [12, 65], [5, 61], [8, 56], [2, 51], [-5, 48]],
+      // Africa, Table Mountain end down where Cape Town's dot needs it.
+      [[-17, 15], [-10, 30], [-6, 35], [10, 37], [20, 32], [32, 31], [34, 27], [43, 11], [51, 12],
+       [41, -2], [36, -18], [29, -30], [19, -35], [14, -29], [12, -18], [14, -6], [9, 4], [-8, 4], [-16, 10]],
+      // Australia.
+      [[114, -22], [122, -17], [131, -11], [136, -14], [142, -10], [146, -18], [153, -26],
+       [151, -34], [144, -39], [136, -35], [129, -32], [124, -33], [115, -34], [112, -27]],
+      // The British Isles and Japan: two small lands two of the twelve
+      // dots sit beside; without them London floats in the sea.
+      [[-5, 50], [-3, 53], [-5, 58], [-2, 58], [0, 53], [1, 51]],
+      [[130, 31], [133, 34], [137, 35], [140, 36], [141, 40], [143, 45], [140, 43], [136, 37], [131, 33]],
+    ];
+    function mapPt(lon, lat) {
+      return (lon + 180).toFixed(1) + ',' + (90 - lat).toFixed(1);
+    }
+
+    function drawMap(sum, pool, todayTag) {
       const seen = (sum && sum.cities) || {};
-      let done = 0;
+      const land = LAND.map(function (poly) {
+        return '<polygon class="land" points="'
+          + poly.map(function (p) { return mapPt(p[0], p[1]); }).join(' ') + '"/>';
+      }).join('');
+      // The trail: visited cities in the order they were FIRST run -- the
+      // journey as it happened, not as the roster lists it. Drawn before
+      // the dots so it passes under them, and drawn in by CSS on open.
+      const visited = pool
+        .map(function (s) { return { s: s, c: seen[s.name] }; })
+        .filter(function (x) { return x.c && x.c.first && x.s.latlon; });
+      visited.sort(function (a, b) { return a.c.first < b.c.first ? -1 : 1; });
+      const trail = visited.length > 1
+        ? '<polyline class="trail" points="'
+          + visited.map(function (x) { return mapPt(x.s.latlon[1], x.s.latlon[0]); }).join(' ') + '"/>'
+        : '';
+      const dots = pool.map(function (s) {
+        if (!s.latlon) return '';
+        const c = seen[s.name];
+        const tier = stampTier(s, c);
+        const today = s.tag === todayTag;
+        const xy = mapPt(s.latlon[1], s.latlon[0]).split(',');
+        return (today ? '<circle class="dotPulse" r="7" cx="' + xy[0] + '" cy="' + xy[1] + '"/>' : '')
+          + '<circle class="dot ' + tier + (today ? ' today' : '') + '" r="3" cx="' + xy[0] + '" cy="' + xy[1] + '">'
+          + '<title>' + s.name + '</title></circle>';
+      }).join('');
+      // Poles cropped: nothing in the pool lives above 60N or below 45S,
+      // and the empty ice is height the phone does not have.
+      n.mapBox.innerHTML = '<svg viewBox="0 25 360 115" role="img" aria-label="World map of the tour">'
+        + land + trail + dots + '</svg>';
+    }
+
+    function drawPassport(sum) {
+      const pool = (MR.Course && MR.Course.SETTINGS) ? MR.Course.SETTINGS : [];
+      if (!pool.length) { n.cityRule.textContent = ''; n.stampWall.innerHTML = ''; n.mapBox.innerHTML = ''; return { gold: 0, run: 0 }; }
+      const seen = (sum && sum.cities) || {};
+      const todayTag = course && course.settings && course.settings.length ? course.settings[0].tag : null;
+      drawMap(sum, pool, todayTag);
+      let gold = 0, run = 0;
       const html = pool.map(function (s) {
         const c = seen[s.name];
-        const state = (c && c.rec) ? 'rec' : c ? 'ran' : 'new';
-        if (state === 'rec') done++;
-        // A mark as well as a colour and an opacity: the three states have to
-        // be told apart by someone who cannot see the difference between the
-        // green and the cream, and by anyone reading this on a phone in the
-        // sun. Typeset, not iconed, for the reason the WR mark below is -- the
-        // embedded face is subset to what this HUD prints and a symbol would
-        // arrive in the system font.
-        const mark = state === 'rec' ? 'WR' : state === 'ran' ? 'RAN' : '&mdash;';
-        return '<span class="ccity ' + state + '">'
-          + '<span class="cname">' + s.name + '</span>'
-          + '<span class="cmark">' + mark + '</span></span>';
+        const tier = stampTier(s, c);
+        if (tier === 'gold') gold++;
+        if (c) run++;
+        const word = tier === 'gold' ? 'GOLD' : tier === 'bronze' ? 'BRONZE' : tier === 'ink' ? 'RUN' : 'NOT YET DRAWN';
+        const cr = s.rec ? 'CR ' + Pace.clock(s.rec) + ' · ' + s.holder : '';
+        // A visited stamp is a door: its most recent course, rerunnable --
+        // that is how a bronze becomes gold. Today's city routes through
+        // the ordinary start instead (its door is TOE THE LINE), and a
+        // GOLD stamp is not a door at all: there is nothing above gold,
+        // and the day behind it is locked by the record anyway.
+        const door = c && c.last && s.tag !== todayTag && tier !== 'gold';
+        return '<' + (door ? 'button type="button"' : 'div') + ' class="stampC ' + tier + '"'
+          + (door ? ' data-date="' + c.last + '"' : '') + '>'
+          + '<span class="sCity">' + s.name + '</span>'
+          + '<span class="sTier">' + word + '</span>'
+          + (c ? '<span class="sBest num">' + Pace.clock(c.best) + '</span>' : '<span class="sBest num">&mdash;</span>')
+          + '<span class="sCr num">' + cr + '</span>'
+          + (c ? '<span class="sDays">' + c.runs + (c.runs === 1 ? ' RUN' : ' RUNS')
+              + (door ? ' · TAP TO RUN IT'
+                : s.tag === todayTag ? ' · TODAY'
+                  : tier === 'gold' ? ' · SEALED' : '') + '</span>'
+             : '<span class="sDays"></span>')
+          + '</' + (door ? 'button' : 'div') + '>';
       }).join('');
-      n.cityRule.textContent = 'RECORD CITIES · ' + done + ' OF ' + pool.length;
-      n.cityGrid.innerHTML = html;
+      n.cityRule.textContent = 'STAMPS · ' + run + ' OF ' + pool.length + ' CITIES · ' + gold + ' GOLD';
+      n.stampWall.innerHTML = html;
+      return { gold: gold, run: run };
     }
+
+    /**
+     * THE REVISIT DOOR. One delegated listener; the reload carries the
+     * date and nothing else, so a bot flag from a tool session cannot leak
+     * into a player's rerun. store.js treats the backwards date as a
+     * revisit: the stamp can improve, the calendar cannot move.
+     */
+    n.stampWall.addEventListener('click', function (ev) {
+      let el = ev.target;
+      while (el && el !== n.stampWall && !el.getAttribute('data-date')) el = el.parentElement;
+      const d = el && el !== n.stampWall && el.getAttribute('data-date');
+      if (d) location.href = location.pathname + '?date=' + d;
+    });
 
     api.setHistory = function (sum) {
       const rows = sum && sum.history ? sum.history : [];
@@ -969,10 +1142,11 @@ MR.HUD = (function () {
         n.histSum.innerHTML = '';
         n.histList.innerHTML = '';
         n.cityRule.textContent = '';
-        n.cityGrid.innerHTML = '';
+        n.stampWall.innerHTML = '';
+        n.mapBox.innerHTML = '';
         return;
       }
-      drawCities(sum);
+      drawPassport(sum);
 
       let wr = 0;
       for (const e of rows) if (e.rec) wr++;
@@ -982,6 +1156,12 @@ MR.HUD = (function () {
           sum.recordStreakCounted ? 'RECORDS IN A ROW'
                                   : 'BREAK TODAY FOR ' + (sum.recordStreak + 1));
       }
+      // The ledger the feedback asked the home of the tour to carry:
+      // marathons as MILES, because "1,231 marathon miles" is the fact a
+      // player repeats to a friend, and every rerun is its own 26.2.
+      html += plate('MARATHON MILES',
+        String(Math.round((sum.totalRuns || rows.length) * K.MARATHON_MILES)),
+        (sum.totalRuns || rows.length) + ' MARATHONS RUN');
       html += plate('DAYS FINISHED', String(rows.length), 'ONE CITY EACH');
       html += plate('RECORDS BROKEN', String(wr), wr ? 'MARKED WR BELOW' : 'NONE YET');
       n.histSum.innerHTML = html;
@@ -990,7 +1170,7 @@ MR.HUD = (function () {
         return '<div class="hrow' + (e.rec ? ' rec' : '') + '">'
           + '<span class="hdate">' + histDay(e.date, sum.dateKey) + '</span>'
           + '<span class="hcity">' + (e.city || '&mdash;') + '</span>'
-          + '<span class="hwr">' + (e.rec ? 'WR' : '') + '</span>'
+          + '<span class="hwr">' + (e.rec ? 'WR' : e.rv ? 'RV' : '') + '</span>'
           + '<span class="htime num">' + Pace.clock(e.time) + '</span>'
           + '</div>';
       }).join('');
@@ -1549,6 +1729,17 @@ MR.HUD = (function () {
       n.startRoute.textContent = set && set.length
         ? set.map(function (x) { return x.name; }).join(' → ')
         : '';
+      // The bronze bar: today's REAL course record, under the world-record
+      // wager. Hidden in London, where they are the same number and the
+      // second line would restate the first (see SETTINGS: Sawe's 1:59:30
+      // IS London's course record).
+      const st0 = set && set[0];
+      const showCity = st0 && st0.rec && st0.rec > K.RECORD_SECONDS;
+      n.cityBar.classList.toggle('hidden', !showCity);
+      if (showCity) {
+        n.cityBarLab.textContent = 'BEAT ' + st0.name + ' COURSE RECORD FOR BRONZE';
+        n.cityBarTime.textContent = Pace.clock(st0.rec) + ' · ' + st0.holder;
+      }
       drawRoute(set);
       api.milesSpeaks(set && set.length ? set[0].tag : null);
       // The route and the gate count arrive after the panel is first laid out
@@ -2117,6 +2308,37 @@ MR.HUD = (function () {
       n.tierNext.textContent = up
         ? Pace.clock(Tier.gapTo(t, up)) + ' OFF ' + up.name
         : '';
+
+      // ---- the stamp ------------------------------------------------------
+      // See the markup note: this is the permanent thing this finish just
+      // did to the passport, pressed onto the card as it opens. The medal
+      // is computed by course.js, the file that owns both bars.
+      const st0 = course && course.settings && course.settings.length ? course.settings[0] : null;
+      if (st0) {
+        const medal = MR.Course.tierFor ? MR.Course.tierFor(t, st0.tag) : '';
+        n.stampCity.textContent = st0.name;
+        n.stampWord.textContent = medal === 'gold' ? 'WORLD RECORD'
+          : medal === 'bronze' ? 'COURSE RECORD' : 'FINISHED';
+        n.stampDate.textContent = (rec.dateKey || '').replace(/-/g, '.')
+          + (rec.revisit ? ' · REVISIT' : '');
+        n.stampInk.className = medal || 'plain';
+        n.stampCtx.textContent = medal === 'gold'
+          ? 'THE WORLD RECORD, BY ' + Pace.clock(K.RECORD_SECONDS - t)
+          : medal === 'bronze'
+            ? 'AHEAD OF ' + st0.holder + ' BY ' + Pace.clock(st0.rec - t)
+            : (st0.rec && st0.rec > K.RECORD_SECONDS
+                ? 'COURSE RECORD ' + Pace.clock(st0.rec) + ' · ' + Pace.clock(t - st0.rec) + ' AWAY'
+                : '');
+        // Replay the press. The class is pulled, the layout is forced to
+        // notice, and the class returns -- the standard way to rewind a CSS
+        // animation without cloning the node.
+        n.stampMoment.classList.remove('hidden');
+        n.stampInk.classList.remove('press');
+        void n.stampInk.offsetWidth;
+        n.stampInk.classList.add('press');
+      } else {
+        n.stampMoment.classList.add('hidden');
+      }
 
       // ---- what the save made of it --------------------------------------
       const badges = [];

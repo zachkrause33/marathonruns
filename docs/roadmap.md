@@ -8933,3 +8933,58 @@ coat is tuned to the gate, tune it to the WORST road in the pool
 plus the pool's variance, not to the day the tuning happened.
 
 Gates: 8/8 shots, 90/90 courses, simulate PASS.
+
+## 108. The World Tour: passport, map, and the two records
+
+The owner greenlit the hybrid and added the idea that completes it:
+"Can we pull the winning record at each marathon? Maybe beating that
+is bronze and beating the world record is gold. If this is the case
+we need to make the world record a close to perfect run. The
+map/passport is very important. Animation is key."
+
+THE TWO BARS. Every city in SETTINGS now carries its REAL men's
+course record, looked up rather than remembered (Boston fell to
+Korir this spring; Sydney to Gobena; Cape Town to Esa). Beating the
+city's record is BRONZE; beating 1:59:30 is GOLD -- and the lookup
+delivered the best flavor in the game for free: London's course
+record IS the world record, Sebastian Sawe's 1:59:30, the first
+official sub-two, run at London in April 2026. There is no bronze in
+London, the second wager line hides there, and the ghost the whole
+game chases turns out to be a real run on a real course.
+
+THE PRICE, MOVED FOR THE LADDER. At 0.0085 the policy grid was
+bimodal -- collectors 1:55-1:58, everyone else 2:12+ -- so the whole
+bronze band (2:00:35-2:06:24) was a dead zone no line ever landed
+in. At 0.0070 (swept): the learned line runs 1:55:54-1:58:49, gold
+is 3% of first-attempt cells ("close to perfect", as ordered), and
+an honest first-attempt collector runs 1:58:50-2:05:04 -- exactly
+across the bronze band, with a real per-city gradient: 2:00:11
+takes bronze even in Kiptum's Chicago, 2:05:04 only in Rome.
+
+THE PASSPORT. The history tab is now the tour: a low-poly world map
+(land authored in lon/lat, ten-to-twenty vertices a continent --
+survey accuracy would be the one realistic object in a toon world)
+with the twelve dots in the stamp language, today's city breathing,
+and the route-so-far drawing itself through the visited dots in
+first-run order. Under it, the ledger (MARATHON MILES leads -- the
+fact a player repeats to a friend), then the stamp wall: dashed
+outline for a city not yet dealt, ink for a finish, bronze and gold
+rings for the records, each stamp carrying best time, the real CR
+and holder, and the run count. THE FINISH PRESSES A STAMP: the card
+now slams the day's stamp onto itself (CSS press with one
+overshoot), gold, bronze or ink, with the margin over the record it
+was measured against printed under it.
+
+THE REVISIT DOOR. A visited stamp is a button: it reruns that
+city's most recent date. store.js learned the difference between a
+revisit and a day -- a backwards date now folds into its HISTORY
+ROW (best time, the rec latch, run count, marked rv) and into
+nothing else; recDay is the honest half of the latch, so the record
+STREAK still counts only records run on the day, and a revisit can
+polish a stamp but never extend a chain. Gold stamps are not doors:
+there is nothing above gold. Verified end to end: a revisit run
+bumped its row to rv with the calendar untouched, and the finish
+card stamped FINISHED · REVISIT.
+
+Gates: 8/8 shots, 90/90 courses, simulate PASS, plus live probes of
+all three surfaces with a seeded save.

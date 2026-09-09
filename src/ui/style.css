@@ -783,6 +783,8 @@ html, body {
 /* The generic .hidden rule only exists for .panel and #count; these two are
  * plain elements inside a panel, so they need their own. */
 #lockedBox.hidden, #histBtn.hidden, #endHistBtn.hidden { display: none; }
+#mapView.hidden, #passView.hidden, #cityBar.hidden, #pickLine.hidden,
+#pickBtn.hidden, #stampMoment.hidden { display: none; }
 
 /* THE LOCKED BOX replaces TOE THE LINE on a day the record has fallen. It
  * borrows #tomorrow's plate (the other "come back later" element) with the
@@ -902,35 +904,59 @@ html, body {
  * anyone who cannot see it, and an opacity alone reads as a rendering fault
  * rather than as a state. */
 #cityRule:empty { display: none; }
-/* ---- the world map ----
- * One glanceable visual, no stats: land in a lifted ink, the trail in the
- * accent, dots in the stamp wall's own three-state language. The trail
- * draws itself in when the panel opens -- dashoffset from beyond its
- * longest possible length to zero -- and today's dot breathes. */
-#mapBox { max-width: 460px; margin: 2px auto 10px; }
+/* ---- the world map, second draft: a folded paper object ----
+ * Bright paper held up against the dark HUD, per the owner's reference
+ * images: alternating fold panels of ocean, crease seams, a white frame
+ * with a real shadow. Land carries the scratch-map fantasy -- muted until
+ * its region holds a run, gold when the region is sealed -- and the pins
+ * DROP onto the paper when the page opens. */
+#mapBox { max-width: 520px; margin: 4px auto 8px; }
 #mapBox:empty { display: none; }
-#mapBox svg { display: block; width: 100%; height: auto; }
+#mapBox svg {
+  display: block; width: 100%; height: auto;
+  filter: drop-shadow(0 6px 14px rgba(4, 6, 20, 0.55));
+}
+#mapBox .paper { fill: #fffdf5; }
+#mapBox .ocean0 { fill: #5aa8e8; }
+#mapBox .ocean1 { fill: #6cb6f0; }
+#mapBox .crease { stroke: rgba(20, 40, 80, 0.18); stroke-width: 1; }
 #mapBox .land {
-  fill: rgba(255, 253, 245, 0.10);
-  stroke: rgba(255, 253, 245, 0.22); stroke-width: 0.6;
+  fill: #cfd8de;
+  stroke: rgba(30, 50, 80, 0.25); stroke-width: 0.6;
   stroke-linejoin: round;
+  transition: fill 0.6s ease;
 }
+#mapBox .land.lit { fill: #f6f2e6; }
+#mapBox .land.goldland { fill: #ffe45e; stroke: rgba(120, 90, 0, 0.35); }
 #mapBox .trail {
-  fill: none; stroke: var(--accent); stroke-width: 1.2;
+  fill: none; stroke: #e8433f; stroke-width: 1.4;
   stroke-linecap: round; stroke-linejoin: round;
-  stroke-dasharray: 900; stroke-dashoffset: 900;
-  animation: traildraw 1.6s ease-out 0.15s forwards;
-  opacity: 0.85;
+  stroke-dasharray: 3 3;
+  opacity: 0.9;
+  animation: traildraw 1.4s ease-out 0.3s backwards;
 }
-@keyframes traildraw { to { stroke-dashoffset: 0; } }
-#mapBox .dot { stroke: rgba(14, 18, 48, 0.9); stroke-width: 0.7; }
-#mapBox .dot.new { fill: rgba(255, 253, 245, 0.28); }
-#mapBox .dot.ink { fill: #fffdf5; }
-#mapBox .dot.bronze { fill: #e0955a; }
-#mapBox .dot.gold { fill: var(--accent); }
-#mapBox .dot.today { stroke: var(--accent); stroke-width: 1.1; }
-#mapBox .dotPulse {
-  fill: none; stroke: var(--accent); stroke-width: 1;
+@keyframes traildraw { from { opacity: 0; } to { opacity: 0.9; } }
+/* Pins: teardrops in the tier language. The drop is the page-open
+ * animation -- each pin falls onto the paper with one bounce -- and a
+ * settled redraw (a pin tap) stills it. */
+#mapBox .pin { stroke: rgba(20, 20, 40, 0.5); stroke-width: 0.7; }
+#mapBox .pin.new { fill: #9fb0bc; }
+#mapBox .pin.ink { fill: #e8433f; }
+#mapBox .pin.bronze { fill: #e0955a; }
+#mapBox .pin.gold { fill: #ffd93e; }
+#mapBox .pinHole { fill: #fffdf5; }
+#mapBox .pinShadow { fill: rgba(20, 30, 60, 0.30); }
+#mapBox .pinHit { fill: transparent; cursor: pointer; }
+#mapBox .pinDrop {
+  animation: pindrop 0.5s cubic-bezier(0.25, 1.5, 0.4, 1) backwards;
+}
+#mapBox svg.settled .pinDrop, #mapBox svg.settled .trail { animation: none; }
+@keyframes pindrop {
+  from { transform: translateY(-26px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+#mapBox .pinPulse {
+  fill: none; stroke: #fffdf5; stroke-width: 1.2;
   animation: dotpulse 1.6s ease-out infinite;
   transform-box: fill-box; transform-origin: center;
 }
@@ -939,6 +965,44 @@ html, body {
   70% { transform: scale(1); opacity: 0; }
   100% { transform: scale(1); opacity: 0; }
 }
+
+/* The two pages of the tour. */
+#tourTabs { display: flex; gap: 6px; justify-content: center; margin: 0 0 10px; }
+#tourTabs button {
+  font: inherit; color: inherit; cursor: pointer;
+  font-size: 10px; font-weight: 800; letter-spacing: 0.16em;
+  padding: 6px 14px;
+  background: none; border: 1px solid var(--hair); border-radius: 3px;
+  opacity: 0.6;
+}
+#tourTabs button.on {
+  opacity: 1; color: #14183a; background: var(--accent); border-color: var(--accent);
+}
+
+/* The city card under the map: the tapped pin's facts, and the door. */
+#mapCard {
+  max-width: 520px; margin: 0 auto;
+  padding: 9px 12px 10px;
+  background: var(--ink); border-left: 4px solid var(--accent);
+  text-align: left;
+}
+#mapCard:empty { display: none; }
+.mcTop { display: flex; align-items: baseline; gap: 8px; }
+.mcCity { font-size: 16px; font-weight: 800; letter-spacing: 0.08em; }
+.mcReg { font-size: 8px; font-weight: 800; letter-spacing: 0.16em; opacity: 0.55; }
+.mcTier { margin-left: auto; font-size: 9px; font-weight: 800; letter-spacing: 0.18em; }
+.mcTier.gold { color: var(--accent); }
+.mcTier.bronze { color: #eda56a; }
+.mcRow { font-size: 10px; opacity: 0.8; margin-top: 3px; letter-spacing: 0.05em; }
+.mcRun {
+  display: block; width: 100%; margin-top: 8px;
+  font: inherit; cursor: pointer;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.14em;
+  padding: 9px 0;
+  color: #14183a; background: var(--accent); border: none; border-radius: 3px;
+}
+.mcRun:active { transform: scale(0.98); }
+.mcNote { margin-top: 7px; font-size: 9px; font-weight: 800; letter-spacing: 0.14em; opacity: 0.7; }
 
 /* ---- the stamp wall ----
  * Four states in the border and the tier word: dashed outline for a city

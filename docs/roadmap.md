@@ -9035,3 +9035,37 @@ the featured chip; picking Rome swaps the bronze bar to Rutto's
 record; the tape spends the day; a bare reload and a forced
 ?city=TOKYO both land back in Rome; the spent wall reads TOMORROW
 twelve times. Gates: 8/8 shots, 90+90 courses, simulate PASS.
+
+## 110. The map becomes a paper object, and the tour gets two pages
+
+The owner, with two reference images: "The map needs drastic
+improves... Maybe map and passport are separate pages." The
+references chose the design between them. From the folded travel
+map: the map is now a bright PAPER OBJECT held up against the dark
+HUD -- four alternating ocean fold panels with crease seams, a white
+frame with a real shadow, teardrop pins with punched holes and
+ground shadows, and a red dashed route through the journey in
+first-run order. The pins DROP onto the paper when the page opens,
+staggered, with one bounce each; a settled redraw (a pin tap) stills
+them. From the scratch map: the LAND is the progression surface --
+a landmass sits muted until its region holds a run, brightens to
+paper-cream when it does, and turns gold when every city in the
+region is sealed. Eurasia split at the Urals for that reveal and no
+other reason: a map does not owe geography a border, but a reveal
+needs an edge.
+
+Two pages, one panel: WORLD MAP (the pin map and the day's picker --
+tapping a pin opens the city card with best, CR, tier and the RUN
+door under the one-a-day rule) and PASSPORT (the ledger, the stamp
+wall, the log), tabbed, so the back stack and the open/close
+plumbing are exactly what they were.
+
+The bug this page-split surfaced is worth its line: this stylesheet
+has NO global .hidden rule -- display:none is granted per-element by
+design -- and five of the World Tour's new elements had been relying
+on a class that did nothing (the passport wall rendered under the
+map; the start panel's bronze bar merely happened to be empty when
+it should have been hidden). All five are in the granted list now.
+
+Gates: 8/8 shots, 90+90 courses, simulate PASS, both pages and the
+finish stamp re-probed.

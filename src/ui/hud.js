@@ -496,19 +496,38 @@ MR.HUD = (function () {
       <div class="panel hidden" id="histPanel" role="dialog" aria-modal="true"
            aria-labelledby="histTitle"><div class="panelInner">
         <div class="date">WORLD TOUR</div>
-        <h1 id="histTitle">PASSPORT</h1>
+        <h1 id="histTitle">WORLD MAP</h1>
         <!--
-          THE WORLD MAP, un-paused on the owner's word ("The map/passport is
-          very important"). One glanceable visual and no stats of its own --
-          the stats live on the stamps below, so the two halves never say
-          the same thing twice. Land is hand-drawn low-poly in the game's
-          own idiom (a literal atlas would be the one realistic object in a
-          toon world); each dot is a city in the pool, colored by the same
-          three-state language the stamps use, with today's city pulsing
-          and the route so far drawn through the visited dots in the order
-          they were first run.
+          TWO PAGES, ONE PANEL. The owner, with two reference images (a
+          folded paper travel map with pins; a scratch map whose countries
+          reveal in color as they are visited): "The map needs drastic
+          improves... Maybe map and passport are separate pages." So they
+          are: the MAP page is the pin map and the day's picker, the
+          PASSPORT page is the stamps, the ledger and the log. One panel,
+          two views -- the back stack and the open/close plumbing stay
+          exactly what they were.
         -->
-        <div id="mapBox"></div>
+        <div id="tourTabs">
+          <button type="button" id="tabMap" class="on">WORLD MAP</button>
+          <button type="button" id="tabPass">PASSPORT</button>
+        </div>
+
+        <!--
+          THE MAP, SECOND DRAFT: a paper object, not a chart. Bright folded
+          paper held up against the dark HUD -- alternating fold panels,
+          crease seams, a white frame -- with teardrop PINS in the tier
+          language that DROP onto the paper when the page opens, a dashed
+          route through the journey so far, and the scratch-map fantasy on
+          the land itself: a region's landmass brightens when it holds a
+          run and turns gold when every city in it is sealed. Tapping a pin
+          opens the city card under the map, and the card carries the door.
+        -->
+        <div id="mapView">
+          <div id="mapBox"></div>
+          <div id="mapCard"></div>
+        </div>
+
+        <div id="passView" class="hidden">
         <div id="histSum"></div>
 
         <!--
@@ -550,6 +569,7 @@ MR.HUD = (function () {
         <div id="stampWall"></div>
 
         <div id="histList"></div>
+        </div>
         <button class="cta" id="histBack" type="button">BACK TO THE LINE</button>
       </div></div>
 
@@ -817,6 +837,8 @@ MR.HUD = (function () {
       shareBox: q('shareBox'), shareLegs: q('shareLegs'), shareLine: q('shareLine'),
       shareBtn: q('shareBtn'), shareNote: q('shareNote'), shareText: q('shareText'),
       cityRule: q('cityRule'), stampWall: q('stampWall'), mapBox: q('mapBox'),
+      mapView: q('mapView'), passView: q('passView'), mapCard: q('mapCard'),
+      tabMap: q('tabMap'), tabPass: q('tabPass'), histTitle: q('histTitle'),
       stampMoment: q('stampMoment'), stampInk: q('stampInk'),
       stampCity: q('stampCity'), stampWord: q('stampWord'),
       stampDate: q('stampDate'), stampCtx: q('stampCtx'),
@@ -1018,56 +1040,103 @@ MR.HUD = (function () {
     }
 
     /**
-     * ---- THE WORLD, AS SEVEN BLOBS AND TWELVE DOTS -----------------------
+     * ---- THE WORLD, AS A FOLDED PAPER MAP --------------------------------
      *
-     * Land is authored in lon/lat and projected here (x = lon + 180,
-     * y = 90 - lat, poles cropped by the viewBox), so a thirteenth city is
-     * one dot from its latlon and no redrawing. The shapes are DELIBERATELY
-     * low-poly -- ten to twenty vertices a continent, the same budget a
-     * hazard's silhouette gets -- because a survey-accurate coastline would
-     * be the one realistic object in a toon world. They only have to be
-     * true enough that Cape Town sits at the bottom of Africa and Sydney
-     * hangs off the far right, which is what makes the trail readable as A
-     * JOURNEY rather than as a chart.
+     * Second draft, to the owner's two reference images: a folded paper
+     * travel map (bright ocean, fold creases, red pins) and a scratch map
+     * (the world revealed in color as it is visited). Land is authored in
+     * lon/lat and projected (x = lon + 180, y = 90 - lat); each landmass
+     * carries the REGION whose progress lights it -- untouched land sits
+     * muted on the paper, a region with a run brightens, a region whose
+     * every city is gold turns gold, which is the scratch fantasy exactly.
+     * Eurasia is split at the Urals line for that reason and no other; a
+     * map does not owe geography a border, but a reveal needs an edge.
+     * Still low-poly on purpose: a survey coastline would be the one
+     * realistic object in a toon world.
      */
     const LAND = [
-      // North America, with the Central American taper the trail crosses.
-      [[-165, 66], [-150, 71], [-125, 72], [-95, 73], [-80, 72], [-68, 62], [-55, 52], [-65, 45],
-       [-70, 42], [-76, 36], [-81, 30], [-81, 25], [-89, 30], [-97, 27], [-106, 22], [-97, 16],
-       [-84, 10], [-79, 8], [-92, 14], [-110, 22], [-118, 32], [-125, 42], [-127, 50], [-140, 59], [-158, 57]],
-      // South America.
-      [[-79, 8], [-70, 12], [-61, 9], [-52, 4], [-35, -6], [-39, -14], [-48, -26], [-54, -35],
-       [-63, -42], [-70, -46], [-72, -34], [-70, -19], [-77, -12], [-81, -4]],
-      // Eurasia, one mass -- the map does not owe the Urals a border.
-      [[-9, 43], [-9, 37], [0, 36], [10, 38], [16, 38], [22, 36], [27, 37], [36, 36], [44, 38],
-       [52, 37], [58, 25], [67, 24], [72, 20], [77, 7], [81, 15], [89, 21], [95, 16], [105, 9],
-       [109, 13], [110, 21], [122, 30], [122, 40], [135, 44], [142, 53], [156, 60], [170, 64],
-       [178, 66], [160, 70], [140, 73], [110, 76], [80, 72], [60, 69], [45, 67], [40, 65],
-       [30, 70], [22, 70], [12, 65], [5, 61], [8, 56], [2, 51], [-5, 48]],
-      // Africa, Table Mountain end down where Cape Town's dot needs it.
-      [[-17, 15], [-10, 30], [-6, 35], [10, 37], [20, 32], [32, 31], [34, 27], [43, 11], [51, 12],
-       [41, -2], [36, -18], [29, -30], [19, -35], [14, -29], [12, -18], [14, -6], [9, 4], [-8, 4], [-16, 10]],
-      // Australia.
-      [[114, -22], [122, -17], [131, -11], [136, -14], [142, -10], [146, -18], [153, -26],
-       [151, -34], [144, -39], [136, -35], [129, -32], [124, -33], [115, -34], [112, -27]],
-      // The British Isles and Japan: two small lands two of the twelve
-      // dots sit beside; without them London floats in the sea.
-      [[-5, 50], [-3, 53], [-5, 58], [-2, 58], [0, 53], [1, 51]],
-      [[130, 31], [133, 34], [137, 35], [140, 36], [141, 40], [143, 45], [140, 43], [136, 37], [131, 33]],
+      { reg: 'AMERICAS', pts: [[-165, 66], [-150, 71], [-125, 72], [-95, 73], [-80, 72], [-68, 62], [-55, 52], [-65, 45],
+        [-70, 42], [-76, 36], [-81, 30], [-81, 25], [-89, 30], [-97, 27], [-106, 22], [-97, 16],
+        [-84, 10], [-79, 8], [-92, 14], [-110, 22], [-118, 32], [-125, 42], [-127, 50], [-140, 59], [-158, 57]] },
+      { reg: 'AMERICAS', pts: [[-79, 8], [-70, 12], [-61, 9], [-52, 4], [-35, -6], [-39, -14], [-48, -26], [-54, -35],
+        [-63, -42], [-70, -46], [-72, -34], [-70, -19], [-77, -12], [-81, -4]] },
+      // Greenland belongs to no region here; it is furniture the folded
+      // paper would look empty without.
+      { reg: null, pts: [[-45, 60], [-30, 68], [-20, 70], [-25, 76], [-40, 78], [-55, 75], [-52, 66]] },
+      { reg: 'EUROPE', pts: [[-9, 43], [-9, 37], [0, 36], [10, 38], [16, 38], [22, 36], [27, 37], [36, 36], [44, 38],
+        [50, 44], [54, 52], [56, 62], [50, 68], [40, 65], [30, 70], [22, 70], [12, 65], [5, 61], [8, 56], [2, 51], [-5, 48]] },
+      { reg: 'EUROPE', pts: [[-5, 50], [-3, 53], [-5, 58], [-2, 58], [0, 53], [1, 51]] },
+      { reg: 'ASIA-PACIFIC', pts: [[44, 38], [52, 37], [58, 25], [67, 24], [72, 20], [77, 7], [81, 15], [89, 21],
+        [95, 16], [105, 9], [109, 13], [110, 21], [122, 30], [122, 40], [135, 44], [142, 53], [156, 60], [170, 64],
+        [178, 66], [160, 70], [140, 73], [110, 76], [80, 72], [60, 69], [50, 68], [56, 62], [54, 52], [50, 44]] },
+      { reg: 'ASIA-PACIFIC', pts: [[130, 31], [133, 34], [137, 35], [140, 36], [141, 40], [143, 45], [140, 43], [136, 37], [131, 33]] },
+      { reg: 'ASIA-PACIFIC', pts: [[114, -22], [122, -17], [131, -11], [136, -14], [142, -10], [146, -18], [153, -26],
+        [151, -34], [144, -39], [136, -35], [129, -32], [124, -33], [115, -34], [112, -27]] },
+      { reg: 'AFRICA', pts: [[-17, 15], [-10, 30], [-6, 35], [10, 37], [20, 32], [32, 31], [34, 27], [43, 11], [51, 12],
+        [41, -2], [36, -18], [29, -30], [19, -35], [14, -29], [12, -18], [14, -6], [9, 4], [-8, 4], [-16, 10]] },
     ];
+    // Content coordinates: x 0..360, y 20..135 (the poles are not on the
+    // paper). The paper adds a PAD frame around the ocean.
+    const MAP_PAD = 6, MAP_Y0 = 20, MAP_H = 115;
     function mapPt(lon, lat) {
       return (lon + 180).toFixed(1) + ',' + (90 - lat).toFixed(1);
     }
 
-    function drawMap(sum, pool, todayTag) {
+    /** The one-a-day door state, shared by the stamp wall and the map card. */
+    function doorState(sum, s, loadedTag) {
+      const spent = !!(sum && sum.todayCity);
+      const dayDone = !!(sum && sum.done);
+      const isLoaded = s.tag === loadedTag;
+      const isSpent = spent && sum.todayCity === s.name;
+      const door = !dayDone && !spent && !isLoaded;
+      const note = isLoaded ? (dayDone ? 'TODAY · SEALED' : spent ? 'TODAY' : 'AT THE LINE')
+        : isSpent ? 'TODAY' : door ? 'RUN IT TODAY' : 'BACK TOMORROW';
+      return { door: door, note: note };
+    }
+
+    /** Which city the map card shows; a tapped pin moves it. */
+    let mapSel = null;
+
+    function drawMap(sum, pool, loadedTag, animate) {
       const seen = (sum && sum.cities) || {};
-      const land = LAND.map(function (poly) {
-        return '<polygon class="land" points="'
-          + poly.map(function (p) { return mapPt(p[0], p[1]); }).join(' ') + '"/>';
+      // Region progress lights the land.
+      const regStat = {};
+      for (const s of pool) {
+        const r = s.reg || s.region;
+        if (!r) continue;
+        const st = regStat[r] || (regStat[r] = { n: 0, run: 0, gold: 0 });
+        st.n++;
+        const c = seen[s.name];
+        const tier = stampTier(s, c);
+        if (c) st.run++;
+        if (tier === 'gold') st.gold++;
+      }
+      const landCls = function (reg) {
+        const st = reg && regStat[reg];
+        if (!st) return 'land';
+        if (st.gold === st.n && st.n > 0) return 'land goldland';
+        if (st.run > 0) return 'land lit';
+        return 'land';
+      };
+      const polys = LAND.map(function (L) {
+        return '<polygon class="' + landCls(L.reg) + '" points="'
+          + L.pts.map(function (p) { return mapPt(p[0], p[1]); }).join(' ') + '"/>';
       }).join('');
-      // The trail: visited cities in the order they were FIRST run -- the
-      // journey as it happened, not as the roster lists it. Drawn before
-      // the dots so it passes under them, and drawn in by CSS on open.
+
+      // The folded paper: four panels of alternating ocean, seams at the
+      // creases -- the reference image is a map you could pick up.
+      let folds = '';
+      for (let i = 0; i < 4; i++) {
+        folds += '<rect class="ocean' + (i % 2) + '" x="' + (i * 90) + '" y="' + MAP_Y0
+          + '" width="90" height="' + MAP_H + '"/>';
+      }
+      for (let i = 1; i < 4; i++) {
+        folds += '<line class="crease" x1="' + (i * 90) + '" y1="' + MAP_Y0
+          + '" x2="' + (i * 90) + '" y2="' + (MAP_Y0 + MAP_H) + '"/>';
+      }
+
+      // The route so far: a dashed travel line through the visited cities
+      // in the order they were first run.
       const visited = pool
         .map(function (s) { return { s: s, c: seen[s.name] }; })
         .filter(function (x) { return x.c && x.c.first && x.s.latlon; });
@@ -1076,39 +1145,67 @@ MR.HUD = (function () {
         ? '<polyline class="trail" points="'
           + visited.map(function (x) { return mapPt(x.s.latlon[1], x.s.latlon[0]); }).join(' ') + '"/>'
         : '';
-      const dots = pool.map(function (s) {
-        if (!s.latlon) return '';
+
+      // The pins, southernmost drawn last so an overlapping pair stacks the
+      // way paper pins would. Each drops onto the paper when the page opens
+      // (staggered), and the tap target is far larger than the pin.
+      const order = pool.slice().filter(function (s) { return s.latlon; })
+        .sort(function (a, b) { return b.latlon[0] - a.latlon[0]; });
+      const pins = order.map(function (s, i) {
         const c = seen[s.name];
         const tier = stampTier(s, c);
-        const today = s.tag === todayTag;
         const xy = mapPt(s.latlon[1], s.latlon[0]).split(',');
-        return (today ? '<circle class="dotPulse" r="7" cx="' + xy[0] + '" cy="' + xy[1] + '"/>' : '')
-          + '<circle class="dot ' + tier + (today ? ' today' : '') + '" r="3" cx="' + xy[0] + '" cy="' + xy[1] + '">'
-          + '<title>' + s.name + '</title></circle>';
+        const isSel = s.tag === mapSel;
+        const isLoaded = s.tag === loadedTag;
+        return '<g class="pinP' + (isSel ? ' sel' : '') + '" transform="translate(' + xy[0] + ',' + xy[1] + ')'
+          + (isSel ? ' scale(1.3)' : '') + '">'
+          + '<ellipse class="pinShadow" cx="0.6" cy="0.7" rx="3.4" ry="1.2"/>'
+          + (isLoaded ? '<circle class="pinPulse" cy="-1" r="6"/>' : '')
+          + '<g class="pinDrop"' + (animate ? ' style="animation-delay:' + (0.05 * i).toFixed(2) + 's"' : '') + '>'
+          + '<path class="pin ' + tier + '" d="M0 0C-4.2-6.2-6.5-8.4-6.5-12A6.5 6.5 0 1 1 6.5-12C6.5-8.4 4.2-6.2 0 0Z"/>'
+          + '<circle class="pinHole" cx="0" cy="-12" r="2.5"/>'
+          + '</g>'
+          + '<circle class="pinHit" r="11" cy="-9" data-pin="' + s.tag + '"><title>' + s.name + '</title></circle>'
+          + '</g>';
       }).join('');
-      // Poles cropped: nothing in the pool lives above 60N or below 45S,
-      // and the empty ice is height the phone does not have.
-      n.mapBox.innerHTML = '<svg viewBox="0 25 360 115" role="img" aria-label="World map of the tour">'
-        + land + trail + dots + '</svg>';
+
+      const W = 360 + MAP_PAD * 2, H = MAP_H + MAP_PAD * 2;
+      n.mapBox.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="World tour map"'
+        + (animate ? '' : ' class="settled"') + '>'
+        + '<rect class="paper" x="0" y="0" width="' + W + '" height="' + H + '" rx="5"/>'
+        + '<clipPath id="mclip"><rect x="0" y="' + MAP_Y0 + '" width="360" height="' + MAP_H + '" rx="3"/></clipPath>'
+        + '<g transform="translate(' + MAP_PAD + ',' + (MAP_PAD - MAP_Y0) + ')">'
+        + '<g clip-path="url(#mclip)">' + folds + polys + trail + '</g>'
+        + pins
+        + '</g></svg>';
     }
 
     /**
-     * ---- THE PICKER (2026-09-09) -----------------------------------------
-     *
-     * "All locations available everyday. You got to pick one to play each
-     * day. Can only play one a day." The wall is grouped by REGION -- the
-     * owner: "Some might want to tackle the biggest cities first, while
-     * others may want to tackle regions. We want to group cities by
-     * regions so this is the goal" -- each region carrying its own tally,
-     * so 'finish Europe' is a goal the panel itself keeps score of.
-     *
-     * The one-a-day rule, as the wall draws it: on a FREE day every stamp
-     * is a door (RUN IT TODAY) except the city already at the line; once
-     * today's choice is SPENT -- the save has a finished run -- every
-     * other door closes to TOMORROW, and when the record falls the whole
-     * day seals. The featured city wears the day's-race chip: picking it
-     * is running with everyone else in the world.
+     * The city card under the map: the tapped pin's facts and, when the
+     * one-a-day rule allows, the door. The same facts as that city's stamp
+     * -- the map page is for CHOOSING, the passport page is for KEEPING.
      */
+    function drawMapCard(sum, pool, loadedTag) {
+      const s = pool.filter(function (x) { return x.tag === mapSel; })[0]
+        || pool.filter(function (x) { return x.tag === loadedTag; })[0] || pool[0];
+      if (!s) { n.mapCard.innerHTML = ''; return; }
+      const seen = (sum && sum.cities) || {};
+      const c = seen[s.name];
+      const tier = stampTier(s, c);
+      const d = doorState(sum, s, loadedTag);
+      const word = tier === 'gold' ? 'GOLD' : tier === 'bronze' ? 'BRONZE' : tier === 'ink' ? 'RUN' : 'NEW ROAD';
+      n.mapCard.innerHTML =
+        '<div class="mcTop"><span class="mcCity">' + s.name + '</span>'
+        + '<span class="mcReg">' + (s.region || '') + '</span>'
+        + '<span class="mcTier ' + tier + '">' + word + '</span></div>'
+        + '<div class="mcRow num">'
+        + (c ? 'BEST ' + Pace.clock(c.best) + ' · ' : '')
+        + (s.rec ? 'CR ' + Pace.clock(s.rec) + ' · ' + s.holder : '') + '</div>'
+        + (d.door
+          ? '<button type="button" class="mcRun" data-city="' + s.tag + '">RUN ' + s.name + ' TODAY</button>'
+          : '<div class="mcNote">' + d.note + '</div>');
+    }
+
     function drawPassport(sum) {
       const pool = (MR.Course && MR.Course.SETTINGS) ? MR.Course.SETTINGS : [];
       if (!pool.length) { n.cityRule.textContent = ''; n.stampWall.innerHTML = ''; n.mapBox.innerHTML = ''; return; }
@@ -1116,9 +1213,9 @@ MR.HUD = (function () {
       const loadedTag = course && course.settings && course.settings.length ? course.settings[0].tag : null;
       const featTag = sum && sum.dateKey && MR.Course.pickSettings
         ? MR.Course.pickSettings(sum.dateKey)[0].tag : null;
-      drawMap(sum, pool, loadedTag);
-      const spent = !!(sum && sum.todayCity);
-      const dayDone = !!(sum && sum.done);
+      if (!mapSel) mapSel = loadedTag;
+      drawMap(sum, pool, loadedTag, true);
+      drawMapCard(sum, pool, loadedTag);
       const regions = [];
       const byReg = {};
       for (const s of pool) {
@@ -1136,12 +1233,8 @@ MR.HUD = (function () {
           if (c) { run++; rRun++; }
           const word = tier === 'gold' ? 'GOLD' : tier === 'bronze' ? 'BRONZE' : tier === 'ink' ? 'RUN' : 'NEW ROAD';
           const cr = s.rec ? 'CR ' + Pace.clock(s.rec) + ' · ' + s.holder : '';
-          const isLoaded = s.tag === loadedTag;
-          const isSpent = spent && sum.todayCity === s.name;
-          const door = !dayDone && !spent && !isLoaded;
-          const note = isLoaded ? (dayDone ? 'TODAY · SEALED' : spent ? 'TODAY' : 'AT THE LINE')
-            : isSpent ? 'TODAY'
-              : door ? 'RUN IT TODAY' : 'TOMORROW';
+          const d = doorState(sum, s, loadedTag);
+          const door = d.door, note = d.note;
           return '<' + (door ? 'button type="button"' : 'div') + ' class="stampC ' + tier
             + (door ? ' open' : '') + '"'
             + (door ? ' data-city="' + s.tag + '"' : '') + '>'
@@ -1166,17 +1259,51 @@ MR.HUD = (function () {
      * tool's business) survives the reload -- a bot flag from a probe
      * session must not leak into a player's run.
      */
-    n.stampWall.addEventListener('click', function (ev) {
-      let el = ev.target;
-      while (el && el !== n.stampWall && !el.getAttribute('data-city')) el = el.parentElement;
-      const tag = el && el !== n.stampWall && el.getAttribute('data-city');
-      if (!tag) return;
+    function goCity(tag) {
       const cur = new URLSearchParams(location.search);
       const next = new URLSearchParams();
       if (cur.get('date')) next.set('date', cur.get('date'));
       next.set('city', tag);
       location.href = location.pathname + '?' + next.toString();
+    }
+    function cityClick(rootEl) {
+      return function (ev) {
+        let el = ev.target;
+        while (el && el !== rootEl && !el.getAttribute('data-city')) el = el.parentElement;
+        const tag = el && el !== rootEl && el.getAttribute('data-city');
+        if (tag) goCity(tag);
+      };
+    }
+    n.stampWall.addEventListener('click', cityClick(n.stampWall));
+    n.mapCard.addEventListener('click', cityClick(n.mapCard));
+
+    // A tapped pin moves the card, not the page: the map redraws without
+    // replaying the drop (the settled class stills the animation), and the
+    // selected pin grows the way a thumb on a paper map would press it.
+    n.mapBox.addEventListener('click', function (ev) {
+      const t = ev.target;
+      const tag = t && t.getAttribute && t.getAttribute('data-pin');
+      if (!tag) return;
+      mapSel = tag;
+      const pool = (MR.Course && MR.Course.SETTINGS) ? MR.Course.SETTINGS : [];
+      const loadedTag = course && course.settings && course.settings.length ? course.settings[0].tag : null;
+      drawMap(lastSum, pool, loadedTag, false);
+      drawMapCard(lastSum, pool, loadedTag);
     });
+
+    // The two pages. One panel, so BACK and the open/close plumbing are
+    // untouched; the tabs only swap which half is visible.
+    function tourView(v) {
+      const isMap = v === 'map';
+      n.mapView.classList.toggle('hidden', !isMap);
+      n.passView.classList.toggle('hidden', isMap);
+      n.tabMap.classList.toggle('on', isMap);
+      n.tabPass.classList.toggle('on', !isMap);
+      n.histTitle.textContent = isMap ? 'WORLD MAP' : 'PASSPORT';
+      requestAnimationFrame(markScroll);
+    }
+    n.tabMap.addEventListener('click', function () { tourView('map'); });
+    n.tabPass.addEventListener('click', function () { tourView('pass'); });
 
     api.setHistory = function (sum) {
       lastSum = sum || null;

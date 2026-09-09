@@ -14786,7 +14786,19 @@ MR.World = (function () {
     // The crate load's woodgrain mean sat between the finish carpet and
     // the lanes (-0.104 vs carpet1); brightened and saturated
     // (l 1.35, s 1.5) it measures L 81.7 / S 0.481, +0.151 clear.
-    dressHazard(K.BLOCK, 8, 'veh_crateload', 0, [{ h: 0, l: 1.35, s: 1.5 }]);
+    // s 1.5 -> 1.8 AND t 0 (2026-09-09): the crateload cleared the S gate
+    // by 0.005 and the next day's road palette (S 0.239 on lane 2) spent
+    // it. s alone bought 0.005 of the shortfall -- the default t 0.25
+    // leaves every near-neutral wood texel out of the coat, and the area
+    // mean is mostly wood -- so the whole body takes it, like the
+    // dumpster and the police car. That still only bought 0.002: the
+    // colorful texels are already at the S ceiling and wood times 1.8 is
+    // still wood, so the AREA MEAN tops out near 0.45 and the S axis is
+    // spent. The margin comes from L instead, and it must clear the
+    // BRIGHTEST road in the pool (lane 1, L 95-103 by city): l 1.62 left
+    // one city at +0.002 over the gate -- thin is a fail on a timer, per
+    // the dumpster -- so 1.7, which holds 1.3x+ in every city shot.
+    dressHazard(K.BLOCK, 8, 'veh_crateload', 0, [{ h: 0, t: 0, l: 1.7, s: 1.8 }]);
     // The delivery scooter as sculpted measures L 69.7 / S 0.12 -- under
     // the gate against lane 0 in every city shot (-0.051 at best). Its
     // one shipped coat repaints moped and jacket alike (low threshold),
@@ -14809,9 +14821,12 @@ MR.World = (function () {
     // it, in two measured steps (l 1.45 landed it at L 72.1, between the
     // carpet at 57 and the light city road at 85 -- inside the band is the
     // one place it cannot stay): l 1.55 clears the dark roads on the L
-    // axis, and s 1.5 (t 0, the whole desaturated body) carries the light
-    // low-S roads on the S axis.
-    dressHazard(K.BLOCK, 11, 'veh_dumpster', Math.PI / 2, [{ h: 0, t: 0, l: 1.55, s: 1.5 }]);
+    // axis, and s (t 0, the whole desaturated body) carries the light
+    // low-S roads on the S axis. s 1.5 shipped with 0.003 of S margin on
+    // one road and the NEXT DAY'S palette spent it (S 0.446 on a road of
+    // 0.229, gate 0.22) -- a margin that thin is a fail on a timer, so
+    // 1.75 buys ~0.07 of real slack on the S axis it depends on.
+    dressHazard(K.BLOCK, 11, 'veh_dumpster', Math.PI / 2, [{ h: 0, t: 0, l: 1.55, s: 1.75 }]);
     // The owner's blue car takes four coats through the paint shop --
     // "please make it different colors so it is not only a blue car
     // throughout the whole game" -- and none of them is blue, because the

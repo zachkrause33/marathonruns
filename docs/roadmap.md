@@ -8988,3 +8988,50 @@ card stamped FINISHED · REVISIT.
 
 Gates: 8/8 shots, 90/90 courses, simulate PASS, plus live probes of
 all three surfaces with a seeded save.
+
+## 109. Pick your own adventure: every city, every day, one a day
+
+The owner, closing the loop the passport opened: "What if all
+locations were available everyday. You got to pick one to play each
+day. Can only play one a day... You are ultimately chasing the
+record everyday you just get to pick your own adventure... We want
+to group cities by regions so this is the goal."
+
+THE KEY GREW A TAG. A course key is now a bare date -- the FEATURED
+city, dealt from the calendar exactly as always, bit-identical for
+every date that ever shipped -- or date|TAG, the same date run in a
+chosen city. The whole key seeds every stream, so Rome-today and
+Rome-tomorrow are different roads, every player who picks Rome today
+runs the same Rome, and "try the record again" is always a live
+attempt rather than a memorized layout. course-test now validates a
+chosen-city course per day alongside the featured one (90+90).
+
+ONE A DAY IS THE SAVE'S LAW, written twice: main.js resolves every
+load through the day's history row (the city already run today
+outranks any URL), and store.js refuses to fold a second city's time
+into a spent date (a forced ?city or a racing second tab keeps its
+date-independent all-time marks and writes nothing else). The
+picker: every stamp on the wall is a RUN IT TODAY door while the day
+is open; the first tape closes every other door to TOMORROW; gold
+seals the day. The featured city wears the TODAY'S-RACE chip --
+picking it is running with the world, and the share card names the
+city either way (the owner: "The share card would say the city you
+ran that day"). A bronze now travels on the share card too.
+
+REGIONS, "so this is the goal": every roster city carries a region
+(AMERICAS, EUROPE, ASIA-PACIFIC, AFRICA), the wall groups under
+region headers that keep their own score (EUROPE · 4 OF 6 RUN · 2
+GOLD · COMPLETE), and a new city is one roster line -- region, dot
+and stamp included. The empty-state rule changed hands with the
+picker: a passport with no stamps used to be nothing to show, but
+the choice exists before the first run does, so the map and wall now
+draw for a brand-new player -- choosing a first city IS the first
+act of the game.
+
+The ?date replay door from roadmap 108 is superseded by the picker
+(a fresh course beats a frozen one on every axis) and survives only
+as tooling. Verified end to end: fresh boot offers eleven doors and
+the featured chip; picking Rome swaps the bronze bar to Rutto's
+record; the tape spends the day; a bare reload and a forced
+?city=TOKYO both land back in Rome; the spent wall reads TOMORROW
+twelve times. Gates: 8/8 shots, 90+90 courses, simulate PASS.

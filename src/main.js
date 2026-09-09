@@ -151,6 +151,35 @@ MR.unbail = function () {
 
   const params = new URLSearchParams(location.search);
   const dateKey = params.get('date') || MR.rng.dateKey();
+  /**
+   * ---- EVERY CITY, EVERY DAY -- AND ONLY ONE A DAY ----------------------
+   *
+   * The owner: "all locations available everyday. You got to pick one to
+   * play each day. Can only play one a day... you just get to pick your
+   * own adventure." Resolution order is the rule made executable:
+   *
+   *   1. the city ALREADY RUN today -- the save is the law. Once a city
+   *      has a run on today's date, every load lands back in it whatever
+   *      the URL says; the choice was spent at the first tape.
+   *   2. ?city=TAG -- the picker's door.
+   *   3. the featured city the calendar deals -- the default, the shared
+   *      race, and exactly the course that date always had: the course
+   *      key carries the tag only when it DIFFERS from the featured pick,
+   *      so every bare-date course ever shipped is bit-identical.
+   */
+  const featuredTag = MR.Course.pickSettings(dateKey)[0].tag;
+  let cityTag = featuredTag;
+  {
+    const pool = MR.Course.SETTINGS;
+    const want = (params.get('city') || '').toUpperCase();
+    const sum0 = params.get('nosave') === '1' ? null : MR.Store.summary(dateKey);
+    const spentName = sum0 && sum0.todayCity;
+    let spentTag = null;
+    if (spentName) for (const c of pool) if (c.name === spentName) spentTag = c.tag;
+    if (spentTag) cityTag = spentTag;
+    else if (want) for (const c of pool) if (c.tag === want) cityTag = want;
+  }
+  const courseKey = cityTag === featuredTag ? dateKey : dateKey + '|' + cityTag;
   const botParam = params.get('bot');
   const BOT = botParam !== null;
   const BOT_SKILL = BOT ? (botParam === '1' || botParam === '' ? 1 : parseFloat(botParam)) : 0;
@@ -236,7 +265,7 @@ MR.unbail = function () {
 
   MR.shading.lights(scene);
 
-  const course = MR.Course.generate(dateKey);
+  const course = MR.Course.generate(courseKey);
   if (!course.valid.ok) console.error('COURSE INVALID', course.valid.errors);
 
   const world = MR.World.create(course);

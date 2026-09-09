@@ -423,6 +423,14 @@ MR.HUD = (function () {
           <span id="cityBarLab"></span>
           <b class="num" id="cityBarTime"></b>
         </div>
+        <!--
+          PICK YOUR OWN ADVENTURE. Every city is open every day and the
+          player spends ONE on it; this is the door to the picker, and the
+          line under it says which state the day is in -- running the
+          world's race, running your own pick, or spent until tomorrow.
+        -->
+        <div id="pickLine" class="hidden"></div>
+        <button id="pickBtn" type="button" class="textBtn hidden">CHOOSE YOUR CITY · WORLD MAP</button>
 
         <!--
           WHAT THE GAME REMEMBERS.
@@ -813,6 +821,7 @@ MR.HUD = (function () {
       stampCity: q('stampCity'), stampWord: q('stampWord'),
       stampDate: q('stampDate'), stampCtx: q('stampCtx'),
       cityBar: q('cityBar'), cityBarLab: q('cityBarLab'), cityBarTime: q('cityBarTime'),
+      pickLine: q('pickLine'), pickBtn: q('pickBtn'),
       againBtn: q('againBtn'),
       count: q('count'), countVal: q('countVal'),
       pauseBtn: q('pauseBtn'), pausePanel: q('pausePanel'),
@@ -1083,70 +1092,110 @@ MR.HUD = (function () {
         + land + trail + dots + '</svg>';
     }
 
+    /**
+     * ---- THE PICKER (2026-09-09) -----------------------------------------
+     *
+     * "All locations available everyday. You got to pick one to play each
+     * day. Can only play one a day." The wall is grouped by REGION -- the
+     * owner: "Some might want to tackle the biggest cities first, while
+     * others may want to tackle regions. We want to group cities by
+     * regions so this is the goal" -- each region carrying its own tally,
+     * so 'finish Europe' is a goal the panel itself keeps score of.
+     *
+     * The one-a-day rule, as the wall draws it: on a FREE day every stamp
+     * is a door (RUN IT TODAY) except the city already at the line; once
+     * today's choice is SPENT -- the save has a finished run -- every
+     * other door closes to TOMORROW, and when the record falls the whole
+     * day seals. The featured city wears the day's-race chip: picking it
+     * is running with everyone else in the world.
+     */
     function drawPassport(sum) {
       const pool = (MR.Course && MR.Course.SETTINGS) ? MR.Course.SETTINGS : [];
-      if (!pool.length) { n.cityRule.textContent = ''; n.stampWall.innerHTML = ''; n.mapBox.innerHTML = ''; return { gold: 0, run: 0 }; }
+      if (!pool.length) { n.cityRule.textContent = ''; n.stampWall.innerHTML = ''; n.mapBox.innerHTML = ''; return; }
       const seen = (sum && sum.cities) || {};
-      const todayTag = course && course.settings && course.settings.length ? course.settings[0].tag : null;
-      drawMap(sum, pool, todayTag);
-      let gold = 0, run = 0;
-      const html = pool.map(function (s) {
-        const c = seen[s.name];
-        const tier = stampTier(s, c);
-        if (tier === 'gold') gold++;
-        if (c) run++;
-        const word = tier === 'gold' ? 'GOLD' : tier === 'bronze' ? 'BRONZE' : tier === 'ink' ? 'RUN' : 'NOT YET DRAWN';
-        const cr = s.rec ? 'CR ' + Pace.clock(s.rec) + ' · ' + s.holder : '';
-        // A visited stamp is a door: its most recent course, rerunnable --
-        // that is how a bronze becomes gold. Today's city routes through
-        // the ordinary start instead (its door is TOE THE LINE), and a
-        // GOLD stamp is not a door at all: there is nothing above gold,
-        // and the day behind it is locked by the record anyway.
-        const door = c && c.last && s.tag !== todayTag && tier !== 'gold';
-        return '<' + (door ? 'button type="button"' : 'div') + ' class="stampC ' + tier + '"'
-          + (door ? ' data-date="' + c.last + '"' : '') + '>'
-          + '<span class="sCity">' + s.name + '</span>'
-          + '<span class="sTier">' + word + '</span>'
-          + (c ? '<span class="sBest num">' + Pace.clock(c.best) + '</span>' : '<span class="sBest num">&mdash;</span>')
-          + '<span class="sCr num">' + cr + '</span>'
-          + (c ? '<span class="sDays">' + c.runs + (c.runs === 1 ? ' RUN' : ' RUNS')
-              + (door ? ' · TAP TO RUN IT'
-                : s.tag === todayTag ? ' · TODAY'
-                  : tier === 'gold' ? ' · SEALED' : '') + '</span>'
-             : '<span class="sDays"></span>')
-          + '</' + (door ? 'button' : 'div') + '>';
-      }).join('');
-      n.cityRule.textContent = 'STAMPS · ' + run + ' OF ' + pool.length + ' CITIES · ' + gold + ' GOLD';
+      const loadedTag = course && course.settings && course.settings.length ? course.settings[0].tag : null;
+      const featTag = sum && sum.dateKey && MR.Course.pickSettings
+        ? MR.Course.pickSettings(sum.dateKey)[0].tag : null;
+      drawMap(sum, pool, loadedTag);
+      const spent = !!(sum && sum.todayCity);
+      const dayDone = !!(sum && sum.done);
+      const regions = [];
+      const byReg = {};
+      for (const s of pool) {
+        const r = s.region || 'THE WORLD';
+        if (!byReg[r]) { byReg[r] = []; regions.push(r); }
+        byReg[r].push(s);
+      }
+      let gold = 0, run = 0, html = '';
+      for (const reg of regions) {
+        let rGold = 0, rRun = 0;
+        const cards = byReg[reg].map(function (s) {
+          const c = seen[s.name];
+          const tier = stampTier(s, c);
+          if (tier === 'gold') { gold++; rGold++; }
+          if (c) { run++; rRun++; }
+          const word = tier === 'gold' ? 'GOLD' : tier === 'bronze' ? 'BRONZE' : tier === 'ink' ? 'RUN' : 'NEW ROAD';
+          const cr = s.rec ? 'CR ' + Pace.clock(s.rec) + ' · ' + s.holder : '';
+          const isLoaded = s.tag === loadedTag;
+          const isSpent = spent && sum.todayCity === s.name;
+          const door = !dayDone && !spent && !isLoaded;
+          const note = isLoaded ? (dayDone ? 'TODAY · SEALED' : spent ? 'TODAY' : 'AT THE LINE')
+            : isSpent ? 'TODAY'
+              : door ? 'RUN IT TODAY' : 'TOMORROW';
+          return '<' + (door ? 'button type="button"' : 'div') + ' class="stampC ' + tier
+            + (door ? ' open' : '') + '"'
+            + (door ? ' data-city="' + s.tag + '"' : '') + '>'
+            + '<span class="sCity">' + s.name + '</span>'
+            + '<span class="sTier">' + word
+            + (s.tag === featTag ? ' <span class="sFeat">TODAY\'S RACE</span>' : '') + '</span>'
+            + (c ? '<span class="sBest num">' + Pace.clock(c.best) + '</span>' : '<span class="sBest num">&mdash;</span>')
+            + '<span class="sCr num">' + cr + '</span>'
+            + '<span class="sDays">' + (c ? c.runs + (c.runs === 1 ? ' RUN · ' : ' RUNS · ') : '') + note + '</span>'
+            + '</' + (door ? 'button' : 'div') + '>';
+        }).join('');
+        html += '<div class="regHead">' + reg + ' · ' + rRun + ' OF ' + byReg[reg].length + ' RUN'
+          + (rGold ? ' · ' + rGold + ' GOLD' : '')
+          + (rGold === byReg[reg].length ? ' · COMPLETE' : '') + '</div>' + cards;
+      }
+      n.cityRule.textContent = 'PICK A CITY · ONE A DAY · ' + run + ' OF ' + pool.length + ' RUN · ' + gold + ' GOLD';
       n.stampWall.innerHTML = html;
-      return { gold: gold, run: run };
     }
 
     /**
-     * THE REVISIT DOOR. One delegated listener; the reload carries the
-     * date and nothing else, so a bot flag from a tool session cannot leak
-     * into a player's rerun. store.js treats the backwards date as a
-     * revisit: the stamp can improve, the calendar cannot move.
+     * The picker's door: reload into the chosen city. Only the date (a
+     * tool's business) survives the reload -- a bot flag from a probe
+     * session must not leak into a player's run.
      */
     n.stampWall.addEventListener('click', function (ev) {
       let el = ev.target;
-      while (el && el !== n.stampWall && !el.getAttribute('data-date')) el = el.parentElement;
-      const d = el && el !== n.stampWall && el.getAttribute('data-date');
-      if (d) location.href = location.pathname + '?date=' + d;
+      while (el && el !== n.stampWall && !el.getAttribute('data-city')) el = el.parentElement;
+      const tag = el && el !== n.stampWall && el.getAttribute('data-city');
+      if (!tag) return;
+      const cur = new URLSearchParams(location.search);
+      const next = new URLSearchParams();
+      if (cur.get('date')) next.set('date', cur.get('date'));
+      next.set('city', tag);
+      location.href = location.pathname + '?' + next.toString();
     });
 
     api.setHistory = function (sum) {
+      lastSum = sum || null;
+      syncChoice();
       const rows = sum && sum.history ? sum.history : [];
       n.histBtn.classList.toggle('hidden', !rows.length);
       n.endHistBtn.classList.toggle('hidden', !rows.length);
+      // The empty-state rule changed hands with the picker: a passport
+      // with no stamps used to be nothing to show, but the panel is now
+      // where a day's city is CHOSEN, and the choice exists before the
+      // first run does. So the map and the wall always draw; only the
+      // ledger and the log keep the old rule (a history of zero runs is
+      // still not a history).
+      drawPassport(sum);
       if (!rows.length) {
         n.histSum.innerHTML = '';
         n.histList.innerHTML = '';
-        n.cityRule.textContent = '';
-        n.stampWall.innerHTML = '';
-        n.mapBox.innerHTML = '';
         return;
       }
-      drawPassport(sum);
 
       let wr = 0;
       for (const e of rows) if (e.rec) wr++;
@@ -1226,6 +1275,32 @@ MR.HUD = (function () {
     };
 
     n.histBtn.addEventListener('click', function () { openHist(n.startPanel); });
+    n.pickBtn.addEventListener('click', function () { openHist(n.startPanel); });
+
+    /**
+     * The start panel's one line about the day's choice: whose race the
+     * loaded city is, or that the day is already spent. Re-derived when
+     * either input arrives (the course at boot, the save after it), so
+     * the order they land in cannot leave the line stale.
+     */
+    let lastSum = null;
+    function syncChoice() {
+      if (!n.pickBtn) return;
+      const set = course && course.settings;
+      const loaded = set && set.length ? set[0] : null;
+      const feat = lastSum && lastSum.dateKey && MR.Course.pickSettings
+        ? MR.Course.pickSettings(lastSum.dateKey)[0] : null;
+      const spent = !!(lastSum && lastSum.todayCity);
+      const done = !!(lastSum && lastSum.done);
+      n.pickBtn.classList.toggle('hidden', !loaded || spent || done);
+      let line = '';
+      if (loaded && feat && !done) {
+        if (spent) line = 'TODAY IS ' + (lastSum.todayCity || loaded.name) + ' · NEW PICK TOMORROW';
+        else if (loaded.tag !== feat.tag) line = 'YOUR PICK · THE WORLD RUNS ' + feat.name + ' TODAY';
+      }
+      n.pickLine.textContent = line;
+      n.pickLine.classList.toggle('hidden', !line);
+    }
     n.endHistBtn.addEventListener('click', function () { openHist(n.endPanel); });
     n.histBack.addEventListener('click', function () {
       n.histPanel.classList.add('hidden');
@@ -1511,10 +1586,14 @@ MR.HUD = (function () {
       const isRec = t <= K.RECORD_SECONDS;
 
       const out = [];
+      // The medal travels: a bronze names the real record it beat, which
+      // is the line a group chat actually asks about.
+      const medal = set && set.length && MR.Course.tierFor ? MR.Course.tierFor(t, set[0].tag) : '';
       out.push('MARATHON MILES' + (city ? ' · ' + city : ''));
       out.push((isRec ? TROPHY + ' ' : '') + Tier.of(t).name
         + ' · ' + Pace.clock(t)
-        + ' (' + (vs <= 0 ? '-' : '+') + Pace.clock(Math.abs(vs)) + ')');
+        + ' (' + (vs <= 0 ? '-' : '+') + Pace.clock(Math.abs(vs)) + ')'
+        + (medal === 'bronze' ? ' · CITY RECORD BEATEN' : ''));
       if (marks.length) out.push(marks.map(function (m) { return BLOCK[m]; }).join(''));
       const streak = rec && rec.dayStreak ? rec.dayStreak | 0 : 0;
       if (streak >= 2) out.push('Day streak: ' + streak);
@@ -1742,6 +1821,7 @@ MR.HUD = (function () {
       }
       drawRoute(set);
       api.milesSpeaks(set && set.length ? set[0].tag : null);
+      syncChoice();
       // The route and the gate count arrive after the panel is first laid out
       // and both add height, so the overflow test has to run again here or it
       // measures a panel shorter than the one on screen.

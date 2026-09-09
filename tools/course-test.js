@@ -23,6 +23,13 @@ const DAYS = parseInt(process.argv[2] || '90', 10);
 let fail = 0;
 const stats = { gates: [], blocks: 0, jumps: 0, ducks: 0, trains: 0 };
 
+// Every city is playable every day now ('YYYY-MM-DD|TAG' keys -- see
+// pickSettings), so the calendar under test is DAYS x the featured course
+// plus, each day, one CHOSEN city rotated through the roster -- every city
+// gets DAYS/12 chosen-course validations without multiplying the runtime
+// by thirteen. The chosen course must hold every invariant the featured
+// one does; a player who picks Rome is owed the same fairness.
+let chosenTested = 0;
 for (let i = 0; i < DAYS; i++) {
   const d = new Date(Date.UTC(2026, 0, 1) + i * 86400000);
   const key = ctx.MR.rng.dateKey(d);
@@ -32,6 +39,27 @@ for (let i = 0; i < DAYS; i++) {
     fail++;
     console.log(`FAIL ${key}: ${a.valid.errors.slice(0, 3).join('; ')}`);
     continue;
+  }
+
+  {
+    const tag = Course.SETTINGS[i % Course.SETTINGS.length].tag;
+    const ck = key + '|' + tag;
+    const c = Course.generate(ck);
+    if (!c.valid.ok) {
+      fail++;
+      console.log(`FAIL ${ck}: ${c.valid.errors.slice(0, 3).join('; ')}`);
+    } else if (c.settings[0].tag !== tag) {
+      fail++;
+      console.log(`FAIL ${ck}: wrong city ${c.settings[0].tag}`);
+    } else if (tag === a.settings[0].tag
+        && JSON.stringify(c.gates) !== JSON.stringify(a.gates)) {
+      // The same city under both key shapes may differ (the keys seed the
+      // streams differently) -- but the FEATURED city under its bare key
+      // must never change, which the determinism check below guards.
+      chosenTested++;
+    } else {
+      chosenTested++;
+    }
   }
 
   // Determinism: regenerate and compare structurally.
@@ -60,7 +88,7 @@ if (JSON.stringify(k1) === JSON.stringify(k2)) { fail++; console.log('FAIL: cons
 
 const avg = stats.gates.reduce((a, b) => a + b, 0) / stats.gates.length;
 const min = Math.min(...stats.gates), max = Math.max(...stats.gates);
-console.log(`days tested   ${DAYS}`);
+console.log(`days tested   ${DAYS}  (+${chosenTested} chosen-city courses)`);
 console.log(`gates         avg ${avg.toFixed(1)}  min ${min}  max ${max}`);
 console.log(`hazards       jump ${stats.jumps}  duck ${stats.ducks}  block ${stats.blocks}  trains ${stats.trains}`);
 console.log(`course length ${K.TOTAL_UNITS.toFixed(0)} units / ${K.MARATHON_MILES.toFixed(3)} mi`);

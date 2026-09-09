@@ -1336,29 +1336,29 @@ MR.Course = (function () {
    * dot on the passport's world map.
    */
   const SETTINGS = [
-    { tag: 'BOSTON',    name: 'BOSTON',        rec: 7312, holder: 'KORIR 2026',      latlon: [42.36, -71.06],
+    { tag: 'BOSTON', region: 'AMERICAS',    name: 'BOSTON',        rec: 7312, holder: 'KORIR 2026',      latlon: [42.36, -71.06],
       hint: 'brownstones, autumn maples, the Citgo sign, a right on Hereford and a left on Boylston' },
-    { tag: 'LONDON',    name: 'LONDON',        rec: 7170, holder: 'SAWE 2026 · WR',  latlon: [51.51, -0.13],
+    { tag: 'LONDON', region: 'EUROPE',    name: 'LONDON',        rec: 7170, holder: 'SAWE 2026 · WR',  latlon: [51.51, -0.13],
       hint: 'Tower Bridge, red buses, black cabs, plane trees, the Thames' },
-    { tag: 'BERLIN',    name: 'BERLIN',        rec: 7269, holder: 'KIPCHOGE 2022',   latlon: [52.52, 13.41],
+    { tag: 'BERLIN', region: 'EUROPE',    name: 'BERLIN',        rec: 7269, holder: 'KIPCHOGE 2022',   latlon: [52.52, 13.41],
       hint: 'the Brandenburg Gate, the Fernsehturm, linden avenues, the Spree' },
-    { tag: 'CHICAGO',   name: 'CHICAGO',       rec: 7235, holder: 'KIPTUM 2023',     latlon: [41.88, -87.63],
+    { tag: 'CHICAGO', region: 'AMERICAS',   name: 'CHICAGO',       rec: 7235, holder: 'KIPTUM 2023',     latlon: [41.88, -87.63],
       hint: 'elevated L track over the road, river bascule bridges, a black glass skyline' },
-    { tag: 'NEWYORK',   name: 'NEW YORK',      rec: 7498, holder: 'TOLA 2023',       latlon: [40.71, -74.01],
+    { tag: 'NEWYORK', region: 'AMERICAS',   name: 'NEW YORK',      rec: 7498, holder: 'TOLA 2023',       latlon: [40.71, -74.01],
       hint: 'the Verrazzano span, brownstones, yellow cabs, Central Park stone walls' },
-    { tag: 'TOKYO',     name: 'TOKYO',         rec: 7336, holder: 'KIPRUTO 2024',    latlon: [35.68, 139.69],
+    { tag: 'TOKYO', region: 'ASIA-PACIFIC',     name: 'TOKYO',         rec: 7336, holder: 'KIPRUTO 2024',    latlon: [35.68, 139.69],
       hint: 'the Imperial Palace moat, torii, neon signage, the Skytree' },
-    { tag: 'SYDNEY',    name: 'SYDNEY',        rec: 7482, holder: 'GOBENA 2026',     latlon: [-33.87, 151.21],
+    { tag: 'SYDNEY', region: 'ASIA-PACIFIC',    name: 'SYDNEY',        rec: 7482, holder: 'GOBENA 2026',     latlon: [-33.87, 151.21],
       hint: 'the Harbour Bridge, the Opera House shells, ferries, harbour water' },
-    { tag: 'PARIS',     name: 'PARIS',         rec: 7461, holder: 'ROTICH 2021',     latlon: [48.86, 2.35],
+    { tag: 'PARIS', region: 'EUROPE',     name: 'PARIS',         rec: 7461, holder: 'ROTICH 2021',     latlon: [48.86, 2.35],
       hint: 'the Eiffel Tower, Haussmann facades, Seine bridges, kiosks' },
-    { tag: 'VALENCIA',  name: 'VALENCIA',      rec: 7308, holder: 'LEMMA 2023',      latlon: [39.47, -0.38],
+    { tag: 'VALENCIA', region: 'EUROPE',  name: 'VALENCIA',      rec: 7308, holder: 'LEMMA 2023',      latlon: [39.47, -0.38],
       hint: 'the City of Arts and Sciences, the Serranos gate, palms, orange groves, white stone' },
-    { tag: 'AMSTERDAM', name: 'AMSTERDAM',     rec: 7411, holder: 'TOROITICH 2025',  latlon: [52.37, 4.90],
+    { tag: 'AMSTERDAM', region: 'EUROPE', name: 'AMSTERDAM',     rec: 7411, holder: 'TOROITICH 2025',  latlon: [52.37, 4.90],
       hint: 'canals, gabled houses, bicycle racks, humpback bridges, a smock windmill' },
-    { tag: 'ROME',      name: 'ROME',          rec: 7584, holder: 'RUTTO 2024',      latlon: [41.90, 12.50],
+    { tag: 'ROME', region: 'EUROPE',      name: 'ROME',          rec: 7584, holder: 'RUTTO 2024',      latlon: [41.90, 12.50],
       hint: 'the Colosseum, an aqueduct, umbrella pines, ochre walls' },
-    { tag: 'CAPETOWN',  name: 'CAPE TOWN',     rec: 7495, holder: 'ESA 2026',        latlon: [-33.92, 18.42],
+    { tag: 'CAPETOWN', region: 'AFRICA',  name: 'CAPE TOWN',     rec: 7495, holder: 'ESA 2026',        latlon: [-33.92, 18.42],
       hint: 'Table Mountain, the coast road, the Green Point lighthouse, the stadium, fynbos' },
   ];
 
@@ -1403,6 +1403,36 @@ MR.Course = (function () {
    * must not.
    */
   function pickSettings(key) {
+    /**
+     * ---- EVERY CITY, EVERY DAY (2026-09-09) ------------------------------
+     *
+     * The owner: "What if all locations were available everyday. You got
+     * to pick one to play each day... Key is only one a day." A course
+     * key is now either a bare date -- the FEATURED city, dealt from the
+     * calendar bag exactly as it always was, bit-identical for every date
+     * that has ever shipped -- or 'YYYY-MM-DD|TAG', the same date run in
+     * a CHOSEN city. The tag picks the setting; the whole key seeds every
+     * stream, so Rome-today and Rome-tomorrow are different courses, and
+     * every player who picks Rome today runs the same Rome. main.js owns
+     * the one-a-day rule (the save enforces it); this file only answers
+     * what road a key names.
+     */
+    const bar = key.indexOf('|');
+    if (bar >= 0) {
+      const tag = key.slice(bar + 1);
+      for (const c of SETTINGS) {
+        if (c.tag === tag) {
+          return [{
+            tag: c.tag, name: c.name, hint: c.hint,
+            rec: c.rec, holder: c.holder, latlon: c.latlon, region: c.region,
+            from: 0, to: 1, first: true, last: true,
+          }];
+        }
+      }
+      // An unknown tag (a hand-edited URL, a city later removed) falls
+      // through to the featured pick rather than throwing at boot.
+      key = key.slice(0, bar);
+    }
     const p = key.split('-');
     const day = Math.floor(Date.UTC(+p[0], +p[1] - 1, +p[2]) / 86400000);
     const cycle = Math.floor(day / SETTINGS.length);
@@ -1418,7 +1448,7 @@ MR.Course = (function () {
     const s = bag[pos];
     return [{
       tag: s.tag, name: s.name, hint: s.hint,
-      rec: s.rec, holder: s.holder, latlon: s.latlon,
+      rec: s.rec, holder: s.holder, latlon: s.latlon, region: s.region,
       from: 0, to: 1, first: true, last: true,
     }];
   }

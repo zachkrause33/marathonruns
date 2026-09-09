@@ -340,6 +340,10 @@ MR.Store = (function () {
       totalDays: s.hist.length,
       totalRuns: totalRuns,
       totalRecs: totalRecs,
+      // The city today's choice was spent on, or null while the day is
+      // still open. main.js resolves every load through this: one city a
+      // day, and the first finished run is what chooses it.
+      todayCity: todayRow ? (todayRow.city || null) : null,
       done: doneToday,                    // the record fell today: today is over
       doneTime: doneToday ? todayRow.time : 0,
       recordStreak: recStreak,
@@ -399,7 +403,21 @@ MR.Store = (function () {
     const backwards = (s.day && dateKey < s.day.date)
                    || (s.days.last && dateKey < s.days.last);
 
-    if (!backwards) {
+    /**
+     * ONE CITY A DAY, enforced here as well as at boot. main.js already
+     * routes every load back to the city a date was spent in, so a run
+     * from a DIFFERENT city arriving for the same date means a forced
+     * URL or a second tab racing the save -- and folding a Tokyo time
+     * into Cape Town's row would corrupt the passport. Such a run keeps
+     * its date-independent all-time marks below and writes nothing else.
+     */
+    const cityNow = str(run && run.city);
+    let clashRow = null;
+    for (const e of s.hist) if (e.date === dateKey) { clashRow = e; break; }
+    const cityClash = !!(clashRow && cityNow && clashRow.city && clashRow.city !== cityNow);
+    if (cityClash) out.cityClash = true;
+
+    if (!backwards && !cityClash) {
       const newDay = !s.day || s.day.date !== dateKey;
       if (newDay) {
         if (s.day) s.prev = { date: s.day.date, time: s.day.time, streak: s.day.streak, tier: s.day.tier };
@@ -443,7 +461,7 @@ MR.Store = (function () {
         if (city && !h.city) h.city = city;
       }
       out.recordBroken = rec;
-    } else {
+    } else if (!cityClash) {
       /**
        * THE REVISIT DOOR. A backwards date used to fall through with only
        * the all-time marks -- which also meant an old city's stamp could

@@ -495,6 +495,15 @@ html, body {
 #railGap.behind { background: rgba(255, 107, 132, 0.42); }
 #railGap.ahead  { background: rgba(77, 251, 160, 0.42); }
 #railGap.level  { background: rgba(255, 253, 245, 0.26); }
+/* ON YOUR SHOULDER: within a tenth of a mile of the ghost the gap value and
+ * the sliver of road between you both breathe. A slow opacity pulse and
+ * nothing else -- no size, no colour change -- so the moment is felt without
+ * the rail ever contradicting its own tone system. */
+#railGap.near, #gapVal.near { animation: shoulder 1.1s ease-in-out infinite; }
+@keyframes shoulder {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
 
 #railGhost {
   position: absolute; top: -5px; bottom: -5px;

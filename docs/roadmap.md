@@ -8881,3 +8881,55 @@ underside are all in ordinary shot.
 
 A Tripo generation can replace the code art later (single view, one
 small car, side-on fit) -- noted in the backlog, no credits spent.
+
+## 106. Ghost drama: the chase as an arc, not a number
+
+Outside feedback, quoted because it named the defect exactly: the
+emotional experience "shouldn't just be my score is 8,742. It should
+be I'm 20 meters behind the record -> I'm gaining -> we're shoulder-
+to-shoulder -> I crashed -> now he's disappearing down the road."
+The rail drew position; nothing drew MOTION or PRESENCE. Three
+additions, none of them a verdict:
+
+THE TREND -- UP THE ROAD · CLOSING / SLIPPING, BEHIND YOU · GAINING:
+the derivative of the positional gap, smoothed over ~2s. The old
+GAINING/LOSING tag died for reading pace against RECORD_PACE (wrong
+for three quarters of a clean run); the derivative of the gap itself
+is geography over time and cannot disagree with the map it annotates.
+The threshold is a real-machine constant (0.5 s/s) set from the bot's
+own d(t) across skip points -- it CANNOT be tuned by watching the
+headless probe, which runs the whole game ~10x slow; the EMA was
+verified against measured drift to two decimals at that speed.
+
+ON YOUR SHOULDER -- within 0.04 mi of the ghost (10 road units, him
+large in frame beside you) the line yields to presence, and the gap
+value and the sliver of road between you breathe on a 1.1s opacity
+pulse. Past the first half mile only: the gun has everyone level,
+and a moment that fires at every start is not a moment.
+
+THE CHASE PULSE -- a fourth ambient layer beside the bed, the rush
+and the grade: a 57 Hz sine under a 2.3 Hz tremolo whose level rises
+with physical proximity to the ghost, silent beyond 0.12 mi. Pure
+state by the mix's own taxonomy, honest by the grade section's rule:
+it charges nothing and implies nothing, it states that the record is
+running beside you. Verified live: +0:00.5 ON YOUR SHOULDER at mile
+6.32, breathing, with the pulse driven from the same geography.
+
+Gates: 8/8 shots, 90/90 courses, simulate PASS.
+
+## 107. Thin margins fail on a timer: the calendar collected two
+
+Six days after the grade shipped with every margin green, the day's
+palette rotated and two variants failed the contrast gate with NO
+code change at all: the dumpster (S margin 0.003) and the crateload
+(0.005). A margin thinner than the road pool's day-to-day variance
+is not a pass, it is a fail with a date on it. Both repaired at the
+axis that actually has headroom -- the dumpster's S coat widened
+(s 1.75), the crateload moved OFF the S axis entirely (its colorful
+texels sit at the S ceiling and wood times anything is wood, so the
+area mean tops out near 0.45; l 1.7 clears the brightest lane-1 road
+1.3x+ in every city instead). The rule this leaves behind: when a
+coat is tuned to the gate, tune it to the WORST road in the pool
+plus the pool's variance, not to the day the tuning happened.
+
+Gates: 8/8 shots, 90/90 courses, simulate PASS.

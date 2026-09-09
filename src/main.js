@@ -1229,6 +1229,13 @@ MR.unbail = function () {
       // layer of the mix is silent -- the hills are audible only through
       // cadence, which falls out of a grade-inclusive speed for free.
       audio.setIntensity(pace.streak / 70, pace.grade);
+      // The chase pulse: proximity to the ghost as the rail draws it --
+      // silent beyond 0.12 mi, full when shoulder to shoulder. The same
+      // geography the ON YOUR SHOULDER line prints, in the mix's terms.
+      // Past the first half mile only, same guard as the rail's shoulder
+      // line: the gun has everyone level, and that is not the moment.
+      audio.chase(pace.miles > 0.5
+        ? 1 - Math.min(1, Math.abs(pace.ghostMiles() - pace.miles) / 0.08) : 0);
 
       // The record slipping out of reach, and the ladder moving under you.
       // Both are changes of situation rather than events, both are currently

@@ -1865,11 +1865,58 @@ MR.HUD = (function () {
       }
 
       const tone = ahead ? 'ahead' : state === 'off' ? 'behind' : 'level';
+      /**
+       * THE CHASE, AS MOTION AND NOT ONLY POSITION. The feedback that
+       * commissioned this said the emotional arc should be "I'm gaining ->
+       * shoulder-to-shoulder -> he's disappearing down the road", and the
+       * rail already draws two of those three -- what it never said was
+       * which way the road between you is CHANGING. The old GAINING/LOSING
+       * tag was removed for reading pace against RECORD_PACE (wrong for
+       * three quarters of a clean run -- see the header above); this one is
+       * the derivative of the positional gap itself, which is geography
+       * over time and cannot disagree with the map it annotates. Smoothed
+       * over ~2s of wall clock so a jump or a mat cannot flicker it.
+       *
+       * ON YOUR SHOULDER outranks both trend words: within a tenth of a
+       * mile of the ghost the question is not which way the gap drifts,
+       * it is that the record is PHYSICALLY BESIDE YOU -- the one moment
+       * the whole rail exists to build toward, so it gets the line.
+       */
+      const nowMs = performance.now();
+      if (cache.gapT === undefined) {
+        cache.gapPrev = d; cache.gapT = nowMs; cache.gapVel = 0;
+      } else {
+        const dt = (nowMs - cache.gapT) / 1000;
+        if (dt > 0.08) {
+          const v = (d - cache.gapPrev) / dt;
+          cache.gapVel += (v - cache.gapVel) * Math.min(1, dt / 2);
+          cache.gapPrev = d; cache.gapT = nowMs;
+        }
+      }
+      // Past the first half mile only: everyone is shoulder to shoulder at
+      // the gun, and a moment that fires at every start is not a moment.
+      // 0.04 mi is ~10 road units -- the ghost large in frame beside you,
+      // not merely visible up the road (0.10 read SHOULDER at 19 units out,
+      // which is a sighting, not a shoulder). The trend threshold is a
+      // REAL-MACHINE constant, and it cannot be tuned by watching the
+      // headless probe: swiftshader runs the whole game ~10x slow, so its
+      // live drift is a tenth of a player's (the EMA was verified against
+      // measured drift to two decimals at that speed). Rates at full speed,
+      // read from the bot's own d(t) across ?skip points: mild drift
+      // +-0.3 s/s, a real mid-race surge -3.4, the long late chase -0.8.
+      // 0.5 sits between: surges and chases read, pacing wobble stays
+      // quiet.
+      const nearGh = p.miles > 0.5 && Math.abs(p.ghostMiles() - p.miles) < 0.04;
+      const vel = cache.gapVel || 0;
+      const drift = vel < -0.5 ? ' · CLOSING' : vel > 0.5 ? ' · SLIPPING' : '';
       set(n.gapLabel, 'gapLab', 'RECORD GHOST');
       set(n.gapVal, 'gap', Pace.delta(d));
-      cls(n.gapVal, 'gapCls', 'num ' + tone);
-      cls(n.railGap, 'railGapCls', tone);
-      set(n.gapTrend, 'trend', Math.abs(d) < 1 ? 'LEVEL' : ahead ? 'BEHIND YOU' : 'UP THE ROAD');
+      cls(n.gapVal, 'gapCls', 'num ' + tone + (nearGh ? ' near' : ''));
+      cls(n.railGap, 'railGapCls', tone + (nearGh ? ' near' : ''));
+      set(n.gapTrend, 'trend', nearGh ? 'ON YOUR SHOULDER'
+        : Math.abs(d) < 1 ? 'LEVEL'
+          : ahead ? 'BEHIND YOU' + (vel > 0.5 ? ' · GAINING' : '')
+            : 'UP THE ROAD' + drift);
       cls(n.gapTrend, 'trendCls', tone);
 
       if (extra && extra.fps !== undefined) {

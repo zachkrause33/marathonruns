@@ -100,7 +100,7 @@ MR.Audio = (function () {
   // Every method the game may call. The silent stub is generated from this,
   // so adding a cue below can never leave the no-audio path short of one.
   const API = [
-    'unlock', 'setMuted', 'setPaused', 'ambient', 'setIntensity',
+    'unlock', 'setMuted', 'setPaused', 'ambient', 'setIntensity', 'chase',
     'footstep', 'jump', 'land', 'duck', 'hit', 'clean', 'crossover', 'aid',
     'mile', 'roar', 'finish', 'countdown',
     'aidMissed', 'recordLost', 'tier',
@@ -337,9 +337,48 @@ MR.Audio = (function () {
       rsrc.connect(rf); rf.connect(rg); rg.connect(evt);
       rsrc.start(ctx.currentTime + 0.02);
 
-      amb = { src, f, g, gq, rsrc, rf, rg };
+      /**
+       * THE CHASE. Pure state, like the rush: it says nothing about any
+       * event, it is just HOW CLOSE THE RECORD IS, and it is silent
+       * whenever the ghost is out of arm's reach. A low sine at 57 Hz
+       * under a slow 2.3 Hz tremolo -- a pulse felt more than heard --
+       * whose level rises with physical proximity to the ghost on the
+       * road. Honest by the grade section's own rule: the game charges
+       * nothing for being near the ghost, and this implies nothing --
+       * it states presence, which is exactly the fact the rail's ON
+       * YOUR SHOULDER line prints at the same moment. main.js drives it
+       * every frame from the same geography the rail draws.
+       */
+      const csrc = ctx.createOscillator();
+      csrc.type = 'sine'; csrc.frequency.value = 57;
+      const cg = ctx.createGain(); cg.gain.value = 0;
+      const clfo = ctx.createOscillator();
+      clfo.type = 'sine'; clfo.frequency.value = 2.3;
+      const clg = ctx.createGain(); clg.gain.value = 0;
+      clfo.connect(clg); clg.connect(cg.gain);
+      csrc.connect(cg); cg.connect(evt);
+      csrc.start(); clfo.start();
+
+      amb = { src, f, g, gq, rsrc, rf, rg, cg, clg };
       applyBed();
     }
+
+    /**
+     * Proximity to the ghost, 0 (far) to 1 (level). Squared into gain so
+     * the pulse blooms in the last stretch of the approach rather than
+     * fading in from half a mile out.
+     */
+    let lastChase = -1;
+    s.chase = function (nearness) {
+      if (!amb) return;
+      const v = Math.max(0, Math.min(1, nearness || 0));
+      if (Math.abs(v - lastChase) < 0.02) return;
+      lastChase = v;
+      const t = ctx.currentTime;
+      const base = 0.050 * v * v;
+      amb.cg.gain.setTargetAtTime(base, t, 0.5);
+      amb.clg.gain.setTargetAtTime(base * 0.55, t, 0.5);
+    };
 
     // ---- THE GRADE ------------------------------------------------------
     //

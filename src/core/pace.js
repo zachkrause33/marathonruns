@@ -283,8 +283,18 @@ MR.Pace = (function () {
      * 2:05:04 only in Rome. First-attempt GOLD is 1 cell of 30 (3%):
      * close to perfect, as ordered. Non-collectors stay 2:12+ and earn
      * ink, which is the truth of a marathon run on no fuel.
+     *
+     * 0.0070 -> 0.0065 with the two-goal HUD (2026-09-09, the owner:
+     * "As a goal we need to make the game harder. It needs to be a near
+     * perfect run to break the record"). At 0.0065 the earlier sweep
+     * stands: gold falls ONLY to the learned line at 0.98+ execution
+     * (HARVEST 1:56:41 perfect, 1:58:33 at 0.98, 2:01:36 -- over -- at
+     * 0.96; no first attempt anywhere), which is "near perfect" by the
+     * grid's own definition, while the honest greedy collector spans
+     * 2:01:40-2:08:33 and keeps BRONZE as the daily goal a strong run
+     * can actually take home. Two goals, two prices.
      */
-    ENERGY_PER_PICKUP: 0.0070,
+    ENERGY_PER_PICKUP: 0.0065,
     ENERGY_HIT: 0.08,            // what a contact costs: ten pickups of it
     ENERGY_KNEE: 0.5,            // the dry line: a stat threshold, no longer a tax
 

@@ -8177,7 +8177,8 @@ MR.World = (function () {
       const bag = [];
       defs.forEach(function (d, i) {
         // weight: 0 is a real value -- a variant only a cast site can
-        // deal (the crossing minicar) -- so it must not default to 1.
+        // deal -- so it must not default to 1. (No def uses it today;
+        // the crossing minicar did, and the mechanism outlives it.)
         const w = d.weight === 0 ? 0 : (d.weight || 1);
         for (let k = 0; k < w; k++) bag.push(i);
       });
@@ -9814,66 +9815,6 @@ MR.World = (function () {
       return merge(parts);
     })();
 
-    /**
-     * ============ THE CROSSING MINICAR (JUMP v12) ============
-     *
-     * The one car in the game you jump, and the owner ordered it so:
-     * "let's only do small cars. If that's the case maybe you can jump
-     * over them." SMALL is what keeps the fleet's swipe read intact --
-     * 0.78 to the roof against 2.0+ for every blocking vehicle -- and
-     * SIDE-ON is what keeps its own read honest: it is authored nose
-     * along +x, mid-crossing, a silhouette no swipe vehicle ever shows.
-     * It never spawns from the bag (weight 0); the jcross cast site is
-     * the only door in, so it always ARRIVES crossing, wearing the
-     * crossing-street paint under it.
-     *
-     * Built on all sides per rule 1: the player jumps it, passes it in
-     * both adjacent lanes, and watches it drive in from either verge --
-     * both flanks, both ends, the roof and the underside are in shot in
-     * ordinary play. Envelope: MR.Collision.BOX[JUMP] is 0.80 tall,
-     * +/-1.12 wide, 0.52 halfZ; everything below stays inside 0.78 /
-     * +/-1.04 / +/-0.48, guarded like every other variant.
-     */
-    const jumpMiniGeo = (function () {
-      const BODY = 0xff5a48, ROOF = 0xf6f1e4, GLASS = 0x1a2934,
-        TYRE = 0x20242a, SKIRT = 0x2a1714, TRIM = 0xffd7cf;
-      const parts = [];
-      // The tub, nose at +x. A chamfered box so the little body reads
-      // rounded, sitting over its own dark underside -- the underbody
-      // rule: lit road is never seen through a vehicle.
-      parts.push(gl(hcbx(2.00, 0.32, 0.92, 0, 0.40, 0, BODY, 0.06), GLOSS.paint));
-      parts.push(gl(hbx(1.54, 0.22, 0.80, 0, 0.15, 0, SKIRT), GLOSS.matte));
-      // The greenhouse: cabin sides in body colour, and ONE glass band a
-      // hair proud of the cabin on all four faces, so side windows,
-      // windscreen and backlight are the same material seen from every
-      // angle the dart and the jump produce.
-      parts.push(gl(hcbx(1.34, 0.20, 0.82, -0.10, 0.66, 0, BODY, 0.04), GLOSS.paint));
-      parts.push(gl(hbx(1.24, 0.13, 0.84, -0.10, 0.665, 0, GLASS), GLOSS.chrome));
-      parts.push(gl(hbx(1.16, 0.02, 0.02, -0.10, 0.665, 0.43, TRIM), GLOSS.trim));
-      parts.push(gl(hbx(1.16, 0.02, 0.02, -0.10, 0.665, -0.43, TRIM), GLOSS.trim));
-      // The roof cap, cream, the brightest thing on it from above -- the
-      // face a jumping player actually sees.
-      parts.push(gl(hcbx(1.30, 0.055, 0.78, -0.10, 0.755, 0, ROOF, 0.02), GLOSS.paint));
-      // Wheels: axis along z (the car points along x), tyre barrel plus a
-      // rim disc on BOTH z faces -- the near flank and the far one.
-      for (const sx of [-1, 1]) {
-        for (const sz of [-1, 1]) {
-          const wx = sx * 0.62, wz = sz * 0.33;
-          parts.push(gl(cyl(0.155, 0.155, 0.14, 12, wx, 0.155, wz, TYRE, Math.PI / 2), GLOSS.trim));
-          parts.push(gl(cyl(0.09, 0.09, 0.03, 10, wx, 0.155, wz + sz * 0.075, WHEEL_RIM, Math.PI / 2), GLOSS.chrome));
-        }
-      }
-      // Bumpers, headlamps at the nose (+x), tail lamps at the back --
-      // the two ends lead and trail every crossing.
-      parts.push(gl(hbx(0.10, 0.10, 0.86, 1.00, 0.30, 0, TRIM), GLOSS.trim));
-      parts.push(gl(hbx(0.10, 0.10, 0.86, -1.00, 0.30, 0, TRIM), GLOSS.trim));
-      for (const sz of [-1, 1]) {
-        parts.push(gl(hbx(0.04, 0.09, 0.12, 1.03, 0.46, sz * 0.30, 0xfff2c0), GLOSS.chrome));
-        parts.push(gl(hbx(0.04, 0.08, 0.10, -1.03, 0.46, sz * 0.30, 0xd91c1c), GLOSS.chrome));
-      }
-      return merge(parts);
-    })();
-
     const jumpPool = hazardPool(K.JUMP, 'jump', [
       { geo: jumpSandGeo, face: null },
       /**
@@ -9918,10 +9859,6 @@ MR.World = (function () {
       { geo: jumpDrumGeo, face: null },
       { geo: jumpLowBarGeo, face: null },
       { geo: jumpTrashGeo, face: null },
-      // The crossing minicar. WEIGHT ZERO: it never spawns parked -- a
-      // crossing car that did not cross is a prop -- so the jcross cast
-      // site is its only door. See the geo header and castGates.
-      { geo: jumpMiniGeo, face: null, weight: 0 },
     ]);
 
     /**
@@ -15345,12 +15282,6 @@ MR.World = (function () {
       // course, repetition is not the risk, and keeping them out of the deal
       // leaves the bag's anti-repetition property intact for the fleet.
       const SWEEP_CAST = [4, 5, 6, 7, 9, 12, 13, 14];
-      // The dart is a CAR: a bus or a lorry shooting out of a side street
-      // reads as a physics error, a taxi or a hatchback reads as traffic.
-      const CROSS_CAST = [5, 12, 13];
-      // The crossing minicar's JUMP variant index -- the last def in the
-      // jump vocabulary, dealt only here.
-      const JCROSS_VI = 12;
       const cast = [];
       for (let g = 0; g < gates.length; g++) {
         const gate = gates[g];
@@ -15359,12 +15290,6 @@ MR.World = (function () {
           const kind = gate.lanes[l];
           if (kind === K.CLEAR || !bags[kind]) continue;
           row[l] = (kind === K.BLOCK && gate.train) ? 0
-            // The crossing minicar: the only door to JUMP v12 (weight 0
-            // in the bag), and only on the lane that actually crosses.
-            : (kind === K.JUMP && gate.jcross && gate.jcross.lane === l)
-              ? JCROSS_VI
-            : (kind === K.BLOCK && gate.cross)
-              ? CROSS_CAST[MR.rng.hashString((key || '') + '|sweep-skin|' + g) % CROSS_CAST.length]
             : (kind === K.BLOCK && (gate.sweep || gate.on))
               // The escort salt: a two-wall oncoming gate casts BOTH block
               // lanes off this row, and one hash per gate dressed them as
@@ -19096,30 +19021,78 @@ MR.World = (function () {
      * appears.
      */
     /**
-     * The cross-street paint: a transverse band of asphalt with dashed
-     * edge lines, laid across the whole road (and a little into both
-     * verges) at a cross gate, so the car darting in from the side reads
-     * as coming out of a SIDE STREET rather than out of the scenery. Road
-     * marking, not an object -- a single flat quad is correct here per
-     * the rule-1 exception, because the player can never get under it.
-     * One draw per live cross gate, claimed and released with the gate.
+     * The zebra crossing: white bars across the whole road, laid two
+     * units BEFORE a walk gate's line, so the figure crossing it reads
+     * as a pedestrian on a marked crossing rather than a stray from the
+     * crowd. Road marking, not an object -- a single flat quad per the
+     * rule-1 exception. One draw per live walk gate, claimed and
+     * released with the gate.
      */
-    const crossPaintPool = Pool(function () {
-      const cv = canvas(128, 64);
+    const walkPaintPool = Pool(function () {
+      const cv = canvas(128, 32);
       const cg = cv.getContext('2d');
-      cg.fillStyle = '#4a4d57';
-      cg.fillRect(0, 0, 128, 64);
-      cg.fillStyle = '#c9ccd4';
-      for (let x = 0; x < 128; x += 16) { cg.fillRect(x, 3, 9, 3); cg.fillRect(x, 58, 9, 3); }
+      cg.clearRect(0, 0, 128, 32);
+      cg.fillStyle = '#e9e6da';
+      for (let x = 2; x < 128; x += 16) cg.fillRect(x, 2, 9, 28);
       const tex = new THREE.CanvasTexture(cv);
       tex.colorSpace = THREE.SRGBColorSpace;
       const g = new THREE.Mesh(
-        new THREE.PlaneGeometry(9.4, 4.6).rotateX(-Math.PI / 2),
-        new THREE.MeshBasicMaterial({ map: tex }));
-      // AFTER the road, like the finish carpet (renderOrder 1): a band at
-      // renderOrder -2 with depthWrite off is drawn first and the opaque
-      // road then paints straight over it -- it shipped invisible that way.
+        new THREE.PlaneGeometry(9.4, 2.0).rotateX(-Math.PI / 2),
+        new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+      // AFTER the road, like the finish carpet -- see roadmap 100 for the
+      // renderOrder lesson this line carries.
       g.renderOrder = 1;
+      return g;
+    }, group);
+
+    /**
+     * THE STREET-CROSSER. One recurring figure -- red jacket, cream cap
+     * -- because a character the player meets every few miles is worth
+     * more than a wardrobe. Built on all sides per rule 1 (the player
+     * passes within two units of them); legs and arms are separate
+     * meshes on hip and shoulder pivots so the walk is a real stride,
+     * and a soft blob shadow rides the group so the figure sits on the
+     * road instead of floating over it. See the walk branch in the anim
+     * loop for the timing contract.
+     */
+    const walkerPool = Pool(function () {
+      const JACKET = 0xe8433f, TROUSER = 0x2a3450, SKIN = 0xe8b48c,
+        CAP = 0xf6f1e4, SHOE = 0x1c2026;
+      const g = new THREE.Group();
+      const body = [];
+      // Torso, head, cap -- static, merged once.
+      body.push(gl(hcbx(0.40, 0.52, 0.24, 0, 0.90, 0, JACKET, 0.05), GLOSS.matte));
+      body.push(gl(hbx(0.20, 0.20, 0.19, 0, 1.27, 0, SKIN), GLOSS.matte));
+      body.push(gl(hcbx(0.23, 0.09, 0.22, 0, 1.40, 0, CAP, 0.03), GLOSS.matte));
+      body.push(gl(hbx(0.24, 0.035, 0.10, 0.11, 1.345, 0, CAP), GLOSS.matte));
+      g.add(S.outlined(merge(body), mats.propLit, S.INK.hazard));
+      // Limbs: geometry dropped so the origin is the pivot, one mesh
+      // each, swung in the anim loop.
+      function limb(w, len, d, color) {
+        const geo = new THREE.BoxGeometry(w, len, d);
+        geo.translate(0, -len / 2, 0);
+        const n2 = geo.attributes.position.count;
+        const col = new Float32Array(n2 * 3);
+        const c = new THREE.Color(color);
+        for (let i = 0; i < n2; i++) { col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
+        geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+        return new THREE.Mesh(geo, mats.propLit);
+      }
+      const legL = limb(0.14, 0.64, 0.16, TROUSER); legL.position.set(-0.11, 0.64, 0);
+      const legR = limb(0.14, 0.64, 0.16, TROUSER); legR.position.set(0.11, 0.64, 0);
+      const armL = limb(0.10, 0.42, 0.12, JACKET); armL.position.set(-0.25, 1.12, 0);
+      const armR = limb(0.10, 0.42, 0.12, JACKET); armR.position.set(0.25, 1.12, 0);
+      // Shoes ride the legs so the stride carries them.
+      const shoeL = limb(0.15, 0.06, 0.22, SHOE); shoeL.position.set(0, -0.62, 0.03); legL.add(shoeL);
+      const shoeR = limb(0.15, 0.06, 0.22, SHOE); shoeR.position.set(0, -0.62, 0.03); legR.add(shoeR);
+      g.add(legL); g.add(legR); g.add(armL); g.add(armR);
+      const shadow = new THREE.Mesh(
+        new THREE.CircleGeometry(0.34, 10).rotateX(-Math.PI / 2),
+        new THREE.MeshBasicMaterial({ color: 0x0a0e20, transparent: true, opacity: 0.35 }));
+      shadow.position.y = 0.02;
+      shadow.renderOrder = 2;
+      g.add(shadow);
+      g.userData.limbs = { legL, legR, armL, armR };
       return g;
     }, group);
 
@@ -19694,13 +19667,19 @@ MR.World = (function () {
           objs.push(o);
         }
         const entry = { gate, objs };
-        // Both crossing kinds lay the side-street band: the swipe dart
-        // (gate.cross) and the jumpable minicar (gate.jcross).
-        if (gate.cross || gate.jcross) {
-          const p = crossPaintPool.claim();
-          p.position.set(0, eAt(gate.z) + 0.016, gate.z);
-          p.rotation.x = -Math.atan(EL.slope(gate.z));
+        // A walk gate lays its zebra and stands its crosser at the verge
+        // two units before the line; the anim loop owns the walk itself.
+        if (gate.walk) {
+          const wz = gate.z - 2.0;
+          const p = walkPaintPool.claim();
+          p.position.set(0, eAt(wz) + 0.016, wz);
+          p.rotation.x = -Math.atan(EL.slope(wz));
           entry.paint = p;
+          const w = walkerPool.claim();
+          w.position.set(gate.walk.side * 4.2, eAt(wz), wz);
+          w.rotation.y = gate.walk.side > 0 ? Math.PI : 0;
+          w.visible = true;
+          entry.walker = w;
         }
         activeGates.push(entry);
       }
@@ -19727,7 +19706,8 @@ MR.World = (function () {
           && activeGates[0].gate.z + trainDepth(activeGates[0].gate) < back) {
         const g = activeGates.shift();
         for (let l = 0; l < 3; l++) if (g.objs[l]) releaseHazard(g.gate.lanes[l], g.objs[l]);
-        if (g.paint) crossPaintPool.release(g.paint);
+        if (g.paint) walkPaintPool.release(g.paint);
+        if (g.walker) walkerPool.release(g.walker);
       }
 
       // roadside props
@@ -20219,37 +20199,39 @@ MR.World = (function () {
         // verge beside its lane, fully sideways, straightening as it brakes
         // into place. Same lock as its siblings; the crossing-street paint
         // under it (claimed with the gate) is what its entry drives over.
-        const cr = g.gate.cross;
-        if (cr && g.objs[cr.lane]) {
-          const o = g.objs[cr.lane];
+        /**
+         * THE STREET-CROSSER'S WALK. Pure approach theater on the motion
+         * contract: no kill box exists at this figure, so the only
+         * promise to keep is the owner's -- "They need to cross the
+         * whole street just before the runner gets there." Position is a
+         * pure function of distance: waiting at the near verge beyond
+         * WALK_ENTER, walking a straight line across all three lanes as
+         * d falls, stepping onto the far verge at WALK_EXIT -- about
+         * half a second before the runner crosses the zebra. The stride
+         * is distance-driven too (legs and arms counter-swing on their
+         * pivots, amplitude zero at both verges), so a paused game holds
+         * a mid-step pose instead of marching in place.
+         */
+        const wk = g.gate.walk;
+        if (wk && g.walker) {
+          const o = g.walker;
           const d = g.gate.z - z;
-          const t = (MR.Course.CROSS_START - d)
-            / (MR.Course.CROSS_START - MR.Course.SWEEP_LOCK);
-          const c = t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
-          const fx = cr.side * (Math.abs(K.LANE_X[0]) + 1.9);
-          const tx = K.LANE_X[cr.lane];
-          o.position.x = fx + (tx - fx) * c;
-          o.rotation.y = (tx > fx ? 1 : -1) * (Math.PI / 2) * (1 - c);
-          o.visible = c > 0.001;
-        }
-        // THE JUMPABLE CROSSING MINICAR: same dart as gate.cross, but it
-        // NEVER straightens -- it is authored side-on (nose along +x) and
-        // stays mid-crossing when it locks, which is the whole read: a
-        // little car caught crossing, hop it. Yaw only points the nose
-        // along the direction of travel; entering from +x it drives
-        // toward -x, so the body flips PI.
-        const jc = g.gate.jcross;
-        if (jc && g.objs[jc.lane]) {
-          const o = g.objs[jc.lane];
-          const d = g.gate.z - z;
-          const t = (MR.Course.CROSS_START - d)
-            / (MR.Course.CROSS_START - MR.Course.SWEEP_LOCK);
-          const c = t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
-          const fx = jc.side * (Math.abs(K.LANE_X[0]) + 1.9);
-          const tx = K.LANE_X[jc.lane];
-          o.position.x = fx + (tx - fx) * c;
-          o.rotation.y = jc.side > 0 ? Math.PI : 0;
-          o.visible = c > 0.001;
+          const t = (MR.Course.WALK_ENTER - d)
+            / (MR.Course.WALK_ENTER - MR.Course.WALK_EXIT);
+          const c = t <= 0 ? 0 : t >= 1 ? 1 : t;
+          const fx = wk.side * 4.2;
+          o.position.x = fx - wk.side * 8.4 * c;
+          const walking = c > 0.001 && c < 0.999;
+          const L = o.userData.limbs;
+          const ph = c * 8.4 * 3.4;
+          const amp = walking ? 0.55 : 0;
+          L.legL.rotation.x = Math.sin(ph) * amp;
+          L.legR.rotation.x = -Math.sin(ph) * amp;
+          L.armL.rotation.x = -Math.sin(ph) * amp * 0.6;
+          L.armR.rotation.x = Math.sin(ph) * amp * 0.6;
+          // A touch of bob so the stride reads from behind, where the
+          // legs are mostly hidden by the body.
+          o.position.y = eAt(g.gate.z - 2.0) + (walking ? Math.abs(Math.sin(ph)) * 0.035 : 0);
         }
         const sw = g.gate.sweep;
         if (sw && g.objs[sw.lane]) {

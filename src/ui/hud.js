@@ -319,6 +319,17 @@ MR.HUD = (function () {
           <div id="railFill"></div>
           <div id="railGap"></div>
           <div id="railGhost"></div>
+          <!--
+            THE SECOND RUNNER UP THE ROAD (2026-09-09). The owner: "Add in
+            the location record into each day. You have two goals
+            essentially." The bronze tick is the day's REAL course-record
+            holder running their own race on the same rail -- position is
+            raceTime at the CR's average pace, the same arithmetic the
+            ghost uses -- so both goals are geography on one line: catch
+            the bronze runner, then catch the ghost. Hidden in London,
+            where they are the same runner.
+          -->
+          <div id="railCR" class="hidden"></div>
         </div>
         <!--
           THE AXIS LABEL BECOMES THE ROUTE.
@@ -818,6 +829,7 @@ MR.HUD = (function () {
       distVal: q('distVal'),
       railWrap: q('railWrap'),
       rail: q('rail'), railFill: q('railFill'), railGap: q('railGap'), railGhost: q('railGhost'),
+      railCR: q('railCR'),
       railRoute: q('railRoute'),
       gapVal: q('gapVal'), gapTrend: q('gapTrend'), gapLabel: q('gapLabel'),
       toast: q('toast'), toastLab: q('toastLab'), toastBig: q('toastBig'),
@@ -2190,6 +2202,18 @@ MR.HUD = (function () {
       const gh = clamp01(p.ghostMiles() / K.MARATHON_MILES) * 100;
       n.railFill.style.width = you + '%';
       n.railGhost.style.left = gh + '%';
+      {
+        const st0 = course && course.settings && course.settings[0];
+        const hasCR = st0 && st0.rec && st0.rec > K.RECORD_SECONDS;
+        if (cache.crShown !== hasCR) {
+          cache.crShown = hasCR;
+          n.railCR.classList.toggle('hidden', !hasCR);
+        }
+        if (hasCR) {
+          const crM = Math.min(K.MARATHON_MILES, (p.raceTime || 0) * K.MARATHON_MILES / st0.rec);
+          n.railCR.style.left = (clamp01(crM / K.MARATHON_MILES) * 100) + '%';
+        }
+      }
       n.railGap.style.left = Math.min(you, gh) + '%';
       n.railGap.style.width = Math.abs(you - gh) + '%';
 

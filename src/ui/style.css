@@ -510,6 +510,14 @@ html, body {
   width: 3px; background: #fffdf5;
   box-shadow: 0 0 0 1.5px rgba(14, 18, 48, 0.9);
 }
+/* The day's course-record holder: the nearer of the two goals, in the
+ * bronze the stamps use, sized under the ghost so the road reads
+ * you -> bronze -> white. */
+#railCR {
+  position: absolute; top: -2px; bottom: -2px;
+  width: 3px; background: #e0955a;
+  box-shadow: 0 0 0 1px rgba(14, 18, 48, 0.9);
+}
 /* A cap above the line, so the marker is findable at a glance against both
  * the yellow fill and the dark road ahead of it. */
 #railGhost::after {
@@ -784,7 +792,7 @@ html, body {
  * plain elements inside a panel, so they need their own. */
 #lockedBox.hidden, #histBtn.hidden, #endHistBtn.hidden { display: none; }
 #mapView.hidden, #passView.hidden, #cityBar.hidden, #pickLine.hidden,
-#pickBtn.hidden, #stampMoment.hidden { display: none; }
+#pickBtn.hidden, #stampMoment.hidden, #railCR.hidden { display: none; }
 
 /* THE LOCKED BOX replaces TOE THE LINE on a day the record has fallen. It
  * borrows #tomorrow's plate (the other "come back later" element) with the

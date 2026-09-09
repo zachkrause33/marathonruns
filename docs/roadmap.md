@@ -9069,3 +9069,47 @@ it should have been hidden). All five are in the granted list now.
 
 Gates: 8/8 shots, 90+90 courses, simulate PASS, both pages and the
 finish stamp re-probed.
+
+## 111. The crosser, the convoys, and the two runners up the road
+
+Four owner instructions in one message (2026-09-09), each landed:
+
+THE CAR CROSSINGS ARE GONE -- "Remove the car crossing the street it
+doesn't work" -- both of them: the swipe dart (roadmap 100) and the
+jumpable minicar (roadmap 105), their casts, their annotation
+streams and JUMP v12 itself. What replaces them is a PERSON, and the
+person is a better fit for the motion contract than either car was,
+because they are not a hazard at all: a recurring figure (red
+jacket, cream cap, articulated stride on hip and shoulder pivots,
+built all sides) waits at the verge, crosses all three lanes on a
+zebra strip painted two units before the gate line, and steps onto
+the far verge about half a second before the runner arrives --
+"cross the whole street just before the runner gets there",
+verbatim. No kill box exists, none moves; the near-miss is
+manufactured entirely by timing (WALK_ENTER 62 -> WALK_EXIT 9, a
+pure function of distance). Verified live: mid-road with legs
+swinging at d 34.5, standing on the far verge at d 0.4. ~5.7 a
+course.
+
+MORE, CLOSER -- rate 0.75, echo may arm one further echo (triples),
+window 80, and ONCOMING_LOCK drops to 0.6x READ_NEAR (~15 units):
+the dodge is a lane decision off fixed data and the mat, which the
+drive never touches, so the lock's only hard floor is art-on-box by
+contact -- 15 units keeps a full settle margin over it and the car
+now brakes in the player's face. Census: oncoming 15.2 -> 20.5 a
+course, two drives at once on 361/365 days, THREE at once on 209.
+
+NEAR PERFECT -- PER_PICKUP 0.0070 -> 0.0065: gold now falls only to
+the learned line at 0.98+ execution (no first attempt anywhere in
+the grid), while the honest greedy collector spans 2:01:40-2:08:33
+and keeps bronze as the daily goal. Two goals, two prices.
+
+TWO RUNNERS UP THE ROAD -- "Add in the location record into each
+day. You have two goals essentially." The day's course-record holder
+now runs the rail as a bronze tick beside the white ghost, at the
+CR's own average pace -- both goals as geography on one line, catch
+the bronze runner first. Hidden in London, where they are the same
+runner. The start panel's bronze bar and the finish stamp already
+carried the other two surfaces.
+
+Gates: 8/8 shots, 90+90 courses, simulate PASS.

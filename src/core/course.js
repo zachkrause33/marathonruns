@@ -2296,22 +2296,29 @@ MR.Course = (function () {
    * vehicle never does: it occupies its kill lane for the entire drive,
    * so the lane read is available the whole time and the only thing the
    * lock protects is the NEAR FACE being settled on the gate line before
-   * the player commits. 1.05x READ_NEAR (~26.6 runner units) has it
-   * braking to a stop just as the commit window opens -- still driving
-   * when every other gate has long been frozen, parked by the point the
-   * contract needs it parked. The sweep and the cross dart keep the
-   * 1.5x lock; they are the ones that move across lanes.
+   * the player commits. 1.05x READ_NEAR (~26.6 runner units) had it
+   * braking as the commit window opened; the owner asked for closer
+   * still ("More moving and closer to the runner getting there"), and
+   * the contract allows it: the DODGE is a lane decision made off fixed
+   * course data and the telegraph mat, neither of which the drive
+   * touches -- the only hard floor is that the art must be ON the box
+   * by contact. 0.6x READ_NEAR (~15.2 units, about three quarters of a
+   * second out) keeps a 15-unit settle margin over that floor, and the
+   * car now brakes to a stop practically in the player's face.
    */
-  const ONCOMING_LOCK = 1.05 * (ACTION_WINDOW + K.CAM_BASE_BACK);
-  // 0.60 -> 0.65 with the widened oncoming eligibility and the echo
-  // pairs (see markMotion): the rate stays near where the difficulty
-  // pass put it, and the extra motion comes from the gates the old
-  // eligibility threw away plus the seeded pairs, not from a blanket
-  // rate hike. Census in roadmap 104.
-  const SWEEP_RATE = 0.65;
-  // The crossing minicar's own rate, on JUMP gates -- see the jcross
-  // pass in markMotion. Censused at ~4 a course over 365 days.
-  const JCROSS_RATE = 0.08;
+  const ONCOMING_LOCK = 0.6 * (ACTION_WINDOW + K.CAM_BASE_BACK);
+  // 0.65 -> 0.75 on the owner's third "more" (2026-09-09): with the
+  // cross car gone the rotation is essentially oncoming-or-sweep, and
+  // three of four eligible gates now animate. Census in roadmap 111.
+  const SWEEP_RATE = 0.75;
+  // The street-crosser's rate, over nearly every gate -- see the walk
+  // pass in markMotion. Censused at ~7 a course over 365 days.
+  const WALK_RATE = 0.05;
+  // The walk's window, in runner-to-gate units: steps off the near verge
+  // at ENTER, steps onto the far one at EXIT -- about half a second
+  // before the runner reaches the line, which is the whole act.
+  const WALK_ENTER = 62;
+  const WALK_EXIT = 9;
   /**
    * ---- AND THE ONCOMING VEHICLE, THE SAME CONTRACT ROTATED 90 DEGREES ----
    *
@@ -2357,12 +2364,13 @@ MR.Course = (function () {
     // hope: independent per-gate hashes put two oncoming drives in motion
     // at the same instant on 10 days of 365 (a drive window is ~59 units
     // of player travel; unpaired oncoming gates rarely land that close).
-    // So a pair is seeded instead of wished for: the first eligible gate
-    // within one drive window after a naturally-rolled oncoming gate is
-    // biased oncoming too -- one echo per natural roll, never a chain
-    // (the echo does not arm another echo). Deterministic: a function of
-    // the same hashes and gate geometry as everything else in this pass.
-    let lastOnZ = -1e9, lastOnEcho = false;
+    // So a pair is seeded instead of wished for: an eligible gate within
+    // one drive window of a marked oncoming gate is biased oncoming too.
+    // The echo may now arm ONE further echo (owner: "More at one time")
+    // -- a natural roll can seed a triple, and the counter is what stops
+    // a whole mile of road turning into a single convoy. Deterministic:
+    // a function of the same hashes and geometry as everything else.
+    let lastOnZ = -1e9, echoRun = 0;
     for (let i = 0; i < gates.length; i++) {
       const gate = gates[i];
       if (gate.train || gate.ramp !== undefined || gate.narrow) continue;
@@ -2396,7 +2404,7 @@ MR.Course = (function () {
       // chain. Behind the rate gate the echo fired on luck (24 of 365
       // days had a simultaneous pair); in front of it, a pair follows
       // nearly every natural roll that the course geometry can host.
-      const echoArm = !lastOnEcho && gate.z - lastOnZ < 60;
+      const echoArm = echoRun < 2 && gate.z - lastOnZ < 80;
       if (!echoArm && (h % 4096) / 4096 >= SWEEP_RATE * SWEEP) continue;
       const single = blockLanes.length === 1
         && !(i > 0 && gates[i - 1].lanes[blockLanes[0]] === K.BLOCK);
@@ -2429,103 +2437,53 @@ MR.Course = (function () {
       }
       range = Math.min(range, K.TOTAL_UNITS - FINISH_GRACE - gate.z);
       const corridor = range >= 25;
-      /**
-       * THE CROSS-STREET CAR -- the owner: "adding cross streets where as
-       * you approach a car comes across the street that you have to
-       * avoid. What we need to decide is if you can jump over there or
-       * need to swipe across." DECIDED: swipe. A car is never jumpable in
-       * this game's grammar -- JUMP tops out at 0.80 and every vehicle
-       * teaches "swipe, never leap"; one jumpable car would poison that
-       * read everywhere else. So the cross car is a BLOCK like its
-       * siblings, and the dodge is the swipe the player already knows.
-       *
-       * It enters from the VERGE beside its own lane, which is what makes
-       * it cheap where the full-width crossing was calendar-rare (0.08 a
-       * course needs both other lanes clear): an edge wall's verge is
-       * adjacent, so there is NO transit lane to demand; a centre wall
-       * crosses the adjacent edge, the sweep's own from-condition. The
-       * renderer hides the car until the dart begins and lays the
-       * crossing-street paint at the gate, so the fiction is a side
-       * street; the kill lane is fixed course data and the car stands in
-       * it from SWEEP_LOCK out -- same lock, same proof, as everything
-       * else that moves.
-       */
-      let crossSide = 0;
-      if (single) {
-        if (lane !== 1) crossSide = lane === 0 ? 1 : -1;
-        else if (from >= 0) crossSide = from === 0 ? 1 : -1;
-      }
-      // Rotate oncoming / cross / sweep on a hash trit with fallback, so a
-      // gate that cannot host its first pick takes its second rather than
-      // going still. 4/3/3 shipped leaning against oncoming; re-leant to
-      // 5/3/2 on the owner's "We need more moving vehicles towards you.
-      // Multiple at a time" -- oncoming is the ask, the sweep is the one
-      // that cedes (it reads most like a parked gate inside the window
-      // anyway, by its own contract).
+      // Rotate oncoming / sweep on a hash roll with fallback. The CROSS
+      // CAR IS GONE -- the owner, having played it: "Remove the car
+      // crossing the street it doesn't work" -- so the rotation is the
+      // two kinds that read: 7/10 prefer the drive, 3/10 the sweep.
       const roll = (h >>> 16) % 10;
       const echo = echoArm && corridor;
       // An armed echo whose corridor failed still only got here on its
       // own rate roll (the arm bypassed the gate above) -- so a dead
       // echo falls back to the ordinary rotation, not to silence.
       if (echoArm && !corridor && (h % 4096) / 4096 >= SWEEP_RATE * SWEEP) continue;
-      const prefer = echo || roll < 5 ? ['on', 'cross', 'sweep']
-        : roll < 8 ? ['cross', 'on', 'sweep'] : ['sweep', 'on', 'cross'];
+      const prefer = echo || roll < 7 ? ['on', 'sweep'] : ['sweep', 'on'];
       for (const p of prefer) {
         if (p === 'on' && corridor) {
           gate.on = { lane, range }; tally.oncoming++;
-          lastOnZ = gate.z; lastOnEcho = echo;
+          lastOnZ = gate.z; echoRun = echo ? echoRun + 1 : 0;
           break;
         }
-        if (p === 'cross' && crossSide) { gate.cross = { side: crossSide, lane }; tally.cross++; break; }
         if (p === 'sweep' && from >= 0) { gate.sweep = { from, lane }; tally.sweeps++; break; }
       }
     }
     /**
-     * ---- THE CROSSING MINICAR, THE ONE CAR YOU JUMP --------------------
+     * ---- THE PERSON CROSSING THE STREET (2026-09-09) -------------------
      *
-     * The owner, revisiting the swipe decision of roadmap 100: "Can you
-     * build crossing roads so cars can actually cross the road as you
-     * run. If so, let's only do small cars. If that's the case maybe you
-     * can jump over them." Roadmap 100 refused a jumpable car because a
-     * 2.0+ vehicle you sometimes hurdle poisons the swipe read on every
-     * other vehicle. The owner's "small" is what unpoisons it: this car
-     * is a JUMP hazard head to toe -- 0.78 to the roof against 2.0+ for
-     * every blocking vehicle, a THIRD of any car the player swipes past
-     * -- and it is the only vehicle in the game that sits SIDE-ON, mid-
-     * crossing, so nothing about its silhouette matches the fleet.
-     *
-     * Same motion contract, third verse: the kill lane is fixed course
-     * data (an ordinary JUMP lane), and only the approach animates. The
-     * car enters from the verge at CROSS_START and drives across the
-     * road into its lane, locked from SWEEP_LOCK out (it crosses lanes,
-     * so it takes the lane-crossing margin, not the oncoming one). An
-     * edge lane is entered from its own verge; a centre lane needs the
-     * transit edge CLEAR at this gate line, because the dart drives
-     * through that lane's gate plane on the way. Gates already animated
-     * by the block pass are skipped -- two vehicles arriving at one gate
-     * is noise, not challenge.
+     * Both crossing cars are gone on the owner's verdict ("Remove the
+     * car crossing the street it doesn't work. How about we do a person
+     * crossing the street. They need to cross the whole street just
+     * before the runner gets there") -- and the person is a BETTER fit
+     * for the motion contract than either car was, because they are not
+     * a hazard at all. The walk is pure approach theater: a figure
+     * waiting at the verge crosses all three lanes on a zebra strip
+     * painted just BEFORE the gate line and steps off the far side
+     * moments before the runner arrives. No kill box exists, none
+     * moves, and the near-miss is manufactured entirely by timing --
+     * gate.walk = { side }, position a pure function of distance like
+     * every other approach in the game (WALK_ENTER down to WALK_EXIT).
+     * Sweep gates are skipped: two things moving sideways at one gate
+     * is noise, not tension.
      */
     for (let i = 0; i < gates.length; i++) {
       const gate = gates[i];
       if (gate.train || gate.ramp !== undefined || gate.narrow) continue;
-      if (gate.on || gate.cross || gate.sweep) continue;
-      if (gate.f < 0.15 || gate.f > 0.90) continue;
-      const jumpLanes = [];
-      for (let l = 0; l < 3; l++) if (gate.lanes[l] === K.JUMP) jumpLanes.push(l);
-      if (!jumpLanes.length) continue;
-      const h = MR.rng.hashString(key + '|jcross/v1|' + i);
-      if ((h % 4096) / 4096 >= JCROSS_RATE * SWEEP) continue;
-      const lane = jumpLanes[(h >>> 8) % jumpLanes.length];
-      let side = 0;
-      if (lane !== 1) side = lane === 0 ? 1 : -1;
-      else {
-        const open = [0, 2].filter((l) => gate.lanes[l] === K.CLEAR);
-        if (!open.length) continue;
-        const enter = open.length === 2 ? open[(h >>> 12) & 1] : open[0];
-        side = enter === 0 ? 1 : -1;
-      }
-      gate.jcross = { side, lane };
-      tally.jcross++;
+      if (gate.sweep) continue;
+      if (gate.f < 0.12 || gate.f > 0.92) continue;
+      const h = MR.rng.hashString(key + '|walk/v1|' + i);
+      if ((h % 4096) / 4096 >= WALK_RATE * SWEEP) continue;
+      gate.walk = { side: (h >>> 12) & 1 ? 1 : -1 };
+      tally.walkers++;
     }
   }
 
@@ -2563,7 +2521,7 @@ MR.Course = (function () {
     // "solvable on all 365 days" is true by construction and proves nothing
     // about whether a new mechanic damaged the course -- the damage would show
     // up as the generator giving up more often, and nothing counted that.
-    const tally = { degraded: 0, attempts: 0, narrowings: 0, narrowAbandoned: 0, sweeps: 0, oncoming: 0, cross: 0, jcross: 0 };
+    const tally = { degraded: 0, attempts: 0, narrowings: 0, narrowAbandoned: 0, sweeps: 0, oncoming: 0, walkers: 0 };
 
     // A closure in flight: the lanes it holds shut, and the gate index it runs
     // to. Deliberately the same shape as trainUntil, because it is the same
@@ -3215,8 +3173,9 @@ MR.Course = (function () {
            // SWEEP_START. Exported so the animation reads the numbers from the
            // file that derives them from the read window -- see markSweeps.
            SWEEP_LOCK, SWEEP_START, ONCOMING_LOCK, ONCOMING_RANGE, ONCOMING_RATIO,
-           // The cross-street dart: begins here, locks at SWEEP_LOCK.
-           CROSS_START: SWEEP_LOCK + 22,
+           // The street-crosser's window; the renderer walks the figure
+           // across between these two distances and not one unit outside.
+           WALK_ENTER, WALK_EXIT,
            elevationPlan };
 
   // Accessors rather than plain fields, so a nonsense value cannot be written

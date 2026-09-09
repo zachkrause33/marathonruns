@@ -628,6 +628,14 @@ html, body {
   width: 3px; background: #fffdf5;
   box-shadow: 0 0 0 1.5px rgba(14, 18, 48, 0.9);
 }
+/* The day's course-record holder: the nearer of the two goals, in the
+ * bronze the stamps use, sized under the ghost so the road reads
+ * you -> bronze -> white. */
+#railCR {
+  position: absolute; top: -2px; bottom: -2px;
+  width: 3px; background: #e0955a;
+  box-shadow: 0 0 0 1px rgba(14, 18, 48, 0.9);
+}
 /* A cap above the line, so the marker is findable at a glance against both
  * the yellow fill and the dark road ahead of it. */
 #railGhost::after {
@@ -902,7 +910,7 @@ html, body {
  * plain elements inside a panel, so they need their own. */
 #lockedBox.hidden, #histBtn.hidden, #endHistBtn.hidden { display: none; }
 #mapView.hidden, #passView.hidden, #cityBar.hidden, #pickLine.hidden,
-#pickBtn.hidden, #stampMoment.hidden { display: none; }
+#pickBtn.hidden, #stampMoment.hidden, #railCR.hidden { display: none; }
 
 /* THE LOCKED BOX replaces TOE THE LINE on a day the record has fallen. It
  * borrows #tomorrow's plate (the other "come back later" element) with the
@@ -7708,8 +7716,18 @@ MR.Pace = (function () {
      * 2:05:04 only in Rome. First-attempt GOLD is 1 cell of 30 (3%):
      * close to perfect, as ordered. Non-collectors stay 2:12+ and earn
      * ink, which is the truth of a marathon run on no fuel.
+     *
+     * 0.0070 -> 0.0065 with the two-goal HUD (2026-09-09, the owner:
+     * "As a goal we need to make the game harder. It needs to be a near
+     * perfect run to break the record"). At 0.0065 the earlier sweep
+     * stands: gold falls ONLY to the learned line at 0.98+ execution
+     * (HARVEST 1:56:41 perfect, 1:58:33 at 0.98, 2:01:36 -- over -- at
+     * 0.96; no first attempt anywhere), which is "near perfect" by the
+     * grid's own definition, while the honest greedy collector spans
+     * 2:01:40-2:08:33 and keeps BRONZE as the daily goal a strong run
+     * can actually take home. Two goals, two prices.
      */
-    ENERGY_PER_PICKUP: 0.0070,
+    ENERGY_PER_PICKUP: 0.0065,
     ENERGY_HIT: 0.08,            // what a contact costs: ten pickups of it
     ENERGY_KNEE: 0.5,            // the dry line: a stat threshold, no longer a tax
 
@@ -10833,22 +10851,29 @@ MR.Course = (function () {
    * vehicle never does: it occupies its kill lane for the entire drive,
    * so the lane read is available the whole time and the only thing the
    * lock protects is the NEAR FACE being settled on the gate line before
-   * the player commits. 1.05x READ_NEAR (~26.6 runner units) has it
-   * braking to a stop just as the commit window opens -- still driving
-   * when every other gate has long been frozen, parked by the point the
-   * contract needs it parked. The sweep and the cross dart keep the
-   * 1.5x lock; they are the ones that move across lanes.
+   * the player commits. 1.05x READ_NEAR (~26.6 runner units) had it
+   * braking as the commit window opened; the owner asked for closer
+   * still ("More moving and closer to the runner getting there"), and
+   * the contract allows it: the DODGE is a lane decision made off fixed
+   * course data and the telegraph mat, neither of which the drive
+   * touches -- the only hard floor is that the art must be ON the box
+   * by contact. 0.6x READ_NEAR (~15.2 units, about three quarters of a
+   * second out) keeps a 15-unit settle margin over that floor, and the
+   * car now brakes to a stop practically in the player's face.
    */
-  const ONCOMING_LOCK = 1.05 * (ACTION_WINDOW + K.CAM_BASE_BACK);
-  // 0.60 -> 0.65 with the widened oncoming eligibility and the echo
-  // pairs (see markMotion): the rate stays near where the difficulty
-  // pass put it, and the extra motion comes from the gates the old
-  // eligibility threw away plus the seeded pairs, not from a blanket
-  // rate hike. Census in roadmap 104.
-  const SWEEP_RATE = 0.65;
-  // The crossing minicar's own rate, on JUMP gates -- see the jcross
-  // pass in markMotion. Censused at ~4 a course over 365 days.
-  const JCROSS_RATE = 0.08;
+  const ONCOMING_LOCK = 0.6 * (ACTION_WINDOW + K.CAM_BASE_BACK);
+  // 0.65 -> 0.75 on the owner's third "more" (2026-09-09): with the
+  // cross car gone the rotation is essentially oncoming-or-sweep, and
+  // three of four eligible gates now animate. Census in roadmap 111.
+  const SWEEP_RATE = 0.75;
+  // The street-crosser's rate, over nearly every gate -- see the walk
+  // pass in markMotion. Censused at ~7 a course over 365 days.
+  const WALK_RATE = 0.05;
+  // The walk's window, in runner-to-gate units: steps off the near verge
+  // at ENTER, steps onto the far one at EXIT -- about half a second
+  // before the runner reaches the line, which is the whole act.
+  const WALK_ENTER = 62;
+  const WALK_EXIT = 9;
   /**
    * ---- AND THE ONCOMING VEHICLE, THE SAME CONTRACT ROTATED 90 DEGREES ----
    *
@@ -10894,12 +10919,13 @@ MR.Course = (function () {
     // hope: independent per-gate hashes put two oncoming drives in motion
     // at the same instant on 10 days of 365 (a drive window is ~59 units
     // of player travel; unpaired oncoming gates rarely land that close).
-    // So a pair is seeded instead of wished for: the first eligible gate
-    // within one drive window after a naturally-rolled oncoming gate is
-    // biased oncoming too -- one echo per natural roll, never a chain
-    // (the echo does not arm another echo). Deterministic: a function of
-    // the same hashes and gate geometry as everything else in this pass.
-    let lastOnZ = -1e9, lastOnEcho = false;
+    // So a pair is seeded instead of wished for: an eligible gate within
+    // one drive window of a marked oncoming gate is biased oncoming too.
+    // The echo may now arm ONE further echo (owner: "More at one time")
+    // -- a natural roll can seed a triple, and the counter is what stops
+    // a whole mile of road turning into a single convoy. Deterministic:
+    // a function of the same hashes and geometry as everything else.
+    let lastOnZ = -1e9, echoRun = 0;
     for (let i = 0; i < gates.length; i++) {
       const gate = gates[i];
       if (gate.train || gate.ramp !== undefined || gate.narrow) continue;
@@ -10933,7 +10959,7 @@ MR.Course = (function () {
       // chain. Behind the rate gate the echo fired on luck (24 of 365
       // days had a simultaneous pair); in front of it, a pair follows
       // nearly every natural roll that the course geometry can host.
-      const echoArm = !lastOnEcho && gate.z - lastOnZ < 60;
+      const echoArm = echoRun < 2 && gate.z - lastOnZ < 80;
       if (!echoArm && (h % 4096) / 4096 >= SWEEP_RATE * SWEEP) continue;
       const single = blockLanes.length === 1
         && !(i > 0 && gates[i - 1].lanes[blockLanes[0]] === K.BLOCK);
@@ -10966,103 +10992,53 @@ MR.Course = (function () {
       }
       range = Math.min(range, K.TOTAL_UNITS - FINISH_GRACE - gate.z);
       const corridor = range >= 25;
-      /**
-       * THE CROSS-STREET CAR -- the owner: "adding cross streets where as
-       * you approach a car comes across the street that you have to
-       * avoid. What we need to decide is if you can jump over there or
-       * need to swipe across." DECIDED: swipe. A car is never jumpable in
-       * this game's grammar -- JUMP tops out at 0.80 and every vehicle
-       * teaches "swipe, never leap"; one jumpable car would poison that
-       * read everywhere else. So the cross car is a BLOCK like its
-       * siblings, and the dodge is the swipe the player already knows.
-       *
-       * It enters from the VERGE beside its own lane, which is what makes
-       * it cheap where the full-width crossing was calendar-rare (0.08 a
-       * course needs both other lanes clear): an edge wall's verge is
-       * adjacent, so there is NO transit lane to demand; a centre wall
-       * crosses the adjacent edge, the sweep's own from-condition. The
-       * renderer hides the car until the dart begins and lays the
-       * crossing-street paint at the gate, so the fiction is a side
-       * street; the kill lane is fixed course data and the car stands in
-       * it from SWEEP_LOCK out -- same lock, same proof, as everything
-       * else that moves.
-       */
-      let crossSide = 0;
-      if (single) {
-        if (lane !== 1) crossSide = lane === 0 ? 1 : -1;
-        else if (from >= 0) crossSide = from === 0 ? 1 : -1;
-      }
-      // Rotate oncoming / cross / sweep on a hash trit with fallback, so a
-      // gate that cannot host its first pick takes its second rather than
-      // going still. 4/3/3 shipped leaning against oncoming; re-leant to
-      // 5/3/2 on the owner's "We need more moving vehicles towards you.
-      // Multiple at a time" -- oncoming is the ask, the sweep is the one
-      // that cedes (it reads most like a parked gate inside the window
-      // anyway, by its own contract).
+      // Rotate oncoming / sweep on a hash roll with fallback. The CROSS
+      // CAR IS GONE -- the owner, having played it: "Remove the car
+      // crossing the street it doesn't work" -- so the rotation is the
+      // two kinds that read: 7/10 prefer the drive, 3/10 the sweep.
       const roll = (h >>> 16) % 10;
       const echo = echoArm && corridor;
       // An armed echo whose corridor failed still only got here on its
       // own rate roll (the arm bypassed the gate above) -- so a dead
       // echo falls back to the ordinary rotation, not to silence.
       if (echoArm && !corridor && (h % 4096) / 4096 >= SWEEP_RATE * SWEEP) continue;
-      const prefer = echo || roll < 5 ? ['on', 'cross', 'sweep']
-        : roll < 8 ? ['cross', 'on', 'sweep'] : ['sweep', 'on', 'cross'];
+      const prefer = echo || roll < 7 ? ['on', 'sweep'] : ['sweep', 'on'];
       for (const p of prefer) {
         if (p === 'on' && corridor) {
           gate.on = { lane, range }; tally.oncoming++;
-          lastOnZ = gate.z; lastOnEcho = echo;
+          lastOnZ = gate.z; echoRun = echo ? echoRun + 1 : 0;
           break;
         }
-        if (p === 'cross' && crossSide) { gate.cross = { side: crossSide, lane }; tally.cross++; break; }
         if (p === 'sweep' && from >= 0) { gate.sweep = { from, lane }; tally.sweeps++; break; }
       }
     }
     /**
-     * ---- THE CROSSING MINICAR, THE ONE CAR YOU JUMP --------------------
+     * ---- THE PERSON CROSSING THE STREET (2026-09-09) -------------------
      *
-     * The owner, revisiting the swipe decision of roadmap 100: "Can you
-     * build crossing roads so cars can actually cross the road as you
-     * run. If so, let's only do small cars. If that's the case maybe you
-     * can jump over them." Roadmap 100 refused a jumpable car because a
-     * 2.0+ vehicle you sometimes hurdle poisons the swipe read on every
-     * other vehicle. The owner's "small" is what unpoisons it: this car
-     * is a JUMP hazard head to toe -- 0.78 to the roof against 2.0+ for
-     * every blocking vehicle, a THIRD of any car the player swipes past
-     * -- and it is the only vehicle in the game that sits SIDE-ON, mid-
-     * crossing, so nothing about its silhouette matches the fleet.
-     *
-     * Same motion contract, third verse: the kill lane is fixed course
-     * data (an ordinary JUMP lane), and only the approach animates. The
-     * car enters from the verge at CROSS_START and drives across the
-     * road into its lane, locked from SWEEP_LOCK out (it crosses lanes,
-     * so it takes the lane-crossing margin, not the oncoming one). An
-     * edge lane is entered from its own verge; a centre lane needs the
-     * transit edge CLEAR at this gate line, because the dart drives
-     * through that lane's gate plane on the way. Gates already animated
-     * by the block pass are skipped -- two vehicles arriving at one gate
-     * is noise, not challenge.
+     * Both crossing cars are gone on the owner's verdict ("Remove the
+     * car crossing the street it doesn't work. How about we do a person
+     * crossing the street. They need to cross the whole street just
+     * before the runner gets there") -- and the person is a BETTER fit
+     * for the motion contract than either car was, because they are not
+     * a hazard at all. The walk is pure approach theater: a figure
+     * waiting at the verge crosses all three lanes on a zebra strip
+     * painted just BEFORE the gate line and steps off the far side
+     * moments before the runner arrives. No kill box exists, none
+     * moves, and the near-miss is manufactured entirely by timing --
+     * gate.walk = { side }, position a pure function of distance like
+     * every other approach in the game (WALK_ENTER down to WALK_EXIT).
+     * Sweep gates are skipped: two things moving sideways at one gate
+     * is noise, not tension.
      */
     for (let i = 0; i < gates.length; i++) {
       const gate = gates[i];
       if (gate.train || gate.ramp !== undefined || gate.narrow) continue;
-      if (gate.on || gate.cross || gate.sweep) continue;
-      if (gate.f < 0.15 || gate.f > 0.90) continue;
-      const jumpLanes = [];
-      for (let l = 0; l < 3; l++) if (gate.lanes[l] === K.JUMP) jumpLanes.push(l);
-      if (!jumpLanes.length) continue;
-      const h = MR.rng.hashString(key + '|jcross/v1|' + i);
-      if ((h % 4096) / 4096 >= JCROSS_RATE * SWEEP) continue;
-      const lane = jumpLanes[(h >>> 8) % jumpLanes.length];
-      let side = 0;
-      if (lane !== 1) side = lane === 0 ? 1 : -1;
-      else {
-        const open = [0, 2].filter((l) => gate.lanes[l] === K.CLEAR);
-        if (!open.length) continue;
-        const enter = open.length === 2 ? open[(h >>> 12) & 1] : open[0];
-        side = enter === 0 ? 1 : -1;
-      }
-      gate.jcross = { side, lane };
-      tally.jcross++;
+      if (gate.sweep) continue;
+      if (gate.f < 0.12 || gate.f > 0.92) continue;
+      const h = MR.rng.hashString(key + '|walk/v1|' + i);
+      if ((h % 4096) / 4096 >= WALK_RATE * SWEEP) continue;
+      gate.walk = { side: (h >>> 12) & 1 ? 1 : -1 };
+      tally.walkers++;
     }
   }
 
@@ -11100,7 +11076,7 @@ MR.Course = (function () {
     // "solvable on all 365 days" is true by construction and proves nothing
     // about whether a new mechanic damaged the course -- the damage would show
     // up as the generator giving up more often, and nothing counted that.
-    const tally = { degraded: 0, attempts: 0, narrowings: 0, narrowAbandoned: 0, sweeps: 0, oncoming: 0, cross: 0, jcross: 0 };
+    const tally = { degraded: 0, attempts: 0, narrowings: 0, narrowAbandoned: 0, sweeps: 0, oncoming: 0, walkers: 0 };
 
     // A closure in flight: the lanes it holds shut, and the gate index it runs
     // to. Deliberately the same shape as trainUntil, because it is the same
@@ -11752,8 +11728,9 @@ MR.Course = (function () {
            // SWEEP_START. Exported so the animation reads the numbers from the
            // file that derives them from the read window -- see markSweeps.
            SWEEP_LOCK, SWEEP_START, ONCOMING_LOCK, ONCOMING_RANGE, ONCOMING_RATIO,
-           // The cross-street dart: begins here, locks at SWEEP_LOCK.
-           CROSS_START: SWEEP_LOCK + 22,
+           // The street-crosser's window; the renderer walks the figure
+           // across between these two distances and not one unit outside.
+           WALK_ENTER, WALK_EXIT,
            elevationPlan };
 
   // Accessors rather than plain fields, so a nonsense value cannot be written
@@ -28815,7 +28792,8 @@ MR.World = (function () {
       const bag = [];
       defs.forEach(function (d, i) {
         // weight: 0 is a real value -- a variant only a cast site can
-        // deal (the crossing minicar) -- so it must not default to 1.
+        // deal -- so it must not default to 1. (No def uses it today;
+        // the crossing minicar did, and the mechanism outlives it.)
         const w = d.weight === 0 ? 0 : (d.weight || 1);
         for (let k = 0; k < w; k++) bag.push(i);
       });
@@ -30452,66 +30430,6 @@ MR.World = (function () {
       return merge(parts);
     })();
 
-    /**
-     * ============ THE CROSSING MINICAR (JUMP v12) ============
-     *
-     * The one car in the game you jump, and the owner ordered it so:
-     * "let's only do small cars. If that's the case maybe you can jump
-     * over them." SMALL is what keeps the fleet's swipe read intact --
-     * 0.78 to the roof against 2.0+ for every blocking vehicle -- and
-     * SIDE-ON is what keeps its own read honest: it is authored nose
-     * along +x, mid-crossing, a silhouette no swipe vehicle ever shows.
-     * It never spawns from the bag (weight 0); the jcross cast site is
-     * the only door in, so it always ARRIVES crossing, wearing the
-     * crossing-street paint under it.
-     *
-     * Built on all sides per rule 1: the player jumps it, passes it in
-     * both adjacent lanes, and watches it drive in from either verge --
-     * both flanks, both ends, the roof and the underside are in shot in
-     * ordinary play. Envelope: MR.Collision.BOX[JUMP] is 0.80 tall,
-     * +/-1.12 wide, 0.52 halfZ; everything below stays inside 0.78 /
-     * +/-1.04 / +/-0.48, guarded like every other variant.
-     */
-    const jumpMiniGeo = (function () {
-      const BODY = 0xff5a48, ROOF = 0xf6f1e4, GLASS = 0x1a2934,
-        TYRE = 0x20242a, SKIRT = 0x2a1714, TRIM = 0xffd7cf;
-      const parts = [];
-      // The tub, nose at +x. A chamfered box so the little body reads
-      // rounded, sitting over its own dark underside -- the underbody
-      // rule: lit road is never seen through a vehicle.
-      parts.push(gl(hcbx(2.00, 0.32, 0.92, 0, 0.40, 0, BODY, 0.06), GLOSS.paint));
-      parts.push(gl(hbx(1.54, 0.22, 0.80, 0, 0.15, 0, SKIRT), GLOSS.matte));
-      // The greenhouse: cabin sides in body colour, and ONE glass band a
-      // hair proud of the cabin on all four faces, so side windows,
-      // windscreen and backlight are the same material seen from every
-      // angle the dart and the jump produce.
-      parts.push(gl(hcbx(1.34, 0.20, 0.82, -0.10, 0.66, 0, BODY, 0.04), GLOSS.paint));
-      parts.push(gl(hbx(1.24, 0.13, 0.84, -0.10, 0.665, 0, GLASS), GLOSS.chrome));
-      parts.push(gl(hbx(1.16, 0.02, 0.02, -0.10, 0.665, 0.43, TRIM), GLOSS.trim));
-      parts.push(gl(hbx(1.16, 0.02, 0.02, -0.10, 0.665, -0.43, TRIM), GLOSS.trim));
-      // The roof cap, cream, the brightest thing on it from above -- the
-      // face a jumping player actually sees.
-      parts.push(gl(hcbx(1.30, 0.055, 0.78, -0.10, 0.755, 0, ROOF, 0.02), GLOSS.paint));
-      // Wheels: axis along z (the car points along x), tyre barrel plus a
-      // rim disc on BOTH z faces -- the near flank and the far one.
-      for (const sx of [-1, 1]) {
-        for (const sz of [-1, 1]) {
-          const wx = sx * 0.62, wz = sz * 0.33;
-          parts.push(gl(cyl(0.155, 0.155, 0.14, 12, wx, 0.155, wz, TYRE, Math.PI / 2), GLOSS.trim));
-          parts.push(gl(cyl(0.09, 0.09, 0.03, 10, wx, 0.155, wz + sz * 0.075, WHEEL_RIM, Math.PI / 2), GLOSS.chrome));
-        }
-      }
-      // Bumpers, headlamps at the nose (+x), tail lamps at the back --
-      // the two ends lead and trail every crossing.
-      parts.push(gl(hbx(0.10, 0.10, 0.86, 1.00, 0.30, 0, TRIM), GLOSS.trim));
-      parts.push(gl(hbx(0.10, 0.10, 0.86, -1.00, 0.30, 0, TRIM), GLOSS.trim));
-      for (const sz of [-1, 1]) {
-        parts.push(gl(hbx(0.04, 0.09, 0.12, 1.03, 0.46, sz * 0.30, 0xfff2c0), GLOSS.chrome));
-        parts.push(gl(hbx(0.04, 0.08, 0.10, -1.03, 0.46, sz * 0.30, 0xd91c1c), GLOSS.chrome));
-      }
-      return merge(parts);
-    })();
-
     const jumpPool = hazardPool(K.JUMP, 'jump', [
       { geo: jumpSandGeo, face: null },
       /**
@@ -30556,10 +30474,6 @@ MR.World = (function () {
       { geo: jumpDrumGeo, face: null },
       { geo: jumpLowBarGeo, face: null },
       { geo: jumpTrashGeo, face: null },
-      // The crossing minicar. WEIGHT ZERO: it never spawns parked -- a
-      // crossing car that did not cross is a prop -- so the jcross cast
-      // site is its only door. See the geo header and castGates.
-      { geo: jumpMiniGeo, face: null, weight: 0 },
     ]);
 
     /**
@@ -35983,12 +35897,6 @@ MR.World = (function () {
       // course, repetition is not the risk, and keeping them out of the deal
       // leaves the bag's anti-repetition property intact for the fleet.
       const SWEEP_CAST = [4, 5, 6, 7, 9, 12, 13, 14];
-      // The dart is a CAR: a bus or a lorry shooting out of a side street
-      // reads as a physics error, a taxi or a hatchback reads as traffic.
-      const CROSS_CAST = [5, 12, 13];
-      // The crossing minicar's JUMP variant index -- the last def in the
-      // jump vocabulary, dealt only here.
-      const JCROSS_VI = 12;
       const cast = [];
       for (let g = 0; g < gates.length; g++) {
         const gate = gates[g];
@@ -35997,12 +35905,6 @@ MR.World = (function () {
           const kind = gate.lanes[l];
           if (kind === K.CLEAR || !bags[kind]) continue;
           row[l] = (kind === K.BLOCK && gate.train) ? 0
-            // The crossing minicar: the only door to JUMP v12 (weight 0
-            // in the bag), and only on the lane that actually crosses.
-            : (kind === K.JUMP && gate.jcross && gate.jcross.lane === l)
-              ? JCROSS_VI
-            : (kind === K.BLOCK && gate.cross)
-              ? CROSS_CAST[MR.rng.hashString((key || '') + '|sweep-skin|' + g) % CROSS_CAST.length]
             : (kind === K.BLOCK && (gate.sweep || gate.on))
               // The escort salt: a two-wall oncoming gate casts BOTH block
               // lanes off this row, and one hash per gate dressed them as
@@ -39734,30 +39636,78 @@ MR.World = (function () {
      * appears.
      */
     /**
-     * The cross-street paint: a transverse band of asphalt with dashed
-     * edge lines, laid across the whole road (and a little into both
-     * verges) at a cross gate, so the car darting in from the side reads
-     * as coming out of a SIDE STREET rather than out of the scenery. Road
-     * marking, not an object -- a single flat quad is correct here per
-     * the rule-1 exception, because the player can never get under it.
-     * One draw per live cross gate, claimed and released with the gate.
+     * The zebra crossing: white bars across the whole road, laid two
+     * units BEFORE a walk gate's line, so the figure crossing it reads
+     * as a pedestrian on a marked crossing rather than a stray from the
+     * crowd. Road marking, not an object -- a single flat quad per the
+     * rule-1 exception. One draw per live walk gate, claimed and
+     * released with the gate.
      */
-    const crossPaintPool = Pool(function () {
-      const cv = canvas(128, 64);
+    const walkPaintPool = Pool(function () {
+      const cv = canvas(128, 32);
       const cg = cv.getContext('2d');
-      cg.fillStyle = '#4a4d57';
-      cg.fillRect(0, 0, 128, 64);
-      cg.fillStyle = '#c9ccd4';
-      for (let x = 0; x < 128; x += 16) { cg.fillRect(x, 3, 9, 3); cg.fillRect(x, 58, 9, 3); }
+      cg.clearRect(0, 0, 128, 32);
+      cg.fillStyle = '#e9e6da';
+      for (let x = 2; x < 128; x += 16) cg.fillRect(x, 2, 9, 28);
       const tex = new THREE.CanvasTexture(cv);
       tex.colorSpace = THREE.SRGBColorSpace;
       const g = new THREE.Mesh(
-        new THREE.PlaneGeometry(9.4, 4.6).rotateX(-Math.PI / 2),
-        new THREE.MeshBasicMaterial({ map: tex }));
-      // AFTER the road, like the finish carpet (renderOrder 1): a band at
-      // renderOrder -2 with depthWrite off is drawn first and the opaque
-      // road then paints straight over it -- it shipped invisible that way.
+        new THREE.PlaneGeometry(9.4, 2.0).rotateX(-Math.PI / 2),
+        new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+      // AFTER the road, like the finish carpet -- see roadmap 100 for the
+      // renderOrder lesson this line carries.
       g.renderOrder = 1;
+      return g;
+    }, group);
+
+    /**
+     * THE STREET-CROSSER. One recurring figure -- red jacket, cream cap
+     * -- because a character the player meets every few miles is worth
+     * more than a wardrobe. Built on all sides per rule 1 (the player
+     * passes within two units of them); legs and arms are separate
+     * meshes on hip and shoulder pivots so the walk is a real stride,
+     * and a soft blob shadow rides the group so the figure sits on the
+     * road instead of floating over it. See the walk branch in the anim
+     * loop for the timing contract.
+     */
+    const walkerPool = Pool(function () {
+      const JACKET = 0xe8433f, TROUSER = 0x2a3450, SKIN = 0xe8b48c,
+        CAP = 0xf6f1e4, SHOE = 0x1c2026;
+      const g = new THREE.Group();
+      const body = [];
+      // Torso, head, cap -- static, merged once.
+      body.push(gl(hcbx(0.40, 0.52, 0.24, 0, 0.90, 0, JACKET, 0.05), GLOSS.matte));
+      body.push(gl(hbx(0.20, 0.20, 0.19, 0, 1.27, 0, SKIN), GLOSS.matte));
+      body.push(gl(hcbx(0.23, 0.09, 0.22, 0, 1.40, 0, CAP, 0.03), GLOSS.matte));
+      body.push(gl(hbx(0.24, 0.035, 0.10, 0.11, 1.345, 0, CAP), GLOSS.matte));
+      g.add(S.outlined(merge(body), mats.propLit, S.INK.hazard));
+      // Limbs: geometry dropped so the origin is the pivot, one mesh
+      // each, swung in the anim loop.
+      function limb(w, len, d, color) {
+        const geo = new THREE.BoxGeometry(w, len, d);
+        geo.translate(0, -len / 2, 0);
+        const n2 = geo.attributes.position.count;
+        const col = new Float32Array(n2 * 3);
+        const c = new THREE.Color(color);
+        for (let i = 0; i < n2; i++) { col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
+        geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+        return new THREE.Mesh(geo, mats.propLit);
+      }
+      const legL = limb(0.14, 0.64, 0.16, TROUSER); legL.position.set(-0.11, 0.64, 0);
+      const legR = limb(0.14, 0.64, 0.16, TROUSER); legR.position.set(0.11, 0.64, 0);
+      const armL = limb(0.10, 0.42, 0.12, JACKET); armL.position.set(-0.25, 1.12, 0);
+      const armR = limb(0.10, 0.42, 0.12, JACKET); armR.position.set(0.25, 1.12, 0);
+      // Shoes ride the legs so the stride carries them.
+      const shoeL = limb(0.15, 0.06, 0.22, SHOE); shoeL.position.set(0, -0.62, 0.03); legL.add(shoeL);
+      const shoeR = limb(0.15, 0.06, 0.22, SHOE); shoeR.position.set(0, -0.62, 0.03); legR.add(shoeR);
+      g.add(legL); g.add(legR); g.add(armL); g.add(armR);
+      const shadow = new THREE.Mesh(
+        new THREE.CircleGeometry(0.34, 10).rotateX(-Math.PI / 2),
+        new THREE.MeshBasicMaterial({ color: 0x0a0e20, transparent: true, opacity: 0.35 }));
+      shadow.position.y = 0.02;
+      shadow.renderOrder = 2;
+      g.add(shadow);
+      g.userData.limbs = { legL, legR, armL, armR };
       return g;
     }, group);
 
@@ -40332,13 +40282,19 @@ MR.World = (function () {
           objs.push(o);
         }
         const entry = { gate, objs };
-        // Both crossing kinds lay the side-street band: the swipe dart
-        // (gate.cross) and the jumpable minicar (gate.jcross).
-        if (gate.cross || gate.jcross) {
-          const p = crossPaintPool.claim();
-          p.position.set(0, eAt(gate.z) + 0.016, gate.z);
-          p.rotation.x = -Math.atan(EL.slope(gate.z));
+        // A walk gate lays its zebra and stands its crosser at the verge
+        // two units before the line; the anim loop owns the walk itself.
+        if (gate.walk) {
+          const wz = gate.z - 2.0;
+          const p = walkPaintPool.claim();
+          p.position.set(0, eAt(wz) + 0.016, wz);
+          p.rotation.x = -Math.atan(EL.slope(wz));
           entry.paint = p;
+          const w = walkerPool.claim();
+          w.position.set(gate.walk.side * 4.2, eAt(wz), wz);
+          w.rotation.y = gate.walk.side > 0 ? Math.PI : 0;
+          w.visible = true;
+          entry.walker = w;
         }
         activeGates.push(entry);
       }
@@ -40365,7 +40321,8 @@ MR.World = (function () {
           && activeGates[0].gate.z + trainDepth(activeGates[0].gate) < back) {
         const g = activeGates.shift();
         for (let l = 0; l < 3; l++) if (g.objs[l]) releaseHazard(g.gate.lanes[l], g.objs[l]);
-        if (g.paint) crossPaintPool.release(g.paint);
+        if (g.paint) walkPaintPool.release(g.paint);
+        if (g.walker) walkerPool.release(g.walker);
       }
 
       // roadside props
@@ -40857,37 +40814,39 @@ MR.World = (function () {
         // verge beside its lane, fully sideways, straightening as it brakes
         // into place. Same lock as its siblings; the crossing-street paint
         // under it (claimed with the gate) is what its entry drives over.
-        const cr = g.gate.cross;
-        if (cr && g.objs[cr.lane]) {
-          const o = g.objs[cr.lane];
+        /**
+         * THE STREET-CROSSER'S WALK. Pure approach theater on the motion
+         * contract: no kill box exists at this figure, so the only
+         * promise to keep is the owner's -- "They need to cross the
+         * whole street just before the runner gets there." Position is a
+         * pure function of distance: waiting at the near verge beyond
+         * WALK_ENTER, walking a straight line across all three lanes as
+         * d falls, stepping onto the far verge at WALK_EXIT -- about
+         * half a second before the runner crosses the zebra. The stride
+         * is distance-driven too (legs and arms counter-swing on their
+         * pivots, amplitude zero at both verges), so a paused game holds
+         * a mid-step pose instead of marching in place.
+         */
+        const wk = g.gate.walk;
+        if (wk && g.walker) {
+          const o = g.walker;
           const d = g.gate.z - z;
-          const t = (MR.Course.CROSS_START - d)
-            / (MR.Course.CROSS_START - MR.Course.SWEEP_LOCK);
-          const c = t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
-          const fx = cr.side * (Math.abs(K.LANE_X[0]) + 1.9);
-          const tx = K.LANE_X[cr.lane];
-          o.position.x = fx + (tx - fx) * c;
-          o.rotation.y = (tx > fx ? 1 : -1) * (Math.PI / 2) * (1 - c);
-          o.visible = c > 0.001;
-        }
-        // THE JUMPABLE CROSSING MINICAR: same dart as gate.cross, but it
-        // NEVER straightens -- it is authored side-on (nose along +x) and
-        // stays mid-crossing when it locks, which is the whole read: a
-        // little car caught crossing, hop it. Yaw only points the nose
-        // along the direction of travel; entering from +x it drives
-        // toward -x, so the body flips PI.
-        const jc = g.gate.jcross;
-        if (jc && g.objs[jc.lane]) {
-          const o = g.objs[jc.lane];
-          const d = g.gate.z - z;
-          const t = (MR.Course.CROSS_START - d)
-            / (MR.Course.CROSS_START - MR.Course.SWEEP_LOCK);
-          const c = t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
-          const fx = jc.side * (Math.abs(K.LANE_X[0]) + 1.9);
-          const tx = K.LANE_X[jc.lane];
-          o.position.x = fx + (tx - fx) * c;
-          o.rotation.y = jc.side > 0 ? Math.PI : 0;
-          o.visible = c > 0.001;
+          const t = (MR.Course.WALK_ENTER - d)
+            / (MR.Course.WALK_ENTER - MR.Course.WALK_EXIT);
+          const c = t <= 0 ? 0 : t >= 1 ? 1 : t;
+          const fx = wk.side * 4.2;
+          o.position.x = fx - wk.side * 8.4 * c;
+          const walking = c > 0.001 && c < 0.999;
+          const L = o.userData.limbs;
+          const ph = c * 8.4 * 3.4;
+          const amp = walking ? 0.55 : 0;
+          L.legL.rotation.x = Math.sin(ph) * amp;
+          L.legR.rotation.x = -Math.sin(ph) * amp;
+          L.armL.rotation.x = -Math.sin(ph) * amp * 0.6;
+          L.armR.rotation.x = Math.sin(ph) * amp * 0.6;
+          // A touch of bob so the stride reads from behind, where the
+          // legs are mostly hidden by the body.
+          o.position.y = eAt(g.gate.z - 2.0) + (walking ? Math.abs(Math.sin(ph)) * 0.035 : 0);
         }
         const sw = g.gate.sweep;
         if (sw && g.objs[sw.lane]) {
@@ -46290,6 +46249,17 @@ MR.HUD = (function () {
           <div id="railFill"></div>
           <div id="railGap"></div>
           <div id="railGhost"></div>
+          <!--
+            THE SECOND RUNNER UP THE ROAD (2026-09-09). The owner: "Add in
+            the location record into each day. You have two goals
+            essentially." The bronze tick is the day's REAL course-record
+            holder running their own race on the same rail -- position is
+            raceTime at the CR's average pace, the same arithmetic the
+            ghost uses -- so both goals are geography on one line: catch
+            the bronze runner, then catch the ghost. Hidden in London,
+            where they are the same runner.
+          -->
+          <div id="railCR" class="hidden"></div>
         </div>
         <!--
           THE AXIS LABEL BECOMES THE ROUTE.
@@ -46789,6 +46759,7 @@ MR.HUD = (function () {
       distVal: q('distVal'),
       railWrap: q('railWrap'),
       rail: q('rail'), railFill: q('railFill'), railGap: q('railGap'), railGhost: q('railGhost'),
+      railCR: q('railCR'),
       railRoute: q('railRoute'),
       gapVal: q('gapVal'), gapTrend: q('gapTrend'), gapLabel: q('gapLabel'),
       toast: q('toast'), toastLab: q('toastLab'), toastBig: q('toastBig'),
@@ -48161,6 +48132,18 @@ MR.HUD = (function () {
       const gh = clamp01(p.ghostMiles() / K.MARATHON_MILES) * 100;
       n.railFill.style.width = you + '%';
       n.railGhost.style.left = gh + '%';
+      {
+        const st0 = course && course.settings && course.settings[0];
+        const hasCR = st0 && st0.rec && st0.rec > K.RECORD_SECONDS;
+        if (cache.crShown !== hasCR) {
+          cache.crShown = hasCR;
+          n.railCR.classList.toggle('hidden', !hasCR);
+        }
+        if (hasCR) {
+          const crM = Math.min(K.MARATHON_MILES, (p.raceTime || 0) * K.MARATHON_MILES / st0.rec);
+          n.railCR.style.left = (clamp01(crM / K.MARATHON_MILES) * 100) + '%';
+        }
+      }
       n.railGap.style.left = Math.min(you, gh) + '%';
       n.railGap.style.width = Math.abs(you - gh) + '%';
 

@@ -9113,3 +9113,57 @@ runner. The start panel's bronze bar and the finish stamp already
 carried the other two surfaces.
 
 Gates: 8/8 shots, 90+90 courses, simulate PASS.
+
+## 112. Six orders: runners, the truck, density, the bar, and five cities
+
+The 2026-09-15 batch, each line measured:
+
+THE CROSSERS ARE THE OWNER'S PEOPLE, RUNNING. "The cross runner
+needs to move and run like miles. Use the 4 additional runners we
+created" -- the four props-v1 spectators, whose sculpts are unrigged
+cheering poses. The rig is cut at runtime: every triangle below the
+hip line goes to a leg by centroid, each leg hangs from a hip pivot,
+and the run is a real stride -- 0.95 rad swing, a sprinter's lean,
+a bounce -- while the arms STAY UP, because what crosses the road is
+a spectator sprinting mid-cheer, which is the only honest reading of
+the source and exactly this game's tone. Four figures, seeded
+wardrobes, dealt per crossing by gate hash; box-person fallback kept.
+
+THE BIG TRUCK PARKS FOR GOOD. "Not to scale and it comes in
+sideways": v14 is the one vehicle sized to fill the whole block
+envelope -- the owner's own lane-filling order -- which is exactly
+what disqualifies it from moving. Out of SWEEP_CAST; it stands, the
+vehicles with a nose drive.
+
+MORE: rate 0.85, walkers 0.08 -- census 22.6 oncoming and 8.9
+crossers a course, three drives at once on 219 days of 365.
+
+THE BAR, RE-MEASURED UNDER THE NEW DENSITY: the grid is untouched by
+annotations (they never move a lane), so gold still falls only to
+the learned line at 0.98+ execution and no first attempt anywhere.
+"Add water and bananas as needed" resolves to NOT NEEDED: any aid
+added now would soften the near-perfect requirement the same message
+re-ordered. The dial is there the day the owner wants it.
+
+FIVE CITIES (17 now): ATHENS (CR 2:10:34 Kiptoo -- the hardest
+bronze on the roster, as the original uphill course should be),
+SEOUL (2:04:23 Teklu, fell THIS YEAR), SINGAPORE (2:11:25 Kibet),
+BUENOS AIRES (2:05:02 Chebet), NAIROBI (2:10:12 Kigen) -- records
+searched, not remembered. Ten new landmark builders (Parthenon on
+its rock, the Panathenaic horseshoe, N Seoul Tower on Namsan,
+Namdaemun, Marina Bay Sands, supertrees, the Obelisco, the Casa
+Rosada, the KICC drum, an acacia stand) plus Liberty for New York,
+and five full SETTING_LOOK identities (Bo-Kaap taught the shophouse
+trick: Singapore's pastel terraces do more identification than any
+tower). The calendar reshuffles with the roster size, as roadmap 108
+accepted; no shipped course's gates change.
+
+OPENINGS DENSER EVERYWHERE: every city's CITY START mark list now
+carries at least three entries led by its signatures (New York
+swaps a generic clock for Liberty; London doubles Big Ben; Paris
+doubles the Eiffel; Rome doubles the Colosseum...), per "the
+beginning is most important. The uniqueness can diminish as the
+race goes on."
+
+Gates: 8/8 shots, 90+90 courses across the 17-city roster, simulate
+PASS.

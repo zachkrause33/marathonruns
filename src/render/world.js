@@ -625,7 +625,7 @@ MR.World = (function () {
       tower: { colors: [0x8a8a98, 0xa89e94, 0xc0b4a0], glass: 0, crown: 'flat' },
       tree: { kind: 'round', colors: [0xe0692f, 0xd8952a, 0xc04a2a, 0xe8b13a], h: 1.05 },
       marks: {
-        'CITY START': [{ k: 'citgo', x: 15 }, { k: 'spireWhite', x: 14 }, { k: 'clock', x: 14.5 }],
+        'CITY START': [{ k: 'citgo', x: 15 }, { k: 'spireWhite', x: 14 }, { k: 'citgo', x: 18 }],
         'RIVERSIDE': [{ k: 'citgo', x: 16 }, { k: 'ship', x: 34, y: -0.12 }],
         'PARKLAND': [{ k: 'oak', x: 15 }, { k: 'pond', x: 27 }, { k: 'spireWhite', x: 15 }],
         'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'spireWhite', x: 14 }],
@@ -645,7 +645,7 @@ MR.World = (function () {
       tower: { colors: [0x9a9aa4, 0xb0aca8, 0xc8c4b8], glass: 1, crown: 'flat' },
       tree: { kind: 'round', colors: [0x5f7f30, 0x84a83c, 0xaad84e], h: 1.15, trunk: 0x9a9a86 },
       marks: {
-        'CITY START': [{ k: 'stPauls', x: 17 }, { k: 'bigBen', x: 14 }],
+        'CITY START': [{ k: 'stPauls', x: 17 }, { k: 'bigBen', x: 14 }, { k: 'bigBen', x: 16 }],
         'RIVERSIDE': [{ k: 'stPauls', x: 18 }, { k: 'ship', x: 34, y: -0.12 }],
         'PARKLAND': [{ k: 'oak', x: 15 }, { k: 'pond', x: 27 }],
         'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'bigBen', x: 14 }],
@@ -665,7 +665,7 @@ MR.World = (function () {
       tower: { colors: [0x9a9ca8, 0xb4b0ac, 0xd0ccc0], glass: 1, crown: 'flat' },
       tree: { kind: 'round', colors: [0x688a2e, 0x8cb43a, 0xb0e04e], h: 1.2 },
       marks: {
-        'CITY START': [{ k: 'fernsehturm', x: 22 }, { k: 'brandenburg', over: 1 }],
+        'CITY START': [{ k: 'fernsehturm', x: 22 }, { k: 'brandenburg', over: 1 }, { k: 'fernsehturm', x: 26 }],
         'RIVERSIDE': [{ k: 'fernsehturm', x: 24 }, { k: 'ship', x: 34, y: -0.12 }],
         'PARKLAND': [{ k: 'victoryColumn', x: 16 }, { k: 'oak', x: 15 }, { k: 'pond', x: 27 }],
         'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'fernsehturm', x: 20 }],
@@ -685,7 +685,7 @@ MR.World = (function () {
       tower: { colors: [0x4a4a54, 0x5a5660, 0x6e6870], glass: 1, crown: 'antenna' },
       tree: { kind: 'round', colors: [0x5c8028, 0x7fa838, 0xa4d848], h: 1.0 },
       marks: {
-        'CITY START': [{ k: 'willis', x: 20 }, { k: 'lTrack', over: 1, run: 48 }],
+        'CITY START': [{ k: 'willis', x: 20 }, { k: 'lTrack', over: 1, run: 48 }, { k: 'willis', x: 24 }],
         'RIVERSIDE': [{ k: 'lTrack', over: 1, run: 48 }, { k: 'crane', x: 13 }, { k: 'willis', x: 22 }],
         'PARKLAND': [{ k: 'oak', x: 15 }, { k: 'pond', x: 27 }],
         'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'willis', x: 19 }],
@@ -706,7 +706,7 @@ MR.World = (function () {
       tower: { colors: [0x8a8272, 0xa89c88, 0x6f7488], glass: 0, crown: 'stepped' },
       tree: { kind: 'round', colors: [0x5c8028, 0x7fa838, 0xa4d848], h: 1.1 },
       marks: {
-        'CITY START': [{ k: 'empire', x: 21 }, { k: 'clock', x: 15 }],
+        'CITY START': [{ k: 'empire', x: 21 }, { k: 'liberty', x: 18 }, { k: 'empire', x: 25 }],
         'RIVERSIDE': [{ k: 'empire', x: 24 }, { k: 'ship', x: 34, y: -0.12 }],
         'PARKLAND': [{ k: 'oak', x: 15 }, { k: 'pond', x: 27 }, { k: 'empire', x: 26 }],
         'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'empire', x: 20 }],
@@ -746,7 +746,7 @@ MR.World = (function () {
       tower: { colors: [0xa4a8ac, 0xbcbcb4, 0xd8d4c8], glass: 1, crown: 'flat' },
       tree: { kind: 'palm', colors: [0x5f8a30, 0x92c040], h: 1.1 },
       marks: {
-        'CITY START': [{ k: 'operaHouse', x: 19 }, { k: 'sydneyTower', x: 20 }],
+        'CITY START': [{ k: 'operaHouse', x: 19 }, { k: 'sydneyTower', x: 20 }, { k: 'operaHouse', x: 22 }],
         'RIVERSIDE': [{ k: 'operaHouse', x: 20 }, { k: 'ship', x: 34, y: -0.12 }],
         'PARKLAND': [{ k: 'oak', x: 15 }, { k: 'pond', x: 27 }, { k: 'sydneyTower', x: 20 }],
         'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'sydneyTower', x: 18 }],
@@ -766,7 +766,7 @@ MR.World = (function () {
       tower: { colors: [0xc8c0ac, 0xd8d0bc, 0xb0a894], glass: 0, crown: 'flat' },
       tree: { kind: 'pollard', colors: [0x62862e, 0x8ab23c, 0xaedc4e], h: 1.1, trunk: 0xa8a894 },
       marks: {
-        'CITY START': [{ k: 'eiffel', x: 24 }, { k: 'arcDeTriomphe', over: 1 }],
+        'CITY START': [{ k: 'eiffel', x: 24 }, { k: 'arcDeTriomphe', over: 1 }, { k: 'eiffel', x: 28 }],
         'RIVERSIDE': [{ k: 'eiffel', x: 26 }, { k: 'ship', x: 34, y: -0.12 }],
         'PARKLAND': [{ k: 'eiffel', x: 26 }, { k: 'pond', x: 27 }, { k: 'oak', x: 15 }],
         'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'eiffel', x: 22 }],
@@ -812,7 +812,7 @@ MR.World = (function () {
       // One-city-a-day top-up: the windmill joined when AMSTERDAM started
       // carrying whole days alone (7 landmark kinds against a median 8).
       marks: {
-        'CITY START': [{ k: 'canal', x: 20, run: 40, alt: 'canalBridge', every: 3, side: -1 }, { k: 'westerkerk', x: 15 }],
+        'CITY START': [{ k: 'canal', x: 20, run: 40, alt: 'canalBridge', every: 3, side: -1 }, { k: 'westerkerk', x: 15 }, { k: 'windmill', x: 18 }],
         'RIVERSIDE': [{ k: 'canal', x: 20, run: 40, alt: 'canalBridge', every: 3, side: -1 }, { k: 'westerkerk', x: 16 }, { k: 'windmill', x: 17.5 }],
         'PARKLAND': [{ k: 'oak', x: 15 }, { k: 'windmill', x: 17.5 }, { k: 'pond', x: 27 }],
         'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'westerkerk', x: 15 }],
@@ -832,7 +832,7 @@ MR.World = (function () {
       tower: { colors: [0xe8c48c, 0xd8a868, 0xf0dcb0], glass: 0, crown: 'flat' },
       tree: { kind: 'umbrella', colors: [0x466a24, 0x628c30, 0x88bc3c], h: 1.2 },
       marks: {
-        'CITY START': [{ k: 'colosseum', x: 21 }, { k: 'aqueduct', over: 1 }],
+        'CITY START': [{ k: 'colosseum', x: 21 }, { k: 'aqueduct', over: 1 }, { k: 'colosseum', x: 25 }],
         'RIVERSIDE': [{ k: 'colosseum', x: 22 }, { k: 'ship', x: 34, y: -0.12 }],
         'PARKLAND': [{ k: 'aqueduct', over: 1 }, { k: 'pond', x: 27 }, { k: 'oak', x: 15 }],
         'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'aqueduct', over: 1 }],
@@ -865,6 +865,110 @@ MR.World = (function () {
         'FINAL MILE': [{ k: 'tableMountain', x: 72, run: 220, side: -1 }, { k: 'jumbo', x: 13.5 }, { k: 'ctStadium', x: 30 }],
       },
       bridge: 'tower',
+    },
+
+    ATHENS: {
+      sky: [0x4a8cc8, 0xd8ecf0], fog: 0xd8ecf2, ground: 0x9aa858, road: 0x6a6a60,
+      water: 0x3a8cc0, edge: 0xf6ead2,
+      terrace: {
+        colors: [0xf4ecd8, 0xe8dcc0, 0xf0e4cc, 0xdcd0b4, 0xf8f0e0],
+        trim: 0xfffaf0, win: 0x35528a, roof: 'flat', roofColor: 0xc4b494,
+        h: [8.0, 10.5], bay: 4.2, depth: 6.4, rows: 3, balcony: 1,
+      },
+      tower: { colors: [0xd8d0bc, 0xc8c0ac, 0xe4dcc8], glass: 0, crown: 'flat' },
+      tree: { kind: 'columnar', colors: [0x4a6a2e, 0x5f8038, 0x6f9040], h: 1.2, trunk: 0x8a7a5e },
+      marks: {
+        'CITY START': [{ k: 'parthenon', x: 34 }, { k: 'panathenaic', x: 24 }, { k: 'parthenon', x: 38 }],
+        'RIVERSIDE': [{ k: 'parthenon', x: 36 }, { k: 'oak', x: 15 }],
+        'PARKLAND': [{ k: 'oak', x: 15 }, { k: 'pond', x: 27 }, { k: 'parthenon', x: 40 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'parthenon', x: 36 }],
+        'FINAL MILE': [{ k: 'panathenaic', x: 22 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'stoneArch',
+    },
+
+    SEOUL: {
+      sky: [0x4a86c4, 0xcae6ee], fog: 0xc8e2f0, ground: 0x66b468, road: 0x686a64,
+      water: 0x447eaa, edge: 0xeef2fa,
+      terrace: {
+        colors: [0xd8d4cc, 0xc8ccd0, 0xe0dcd4, 0xb8c0c8, 0xe8e4dc],
+        trim: 0xf8f6f0, win: 0x2f3e60, roof: 'flat', roofColor: 0x6a7278,
+        h: [10.5, 13.5], bay: 4.6, depth: 7.0, rows: 4, balcony: 1,
+      },
+      tower: { colors: [0x8a94a4, 0xa4acb8, 0xc0c8d4], glass: 1, crown: 'flat' },
+      tree: { kind: 'round', colors: [0x6a8f2e, 0x8fb43c, 0xc0d84e], h: 1.1 },
+      marks: {
+        'CITY START': [{ k: 'namdaemun', x: 17 }, { k: 'seoulTower', x: 40 }, { k: 'namdaemun', x: 19 }],
+        'RIVERSIDE': [{ k: 'seoulTower', x: 42 }, { k: 'ship', x: 34, y: -0.12 }],
+        'PARKLAND': [{ k: 'oak', x: 15 }, { k: 'pond', x: 27 }, { k: 'seoulTower', x: 44 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'seoulTower', x: 42 }],
+        'FINAL MILE': [{ k: 'namdaemun', x: 18 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'zakim',
+    },
+
+    SINGAPORE: {
+      sky: [0x3f8cc8, 0xd0f0f2], fog: 0xd2eef4, ground: 0x5fc06a, road: 0x6a6b66,
+      water: 0x2f96c8, edge: 0xf2f6fc,
+      terrace: {
+        // Shophouses: pastel fronts under white trim, the street-level
+        // Singapore every photo of Chinatown or Katong leads with.
+        colors: [0x8fd0d8, 0xf0b0c0, 0xf6e0a0, 0xb8e0a8, 0xd8b8e8, 0xf8d0b0],
+        trim: 0xffffff, win: 0x3a4a68, roof: 'pitch', roofColor: 0xc46a4e,
+        h: [7.5, 9.5], bay: 4.0, depth: 6.2, rows: 3, balcony: 1,
+      },
+      tower: { colors: [0xb8c8d8, 0xa8bcd0, 0xd0dce8], glass: 1, crown: 'flat' },
+      tree: { kind: 'palm', colors: [0x4f9040, 0x62a848, 0x78c052], h: 1.15 },
+      marks: {
+        'CITY START': [{ k: 'marinaBay', x: 34 }, { k: 'supertree', x: 15 }, { k: 'marinaBay', x: 38 }],
+        'RIVERSIDE': [{ k: 'marinaBay', x: 36 }, { k: 'ship', x: 34, y: -0.12 }, { k: 'supertree', x: 16 }],
+        'PARKLAND': [{ k: 'supertree', x: 14 }, { k: 'pond', x: 27 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'marinaBay', x: 36 }],
+        'FINAL MILE': [{ k: 'marinaBay', x: 34 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'harbour',
+    },
+
+    BUENOSAIRES: {
+      sky: [0x4e8ac2, 0xcfeaf0], fog: 0xcfe6f0, ground: 0x6cbc6c, road: 0x6b6a63,
+      water: 0x8a7a5a, edge: 0xf6eee0,
+      terrace: {
+        // The French facades of the microcentro, with jacaranda mauve in
+        // the street trees below.
+        colors: [0xe8dcc8, 0xd8ccb8, 0xf0e6d4, 0xc8bca8, 0xe0d4c0],
+        trim: 0xfff6ea, win: 0x3a4664, roof: 'mansard', roofColor: 0x5a6068,
+        h: [11.0, 13.5], bay: 4.6, depth: 7.2, rows: 4, balcony: 1,
+      },
+      tower: { colors: [0xa8a4a0, 0xbcb8b0, 0xd0c8bc], glass: 1, crown: 'flat' },
+      tree: { kind: 'round', colors: [0x8f7ab8, 0xa48fd0, 0x7a9a3e], h: 1.1, trunk: 0x7a6a54 },
+      marks: {
+        'CITY START': [{ k: 'obelisco', x: 13 }, { k: 'casaRosada', x: 24 }, { k: 'obelisco', x: 15 }],
+        'RIVERSIDE': [{ k: 'obelisco', x: 14 }, { k: 'ship', x: 34, y: -0.12 }],
+        'PARKLAND': [{ k: 'oak', x: 15 }, { k: 'pond', x: 27 }, { k: 'obelisco', x: 16 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'obelisco', x: 14 }],
+        'FINAL MILE': [{ k: 'casaRosada', x: 22 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'harp',
+    },
+
+    NAIROBI: {
+      sky: [0x4f94c8, 0xe0eedc], fog: 0xdcecdc, ground: 0xa8963e, road: 0x6e6a5c,
+      water: 0x6a9a7a, edge: 0xf8ecd8,
+      terrace: {
+        colors: [0xd8c8a8, 0xc8b48c, 0xe4d4b4, 0xb8a480, 0xd0bc94],
+        trim: 0xf4ead8, win: 0x3a4258, roof: 'flat', roofColor: 0x8a7a5c,
+        h: [8.5, 11.0], bay: 4.4, depth: 6.8, rows: 3,
+      },
+      tower: { colors: [0xb0885e, 0xc09a6e, 0x9a7a54], glass: 0, crown: 'flat' },
+      tree: { kind: 'umbrella', colors: [0x7d9038, 0x93a848, 0x6a8034], h: 1.0, trunk: 0x6a4a34 },
+      marks: {
+        'CITY START': [{ k: 'kicc', x: 26 }, { k: 'acaciaGrove', x: 16 }, { k: 'kicc', x: 30 }],
+        'RIVERSIDE': [{ k: 'acaciaGrove', x: 15 }, { k: 'kicc', x: 28 }],
+        'PARKLAND': [{ k: 'acaciaGrove', x: 14 }, { k: 'pond', x: 27 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'kicc', x: 28 }],
+        'FINAL MILE': [{ k: 'kicc', x: 26 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'stoneArch',
     },
   };
 
@@ -3754,6 +3858,173 @@ MR.World = (function () {
       parts.push(cyl(13.6, 13.6, 0.8, 16, 0, 9.6, 0, ROOF));
       parts.push(cyl(9.6, 9.6, 0.5, 16, 0, 9.8, 0, SKIN2));
       parts.push(cyl(6.4, 6.4, 0.4, 12, 0, 9.9, 0, 0x5f8f52));
+      return merge(parts);
+    },
+
+    /** Liberty: the green figure, torch up, on her star plinth. */
+    liberty: function () {
+      const parts = [];
+      const CU = 0x5fae94, CU2 = 0x4f9a84, STONE = 0xc8b898;
+      parts.push(bx(7.0, 3.0, 7.0, 0, 1.5, 0, STONE));
+      parts.push(bx(5.2, 4.4, 5.2, 0, 5.2, 0, STONE));
+      parts.push(bx(3.2, 1.2, 3.2, 0, 8.0, 0, CU2));
+      parts.push(bx(2.2, 6.5, 1.8, 0, 11.8, 0, CU));
+      parts.push(bx(2.6, 0.8, 2.0, 0, 15.4, 0, CU2));
+      parts.push(bx(1.1, 1.1, 1.1, 0, 16.4, 0, CU));
+      for (let i = 0; i < 7; i++) {
+        parts.push(bx(0.16, 1.1, 0.16, -0.72 + i * 0.24, 17.3, 0, CU2, 0, 0, (i - 3) * 0.28));
+      }
+      parts.push(bx(0.5, 4.2, 0.5, 1.35, 14.6, 0, CU, 0, 0, -0.28));
+      parts.push(bx(0.9, 0.9, 0.9, 2.5, 17.0, 0, 0xffd75e));
+      parts.push(bx(0.6, 2.8, 1.4, -1.15, 12.4, 0.2, CU2, 0, 0, 0.32));
+      return merge(parts);
+    },
+
+    // ---- ATHENS --------------------------------------------------------
+    /** The Acropolis: an ochre hill with the Parthenon's colonnade on top. */
+    parthenon: function () {
+      const parts = [];
+      const ROCK = 0xb99f78, MARBLE = 0xf2ead6, MARBLE2 = 0xdcd2b8;
+      parts.push(cyl(16.0, 22.0, 9.0, 10, 0, 4.5, 0, ROCK));
+      parts.push(cyl(11.0, 14.5, 2.4, 10, 0, 10.2, 0, 0xa8905f));
+      // The stylobate, then the peristyle: eight columns a flank, four an end.
+      parts.push(bx(17.0, 1.0, 9.0, 0, 11.9, 0, MARBLE2));
+      for (let i = 0; i < 8; i++) {
+        for (const szn of [-1, 1]) {
+          parts.push(cyl(0.42, 0.5, 3.6, 6, -7.0 + i * 2.0, 14.2, szn * 3.6, MARBLE));
+        }
+      }
+      for (const sxn of [-1, 1]) {
+        parts.push(cyl(0.42, 0.5, 3.6, 6, sxn * 7.0, 14.2, 1.2, MARBLE));
+        parts.push(cyl(0.42, 0.5, 3.6, 6, sxn * 7.0, 14.2, -1.2, MARBLE));
+      }
+      parts.push(bx(16.6, 0.9, 8.6, 0, 16.4, 0, MARBLE));
+      // Pediments on BOTH ends, per the rule this file opens with.
+      for (const sxn of [-1, 1]) {
+        parts.push(bx(0.8, 1.5, 7.6, sxn * 7.9, 17.4, 0, MARBLE2, 0, 0, sxn * 0.0));
+      }
+      parts.push(bx(15.4, 1.2, 7.2, 0, 17.3, 0, MARBLE2));
+      return merge(parts);
+    },
+    /** The Panathenaic: the all-marble horseshoe, open end to the road. */
+    panathenaic: function () {
+      const parts = [];
+      const M = 0xf4ecd8, M2 = 0xe2d8c0, TRACK = 0xc26a4a;
+      for (let t = 0; t < 3; t++) {
+        const w = 4.5 - t * 1.1, y = 1.0 + t * 1.4;
+        for (const szn of [-1, 1]) {
+          parts.push(bx(26.0 - t * 1.6, 1.5, w, 3.0, y, szn * (7.5 + t * 1.0), t % 2 ? M2 : M));
+        }
+        parts.push(bx(w, 1.5, 15.0 + t * 2.0, 16.0 + t * 0.8, y, 0, t % 2 ? M2 : M));
+      }
+      parts.push(bx(22.0, 0.3, 13.0, 2.0, 0.35, 0, TRACK));
+      return merge(parts);
+    },
+
+    // ---- SEOUL ---------------------------------------------------------
+    /** N Seoul Tower on Namsan: green hill, white shaft, the ringed pod. */
+    seoulTower: function () {
+      const parts = [];
+      const HILL = 0x4f7a3a, HILL2 = 0x639048, SHAFT = 0xeef0f2, POD = 0xd8dce4;
+      parts.push(cyl(15.0, 21.0, 8.0, 10, 0, 4.0, 0, HILL));
+      parts.push(cyl(9.0, 13.0, 4.5, 9, 0, 9.5, 0, HILL2));
+      parts.push(cyl(1.6, 2.2, 14.0, 8, 0, 18.5, 0, SHAFT));
+      parts.push(cyl(3.4, 2.6, 2.6, 8, 0, 26.5, 0, POD));
+      parts.push(cyl(3.6, 3.6, 0.6, 8, 0, 27.6, 0, 0x9aa4b4));
+      parts.push(cyl(0.28, 0.4, 6.0, 6, 0, 30.8, 0, 0xc23a3a));
+      return merge(parts);
+    },
+    /** Namdaemun: the stone gate with the double tiered roof. */
+    namdaemun: function () {
+      const parts = [];
+      const STONE = 0xb8ac94, WOOD = 0x8a3f34, ROOF = 0x3e4a44, TRIM = 0x2f6a54;
+      parts.push(bx(14.0, 5.5, 7.0, 0, 2.75, 0, STONE));
+      parts.push(bx(4.2, 3.6, 7.2, 0, 1.8, 0, 0x4a4438));
+      parts.push(bx(12.6, 2.2, 6.0, 0, 6.6, 0, WOOD));
+      parts.push(bx(14.6, 0.9, 7.6, 0, 8.0, 0, ROOF));
+      for (const sxn of [-1, 1]) parts.push(bx(1.2, 0.7, 7.8, sxn * 7.2, 8.15, 0, TRIM, 0, 0, sxn * 0.22));
+      parts.push(bx(10.4, 1.8, 5.2, 0, 9.2, 0, WOOD));
+      parts.push(bx(12.0, 0.9, 6.4, 0, 10.4, 0, ROOF));
+      for (const sxn of [-1, 1]) parts.push(bx(1.1, 0.7, 6.6, sxn * 5.9, 10.55, 0, TRIM, 0, 0, sxn * 0.24));
+      return merge(parts);
+    },
+
+    // ---- SINGAPORE -----------------------------------------------------
+    /** Marina Bay Sands: three towers under the SkyPark deck and its prow. */
+    marinaBay: function () {
+      const parts = [];
+      const TOWER = 0xcfd8e2, GLASS = 0x9fc4d8, DECK = 0xe8e4d4, GARDEN = 0x5f9048;
+      for (let i = 0; i < 3; i++) {
+        const x = -8.0 + i * 8.0;
+        parts.push(bx(4.6, 22.0, 6.0, x, 11.0, 0, TOWER, 0, 0, 0.05));
+        parts.push(bx(4.0, 20.0, 0.8, x - 0.2, 10.0, 3.1, GLASS, 0, 0, 0.05));
+      }
+      parts.push(bx(26.0, 1.6, 7.0, 0, 23.0, 0, DECK));
+      parts.push(bx(7.0, 1.3, 6.4, -15.5, 23.0, 0, DECK, 0, 0, 0.02));
+      parts.push(bx(22.0, 0.6, 5.2, 0, 24.0, 0, GARDEN));
+      return merge(parts);
+    },
+    /** Two Supertrees: lattice trunks flaring into violet canopies. */
+    supertree: function () {
+      const parts = [];
+      const TRUNK = 0x7a4a7a, LAT = 0x9a5f9e, CAN = 0x5f8f52;
+      for (const [x, h] of [[-4.5, 12.0], [3.5, 9.5]]) {
+        parts.push(cyl(0.9, 1.6, h, 8, x, h / 2, 0, TRUNK));
+        parts.push(cyl(4.2, 1.2, 2.6, 9, x, h + 1.3, 0, LAT));
+        parts.push(cyl(4.4, 4.4, 0.5, 9, x, h + 2.8, 0, CAN));
+      }
+      return merge(parts);
+    },
+
+    // ---- BUENOS AIRES --------------------------------------------------
+    /** The Obelisco, white on its stepped plinth. */
+    obelisco: function () {
+      const parts = [];
+      const W = 0xf4f2ea, W2 = 0xe0dcd0;
+      parts.push(bx(6.0, 1.2, 6.0, 0, 0.6, 0, W2));
+      parts.push(bx(4.4, 3.0, 4.4, 0, 2.7, 0, W));
+      parts.push(cyl(1.5, 2.1, 24.0, 4, 0, 16.2, 0, W));
+      parts.push(cyl(0.05, 1.5, 2.6, 4, 0, 29.5, 0, W2));
+      parts.push(bx(1.6, 0.7, 1.6, 0, 27.0, 0, W2));
+      return merge(parts);
+    },
+    /** The Casa Rosada: the pink palazzo with its white loggia arches. */
+    casaRosada: function () {
+      const parts = [];
+      const PINK = 0xd87a86, PINK2 = 0xc86a76, TRIM = 0xfff4ec, DARK = 0x5a3040;
+      parts.push(bx(22.0, 9.0, 8.0, 0, 4.5, 0, PINK));
+      for (const sxn of [-1, 1]) parts.push(bx(5.0, 11.0, 8.6, sxn * 9.5, 5.5, 0, PINK2));
+      for (let i = 0; i < 5; i++) {
+        parts.push(bx(1.8, 3.4, 0.5, -6.4 + i * 3.2, 5.4, 4.0, DARK));
+        parts.push(bx(2.4, 0.5, 0.6, -6.4 + i * 3.2, 7.3, 4.05, TRIM));
+      }
+      parts.push(bx(23.0, 0.8, 8.8, 0, 9.4, 0, TRIM));
+      parts.push(bx(6.5, 2.6, 6.0, 0, 10.6, 0, PINK));
+      parts.push(bx(7.1, 0.6, 6.6, 0, 12.1, 0, TRIM));
+      return merge(parts);
+    },
+
+    // ---- NAIROBI -------------------------------------------------------
+    /** The KICC: the terracotta drum tower and its amphitheatre cone. */
+    kicc: function () {
+      const parts = [];
+      const DRUM = 0xb06a44, DRUM2 = 0x9a5a3a, DECK = 0xd8c8a8, CONE = 0xa8764e;
+      parts.push(cyl(3.4, 3.8, 24.0, 10, 0, 12.0, 0, DRUM));
+      for (let i = 0; i < 5; i++) parts.push(cyl(3.75, 3.75, 0.35, 10, 0, 4.0 + i * 4.4, 0, DRUM2));
+      parts.push(cyl(5.2, 4.2, 1.8, 10, 0, 25.2, 0, DECK));
+      parts.push(cyl(4.4, 4.4, 0.4, 10, 0, 26.3, 0, DRUM2));
+      parts.push(cyl(1.0, 7.5, 5.5, 9, 9.0, 2.75, 0, CONE));
+      return merge(parts);
+    },
+    /** An acacia stand: flat crowns over red earth. */
+    acaciaGrove: function () {
+      const parts = [];
+      const TRUNK = 0x6a4a34, CAN = 0x7d9038, CAN2 = 0x93a848, EARTH = 0xb8764e;
+      parts.push(cyl(7.5, 8.5, 0.5, 10, 0, 0.25, 0, EARTH));
+      for (const [x, zz, h, r] of [[-3.5, 1.0, 6.0, 4.6], [3.0, -1.5, 4.6, 3.4], [1.0, 3.0, 3.4, 2.4]]) {
+        parts.push(cyl(0.35, 0.6, h, 6, x, h / 2, zz, TRUNK));
+        parts.push(cyl(r, r * 0.55, 0.9, 9, x, h + 0.45, zz, h > 5 ? CAN : CAN2));
+      }
       return merge(parts);
     },
   };
@@ -15281,7 +15552,17 @@ MR.World = (function () {
       // independent hash rather than a bag draw -- sweeps are a handful per
       // course, repetition is not the risk, and keeping them out of the deal
       // leaves the bag's anti-repetition property intact for the fleet.
-      const SWEEP_CAST = [4, 5, 6, 7, 9, 12, 13, 14];
+      //
+      // v14 IS OUT (2026-09-15, the owner: "Review the big truck. It is
+      // not to scale and it comes in sideways"): the cargo truck is the
+      // one vehicle sized to FILL the whole block envelope -- the owner's
+      // own lane-filling order -- and that is exactly what disqualifies
+      // it from moving. As a sweeper the full slab slides laterally into
+      // the lane, which reads as a wall arriving sideways, and driving
+      // oncoming it is the largest silhouette in the game bearing down at
+      // 1.6x run speed. It parks; the vehicles that move are the ones
+      // with a nose.
+      const SWEEP_CAST = [4, 5, 6, 7, 9, 12, 13];
       const cast = [];
       for (let g = 0; g < gates.length; g++) {
         const gate = gates[g];
@@ -19046,53 +19327,108 @@ MR.World = (function () {
     }, group);
 
     /**
-     * THE STREET-CROSSER. One recurring figure -- red jacket, cream cap
-     * -- because a character the player meets every few miles is worth
-     * more than a wardrobe. Built on all sides per rule 1 (the player
-     * passes within two units of them); legs and arms are separate
-     * meshes on hip and shoulder pivots so the walk is a real stride,
-     * and a soft blob shadow rides the group so the figure sits on the
-     * road instead of floating over it. See the walk branch in the anim
-     * loop for the timing contract.
+     * THE STREET-CROSSERS, SECOND DRAFT: the owner's four Tripo people
+     * ("Use the 4 additional runners we created"), running. The crowd
+     * pack's figures are unrigged -- baked cheering poses, arms up -- so
+     * the rig is CUT AT RUNTIME: every triangle below the hip line goes
+     * to a left or right leg by its centroid, each leg hangs from a
+     * pivot group at the hip, and the walk branch swings the pivots. The
+     * arms STAY UP, deliberately: what crosses the road is a spectator
+     * sprinting to the far rail mid-cheer, which is the only honest
+     * reading of a cheering sculpt at a run, and exactly this game's
+     * tone. A forward lean group carries the sprint; each figure wears a
+     * fresh seeded wardrobe from the crowd's own palette so the four
+     * crossers differ day to day. Box-person fallback when the pack is
+     * unreadable, same rule as every sculpt path.
      */
     const walkerPool = Pool(function () {
-      const JACKET = 0xe8433f, TROUSER = 0x2a3450, SKIN = 0xe8b48c,
-        CAP = 0xf6f1e4, SHOE = 0x1c2026;
       const g = new THREE.Group();
-      const body = [];
-      // Torso, head, cap -- static, merged once.
-      body.push(gl(hcbx(0.40, 0.52, 0.24, 0, 0.90, 0, JACKET, 0.05), GLOSS.matte));
-      body.push(gl(hbx(0.20, 0.20, 0.19, 0, 1.27, 0, SKIN), GLOSS.matte));
-      body.push(gl(hcbx(0.23, 0.09, 0.22, 0, 1.40, 0, CAP, 0.03), GLOSS.matte));
-      body.push(gl(hbx(0.24, 0.035, 0.10, 0.11, 1.345, 0, CAP), GLOSS.matte));
-      g.add(S.outlined(merge(body), mats.propLit, S.INK.hazard));
-      // Limbs: geometry dropped so the origin is the pivot, one mesh
-      // each, swung in the anim loop.
-      function limb(w, len, d, color) {
-        const geo = new THREE.BoxGeometry(w, len, d);
-        geo.translate(0, -len / 2, 0);
-        const n2 = geo.attributes.position.count;
-        const col = new Float32Array(n2 * 3);
-        const c = new THREE.Color(color);
-        for (let i = 0; i < n2; i++) { col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
-        geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-        return new THREE.Mesh(geo, mats.propLit);
+      const lean = new THREE.Group();
+      g.add(lean);
+      const variants = [];
+      if (crowdPeople) {
+        const r = MR.rng.stream('walker', 'wardrobe/v1');
+        const rf = r.next;
+        for (let vi = 0; vi < crowdPeople.length; vi++) {
+          const variant = crowdPeople[vi];
+          const geo = crowdFigureGeo(variant, rf);
+          const idx = geo.getIndex().array;
+          const pos = geo.attributes.position.array;
+          const hipY = variant.h * 0.47;
+          const legL = [], legR = [], body = [];
+          for (let t = 0; t < idx.length; t += 3) {
+            const a = idx[t], b = idx[t + 1], c2 = idx[t + 2];
+            const cy = (pos[a * 3 + 1] + pos[b * 3 + 1] + pos[c2 * 3 + 1]) / 3;
+            const cx = (pos[a * 3] + pos[b * 3] + pos[c2 * 3]) / 3;
+            (cy < hipY ? (cx < 0 ? legL : legR) : body).push(a, b, c2);
+          }
+          const sub = function (list) {
+            const g2 = new THREE.BufferGeometry();
+            g2.setAttribute('position', geo.attributes.position);
+            g2.setAttribute('color', geo.attributes.color);
+            g2.setAttribute('normal', geo.attributes.normal);
+            g2.setIndex(list);
+            return g2;
+          };
+          const sc = 1.62 / variant.h;
+          const fig = new THREE.Group();
+          fig.scale.set(sc, sc, sc);
+          fig.add(new THREE.Mesh(sub(body), mats.propLit));
+          const pivot = function (list) {
+            const p = new THREE.Group();
+            p.position.y = hipY;
+            const m = new THREE.Mesh(sub(list), mats.propLit);
+            m.position.y = -hipY;
+            p.add(m);
+            fig.add(p);
+            return p;
+          };
+          const pL = pivot(legL), pR = pivot(legR);
+          fig.userData.limbs = { legL: pL, legR: pR };
+          fig.visible = vi === 0;
+          lean.add(fig);
+          variants.push(fig);
+        }
+      } else {
+        // The box-person fallback: red jacket, cream cap, the original
+        // hand-built crosser.
+        const JACKET = 0xe8433f, TROUSER = 0x2a3450, SKIN = 0xe8b48c,
+          CAP = 0xf6f1e4, SHOE = 0x1c2026;
+        const body = [];
+        body.push(gl(hcbx(0.40, 0.52, 0.24, 0, 0.90, 0, JACKET, 0.05), GLOSS.matte));
+        body.push(gl(hbx(0.20, 0.20, 0.19, 0, 1.27, 0, SKIN), GLOSS.matte));
+        body.push(gl(hcbx(0.23, 0.09, 0.22, 0, 1.40, 0, CAP, 0.03), GLOSS.matte));
+        const fig = new THREE.Group();
+        fig.add(S.outlined(merge(body), mats.propLit, S.INK.hazard));
+        const limb = function (w, len, d, color, x, y) {
+          const geo = new THREE.BoxGeometry(w, len, d);
+          geo.translate(0, -len / 2, 0);
+          const n2 = geo.attributes.position.count;
+          const col = new Float32Array(n2 * 3);
+          const c = new THREE.Color(color);
+          for (let i = 0; i < n2; i++) { col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
+          geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+          const m = new THREE.Mesh(geo, mats.propLit);
+          m.position.set(x, y, 0);
+          fig.add(m);
+          return m;
+        };
+        const pL = limb(0.14, 0.64, 0.16, TROUSER, -0.11, 0.64);
+        const pR = limb(0.14, 0.64, 0.16, TROUSER, 0.11, 0.64);
+        limb(0.10, 0.42, 0.12, JACKET, -0.25, 1.12);
+        limb(0.10, 0.42, 0.12, JACKET, 0.25, 1.12);
+        fig.userData.limbs = { legL: pL, legR: pR };
+        lean.add(fig);
+        variants.push(fig);
       }
-      const legL = limb(0.14, 0.64, 0.16, TROUSER); legL.position.set(-0.11, 0.64, 0);
-      const legR = limb(0.14, 0.64, 0.16, TROUSER); legR.position.set(0.11, 0.64, 0);
-      const armL = limb(0.10, 0.42, 0.12, JACKET); armL.position.set(-0.25, 1.12, 0);
-      const armR = limb(0.10, 0.42, 0.12, JACKET); armR.position.set(0.25, 1.12, 0);
-      // Shoes ride the legs so the stride carries them.
-      const shoeL = limb(0.15, 0.06, 0.22, SHOE); shoeL.position.set(0, -0.62, 0.03); legL.add(shoeL);
-      const shoeR = limb(0.15, 0.06, 0.22, SHOE); shoeR.position.set(0, -0.62, 0.03); legR.add(shoeR);
-      g.add(legL); g.add(legR); g.add(armL); g.add(armR);
       const shadow = new THREE.Mesh(
         new THREE.CircleGeometry(0.34, 10).rotateX(-Math.PI / 2),
         new THREE.MeshBasicMaterial({ color: 0x0a0e20, transparent: true, opacity: 0.35 }));
       shadow.position.y = 0.02;
       shadow.renderOrder = 2;
       g.add(shadow);
-      g.userData.limbs = { legL, legR, armL, armR };
+      g.userData.lean = lean;
+      g.userData.variants = variants;
       return g;
     }, group);
 
@@ -19679,6 +20015,13 @@ MR.World = (function () {
           w.position.set(gate.walk.side * 4.2, eAt(wz), wz);
           w.rotation.y = gate.walk.side > 0 ? Math.PI : 0;
           w.visible = true;
+          // Which of the four people runs this crossing: dealt from the
+          // gate's own position so the same course fields the same crowd.
+          const vs = w.userData.variants;
+          const pickV = MR.rng.hashString('walker|' + gate.z.toFixed(1)) % vs.length;
+          for (let k = 0; k < vs.length; k++) vs[k].visible = k === pickV;
+          w.userData.limbs = vs[pickV].userData.limbs;
+          w.userData.lean.rotation.x = 0;
           entry.walker = w;
         }
         activeGates.push(entry);
@@ -20223,15 +20566,19 @@ MR.World = (function () {
           o.position.x = fx - wk.side * 8.4 * c;
           const walking = c > 0.001 && c < 0.999;
           const L = o.userData.limbs;
-          const ph = c * 8.4 * 3.4;
-          const amp = walking ? 0.55 : 0;
-          L.legL.rotation.x = Math.sin(ph) * amp;
-          L.legR.rotation.x = -Math.sin(ph) * amp;
-          L.armL.rotation.x = -Math.sin(ph) * amp * 0.6;
-          L.armR.rotation.x = Math.sin(ph) * amp * 0.6;
-          // A touch of bob so the stride reads from behind, where the
-          // legs are mostly hidden by the body.
-          o.position.y = eAt(g.gate.z - 2.0) + (walking ? Math.abs(Math.sin(ph)) * 0.035 : 0);
+          // A RUN, not a walk (the owner: "move and run like miles"):
+          // long stride, high frequency, a sprinter's forward lean that
+          // eases in and out at the verges, and a real bounce. The lean
+          // lives on its own group under the yaw so it always points
+          // down the direction of travel.
+          const ph = c * 8.4 * 4.6;
+          const amp = walking ? 0.95 : 0;
+          if (L) {
+            L.legL.rotation.x = Math.sin(ph) * amp;
+            L.legR.rotation.x = -Math.sin(ph) * amp;
+          }
+          o.userData.lean.rotation.x = walking ? 0.22 : 0;
+          o.position.y = eAt(g.gate.z - 2.0) + (walking ? Math.abs(Math.sin(ph)) * 0.055 : 0);
         }
         const sw = g.gate.sweep;
         if (sw && g.objs[sw.lane]) {

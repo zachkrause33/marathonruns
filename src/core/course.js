@@ -1360,6 +1360,20 @@ MR.Course = (function () {
       hint: 'the Colosseum, an aqueduct, umbrella pines, ochre walls' },
     { tag: 'CAPETOWN', region: 'AFRICA',  name: 'CAPE TOWN',     rec: 7495, holder: 'ESA 2026',        latlon: [-33.92, 18.42],
       hint: 'Table Mountain, the coast road, the Green Point lighthouse, the stadium, fynbos' },
+    // The 2026-09-15 five (owner: "lets do an additional 5 at a time"),
+    // records looked up the day they joined: Seoul's fell THIS YEAR to
+    // Teklu; Athens is the hardest bronze on the roster and should be --
+    // it is the original course, and it runs uphill.
+    { tag: 'ATHENS',    region: 'EUROPE',       name: 'ATHENS',       rec: 7834, holder: 'KIPTOO 2023',  latlon: [37.98, 23.73],
+      hint: 'the Acropolis on its rock, the Panathenaic marble, olive and cypress, ochre stone' },
+    { tag: 'SEOUL',     region: 'ASIA-PACIFIC', name: 'SEOUL',        rec: 7463, holder: 'TEKLU 2026',   latlon: [37.57, 126.98],
+      hint: 'Namdaemun gate, N Seoul Tower on Namsan, the Han, gingko avenues' },
+    { tag: 'SINGAPORE', region: 'ASIA-PACIFIC', name: 'SINGAPORE',    rec: 7885, holder: 'KIBET 2009',   latlon: [1.35, 103.82],
+      hint: 'Marina Bay Sands, the supertrees, shophouse pastels, rain trees, the strait' },
+    { tag: 'BUENOSAIRES', region: 'AMERICAS',   name: 'BUENOS AIRES', rec: 7502, holder: 'CHEBET 2019',  latlon: [-34.60, -58.38],
+      hint: 'the Obelisco, the Nueve de Julio, jacaranda, French facades, the Casa Rosada' },
+    { tag: 'NAIROBI',   region: 'AFRICA',       name: 'NAIROBI',      rec: 7812, holder: 'KIGEN 2009',   latlon: [-1.29, 36.82],
+      hint: 'the KICC drum tower, acacia crowns, red earth, Uhuru Park' },
   ];
 
   /**
@@ -2307,13 +2321,14 @@ MR.Course = (function () {
    * car now brakes to a stop practically in the player's face.
    */
   const ONCOMING_LOCK = 0.6 * (ACTION_WINDOW + K.CAM_BASE_BACK);
-  // 0.65 -> 0.75 on the owner's third "more" (2026-09-09): with the
-  // cross car gone the rotation is essentially oncoming-or-sweep, and
-  // three of four eligible gates now animate. Census in roadmap 111.
-  const SWEEP_RATE = 0.75;
+  // 0.75 -> 0.85 on the owner's fourth "more" (2026-09-15). Census in
+  // roadmap 112; the remaining headroom above this is eligibility, not
+  // the rate.
+  const SWEEP_RATE = 0.85;
   // The street-crosser's rate, over nearly every gate -- see the walk
-  // pass in markMotion. Censused at ~7 a course over 365 days.
-  const WALK_RATE = 0.05;
+  // pass in markMotion. 0.05 -> 0.08 (owner: "Add more... cross
+  // runners", 2026-09-15); censused at ~9 a course over 365 days.
+  const WALK_RATE = 0.08;
   // The walk's window, in runner-to-gate units: steps off the near verge
   // at ENTER, steps onto the far one at EXIT -- about half a second
   // before the runner reaches the line, which is the whole act.

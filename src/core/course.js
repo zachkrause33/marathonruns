@@ -2302,26 +2302,14 @@ MR.Course = (function () {
   // instead of 101 down to 51.
   const SWEEP_LOCK = 1.5 * (ACTION_WINDOW + K.CAM_BASE_BACK);
   const SWEEP_START = 3 * (ACTION_WINDOW + K.CAM_BASE_BACK);
-  /**
-   * THE ONCOMING VEHICLE GETS ITS OWN, LATER LOCK. The owner, on the
-   * shipped drive: "They move and stop before you even get close to
-   * them." The sweep's 1.5x margin exists because a sweep CHANGES LANES
-   * -- the kill lane is not knowable until it settles. The oncoming
-   * vehicle never does: it occupies its kill lane for the entire drive,
-   * so the lane read is available the whole time and the only thing the
-   * lock protects is the NEAR FACE being settled on the gate line before
-   * the player commits. 1.05x READ_NEAR (~26.6 runner units) had it
-   * braking as the commit window opened; the owner asked for closer
-   * still ("More moving and closer to the runner getting there"), and
-   * the contract allows it: the DODGE is a lane decision made off fixed
-   * course data and the telegraph mat, neither of which the drive
-   * touches -- the only hard floor is that the art must be ON the box
-   * by contact. 0.6x READ_NEAR (~15.2 units, about three quarters of a
-   * second out) keeps a 15-unit settle margin over that floor, and the
-   * car now brakes to a stop practically in the player's face.
-   */
-  const ONCOMING_LOCK = 0.6 * (ACTION_WINDOW + K.CAM_BASE_BACK);
-  // 0.75 -> 0.85 on the owner's fourth "more" (2026-09-15). Census in
+  // THE ONCOMING LOCK IS RETIRED (2026-09-15, the owner: "All moving
+  // vehicles need to drive past the runner. No stop before he gets to
+  // them"). The drive is now a = d * RATIO all the way through zero: the
+  // nose meets the gate line exactly as the player does -- art and box
+  // coincide at the one instant contact is evaluated -- and the vehicle
+  // carries on past. See the oncoming branch in world.js for the
+  // argument in full.
+    // 0.75 -> 0.85 on the owner's fourth "more" (2026-09-15). Census in
   // roadmap 112; the remaining headroom above this is eligibility, not
   // the rate.
   const SWEEP_RATE = 0.85;
@@ -2332,8 +2320,12 @@ MR.Course = (function () {
   // The walk's window, in runner-to-gate units: steps off the near verge
   // at ENTER, steps onto the far one at EXIT -- about half a second
   // before the runner reaches the line, which is the whole act.
-  const WALK_ENTER = 62;
-  const WALK_EXIT = 9;
+  // 62->45 / 9->5 (2026-09-15, the owner: "Running across the street
+  // needs to happen closer to when the runner gets there"): the sprint
+  // starts later, moves faster, and clears the zebra a fifth of a
+  // second before the runner crosses it.
+  const WALK_ENTER = 45;
+  const WALK_EXIT = 5;
   /**
    * ---- AND THE ONCOMING VEHICLE, THE SAME CONTRACT ROTATED 90 DEGREES ----
    *
@@ -3187,7 +3179,7 @@ MR.Course = (function () {
            // in its own lane by SWEEP_LOCK and parked in `from` beyond
            // SWEEP_START. Exported so the animation reads the numbers from the
            // file that derives them from the read window -- see markSweeps.
-           SWEEP_LOCK, SWEEP_START, ONCOMING_LOCK, ONCOMING_RANGE, ONCOMING_RATIO,
+           SWEEP_LOCK, SWEEP_START, ONCOMING_RANGE, ONCOMING_RATIO,
            // The street-crosser's window; the renderer walks the figure
            // across between these two distances and not one unit outside.
            WALK_ENTER, WALK_EXIT,

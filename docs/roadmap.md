@@ -9167,3 +9167,36 @@ race goes on."
 
 Gates: 8/8 shots, 90+90 courses across the 17-city roster, simulate
 PASS.
+
+## 113. The meet, the sprint, and the lorry built by hand
+
+THE STOP IS GONE, and what replaced it is fairer than the stop was.
+The owner: "All moving vehicles need to drive past the runner. No
+stop before he gets to them." The oncoming advance is now a = d x
+RATIO straight through zero -- no lock, no freeze. The nose reaches
+the gate line at exactly d = 0, which means the art COINCIDES with
+MR.Collision.BOX at the one instant contact is ever evaluated; on
+the approach the art is always beyond the box (a hit with daylight
+is impossible by construction), and past the plane the car simply
+keeps driving, behind the runner and away. Verified live to the
+decimal at three sample points across the meet. The old lock's whole
+purpose -- a settled near face -- turns out to be the one thing the
+meet gives for free.
+
+THE SPRINT GOT CLOSER: WALK_ENTER 62 -> 45, WALK_EXIT 9 -> 5. The
+crosser now starts later, moves at a real sprint, and clears the
+zebra a fifth of a second before the runner crosses it.
+
+THE LORRY IS CODE ART AGAIN, third draft, on the owner's screenshot
+("What is the vehicle on the left? That needs to be reworked"): the
+scanned trailer read from behind as a featureless floating blue slab
+-- no cab, no doors, no wheels. blockLorryGeo replaces it, built in
+the van's own idiom to the owner's lane-filling envelope: tractor
+cab with glass, grille and mirrors, a panelled load box, six wheels
+under real arches, and the rear the chase camera actually meets --
+door seam, hinge straps, latch handles, marker lamps, plate,
+mudflaps. The envelope guard earned its keep once more mid-build
+(rear hardware at halfZ 1.983 against 1.95; the layout moved, not
+the guard). The cargo-truck scan is retired, not deleted.
+
+Gates: 8/8 shots, 90+90 courses, simulate PASS.

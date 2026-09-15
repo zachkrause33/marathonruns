@@ -14335,23 +14335,83 @@ MR.World = (function () {
     })();
 
     /**
-     * v14's fit box and pre-decode fallback: the WHOLE BLOCK envelope.
-     * The owner, twice: "the trucks are so small... they need to take up
-     * the entire space of the lane." The van def gave 2.59 of height,
-     * the tram def gave the height but only 1.66 of the 2.24-wide box --
-     * so the truck gets the box itself, hair-inset, and the per-axis fit
-     * stretches the sculpt to fill the lane the way the code slabs
-     * always did. As fallback art it is exactly that slab for the
-     * pre-decode moment.
+     * v14, THIRD DRAFT: a fully authored code-art box lorry. The sculpt
+     * era ended on the owner's screenshot (2026-09-15, "What is the
+     * vehicle on the left? That needs to be reworked") -- the scanned
+     * trailer read from behind as a featureless blue slab floating over
+     * the road: no cab visible, no doors, no wheels, the blue coat
+     * washing out what detail the bake had. This is the fleet's own
+     * answer, built like the van and to the same envelope the owner set
+     * ("they need to take up the entire space of the lane"): 2.23 wide,
+     * 2.72 to the box roof, cab forward with glass and grille, a load
+     * box with REAR DOORS the chase camera actually reads -- seam,
+     * hinges, latch bars, lamps, plate, mudflaps -- and the underbody
+     * rules observed (skirt, arches, dark shadow panel, six wheels).
      */
-    const blockSlabGeo = (function () {
-      const g = new THREE.BoxGeometry(2.23, 2.79, 3.89);
-      g.translate(0, 1.395, 0);
-      const n = g.attributes.position.count;
-      const col = new Float32Array(n * 3);
-      for (let i = 0; i < n; i++) { col[i * 3] = 0.33; col[i * 3 + 1] = 0.45; col[i * 3 + 2] = 0.72; }
-      g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-      return g;
+    const blockLorryGeo = (function () {
+      const parts = [];
+      const BODY = 0x2f6ad8, CREASE = 0x1f4aa8, BOX_P = 0x4a80e4, DARK = 0x1a2438,
+        DOOR = 0x3a72dc, TRIM = 0xd8e0ec;
+      vUnder(parts, {
+        bodyW: 2.23, z0: -1.92, z1: 1.92, axles: [-1.30, -0.62, 1.24],
+        skirtTop: 0.66, skirtBot: 0.15, spring: 0.17, archR: 0.47,
+        wheelX: 0.94, wheelR: 0.36, wheelW: 0.32,
+        skirt: CREASE, under: DARK, tyre: TYRE_WARM,
+      });
+      // The load box: the mass of the thing, panelled so the flank is a
+      // container wall rather than a wall.
+      parts.push(
+        gl(hcbx(2.23, 2.02, 2.95, 0, 1.68, -0.44, BODY, 0.05), GLOSS.paint),
+        gl(hcbx(2.26, 0.10, 2.99, 0, 2.70, -0.44, TRIM, 0.02), GLOSS.trim),
+        gl(hbx(2.26, 0.12, 2.99, 0, 0.72, -0.44, DARK), GLOSS.trim)
+      );
+      for (let i = 0; i < 4; i++) {
+        for (const sx of [-1, 1]) {
+          parts.push(gl(bx(0.03, 1.78, 0.08, sx * (2.23 * LANE_FIT / 2 + 0.012), 1.68, -1.72 + i * 0.86, BOX_P), GLOSS.trim));
+        }
+      }
+      // THE REAR DOORS, the face this rework exists for: two panels with
+      // a centre seam, hinge straps, vertical latch bars with handles,
+      // marker lamps, a plate -- at the z the player meets first.
+      // Every rear piece keeps its far face at or inside z -1.943: the
+      // envelope guard bit this stack once (halfZ 1.983 against 1.95)
+      // and the fix is the layout, not the guard.
+      parts.push(gl(hbx(2.12, 1.94, 0.10, 0, 1.68, -1.88, DOOR), GLOSS.paint));
+      parts.push(gl(bx(0.05, 1.90, 0.024, 0, 1.68, -1.930, DARK), GLOSS.trim));
+      for (const sx of [-1, 1]) {
+        parts.push(gl(bx(0.10, 1.86, 0.020, sx * 0.42, 1.66, -1.932, CREASE), GLOSS.chrome));
+        parts.push(gl(bx(0.16, 0.10, 0.024, sx * 0.30, 1.30, -1.930, TRIM), GLOSS.chrome));
+        for (const hy of [0.98, 1.68, 2.38]) {
+          parts.push(gl(bx(0.34, 0.10, 0.020, sx * 0.88, hy, -1.932, CREASE), GLOSS.trim));
+        }
+        parts.push(gl(bx(0.22, 0.10, 0.022, sx * 0.92, 2.62, -1.930, 0xffb43a), GLOSS.chrome));
+      }
+      vBumper(parts, 2.14, 0.30, 0.48, -1.94, DARK, 0.62);
+      vLamps(parts, 0.94, 0.50, -1.93, 0.15);
+      for (const sx of [-1, 1]) {
+        parts.push(gl(bx(0.30, 0.26, 0.04, sx * 0.72, 0.30, -1.90, DARK), GLOSS.matte));
+      }
+      // The cab, forward of the box with a visible gap -- a tractor unit,
+      // not a slab: windscreen, side glass, grille, mirrors, sun visor.
+      parts.push(
+        gl(hcbx(2.16, 1.34, 0.86, 0, 1.20, 1.46, BODY, 0.06), GLOSS.paint),
+        gl(hcbx(2.10, 0.34, 0.80, 0, 2.02, 1.40, BODY, 0.04), GLOSS.paint),
+        gl(hbx(2.12, 0.08, 0.84, 0, 2.24, 1.40, TRIM), GLOSS.trim)
+      );
+      vGlass(parts, 2.02, 0.56, 0.78, 0, 1.72, 1.44, true);
+      vFront(parts, {
+        zFront: 1.82, w: 2.16, dark: DARK, crease: CREASE,
+        grilleY: 0.96, grilleH: 0.30, lampX: 0.80, lampW: 0.32, lampH: 0.22,
+        bumpW: 2.18, bumpH: 0.34, bumpY: 0.56, plateW: 0.62,
+      });
+      for (const sx of [-1, 1]) {
+        parts.push(gl(bx(0.06, 0.34, 0.10, sx * 1.06, 1.94, 1.70, DARK), GLOSS.matte));
+      }
+      // Exhaust stack and horns on the cab roof: the silhouette pieces
+      // that say lorry at ninety units.
+      parts.push(gl(cyl(0.07, 0.07, 0.52, 7, -0.92, 2.52, 1.10, DARK), GLOSS.chrome));
+      parts.push(gl(bx(0.50, 0.10, 0.16, 0.30, 2.34, 1.44, TRIM), GLOSS.chrome));
+      return merge(parts);
     })();
 
     const blockPool = hazardPool(K.BLOCK, 'block', [
@@ -14493,7 +14553,7 @@ MR.World = (function () {
       // idle's +/-0.022 bob would leave the collision box -- the same
       // arithmetic that took the tram's pantograph sway. A vehicle at
       // the ceiling stands still.
-      { geo: blockSlabGeo, face: [2.16, 0.30, 0.78, -1.940], weight: 2 },
+      { geo: blockLorryGeo, face: [2.16, 0.30, 0.78, -1.940], weight: 2 },
     ]);
 
     /**
@@ -15073,9 +15133,9 @@ MR.World = (function () {
     // measured box -- the owner's "the trucks are so small" verbatim; the
     // pipeline rule is now split FIRST, quantize LAST): blue +0.409 raw,
     // red +0.400, yellow +0.959, green +0.359 at the tightest road.
-    dressHazard(K.BLOCK, 14, 'veh_cargotruck', -Math.PI / 2,
-      [{ h: 0 }, { h: 150, s: 1.4, l: 1.15 },
-       { h: 210 }, { h: 290, s: 1.4, l: 1.2 }]);
+    // v14 wears NO sculpt any more -- see blockLorryGeo. The scan is
+    // retired, not deleted: veh_cargotruck stays in the release for the
+    // deck-rake machinery that still references its cab-cut sibling.
 
     // ---- the JUMP vocabulary (props-v4) --------------------------------
     // Every coat below was measured through contrastAudit; the margin
@@ -20503,8 +20563,8 @@ MR.World = (function () {
       for (const g of activeGates) {
         // THE ONCOMING VEHICLE -- the sweeper's contract on the z axis. It
         // drives down its own lane toward the player at ONCOMING_RATIO
-        // approach-units per player-unit and brakes to a stop exactly on
-        // its gate line, standing there from ONCOMING_LOCK out. It stays
+        // approach-units per player-unit, meets its gate line exactly as
+        // the player does, and drives on past them. It stays
         // nose-to-player when parked -- a car that drove up and stopped --
         // so the caution face is on its far side; the mat telegraph and
         // the contrast gate carry the kind read, as they do for the four
@@ -20526,12 +20586,23 @@ MR.World = (function () {
           // body exactly inside [gate.z, gate.z + 2*halfZ]. The advance is
           // capped at range - 2*halfZ so the far end of the drive stays
           // inside the corridor the course proved clear.
-          // ONCOMING_LOCK, not SWEEP_LOCK: this vehicle never changes
-          // lanes, so it is allowed to keep rolling until the commit
-          // window opens -- see the lock's derivation in course.js.
+          /**
+           * NO LOCK AT ALL (2026-09-15, the owner: "All moving vehicles
+           * need to drive past the runner. No stop before he gets to
+           * them"). a = d * RATIO, uncapped below and corridor-capped
+           * above, and the fairness argument is BETTER than the stop's:
+           * the nose reaches the gate line exactly at d = 0, so the art
+           * coincides with MR.Collision.BOX at the one instant contact
+           * is ever evaluated -- before that the art is always FARTHER
+           * up the road than the box (never a hit with daylight), and
+           * after the plane the car simply keeps driving, past the
+           * runner and away behind them. The dodge read never depended
+           * on the stop: the lane is fixed course data and the mat
+           * telegraph, and the car occupies its kill lane for the whole
+           * approach.
+           */
           const cap = Math.max(0, (on.range || MR.Course.ONCOMING_RANGE) - 2 * hzB);
-          const a = d <= MR.Course.ONCOMING_LOCK ? 0
-            : Math.min(cap, (d - MR.Course.ONCOMING_LOCK) * MR.Course.ONCOMING_RATIO);
+          const a = Math.min(cap, d * MR.Course.ONCOMING_RATIO);
           const vz = g.gate.z + 2 * hzB + a;
           o.position.z = vz;
           o.position.y = eAt(vz);

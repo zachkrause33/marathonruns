@@ -147,3 +147,9 @@ Tripo note for all future generations: feed ONE view of the object.
 A multi-view input image comes back as multiple copies baked into one
 mesh (the cargo truck held three); vehsplit.js in the scratchpad cuts
 them apart, but single-view input avoids the surgery.
+
+
+v14 note (2026-09-15): the cargo-truck sculpt is RETIRED from the
+BLOCK wardrobe -- from behind it read as a featureless blue slab --
+and v14 is fully authored code art now (blockLorryGeo). The scan
+stays in props-v3 for the parked deck-rake machinery.

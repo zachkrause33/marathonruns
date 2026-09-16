@@ -1538,6 +1538,17 @@ button.stampC:active { transform: scale(0.96); }
   color: var(--accent); line-height: 1.45; margin-top: 3px;
   text-wrap: balance;
 }
+/* The hook: the player's own next rung, quieter than the city so the box
+ * still leads with tomorrow's name. Empty text collapses it. */
+#tomorrow .tomHook {
+  font-size: 9px; font-weight: 800; letter-spacing: 0.12em;
+  opacity: 0.85; margin-top: 4px;
+}
+#tomorrow .tomHook:empty { display: none; }
+
+/* A near miss wears the accent, on the one line that says how near. */
+.endSub.nearMiss { color: var(--accent); }
+#stampCtx.near { color: var(--accent); opacity: 1; }
 
 /* The only tap target on the screen, on a screen that is now taller: full
  * width so it cannot be missed at the bottom of a phone. */
@@ -47303,6 +47314,14 @@ MR.HUD = (function () {
         <div id="tomorrow" class="empty">
           <div class="lab">TOMORROW</div>
           <div class="tomRoute" id="tomorrowRoute"></div>
+          <!--
+            THE HOOK. The finish is the one moment motivation is spent and
+            renewable at once, and the box used to end on a city name. One
+            line names the reason to come back: the record that nearly fell
+            today, or the roads still unstamped, or the bronze that can go
+            gold -- always the player's own next rung, never a generic cheer.
+          -->
+          <div class="tomHook num" id="tomorrowHook"></div>
         </div>
         <button class="cta" id="againBtn">RUN IT AGAIN</button>
         <!--
@@ -47392,6 +47411,7 @@ MR.HUD = (function () {
       milesLine: q('milesLine'), milesEnd: q('milesEnd'),
       endBadges: q('endBadges'), endMem: q('endMem'),
       endTurn: q('endTurn'), tomorrow: q('tomorrow'), tomorrowRoute: q('tomorrowRoute'),
+      tomorrowHook: q('tomorrowHook'),
       debriefBtn: q('debriefBtn'), debrief: q('debrief'),
       shareBox: q('shareBox'), shareLegs: q('shareLegs'), shareLine: q('shareLine'),
       shareBtn: q('shareBtn'), shareNote: q('shareNote'), shareText: q('shareText'),
@@ -48002,9 +48022,15 @@ MR.HUD = (function () {
     };
     api.milesFinish = function (finishTime) {
       const over = finishTime - K.RECORD_SECONDS;
+      // The near-miss band widened to 45 on the behavioral review: a
+      // 2:00:10 and a 2:10:00 used to get the same eulogy, and the agony of
+      // almost is the strongest come-back-tomorrow fuel there is. Under 15
+      // seconds Miles counts them; under 45 he names what they are worth --
+      // one clean leg -- which is also, exactly, the coaching.
       const line = over <= 0 ? 'THAT&rsquo;S THE ONE.'
         : over <= 15 ? (over <= 1.5 ? 'ONE SECOND. TOMORROW.'
           : Math.ceil(over) + ' SECONDS. TOMORROW.')
+        : over <= 45 ? Math.ceil(over) + ' SECONDS IS ONE CLEAN LEG.'
         : 'THE ROAD WON TODAY.';
       n.milesEnd.innerHTML = '&ldquo;' + line + '&rdquo;<span class="who">&mdash; MILES</span>';
     };
@@ -49272,9 +49298,45 @@ MR.HUD = (function () {
         const k = Store && dateKey ? Store.shift(dateKey, 1) : null;
         const s = k && MR.Course.pickSettings ? MR.Course.pickSettings(k) : null;
         if (s && s.length) {
-          return s.map(function (x) { return x.name; }).join(' → ');
+          // The city AND its wager. A name alone is a fact; a name with the
+          // record under it is a reason to come back.
+          const names = s.map(function (x) { return x.name; }).join(' → ');
+          return s[0].rec ? names + ' · RECORD ' + Pace.clock(s[0].rec) : names;
         }
       } catch (e) { /* a teaser is never worth an exception */ }
+      return '';
+    }
+
+    /**
+     * The hook line under tomorrow's city: the player's own next rung, in
+     * priority order. A record that nearly fell today outranks everything
+     * -- that ache is the strongest return fuel there is -- then the roads
+     * not yet run, then the bronze that can go gold, and a full-gold map is
+     * a thing to defend. Empty when there is nothing true to say, which is
+     * the same rule every plate on this card follows.
+     */
+    function hookLine(t, st0) {
+      const overWR = t - K.RECORD_SECONDS;
+      if (overWR > 0 && overWR <= 30) {
+        return Pace.clock(overWR) + ' OFF THE WORLD RECORD · IT CAN FALL TOMORROW';
+      }
+      const overCity = st0 && st0.rec && st0.rec > K.RECORD_SECONDS ? t - st0.rec : Infinity;
+      if (overCity > 0 && overCity <= 30) {
+        return Pace.clock(overCity) + ' OFF THE COURSE RECORD · FINISH THE JOB';
+      }
+      const pool = MR.Course && MR.Course.SETTINGS;
+      if (lastSum && lastSum.cities && pool && pool.length) {
+        let unrun = 0, bronze = 0, gold = 0;
+        for (const s of pool) {
+          const tier = stampTier(s, lastSum.cities[s.name]);
+          if (tier === 'new') unrun++;
+          else if (tier === 'bronze') bronze++;
+          else if (tier === 'gold') gold++;
+        }
+        if (unrun > 0) return unrun + ' ROAD' + (unrun === 1 ? '' : 'S') + ' STILL UNSTAMPED';
+        if (bronze > 0) return bronze + ' BRONZE STAMP' + (bronze === 1 ? '' : 'S') + ' CAN GO GOLD';
+        if (gold === pool.length) return 'EVERY STAMP IS GOLD · DEFEND THE MAP';
+      }
       return '';
     }
 
@@ -49303,7 +49365,10 @@ MR.HUD = (function () {
       const vs = t - K.RECORD_SECONDS;
       n.endVs.textContent = (vs <= 0 ? '-' : '+') + Pace.clock(Math.abs(vs))
                           + ' VS ' + K.RECORD_LABEL;
-      cls(n.endVs, 'endVsCls', 'endSub num' + (vs <= 0 ? ' ahead' : ''));
+      // A near miss wears the accent: +0:19 and +10:19 are different facts
+      // and the type should say so before the words do.
+      cls(n.endVs, 'endVsCls', 'endSub num' + (vs <= 0 ? ' ahead'
+        : vs <= 30 ? ' nearMiss' : ''));
 
       // ---- the grade -----------------------------------------------------
       n.verdict.textContent = rung.name;
@@ -49337,6 +49402,8 @@ MR.HUD = (function () {
             : (st0.rec && st0.rec > K.RECORD_SECONDS
                 ? 'COURSE RECORD ' + Pace.clock(st0.rec) + ' · ' + Pace.clock(t - st0.rec) + ' AWAY'
                 : '');
+        n.stampCtx.classList.toggle('near',
+          !medal && st0.rec && st0.rec > K.RECORD_SECONDS && t - st0.rec > 0 && t - st0.rec <= 30);
         // Replay the press. The class is pulled, the layout is forced to
         // notice, and the class returns -- the standard way to rewind a CSS
         // animation without cloning the node.
@@ -49428,6 +49495,7 @@ MR.HUD = (function () {
       const tom = tomorrowLine();
       n.tomorrowRoute.textContent = tom;
       n.tomorrow.classList.toggle('empty', !tom);
+      n.tomorrowHook.textContent = tom ? hookLine(t, st0) : '';
 
       n.endPanel.classList.remove('hidden');
       syncPanels();

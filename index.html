@@ -640,6 +640,13 @@ html, body {
   width: 3px; background: #e0955a;
   box-shadow: 0 0 0 1px rgba(14, 18, 48, 0.9);
 }
+/* Your own best: the middle rung, in a blue nothing else on the rail
+ * uses, a step narrower than the bronze runner. */
+#railPB {
+  position: absolute; top: -1px; bottom: -1px;
+  width: 2px; background: #6db9ff;
+  box-shadow: 0 0 0 1px rgba(14, 18, 48, 0.9);
+}
 /* A cap above the line, so the marker is findable at a glance against both
  * the yellow fill and the dark road ahead of it. */
 #railGhost::after {
@@ -915,7 +922,7 @@ html, body {
 #lockedBox.hidden, #histBtn.hidden, #endHistBtn.hidden { display: none; }
 #mapView.hidden, #passView.hidden, #cityBar.hidden, #pickLine.hidden,
 #pickBtn.hidden, #stampMoment.hidden, #railCR.hidden,
-#challengeBar.hidden { display: none; }
+#challengeBar.hidden, #railPB.hidden, #pbBar.hidden { display: none; }
 
 /* THE LOCKED BOX replaces TOE THE LINE on a day the record has fallen. It
  * borrows #tomorrow's plate (the other "come back later" element) with the
@@ -1246,6 +1253,7 @@ button.stampC:active { transform: scale(0.96); }
 .raceB.shut { opacity: 0.45; cursor: default; }
 .raceB .rbCity { font-size: 11px; font-weight: 800; letter-spacing: 0.07em; }
 .raceB .rbRec { font-size: 9px; opacity: 0.75; margin-top: 1px; }
+.raceB .rbBest { font-size: 8px; color: #8cc6ff; margin-top: 1px; }
 .raceB .rbNote { font-size: 7.5px; font-weight: 800; letter-spacing: 0.14em; color: var(--accent); margin-top: 2px; }
 .raceB.shut .rbNote { color: inherit; opacity: 0.6; }
 
@@ -1304,6 +1312,17 @@ button.stampC:active { transform: scale(0.96); }
 }
 #challengeBar span { font-size: 8.5px; font-weight: 800; letter-spacing: 0.12em; color: var(--accent); }
 #challengeBar #challengeTime { font-size: 11px; font-weight: 700; white-space: nowrap; }
+
+/* The middle rung, in the rail tick's own blue. */
+#pbBar {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  margin: 4px auto 0; max-width: 340px;
+  padding: 4px 10px;
+  border-left: 4px solid #6db9ff;
+  background: var(--ink);
+}
+#pbBar span { font-size: 8.5px; font-weight: 800; letter-spacing: 0.12em; color: #8cc6ff; }
+#pbBar #pbTime { font-size: 11px; font-weight: 700; white-space: nowrap; }
 
 /* ---- finish panel ----
  *
@@ -47038,6 +47057,14 @@ MR.HUD = (function () {
             where they are the same runner.
           -->
           <div id="railCR" class="hidden"></div>
+          <!--
+            YOUR OWN BEST, the middle rung. Bronze and gold are other
+            people's times; between them stands the run YOU did on this
+            road, at its average pace, in a blue no other marker uses.
+            The ladder on one line: beat yourself, then the record
+            holder, then the world. Hidden until this city has a best.
+          -->
+          <div id="railPB" class="hidden"></div>
         </div>
         <!--
           THE AXIS LABEL BECOMES THE ROUTE.
@@ -47151,6 +47178,11 @@ MR.HUD = (function () {
         <div id="challengeBar" class="hidden">
           <span>A FRIEND RAN THIS ROAD</span>
           <b class="num" id="challengeTime"></b>
+        </div>
+        <!-- The middle rung on the panel: your own best on this road. -->
+        <div id="pbBar" class="hidden">
+          <span>YOUR BEST ON THIS ROAD</span>
+          <b class="num" id="pbTime"></b>
         </div>
         <!--
           PICK YOUR OWN ADVENTURE. Every city is open every day and the
@@ -47590,7 +47622,8 @@ MR.HUD = (function () {
       distVal: q('distVal'),
       railWrap: q('railWrap'),
       rail: q('rail'), railFill: q('railFill'), railGap: q('railGap'), railGhost: q('railGhost'),
-      railCR: q('railCR'),
+      railCR: q('railCR'), railPB: q('railPB'),
+      pbBar: q('pbBar'), pbTime: q('pbTime'),
       railRoute: q('railRoute'),
       gapVal: q('gapVal'), gapTrend: q('gapTrend'), gapLabel: q('gapLabel'),
       toast: q('toast'), toastLab: q('toastLab'), toastBig: q('toastBig'),
@@ -48271,6 +48304,7 @@ MR.HUD = (function () {
           + '<span class="rbCity">' + s.name
           + (s.tag === featTag ? ' <span class="sFeat">TODAY\'S RACE</span>' : '') + '</span>'
           + '<span class="rbRec num">' + (s.rec ? 'RECORD ' + Pace.clock(s.rec) : '') + '</span>'
+          + (c && c.best ? '<span class="rbBest num">YOUR BEST ' + Pace.clock(c.best) + '</span>' : '')
           + '<span class="rbNote">' + (s.tag === loadedTag ? 'AT THE LINE' : d.door ? 'RUN IT' : d.note) + '</span>'
           + '</button>';
       }).join('');
@@ -48290,8 +48324,16 @@ MR.HUD = (function () {
      * the order they land in cannot leave the line stale.
      */
     let lastSum = null;
+    let pbBest = 0;   // this city's own best, seconds; 0 until both inputs land
     function syncChoice() {
       if (!n.pickBtn) return;
+      {
+        const st0 = course && course.settings && course.settings.length ? course.settings[0] : null;
+        const c = st0 && lastSum && lastSum.cities ? lastSum.cities[st0.name] : null;
+        pbBest = c && c.best ? c.best : 0;
+        n.pbBar.classList.toggle('hidden', !pbBest);
+        if (pbBest) n.pbTime.textContent = Pace.clock(pbBest) + ' · BEAT IT';
+      }
       const set = course && course.settings;
       const loaded = set && set.length ? set[0] : null;
       const feat = lastSum && lastSum.dateKey && MR.Course.pickSettings
@@ -49378,6 +49420,16 @@ MR.HUD = (function () {
         if (hasCR) {
           const crM = Math.min(K.MARATHON_MILES, (p.raceTime || 0) * K.MARATHON_MILES / st0.rec);
           n.railCR.style.left = (clamp01(crM / K.MARATHON_MILES) * 100) + '%';
+        }
+        // Your past self, same arithmetic as the other two runners.
+        const hasPB = !!pbBest;
+        if (cache.pbShown !== hasPB) {
+          cache.pbShown = hasPB;
+          n.railPB.classList.toggle('hidden', !hasPB);
+        }
+        if (hasPB) {
+          const pbM = Math.min(K.MARATHON_MILES, (p.raceTime || 0) * K.MARATHON_MILES / pbBest);
+          n.railPB.style.left = (clamp01(pbM / K.MARATHON_MILES) * 100) + '%';
         }
       }
       n.railGap.style.left = Math.min(you, gh) + '%';

@@ -1420,6 +1420,17 @@ button.stampC:active { transform: scale(0.96); }
   color: var(--accent); line-height: 1.45; margin-top: 3px;
   text-wrap: balance;
 }
+/* The hook: the player's own next rung, quieter than the city so the box
+ * still leads with tomorrow's name. Empty text collapses it. */
+#tomorrow .tomHook {
+  font-size: 9px; font-weight: 800; letter-spacing: 0.12em;
+  opacity: 0.85; margin-top: 4px;
+}
+#tomorrow .tomHook:empty { display: none; }
+
+/* A near miss wears the accent, on the one line that says how near. */
+.endSub.nearMiss { color: var(--accent); }
+#stampCtx.near { color: var(--accent); opacity: 1; }
 
 /* The only tap target on the screen, on a screen that is now taller: full
  * width so it cannot be missed at the bottom of a phone. */

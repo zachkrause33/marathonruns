@@ -9282,3 +9282,26 @@ formatted as a clock past 90s (8340 raw seconds was the screenshot
 that forced it).
 
 Gates: 8/8 shots, 90+90 courses, simulate PASS.
+
+## 116. The hook, and the ache of almost (2026-09-16)
+
+Item 2 of the review list. The finish card ended on a city name; now
+the TOMORROW box carries the wager under it (SINGAPORE - RECORD
+2:11:25) and one hook line naming the player's own next rung, in
+priority order: a world record within thirty seconds outranks
+everything (IT CAN FALL TOMORROW), then a course record within
+thirty (FINISH THE JOB), then the roads still unstamped, the bronze
+that can go gold, and a full-gold map to defend. Empty when nothing
+is true -- the rule every plate on this card follows.
+
+The near miss got its type: the vs-record line wears the accent
+inside thirty seconds, the stamp context does the same when the
+course record was that close, and Miles's eulogy gained a band --
+under 45 seconds he no longer says THE ROAD WON TODAY but what the
+gap is worth: N SECONDS IS ONE CLEAN LEG. Which is also, exactly,
+the coaching.
+
+Verified on the page: a seeded ten-city save prints 7 ROADS STILL
+UNSTAMPED under tomorrow's record; nosave prints nothing.
+
+Gates: 8/8 shots, 90+90 courses, simulate PASS.

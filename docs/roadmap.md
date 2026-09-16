@@ -9305,3 +9305,27 @@ Verified on the page: a seeded ten-city save prints 7 ROADS STILL
 UNSTAMPED under tomorrow's record; nosave prints nothing.
 
 Gates: 8/8 shots, 90+90 courses, simulate PASS.
+
+## 117. The stamp card is a picture now (2026-09-16)
+
+Item 3. The text result survives a message thread; the CARD survives
+a story, a feed, a lock screen -- and the game's most share-worthy
+artifacts (the stamp, the six legs, the time against 1:59:30) only
+existed as DOM. SAVE THE STAMP CARD draws them once, at tap time,
+onto a 1080x1350 canvas: masthead, city shrunk-to-fit, the time at
+216px, the vs-record line in the near-miss palette, the six leg
+blocks in the three colors they mean everywhere, and the stamp
+pressed at its six degrees in its tier's metal.
+
+Ships through the text result's own ladder: the share sheet with the
+file where navigator.canShare says the picture reaches the thread,
+a plain download everywhere else, a cancelled sheet is a change of
+mind, and the note always says what happened. System heavy sans on
+canvas for the reason every in-world sign uses it -- the embedded
+font is subset to the HUD. NO URL, per buildShare's standing rule,
+until the owner says where to point one.
+
+Verified by intercepting the download blob on a real finish: the
+card reads correctly at full size.
+
+Gates: 8/8 shots, 90+90 courses, simulate PASS.

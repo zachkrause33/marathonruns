@@ -1372,6 +1372,18 @@ button.stampC:active { transform: scale(0.96); }
 }
 #shareBtn:active { transform: translateY(1px); }
 #shareBtn:focus-visible { outline: 3px solid #fffdf5; outline-offset: 3px; }
+/* The picture button rides beside the text one, quieter -- cream hairline
+ * rather than accent, because the text result is still the primary act. */
+#shareImgBtn {
+  display: inline-block; margin: 9px 0 0 8px;
+  background: none; border: 1px solid rgba(255, 253, 245, 0.4);
+  color: inherit;
+  font-family: inherit;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.16em;
+  padding: 11px 20px; min-height: 44px; cursor: pointer; pointer-events: auto;
+}
+#shareImgBtn:active { transform: translateY(1px); }
+#shareImgBtn:focus-visible { outline: 3px solid #fffdf5; outline-offset: 3px; }
 /* THE RECEIPT. It is inline-block beside the button rather than under it so a
  * COPIED that lands in a 320px column cannot push the card's last block down
  * the page and move the button out from under the thumb that just pressed it. */

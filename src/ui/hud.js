@@ -435,6 +435,16 @@ MR.HUD = (function () {
           <b class="num" id="cityBarTime"></b>
         </div>
         <!--
+          THE THROWN GAUNTLET. A shared link can carry ?beat= -- a friend's
+          finish on this same city -- and this bar is that time made a
+          third wager on the panel. It renders only when main.js has
+          verified the link's city is the loaded city.
+        -->
+        <div id="challengeBar" class="hidden">
+          <span>A FRIEND RAN THIS ROAD</span>
+          <b class="num" id="challengeTime"></b>
+        </div>
+        <!--
           PICK YOUR OWN ADVENTURE. Every city is open every day and the
           player spends ONE on it; this is the door to the picker, and the
           line under it says which state the day is in -- running the
@@ -901,6 +911,7 @@ MR.HUD = (function () {
       stampCity: q('stampCity'), stampWord: q('stampWord'),
       stampDate: q('stampDate'), stampCtx: q('stampCtx'),
       cityBar: q('cityBar'), cityBarLab: q('cityBarLab'), cityBarTime: q('cityBarTime'),
+      challengeBar: q('challengeBar'), challengeTime: q('challengeTime'),
       pickLine: q('pickLine'), pickBtn: q('pickBtn'), racePick: q('racePick'),
       againBtn: q('againBtn'),
       count: q('count'), countVal: q('countVal'),
@@ -1514,6 +1525,17 @@ MR.HUD = (function () {
       n.milesEnd.innerHTML = '&ldquo;' + line + '&rdquo;<span class="who">&mdash; MILES</span>';
     };
 
+    /**
+     * The thrown gauntlet, verified by main.js (the link's city must be the
+     * loaded city). Stored so the finish card can answer it.
+     */
+    let challengeBeat = 0;
+    api.setChallenge = function (seconds) {
+      challengeBeat = seconds | 0;
+      n.challengeBar.classList.toggle('hidden', !challengeBeat);
+      if (challengeBeat) n.challengeTime.textContent = Pace.clock(challengeBeat) + ' · BEAT IT';
+    };
+
     n.histBtn.addEventListener('click', function () { openHist(n.startPanel); });
     /**
      * The bubble sheet. Rebuilt on every open from the same doorState
@@ -2018,6 +2040,21 @@ MR.HUD = (function () {
       if (marks.length) out.push(marks.map(function (m) { return BLOCK[m]; }).join(''));
       const streak = rec && rec.dayStreak ? rec.dayStreak | 0 : 0;
       if (streak >= 2) out.push('Day streak: ' + streak);
+      // The challenge, answered in the thread it came from.
+      if (challengeBeat) {
+        out.push(t <= challengeBeat
+          ? 'Challenge beaten by ' + Pace.clock(challengeBeat - t)
+          : 'Challenge missed by ' + Pace.clock(t - challengeBeat));
+      }
+      // THE LINK, at last. The NO URL rule below this function stood while
+      // "the game has no domain yet" was true; site/CNAME says it is not.
+      // The link carries the city and this finish as the target, so the
+      // result IS the challenge: whoever taps it races this exact wager.
+      const tag = set && set.length ? set[0].tag : '';
+      if (tag) {
+        out.push('Beat me: https://marathon-miles.com/?city=' + tag
+          + '&beat=' + Math.round(t));
+      }
       return out.join('\n');
     }
 
@@ -3069,6 +3106,12 @@ MR.HUD = (function () {
       // did carry the run ("CLEAN THROUGH THE WALL").
       const where = p.hits ? decisiveChapter(t) : null;
       if (where) notes.push('CLEAN THROUGH ' + where.name + ' · ' + Pace.clock(where.would));
+      // The gauntlet answered, before anything else the card wants to say.
+      if (challengeBeat) {
+        notes.unshift(t <= challengeBeat
+          ? 'CHALLENGE BEATEN BY ' + Pace.clock(challengeBeat - t)
+          : 'CHALLENGE MISSED BY ' + Pace.clock(t - challengeBeat));
+      }
       n.endTurn.innerHTML = notes
         .map(function (x) { return '<div>' + x + '</div>'; }).join('');
 

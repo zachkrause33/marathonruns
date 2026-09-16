@@ -9329,3 +9329,31 @@ Verified by intercepting the download blob on a real finish: the
 card reads correctly at full size.
 
 Gates: 8/8 shots, 90+90 courses, simulate PASS.
+
+## 118. The thrown gauntlet (2026-09-16)
+
+Item 4, and the day the NO URL rule retired honestly: it stood on
+"the game has no domain yet", and site/CNAME says marathon-miles.com.
+The share string now ends with the line a group chat acts on --
+"Beat me: https://marathon-miles.com/?city=ROME&beat=7451" -- the
+city and this finish as the target, so the result IS the challenge.
+
+The receiving side: ?beat= is honored only when the link's city is
+the city that actually loaded (a spent day overrides ?city, and a
+challenge silently reattached to a different road would be a lie
+about what the friend ran), and only inside sanity bounds no real
+time can fail. It renders as a third wager on the start panel -- A
+FRIEND RAN THIS ROAD · 2:04:11 · BEAT IT, accent-barred beside the
+city record's bronze bar -- and the finish card answers it first:
+CHALLENGE BEATEN BY / MISSED BY, on the card and in the share text,
+so the answer travels back to the thread the gauntlet came from.
+
+The instrument audit that came with it (rule 3): tools/sharecard.js
+had gone stale against the passport rework -- still asserting the
+old #cityGrid checklist and RECORD CITIES rule -- and its streak
+checks counted total lines, which the new link line broke and any
+future line would break again. Rewritten against the stamp wall's
+tier language and the line's absence. PASS, including the round-trip
+through the system clipboard.
+
+Gates: 8/8 shots, 90+90 courses, simulate PASS, sharecard PASS.

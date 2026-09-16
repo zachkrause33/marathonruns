@@ -792,7 +792,8 @@ html, body {
  * plain elements inside a panel, so they need their own. */
 #lockedBox.hidden, #histBtn.hidden, #endHistBtn.hidden { display: none; }
 #mapView.hidden, #passView.hidden, #cityBar.hidden, #pickLine.hidden,
-#pickBtn.hidden, #stampMoment.hidden, #railCR.hidden { display: none; }
+#pickBtn.hidden, #stampMoment.hidden, #railCR.hidden,
+#challengeBar.hidden { display: none; }
 
 /* THE LOCKED BOX replaces TOE THE LINE on a day the record has fallen. It
  * borrows #tomorrow's plate (the other "come back later" element) with the
@@ -1169,6 +1170,18 @@ button.stampC:active { transform: scale(0.96); }
 }
 #cityBar #cityBarLab { font-size: 8.5px; font-weight: 800; letter-spacing: 0.12em; color: #eda56a; }
 #cityBar #cityBarTime { font-size: 11px; font-weight: 700; white-space: nowrap; }
+
+/* The thrown gauntlet: the friend's time as a third wager, in the accent
+ * the challenge deserves. Same bar shape as the city record above it. */
+#challengeBar {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  margin: 4px auto 0; max-width: 340px;
+  padding: 4px 10px;
+  border-left: 4px solid var(--accent);
+  background: var(--ink);
+}
+#challengeBar span { font-size: 8.5px; font-weight: 800; letter-spacing: 0.12em; color: var(--accent); }
+#challengeBar #challengeTime { font-size: 11px; font-weight: 700; white-space: nowrap; }
 
 /* ---- finish panel ----
  *

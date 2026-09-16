@@ -225,12 +225,14 @@ function spoilers(s) {
       spoilers(s).join(', '));
   }
   // A streak of one is not a streak, on the share string for the same reason it
-  // is not on the memory plate.
+  // is not on the memory plate. Checked by the line's absence rather than by
+  // total line count -- the count broke the day the Beat-me link joined the
+  // string, and it would break again on the next legitimate line.
   const lone = await page.evaluate(() => window.__stage(7300, [], [], 1));
-  check('a day streak of 1 is not claimed', lone.split('\n').length === 3,
+  check('a day streak of 1 is not claimed', lone.indexOf('Day streak') === -1,
     JSON.stringify(lone));
   const none = await page.evaluate(() => window.__stage(7300, [], [], 0));
-  check('no save means no streak line', none.split('\n').length === 3,
+  check('no save means no streak line', none.indexOf('Day streak') === -1,
     JSON.stringify(none));
 
   // ---- 3. the clipboard actually holds the text --------------------------
@@ -337,13 +339,17 @@ function spoilers(s) {
     });
     if (!open) return { open: false };
     await page.waitForTimeout(250);
+    // The passport wall replaced the old #cityGrid checklist (roadmaps
+    // 108-110): stamps carry the TIER language now -- gold for the world
+    // record, bronze for the city record, ink for a finish, new for a road
+    // not yet run -- and the rule line reads PICK A CITY - ONE A DAY.
     return page.evaluate(() => ({
       open: true,
       rule: document.getElementById('cityRule').textContent.trim(),
-      rec: [...document.querySelectorAll('#cityGrid .ccity.rec .cname')].map((e) => e.textContent),
-      ran: [...document.querySelectorAll('#cityGrid .ccity.ran .cname')].map((e) => e.textContent),
-      fresh: [...document.querySelectorAll('#cityGrid .ccity.new .cname')].map((e) => e.textContent),
-      total: document.querySelectorAll('#cityGrid .ccity').length,
+      rec: [...document.querySelectorAll('#stampWall .stampC.gold .sCity')].map((e) => e.textContent),
+      ran: [...document.querySelectorAll('#stampWall .stampC.ink .sCity')].map((e) => e.textContent),
+      fresh: [...document.querySelectorAll('#stampWall .stampC.new .sCity')].map((e) => e.textContent),
+      total: document.querySelectorAll('#stampWall .stampC').length,
     }));
   }
 
@@ -361,13 +367,16 @@ function spoilers(s) {
   cr = await readCities({ v: 1, day: null, prev: null,
     days: { count: 1, last: shiftKey(dateKey, -2) }, best: null, hist: someRows });
   check('cities: the panel opened', cr.open === true);
-  check('cities: two of the pool are marked',
-    cr.rule === 'RECORD CITIES · 2 OF ' + pool.length, 'rule reads "' + cr.rule + '"');
-  check('cities: the record cities are the right two',
-    cr.rec.join('|') === [pool[0], pool[2]].sort((a, b) =>
-      pool.indexOf(a) - pool.indexOf(b)).join('|'), 'marked: ' + cr.rec.join(', '));
-  check('cities: a raced day without the record is its own state',
-    cr.ran.join('|') === pool[1], 'ran: ' + cr.ran.join(', '));
+  check('cities: three run, two gold, on the rule line',
+    cr.rule === 'PICK A CITY · ONE A DAY · 3 OF ' + pool.length + ' RUN · 2 GOLD',
+    'rule reads "' + cr.rule + '"');
+  // The wall groups by REGION, so stamp order is not pool order: compare as
+  // sets, which is what the tier claim actually is.
+  check('cities: the gold stamps are the right two',
+    cr.rec.slice().sort().join('|') === [pool[0], pool[2]].sort().join('|'),
+    'gold: ' + cr.rec.join(', '));
+  check('cities: a raced day without a record is plain ink',
+    cr.ran.join('|') === pool[1], 'ink: ' + cr.ran.join(', '));
   check('cities: the rest read as not yet visited',
     cr.fresh.length === pool.length - 3, cr.fresh.length + ' unvisited');
   check('cities: every city in the pool is listed', cr.total === pool.length,
@@ -384,7 +393,8 @@ function spoilers(s) {
   cr = await readCities({ v: 1, day: null, prev: null,
     days: { count: 1, last: shiftKey(dateKey, -1) }, best: null, hist: allRows });
   check('cities: all of them counted',
-    cr.rule === 'RECORD CITIES · ' + pool.length + ' OF ' + pool.length,
+    cr.rule === 'PICK A CITY · ONE A DAY · ' + pool.length + ' OF ' + pool.length
+      + ' RUN · ' + pool.length + ' GOLD',
     'rule reads "' + cr.rule + '"');
   check('cities: none left unvisited', cr.fresh.length === 0 && cr.ran.length === 0,
     cr.fresh.length + ' unvisited, ' + cr.ran.length + ' raced-only');
@@ -406,7 +416,7 @@ function spoilers(s) {
     };
   });
   check('cities: a bad save leaves the panel standing', survived.start
-    && /RECORD CITIES/.test(survived.rule), 'rule reads "' + survived.rule + '"');
+    && /PICK A CITY/.test(survived.rule), 'rule reads "' + survived.rule + '"');
   notes.push('corrupt save rule: "' + survived.rule + '"');
 
   // ---- 6. the head the share string travels with -------------------------

@@ -180,6 +180,22 @@ MR.unbail = function () {
     else if (want) for (const c of pool) if (c.tag === want) cityTag = want;
   }
   const courseKey = cityTag === featuredTag ? dateKey : dateKey + '|' + cityTag;
+  /**
+   * THE CHALLENGE. ?beat= travels with ?city= in a shared link ("Beat me:
+   * .../?city=ROME&beat=7451") and is a friend's finish time in seconds.
+   * Honored only when the city the link asked for is the city that actually
+   * loaded -- a spent day overrides ?city, and a challenge silently
+   * reattached to a different road would be a lie about what the friend
+   * ran. The bounds only reject nonsense (faster than the floor allows,
+   * slower than anyone finishes); a real time cannot fail them.
+   */
+  const BEAT = (function () {
+    const b = parseInt(params.get('beat') || '0', 10);
+    const want = (params.get('city') || '').toUpperCase();
+    if (!b || b < 5700 || b > 21600) return 0;
+    if (want && want !== cityTag) return 0;
+    return b;
+  })();
   const botParam = params.get('bot');
   const BOT = botParam !== null;
   const BOT_SKILL = BOT ? (botParam === '1' || botParam === '' ? 1 : parseFloat(botParam)) : 0;
@@ -291,6 +307,7 @@ MR.unbail = function () {
   const hud = MR.HUD.create(document.getElementById('ui'));
   hud.setDate(dateKey);
   hud.setCourse(course);
+  if (BEAT) hud.setChallenge(BEAT);
   hud.showPerf(DEBUG);
 
   // The road profile is the course's, so the camera and the pace model read

@@ -2850,6 +2850,21 @@ MR.HUD = (function () {
     };
 
     /**
+     * The coach's card: the aid toast's own element held longer, with the
+     * accent bar so a tip does not read as an event. Three of these exist
+     * in the whole game, on a player's first run only -- see main.js.
+     */
+    api.coach = function (lab, sub) {
+      n.toastLab.textContent = lab;
+      n.toastBig.textContent = sub;
+      n.toast.classList.add('show', 'coach');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () {
+        n.toast.classList.remove('show', 'coach');
+      }, 4200);
+    };
+
+    /**
      * The mile split card, retired. See the markup comment on #toast for the
      * four facts it carried and where each one already was.
      *

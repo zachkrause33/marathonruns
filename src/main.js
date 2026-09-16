@@ -348,6 +348,28 @@ MR.unbail = function () {
   let mileShown = 0;
   // The next authored cheer zone to roar for. See world.cheerZones.
   let cheerIdx = 0;
+  /**
+   * FIRST-RUN COACHING. Three cards in the opening seconds of a player's
+   * first-ever run -- the controls, the read, and the one sentence that
+   * frames the whole game. Gated hard: never for a bot, a skip, or a
+   * nosave inspection; never twice (its own localStorage key, not the
+   * save, so clearing a save does not re-school a veteran); and never
+   * when the save already carries a finished day.
+   */
+  const coachTips = (function () {
+    if (BOT || SKIP > 0 || NOSAVE) return [];
+    try {
+      if (localStorage.getItem('marathonruns/coach/v1')) return [];
+    } catch (e) { return []; }
+    const sum = MR.Store.summary(dateKey);
+    if (sum && sum.totalDays) return [];
+    return [
+      [2.5, 'THREE LANES', '\u2190 \u2192 OR SWIPE'],
+      [9, 'READ THE ROAD', '\u2191 JUMP THE LOW \u00b7 \u2193 SLIDE THE HIGH'],
+      [16, 'ONE TOUCH COSTS', 'A PERFECT LINE BEATS 1:59:30'],
+    ];
+  })();
+  let coachIdx = 0;
   // Edge detectors for the two cues that mark a change of situation rather
   // than an event. Neither has anything else on screen at the moment it
   // happens, which is why they are worth a sound: the record going out of
@@ -1269,6 +1291,15 @@ MR.unbail = function () {
         const d = sp.time - sp.mile * K.RECORD_PACE;
         hud.toast(`MILE ${sp.mile}`, `${Pace.clock(sp.time)}  ·  ${Pace.delta(d)} vs record`);
         audio.mile(sp.mile);
+      }
+
+      // First-run coaching, on the wall clock the player actually feels.
+      while (coachIdx < coachTips.length && pace.realTime >= coachTips[coachIdx][0]) {
+        const tip = coachTips[coachIdx++];
+        hud.coach(tip[1], tip[2]);
+        if (coachIdx === coachTips.length) {
+          try { localStorage.setItem('marathonruns/coach/v1', '1'); } catch (e) { /* shown is shown */ }
+        }
       }
 
       // The authored crowds. The knots are world.js's; the ROAR is fired

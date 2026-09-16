@@ -391,6 +391,10 @@ html, body {
   transition: opacity 0.22s ease-out, transform 0.22s ease-out;
 }
 #toast.show { opacity: 1; transform: none; }
+/* The coach's card: accent-barred, smaller type for a sentence. */
+#toast.coach { border-left-color: var(--accent); }
+#toast.coach .lab { color: var(--accent); }
+#toast.coach .big { font-size: 14px; font-weight: 800; letter-spacing: 0.07em; }
 #toast .lab { opacity: 0.85; color: #fffdf5; }
 #toast .big { font-size: 27px; font-weight: 700; line-height: 1.05; }
 

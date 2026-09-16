@@ -9424,3 +9424,22 @@ weather for the ears, not course data. setPlace joins the API list
 so the no-audio stub stays complete.
 
 Gates: 8/8 shots, 90+90 courses, simulate PASS.
+
+## 122. Three cards for the first run (2026-09-16)
+
+Item 8. Measured: zero first-attempt golds, and nothing taught a new
+player anything -- they learned by dying, and a loss with no lesson
+reads as randomness. Three coach cards now ride the aid toast's own
+element (accent-barred so a tip cannot read as an event) in the
+opening seconds of a player's FIRST run only: the controls at 2.5s,
+the read at 9s (jump the low, slide the high), and at 16s the one
+sentence that frames the game -- ONE TOUCH COSTS · A PERFECT LINE
+BEATS 1:59:30.
+
+Gated hard: never for a bot, a skip or a nosave inspection; never
+when the save carries a finished day; and never twice, on its own
+localStorage key rather than the save, so clearing a save does not
+re-school a veteran. Verified on the page: three tips in order,
+flag written, second visit silent.
+
+Gates: 8/8 shots, 90+90 courses, simulate PASS.

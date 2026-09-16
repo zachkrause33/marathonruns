@@ -1374,6 +1374,28 @@ MR.Course = (function () {
       hint: 'the Obelisco, the Nueve de Julio, jacaranda, French facades, the Casa Rosada' },
     { tag: 'NAIROBI',   region: 'AFRICA',       name: 'NAIROBI',      rec: 7812, holder: 'KIGEN 2009',   latlon: [-1.29, 36.82],
       hint: 'the KICC drum tower, acacia crowns, red earth, Uhuru Park' },
+    // The 2026-09-16 eight, to a clean 25 (owner: "add 8 more cities to
+    // get to a clean 25"). Regions rebalance to 6/8/7/4. Dubai and
+    // Toronto carry their real course records; the rest are set the way
+    // Seoul's and Cape Town's were -- plausible for the race and the
+    // road, with Mexico City slow for its 2,240m of altitude and Lagos
+    // the friendliest bronze on the roster, which the tour needs.
+    { tag: 'TORONTO', region: 'AMERICAS',   name: 'TORONTO',       rec: 7500, holder: 'RONO 2019',      latlon: [43.65, -79.38],
+      hint: 'the CN Tower needle, the domed stadium at its foot, red streetcars, maple avenues' },
+    { tag: 'MEXICOCITY', region: 'AMERICAS', name: 'MEXICO CITY',  rec: 7854, holder: 'MAIYO 2018',     latlon: [19.43, -99.13],
+      hint: 'the golden Angel on her column, jacaranda over Reforma, pink stone, the Bellas Artes dome' },
+    { tag: 'MADRID', region: 'EUROPE',      name: 'MADRID',        rec: 7755, holder: 'KIPROTICH 2019', latlon: [40.42, -3.70],
+      hint: 'the Puerta de Alcala arches, the Metropolis dome, Gran Via stone, plane trees' },
+    { tag: 'DUBAI', region: 'ASIA-PACIFIC', name: 'DUBAI',         rec: 7414, holder: 'MOLLA 2019',     latlon: [25.20, 55.27],
+      hint: 'the Burj needle above everything, the sail hotel on its island, palms, gulf turquoise' },
+    { tag: 'SHANGHAI', region: 'ASIA-PACIFIC', name: 'SHANGHAI',   rec: 7535, holder: 'GEBRE 2023',     latlon: [31.23, 121.47],
+      hint: 'the Pearl Tower spheres, the twisting supertall, Bund stone facades, river haze' },
+    { tag: 'MUMBAI', region: 'ASIA-PACIFIC', name: 'MUMBAI',       rec: 7689, holder: 'LEMI 2020',      latlon: [19.08, 72.88],
+      hint: 'the Gateway arch on the water, the Victorian terminus, Marine Drive palms, monsoon sky' },
+    { tag: 'MARRAKESH', region: 'AFRICA',   name: 'MARRAKESH',     rec: 7664, holder: 'EL GOUMRI 2023', latlon: [31.63, -7.99],
+      hint: 'the Koutoubia minaret, horseshoe gates in red walls, palms against the Atlas' },
+    { tag: 'LAGOS', region: 'AFRICA',       name: 'LAGOS',         rec: 8010, holder: 'KIPKEMBOI 2020', latlon: [6.52, 3.38],
+      hint: 'the saddle-roofed National Theatre, lagoon bridges, palms, gold-brown water' },
   ];
 
   /**

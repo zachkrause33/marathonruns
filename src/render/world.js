@@ -978,6 +978,171 @@ MR.World = (function () {
       },
       bridge: 'stoneArch',
     },
+
+    // ---- the 2026-09-16 eight: to a clean 25 ---------------------------
+    // Roads all stay in the neutral tarmac family -- the same day these
+    // joined, the contrast sweep caught Nairobi's warm road putting four
+    // coats under the gate. Identity goes in the ground, the trees, the
+    // water and the skyline, never the asphalt.
+    TORONTO: {
+      sky: [0x4c88be, 0xc8e6ec], fog: 0xc4dfea, ground: 0x63b468, road: 0x696a63,
+      water: 0x3f7fa8, edge: 0xeef0f6,
+      terrace: {
+        colors: [0xb8574a, 0xc9705a, 0xa04a3e, 0xd0855e, 0x8f9aa4],
+        trim: 0xf0e8dc, win: 0x2f3a50, roof: 'parapet', roofColor: 0x5a5248,
+        h: [10.0, 13.0], bay: 4.3, depth: 7.0, rows: 4, stoop: 1,
+      },
+      tower: { colors: [0x8a94a4, 0xa4acb8, 0x6e7888], glass: 1, crown: 'flat' },
+      tree: { kind: 'round', colors: [0x5c8028, 0x9a4a2a, 0xc9702e, 0x7fa838], h: 1.15 },
+      marks: {
+        'CITY START': [{ k: 'cnTower', x: 34 }, { k: 'skydome', x: 24 }, { k: 'cnTower', x: 38 }],
+        'RIVERSIDE': [{ k: 'cnTower', x: 36 }, { k: 'crane', x: 13.0 }],
+        'PARKLAND': [{ k: 'oak', x: 15.0 }, { k: 'pond', x: 27.0 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'cnTower', x: 36 }],
+        'FINAL MILE': [{ k: 'cnTower', x: 34 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'bascule',
+    },
+
+    MEXICOCITY: {
+      sky: [0x4a8cc8, 0xdceef0], fog: 0xd8e8ee, ground: 0x74b060, road: 0x6a6a62,
+      water: 0x5a8f9a, edge: 0xf6ecd8,
+      terrace: {
+        colors: [0xc45a6a, 0xd88a4e, 0x8a5aa0, 0xe0b060, 0xb84848],
+        trim: 0xf6ead2, win: 0x3a3050, roof: 'flat', roofColor: 0x8a6a50,
+        h: [8.0, 10.5], bay: 4.2, depth: 6.6, rows: 4,
+      },
+      tower: { colors: [0xb0a494, 0xc4b8a4, 0x9a8e7c], glass: 0, crown: 'flat' },
+      tree: { kind: 'round', colors: [0x8f7ab8, 0xa48fd0, 0x7a9a3e], h: 1.1, trunk: 0x7a6a54 },
+      marks: {
+        'CITY START': [{ k: 'angelMx', x: 15 }, { k: 'bellasArtes', x: 22 }, { k: 'angelMx', x: 17 }],
+        'RIVERSIDE': [{ k: 'bellasArtes', x: 22 }, { k: 'angelMx', x: 16 }],
+        'PARKLAND': [{ k: 'oak', x: 15.0 }, { k: 'pond', x: 27.0 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'angelMx', x: 16 }],
+        'FINAL MILE': [{ k: 'angelMx', x: 15 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'stoneArch',
+    },
+
+    MADRID: {
+      sky: [0x4a8ac6, 0xe2eef0], fog: 0xdfeaf0, ground: 0x8fb45c, road: 0x6b6962,
+      water: 0x5f92a4, edge: 0xf6eedc,
+      terrace: {
+        colors: [0xd8a878, 0xc89058, 0xe4c090, 0xb87a4e, 0xd0b088],
+        trim: 0xf8f0e0, win: 0x3a4058, roof: 'parapet', roofColor: 0x8a6a48,
+        h: [10.5, 13.0], bay: 4.4, depth: 7.0, rows: 5, balcony: 1,
+      },
+      tower: { colors: [0xc4b09a, 0xd4c2ac, 0xb09a80], glass: 0, crown: 'flat' },
+      tree: { kind: 'round', colors: [0x5f7f30, 0x84a83c, 0xaad84e], h: 1.1, trunk: 0x9a9a86 },
+      marks: {
+        'CITY START': [{ k: 'metropolis', x: 15 }, { k: 'puertaAlcala', over: 1 }, { k: 'metropolis', x: 17 }],
+        'RIVERSIDE': [{ k: 'metropolis', x: 16 }, { k: 'crane', x: 13.0 }],
+        'PARKLAND': [{ k: 'oak', x: 15.0 }, { k: 'pond', x: 27.0 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'metropolis', x: 16 }],
+        'FINAL MILE': [{ k: 'metropolis', x: 15 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'stoneArch',
+    },
+
+    DUBAI: {
+      sky: [0x3f8ed0, 0xf0e6cc], fog: 0xecdfc6, ground: 0xd8c090, road: 0x6a6a64,
+      water: 0x2fb0d4, edge: 0xfef6e6,
+      terrace: {
+        colors: [0xf0e4cc, 0xe4d4b8, 0xd8c8ac, 0xf6ecd8, 0xcabb9e],
+        trim: 0xfefaf0, win: 0x2f4a66, roof: 'flat', roofColor: 0xb8a888,
+        h: [9.0, 12.5], bay: 4.4, depth: 6.8, rows: 4,
+      },
+      tower: { colors: [0x9ab8cc, 0xb4ccdc, 0x84a4bc], glass: 1, crown: 'antenna' },
+      tree: { kind: 'palm', colors: [0x5f8a30, 0x86b83c], h: 1.2 },
+      marks: {
+        'CITY START': [{ k: 'burjKhalifa', x: 30 }, { k: 'burjAlArab', x: 26, side: -1 }, { k: 'burjKhalifa', x: 34 }],
+        'RIVERSIDE': [{ k: 'burjAlArab', x: 26, side: -1 }, { k: 'burjKhalifa', x: 32 }],
+        'PARKLAND': [{ k: 'burjKhalifa', x: 34 }, { k: 'pond', x: 27.0 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'burjKhalifa', x: 32 }],
+        'FINAL MILE': [{ k: 'burjKhalifa', x: 30 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'harp',
+    },
+
+    SHANGHAI: {
+      sky: [0x5a80aa, 0xe6e2da], fog: 0xe0dcd6, ground: 0x66a868, road: 0x696a64,
+      water: 0x7a8f96, edge: 0xeef0f2,
+      terrace: {
+        colors: [0xcfc4ac, 0xbcb096, 0xd8ccb4, 0xaa9e84, 0xc4b89e],
+        trim: 0xf0eadc, win: 0x323c50, roof: 'parapet', roofColor: 0x5a5448,
+        h: [11.0, 13.5], bay: 4.4, depth: 7.2, rows: 5,
+      },
+      tower: { colors: [0x8ca4b8, 0xa4bac8, 0x7690a8], glass: 1, crown: 'antenna' },
+      tree: { kind: 'round', colors: [0x527a2c, 0x74a038, 0x98cc48], h: 1.05 },
+      marks: {
+        'CITY START': [{ k: 'pearlTower', x: 30 }, { k: 'bundRow', x: 19 }, { k: 'shanghaiTower', x: 36 }],
+        'RIVERSIDE': [{ k: 'pearlTower', x: 32, side: -1 }, { k: 'bundRow', x: 19 }],
+        'PARKLAND': [{ k: 'oak', x: 15.0 }, { k: 'pond', x: 27.0 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'shanghaiTower', x: 38 }],
+        'FINAL MILE': [{ k: 'pearlTower', x: 30 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'harp',
+    },
+
+    MUMBAI: {
+      sky: [0x4a7ab0, 0xe8e0cc], fog: 0xe2dcc8, ground: 0x74a858, road: 0x6a6a62,
+      water: 0x6a94a0, edge: 0xf6ecd8,
+      terrace: {
+        colors: [0xd8b06a, 0xc49a54, 0xe4c88c, 0xb08848, 0x8fa0a8],
+        trim: 0xf4ecd8, win: 0x3a3448, roof: 'flat', roofColor: 0x8a7454,
+        h: [9.0, 12.0], bay: 4.3, depth: 6.8, rows: 4, balcony: 1,
+      },
+      tower: { colors: [0xb0a08a, 0xc2b49c, 0x9a8a72], glass: 0, crown: 'flat' },
+      tree: { kind: 'palm', colors: [0x4f8a34, 0x74b040], h: 1.2 },
+      marks: {
+        'CITY START': [{ k: 'gatewayIndia', x: 17, side: -1 }, { k: 'cstStation', x: 21 }, { k: 'gatewayIndia', x: 19, side: -1 }],
+        'RIVERSIDE': [{ k: 'gatewayIndia', x: 17, side: -1 }, { k: 'cstStation', x: 22 }],
+        'PARKLAND': [{ k: 'oak', x: 15.0 }, { k: 'pond', x: 27.0 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'cstStation', x: 22 }],
+        'FINAL MILE': [{ k: 'gatewayIndia', x: 17, side: -1 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'harp',
+    },
+
+    MARRAKESH: {
+      sky: [0x4a8cc8, 0xf0dfc2], fog: 0xecd8ba, ground: 0xc08a5e, road: 0x686862,
+      water: 0x5f9aa0, edge: 0xf8e8d0,
+      terrace: {
+        colors: [0xc08a5e, 0xb87a52, 0xd09a6a, 0xac6e48, 0xc89262],
+        trim: 0xe8d0a8, win: 0x3a2c28, roof: 'flat', roofColor: 0x9a6a48,
+        h: [7.5, 9.5], bay: 4.2, depth: 6.4, rows: 3,
+      },
+      tower: { colors: [0xc08a5e, 0xb0784e, 0xd09a6a], glass: 0, crown: 'flat' },
+      tree: { kind: 'palm', colors: [0x5f8a30, 0x86b83c], h: 1.15 },
+      marks: {
+        'CITY START': [{ k: 'koutoubia', x: 18 }, { k: 'babAgnaou', x: 14 }, { k: 'koutoubia', x: 20 }],
+        'RIVERSIDE': [{ k: 'babAgnaou', x: 14 }, { k: 'koutoubia', x: 19 }],
+        'PARKLAND': [{ k: 'orangeGrove', x: 16 }, { k: 'pond', x: 27.0 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'koutoubia', x: 19 }],
+        'FINAL MILE': [{ k: 'koutoubia', x: 18 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'stoneArch',
+    },
+
+    LAGOS: {
+      sky: [0x4f90c0, 0xe8e8d4], fog: 0xe0e4d2, ground: 0x6ab060, road: 0x696a63,
+      water: 0x8a8a5e, edge: 0xf4f0dc,
+      terrace: {
+        colors: [0xe0c060, 0xc9704a, 0x5a9a6a, 0xd88a4e, 0x8a6aa0],
+        trim: 0xf4ecd0, win: 0x343048, roof: 'flat', roofColor: 0x8a7a54,
+        h: [8.0, 10.5], bay: 4.2, depth: 6.6, rows: 4,
+      },
+      tower: { colors: [0xb0a894, 0xc2baa4, 0x9a927e], glass: 0, crown: 'flat' },
+      tree: { kind: 'palm', colors: [0x4f8a34, 0x74b040], h: 1.2 },
+      marks: {
+        'CITY START': [{ k: 'natTheatre', x: 22 }, { k: 'cocoaHouse', x: 24 }, { k: 'natTheatre', x: 26 }],
+        'RIVERSIDE': [{ k: 'natTheatre', x: 24, side: -1 }, { k: 'cocoaHouse', x: 26 }],
+        'PARKLAND': [{ k: 'oak', x: 15.0 }, { k: 'pond', x: 27.0 }],
+        'THE WALL': [{ k: 'hoarding', x: 12.6, rz: -0.16 }, { k: 'cocoaHouse', x: 26 }],
+        'FINAL MILE': [{ k: 'natTheatre', x: 22 }, { k: 'jumbo', x: 13.5 }],
+      },
+      bridge: 'harp',
+    },
   };
 
   /** Palette fields a setting owes; used to build the no-settings fallback. */
@@ -4062,6 +4227,239 @@ MR.World = (function () {
         parts.push(cyl(0.35, 0.6, h, 6, x, h / 2, zz, TRUNK));
         parts.push(cyl(r, r * 0.55, 0.9, 9, x, h + 0.45, zz, h > 5 ? CAN : CAN2));
       }
+      return merge(parts);
+    },
+
+    // ---- the 2026-09-16 eight (roadmap 125): sixteen signatures --------
+    /** The CN Tower: the concrete needle, the pod, the mast. */
+    cnTower: function () {
+      const parts = [];
+      const CONC = 0xd8d4cc, CONC2 = 0xc4c0b8, GLASS = 0x4a5a72;
+      parts.push(cyl(3.6, 4.6, 1.6, 8, 0, 0.8, 0, CONC2));
+      parts.push(cyl(1.1, 2.6, 24.0, 8, 0, 13.6, 0, CONC));
+      parts.push(cyl(3.1, 2.4, 2.6, 10, 0, 26.9, 0, CONC2));
+      parts.push(cyl(2.9, 2.9, 1.3, 10, 0, 27.0, 0, GLASS));
+      parts.push(cyl(2.2, 3.0, 1.2, 10, 0, 28.8, 0, CONC));
+      parts.push(cyl(0.45, 0.8, 6.5, 6, 0, 32.6, 0, CONC));
+      parts.push(cyl(0.08, 0.3, 3.6, 5, 0, 37.6, 0, CONC2));
+      return merge(parts);
+    },
+    /** The domed stadium at the needle's foot. */
+    skydome: function () {
+      const parts = [];
+      const SHELL = 0xf0ece2, SHELL2 = 0xdcd8cc, BAND = 0x8a90a0;
+      parts.push(cyl(9.5, 10.5, 3.2, 12, 0, 1.6, 0, SHELL2));
+      parts.push(cyl(10.2, 10.2, 0.6, 12, 0, 3.4, 0, BAND));
+      parts.push(cyl(7.2, 9.5, 2.4, 12, 0, 4.9, 0, SHELL));
+      parts.push(cyl(3.8, 7.2, 2.0, 12, 0, 7.1, 0, SHELL));
+      parts.push(cyl(0.6, 3.8, 1.3, 10, 0, 8.75, 0, SHELL2));
+      return merge(parts);
+    },
+    /** The Angel of Independence: the column, the gold. */
+    angelMx: function () {
+      const parts = [];
+      const STONE = 0xe8ddc8, STONE2 = 0xd4c8b0, GOLD = 0xf0c040;
+      parts.push(bx(7.5, 2.6, 7.5, 0, 1.3, 0, STONE2));
+      parts.push(bx(5.2, 2.2, 5.2, 0, 3.7, 0, STONE));
+      parts.push(cyl(1.15, 1.5, 15.5, 10, 0, 12.5, 0, STONE));
+      parts.push(cyl(1.7, 1.4, 1.1, 10, 0, 20.8, 0, STONE2));
+      parts.push(cyl(0.55, 0.75, 2.3, 6, 0, 22.5, 0, GOLD));
+      parts.push(bx(2.7, 1.3, 0.28, 0, 23.3, 0, GOLD));
+      return merge(parts);
+    },
+    /** The Palacio de Bellas Artes: white marble, orange dome. */
+    bellasArtes: function () {
+      const parts = [];
+      const MARBLE = 0xf2ece0, MARBLE2 = 0xe0d8c8, DOME = 0xd8863a, DOME2 = 0xc0742e;
+      parts.push(bx(20.0, 9.0, 12.0, 0, 4.5, 0, MARBLE));
+      parts.push(bx(21.0, 1.1, 13.0, 0, 9.4, 0, MARBLE2));
+      for (const sx of [-1, 1]) parts.push(bx(4.6, 10.6, 12.6, sx * 8.4, 5.3, 0, MARBLE2));
+      for (let i = 0; i < 4; i++) parts.push(cyl(0.5, 0.6, 7.5, 8, -4.5 + i * 3.0, 4.6, 6.2, MARBLE2));
+      parts.push(cyl(4.6, 5.4, 2.2, 12, 0, 11.0, 0, DOME2));
+      parts.push(cyl(2.4, 4.6, 2.6, 12, 0, 13.4, 0, DOME));
+      parts.push(cyl(0.4, 2.4, 1.7, 10, 0, 15.5, 0, DOME));
+      parts.push(cyl(0.12, 0.5, 1.6, 6, 0, 17.0, 0, MARBLE));
+      return merge(parts);
+    },
+    /** The Puerta de Alcala, spanning: five openings, the road takes one. */
+    puertaAlcala: function () {
+      const parts = [];
+      const S = 0xe6dcc6, S2 = 0xd2c4a8, DARK = 0x6a5f4e;
+      for (const sx of [-1, 1]) {
+        for (const cx of [12.6, 17.2]) {
+          for (const cz of [-2.2, 2.2]) {
+            parts.push(cyl(0.85, 1.05, 12.4, 10, sx * cx, 6.2, cz, S));
+            parts.push(bx(2.4, 0.6, 2.4, sx * cx, 0.3, cz, S2));
+          }
+        }
+        parts.push(bx(10.4, 2.4, 7.0, sx * 14.9, 14.0, 0, S));
+        parts.push(bx(4.2, 2.2, 1.0, sx * 14.9, 16.3, 0, S2));
+      }
+      // The centre attic over the road; soffit 14.2, clear of OVERHEAD_Y.
+      parts.push(bx(24.0, 2.4, 7.0, 0, 15.4, 0, S));
+      parts.push(bx(9.0, 2.6, 1.2, 0, 17.9, 0, S2));
+      parts.push(bx(44.0, 0.9, 7.8, 0, 16.9, 0, DARK));
+      return merge(parts);
+    },
+    /** The Metropolis corner: white rotunda, slate dome, gold victory. */
+    metropolis: function () {
+      const parts = [];
+      const STONE = 0xf0e8d8, STONE2 = 0xdcd0ba, SLATE = 0x3a4250, GOLD = 0xf0c040;
+      parts.push(bx(9.0, 12.0, 9.0, 0, 6.0, 0, STONE));
+      parts.push(cyl(4.4, 4.8, 5.0, 12, 0, 14.5, 0, STONE2));
+      for (let i = 0; i < 6; i++) {
+        const a = i * Math.PI / 3;
+        parts.push(cyl(0.35, 0.4, 4.4, 6, Math.cos(a) * 4.0, 14.2, Math.sin(a) * 4.0, STONE));
+      }
+      parts.push(cyl(3.4, 4.6, 3.4, 12, 0, 18.7, 0, SLATE));
+      parts.push(cyl(0.9, 3.4, 2.4, 12, 0, 21.6, 0, SLATE));
+      parts.push(cyl(0.5, 0.8, 1.6, 6, 0, 23.4, 0, GOLD));
+      parts.push(bx(2.1, 1.0, 0.24, 0, 24.0, 0, GOLD));
+      return merge(parts);
+    },
+    /** The Burj: tiered glass taper above everything on the tour. */
+    burjKhalifa: function () {
+      const parts = [];
+      const GLASS = 0xa8c4d8, GLASS2 = 0x8cabc4, STEEL = 0xd8e0e8;
+      parts.push(cyl(5.2, 6.2, 8.0, 12, 0, 4.0, 0, GLASS2));
+      parts.push(cyl(4.0, 5.2, 8.0, 12, 0, 12.0, 0, GLASS));
+      parts.push(cyl(2.9, 4.0, 8.0, 12, 0, 20.0, 0, GLASS2));
+      parts.push(cyl(1.9, 2.9, 7.0, 10, 0, 27.5, 0, GLASS));
+      parts.push(cyl(1.0, 1.9, 6.0, 10, 0, 34.0, 0, GLASS2));
+      parts.push(cyl(0.4, 1.0, 4.5, 8, 0, 39.2, 0, STEEL));
+      parts.push(cyl(0.06, 0.4, 4.5, 6, 0, 43.7, 0, STEEL));
+      return merge(parts);
+    },
+    /** The sail hotel on its island. */
+    burjAlArab: function () {
+      const parts = [];
+      const SAIL = 0xf4f4f0, SAIL2 = 0xe2e4e2, GLASS = 0x4a7a9e, SEA = 0x2f96c8;
+      parts.push(cyl(7.0, 7.6, 0.8, 12, 0, 0.4, 0, SEA));
+      parts.push(bx(1.6, 21.0, 4.8, -2.6, 10.9, 0, SAIL));
+      parts.push(bx(1.6, 21.0, 4.8, 2.6, 10.9, 0, SAIL));
+      parts.push(bx(4.6, 19.0, 2.6, 0, 9.5, -0.9, GLASS));
+      parts.push(bx(5.8, 1.2, 5.0, 0, 21.0, 0, SAIL2));
+      parts.push(cyl(0.14, 0.4, 5.0, 6, -2.6, 23.9, 0, SAIL2));
+      parts.push(bx(3.2, 0.5, 3.2, 0, 22.0, 0, SAIL));
+      return merge(parts);
+    },
+    /** The Pearl Tower: spheres on a concrete stem over the river. */
+    pearlTower: function () {
+      const parts = [];
+      const CONC = 0xc8ccd4, PEARL = 0xb05a78, PEARL2 = 0x8a4460;
+      for (const a of [0, 2.094, 4.189]) {
+        parts.push(cyl(0.7, 0.9, 9.0, 8, Math.cos(a) * 3.2, 4.5, Math.sin(a) * 3.2, CONC));
+      }
+      parts.push(cyl(4.6, 3.4, 4.6, 12, 0, 10.5, 0, PEARL));
+      parts.push(cyl(3.4, 4.6, 3.0, 12, 0, 7.4, 0, PEARL2));
+      parts.push(cyl(1.5, 1.7, 12.0, 8, 0, 18.5, 0, CONC));
+      parts.push(cyl(2.6, 2.0, 2.6, 12, 0, 25.5, 0, PEARL));
+      parts.push(cyl(2.0, 2.6, 2.0, 12, 0, 23.2, 0, PEARL2));
+      parts.push(cyl(0.3, 0.9, 6.5, 6, 0, 30.0, 0, CONC));
+      return merge(parts);
+    },
+    /** The twisting supertall, read as a glass taper with a fin. */
+    shanghaiTower: function () {
+      const parts = [];
+      const GLASS = 0x9ab8c8, GLASS2 = 0x7c9cb4;
+      parts.push(cyl(4.4, 5.0, 11.0, 12, 0, 5.5, 0, GLASS));
+      parts.push(cyl(3.5, 4.4, 10.0, 12, 0, 16.0, 0, GLASS2));
+      parts.push(cyl(2.5, 3.5, 9.0, 12, 0, 25.5, 0, GLASS));
+      parts.push(cyl(1.5, 2.5, 7.0, 10, 0, 33.5, 0, GLASS2));
+      parts.push(bx(0.7, 34.0, 1.9, 3.3, 17.0, 0, GLASS2));
+      parts.push(cyl(0.5, 1.5, 3.0, 8, 0, 38.5, 0, GLASS));
+      return merge(parts);
+    },
+    /** A Bund block: granite revival facade with its clock tower. */
+    bundRow: function () {
+      const parts = [];
+      const GRAN = 0xcfc4ac, GRAN2 = 0xbcb096, DARK = 0x4a4438, FACE = 0xf4eede;
+      parts.push(bx(22.0, 11.0, 9.0, 0, 5.5, 0, GRAN));
+      parts.push(bx(23.0, 1.2, 9.8, 0, 11.6, 0, GRAN2));
+      for (let i = 0; i < 6; i++) parts.push(cyl(0.45, 0.5, 7.0, 8, -7.5 + i * 3.0, 6.5, 4.6, GRAN2));
+      parts.push(bx(5.0, 7.0, 5.0, 6.0, 15.7, 0, GRAN));
+      parts.push(bx(1.9, 1.9, 0.3, 6.0, 17.4, 2.55, FACE));
+      parts.push(bx(1.9, 1.9, 0.3, 6.0, 17.4, -2.55, FACE));
+      parts.push(cyl(1.6, 2.9, 2.2, 8, 6.0, 20.3, 0, DARK));
+      return merge(parts);
+    },
+    /** The Gateway of India: basalt arch, corner turrets, the water side. */
+    gatewayIndia: function () {
+      const parts = [];
+      const BAS = 0xb89468, BAS2 = 0xa07e54, TRIM = 0xd8bc90;
+      for (const sx of [-1, 1]) {
+        parts.push(bx(4.4, 15.0, 6.5, sx * 6.6, 7.5, 0, BAS));
+        parts.push(cyl(1.3, 1.5, 3.4, 8, sx * 6.6, 16.6, 2.2, BAS2));
+        parts.push(cyl(0.2, 1.5, 1.7, 8, sx * 6.6, 19.2, 2.2, TRIM));
+        parts.push(cyl(1.3, 1.5, 3.4, 8, sx * 6.6, 16.6, -2.2, BAS2));
+        parts.push(cyl(0.2, 1.5, 1.7, 8, sx * 6.6, 19.2, -2.2, TRIM));
+      }
+      parts.push(bx(17.6, 3.4, 6.5, 0, 14.3, 0, BAS));
+      parts.push(bx(18.6, 1.2, 7.1, 0, 16.4, 0, TRIM));
+      parts.push(cyl(4.6, 4.6, 6.6, 12, 0, 12.6, 0, BAS2));
+      return merge(parts);
+    },
+    /** The Victorian terminus: wings, arcade, the great dome. */
+    cstStation: function () {
+      const parts = [];
+      const STONE = 0xc9b490, STONE2 = 0xb09a74, ROOF = 0x6a5444, DOME = 0x8a7458;
+      parts.push(bx(24.0, 8.5, 9.0, 0, 4.25, 0, STONE));
+      for (let i = 0; i < 7; i++) parts.push(bx(1.5, 3.2, 0.5, -9.0 + i * 3.0, 4.2, 4.5, ROOF));
+      for (const sx of [-1, 1]) {
+        parts.push(bx(4.6, 11.5, 9.6, sx * 10.2, 5.75, 0, STONE2));
+        parts.push(cyl(0.4, 2.6, 2.6, 8, sx * 10.2, 12.8, 0, ROOF));
+      }
+      parts.push(bx(7.5, 4.0, 9.6, 0, 10.5, 0, STONE2));
+      parts.push(cyl(3.0, 3.6, 2.2, 12, 0, 13.6, 0, DOME));
+      parts.push(cyl(0.5, 3.0, 2.6, 12, 0, 16.0, 0, DOME));
+      parts.push(cyl(0.1, 0.5, 1.5, 6, 0, 17.9, 0, STONE));
+      return merge(parts);
+    },
+    /** The Koutoubia: the red square minaret over the palms. */
+    koutoubia: function () {
+      const parts = [];
+      const RED = 0xc08a5e, RED2 = 0xac764c, BAND = 0xe0c8a0, GREEN = 0x4a7a58, GOLD = 0xf0c040;
+      parts.push(bx(6.4, 22.0, 6.4, 0, 11.0, 0, RED));
+      parts.push(bx(6.8, 1.1, 6.8, 0, 17.5, 0, BAND));
+      for (const yy of [6.0, 11.0]) parts.push(bx(1.7, 2.6, 0.4, 0, yy, 3.25, RED2));
+      parts.push(bx(6.9, 1.4, 6.9, 0, 22.6, 0, BAND));
+      parts.push(bx(3.4, 4.2, 3.4, 0, 25.1, 0, RED2));
+      parts.push(cyl(0.5, 1.3, 1.7, 8, 0, 28.0, 0, GREEN));
+      for (let i = 0; i < 3; i++) parts.push(cyl(0.55 - i * 0.16, 0.55 - i * 0.16, 0.5, 8, 0, 29.0 + i * 0.55, 0, GOLD));
+      return merge(parts);
+    },
+    /** A medina gate: horseshoe arch in the red wall. */
+    babAgnaou: function () {
+      const parts = [];
+      const RED = 0xb87a52, RED2 = 0xa06844, TRIM = 0xe0c8a0, SHADOW = 0x3a2820;
+      parts.push(bx(18.0, 11.0, 3.4, 0, 5.5, 0, RED));
+      parts.push(bx(19.0, 1.4, 4.0, 0, 11.7, 0, RED2));
+      for (let i = 0; i < 5; i++) parts.push(bx(1.2, 1.6, 1.0, -7.2 + i * 3.6, 12.9, 0, RED));
+      parts.push(bx(6.6, 8.2, 3.8, 0, 4.1, 0, TRIM));
+      parts.push(bx(4.6, 6.6, 4.0, 0, 3.3, 0, SHADOW));
+      parts.push(cyl(2.35, 2.35, 4.05, 10, 0, 6.6, 0, SHADOW));
+      return merge(parts);
+    },
+    /** The National Theatre: the flared drum under its saddle rim. */
+    natTheatre: function () {
+      const parts = [];
+      const SHELL = 0xb8bcc4, SHELL2 = 0x9aa0aa, GLASS = 0x4a5a6a, RIM = 0xd8dce2;
+      parts.push(cyl(7.4, 8.4, 1.6, 12, 0, 0.8, 0, SHELL2));
+      parts.push(cyl(8.6, 7.2, 5.4, 12, 0, 4.3, 0, SHELL));
+      parts.push(cyl(8.2, 8.2, 0.7, 12, 0, 5.2, 0, GLASS));
+      parts.push(cyl(9.6, 8.8, 1.5, 12, 0, 7.75, 0, RIM));
+      parts.push(cyl(2.6, 6.2, 2.2, 12, 0, 9.6, 0, SHELL2));
+      return merge(parts);
+    },
+    /** Cocoa House: the modernist slab that named Lagos's skyline. */
+    cocoaHouse: function () {
+      const parts = [];
+      const SLAB = 0xd8cfc0, FIN = 0xb8ae9c, GLASS = 0x45566a;
+      parts.push(bx(8.0, 24.0, 6.0, 0, 12.0, 0, SLAB));
+      for (let i = 0; i < 5; i++) parts.push(bx(0.5, 24.0, 6.4, -3.2 + i * 1.6, 12.0, 0, FIN));
+      parts.push(bx(8.4, 0.9, 6.4, 0, 24.5, 0, FIN));
+      parts.push(bx(6.0, 20.0, 0.4, 0, 11.0, 3.1, GLASS));
+      parts.push(bx(6.0, 20.0, 0.4, 0, 11.0, -3.1, GLASS));
       return merge(parts);
     },
   };
@@ -19059,6 +19457,10 @@ MR.World = (function () {
       ATHENS: 'KALOS ORISATE ATHINA', SEOUL: 'HWANYEONG SEOUL',
       SINGAPORE: 'SELAMAT DATANG SINGAPURA', BUENOSAIRES: 'BIENVENIDOS A BUENOS AIRES',
       NAIROBI: 'KARIBU NAIROBI',
+      TORONTO: 'WELCOME TO TORONTO', MEXICOCITY: 'BIENVENIDOS A M\u00c9XICO',
+      MADRID: 'BIENVENIDOS A MADRID', DUBAI: 'MARHABA DUBAI',
+      SHANGHAI: 'HUANYING SHANGHAI', MUMBAI: 'SWAGAT AAHE MUMBAI',
+      MARRAKESH: 'MARHBA BIK MARRAKESH', LAGOS: 'E KAABO LAGOS',
     };
     if (GREETINGS[SETS[0].tag]) {
       structures.push({ z: 100, kind: 'greet', label: GREETINGS[SETS[0].tag], bg: '#1b1633', fg: '#fffdf5' });

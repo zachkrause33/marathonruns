@@ -963,6 +963,9 @@ MR.Audio = (function () {
       LONDON: 'birds', PARIS: 'birds', BERLIN: 'birds',
       SEOUL: 'birds', TOKYO: 'birds', NAIROBI: 'birds',
       ROME: 'cicadas', ATHENS: 'cicadas', BUENOSAIRES: 'cicadas',
+      TORONTO: 'birds', MEXICOCITY: 'birds', MADRID: 'cicadas',
+      DUBAI: 'gulls', MUMBAI: 'gulls', LAGOS: 'gulls',
+      MARRAKESH: 'cicadas',
     };
     let place = '', placeWild = false, placeTimer = null;
     function placeCue() {

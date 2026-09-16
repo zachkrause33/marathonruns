@@ -9500,3 +9500,34 @@ a scan. No diet needed where the bytes already cache.
 
 Gates: 8/8 shots, 90+90 courses, simulate PASS, full-tour contrast
 sweep OK.
+
+## 125. Twenty-five (2026-09-16)
+
+The owner: "After this add 8 more cities to get to a clean 25." The
+eight: TORONTO (the CN needle and the dome at its foot, maple
+avenues turning), MEXICO CITY (the golden Angel on her column,
+jacaranda over the road, Bellas Artes' orange dome, a 2:10:54
+record honest about 2,240m of altitude), MADRID (the Puerta de
+Alcala spanning the road, the Metropolis dome with its gold
+victory), DUBAI (the Burj needle above everything on the tour at 44
+units, the sail hotel on its island, sand to the horizon, its real
+2:03:34), SHANGHAI (Pearl Tower spheres, the twisting supertall,
+granite Bund rows in river haze), MUMBAI (the Gateway arch on the
+water side, the Victorian terminus, Marine Drive palms), MARRAKESH
+(the Koutoubia minaret, a horseshoe gate in the red wall, the whole
+city in pink-red pise) and LAGOS (the flared drum of the National
+Theatre, Cocoa House fins, gold-brown lagoon water, and at 2:13:30
+the friendliest bronze on the roster, which the tour needed).
+
+Sixteen new code-art landmark builders, all sides by construction.
+Regions rebalance to 6/8/7/4; greetings, wildlife ambience and
+weather moods extend to all eight; Dubai and Toronto carry their
+real course records, the rest set the way Seoul's and Cape Town's
+were. Roads all stay in the neutral tarmac family -- the lesson
+Nairobi taught THIS MORNING -- and the contrast sweep confirms all
+eight clear the legibility gate with margins +0.067..+0.083,
+nothing thin. The picker sheet shows 25 bubbles, the map 25 pins,
+the Europe lens now magnifying 8.
+
+Gates: 8/8 shots, 90+90 courses (chosen-city roster now spans 25),
+simulate PASS, sharecard PASS, 8-city contrast sweep OK.

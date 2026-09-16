@@ -441,7 +441,17 @@ MR.HUD = (function () {
           world's race, running your own pick, or spent until tomorrow.
         -->
         <div id="pickLine" class="hidden"></div>
-        <button id="pickBtn" type="button" class="textBtn hidden">CHOOSE YOUR CITY · WORLD MAP</button>
+        <!--
+          THE RACE PICKER (owner, 2026-09-16: "Home page needs a button
+          that says: choose your race for the day. From there a drop down
+          or bubble screen giving you your options."). The button opens a
+          bubble sheet right here on the panel -- seventeen chips, the
+          featured race first and flagged, each carrying its tier and the
+          real record it is worth -- so choosing costs one tap and zero
+          navigation. The map stays one level deeper for the scenic route.
+        -->
+        <button id="pickBtn" type="button" class="cta2 hidden">CHOOSE YOUR RACE FOR THE DAY</button>
+        <div id="racePick" class="hidden"></div>
 
         <!--
           WHAT THE GAME REMEMBERS.
@@ -855,7 +865,7 @@ MR.HUD = (function () {
       stampCity: q('stampCity'), stampWord: q('stampWord'),
       stampDate: q('stampDate'), stampCtx: q('stampCtx'),
       cityBar: q('cityBar'), cityBarLab: q('cityBarLab'), cityBarTime: q('cityBarTime'),
-      pickLine: q('pickLine'), pickBtn: q('pickBtn'),
+      pickLine: q('pickLine'), pickBtn: q('pickBtn'), racePick: q('racePick'),
       againBtn: q('againBtn'),
       count: q('count'), countVal: q('countVal'),
       pauseBtn: q('pauseBtn'), pausePanel: q('pausePanel'),
@@ -1160,26 +1170,75 @@ MR.HUD = (function () {
 
       // The pins, southernmost drawn last so an overlapping pair stacks the
       // way paper pins would. Each drops onto the paper when the page opens
-      // (staggered), and the tap target is far larger than the pin.
-      const order = pool.slice().filter(function (s) { return s.latlon; })
-        .sort(function (a, b) { return b.latlon[0] - a.latlon[0]; });
-      const pins = order.map(function (s, i) {
-        const c = seen[s.name];
-        const tier = stampTier(s, c);
-        const xy = mapPt(s.latlon[1], s.latlon[0]).split(',');
-        const isSel = s.tag === mapSel;
-        const isLoaded = s.tag === loadedTag;
-        return '<g class="pinP' + (isSel ? ' sel' : '') + '" transform="translate(' + xy[0] + ',' + xy[1] + ')'
-          + (isSel ? ' scale(1.3)' : '') + '">'
-          + '<ellipse class="pinShadow" cx="0.6" cy="0.7" rx="3.4" ry="1.2"/>'
-          + (isLoaded ? '<circle class="pinPulse" cy="-1" r="6"/>' : '')
-          + '<g class="pinDrop"' + (animate ? ' style="animation-delay:' + (0.05 * i).toFixed(2) + 's"' : '') + '>'
-          + '<path class="pin ' + tier + '" d="M0 0C-4.2-6.2-6.5-8.4-6.5-12A6.5 6.5 0 1 1 6.5-12C6.5-8.4 4.2-6.2 0 0Z"/>'
-          + '<circle class="pinHole" cx="0" cy="-12" r="2.5"/>'
-          + '</g>'
-          + '<circle class="pinHit" r="11" cy="-9" data-pin="' + s.tag + '"><title>' + s.name + '</title></circle>'
-          + '</g>';
-      }).join('');
+      // (staggered), and the tap target is far larger than the pin. One
+      // renderer, because the Europe inset below draws the same pins again
+      // at magnification and the two must never disagree.
+      const pinsFor = function (list, labelSel, ps, hitR) {
+        ps = ps || 1; hitR = hitR || 11;
+        const order = list.slice().filter(function (s) { return s.latlon; })
+          .sort(function (a, b) { return b.latlon[0] - a.latlon[0]; });
+        return order.map(function (s, i) {
+          const c = seen[s.name];
+          const tier = stampTier(s, c);
+          const xy = mapPt(s.latlon[1], s.latlon[0]).split(',');
+          const isSel = s.tag === mapSel;
+          const isLoaded = s.tag === loadedTag;
+          return '<g class="pinP' + (isSel ? ' sel' : '') + '" transform="translate(' + xy[0] + ',' + xy[1] + ')'
+            + (isSel ? ' scale(1.3)' : '') + '">'
+            + '<g' + (ps !== 1 ? ' transform="scale(' + ps + ')"' : '') + '>'
+            + '<ellipse class="pinShadow" cx="0.6" cy="0.7" rx="3.4" ry="1.2"/>'
+            + (isLoaded ? '<circle class="pinPulse" cy="-1" r="6"/>' : '')
+            + '<g class="pinDrop"' + (animate ? ' style="animation-delay:' + (0.05 * i).toFixed(2) + 's"' : '') + '>'
+            + '<path class="pin ' + tier + '" d="M0 0C-4.2-6.2-6.5-8.4-6.5-12A6.5 6.5 0 1 1 6.5-12C6.5-8.4 4.2-6.2 0 0Z"/>'
+            + '<circle class="pinHole" cx="0" cy="-12" r="2.5"/>'
+            + '</g></g>'
+            + (isSel && labelSel ? '<text class="pinLab" y="-22">' + s.name + '</text>' : '')
+            + '<circle class="pinHit" r="' + hitR + '" cy="' + (-9 * ps) + '" data-pin="' + s.tag + '"><title>' + s.name + '</title></circle>'
+            + '</g>';
+        }).join('');
+      };
+      const pins = pinsFor(pool, true);
+
+      // The cartographer's furniture: a few wave strokes in the open
+      // water and the region names in faint small caps -- the marks that
+      // make a paper map read as a map rather than a diagram.
+      let waves = '';
+      for (const [wx, wy] of [[52, 108], [120, 122], [230, 118], [318, 72], [40, 46], [300, 125]]) {
+        waves += '<path class="wave" d="M' + wx + ' ' + wy + 'q4 -2.6 8 0 q4 2.6 8 0"/>';
+      }
+      const regLabels =
+        '<text class="mapLab" x="78" y="52">AMERICAS</text>'
+        + '<text class="mapLab" x="252" y="42">ASIA-PACIFIC</text>'
+        + '<text class="mapLab" x="204" y="94">AFRICA</text>';
+
+      /**
+       * THE EUROPE INSET. Six of seventeen pins live inside twenty
+       * degrees of longitude, and at phone width they were a single
+       * golden blob nobody could tap. A paper map solves this the way
+       * paper maps always have: a magnifier circle in the empty
+       * Atlantic, the same land and the same pins at 2.6x, tappable --
+       * the delegation reads data-pin wherever it is drawn.
+       */
+      /* Pins inside the magnifier counter-scale to 0.5x so that, after the
+       * 2.6x lens, they render only ~30% larger than main-map pins while
+       * their POSITIONS spread the full 2.6x -- a full-size pin under the
+       * lens would be 34 units tall, taller than the lens itself. The hit
+       * circle is outside the counter-scale and sized so its on-screen
+       * radius (~10.4) matches the main map's. */
+      const EU = pool.filter(function (s) { return s.region === 'EUROPE'; });
+      const eupins = pinsFor(EU, false, 0.5, 4);
+      const ICX = 63, ICY = 92, IR = 33, ISC = 2.6, ECX = 190, ECY = 46;
+      const inset =
+        '<g class="inset">'
+        + '<clipPath id="euclip"><circle cx="' + ICX + '" cy="' + ICY + '" r="' + IR + '"/></clipPath>'
+        + '<circle class="insetSea" cx="' + ICX + '" cy="' + ICY + '" r="' + IR + '"/>'
+        + '<g clip-path="url(#euclip)">'
+        + '<g transform="translate(' + ICX + ',' + ICY + ') scale(' + ISC + ') translate(' + (-ECX) + ',' + (-ECY) + ')">'
+        + polys + '<g class="insetPins">' + eupins + '</g>'
+        + '</g></g>'
+        + '<circle class="insetRing" cx="' + ICX + '" cy="' + ICY + '" r="' + IR + '"/>'
+        + '<text class="mapLab insetLab" x="' + ICX + '" y="' + (ICY + IR + 7) + '">EUROPE</text>'
+        + '</g>';
 
       const W = 360 + MAP_PAD * 2, H = MAP_H + MAP_PAD * 2;
       n.mapBox.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="World tour map"'
@@ -1187,8 +1246,8 @@ MR.HUD = (function () {
         + '<rect class="paper" x="0" y="0" width="' + W + '" height="' + H + '" rx="5"/>'
         + '<clipPath id="mclip"><rect x="0" y="' + MAP_Y0 + '" width="360" height="' + MAP_H + '" rx="3"/></clipPath>'
         + '<g transform="translate(' + MAP_PAD + ',' + (MAP_PAD - MAP_Y0) + ')">'
-        + '<g clip-path="url(#mclip)">' + folds + polys + trail + '</g>'
-        + pins
+        + '<g clip-path="url(#mclip)">' + folds + waves + polys + trail + regLabels + '</g>'
+        + pins + inset
         + '</g></svg>';
     }
 
@@ -1244,7 +1303,7 @@ MR.HUD = (function () {
           if (tier === 'gold') { gold++; rGold++; }
           if (c) { run++; rRun++; }
           const word = tier === 'gold' ? 'GOLD' : tier === 'bronze' ? 'BRONZE' : tier === 'ink' ? 'RUN' : 'NEW ROAD';
-          const cr = s.rec ? 'CR ' + Pace.clock(s.rec) + ' · ' + s.holder : '';
+          const cr = s.rec ? Pace.clock(s.rec) + ' · ' + s.holder : '';
           const d = doorState(sum, s, loadedTag);
           const door = d.door, note = d.note;
           return '<' + (door ? 'button type="button"' : 'div') + ' class="stampC ' + tier
@@ -1254,7 +1313,7 @@ MR.HUD = (function () {
             + '<span class="sTier">' + word
             + (s.tag === featTag ? ' <span class="sFeat">TODAY\'S RACE</span>' : '') + '</span>'
             + (c ? '<span class="sBest num">' + Pace.clock(c.best) + '</span>' : '<span class="sBest num">&mdash;</span>')
-            + '<span class="sCr num">' + cr + '</span>'
+            + (cr ? '<span class="sCrLab">RACE RECORD</span><span class="sCr num">' + cr + '</span>' : '')
             + '<span class="sDays">' + (c ? c.runs + (c.runs === 1 ? ' RUN · ' : ' RUNS · ') : '') + note + '</span>'
             + '</' + (door ? 'button' : 'div') + '>';
         }).join('');
@@ -1414,7 +1473,43 @@ MR.HUD = (function () {
     };
 
     n.histBtn.addEventListener('click', function () { openHist(n.startPanel); });
-    n.pickBtn.addEventListener('click', function () { openHist(n.startPanel); });
+    /**
+     * The bubble sheet. Rebuilt on every open from the same doorState
+     * the wall and the map card use, so all three doors always agree
+     * about the one-a-day rule. The featured race leads and is flagged;
+     * each bubble carries the stamp tier and the city's REAL record.
+     */
+    function drawRacePick() {
+      const pool = (MR.Course && MR.Course.SETTINGS) ? MR.Course.SETTINGS : [];
+      const sum = lastSum;
+      const seen = (sum && sum.cities) || {};
+      const loadedTag = course && course.settings && course.settings.length ? course.settings[0].tag : null;
+      const featTag = sum && sum.dateKey && MR.Course.pickSettings
+        ? MR.Course.pickSettings(sum.dateKey)[0].tag : null;
+      const ordered = pool.slice().sort(function (a, b) {
+        return (b.tag === featTag) - (a.tag === featTag);
+      });
+      n.racePick.innerHTML = ordered.map(function (s) {
+        const c = seen[s.name];
+        const tier = stampTier(s, c);
+        const d = doorState(sum, s, loadedTag);
+        const cls = 'raceB ' + tier + (d.door || s.tag === loadedTag ? '' : ' shut');
+        return '<button type="button" class="' + cls + '"'
+          + (d.door ? ' data-city="' + s.tag + '"' : '') + '>'
+          + '<span class="rbCity">' + s.name
+          + (s.tag === featTag ? ' <span class="sFeat">TODAY\'S RACE</span>' : '') + '</span>'
+          + '<span class="rbRec num">' + (s.rec ? 'RECORD ' + Pace.clock(s.rec) : '') + '</span>'
+          + '<span class="rbNote">' + (s.tag === loadedTag ? 'AT THE LINE' : d.door ? 'RUN IT' : d.note) + '</span>'
+          + '</button>';
+      }).join('');
+    }
+    n.pickBtn.addEventListener('click', function () {
+      const open = n.racePick.classList.contains('hidden');
+      if (open) drawRacePick();
+      n.racePick.classList.toggle('hidden', !open);
+      requestAnimationFrame(markScroll);
+    });
+    n.racePick.addEventListener('click', cityClick(n.racePick));
 
     /**
      * The start panel's one line about the day's choice: whose race the

@@ -9200,3 +9200,56 @@ mudflaps. The envelope guard earned its keep once more mid-build
 the guard). The cargo-truck scan is retired, not deleted.
 
 Gates: 8/8 shots, 90+90 courses, simulate PASS.
+
+## 114. The front door, the map that got a magnifier, and the city that says hello (2026-09-16)
+
+Owner: "Home page needs a button that says: choose your race for the
+day. From there a drop down or bubble screen giving you your options.
+Map needs to be interactive and look better. Passport needs to clearly
+state the race record for each city. Find ways to make the city look
+better at the start. Think about key markers, language, scenery" --
+reviewed through four lenses (marketing, behavioral, historian,
+geographer) and shipped as one batch.
+
+THE HOME PAGE LEADS WITH THE CHOICE. A "CHOOSE YOUR RACE FOR THE DAY"
+button sits on the start panel; tapping it unfolds a bubble sheet of
+all seventeen cities -- the featured city first with a TODAY'S RACE
+chip, then every other city as a chip carrying its name, its race
+record, and its state (RUN IT / AT THE LINE / spent). Tier is worn on
+the border: bronze copper, gold accent. The chips ride the same
+data-city delegation the map pins use, so one navigation path serves
+both.
+
+THE MAP GREW A MAGNIFIER. Seven of seventeen pins live inside twenty
+degrees of longitude and at phone width they were one golden blob. A
+paper map solves this the way paper maps always have: a lens circle in
+the Atlantic showing Europe at 2.6x, same land, same pins, tappable --
+drawn by the SAME pin renderer as the main map so the two can never
+disagree. Pins inside the lens counter-scale to 0.5x (a full-size pin
+under a 2.6x lens is taller than the lens) and their hit circles sit
+outside the counter-scale, sized to the same on-screen radius as the
+main map's. The selected pin now says its NAME on the paper (ink with
+a paper stroke), waves mark the open water, and the region names sit
+in faint letterspaced caps.
+
+THE PASSPORT SAYS THE NUMBER. Every stamp now carries RACE RECORD as
+a labelled line -- time, holder, year, WR where it is the world record
+-- on spent and unvisited stamps alike, so the wall reads as a table
+of what there is to beat.
+
+THE CITY SAYS HELLO IN ITS OWN LANGUAGE. One banner gantry, 70 units
+past the start arch, on the pooled mile-banner frame: WILLKOMMEN IN
+BERLIN, BIENVENUE A PARIS, G'DAY SYDNEY, KARIBU NAIROBI, SELAMAT
+DATANG SINGAPURA, BIENVENIDOS A BUENOS AIRES. Canvas type measured
+and shrunk to fit (twelve to twenty-six characters); CJK and Greek
+greetings romanized rather than gambling on device glyph sets. z=100
+is measured against every sightline rule: outside mile 1's protected
+band, before the first footbridge.
+
+The historian and geographer pass found the scenery axis already
+honest -- Buenos Aires runs jacaranda-purple trees over the brown Rio
+de la Plata, Nairobi red earth under umbrella acacias, Rome umbrella
+pines, Paris pollarded planes, Amsterdam its canal run -- and the
+banner was the missing language layer, not a repaint.
+
+Gates: 8/8 shots, 90+90 courses, simulate PASS.

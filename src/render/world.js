@@ -1033,6 +1033,35 @@ MR.World = (function () {
   }
 
   /**
+   * The greeting banner's texture. It differs from labelTexture in exactly
+   * one way: the text is measured and the type shrunk to fit, because the
+   * greetings run from twelve characters (KARIBU NAIROBI) to twenty-six
+   * (BIENVENIDOS A BUENOS AIRES) and a fixed 0.60 em would run the long ones
+   * off both ends of the canvas. Canvas text is a system font, not the
+   * page's subset font, so accented Latin (À, È) renders fine; the CJK and
+   * Greek greetings are romanized because a headless or low-end device
+   * without those glyph sets would draw tofu boxes over the start of the
+   * race, which is worse than romanization.
+   */
+  function greetTexture(text, bg, fg) {
+    const c = canvas(1024, 224);
+    const g = c.getContext('2d');
+    g.fillStyle = bg; g.fillRect(0, 0, c.width, c.height);
+    g.strokeStyle = fg; g.lineWidth = 10;
+    g.strokeRect(16, 16, c.width - 32, c.height - 32);
+    g.fillStyle = fg;
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    const fam = 'ui-sans-serif, system-ui, -apple-system, Arial, sans-serif';
+    let px = Math.floor(c.height * 0.52);
+    g.font = `900 ${px}px ${fam}`;
+    const max = c.width - 96;
+    const w = g.measureText(text).width;
+    if (w > max) { px = Math.floor(px * max / w); g.font = `900 ${px}px ${fam}`; }
+    g.fillText(text, c.width / 2, c.height / 2 + px * 0.05);
+    return texture(c);
+  }
+
+  /**
    * THE MILE MARKER'S OWN LABEL, and it is set differently from every other
    * sign in the game for one measured reason.
    *
@@ -18914,6 +18943,33 @@ MR.World = (function () {
     // Far enough out that the player runs through it rather than starting
     // underneath it, which is where the camera would never see it at all.
     structures.push({ z: 30, kind: 'arch', label: 'START', sub: course.key, bg: '#1b1633', fg: '#ffe45e' });
+    /**
+     * THE CITY SAYS HELLO IN ITS OWN LANGUAGE. One gantry, 70 units past the
+     * start arch -- three seconds into the run, when the player is settled
+     * and looking down the road -- carrying the greeting a real race hangs
+     * over its first kilometre. It is the cheapest possible statement of
+     * "you are somewhere specific": one pooled banner frame the mile markers
+     * already pay for, one canvas texture.
+     *
+     * z = 100 is measured against every sightline rule in this file: outside
+     * mile 1's protected band (145 to 266), before the first footbridge
+     * (300), and the only landmark nearer is the side piece at 55, which
+     * does not span the road.
+     */
+    const GREETINGS = {
+      BOSTON: 'WELCOME TO BOSTON', LONDON: 'WELCOME TO LONDON',
+      BERLIN: 'WILLKOMMEN IN BERLIN', CHICAGO: 'WELCOME TO CHICAGO',
+      NEWYORK: 'WELCOME TO NEW YORK', TOKYO: 'YOKOSO TOKYO',
+      SYDNEY: "G'DAY SYDNEY", PARIS: 'BIENVENUE À PARIS',
+      VALENCIA: 'BENVINGUTS A VALÈNCIA', AMSTERDAM: 'WELKOM IN AMSTERDAM',
+      ROME: 'BENVENUTI A ROMA', CAPETOWN: 'WELKOM IN KAAPSTAD',
+      ATHENS: 'KALOS ORISATE ATHINA', SEOUL: 'HWANYEONG SEOUL',
+      SINGAPORE: 'SELAMAT DATANG SINGAPURA', BUENOSAIRES: 'BIENVENIDOS A BUENOS AIRES',
+      NAIROBI: 'KARIBU NAIROBI',
+    };
+    if (GREETINGS[SETS[0].tag]) {
+      structures.push({ z: 100, kind: 'greet', label: GREETINGS[SETS[0].tag], bg: '#1b1633', fg: '#fffdf5' });
+    }
     structures.push({ z: DECK_FROM - 5, kind: 'abut' });
     structures.push({ z: DECK_TO + 5, kind: 'abut' });
 
@@ -19509,6 +19565,7 @@ MR.World = (function () {
         if (kind === 'footbridge') return footbridgePool;
         if (kind === 'archway') return archwayPool;
         if (kind === 'arch') return archPool;
+        if (kind === 'greet') return bannerPool;
         if (kind === 'aidTable') return aidTablePool;
         // The tempo mat, which is paint rather than furniture -- pooled here
         // only because the windowed spawn is the machinery that already knows
@@ -20379,9 +20436,17 @@ MR.World = (function () {
         // this is written on every claim -- a plate left lit from the last
         // zone would be the marking telling the player to take the wrong lane,
         // which is worse than no marking at all.
-        if (st.kind === 'arch' && obj.userData.mat) {
-          if (!st.tex) st.tex = labelTexture(st.label, st.bg, st.fg, 768, 128, st.sub);
+        if ((st.kind === 'arch' || st.kind === 'greet') && obj.userData.mat) {
+          if (!st.tex) {
+            st.tex = st.kind === 'greet'
+              ? greetTexture(st.label, st.bg, st.fg)
+              : labelTexture(st.label, st.bg, st.fg, 768, 128, st.sub);
+          }
           obj.userData.mat.map = st.tex;
+          // The pool is shared with the mile banners, which also write the
+          // color on claim; written here too so neither claimant can inherit
+          // the other's tint.
+          obj.userData.mat.color.set(0xffffff);
           obj.userData.mat.needsUpdate = true;
         }
         // Claim site 5: biome set pieces. Written last, after the per-kind

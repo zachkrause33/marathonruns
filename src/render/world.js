@@ -6095,12 +6095,50 @@ MR.World = (function () {
      * building a world by hand -- gets one pseudo-setting carrying the old
      * per-biome palette, so this file still renders the game it used to.
      */
+    /**
+     * ---- THE DAY'S WEATHER, baked into the look ONCE --------------------
+     *
+     * Same city, different light: a revisit of Rome should not be the same
+     * postcard. The date deals each city one of four moods -- clear,
+     * morning gold, overcast, violet evening -- as SMALL lerps applied to
+     * the setting's OWN sky and fog, so Tokyo's pink stays pink at dawn
+     * and Nairobi's haze stays Nairobi's under cloud.
+     *
+     * THE FAIRNESS BOUNDARY, and it is the whole design: road and ground
+     * are NEVER touched, because hazard contrast is measured against the
+     * local road and roadmap has twice recorded coats failing "on a timer"
+     * as the calendar rotated palettes. Fog moves least (<= 0.08) since it
+     * blends into everything at distance; the sky, which nothing is read
+     * against, carries the mood. Seeded off course.key so every player on
+     * a date shares the weather, and it is part of the course the way the
+     * gates are.
+     */
+    function moodLook(look, tag) {
+      const r = MR.rng.stream(course.key, 'weather/v1|' + tag).next;
+      const roll = r();
+      let mood = null;
+      if (roll < 0.45) mood = null;                                   // clear
+      else if (roll < 0.65) mood = { s0: [0xffc890, 0.10], s1: [0xffd9a0, 0.25], f: [0xffe0c0, 0.07] };
+      else if (roll < 0.85) mood = { s0: [0xbcc6cc, 0.35], s1: [0xc6ced2, 0.28], f: [0xccd2d6, 0.08] };
+      else mood = { s0: [0x6a5a9e, 0.28], s1: [0xf0b8c8, 0.22], f: [0xe0c8d8, 0.06] };
+      if (!mood) return look;
+      const mix = function (hex, m) {
+        return new THREE.Color(hex).lerp(new THREE.Color(m[0]), m[1]).getHex();
+      };
+      // A shallow copy: everything that is not sky or fog stays the SAME
+      // OBJECT, so the terraces, trees and marks read identity untouched.
+      const out = Object.assign({}, look);
+      out.sky = [mix(look.sky[0], mood.s0), mix(look.sky[1], mood.s1)];
+      out.fog = mix(look.fog, mood.f);
+      return out;
+    }
+
     const SETS = (course.settings && course.settings.length
       ? course.settings.map(function (s) {
         return {
           tag: s.tag, name: s.name,
           from: s.from * K.TOTAL_UNITS, to: s.to * K.TOTAL_UNITS,
-          look: SETTING_LOOK[s.tag] || fallbackSetting('CITY START'),
+          look: moodLook(SETTING_LOOK[s.tag] || fallbackSetting('CITY START'), s.tag),
         };
       })
       : [{ tag: '', name: '', from: 0, to: K.TOTAL_UNITS, look: null }]);

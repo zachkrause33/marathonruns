@@ -9357,3 +9357,24 @@ tier language and the line's absence. PASS, including the round-trip
 through the system clipboard.
 
 Gates: 8/8 shots, 90+90 courses, simulate PASS, sharecard PASS.
+
+## 119. The day's weather (2026-09-16)
+
+Item 5. Same city, different light: the date now deals each city one
+of four moods -- clear (45%), morning gold, overcast, violet evening
+-- baked into the setting's look ONCE at world build as small lerps
+on its OWN sky and fog, so Tokyo's pink stays pink at dawn and
+Nairobi's haze stays Nairobi's under cloud. Seeded off course.key,
+so every player on a date shares the weather the way they share the
+gates.
+
+The fairness boundary is the whole design: road and ground are never
+touched -- hazard contrast is measured against the local road, and
+this roadmap has twice recorded coats failing "on a timer" as the
+calendar rotated palettes. Fog moves least (<= 0.08 lerp) because it
+blends into everything at distance; the sky, which nothing is read
+against, carries the mood.
+
+Verified: Rome photographed across four dates shows four skies over
+a bit-identical road. Gates: 8/8 shots, 90+90 courses, simulate
+PASS.

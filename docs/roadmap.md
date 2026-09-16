@@ -9404,3 +9404,23 @@ CHEER_Z, noted here because the class of defect -- a shadowed
 module-scope const -- leaves no trace in any lint this project runs.
 
 Gates: 8/8 shots, 90+90 courses, simulate PASS.
+
+## 121. The city's own air (2026-09-16)
+
+Item 7, the geographer's one note on the sound: Berlin and Nairobi
+were sonically the same street. The smallest honest fix: one quiet
+wildlife cue every eight to eighteen seconds, chosen by where the
+race is. GULLS -- a harsh falling two-note cry -- over the harbor
+cities (Sydney, Cape Town, Singapore, Amsterdam, Boston, Valencia);
+SONGBIRDS over the park capitals (London, Paris, Berlin, Seoul,
+Tokyo), with Nairobi's pitched wider and wilder; CICADAS -- a slow
+shimmer above the vocal band -- over Rome, Athens and Buenos Aires;
+and the pure city bed for New York and Chicago, whose ambience IS
+the absence of nature.
+
+Levels at or below the bed's own 0.035, heard the way real ones are:
+at the edge of attention. Unseeded, deliberately -- ambience is
+weather for the ears, not course data. setPlace joins the API list
+so the no-audio stub stays complete.
+
+Gates: 8/8 shots, 90+90 courses, simulate PASS.

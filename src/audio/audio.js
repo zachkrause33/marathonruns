@@ -103,7 +103,7 @@ MR.Audio = (function () {
     'unlock', 'setMuted', 'setPaused', 'ambient', 'setIntensity', 'chase',
     'footstep', 'jump', 'land', 'duck', 'hit', 'clean', 'crossover', 'aid',
     'mile', 'roar', 'finish', 'countdown',
-    'aidMissed', 'recordLost', 'tier',
+    'aidMissed', 'recordLost', 'tier', 'setPlace',
   ];
 
   function silent(reason) {
@@ -939,6 +939,67 @@ MR.Audio = (function () {
     };
 
     s.ambient = ambient;
+
+    /**
+     * ---- THE PLACE, in the air --------------------------------------------
+     *
+     * The bed is the same crowd in every city, which was the geographer's
+     * one note on the sound: Berlin and Nairobi were sonically the same
+     * street. This is the smallest fix that is honestly a fix -- one quiet
+     * wildlife cue every eight to eighteen seconds, chosen by where the
+     * race is: GULLS over the harbor cities, SONGBIRDS over the park
+     * capitals (Nairobi's pitched wider and wilder), CICADAS over the hot
+     * ones, and the pure city bed for New York and Chicago, whose ambience
+     * IS the absence of nature.
+     *
+     * Levels sit at or below the bed's own 0.035 -- these are heard the way
+     * real ones are, at the edge of attention. Unseeded Math.random, on
+     * purpose: ambience is weather for the ears, not course data, and
+     * nothing downstream reads it.
+     */
+    const PLACE = {
+      SYDNEY: 'gulls', CAPETOWN: 'gulls', SINGAPORE: 'gulls',
+      AMSTERDAM: 'gulls', BOSTON: 'gulls', VALENCIA: 'gulls',
+      LONDON: 'birds', PARIS: 'birds', BERLIN: 'birds',
+      SEOUL: 'birds', TOKYO: 'birds', NAIROBI: 'birds',
+      ROME: 'cicadas', ATHENS: 'cicadas', BUENOSAIRES: 'cicadas',
+    };
+    let place = '', placeWild = false, placeTimer = null;
+    function placeCue() {
+      placeTimer = null;
+      if (place && s.started && !s.muted) {
+        if (place === 'gulls') {
+          // A two-note cry, harsh and falling, far off.
+          tone(1150 + Math.random() * 200, 0.30, 0.016, 'sawtooth', 760, { atk: 0.05 });
+          if (Math.random() < 0.6) {
+            tone(1300 + Math.random() * 200, 0.22, 0.011, 'sawtooth', 900, { at: 0.38, atk: 0.04 });
+          }
+        } else if (place === 'birds') {
+          // Two to four rising chirps; the wild variant ranges wider.
+          const n = 2 + Math.floor(Math.random() * (placeWild ? 3 : 2));
+          for (let i = 0; i < n; i++) {
+            const f0 = (placeWild ? 2200 : 2700) + Math.random() * (placeWild ? 1800 : 900);
+            tone(f0, 0.06 + Math.random() * 0.04, 0.010, 'sine', f0 + 300 + Math.random() * 300,
+              { at: i * 0.13 + Math.random() * 0.05, atk: 0.006 });
+          }
+        } else if (place === 'cicadas') {
+          // A slow shimmer high above the vocal band, swelling and gone.
+          noise(2.4 + Math.random() * 1.2, 5400 + Math.random() * 600, 9, 0.009, 'bandpass',
+            { atk: 0.9 });
+        }
+      }
+      schedulePlace();
+    }
+    function schedulePlace() {
+      if (placeTimer) { clearTimeout(placeTimer); placeTimer = null; }
+      if (!place) return;
+      placeTimer = setTimeout(placeCue, 8000 + Math.random() * 10000);
+    }
+    s.setPlace = function (tag) {
+      place = PLACE[tag] || '';
+      placeWild = tag === 'NAIROBI';
+      schedulePlace();
+    };
 
     // Any cue that throws must not take the frame with it. Every public method
     // is wrapped once, here, rather than each of them carrying a try block --

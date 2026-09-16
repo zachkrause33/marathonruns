@@ -308,6 +308,8 @@ MR.unbail = function () {
   hud.setDate(dateKey);
   hud.setCourse(course);
   if (BEAT) hud.setChallenge(BEAT);
+  // The city's own air: gulls, songbirds or cicadas over the bed.
+  audio.setPlace(course.settings && course.settings.length ? course.settings[0].tag : '');
   hud.showPerf(DEBUG);
 
   // The road profile is the course's, so the camera and the pace model read

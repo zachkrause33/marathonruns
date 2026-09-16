@@ -1490,6 +1490,18 @@ button.stampC:active { transform: scale(0.96); }
 }
 #shareBtn:active { transform: translateY(1px); }
 #shareBtn:focus-visible { outline: 3px solid #fffdf5; outline-offset: 3px; }
+/* The picture button rides beside the text one, quieter -- cream hairline
+ * rather than accent, because the text result is still the primary act. */
+#shareImgBtn {
+  display: inline-block; margin: 9px 0 0 8px;
+  background: none; border: 1px solid rgba(255, 253, 245, 0.4);
+  color: inherit;
+  font-family: inherit;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.16em;
+  padding: 11px 20px; min-height: 44px; cursor: pointer; pointer-events: auto;
+}
+#shareImgBtn:active { transform: translateY(1px); }
+#shareImgBtn:focus-visible { outline: 3px solid #fffdf5; outline-offset: 3px; }
 /* THE RECEIPT. It is inline-block beside the button rather than under it so a
  * COPIED that lands in a 320px column cannot push the card's last block down
  * the page and move the button out from under the thumb that just pressed it. */
@@ -47291,6 +47303,16 @@ MR.HUD = (function () {
           <div id="shareLegs" aria-hidden="true"></div>
           <div id="shareLine" class="num"></div>
           <button id="shareBtn" type="button">COPY RESULT</button>
+          <!--
+            THE PICTURE. The text result is what survives a message thread;
+            the CARD is what survives a story, a feed, a lock screen. Drawn
+            at share time onto a canvas nobody pays for until the tap -- the
+            same facts as the card above (city, time, stamp, six legs),
+            with the same no-spoiler rule, shipped through the same ladder:
+            share sheet with the file on touch, a plain download elsewhere,
+            and the note always says what happened.
+          -->
+          <button id="shareImgBtn" type="button">SAVE THE STAMP CARD</button>
           <div id="shareNote" role="status"></div>
           <!--
             THE LAST RESORT, AND THE REASON IT EXISTS: the button must never
@@ -47414,7 +47436,8 @@ MR.HUD = (function () {
       tomorrowHook: q('tomorrowHook'),
       debriefBtn: q('debriefBtn'), debrief: q('debrief'),
       shareBox: q('shareBox'), shareLegs: q('shareLegs'), shareLine: q('shareLine'),
-      shareBtn: q('shareBtn'), shareNote: q('shareNote'), shareText: q('shareText'),
+      shareBtn: q('shareBtn'), shareImgBtn: q('shareImgBtn'),
+      shareNote: q('shareNote'), shareText: q('shareText'),
       cityRule: q('cityRule'), stampWall: q('stampWall'), mapBox: q('mapBox'),
       mapView: q('mapView'), passView: q('passView'), mapCard: q('mapCard'),
       tabMap: q('tabMap'), tabPass: q('tabPass'), histTitle: q('histTitle'),
@@ -48637,6 +48660,145 @@ MR.HUD = (function () {
       shareCopy(text);
     });
 
+    // ---- the stamp card as a picture -------------------------------------
+
+    /**
+     * The finish, drawn once onto a 1080x1350 canvas (4:5, the portrait
+     * every feed accepts). Same facts as the card on screen, same
+     * no-spoiler rule as the text result, and the type is the system's own
+     * heavy sans -- the same choice every in-world sign already makes --
+     * because the page's embedded font is subset to the HUD's characters
+     * and a canvas asking it for a glyph it lacks gets silence.
+     *
+     * NO URL, for the reason buildShare states: it goes in the day the
+     * owner says where to point it.
+     */
+    function drawShareCard(d) {
+      const c = document.createElement('canvas');
+      c.width = 1080; c.height = 1350;
+      const g = c.getContext('2d');
+      const FAM = 'ui-sans-serif, system-ui, -apple-system, Arial, sans-serif';
+      const CREAM = '#fffdf5', ACCENT = '#ffe45e', BRONZE = '#e0955a';
+      const font = function (w, px) { g.font = w + ' ' + px + 'px ' + FAM; };
+      // Centered text that shrinks to fit rather than running off the card
+      // -- BIENVENIDOS taught this lesson to the greeting gantry already.
+      const fit = function (text, w, px, max) {
+        font(w, px);
+        const tw = g.measureText(text).width;
+        if (tw > max) font(w, Math.floor(px * max / tw));
+        return text;
+      };
+
+      g.fillStyle = '#14183a';
+      g.fillRect(0, 0, c.width, c.height);
+      g.strokeStyle = 'rgba(255, 253, 245, 0.30)';
+      g.lineWidth = 5;
+      g.strokeRect(28, 28, c.width - 56, c.height - 56);
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+
+      g.fillStyle = ACCENT;
+      font('900', 44);
+      g.fillText('M A R A T H O N   M I L E S', 540, 118);
+      g.fillStyle = 'rgba(255, 253, 245, 0.55)';
+      font('700', 30);
+      g.fillText(d.date.replace(/-/g, '.'), 540, 172);
+
+      g.fillStyle = CREAM;
+      g.fillText(fit(d.city, '900', 118, 940), 540, 292);
+
+      font('900', 216);
+      g.fillText(Pace.clock(d.t), 540, 500);
+      g.fillStyle = d.vs <= 0 ? '#4dfba0' : d.vs <= 30 ? ACCENT : 'rgba(255, 253, 245, 0.70)';
+      font('800', 44);
+      g.fillText((d.vs <= 0 ? '-' : '+') + Pace.clock(Math.abs(d.vs)) + ' VS ' + K.RECORD_LABEL, 540, 630);
+
+      // The six legs, the run's own weather report.
+      if (d.marks && d.marks.length) {
+        const COLS = ['#4dfba0', ACCENT, '#ff6b84'];
+        const S = 76, GAP = 16;
+        const x0 = 540 - (d.marks.length * S + (d.marks.length - 1) * GAP) / 2;
+        for (let i = 0; i < d.marks.length; i++) {
+          g.fillStyle = COLS[d.marks[i]] || COLS[0];
+          g.fillRect(x0 + i * (S + GAP), 712, S, S);
+        }
+      }
+
+      // The stamp, pressed at the same six degrees the card presses it.
+      const tint = d.medal === 'gold' ? ACCENT : d.medal === 'bronze' ? BRONZE : CREAM;
+      g.save();
+      g.translate(540, 1030);
+      g.rotate(-6 * Math.PI / 180);
+      g.strokeStyle = tint; g.fillStyle = tint;
+      g.lineWidth = 9;
+      const rr = function (x, y, w, h, r) {
+        if (g.roundRect) { g.beginPath(); g.roundRect(x, y, w, h, r); g.stroke(); }
+        else g.strokeRect(x, y, w, h);
+      };
+      rr(-250, -128, 500, 256, 20);
+      g.lineWidth = 3.5;
+      rr(-236, -114, 472, 228, 14);
+      g.fillText(fit(d.city, '900', 52, 420), 0, -46);
+      font('800', 34);
+      g.fillText(d.word, 0, 16);
+      g.globalAlpha = 0.75;
+      font('700', 28);
+      g.fillText(d.date.replace(/-/g, '.') + (d.revisit ? ' · REVISIT' : ''), 0, 72);
+      g.globalAlpha = 1;
+      g.restore();
+
+      g.fillStyle = 'rgba(255, 253, 245, 0.6)';
+      font('800', 30);
+      g.fillText(d.streak >= 2 ? 'DAY STREAK ' + d.streak : 'ONE RUN A DAY', 540, 1262);
+      return c;
+    }
+
+    function downloadBlob(blob, name) {
+      try {
+        const a = document.createElement('a');
+        const u = URL.createObjectURL(blob);
+        a.href = u; a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(function () { URL.revokeObjectURL(u); }, 4000);
+        shareNote('SAVED');
+      } catch (e) { shareNote('COULD NOT SAVE THE CARD', true); }
+    }
+
+    let shareImgData = null;
+    n.shareImgBtn.addEventListener('click', function () {
+      if (!shareImgData) return;
+      let cv;
+      try { cv = drawShareCard(shareImgData); }
+      catch (e) { shareNote('COULD NOT DRAW THE CARD', true); return; }
+      const name = 'marathon-miles-' + (shareImgData.city || 'run').toLowerCase().replace(/\s+/g, '-')
+        + '-' + shareImgData.date + '.png';
+      cv.toBlob(function (blob) {
+        if (!blob) { shareNote('COULD NOT DRAW THE CARD', true); return; }
+        // Same ladder as the text: the share sheet where it reaches the
+        // thread the picture is going to anyway, a plain download
+        // everywhere else, and a cancelled sheet is a change of mind.
+        const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+        if (coarse && navigator.share && navigator.canShare) {
+          let file = null, ok = false;
+          try {
+            file = new File([blob], name, { type: 'image/png' });
+            ok = navigator.canShare({ files: [file] });
+          } catch (e) { ok = false; }
+          if (ok) {
+            navigator.share({ files: [file] }).then(
+              function () { shareNote('SHARED'); },
+              function (e) {
+                if (e && e.name === 'AbortError') shareNote('');
+                else downloadBlob(blob, name);
+              });
+            return;
+          }
+        }
+        downloadBlob(blob, name);
+      }, 'image/png');
+    });
+
     // Exposed so tools/sharecard.js reads the string the button copies rather
     // than rebuilding it -- an instrument that recomputes its subject is
     // measuring itself. See correction 28 in docs/roadmap.md.
@@ -49468,6 +49630,18 @@ MR.HUD = (function () {
       // reset() that has already emptied the contact lists.
       const marks = legMarks();
       shareStr = buildShare(p, rec, marks);
+      // The picture's facts, captured HERE for the reason shareStr is: the
+      // card must be the run the player is looking at, not a reconstruction
+      // against a reset() that has already emptied the contact lists.
+      shareImgData = {
+        t: t, vs: vs, marks: marks,
+        city: st0 ? st0.name : 'GLOBAL COURSE',
+        medal: st0 && MR.Course.tierFor ? MR.Course.tierFor(t, st0.tag) : '',
+        word: st0 ? n.stampWord.textContent : Tier.of(t).name,
+        date: rec.dateKey || '',
+        revisit: !!rec.revisit,
+        streak: rec.dayStreak | 0,
+      };
       const CLS = ['clean', 'guard', 'hit'];
       n.shareLegs.innerHTML = marks.map(function (m, i) {
         // The leg's name is the accessible label and nothing more: it is not

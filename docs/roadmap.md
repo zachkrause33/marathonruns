@@ -9253,3 +9253,32 @@ pines, Paris pollarded planes, Amsterdam its canal run -- and the
 banner was the missing language layer, not a repaint.
 
 Gates: 8/8 shots, 90+90 courses, simulate PASS.
+
+## 115. The debrief (2026-09-16)
+
+The owner ordered the review list run one by one; this is item 1, the
+one every lens pointed at. The finish card stays the headline the
+third pass cut it to -- what returns is folded behind one quiet
+button, THE DEBRIEF - WHERE IT WENT, because a player who finished
++0:40 and cannot learn where it went reads the loss as randomness,
+and randomness is what makes people stop coming back.
+
+Open, it is the four questions a coach answers: THE CONTACTS (count,
+guards, and -- under the twelve-contact noise guard chapterCosts
+measured -- the erase-them-all counterfactual: "CLEAN, THIS RUN
+FINISHES 1:58:44"); THE TANK (pickups taken of total, seconds run
+dry, fuel taken full); THE LEGS (the share row's six blocks given
+names and per-leg counts, same cut so they cannot disagree); THE
+MILES (a bar strip of the run against ITSELF -- taller is slower,
+fastest and slowest named -- deliberately not graded against the
+ghost, whose early-mile comparison is the exact defect that got the
+old split table removed).
+
+Guards are priced arithmetically at GUARD_TIME; unguarded contacts by
+difference of two aid-less replays, reported against the run's own
+finish. Measured on a bot wreck: 98 contacts attributed 78+10 across
+six legs summing exactly, cost line correctly suppressed, RAN DRY
+formatted as a clock past 90s (8340 raw seconds was the screenshot
+that forced it).
+
+Gates: 8/8 shots, 90+90 courses, simulate PASS.

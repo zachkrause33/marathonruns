@@ -18968,6 +18968,50 @@ MR.World = (function () {
       scenery.sort((p, q) => p.z - q.z);
     }
 
+    /**
+     * ---- CHEER ZONES: the middle of the race gets its Wellesley ---------
+     *
+     * Every famous marathon has a place mid-race where the crowd is a wall
+     * of sound with a name -- Wellesley's scream tunnel at 13, First Avenue
+     * at 16 -- and this course's miles 8 to 18 were its quietest stretch:
+     * the lottery thins where the street walls thin, and nothing was
+     * authored there on purpose. Three zones now are: the riverside
+     * bridgehead, mid-parkland, and the parkland gate before THE WALL.
+     *
+     * Built from their OWN rng stream, deliberately: appending draws to
+     * scenery/v5 would re-roll every prop laid after the first zone, which
+     * is a whole-world shuffle nobody asked for. A separate stream leaves
+     * the shipped world byte-stable and the zones deterministic per day.
+     *
+     * s.b is the knot's distance off the rail; capped at 0.3 here so a
+     * zone packs AGAINST the barrier the way a named crowd does. Budget,
+     * measured thinking: 9 knots a side over 55 units is ~27k transient
+     * triangles and ~20 pooled draw calls in the emptiest part of the
+     * course -- the part with headroom.
+     */
+    // CHEER_Z, not CHEER: that name is the crowd pose enum at module
+    // scope, and shadowing it here put every earlier pose lookup in this
+    // function under the temporal dead zone. Found by the page, not the
+    // build -- rule 2 exists for exactly this class of throw.
+    const CHEER_Z = [0.30, 0.56, 0.68].map((f) => f * K.TOTAL_UNITS);
+    {
+      const cr = MR.rng.stream(course.key, 'cheer/v1');
+      for (const zc of CHEER_Z) {
+        for (let dz = -27; dz <= 27; dz += 6.5) {
+          for (const side of [-1, 1]) {
+            const z = zc + dz + cr.range(-1.5, 1.5);
+            scenery.push({
+              z, side, kind: 'crowd',
+              set: settingIndexAt(Math.max(0, z), cr.next()),
+              x: side * 8,
+              a: cr.next(), b: cr.next() * 0.3, c: cr.next(),
+            });
+          }
+        }
+      }
+      scenery.sort((p, q) => p.z - q.z);
+    }
+
     // How much clear road a mile marker is owed in front of and behind it.
     // Declared here rather than beside nudgeOver() below because the structure
     // loops read it and `const` does not hoist -- see the note on the function
@@ -19626,6 +19670,10 @@ MR.World = (function () {
     const api = { group, sky, mats, course };
     // See THE SCULPTED FLEET at the block defs.
     api.sculptsPending = function () { return sculptsPending; };
+    // Where the authored crowds stand, so main.js can put the ROAR where
+    // the bodies are. Offset back 30 units: the swell should be building
+    // as the player arrives, not startled into being as they pass.
+    api.cheerZones = CHEER_Z.map(function (z) { return z - 30; });
 
     /**
      * ================== THE PALETTE, AND ITS TWO AXES ==================

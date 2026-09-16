@@ -344,6 +344,8 @@ MR.unbail = function () {
   let countT = 0;
   let lastStep = 0;
   let mileShown = 0;
+  // The next authored cheer zone to roar for. See world.cheerZones.
+  let cheerIdx = 0;
   // Edge detectors for the two cues that mark a change of situation rather
   // than an event. Neither has anything else on screen at the moment it
   // happens, which is why they are worth a sound: the record going out of
@@ -480,6 +482,7 @@ MR.unbail = function () {
     cam.reset();
     controls.clear();
     mileShown = 0;
+    cheerIdx = 0;
     lastStep = 0;
     recordGone = false;
     tierIdx = -1;
@@ -1264,6 +1267,18 @@ MR.unbail = function () {
         const d = sp.time - sp.mile * K.RECORD_PACE;
         hud.toast(`MILE ${sp.mile}`, `${Pace.clock(sp.time)}  ·  ${Pace.delta(d)} vs record`);
         audio.mile(sp.mile);
+      }
+
+      // The authored crowds. The knots are world.js's; the ROAR is fired
+      // here because the audio belongs to the run, not to the scenery --
+      // 0.55 sits under a record's roar(1) on the mix ladder, a big crowd
+      // rather than the biggest moment.
+      const zones = world.cheerZones;
+      if (zones) {
+        while (cheerIdx < zones.length && pace.units >= zones[cheerIdx]) {
+          audio.roar(0.55);
+          cheerIdx++;
+        }
       }
 
       // Unclamped, deliberately. The old min(1, ...) saturated at streak 70 on

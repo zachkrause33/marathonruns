@@ -9378,3 +9378,29 @@ against, carries the mood.
 Verified: Rome photographed across four dates shows four skies over
 a bit-identical road. Gates: 8/8 shots, 90+90 courses, simulate
 PASS.
+
+## 120. The middle gets its Wellesley (2026-09-16)
+
+Item 6. Every famous marathon has a mid-race place where the crowd
+is a wall of sound with a name -- Wellesley at 13, First Avenue at
+16 -- and this course's miles 8 to 18 were its quietest stretch by
+construction. Three cheer zones are now authored: the riverside
+bridgehead (0.30), mid-parkland (0.56), and the parkland gate before
+THE WALL (0.68). Nine knots a side over 55 units, packed against the
+barrier (s.b capped at 0.3), ~27k transient triangles and ~20 pooled
+draw calls in the emptiest part of the course.
+
+Built from their OWN rng stream: appending draws to scenery/v5 would
+have re-rolled every prop after the first zone. The ROAR fires from
+main.js as the player arrives (zone minus 30 units), at 0.55 --
+under a record's roar(1) on the mix ladder, a big crowd rather than
+the biggest moment.
+
+The build lied and the page told the truth (rule 2): the zone list
+was named CHEER, which shadowed the crowd pose enum for the whole of
+create() and put every earlier pose lookup in the temporal dead
+zone. node -e parsed it clean; the page threw on boot. Renamed
+CHEER_Z, noted here because the class of defect -- a shadowed
+module-scope const -- leaves no trace in any lint this project runs.
+
+Gates: 8/8 shots, 90+90 courses, simulate PASS.

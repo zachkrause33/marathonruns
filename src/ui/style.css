@@ -522,6 +522,13 @@ html, body {
   width: 3px; background: #e0955a;
   box-shadow: 0 0 0 1px rgba(14, 18, 48, 0.9);
 }
+/* Your own best: the middle rung, in a blue nothing else on the rail
+ * uses, a step narrower than the bronze runner. */
+#railPB {
+  position: absolute; top: -1px; bottom: -1px;
+  width: 2px; background: #6db9ff;
+  box-shadow: 0 0 0 1px rgba(14, 18, 48, 0.9);
+}
 /* A cap above the line, so the marker is findable at a glance against both
  * the yellow fill and the dark road ahead of it. */
 #railGhost::after {
@@ -797,7 +804,7 @@ html, body {
 #lockedBox.hidden, #histBtn.hidden, #endHistBtn.hidden { display: none; }
 #mapView.hidden, #passView.hidden, #cityBar.hidden, #pickLine.hidden,
 #pickBtn.hidden, #stampMoment.hidden, #railCR.hidden,
-#challengeBar.hidden { display: none; }
+#challengeBar.hidden, #railPB.hidden, #pbBar.hidden { display: none; }
 
 /* THE LOCKED BOX replaces TOE THE LINE on a day the record has fallen. It
  * borrows #tomorrow's plate (the other "come back later" element) with the
@@ -1128,6 +1135,7 @@ button.stampC:active { transform: scale(0.96); }
 .raceB.shut { opacity: 0.45; cursor: default; }
 .raceB .rbCity { font-size: 11px; font-weight: 800; letter-spacing: 0.07em; }
 .raceB .rbRec { font-size: 9px; opacity: 0.75; margin-top: 1px; }
+.raceB .rbBest { font-size: 8px; color: #8cc6ff; margin-top: 1px; }
 .raceB .rbNote { font-size: 7.5px; font-weight: 800; letter-spacing: 0.14em; color: var(--accent); margin-top: 2px; }
 .raceB.shut .rbNote { color: inherit; opacity: 0.6; }
 
@@ -1186,6 +1194,17 @@ button.stampC:active { transform: scale(0.96); }
 }
 #challengeBar span { font-size: 8.5px; font-weight: 800; letter-spacing: 0.12em; color: var(--accent); }
 #challengeBar #challengeTime { font-size: 11px; font-weight: 700; white-space: nowrap; }
+
+/* The middle rung, in the rail tick's own blue. */
+#pbBar {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  margin: 4px auto 0; max-width: 340px;
+  padding: 4px 10px;
+  border-left: 4px solid #6db9ff;
+  background: var(--ink);
+}
+#pbBar span { font-size: 8.5px; font-weight: 800; letter-spacing: 0.12em; color: #8cc6ff; }
+#pbBar #pbTime { font-size: 11px; font-weight: 700; white-space: nowrap; }
 
 /* ---- finish panel ----
  *

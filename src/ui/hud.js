@@ -330,6 +330,14 @@ MR.HUD = (function () {
             where they are the same runner.
           -->
           <div id="railCR" class="hidden"></div>
+          <!--
+            YOUR OWN BEST, the middle rung. Bronze and gold are other
+            people's times; between them stands the run YOU did on this
+            road, at its average pace, in a blue no other marker uses.
+            The ladder on one line: beat yourself, then the record
+            holder, then the world. Hidden until this city has a best.
+          -->
+          <div id="railPB" class="hidden"></div>
         </div>
         <!--
           THE AXIS LABEL BECOMES THE ROUTE.
@@ -443,6 +451,11 @@ MR.HUD = (function () {
         <div id="challengeBar" class="hidden">
           <span>A FRIEND RAN THIS ROAD</span>
           <b class="num" id="challengeTime"></b>
+        </div>
+        <!-- The middle rung on the panel: your own best on this road. -->
+        <div id="pbBar" class="hidden">
+          <span>YOUR BEST ON THIS ROAD</span>
+          <b class="num" id="pbTime"></b>
         </div>
         <!--
           PICK YOUR OWN ADVENTURE. Every city is open every day and the
@@ -882,7 +895,8 @@ MR.HUD = (function () {
       distVal: q('distVal'),
       railWrap: q('railWrap'),
       rail: q('rail'), railFill: q('railFill'), railGap: q('railGap'), railGhost: q('railGhost'),
-      railCR: q('railCR'),
+      railCR: q('railCR'), railPB: q('railPB'),
+      pbBar: q('pbBar'), pbTime: q('pbTime'),
       railRoute: q('railRoute'),
       gapVal: q('gapVal'), gapTrend: q('gapTrend'), gapLabel: q('gapLabel'),
       toast: q('toast'), toastLab: q('toastLab'), toastBig: q('toastBig'),
@@ -1563,6 +1577,7 @@ MR.HUD = (function () {
           + '<span class="rbCity">' + s.name
           + (s.tag === featTag ? ' <span class="sFeat">TODAY\'S RACE</span>' : '') + '</span>'
           + '<span class="rbRec num">' + (s.rec ? 'RECORD ' + Pace.clock(s.rec) : '') + '</span>'
+          + (c && c.best ? '<span class="rbBest num">YOUR BEST ' + Pace.clock(c.best) + '</span>' : '')
           + '<span class="rbNote">' + (s.tag === loadedTag ? 'AT THE LINE' : d.door ? 'RUN IT' : d.note) + '</span>'
           + '</button>';
       }).join('');
@@ -1582,8 +1597,16 @@ MR.HUD = (function () {
      * the order they land in cannot leave the line stale.
      */
     let lastSum = null;
+    let pbBest = 0;   // this city's own best, seconds; 0 until both inputs land
     function syncChoice() {
       if (!n.pickBtn) return;
+      {
+        const st0 = course && course.settings && course.settings.length ? course.settings[0] : null;
+        const c = st0 && lastSum && lastSum.cities ? lastSum.cities[st0.name] : null;
+        pbBest = c && c.best ? c.best : 0;
+        n.pbBar.classList.toggle('hidden', !pbBest);
+        if (pbBest) n.pbTime.textContent = Pace.clock(pbBest) + ' · BEAT IT';
+      }
       const set = course && course.settings;
       const loaded = set && set.length ? set[0] : null;
       const feat = lastSum && lastSum.dateKey && MR.Course.pickSettings
@@ -2670,6 +2693,16 @@ MR.HUD = (function () {
         if (hasCR) {
           const crM = Math.min(K.MARATHON_MILES, (p.raceTime || 0) * K.MARATHON_MILES / st0.rec);
           n.railCR.style.left = (clamp01(crM / K.MARATHON_MILES) * 100) + '%';
+        }
+        // Your past self, same arithmetic as the other two runners.
+        const hasPB = !!pbBest;
+        if (cache.pbShown !== hasPB) {
+          cache.pbShown = hasPB;
+          n.railPB.classList.toggle('hidden', !hasPB);
+        }
+        if (hasPB) {
+          const pbM = Math.min(K.MARATHON_MILES, (p.raceTime || 0) * K.MARATHON_MILES / pbBest);
+          n.railPB.style.left = (clamp01(pbM / K.MARATHON_MILES) * 100) + '%';
         }
       }
       n.railGap.style.left = Math.min(you, gh) + '%';

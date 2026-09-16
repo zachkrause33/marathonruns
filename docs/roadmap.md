@@ -9443,3 +9443,17 @@ re-school a veteran. Verified on the page: three tips in order,
 flag written, second visit silent.
 
 Gates: 8/8 shots, 90+90 courses, simulate PASS.
+
+## 123. The middle rung (2026-09-16)
+
+Item 9. Between "beat 2:04:55" and "beat 1:59:30 near-perfectly"
+there was nothing, and that gap is a cliff for the mid player. The
+rung that fills it was already in the save: YOUR OWN BEST on this
+road. Now it stands in three places -- a blue bar on the start panel
+(YOUR BEST ON THIS ROAD · 2:06:41 · BEAT IT), a YOUR BEST line on
+each picker chip, and a third runner on the race rail: your past
+self at its average pace, in a blue no other marker uses, so the
+ladder is geography on one line -- beat yourself, then the record
+holder, then the world.
+
+Gates: 8/8 shots, 90+90 courses, simulate PASS, sharecard PASS.

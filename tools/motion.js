@@ -137,7 +137,7 @@ const SKIPS = arg('skip', null) !== null
     });
     await page.goto('file://' + FILE + '?bot=1&skip=' + SKIP
       + (DATE ? '&date=' + DATE : ''));
-    await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, { timeout: 30000 });
+    await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, null, { timeout: 30000 });
     await page.waitForTimeout(500);
 
     const out = await page.evaluate(async ({ FRAMES }) => {

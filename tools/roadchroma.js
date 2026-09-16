@@ -301,7 +301,7 @@ const PAGE_FN = function (opts) {
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message.split('\n')[0]));
   await page.goto('file://' + INDEX + `?bot=1&date=${DATE}&skip=${SKIP}`, { waitUntil: 'load' });
-  await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, { timeout: 60000 });
+  await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, null, { timeout: 60000 });
   await page.waitForTimeout(900);
   const where = await page.evaluate(() => {
     const f = MR.game.pace.units / MR.K.TOTAL_UNITS;

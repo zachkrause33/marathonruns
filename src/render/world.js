@@ -822,7 +822,10 @@ MR.World = (function () {
     },
 
     ROME: {
-      sky: [0x5490c6, 0xffeac8], fog: 0xffe0bc, ground: 0x8fb45a, road: 0x6f6960,
+      // road cooled a step (was 0x6f6960): BLOCK v11 sat at gate margin
+      // exactly 0.000 against lane 2 -- same sweep, same mechanism as
+      // Nairobi, caught before the calendar could.
+      sky: [0x5490c6, 0xffeac8], fog: 0xffe0bc, ground: 0x8fb45a, road: 0x6b6862,
       water: 0x5f9fae, edge: 0xfff0d8,
       terrace: {
         colors: [0xdc9a4c, 0xcc8640, 0xecb064, 0xbc743a, 0xf2c886],
@@ -952,7 +955,12 @@ MR.World = (function () {
     },
 
     NAIROBI: {
-      sky: [0x4f94c8, 0xe0eedc], fog: 0xdcecdc, ground: 0xa8963e, road: 0x6e6a5c,
+      // road pulled to the neutral tarmac family (was 0x6e6a5c): the warm
+      // bright dust tint compounded through the biome pulls into lanes at
+      // L 96 / S 0.29 and put FOUR hazard coats under the legibility gate
+      // -- tools/contrast-sweep.js's first catch. The red earth lives in
+      // the ground and the acacias; the asphalt is just asphalt.
+      sky: [0x4f94c8, 0xe0eedc], fog: 0xdcecdc, ground: 0xa8963e, road: 0x676861,
       water: 0x6a9a7a, edge: 0xf8ecd8,
       terrace: {
         colors: [0xd8c8a8, 0xc8b48c, 0xe4d4b4, 0xb8a480, 0xd0bc94],
@@ -15132,8 +15140,11 @@ MR.World = (function () {
     // spent. The margin comes from L instead, and it must clear the
     // BRIGHTEST road in the pool (lane 1, L 95-103 by city): l 1.62 left
     // one city at +0.002 over the gate -- thin is a fail on a timer, per
-    // the dumpster -- so 1.7, which holds 1.3x+ in every city shot.
-    dressHazard(K.BLOCK, 8, 'veh_crateload', 0, [{ h: 0, t: 0, l: 1.7, s: 1.8 }]);
+    // the dumpster -- so 1.7, then 1.85: the full-tour sweep
+    // (tools/contrast-sweep.js) found 1.7 thin (+0.036..+0.049) in NINE
+    // cities at once, the single repeat offender on the thin list. One
+    // repaint clears all nine.
+    dressHazard(K.BLOCK, 8, 'veh_crateload', 0, [{ h: 0, t: 0, l: 1.85, s: 1.8 }]);
     // The delivery scooter as sculpted measures L 69.7 / S 0.12 -- under
     // the gate against lane 0 in every city shot (-0.051 at best). Its
     // one shipped coat repaints moped and jacket alike (low threshold),

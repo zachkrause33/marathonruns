@@ -127,7 +127,7 @@ async function sample(browser, file, polish) {
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message.split('\n')[0]));
   await page.goto('file://' + file + '?bot=1&nocount=1&skip=' + SKIP, { waitUntil: 'load' });
-  await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, { timeout: 30000 });
+  await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, null, { timeout: 30000 });
   await page.waitForTimeout(400);
   const speeds = await page.evaluate(() => {
     const K = MR.K;

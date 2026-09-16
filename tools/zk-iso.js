@@ -25,7 +25,7 @@ fs.mkdirSync(OUT, { recursive: true });
   page.on('pageerror', (e) => console.log('pageerror: ' + e.message));
   const file = path.resolve(arg('file', '/tmp/mr-base.html'));
   await page.goto('file://' + file + '?bot=1&skip=1&debug=1', { waitUntil: 'load' });
-  await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, { timeout: 30000 });
+  await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, null, { timeout: 30000 });
   await page.waitForTimeout(500);
 
   const out = await page.evaluate(() => {

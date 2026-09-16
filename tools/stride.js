@@ -75,7 +75,7 @@ fs.mkdirSync(DIR, { recursive: true });
   });
 
   await page.goto('file://' + FILE + '?bot=1&skip=60');
-  await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, { timeout: 30000 });
+  await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, null, { timeout: 30000 });
   await page.waitForTimeout(600);
 
   // Freeze the game loop so the rig is ours alone. Everything after this point

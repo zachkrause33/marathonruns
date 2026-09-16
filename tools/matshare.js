@@ -258,7 +258,7 @@ function measure(o) {
     const errs = [];
     page.on('pageerror', function (e) { errs.push(e.message.split('\n')[0]); });
     await page.goto('file://' + path.join(ROOT, 'index.html') + '?bot=1&date=' + DATE + '&skip=' + skip);
-    await page.waitForFunction(function () { return window.MR && MR.game && MR.game.ready; }, { timeout: 40000 });
+    await page.waitForFunction(function () { return window.MR && MR.game && MR.game.ready; }, null, { timeout: 40000 });
     await page.waitForTimeout(2000);
     const r = await page.evaluate(measure, { w: W, h: H, png: !!PNGDIR });
     if (errs.length) { console.log('FAILED: page threw at skip ' + skip + ': ' + errs[0]); await browser.close(); process.exit(1); }

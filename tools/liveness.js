@@ -206,7 +206,7 @@ const SKIPS = arg('skip', null) !== null
     const errs = [];
     page.on('pageerror', (e) => errs.push('ERR ' + e.message.split('\n')[0]));
     await page.goto('file://' + FILE + '?bot=1&skip=' + SKIP + (DATE ? '&date=' + DATE : ''));
-    await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, { timeout: 30000 });
+    await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, null, { timeout: 30000 });
     await page.waitForTimeout(400);
 
     const out = await page.evaluate(async () => {

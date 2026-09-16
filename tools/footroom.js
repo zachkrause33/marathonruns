@@ -475,7 +475,7 @@ function pageSweep(opt) {
       page.on('pageerror', (e) => { errs.push('pageerror: ' + e.message); failed = true; });
 
       await page.goto('file://' + html + '?bot=1&skip=' + pc.skip + '&debug=1', { waitUntil: 'load' });
-      await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, { timeout: 20000 });
+      await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, null, { timeout: 20000 });
       await page.waitForTimeout(900);
 
       await page.evaluate(pageHarness);

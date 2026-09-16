@@ -429,7 +429,7 @@ function pageRun(o) {
   const errs = [];
   page.on('pageerror', (e) => errs.push('pageerror: ' + e.message.split('\n')[0]));
   await page.goto('file://' + FILE + '?bot=1&nocount=1&skip=' + SKIP, { waitUntil: 'load' });
-  await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, { timeout: 30000 });
+  await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, null, { timeout: 30000 });
   // Let the camera springs settle at this pace before the lens is snapshotted.
   await page.waitForTimeout(1200);
   const buf = await page.evaluate(() => {

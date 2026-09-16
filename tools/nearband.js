@@ -475,7 +475,7 @@ const PAGE_FN = function (opt) {
     const errs = [];
     page.on('pageerror', (e) => errs.push(e.message.split('\n')[0]));
     await page.goto('file://' + INDEX + `?bot=1&date=${DATE}&skip=${SKIP}`, { waitUntil: 'load' });
-    await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, { timeout: 60000 });
+    await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, null, { timeout: 60000 });
     await page.waitForTimeout(900);
     // FREEZE, THEN DRAIN, THEN MEASURE. main.js calls requestAnimationFrame at
     // the TOP of frame(), so overriding rAF stops rescheduling but the callback

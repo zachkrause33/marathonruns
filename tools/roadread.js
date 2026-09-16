@@ -224,7 +224,7 @@ THESE IMAGES HAVE NO COLOUR IN THEM. That is deliberate and it is not a fault
     page.on('pageerror', (e) => errs.push(e.message));
     await page.goto('file://' + path.join(ROOT, 'index.html') + '?date=' + date + '&skip=1&debug=1',
       { waitUntil: 'load' });
-    await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, { timeout: 30000 });
+    await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, null, { timeout: 30000 });
     await page.waitForTimeout(300);
 
     const plan = await page.evaluate(({ mono, dists, every, gateEvery, ctrlN }) => {

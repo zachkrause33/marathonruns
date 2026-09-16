@@ -369,7 +369,7 @@ function stat(a) {
     await page.goto('file://' + html + '?bot=1&nosave=1&skip=250'
       + (jv === null || jv === undefined ? '' : '&joy=' + jv));
     await page.waitForFunction(function () { return window.MR && MR.game && MR.game.ready; },
-      { timeout: 60000 });
+      null, { timeout: 60000 });
     await page.waitForTimeout(300);
     await page.evaluate(pageHarness);
     for (let i = 0; i < 80; i++) {

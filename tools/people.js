@@ -408,7 +408,7 @@ function pct(a, q) {
   const all = {};
   for (const skip of SKIPS) {
     await page.goto('file://' + FILE + '?bot=1&nocount=1&skip=' + skip, { waitUntil: 'load' });
-    await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, { timeout: 30000 });
+    await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, null, { timeout: 30000 });
     await page.waitForTimeout(1200);
     const buf = await page.evaluate(() => {
       const el = MR.game.renderer.domElement;

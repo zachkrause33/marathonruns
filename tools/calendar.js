@@ -428,7 +428,7 @@ const KIND = ['-', 'JUMP', 'DUCK', 'BLOCK'];
   async function load(page, errors, date) {
     errors.length = 0;
     await page.goto('file://' + FILE + '?bot=1&nocount=1&debug=1&date=' + date, { waitUntil: 'load' });
-    await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, { timeout: 30000 })
+    await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, null, { timeout: 30000 })
       .catch(() => { errors.push('MR.game never became ready'); });
   }
 

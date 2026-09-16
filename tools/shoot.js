@@ -215,7 +215,7 @@ const DEFAULT_SHOTS = [
     const html = target ? path.resolve(String(target)) : path.join(ROOT, 'index.html');
     const url = 'file://' + html + '?' + sh.q + '&debug=1';
     await page.goto(url, { waitUntil: 'load' });
-    await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, { timeout: 15000 })
+    await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, null, { timeout: 15000 })
       .catch(() => { errors.push('MR.game never became ready'); failed = true; });
     // The sculpted fleet dresses asynchronously (world.js, THE SCULPTED
     // FLEET). Every audit below must measure the object the player meets,
@@ -224,7 +224,7 @@ const DEFAULT_SHOTS = [
     // correctly what gets measured.
     await page.waitForFunction(
       () => !MR.game.world.sculptsPending || MR.game.world.sculptsPending() === 0,
-      { timeout: 20000 })
+      null, { timeout: 90000 })
       .catch(() => { errors.push('sculpted fleet never settled; auditing code art'); });
     await page.waitForTimeout(sh.settle);
 
@@ -407,6 +407,28 @@ const DEFAULT_SHOTS = [
     }
   }
 
+  // A FAIL names its shots at the very bottom, because the tail is all a
+  // long log's reader ever sees -- a flake whose cause scrolled away 400
+  // lines up is a flake that never gets fixed.
+  if (failed) {
+    for (const r of report) {
+      const why = [];
+      if (r.errors.length) why.push(r.errors.length + ' error(s): ' + r.errors[0]);
+      if (r.occl && !r.occl.skipped) {
+        if (r.occl.low.length) why.push('LOW x' + r.occl.low.length);
+        if (r.occl.hide.length) why.push('HIDES x' + r.occl.hide.length);
+        if (r.occl.blank.length) why.push('BLANKS x' + r.occl.blank.length);
+        if (r.occl.drift) why.push('DRIFT');
+        if (r.occl.envelope && r.occl.envelope.bad && r.occl.envelope.bad.length) {
+          why.push('ENVELOPE x' + r.occl.envelope.bad.length);
+        }
+      }
+      if (r.contrast && !r.contrast.skipped && r.contrast.fail.length) {
+        why.push('PAINTS x' + r.contrast.fail.length);
+      }
+      if (why.length) console.log('  FAILED ' + r.shot + ': ' + why.join(' · '));
+    }
+  }
   console.log('\n' + (failed ? 'FAIL: page errors, missing state, a hazard the player cannot see (behind scenery or behind another hazard), or one they cannot tell from the road' : 'OK: all shots clean'));
   process.exit(failed ? 1 : 0);
 })();

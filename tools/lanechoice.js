@@ -775,7 +775,7 @@ function shootGate(job) {
 
   for (const skip of skips) {
     await page.goto('file://' + path.join(ROOT, 'index.html') + '?bot=1&skip=' + skip + '&date=' + DATE);
-    await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, { timeout: 30000 });
+    await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, null, { timeout: 30000 });
     await page.waitForTimeout(2400);
 
     const found = await page.evaluate(findGate, {});

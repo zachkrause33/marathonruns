@@ -1,0 +1,33 @@
+# The verification gate, run by the forge instead of by discipline.
+#
+# CLAUDE.md rule 2 names four commands; the two that need no browser run
+# here on every push, so a commit that breaks course determinism, course
+# solvability, the pace-model contract, or source/artifact agreement is
+# named by CI even when nobody ran the gate locally. The two browser
+# audits (shoot.js and the contrast sweep) stay local: they need the
+# pinned chromium at /opt/pw-browsers and a GPU-lies-aware reading of
+# their output, and a flaky red X teaches people to ignore CI, which is
+# worse than no CI.
+name: Gate
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: The committed game must match its source
+        run: node tools/build.js --check
+      - name: Courses deterministic and solvable
+        run: node tools/course-test.js
+      - name: Pace model satisfies its contract
+        run: node tools/simulate.js

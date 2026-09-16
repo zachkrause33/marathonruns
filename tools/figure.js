@@ -278,7 +278,7 @@ function pageSweep(opt) {
         const errs = [];
         page.on('pageerror', function (e) { errs.push(e.message.split('\n')[0]); });
         await page.goto('file://' + html + '?bot=1&skip=' + pace.skip);
-        await page.waitForFunction(function () { return window.MR && MR.game && MR.game.ready; }, { timeout: 60000 });
+        await page.waitForFunction(function () { return window.MR && MR.game && MR.game.ready; }, null, { timeout: 60000 });
         await page.waitForTimeout(400);
         await page.evaluate(pageHarness);
         // Let the real scheduler hand over.

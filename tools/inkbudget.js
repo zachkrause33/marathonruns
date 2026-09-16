@@ -83,7 +83,7 @@ const MASK = arg('mask', null);
 
   await page.goto('file://' + path.join(ROOT, 'index.html') + '?bot=1&skip=' + SKIP,
     { waitUntil: 'load' });
-  await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, { timeout: 60000 });
+  await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, null, { timeout: 60000 });
   await page.waitForTimeout(900);
 
   const res = await page.evaluate(({ ISO, HIDE, NOINK, NOHUD }) => {

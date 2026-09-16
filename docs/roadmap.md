@@ -9457,3 +9457,46 @@ ladder is geography on one line -- beat yourself, then the record
 holder, then the world.
 
 Gates: 8/8 shots, 90+90 courses, simulate PASS, sharecard PASS.
+
+## 124. The instruments, audited as a fleet (2026-09-16)
+
+The engineering-health batch, and rule 3's biggest single day.
+
+THE FLAKE HAD A NAME. For the whole life of tools/shoot.js -- and 26
+other tools -- every waitForFunction timeout was written as the
+SECOND argument, which Playwright reads as the page function's arg,
+not as options. Every stated timeout in the fleet was a lie; the
+default 30s applied everywhere, which is exactly the length of a
+cold container's boot, and exactly the "fleet never settled" flake
+this gate has carried. Twenty-seven tools fixed mechanically, the
+gate's own waits raised to honest values (60s boot, 90s settle), and
+a FAIL now recaps its failing shots at the very bottom of the log,
+because a cause that scrolled away 400 lines up is a cause that
+never gets fixed.
+
+THE SWEEP CAUGHT A LIVE FAIRNESS DEFECT ON ITS FIRST RUN.
+tools/contrast-sweep.js enumerates the exposure the calendar kept
+sampling for us -- every city x every hazard coat x every lane tone,
+one page load per city, the same in-page contrastAudit and GATE the
+daily gate trusts. First run: NAIROBI shipped FOUR hazards under the
+legibility gate (worst -0.101; its warm bright road dust compounded
+into lanes at L 96 / S 0.29) and ROME sat at exactly +0.000. Nairobi
+has simply never been the featured city on a day the gate ran. Fix
+at the source: both roads pulled to the neutral tarmac family -- the
+red earth lives in the ground and the acacias, not the asphalt --
+and the crateload coat raised l 1.7 -> 1.85, which cleared the ONE
+repeat offender on the thin list (nine cities at +0.036..+0.049) in
+a single repaint. Re-swept: all 17 cities clear, nothing thin.
+
+CI: .github/workflows/gate.yml runs build --check, course-test and
+simulate on every push -- the browserless three of rule 2's four.
+The browser audits stay local, deliberately: a flaky red X teaches
+people to ignore CI. The asset audit closed as measured-not-guessed:
+the deployed site is the --site flavor (models fetched separately
+under content-hashed URLs, cached independently), so the committed
+17.5MB is the verification artifact, not the player's download; the
+heaviest embed is miles.glb at 2.1MB and the fleet averages ~300KB
+a scan. No diet needed where the bytes already cache.
+
+Gates: 8/8 shots, 90+90 courses, simulate PASS, full-tour contrast
+sweep OK.

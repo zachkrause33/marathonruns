@@ -438,7 +438,7 @@ function shapeFreshness(shapes, skill, W) {
   const errs = [];
   page.on('pageerror', function (e) { errs.push(e.message.split('\n')[0]); });
   await page.goto('file://' + path.join(ROOT, PAGE) + '?bot=1&skip=150');
-  await page.waitForFunction(function () { return window.MR && MR.game && MR.game.ready; }, { timeout: 40000 });
+  await page.waitForFunction(function () { return window.MR && MR.game && MR.game.ready; }, null, { timeout: 40000 });
   await page.waitForTimeout(2200);
 
   if (errs.length) {

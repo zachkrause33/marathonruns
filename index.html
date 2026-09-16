@@ -1411,6 +1411,47 @@ button.stampC:active { transform: scale(0.96); }
  * row is the same six squares everywhere, in the three colours the rest of
  * this sheet already uses for the same three meanings: --ahead for clean,
  * --accent for the tank paying, --behind for a contact that cost time. */
+/* ---- the debrief ----
+ * Folded shut behind one quiet button (the card is a headline; the
+ * analysis is opt-in -- see the markup note). Open, it is a left-aligned
+ * coach's sheet: four labelled sections, the leg rows reusing the share
+ * card's block colors, and a mile strip where taller is slower. */
+#debriefFold { margin-top: 12px; }
+#debriefBtn {
+  font: inherit; color: inherit; cursor: pointer;
+  font-size: 9px; font-weight: 800; letter-spacing: 0.16em;
+  padding: 6px 14px;
+  background: none; border: 1px solid var(--hair); border-radius: 3px;
+  opacity: 0.65;
+}
+#debriefBtn.open { opacity: 1; border-color: rgba(255, 253, 245, 0.5); }
+#debriefBtn.hidden, #debrief.hidden { display: none; }
+#debrief {
+  margin: 10px auto 0; max-width: 360px; text-align: left;
+  padding: 10px 14px 12px;
+  border: 1px solid rgba(255, 253, 245, 0.22);
+  background: rgba(255, 253, 245, 0.045);
+}
+#debrief .dbSec { margin-top: 9px; }
+#debrief .dbSec:first-child { margin-top: 0; }
+#debrief .dbLine { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; margin-top: 3px; }
+#debrief .dbLine.dim { opacity: 0.65; font-weight: 600; font-size: 9px; }
+#debrief .dbLeg {
+  display: flex; align-items: center; gap: 7px; margin-top: 4px;
+}
+#debrief .dbLeg .sblock { width: 10px; height: 10px; }
+#debrief .dbLegName { font-size: 9px; font-weight: 800; letter-spacing: 0.1em; flex: 1; }
+#debrief .dbLegNote { font-size: 9px; opacity: 0.75; }
+#debrief .dbBars {
+  display: flex; align-items: flex-end; gap: 2px; height: 24px; margin-top: 6px;
+}
+#debrief .dbBar {
+  flex: 1 1 0; min-width: 3px;
+  background: rgba(255, 253, 245, 0.35);
+}
+#debrief .dbBar.fastest { background: var(--ahead); }
+#debrief .dbBar.slowest { background: var(--behind); }
+
 #shareBox {
   margin-top: 15px; padding: 10px 12px 11px;
   border: 1px solid rgba(255, 253, 245, 0.22);
@@ -47188,6 +47229,21 @@ MR.HUD = (function () {
         <div id="endTurn"></div>
 
         <!--
+          THE DEBRIEF, and it is FOLDED for a reason worth stating: the third
+          pass cut the contacts-cost plate and the aid note off this card on
+          the owner's word, because a card is a headline. What the cut did
+          not answer is the player who finished +0:40 and wants to know WHERE
+          it went -- without attribution a loss reads as randomness, and
+          randomness is what makes people stop coming back. So the analysis
+          lives one tap away: closed, it is one quiet button; open, it is
+          the four questions a coach would answer. The card stays a headline.
+        -->
+        <div id="debriefFold">
+          <button id="debriefBtn" type="button" class="hidden">THE DEBRIEF &middot; WHERE IT WENT</button>
+          <div id="debrief" class="hidden"></div>
+        </div>
+
+        <!--
           THE SHARE CARD.
 
           The owner: "Share artifact is important. work on that and add that",
@@ -47336,6 +47392,7 @@ MR.HUD = (function () {
       milesLine: q('milesLine'), milesEnd: q('milesEnd'),
       endBadges: q('endBadges'), endMem: q('endMem'),
       endTurn: q('endTurn'), tomorrow: q('tomorrow'), tomorrowRoute: q('tomorrowRoute'),
+      debriefBtn: q('debriefBtn'), debrief: q('debrief'),
       shareBox: q('shareBox'), shareLegs: q('shareLegs'), shareLine: q('shareLine'),
       shareBtn: q('shareBtn'), shareNote: q('shareNote'), shareText: q('shareText'),
       cityRule: q('cityRule'), stampWall: q('stampWall'), mapBox: q('mapBox'),
@@ -48218,6 +48275,151 @@ MR.HUD = (function () {
       // card are commensurable even where the reconstruction drifted.
       return { name: top.name, would: actualFinish - top.cost };
     }
+
+    // ---- the debrief ------------------------------------------------------
+
+    /**
+     * The whole run, erased of its unguarded contacts, replayed once. Same
+     * reconstruction as chapterCosts and the same honesty rule: the answer is
+     * a DIFFERENCE of two aid-less replays, so what the replay cannot model
+     * (the pickups the real run took) is common to both terms and cancels,
+     * and the result is reported against the run's own finish time. Guards
+     * are added arithmetically -- a guarded contact costs GUARD_TIME flat by
+     * construction, so no replay is needed to price one.
+     */
+    function contactsCost(p) {
+      let cost = (p.guards | 0) * 1.5;   // GUARD_TIME, fixed in pace.js
+      if (hitZ && hitZ.size && course && course.gates && course.gates.length) {
+        const run = function (erase) {
+          const q = Pace.create();
+          let gi = 0, guard = 0;
+          while (!q.finished && guard++ < 40000) {
+            q.update(1 / 60);
+            while (gi < course.gates.length && q.units >= course.gates[gi].z) {
+              const g = course.gates[gi];
+              gi++;
+              if (!erase && hitZ.has(g.z)) q.onHit(); else q.onClean();
+            }
+          }
+          return q.finished ? q.finishTime : 0;
+        };
+        const base = run(false), clean = run(true);
+        if (base && clean) cost += Math.max(0, base - clean);
+      }
+      return cost;
+    }
+
+    /**
+     * THE DEBRIEF: the four questions a coach answers after a race, built
+     * only when the player asks for them. Facts lead and the counterfactual
+     * follows, under the same noise guard chapterCosts measured: past twelve
+     * contacts the reconstruction drifts (55s adrift at twenty), so a wreck
+     * gets its facts and not a fiction with a decimal point on it.
+     *
+     * The mile strip deliberately does NOT grade the early miles against the
+     * record ghost -- the comparison is structurally negative before the
+     * build-up ends, which is the exact defect that got the old split table
+     * removed. The bars are the run against ITSELF: taller is slower, the
+     * fastest and slowest miles are named, and both are facts the player
+     * owns.
+     */
+    function buildDebrief(p) {
+      const out = [];
+      const nHit = p.hits | 0, nG = p.guards | 0;
+
+      // 1. The contacts, and what they cost.
+      let head = nHit + nG === 0 ? 'CLEAN RUN · NO CONTACTS'
+        : (nHit + nG) + ' CONTACT' + (nHit + nG === 1 ? '' : 'S')
+          + (nG ? ' · ' + nG + ' GUARDED' : '');
+      let costLine = '';
+      if (nHit + nG > 0 && nHit <= 12) {
+        const c = contactsCost(p);
+        if (c >= 1) {
+          costLine = 'CLEAN, THIS RUN FINISHES ' + Pace.clock(Math.max(0, p.finishTime - c))
+            + ' · CONTACTS COST ' + Pace.clock(c);
+        }
+      }
+      out.push('<div class="dbSec"><div class="lab">THE CONTACTS</div>'
+        + '<div class="dbLine">' + head + '</div>'
+        + (costLine ? '<div class="dbLine num dim">' + costLine + '</div>' : '')
+        + '</div>');
+
+      // 2. The tank.
+      const total = course && course.aid ? course.aid.length : 0;
+      if (total && p.aid !== undefined) {
+        const taken = p.aid | 0;
+        const pct = Math.round(100 * taken / total);
+        const dry = Math.round(p.drySeconds || 0);
+        const bits = ['FUEL ' + taken + ' OF ' + total + ' · ' + pct + '%'];
+        // Race-seconds, and a wreck can spend most of the race under the
+        // knee -- 8340 raw seconds was measured on a bot run -- so past a
+        // minute and a half it reads as a clock, not a count.
+        if (dry >= 1) bits.push('RAN DRY ' + (dry >= 90 ? Pace.clock(dry) : dry + 'S'));
+        if ((p.wasted | 0) >= 3) bits.push((p.wasted | 0) + ' TAKEN FULL');
+        out.push('<div class="dbSec"><div class="lab">THE TANK</div>'
+          + '<div class="dbLine num">' + bits.join(' · ') + '</div>'
+          + (dry >= 1 ? '<div class="dbLine dim">EVERY DRY SECOND IS ROAD GIVEN BACK</div>' : '')
+          + '</div>');
+      }
+
+      // 3. The legs: the share row's six blocks, given their names and
+      // their counts. Same cut, same colors, so the two cannot disagree.
+      const cutter = legCut();
+      if (cutter) {
+        const marks = legMarks();
+        const hitsIn = cutter.legs.map(function () { return 0; });
+        const guardsIn = cutter.legs.map(function () { return 0; });
+        if (hitZ) for (const z of hitZ) hitsIn[cutter.of(z)]++;
+        if (guardZ) for (const z of guardZ) guardsIn[cutter.of(z)]++;
+        const CLS = ['clean', 'guard', 'hit'];
+        out.push('<div class="dbSec"><div class="lab">THE LEGS</div>'
+          + cutter.legs.map(function (b, i) {
+            const note = hitsIn[i]
+              ? hitsIn[i] + ' CONTACT' + (hitsIn[i] === 1 ? '' : 'S')
+                + (guardsIn[i] ? ' +' + guardsIn[i] + 'G' : '')
+              : guardsIn[i] ? guardsIn[i] + ' GUARDED' : 'CLEAN';
+            return '<div class="dbLeg"><span class="sblock ' + CLS[marks[i]] + '"></span>'
+              + '<span class="dbLegName">' + b.name + '</span>'
+              + '<span class="dbLegNote num">' + note + '</span></div>';
+          }).join('') + '</div>');
+      }
+
+      // 4. The miles.
+      const sp = p.splits || [];
+      if (sp.length >= 5) {
+        const mt = [];
+        let prev = 0;
+        for (const s of sp) { mt.push({ mile: s.mile, t: s.time - prev }); prev = s.time; }
+        let fast = mt[0], slow = mt[0];
+        for (const m of mt) { if (m.t < fast.t) fast = m; if (m.t > slow.t) slow = m; }
+        const span = Math.max(0.001, slow.t - fast.t);
+        const bars = mt.map(function (m) {
+          const h = 5 + Math.round(17 * (m.t - fast.t) / span);
+          const cls = m === fast ? ' fastest' : m === slow ? ' slowest' : '';
+          return '<span class="dbBar' + cls + '" style="height:' + h + 'px"'
+            + ' title="MILE ' + m.mile + ' · ' + Pace.pace(m.t) + '/MI"></span>';
+        }).join('');
+        out.push('<div class="dbSec"><div class="lab">THE MILES · TALLER IS SLOWER</div>'
+          + '<div class="dbBars">' + bars + '</div>'
+          + '<div class="dbLine num dim">FASTEST MILE ' + fast.mile + ' · ' + Pace.pace(fast.t)
+          + '/MI &nbsp; SLOWEST MILE ' + slow.mile + ' · ' + Pace.pace(slow.t) + '/MI</div>'
+          + '</div>');
+      }
+
+      return out.join('');
+    }
+
+    let debriefP = null, debriefBuilt = false;
+    n.debriefBtn.addEventListener('click', function () {
+      const open = n.debrief.classList.contains('hidden');
+      if (open && !debriefBuilt && debriefP) {
+        n.debrief.innerHTML = buildDebrief(debriefP);
+        debriefBuilt = true;
+      }
+      n.debrief.classList.toggle('hidden', !open);
+      n.debriefBtn.classList.toggle('open', open);
+      requestAnimationFrame(markScroll);
+    });
 
     // ---- the share card --------------------------------------------------
 
@@ -49184,6 +49386,14 @@ MR.HUD = (function () {
       if (where) notes.push('CLEAN THROUGH ' + where.name + ' · ' + Pace.clock(where.would));
       n.endTurn.innerHTML = notes
         .map(function (x) { return '<div>' + x + '</div>'; }).join('');
+
+      // ---- the debrief, folded shut for a fresh finish ---------------------
+      debriefP = p;
+      debriefBuilt = false;
+      n.debrief.classList.add('hidden');
+      n.debrief.innerHTML = '';
+      n.debriefBtn.classList.remove('open');
+      n.debriefBtn.classList.toggle('hidden', !(p.splits && p.splits.length));
       // ---- the share card --------------------------------------------------
       // Built once, here, off the same finished run everything above was read
       // from -- so the string the button copies is the card the player is

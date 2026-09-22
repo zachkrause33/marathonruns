@@ -9531,3 +9531,53 @@ the Europe lens now magnifying 8.
 
 Gates: 8/8 shots, 90+90 courses (chosen-city roster now spans 25),
 simulate PASS, sharecard PASS, 8-city contrast sweep OK.
+
+## 126. The publish cut (2026-09-22)
+
+The owner, with the full 2026-09-22 list ("we are looking to publish
+soon"), and every item landed as written:
+
+THE HOME PAGE IS SEVEN THINGS, top to bottom, and nothing else: the
+masthead big and alone; PICK TODAY'S RACE with the city ON the
+button (the bubble sheet one tap below); the course record, number
+only -- no holder, no year; the world record; TOE THE LINE as a
+full-width yellow box; and PASSPORT / HOW TO PLAY side by side. Out:
+the key legend (the coach cards teach the controls on the road),
+Miles's quote, the blurb, the memory plates and the PB bar.
+
+PASSPORT AND MAP ARE ONE PAGE, and the map is a MAP: drag pans,
+wheel and pinch zoom about the point under the finger, +/- buttons
+for the wheelless, a press that travels eight pixels is a pan and
+not a pin tap, and the camera survives every save-driven redraw
+because the view lives outside the svg it drives. The stamps state
+the owner's four -- city, course record, world record, medal -- and
+the tabs, the ledger plates and the holders' names all went.
+
+THE MEDAL LADDER: GOLD beats the world record, SILVER beats the
+city's course record, BRONZE completed the course. Every finish
+earns a medal now; plain ink is retired; London still cannot award
+silver, its course record being the world record itself. The ladder
+runs through tierFor, the stamps, the pins, the picker chips, the
+finish stamp, the share text, the picture tint, and the rail's
+course-record runner (silver now).
+
+THREE TRIES A DAY (K.TRIES_PER_DAY, one constant so the lockout and
+the panels cannot disagree): the tries line counts down on both
+panels, the third finish locks the day behind the same box a broken
+record does -- 3 TRIES USED, best of today above -- and bots, skips
+and nosave inspections bypass it the way they bypass the record
+lockout. Completed runs count; an abandoned run costs nothing.
+
+THE SCORE SCREEN is the owner's four: the time, the stamp (which IS
+the medal the passport promises), the tries left, RUN IT AGAIN when
+allowed, PASSPORT beneath it. The grade row, badges, best-today
+memory, turn lines and tomorrow box came off; the debrief (one
+quiet folded line) and the share row (two standing owner orders)
+stay.
+
+The public how-to-play page updated with the batch: three tries,
+twenty-five cities, the medal ladder -- a site that promised
+"Unlimited" retries must not outlive the rule by a day.
+
+Gates: 8/8 shots, 90+90 courses, simulate PASS, sharecard PASS
+(re-taught the ladder), tries and pan/zoom probed on the page.

@@ -3170,12 +3170,18 @@ MR.Course = (function () {
    * you take the ink stamp, which is the truth of that course.
    */
   function tierFor(seconds, tag) {
+    // The medal ladder (owner, 2026-09-22): GOLD beats the world record,
+    // SILVER beats the city's course record, BRONZE completed the course.
+    // Every finish earns at least bronze; London cannot award silver, its
+    // course record being the world record itself.
     if (!(seconds > 0)) return '';
     if (seconds < K.RECORD_SECONDS) return 'gold';
     for (const s of SETTINGS) {
-      if (s.tag === tag) return seconds < s.rec ? 'bronze' : '';
+      if (s.tag === tag) {
+        return (s.rec > K.RECORD_SECONDS && seconds < s.rec) ? 'silver' : 'bronze';
+      }
     }
-    return '';
+    return 'bronze';
   }
 
   const api = { generate, generateAid, validate, solvable, biomeAt, difficulty,

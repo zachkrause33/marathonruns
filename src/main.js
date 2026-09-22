@@ -489,8 +489,15 @@ MR.unbail = function () {
     const sum = NOSAVE ? null : MR.Store.summary(dateKey);
     hud.setMemory(sum);
     hud.setHistory(sum);
-    locked = !!(LOCKOUT && sum && sum.done);
-    hud.setLocked(locked ? { time: sum.doneTime, dateKey: dateKey } : null);
+    // Locked two ways now: the record fell, or the three tries are spent
+    // (owner, 2026-09-22). The reason travels so the panel can say which.
+    const runsToday = sum && sum.today ? (sum.today.runs | 0) : 0;
+    locked = !!(LOCKOUT && sum && (sum.done || runsToday >= K.TRIES_PER_DAY));
+    hud.setLocked(locked ? {
+      time: sum.done ? sum.doneTime : (sum.today ? sum.today.time : 0),
+      dateKey: dateKey,
+      reason: sum.done ? 'record' : 'tries',
+    } : null);
   }
 
   function reset() {

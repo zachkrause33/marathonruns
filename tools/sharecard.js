@@ -347,7 +347,9 @@ function spoilers(s) {
       open: true,
       rule: document.getElementById('cityRule').textContent.trim(),
       rec: [...document.querySelectorAll('#stampWall .stampC.gold .sCity')].map((e) => e.textContent),
-      ran: [...document.querySelectorAll('#stampWall .stampC.ink .sCity')].map((e) => e.textContent),
+      // The medal ladder (2026-09-22): a finish without a record is
+      // BRONZE now; silver is the course record; plain ink retired.
+      ran: [...document.querySelectorAll('#stampWall .stampC.bronze .sCity, #stampWall .stampC.silver .sCity')].map((e) => e.textContent),
       fresh: [...document.querySelectorAll('#stampWall .stampC.new .sCity')].map((e) => e.textContent),
       total: document.querySelectorAll('#stampWall .stampC').length,
     }));
@@ -375,7 +377,7 @@ function spoilers(s) {
   check('cities: the gold stamps are the right two',
     cr.rec.slice().sort().join('|') === [pool[0], pool[2]].sort().join('|'),
     'gold: ' + cr.rec.join(', '));
-  check('cities: a raced day without a record is plain ink',
+  check('cities: a raced day without the world record wears its medal',
     cr.ran.join('|') === pool[1], 'ink: ' + cr.ran.join(', '));
   check('cities: the rest read as not yet visited',
     cr.fresh.length === pool.length - 3, cr.fresh.length + ' unvisited');

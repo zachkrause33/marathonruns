@@ -23,6 +23,11 @@ MR.K = (function () {
   const RECORD_PACE = RECORD_SECONDS / MARATHON_MILES;
 
   const UNITS_PER_MILE = 240;
+  // The daily attempt cap (owner, 2026-09-22: "No unlimited tries - 3 a
+  // day max"). Read by main.js's lockout and by the HUD's tries lines;
+  // one constant so the two can never disagree. Bots, skips and nosave
+  // inspections bypass it the way they bypass the record lockout.
+  const TRIES_PER_DAY = 3;
 
   // Lateral spacing between lane centres. See the track geometry block below
   // for why this number and not another.
@@ -125,6 +130,7 @@ MR.K = (function () {
     TIME_SCALE: 30,
     UNITS_PER_MILE,
     TOTAL_UNITS: MARATHON_MILES * UNITS_PER_MILE,  // 6292.5
+    TRIES_PER_DAY,
 
     // Track geometry. LANE_W is the seed the whole track is cut from: the lane
     // centres, the tarmac, and every hazard width in world.js derive from it.

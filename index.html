@@ -637,7 +637,7 @@ html, body {
  * you -> bronze -> white. */
 #railCR {
   position: absolute; top: -2px; bottom: -2px;
-  width: 3px; background: #e0955a;
+  width: 3px; background: #cfd6de;   /* the course record is SILVER now */
   box-shadow: 0 0 0 1px rgba(14, 18, 48, 0.9);
 }
 /* Your own best: the middle rung, in a blue nothing else on the rail
@@ -920,16 +920,15 @@ html, body {
 /* The generic .hidden rule only exists for .panel and #count; these two are
  * plain elements inside a panel, so they need their own. */
 #lockedBox.hidden, #histBtn.hidden, #endHistBtn.hidden { display: none; }
-#mapView.hidden, #passView.hidden, #cityBar.hidden, #pickLine.hidden,
+#cityBar.hidden, #pickLine.hidden, #triesLine.hidden,
 #pickBtn.hidden, #stampMoment.hidden, #railCR.hidden,
-#challengeBar.hidden, #railPB.hidden, #pbBar.hidden { display: none; }
+#challengeBar.hidden, #railPB.hidden { display: none; }
 
 /* THE LOCKED BOX replaces TOE THE LINE on a day the record has fallen. It
  * borrows #tomorrow's plate (the other "come back later" element) with the
  * win chip on top, so the state reads as a result rather than as a missing
  * button. */
-#startPanel.locked #startBtn,
-#startPanel.locked #startKeys { display: none; }
+#startPanel.locked #startBtn { display: none; }
 #lockedBox {
   margin-top: 20px; padding: 12px 14px 13px;
   border: 1px solid rgba(77, 251, 160, 0.45);
@@ -1050,6 +1049,22 @@ html, body {
  * DROP onto the paper when the page opens. */
 #mapBox { max-width: 520px; margin: 4px auto 8px; }
 #mapBox:empty { display: none; }
+/* A pannable map must own its gestures: no browser scroll or pinch
+ * inside the paper, a grab cursor, and the zoom buttons floated on it. */
+#mapBox { position: relative; touch-action: none; }
+#mapBox svg { cursor: grab; }
+#mapBox.zoomed svg { cursor: move; }
+#mapZoom {
+  position: relative; max-width: 520px; margin: 0 auto; height: 0;
+}
+#mapZoom button {
+  position: absolute; right: 6px; width: 30px; height: 30px;
+  font: inherit; font-size: 17px; font-weight: 800; line-height: 1;
+  color: #14183a; background: #fffdf5; border: none; border-radius: 4px;
+  cursor: pointer; opacity: 0.9;
+}
+#mapZoom #zoomIn { top: -76px; }
+#mapZoom #zoomOut { top: -42px; }
 #mapBox svg {
   display: block; width: 100%; height: auto;
   filter: drop-shadow(0 6px 14px rgba(4, 6, 20, 0.55));
@@ -1080,6 +1095,7 @@ html, body {
 #mapBox .pin { stroke: rgba(20, 20, 40, 0.5); stroke-width: 0.7; }
 #mapBox .pin.new { fill: #9fb0bc; }
 #mapBox .pin.ink { fill: #e8433f; }
+#mapBox .pin.silver { fill: #cfd6de; }
 #mapBox .pin.bronze { fill: #e0955a; }
 #mapBox .pin.gold { fill: #ffd93e; }
 #mapBox .pinHole { fill: #fffdf5; }
@@ -1130,18 +1146,7 @@ html, body {
 }
 #mapBox .insetLab { fill: rgba(20, 24, 58, 0.75); letter-spacing: 0.2em; }
 
-/* The two pages of the tour. */
-#tourTabs { display: flex; gap: 6px; justify-content: center; margin: 0 0 10px; }
-#tourTabs button {
-  font: inherit; color: inherit; cursor: pointer;
-  font-size: 10px; font-weight: 800; letter-spacing: 0.16em;
-  padding: 6px 14px;
-  background: none; border: 1px solid var(--hair); border-radius: 3px;
-  opacity: 0.6;
-}
-#tourTabs button.on {
-  opacity: 1; color: #14183a; background: var(--accent); border-color: var(--accent);
-}
+/* The tour tabs retired with the one-page merge (2026-09-22). */
 
 /* The city card under the map: the tapped pin's facts, and the door. */
 #mapCard {
@@ -1156,6 +1161,7 @@ html, body {
 .mcReg { font-size: 8px; font-weight: 800; letter-spacing: 0.16em; opacity: 0.55; }
 .mcTier { margin-left: auto; font-size: 9px; font-weight: 800; letter-spacing: 0.18em; }
 .mcTier.gold { color: var(--accent); }
+.mcTier.silver { color: #dfe6ee; }
 .mcTier.bronze { color: #eda56a; }
 .mcRow { font-size: 10px; opacity: 0.8; margin-top: 3px; letter-spacing: 0.05em; }
 .mcRun {
@@ -1204,6 +1210,10 @@ button.stampC:active { transform: scale(0.96); }
 .stampC.new .sCr { opacity: 0.7; }
 .stampC .sDays { font-size: 8px; font-weight: 700; letter-spacing: 0.1em; opacity: 0.7; margin-top: 3px; }
 .stampC.new { border-style: dashed; opacity: 0.45; }
+/* The medal ladder (2026-09-22): gold, SILVER, bronze -- bronze now
+ * means completed, silver means the course record fell. */
+.stampC.silver { border-color: #cfd6de; }
+.stampC.silver .sTier, .stampC.silver .sCity { color: #dfe6ee; }
 .stampC.bronze { border-color: #e0955a; }
 .stampC.bronze .sTier, .stampC.bronze .sCity { color: #eda56a; }
 .stampC.gold { border-color: var(--accent); background: rgba(255, 228, 94, 0.07); }
@@ -1248,6 +1258,7 @@ button.stampC:active { transform: scale(0.96); }
   border: 1.5px solid rgba(255, 253, 245, 0.35); border-radius: 14px;
 }
 .raceB:active { transform: scale(0.96); }
+.raceB.silver { border-color: #cfd6de; }
 .raceB.bronze { border-color: #e0955a; }
 .raceB.gold { border-color: var(--accent); background: rgba(255, 228, 94, 0.07); }
 .raceB.shut { opacity: 0.45; cursor: default; }
@@ -1256,6 +1267,64 @@ button.stampC:active { transform: scale(0.96); }
 .raceB .rbBest { font-size: 8px; color: #8cc6ff; margin-top: 1px; }
 .raceB .rbNote { font-size: 7.5px; font-weight: 800; letter-spacing: 0.14em; color: var(--accent); margin-top: 2px; }
 .raceB.shut .rbNote { color: inherit; opacity: 0.6; }
+
+/* ---- the 2026-09-22 spine ---- */
+/* The pick row: label + the chosen city as the button that opens the
+ * bubbles. The city is the biggest thing after the masthead, because the
+ * pick is the day's one decision. */
+#pickRow {
+  display: flex; align-items: baseline; justify-content: center; gap: 10px;
+  margin: 14px auto 0;
+}
+#pickRow #pickLab {
+  font-size: 10px; font-weight: 800; letter-spacing: 0.14em; opacity: 0.85;
+}
+#pickBtn {
+  font: inherit; color: var(--accent); cursor: pointer;
+  font-size: 19px; font-weight: 800; letter-spacing: 0.1em;
+  padding: 4px 12px;
+  background: none; border: 1.5px solid rgba(255, 228, 94, 0.55); border-radius: 8px;
+}
+#pickBtn:disabled { color: inherit; opacity: 0.7; border-color: var(--hair); cursor: default; }
+#pickBtn .chev { font-size: 12px; margin-left: 6px; opacity: 0.8; }
+#pickBtn:active:not(:disabled) { transform: scale(0.97); }
+
+/* The tries line, quiet, above the CTA. */
+#triesLine {
+  margin: 8px auto 0;
+  font-size: 9px; font-weight: 800; letter-spacing: 0.14em;
+  color: var(--accent); opacity: 0.9;
+}
+#triesEnd {
+  margin: 10px auto 0;
+  font-size: 10px; font-weight: 800; letter-spacing: 0.14em;
+  color: var(--accent);
+}
+#triesEnd:empty { display: none; }
+
+/* The two doors off the panel, side by side under the CTA. */
+/* TOE THE LINE, the big yellow box of the spec: block-wide on its
+ * panel, the doors sized against it. */
+#startPanel #startBtn {
+  display: block; width: 100%; max-width: 412px;
+  margin-left: auto; margin-right: auto;
+  font-size: 17px;
+}
+#doorRow {
+  display: flex; gap: 10px; justify-content: center;
+  max-width: 412px; margin: 10px auto 0;
+}
+.boxBtn {
+  flex: 1 1 0; max-width: 200px;
+  display: inline-block; box-sizing: border-box;
+  font: inherit; color: inherit; cursor: pointer; text-decoration: none;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.14em; text-align: center;
+  padding: 12px 10px; min-height: 44px;
+  background: rgba(255, 253, 245, 0.05);
+  border: 1px solid rgba(255, 253, 245, 0.35); border-radius: 4px;
+}
+.boxBtn:active { transform: translateY(1px); }
+#doorRow .boxBtn.hidden { display: none; }
 
 #pickLine {
   margin: 5px auto 0; max-width: 340px;
@@ -1280,6 +1349,7 @@ button.stampC:active { transform: scale(0.96); }
 #stampInk #stampCity { font-size: 17px; font-weight: 800; letter-spacing: 0.14em; }
 #stampInk #stampWord { font-size: 9px; font-weight: 800; letter-spacing: 0.26em; margin-top: 1px; }
 #stampInk #stampDate { font-size: 8px; opacity: 0.7; letter-spacing: 0.12em; margin-top: 2px; }
+#stampInk.silver { border-color: #cfd6de; color: #dfe6ee; box-shadow: inset 0 0 0 1.5px rgba(207, 214, 222, 0.5); }
 #stampInk.bronze { border-color: #e0955a; color: #eda56a; box-shadow: inset 0 0 0 1.5px rgba(224, 149, 90, 0.5); }
 #stampInk.gold { border-color: var(--accent); color: var(--accent); box-shadow: inset 0 0 0 1.5px rgba(255, 228, 94, 0.5); }
 #stampCtx { font-size: 9px; letter-spacing: 0.1em; opacity: 0.8; margin-top: 5px; }
@@ -1293,12 +1363,12 @@ button.stampC:active { transform: scale(0.96); }
 /* The second wager on the start panel: the day's real course record. */
 #cityBar {
   display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
-  margin: 4px auto 0; max-width: 340px;
-  padding: 4px 10px;
-  border-left: 4px solid #e0955a;
+  margin: 14px auto 0; max-width: 340px;
+  padding: 5px 10px;
+  border-left: 4px solid #cfd6de;   /* the course record pays SILVER */
   background: var(--ink);
 }
-#cityBar #cityBarLab { font-size: 8.5px; font-weight: 800; letter-spacing: 0.12em; color: #eda56a; }
+#cityBar #cityBarLab { font-size: 8.5px; font-weight: 800; letter-spacing: 0.12em; color: #dfe6ee; }
 #cityBar #cityBarTime { font-size: 11px; font-weight: 700; white-space: nowrap; }
 
 /* The thrown gauntlet: the friend's time as a third wager, in the accent
@@ -1313,16 +1383,6 @@ button.stampC:active { transform: scale(0.96); }
 #challengeBar span { font-size: 8.5px; font-weight: 800; letter-spacing: 0.12em; color: var(--accent); }
 #challengeBar #challengeTime { font-size: 11px; font-weight: 700; white-space: nowrap; }
 
-/* The middle rung, in the rail tick's own blue. */
-#pbBar {
-  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
-  margin: 4px auto 0; max-width: 340px;
-  padding: 4px 10px;
-  border-left: 4px solid #6db9ff;
-  background: var(--ink);
-}
-#pbBar span { font-size: 8.5px; font-weight: 800; letter-spacing: 0.12em; color: #8cc6ff; }
-#pbBar #pbTime { font-size: 11px; font-weight: 700; white-space: nowrap; }
 
 /* ---- finish panel ----
  *
@@ -6876,6 +6936,11 @@ MR.K = (function () {
   const RECORD_PACE = RECORD_SECONDS / MARATHON_MILES;
 
   const UNITS_PER_MILE = 240;
+  // The daily attempt cap (owner, 2026-09-22: "No unlimited tries - 3 a
+  // day max"). Read by main.js's lockout and by the HUD's tries lines;
+  // one constant so the two can never disagree. Bots, skips and nosave
+  // inspections bypass it the way they bypass the record lockout.
+  const TRIES_PER_DAY = 3;
 
   // Lateral spacing between lane centres. See the track geometry block below
   // for why this number and not another.
@@ -6978,6 +7043,7 @@ MR.K = (function () {
     TIME_SCALE: 30,
     UNITS_PER_MILE,
     TOTAL_UNITS: MARATHON_MILES * UNITS_PER_MILE,  // 6292.5
+    TRIES_PER_DAY,
 
     // Track geometry. LANE_W is the seed the whole track is cut from: the lane
     // centres, the tarmac, and every hazard width in world.js derive from it.
@@ -11885,12 +11951,18 @@ MR.Course = (function () {
    * you take the ink stamp, which is the truth of that course.
    */
   function tierFor(seconds, tag) {
+    // The medal ladder (owner, 2026-09-22): GOLD beats the world record,
+    // SILVER beats the city's course record, BRONZE completed the course.
+    // Every finish earns at least bronze; London cannot award silver, its
+    // course record being the world record itself.
     if (!(seconds > 0)) return '';
     if (seconds < K.RECORD_SECONDS) return 'gold';
     for (const s of SETTINGS) {
-      if (s.tag === tag) return seconds < s.rec ? 'bronze' : '';
+      if (s.tag === tag) {
+        return (s.rec > K.RECORD_SECONDS && seconds < s.rec) ? 'silver' : 'bronze';
+      }
     }
-    return '';
+    return 'bronze';
   }
 
   const api = { generate, generateAid, validate, solvable, biomeAt, difficulty,
@@ -47555,141 +47627,69 @@ MR.HUD = (function () {
       <div class="panel" id="startPanel" role="dialog" aria-modal="true"
            aria-labelledby="startTitle"><div class="panelInner">
         <div class="date" id="startDate"></div>
+        <!--
+          THE SPINE (owner, 2026-09-22: "The home page ... too crowded").
+          Seven things, top to bottom, and nothing else: the masthead, the
+          pick, the course record, the world record, the door onto the
+          road, and the two doors off it. Everything the old panel carried
+          beyond these -- the quote, the blurb, the key legend, the memory
+          plates, your own best -- either teaches itself on the road inside
+          fifteen seconds or lives in the passport now.
+        -->
         <h1 id="startTitle">MARATHON MILES</h1>
-        <div class="route" id="startRoute"></div>
+
         <!--
-          MILES SPEAKS, once a day (docs/miles.md). One terse line in the
-          masthead voice, chosen by the day's city -- the tater-tot lesson
-          from the owner's references: a single spoken line to the camera
-          builds more character than any mesh. Attributed, because the name
-          is new and the line is how the player learns whose name it is.
+          THE PICK leads. The city is not a masthead any more; it is the
+          day's one decision, stated as one: PICK TODAY'S RACE, the chosen
+          city on the button, the bubble sheet one tap below.
         -->
-        <div id="milesLine"></div>
-
-        <div class="blurb">
-          Three lanes. Jump or slide past everything in the way.
-          <b>26.2 miles.</b>
+        <div id="pickRow">
+          <span id="pickLab">PICK TODAY'S RACE:</span>
+          <button id="pickBtn" type="button" class="hidden"><span id="pickCity"></span><span class="chev">&#9662;</span></button>
         </div>
+        <div id="pickLine" class="hidden"></div>
+        <div id="racePick" class="hidden"></div>
 
         <!--
-          THREE LINES CAME OUT OF THIS PANEL AND NONE OF THEM WERE WRONG.
-          The owner cut the duration, the pace rule and the mistake count:
-          "about four minutes", "5:30 up to 4:14 a mile, touch one and most of
-          it is gone", "survives one mistake in 185".
-
-          Every one was true and every one was answering a question nobody had
-          asked yet. A player who has not run this cannot use a pace range, has
-          no idea whether 185 gates is a lot, and does not need the length of a
-          thing they are about to be shown. The panel now states the wager and
-          the controls and stops -- the mechanic teaches itself on the road,
-          where the fuel gauge and the pace readout are already saying it live.
-
-          The target keeps its number because that IS the wager. What it loses
-          is the gloss under it.
-
-          The label names the wager in full -- the owner: the target "needs to
-          mention you are trying to break the marathon record". Same single
-          line, same figure; only the word TARGET grew into the claim it was
-          abbreviating.
-        -->
-        <div class="target">
-          <span class="targetLab">BREAK THE MARATHON WORLD RECORD</span>
-          <b class="num">${K.RECORD_LABEL}</b>
-        </div>
-        <!--
-          THE SECOND WAGER, under the first. Each city carries its REAL
-          course record now, and beating it is the bronze stamp -- so the
-          panel states both bars the day can be won at. One line, set with
-          the city, hidden in London where the two bars are the same bar
-          (Sawe's 1:59:30 IS London's course record).
+          THE TWO BARS, course first (the nearer rung), world under it.
+          No holder, no year -- the owner: "remove name and date of who
+          broke it". The number is the wager; the name was gloss.
         -->
         <div id="cityBar" class="hidden">
-          <span id="cityBarLab"></span>
+          <span id="cityBarLab">COURSE RECORD</span>
           <b class="num" id="cityBarTime"></b>
         </div>
-        <!--
-          THE THROWN GAUNTLET. A shared link can carry ?beat= -- a friend's
-          finish on this same city -- and this bar is that time made a
-          third wager on the panel. It renders only when main.js has
-          verified the link's city is the loaded city.
-        -->
+        <div class="target">
+          <span class="targetLab">WORLD RECORD</span>
+          <b class="num">${K.RECORD_LABEL}</b>
+        </div>
+        <!-- A friend's ?beat= link renders here, verified by main.js. -->
         <div id="challengeBar" class="hidden">
           <span>A FRIEND RAN THIS ROAD</span>
           <b class="num" id="challengeTime"></b>
         </div>
-        <!-- The middle rung on the panel: your own best on this road. -->
-        <div id="pbBar" class="hidden">
-          <span>YOUR BEST ON THIS ROAD</span>
-          <b class="num" id="pbTime"></b>
-        </div>
-        <!--
-          PICK YOUR OWN ADVENTURE. Every city is open every day and the
-          player spends ONE on it; this is the door to the picker, and the
-          line under it says which state the day is in -- running the
-          world's race, running your own pick, or spent until tomorrow.
-        -->
-        <div id="pickLine" class="hidden"></div>
-        <!--
-          THE RACE PICKER (owner, 2026-09-16: "Home page needs a button
-          that says: choose your race for the day. From there a drop down
-          or bubble screen giving you your options."). The button opens a
-          bubble sheet right here on the panel -- seventeen chips, the
-          featured race first and flagged, each carrying its tier and the
-          real record it is worth -- so choosing costs one tap and zero
-          navigation. The map stays one level deeper for the scenic route.
-        -->
-        <button id="pickBtn" type="button" class="cta2 hidden">CHOOSE YOUR RACE FOR THE DAY</button>
-        <div id="racePick" class="hidden"></div>
 
         <!--
-          WHAT THE GAME REMEMBERS.
-
-          Empty on a first visit, and it stays out of the way when it is: a
-          stranger gets exactly the panel they got before. From the second run
-          onward it is the reason to have come back, so it sits directly under
-          the wager it is a record of.
-        -->
-        <div id="startMemory"></div>
-
-        <!--
-          THE DAY IS WON, AND THE PANEL SAYS SO INSTEAD OF OFFERING A START.
-
-          The owner: "You can play the game as many times as you want until
-          you break the record. After that you wait until the next day."
-          Retries stay unlimited on every other day; on a day the record fell
-          this box replaces the button, and it carries the four facts that
-          state of affairs consists of: the record is broken, the time that
-          broke it, that today is over, and when the next road opens. The
-          city and the streak are already on the panel above it.
+          THE DAY IS OVER, either way: the record fell, or the three tries
+          are spent (owner, 2026-09-22: "No unlimited tries - 3 a day
+          max"). Same box, different chip -- setLocked carries the reason.
         -->
         <div id="lockedBox" class="hidden">
-          <div class="lockChip">RECORD BROKEN</div>
+          <div class="lockChip" id="lockChip">RECORD BROKEN</div>
           <div class="lockTime num" id="lockTime"></div>
-          <div class="lockSub">MILES IS DONE FOR TODAY</div>
+          <div class="lockSub" id="lockSub">MILES IS DONE FOR TODAY</div>
           <div class="lockNext num" id="lockNext"></div>
         </div>
 
-        <div class="keys" id="startKeys"></div>
+        <div id="triesLine" class="hidden num"></div>
         <button class="cta" id="startBtn" type="button">TOE THE LINE</button>
-        <!--
-          The door to the run history. A text row rather than a second CTA --
-          it must not compete with TOE THE LINE -- and it renders only once
-          there is a history to show, the same empty-state rule the memory
-          plates follow.
-        -->
-        <button id="histBtn" type="button" class="hidden">PASSPORT · WORLD MAP</button>
-        <!--
-          The door OUT to the explainer, which lives on the site rather than in
-          the game. Absolute rather than rooted, because this same file is
-          opened from file:// by every tool in tools/ and is published as a
-          standalone artifact -- a /how-to-play/ link is a dead link in both,
-          and a dead link on the start panel is worse than no link.
-          target=_blank so a player who taps it mid-session does not lose the
-          page they were about to run.
-        -->
-        <a id="howBtn" class="textBtn"
-           href="https://marathon-miles.com/how-to-play/"
-           target="_blank" rel="noopener">HOW TO PLAY</a>
+        <!-- The two doors off the panel, side by side, smaller than the CTA. -->
+        <div id="doorRow">
+          <button id="histBtn" type="button" class="boxBtn hidden">PASSPORT</button>
+          <a id="howBtn" class="boxBtn"
+             href="https://marathon-miles.com/how-to-play/"
+             target="_blank" rel="noopener">HOW TO PLAY</a>
+        </div>
       </div></div>
 
       <!--
@@ -47705,21 +47705,13 @@ MR.HUD = (function () {
       <div class="panel hidden" id="histPanel" role="dialog" aria-modal="true"
            aria-labelledby="histTitle"><div class="panelInner">
         <div class="date">WORLD TOUR</div>
-        <h1 id="histTitle">WORLD MAP</h1>
+        <h1 id="histTitle">PASSPORT</h1>
         <!--
-          TWO PAGES, ONE PANEL. The owner, with two reference images (a
-          folded paper travel map with pins; a scratch map whose countries
-          reveal in color as they are visited): "The map needs drastic
-          improves... Maybe map and passport are separate pages." So they
-          are: the MAP page is the pin map and the day's picker, the
-          PASSPORT page is the stamps, the ledger and the log. One panel,
-          two views -- the back stack and the open/close plumbing stay
-          exactly what they were.
+          ONE PAGE (owner, 2026-09-22: "Passport and world map are one
+          page"). The map leads -- now a real map: drag to pan, pinch or
+          wheel to zoom -- the tapped city's card sits under it, and the
+          stamp wall follows. The tabs went with the split.
         -->
-        <div id="tourTabs">
-          <button type="button" id="tabMap" class="on">WORLD MAP</button>
-          <button type="button" id="tabPass">PASSPORT</button>
-        </div>
 
         <!--
           THE MAP, SECOND DRAFT: a paper object, not a chart. Bright folded
@@ -47731,13 +47723,12 @@ MR.HUD = (function () {
           run and turns gold when every city in it is sealed. Tapping a pin
           opens the city card under the map, and the card carries the door.
         -->
-        <div id="mapView">
-          <div id="mapBox"></div>
-          <div id="mapCard"></div>
+        <div id="mapBox"></div>
+        <div id="mapZoom" aria-hidden="true">
+          <button type="button" id="zoomIn">+</button>
+          <button type="button" id="zoomOut">&#8722;</button>
         </div>
-
-        <div id="passView" class="hidden">
-        <div id="histSum"></div>
+        <div id="mapCard"></div>
 
         <!--
           EVERY CITY IN THE POOL, AND WHERE THE RECORD HAS FALLEN.
@@ -47778,7 +47769,6 @@ MR.HUD = (function () {
         <div id="stampWall"></div>
 
         <div id="histList"></div>
-        </div>
         <button class="cta" id="histBack" type="button">BACK TO THE LINE</button>
       </div></div>
 
@@ -47864,11 +47854,16 @@ MR.HUD = (function () {
           </div>
         </div>
 
-        <div id="tierRow">
-          <span id="verdict"></span>
-          <div id="milesEnd"></div>
-          <span id="tierNext" class="num"></span>
-        </div>
+        <!--
+          THE SCORE SCREEN, cut to the owner's four (2026-09-22: "Score
+          screen - simple. your time, how many tries you have left, play
+          again if you can, link back to passport screen"): the time, the
+          stamp (which IS the medal the passport requires be clear), the
+          tries, the two buttons. The grade row, the badges, the memory
+          plate, the turn lines and the tomorrow box all came off; the
+          debrief and the share stay because both are one quiet line
+          closed, and both are standing owner orders.
+        -->
 
         <!--
           THE STAMP. "Every time a player finishes a marathon, something
@@ -47890,10 +47885,7 @@ MR.HUD = (function () {
           <div id="stampCtx" class="num"></div>
         </div>
 
-        <div id="endBadges"></div>
-        <div id="endMem" class="num"></div>
-
-        <div id="endTurn"></div>
+        <div id="triesEnd" class="num"></div>
 
         <!--
           THE DEBRIEF, and it is FOLDED for a reason worth stating: the third
@@ -47968,27 +47960,6 @@ MR.HUD = (function () {
           <textarea id="shareText" readonly aria-label="Your result, to copy"></textarea>
         </div>
 
-        <!--
-          THE RETURN HOOK, next to the button it is competing with.
-
-          This was the faintest line on the card, below every stat, which is
-          an odd place for the only element on the screen whose job is to
-          bring someone back tomorrow. It is now a plate directly above RUN IT
-          AGAIN, at the weight of the grade chip, so the two read as a pair of
-          offers: run it again now, or come back for a different road.
-        -->
-        <div id="tomorrow" class="empty">
-          <div class="lab">TOMORROW</div>
-          <div class="tomRoute" id="tomorrowRoute"></div>
-          <!--
-            THE HOOK. The finish is the one moment motivation is spent and
-            renewable at once, and the box used to end on a city name. One
-            line names the reason to come back: the record that nearly fell
-            today, or the roads still unstamped, or the bronze that can go
-            gold -- always the player's own next rung, never a generic cheer.
-          -->
-          <div class="tomHook num" id="tomorrowHook"></div>
-        </div>
         <button class="cta" id="againBtn">RUN IT AGAIN</button>
         <!--
           The owner: "past days needs to be on the score page as well." The
@@ -47997,7 +47968,7 @@ MR.HUD = (function () {
           class as the start panel's door -- and it hides on the same rule,
           because a history of one run is not a history.
         -->
-        <button id="endHistBtn" type="button" class="hidden">PASSPORT · WORLD MAP</button>
+        <button class="cta alt" id="endHistBtn">PASSPORT</button>
       </div></div>
 
       <!--
@@ -48061,37 +48032,31 @@ MR.HUD = (function () {
       railWrap: q('railWrap'),
       rail: q('rail'), railFill: q('railFill'), railGap: q('railGap'), railGhost: q('railGhost'),
       railCR: q('railCR'), railPB: q('railPB'),
-      pbBar: q('pbBar'), pbTime: q('pbTime'),
       railRoute: q('railRoute'),
       gapVal: q('gapVal'), gapTrend: q('gapTrend'), gapLabel: q('gapLabel'),
       toast: q('toast'), toastLab: q('toastLab'), toastBig: q('toastBig'),
       startPanel: q('startPanel'), startBtn: q('startBtn'), startDate: q('startDate'),
-      startRoute: q('startRoute'), startKeys: q('startKeys'),
-      startMemory: q('startMemory'),
       lockedBox: q('lockedBox'), lockTime: q('lockTime'), lockNext: q('lockNext'),
       histBtn: q('histBtn'), histPanel: q('histPanel'),
       endHistBtn: q('endHistBtn'),
-      histSum: q('histSum'), histList: q('histList'), histBack: q('histBack'),
+      histList: q('histList'), histBack: q('histBack'),
       endPanel: q('endPanel'), endTime: q('endTime'), endDate: q('endDate'),
       endVs: q('endVs'),
-      verdict: q('verdict'), tierNext: q('tierNext'),
-      milesLine: q('milesLine'), milesEnd: q('milesEnd'),
-      endBadges: q('endBadges'), endMem: q('endMem'),
-      endTurn: q('endTurn'), tomorrow: q('tomorrow'), tomorrowRoute: q('tomorrowRoute'),
-      tomorrowHook: q('tomorrowHook'),
       debriefBtn: q('debriefBtn'), debrief: q('debrief'),
       shareBox: q('shareBox'), shareLegs: q('shareLegs'), shareLine: q('shareLine'),
       shareBtn: q('shareBtn'), shareImgBtn: q('shareImgBtn'),
       shareNote: q('shareNote'), shareText: q('shareText'),
       cityRule: q('cityRule'), stampWall: q('stampWall'), mapBox: q('mapBox'),
-      mapView: q('mapView'), passView: q('passView'), mapCard: q('mapCard'),
-      tabMap: q('tabMap'), tabPass: q('tabPass'), histTitle: q('histTitle'),
+      mapCard: q('mapCard'), histTitle: q('histTitle'),
+      zoomIn: q('zoomIn'), zoomOut: q('zoomOut'),
       stampMoment: q('stampMoment'), stampInk: q('stampInk'),
       stampCity: q('stampCity'), stampWord: q('stampWord'),
       stampDate: q('stampDate'), stampCtx: q('stampCtx'),
       cityBar: q('cityBar'), cityBarLab: q('cityBarLab'), cityBarTime: q('cityBarTime'),
       challengeBar: q('challengeBar'), challengeTime: q('challengeTime'),
-      pickLine: q('pickLine'), pickBtn: q('pickBtn'), racePick: q('racePick'),
+      pickLine: q('pickLine'), pickBtn: q('pickBtn'), pickCity: q('pickCity'),
+      racePick: q('racePick'), triesLine: q('triesLine'), triesEnd: q('triesEnd'),
+      lockChip: q('lockChip'), lockSub: q('lockSub'),
       againBtn: q('againBtn'),
       count: q('count'), countVal: q('countVal'),
       pauseBtn: q('pauseBtn'), pausePanel: q('pausePanel'),
@@ -48202,41 +48167,10 @@ MR.HUD = (function () {
      * meets is unchanged, and the memory arrives as a reward for having come
      * back rather than as an empty frame promising one.
      */
-    api.setMemory = function (sum) {
-      if (!n.startMemory) return;
-      if (!sum) { n.startMemory.innerHTML = ''; return; }
-
-      let html = '';
-      if (sum.today) {
-        html += plate("TODAY'S BEST", Pace.clock(sum.today.time),
-          Tier.of(sum.today.time).name + ' · ' + sum.today.streak + ' CLEAN');
-      }
-      // The record streak -- consecutive days on which 1:59:30 fell. The win
-      // condition's own streak, so it outranks the played-days one, and it is
-      // held back until 2: a streak of one is just yesterday wearing a label.
-      if ((sum.recordStreak | 0) >= 2) {
-        html += plate('RECORD STREAK', String(sum.recordStreak),
-          sum.recordStreakCounted
-            ? 'RECORDS IN A ROW'
-            : 'BREAK TODAY FOR ' + (sum.recordStreak + 1));
-      }
-      if (sum.dayStreak > 0) {
-        html += plate('DAY STREAK', String(sum.dayStreak),
-          sum.dayStreakCounted
-            ? (sum.dayStreak === 1 ? 'DAY' : 'DAYS') + ' IN A ROW'
-            : 'RUN TODAY FOR ' + (sum.dayStreak + 1));
-      }
-      if (sum.last) {
-        html += plate('LAST RUN', Pace.clock(sum.last.time),
-          dayName(sum.last.date, sum.dateKey) + ' · ' + Tier.of(sum.last.time).name);
-      }
-      if (!html && sum.best) {
-        html += plate('ALL-TIME BEST', Pace.clock(sum.best.time),
-          Tier.of(sum.best.time).name + ' · ' + sum.best.streak + ' CLEAN');
-      }
-      n.startMemory.innerHTML = html;
-      if (api.markScroll) requestAnimationFrame(api.markScroll);
-    };
+    // The memory plates came off the start panel in the 2026-09-22
+    // decrowd; the api survives as a no-op because main.js's refresh path
+    // still calls it and the passport now carries what it showed.
+    api.setMemory = function () {};
 
     // ---- the run history ------------------------------------------------
 
@@ -48281,10 +48215,14 @@ MR.HUD = (function () {
      * course record carried on the pool entry.
      */
     function stampTier(s, c) {
+      // The medal ladder (owner, 2026-09-22): GOLD for the world record,
+      // SILVER for the course record, BRONZE for completing the course.
+      // London can never award silver -- its course record IS the world
+      // record -- which the s.rec > RECORD_SECONDS test encodes.
       if (!c) return 'new';
       if (c.rec || (c.best && c.best < K.RECORD_SECONDS)) return 'gold';
-      if (s.rec && c.best && c.best < s.rec) return 'bronze';
-      return 'ink';
+      if (s.rec && s.rec > K.RECORD_SECONDS && c.best && c.best < s.rec) return 'silver';
+      return 'bronze';
     }
 
     /**
@@ -48475,6 +48413,106 @@ MR.HUD = (function () {
         + '<g clip-path="url(#mclip)">' + folds + waves + polys + trail + regLabels + '</g>'
         + pins + inset
         + '</g></svg>';
+      MV.W = W; MV.H = H;
+      applyMapView();
+    }
+
+    /**
+     * ---- THE MAP IS A MAP NOW (owner, 2026-09-22: "Map needs to be
+     * interactive where you can move and zoom in. If we cannot do this it
+     * does not work.") ---------------------------------------------------
+     *
+     * Drag pans, wheel and pinch zoom about the point under the finger,
+     * the +/- buttons serve the mouseless and the wheelless, and a tap is
+     * still a tap: a press that travelled more than eight pixels swallows
+     * the click before the pin delegation can read it. The view lives
+     * OUTSIDE the svg -- drawMap replaces the element on every save
+     * change, and the camera must survive the redraw. All of it drives
+     * one attribute, viewBox, clamped to the paper.
+     */
+    const MV = { s: 1, x: 0, y: 0, W: 0, H: 0 };
+    const MAP_S_MAX = 6;
+    function applyMapView() {
+      const svg = n.mapBox.querySelector('svg');
+      if (!svg || !MV.W) return;
+      MV.s = Math.max(1, Math.min(MAP_S_MAX, MV.s));
+      const vw = MV.W / MV.s, vh = MV.H / MV.s;
+      MV.x = Math.max(0, Math.min(MV.W - vw, MV.x));
+      MV.y = Math.max(0, Math.min(MV.H - vh, MV.y));
+      svg.setAttribute('viewBox',
+        MV.x.toFixed(2) + ' ' + MV.y.toFixed(2) + ' ' + vw.toFixed(2) + ' ' + vh.toFixed(2));
+      n.mapBox.classList.toggle('zoomed', MV.s > 1.01);
+    }
+    /** Zoom to ns keeping the content point under view-fraction (fx,fy) still. */
+    function mapZoom(ns, fx, fy) {
+      const cx = MV.x + fx * MV.W / MV.s;
+      const cy = MV.y + fy * MV.H / MV.s;
+      MV.s = Math.max(1, Math.min(MAP_S_MAX, ns));
+      MV.x = cx - fx * MV.W / MV.s;
+      MV.y = cy - fy * MV.H / MV.s;
+      applyMapView();
+    }
+    {
+      const box = n.mapBox;
+      const live = new Map();   // pointerId -> {x, y}
+      let movedPx = 0, pinchD0 = 0, pinchS0 = 1;
+      const frac = function (e) {
+        const svg = box.querySelector('svg');
+        if (!svg) return null;
+        const r = svg.getBoundingClientRect();
+        if (!r.width || !r.height) return null;
+        return { fx: (e.clientX - r.left) / r.width, fy: (e.clientY - r.top) / r.height, r: r };
+      };
+      const dist = function () {
+        const p = [...live.values()];
+        return Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+      };
+      box.addEventListener('pointerdown', function (e) {
+        live.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (live.size === 1) movedPx = 0;
+        if (live.size === 2) { pinchD0 = dist(); pinchS0 = MV.s; }
+        try { box.setPointerCapture(e.pointerId); } catch (err) { /* fine */ }
+      });
+      box.addEventListener('pointermove', function (e) {
+        const p = live.get(e.pointerId);
+        if (!p) return;
+        const f = frac(e);
+        movedPx += Math.abs(e.clientX - p.x) + Math.abs(e.clientY - p.y);
+        if (live.size === 1 && f) {
+          MV.x -= (e.clientX - p.x) / f.r.width * MV.W / MV.s;
+          MV.y -= (e.clientY - p.y) / f.r.height * MV.H / MV.s;
+          applyMapView();
+        }
+        p.x = e.clientX; p.y = e.clientY;
+        if (live.size === 2 && pinchD0 > 0 && f) {
+          const pts = [...live.values()];
+          const svg = box.querySelector('svg');
+          const r = svg.getBoundingClientRect();
+          const mx = (pts[0].x + pts[1].x) / 2, my = (pts[0].y + pts[1].y) / 2;
+          mapZoom(pinchS0 * dist() / pinchD0,
+            (mx - r.left) / r.width, (my - r.top) / r.height);
+        }
+      });
+      const drop = function (e) { live.delete(e.pointerId); };
+      box.addEventListener('pointerup', drop);
+      box.addEventListener('pointercancel', drop);
+      // A drag must not read as a pin tap: capture phase, so this runs
+      // before the data-pin delegation sees the click.
+      box.addEventListener('click', function (e) {
+        if (movedPx > 8) { e.stopPropagation(); e.preventDefault(); movedPx = 0; }
+      }, true);
+      box.addEventListener('wheel', function (e) {
+        const f = frac(e);
+        if (!f) return;
+        e.preventDefault();
+        mapZoom(MV.s * Math.pow(1.0015, -e.deltaY), f.fx, f.fy);
+      }, { passive: false });
+      box.addEventListener('dblclick', function (e) {
+        const f = frac(e);
+        if (f) mapZoom(MV.s > 1.5 ? 1 : 2.5, f.fx, f.fy);
+      });
+      if (n.zoomIn) n.zoomIn.addEventListener('click', function () { mapZoom(MV.s * 1.6, 0.5, 0.5); });
+      if (n.zoomOut) n.zoomOut.addEventListener('click', function () { mapZoom(MV.s / 1.6, 0.5, 0.5); });
     }
 
     /**
@@ -48490,14 +48528,16 @@ MR.HUD = (function () {
       const c = seen[s.name];
       const tier = stampTier(s, c);
       const d = doorState(sum, s, loadedTag);
-      const word = tier === 'gold' ? 'GOLD' : tier === 'bronze' ? 'BRONZE' : tier === 'ink' ? 'RUN' : 'NEW ROAD';
+      const word = tier === 'gold' ? 'GOLD' : tier === 'silver' ? 'SILVER'
+        : tier === 'bronze' ? 'BRONZE' : 'NEW ROAD';
       n.mapCard.innerHTML =
         '<div class="mcTop"><span class="mcCity">' + s.name + '</span>'
         + '<span class="mcReg">' + (s.region || '') + '</span>'
         + '<span class="mcTier ' + tier + '">' + word + '</span></div>'
         + '<div class="mcRow num">'
         + (c ? 'BEST ' + Pace.clock(c.best) + ' · ' : '')
-        + (s.rec ? 'CR ' + Pace.clock(s.rec) + ' · ' + s.holder : '') + '</div>'
+        + (s.rec && s.rec > K.RECORD_SECONDS ? 'CR ' + Pace.clock(s.rec) + ' · ' : '')
+        + 'WR ' + K.RECORD_LABEL + '</div>'
         + (d.door
           ? '<button type="button" class="mcRun" data-city="' + s.tag + '">RUN ' + s.name + ' TODAY</button>'
           : '<div class="mcNote">' + d.note + '</div>');
@@ -48528,8 +48568,11 @@ MR.HUD = (function () {
           const tier = stampTier(s, c);
           if (tier === 'gold') { gold++; rGold++; }
           if (c) { run++; rRun++; }
-          const word = tier === 'gold' ? 'GOLD' : tier === 'bronze' ? 'BRONZE' : tier === 'ink' ? 'RUN' : 'NEW ROAD';
-          const cr = s.rec ? Pace.clock(s.rec) + ' · ' + s.holder : '';
+          // The stamp states the owner's four (2026-09-22): the city, the
+          // course record, the world record, and the medal -- no holder,
+          // no year, the same rule the home bars follow.
+          const word = tier === 'gold' ? 'GOLD' : tier === 'silver' ? 'SILVER'
+            : tier === 'bronze' ? 'BRONZE' : 'NEW ROAD';
           const d = doorState(sum, s, loadedTag);
           const door = d.door, note = d.note;
           return '<' + (door ? 'button type="button"' : 'div') + ' class="stampC ' + tier
@@ -48539,7 +48582,10 @@ MR.HUD = (function () {
             + '<span class="sTier">' + word
             + (s.tag === featTag ? ' <span class="sFeat">TODAY\'S RACE</span>' : '') + '</span>'
             + (c ? '<span class="sBest num">' + Pace.clock(c.best) + '</span>' : '<span class="sBest num">&mdash;</span>')
-            + (cr ? '<span class="sCrLab">RACE RECORD</span><span class="sCr num">' + cr + '</span>' : '')
+            + (s.rec && s.rec > K.RECORD_SECONDS
+                ? '<span class="sCrLab">COURSE RECORD</span><span class="sCr num">' + Pace.clock(s.rec) + '</span>'
+                : '')
+            + '<span class="sCrLab">WORLD RECORD</span><span class="sCr num">' + K.RECORD_LABEL + '</span>'
             + '<span class="sDays">' + (c ? c.runs + (c.runs === 1 ? ' RUN · ' : ' RUNS · ') : '') + note + '</span>'
             + '</' + (door ? 'button' : 'div') + '>';
         }).join('');
@@ -48588,19 +48634,8 @@ MR.HUD = (function () {
       drawMapCard(lastSum, pool, loadedTag);
     });
 
-    // The two pages. One panel, so BACK and the open/close plumbing are
-    // untouched; the tabs only swap which half is visible.
-    function tourView(v) {
-      const isMap = v === 'map';
-      n.mapView.classList.toggle('hidden', !isMap);
-      n.passView.classList.toggle('hidden', isMap);
-      n.tabMap.classList.toggle('on', isMap);
-      n.tabPass.classList.toggle('on', !isMap);
-      n.histTitle.textContent = isMap ? 'WORLD MAP' : 'PASSPORT';
-      requestAnimationFrame(markScroll);
-    }
-    n.tabMap.addEventListener('click', function () { tourView('map'); });
-    n.tabPass.addEventListener('click', function () { tourView('pass'); });
+    // The tabs went with the one-page merge (2026-09-22): the map and the
+    // wall are one scroll now, and the title is static PASSPORT.
 
     api.setHistory = function (sum) {
       lastSum = sum || null;
@@ -48616,28 +48651,12 @@ MR.HUD = (function () {
       // still not a history).
       drawPassport(sum);
       if (!rows.length) {
-        n.histSum.innerHTML = '';
         n.histList.innerHTML = '';
         return;
       }
 
-      let wr = 0;
-      for (const e of rows) if (e.rec) wr++;
-      let html = '';
-      if ((sum.recordStreak | 0) >= 2) {
-        html += plate('RECORD STREAK', String(sum.recordStreak),
-          sum.recordStreakCounted ? 'RECORDS IN A ROW'
-                                  : 'BREAK TODAY FOR ' + (sum.recordStreak + 1));
-      }
-      // The ledger the feedback asked the home of the tour to carry:
-      // marathons as MILES, because "1,231 marathon miles" is the fact a
-      // player repeats to a friend, and every rerun is its own 26.2.
-      html += plate('MARATHON MILES',
-        String(Math.round((sum.totalRuns || rows.length) * K.MARATHON_MILES)),
-        (sum.totalRuns || rows.length) + ' MARATHONS RUN');
-      html += plate('DAYS FINISHED', String(rows.length), 'ONE CITY EACH');
-      html += plate('RECORDS BROKEN', String(wr), wr ? 'MARKED WR BELOW' : 'NONE YET');
-      n.histSum.innerHTML = html;
+      // The ledger plates went with the one-page merge (2026-09-22
+      // decrowd); the wall's rule line already counts the tour.
 
       n.histList.innerHTML = rows.map(function (e) {
         return '<div class="hrow' + (e.rec ? ' rec' : '') + '">'
@@ -48683,26 +48702,10 @@ MR.HUD = (function () {
       ROME: 'OLD ROADS KNOW EVERYTHING.',
       CAPETOWN: 'THE MOUNTAIN WATCHES. RUN.',
     };
-    api.milesSpeaks = function (tag) {
-      const line = MILES_CITY[tag];
-      n.milesLine.innerHTML = line
-        ? '&ldquo;' + line + '&rdquo;<span class="who">&mdash; MILES</span>' : '';
-      n.milesLine.classList.toggle('hidden', !line);
-    };
-    api.milesFinish = function (finishTime) {
-      const over = finishTime - K.RECORD_SECONDS;
-      // The near-miss band widened to 45 on the behavioral review: a
-      // 2:00:10 and a 2:10:00 used to get the same eulogy, and the agony of
-      // almost is the strongest come-back-tomorrow fuel there is. Under 15
-      // seconds Miles counts them; under 45 he names what they are worth --
-      // one clean leg -- which is also, exactly, the coaching.
-      const line = over <= 0 ? 'THAT&rsquo;S THE ONE.'
-        : over <= 15 ? (over <= 1.5 ? 'ONE SECOND. TOMORROW.'
-          : Math.ceil(over) + ' SECONDS. TOMORROW.')
-        : over <= 45 ? Math.ceil(over) + ' SECONDS IS ONE CLEAN LEG.'
-        : 'THE ROAD WON TODAY.';
-      n.milesEnd.innerHTML = '&ldquo;' + line + '&rdquo;<span class="who">&mdash; MILES</span>';
-    };
+    // Miles's spoken lines came off both panels in the 2026-09-22
+    // decrowd. MILES_CITY above is kept: the voice belongs to the game
+    // even while no panel quotes it.
+    api.milesSpeaks = function () {};
 
     /**
      * The thrown gauntlet, verified by main.js (the link's city must be the
@@ -48766,11 +48769,11 @@ MR.HUD = (function () {
     function syncChoice() {
       if (!n.pickBtn) return;
       {
+        // pbBest still feeds the race rail's blue tick; the panel bar it
+        // once fed came off in the decrowd.
         const st0 = course && course.settings && course.settings.length ? course.settings[0] : null;
         const c = st0 && lastSum && lastSum.cities ? lastSum.cities[st0.name] : null;
         pbBest = c && c.best ? c.best : 0;
-        n.pbBar.classList.toggle('hidden', !pbBest);
-        if (pbBest) n.pbTime.textContent = Pace.clock(pbBest) + ' · BEAT IT';
       }
       const set = course && course.settings;
       const loaded = set && set.length ? set[0] : null;
@@ -48778,14 +48781,31 @@ MR.HUD = (function () {
         ? MR.Course.pickSettings(lastSum.dateKey)[0] : null;
       const spent = !!(lastSum && lastSum.todayCity);
       const done = !!(lastSum && lastSum.done);
-      n.pickBtn.classList.toggle('hidden', !loaded || spent || done);
+      // The pick row: the chosen city ON the button. Spent or done, the
+      // button stays visible but shut -- the panel should still say where
+      // today went -- and the line under it explains.
+      n.pickBtn.classList.toggle('hidden', !loaded);
+      n.pickBtn.disabled = !!(spent || done);
+      if (loaded) n.pickCity.textContent = spent ? (lastSum.todayCity || loaded.name) : loaded.name;
       let line = '';
       if (loaded && feat && !done) {
-        if (spent) line = 'TODAY IS ' + (lastSum.todayCity || loaded.name) + ' · NEW PICK TOMORROW';
+        if (spent) line = 'NEW PICK TOMORROW';
         else if (loaded.tag !== feat.tag) line = 'YOUR PICK · THE WORLD RUNS ' + feat.name + ' TODAY';
       }
       n.pickLine.textContent = line;
       n.pickLine.classList.toggle('hidden', !line);
+
+      // The tries line, on both panels (owner: three a day). Quiet until
+      // one is spent; the locked box takes over when they are gone.
+      const runs = lastSum && lastSum.today ? (lastSum.today.runs | 0) : 0;
+      const leftN = Math.max(0, (K.TRIES_PER_DAY || 3) - runs);
+      const triesTxt = runs > 0 && leftN > 0 && !done
+        ? leftN + (leftN === 1 ? ' TRY' : ' TRIES') + ' LEFT TODAY' : '';
+      n.triesLine.textContent = triesTxt;
+      n.triesLine.classList.toggle('hidden', !triesTxt);
+      n.triesEnd.textContent = done ? 'RECORD BROKEN · DONE FOR TODAY'
+        : leftN > 0 ? leftN + (leftN === 1 ? ' TRY' : ' TRIES') + ' LEFT TODAY'
+        : lastSum && lastSum.today ? 'NO TRIES LEFT · NEW ROAD TOMORROW' : '';
     }
     n.endHistBtn.addEventListener('click', function () { openHist(n.endPanel); });
     n.histBack.addEventListener('click', function () {
@@ -48815,9 +48835,16 @@ MR.HUD = (function () {
     api.setLocked = function (info) {
       n.startPanel.classList.toggle('locked', !!info);
       n.lockedBox.classList.toggle('hidden', !info);
-      n.againBtn.textContent = info ? 'DONE FOR TODAY' : 'RUN IT AGAIN';
+      // 'Play again if you can': out of tries or day won, the button goes
+      // rather than relabels -- a dead button is a question, a missing one
+      // is an answer. The passport door beneath it remains.
+      n.againBtn.classList.toggle('hidden', !!info);
       if (lockTimer) { clearInterval(lockTimer); lockTimer = null; }
       if (!info) return;
+      const tries = info.reason === 'tries';
+      n.lockChip.textContent = tries ? '3 TRIES USED' : 'RECORD BROKEN';
+      n.lockSub.textContent = tries ? 'BEST OF TODAY ABOVE · NEW ROAD TOMORROW'
+                                    : 'MILES IS DONE FOR TODAY';
       n.lockTime.textContent = Pace.clock(info.time);
       const tick = function () {
         const t0 = Store ? Store.parseKey(info.dateKey) : NaN;
@@ -49224,7 +49251,7 @@ MR.HUD = (function () {
       out.push((isRec ? TROPHY + ' ' : '') + Tier.of(t).name
         + ' · ' + Pace.clock(t)
         + ' (' + (vs <= 0 ? '-' : '+') + Pace.clock(Math.abs(vs)) + ')'
-        + (medal === 'bronze' ? ' · CITY RECORD BEATEN' : ''));
+        + (medal === 'silver' ? ' · COURSE RECORD BEATEN' : ''));
       if (marks.length) out.push(marks.map(function (m) { return BLOCK[m]; }).join(''));
       const streak = rec && rec.dayStreak ? rec.dayStreak | 0 : 0;
       if (streak >= 2) out.push('Day streak: ' + streak);
@@ -49405,7 +49432,8 @@ MR.HUD = (function () {
       }
 
       // The stamp, pressed at the same six degrees the card presses it.
-      const tint = d.medal === 'gold' ? ACCENT : d.medal === 'bronze' ? BRONZE : CREAM;
+      const tint = d.medal === 'gold' ? ACCENT : d.medal === 'silver' ? '#cfd6de'
+        : d.medal === 'bronze' ? BRONZE : CREAM;
       g.save();
       g.translate(540, 1030);
       g.rotate(-6 * Math.PI / 180);
@@ -49590,22 +49618,17 @@ MR.HUD = (function () {
       course = c;
       chapterCost = null;
       const set = course.settings;
-      n.startRoute.textContent = set && set.length
-        ? set.map(function (x) { return x.name; }).join(' → ')
-        : '';
-      // The bronze bar: today's REAL course record, under the world-record
-      // wager. Hidden in London, where they are the same number and the
-      // second line would restate the first (see SETTINGS: Sawe's 1:59:30
-      // IS London's course record).
+      // The course-record bar: the number alone (owner, 2026-09-22:
+      // "remove name and date of who broke it"). Hidden in London, where
+      // it and the world record are the same number.
       const st0 = set && set[0];
       const showCity = st0 && st0.rec && st0.rec > K.RECORD_SECONDS;
       n.cityBar.classList.toggle('hidden', !showCity);
       if (showCity) {
-        n.cityBarLab.textContent = 'BEAT ' + st0.name + ' COURSE RECORD FOR BRONZE';
-        n.cityBarTime.textContent = Pace.clock(st0.rec) + ' · ' + st0.holder;
+        n.cityBarLab.textContent = st0.name + ' COURSE RECORD';
+        n.cityBarTime.textContent = Pace.clock(st0.rec);
       }
       drawRoute(set);
-      api.milesSpeaks(set && set.length ? set[0].tag : null);
       syncChoice();
       // The route and the gate count arrive after the panel is first laid out
       // and both add height, so the overflow test has to run again here or it
@@ -49613,27 +49636,8 @@ MR.HUD = (function () {
       if (api.markScroll) requestAnimationFrame(api.markScroll);
     };
 
-    /**
-     * Show the right instruction to the right device.
-     *
-     * The legend used to lead with four arrow-key chips and end with the word
-     * "swipe", on every device -- and at 360px and below it wrapped so that
-     * "swipe", the only instruction that applied to the phone in the reader's
-     * hand, was orphaned alone on the second line. Width was being used as a
-     * proxy for input type, and it is not one: a 1024px tablet got pure
-     * keyboard instructions and a narrow desktop window got told to swipe.
-     */
-    function inputHint() {
-      const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-      if (coarse) {
-        return 'Swipe <b>left</b> / <b>right</b> to change lane, ' +
-               '<b>up</b> to jump, <b>down</b> to slide';
-      }
-      return '<kbd>&larr;</kbd><kbd>&rarr;</kbd> lanes &nbsp;·&nbsp; ' +
-             '<kbd>&uarr;</kbd> jump &nbsp;·&nbsp; <kbd>&darr;</kbd> slide' +
-             '<span class="orSwipe"> &nbsp;·&nbsp; or swipe</span>';
-    }
-    n.startKeys.innerHTML = inputHint();
+    // The key legend and its inputHint() came off the panel
+    // (owner, 2026-09-22, item 1); the coach cards teach the controls.
 
     /**
      * Flag a panel that overflows, so the fade at its bottom edge only appears
@@ -49662,12 +49666,6 @@ MR.HUD = (function () {
         el.classList.toggle('canScroll',
           el.scrollHeight - el.clientHeight - el.scrollTop > 4);
       }, { passive: true });
-    }
-    if (window.matchMedia) {
-      const mq = window.matchMedia('(pointer: coarse)');
-      const onMq = function () { n.startKeys.innerHTML = inputHint(); };
-      if (mq.addEventListener) mq.addEventListener('change', onMq);
-      else if (mq.addListener) mq.addListener(onMq);
     }
 
     api.update = function (p, extra) {
@@ -50160,53 +50158,8 @@ MR.HUD = (function () {
       return best ? 'FASTEST MILE · MILE ' + best.mile + ' IN ' + Pace.pace(best.mt) + '/MI' : '';
     }
 
-    /** Tomorrow's road. Free: the date seed already decides it. */
-    function tomorrowLine() {
-      try {
-        const k = Store && dateKey ? Store.shift(dateKey, 1) : null;
-        const s = k && MR.Course.pickSettings ? MR.Course.pickSettings(k) : null;
-        if (s && s.length) {
-          // The city AND its wager. A name alone is a fact; a name with the
-          // record under it is a reason to come back.
-          const names = s.map(function (x) { return x.name; }).join(' → ');
-          return s[0].rec ? names + ' · RECORD ' + Pace.clock(s[0].rec) : names;
-        }
-      } catch (e) { /* a teaser is never worth an exception */ }
-      return '';
-    }
-
-    /**
-     * The hook line under tomorrow's city: the player's own next rung, in
-     * priority order. A record that nearly fell today outranks everything
-     * -- that ache is the strongest return fuel there is -- then the roads
-     * not yet run, then the bronze that can go gold, and a full-gold map is
-     * a thing to defend. Empty when there is nothing true to say, which is
-     * the same rule every plate on this card follows.
-     */
-    function hookLine(t, st0) {
-      const overWR = t - K.RECORD_SECONDS;
-      if (overWR > 0 && overWR <= 30) {
-        return Pace.clock(overWR) + ' OFF THE WORLD RECORD · IT CAN FALL TOMORROW';
-      }
-      const overCity = st0 && st0.rec && st0.rec > K.RECORD_SECONDS ? t - st0.rec : Infinity;
-      if (overCity > 0 && overCity <= 30) {
-        return Pace.clock(overCity) + ' OFF THE COURSE RECORD · FINISH THE JOB';
-      }
-      const pool = MR.Course && MR.Course.SETTINGS;
-      if (lastSum && lastSum.cities && pool && pool.length) {
-        let unrun = 0, bronze = 0, gold = 0;
-        for (const s of pool) {
-          const tier = stampTier(s, lastSum.cities[s.name]);
-          if (tier === 'new') unrun++;
-          else if (tier === 'bronze') bronze++;
-          else if (tier === 'gold') gold++;
-        }
-        if (unrun > 0) return unrun + ' ROAD' + (unrun === 1 ? '' : 'S') + ' STILL UNSTAMPED';
-        if (bronze > 0) return bronze + ' BRONZE STAMP' + (bronze === 1 ? '' : 'S') + ' CAN GO GOLD';
-        if (gold === pool.length) return 'EVERY STAMP IS GOLD · DEFEND THE MAP';
-      }
-      return '';
-    }
+    // tomorrowLine() and hookLine() went with the tomorrow box
+    // (2026-09-22 simple score screen).
 
     /**
      * @param p    the finished pace state
@@ -50221,8 +50174,6 @@ MR.HUD = (function () {
       guardZ = guards && guards.length ? guards.slice() : null;
       chapterCost = null;
       const t = p.finishTime;
-      const rung = Tier.of(t);
-      const up = Tier.next(t);
 
       // ---- headline: the time ---------------------------------------------
       // One number. The LONGEST CLEAN co-headline that stood beside it was
@@ -50238,18 +50189,6 @@ MR.HUD = (function () {
       cls(n.endVs, 'endVsCls', 'endSub num' + (vs <= 0 ? ' ahead'
         : vs <= 30 ? ' nearMiss' : ''));
 
-      // ---- the grade -----------------------------------------------------
-      n.verdict.textContent = rung.name;
-      n.verdict.className = 'tier t' + rung.i;
-      api.milesFinish(p.finishTime);
-      // Nothing above RECORD, so nothing to chase and nothing to print. This
-      // slot used to say RECORD BEATEN BY 1:37 directly beneath an endVs
-      // reading -1:37 VS 1:59:30, beside a chip reading RECORD: the same
-      // number three times inside ninety pixels.
-      n.tierNext.textContent = up
-        ? Pace.clock(Tier.gapTo(t, up)) + ' OFF ' + up.name
-        : '';
-
       // ---- the stamp ------------------------------------------------------
       // See the markup note: this is the permanent thing this finish just
       // did to the passport, pressed onto the card as it opens. The medal
@@ -50259,19 +50198,23 @@ MR.HUD = (function () {
         const medal = MR.Course.tierFor ? MR.Course.tierFor(t, st0.tag) : '';
         n.stampCity.textContent = st0.name;
         n.stampWord.textContent = medal === 'gold' ? 'WORLD RECORD'
-          : medal === 'bronze' ? 'COURSE RECORD' : 'FINISHED';
+          : medal === 'silver' ? 'COURSE RECORD' : 'FINISHED';
         n.stampDate.textContent = (rec.dateKey || '').replace(/-/g, '.')
           + (rec.revisit ? ' · REVISIT' : '');
         n.stampInk.className = medal || 'plain';
-        n.stampCtx.textContent = medal === 'gold'
-          ? 'THE WORLD RECORD, BY ' + Pace.clock(K.RECORD_SECONDS - t)
-          : medal === 'bronze'
-            ? 'AHEAD OF ' + st0.holder + ' BY ' + Pace.clock(st0.rec - t)
-            : (st0.rec && st0.rec > K.RECORD_SECONDS
-                ? 'COURSE RECORD ' + Pace.clock(st0.rec) + ' · ' + Pace.clock(t - st0.rec) + ' AWAY'
-                : '');
+        // One context line; a live challenge outranks the record gloss.
+        n.stampCtx.textContent = challengeBeat
+          ? (t <= challengeBeat ? 'CHALLENGE BEATEN BY ' + Pace.clock(challengeBeat - t)
+                                : 'CHALLENGE MISSED BY ' + Pace.clock(t - challengeBeat))
+          : medal === 'gold'
+            ? 'THE WORLD RECORD, BY ' + Pace.clock(K.RECORD_SECONDS - t)
+            : medal === 'silver'
+              ? 'COURSE RECORD BEATEN BY ' + Pace.clock(st0.rec - t)
+              : (st0.rec && st0.rec > K.RECORD_SECONDS
+                  ? 'COURSE RECORD ' + Pace.clock(st0.rec) + ' · ' + Pace.clock(t - st0.rec) + ' AWAY'
+                  : '');
         n.stampCtx.classList.toggle('near',
-          !medal && st0.rec && st0.rec > K.RECORD_SECONDS && t - st0.rec > 0 && t - st0.rec <= 30);
+          medal === 'bronze' && st0.rec && st0.rec > K.RECORD_SECONDS && t - st0.rec > 0 && t - st0.rec <= 30);
         // Replay the press. The class is pulled, the layout is forced to
         // notice, and the class returns -- the standard way to rewind a CSS
         // animation without cloning the node.
@@ -50283,50 +50226,11 @@ MR.HUD = (function () {
         n.stampMoment.classList.add('hidden');
       }
 
-      // ---- what the save made of it --------------------------------------
-      const badges = [];
-      if (rec.allTimeBest && !rec.firstEver) badges.push('ALL-TIME BEST');
-      else if (rec.beatToday && !rec.firstToday) badges.push('BEST TODAY');
-      if (rec.allTimeStreak && !rec.firstEver) badges.push('LONGEST CLEAN EVER');
-      else if (rec.beatTodayStreak && !rec.firstToday) badges.push('LONGEST CLEAN TODAY');
-      if (rec.dayStreak > 1) badges.push(rec.dayStreak + ' DAY STREAK');
-      n.endBadges.innerHTML = badges
-        .map(function (b) { return '<span class="ebadge">' + b + '</span>'; }).join('');
-
-      const was = rec.prevToday;
-      n.endMem.textContent = was
-        ? (t < was.time
-            ? 'BEAT YOUR BEST TODAY BY ' + Pace.clock(was.time - t)
-            : 'YOUR BEST TODAY ' + Pace.clock(was.time)
-              + ' · THIS RUN +' + Pace.clock(t - was.time))
-        // No previous run today means there is no comparison to draw, and
-        // "FIRST RUN TODAY" is that absence typed out. The start panel's
-        // memory plates already refuse to render their own empty state; this
-        // is the same rule on the other side of the run.
-        : '';
-
-      // ---- the two notes ---------------------------------------------------
-      // The turn names one actual moment in the race, which is the job the
-      // six-block split table could not do. The contacts-cost plate and the
-      // AID TAKEN note that used to sit between here and the badges were
-      // removed on the owner's word.
-      const notes = [];
-      const turn = turnLine(p);
-      if (turn) notes.push(turn);
-      // Where the run went. See chapterCosts(): this is the only per-chapter
-      // number in the game that moves with how the player ran rather than
-      // with what the date drew, and it prints only when one biome leg really
-      // did carry the run ("CLEAN THROUGH THE WALL").
-      const where = p.hits ? decisiveChapter(t) : null;
-      if (where) notes.push('CLEAN THROUGH ' + where.name + ' · ' + Pace.clock(where.would));
-      // The gauntlet answered, before anything else the card wants to say.
-      if (challengeBeat) {
-        notes.unshift(t <= challengeBeat
-          ? 'CHALLENGE BEATEN BY ' + Pace.clock(challengeBeat - t)
-          : 'CHALLENGE MISSED BY ' + Pace.clock(t - challengeBeat));
-      }
-      n.endTurn.innerHTML = notes
-        .map(function (x) { return '<div>' + x + '</div>'; }).join('');
+      // The 2026-09-22 cut ("Score screen - simple"): the grade row, the
+      // badges, the best-today memory and the turn lines all came off. A
+      // challenge answer survives as one line in stampCtx's slot below
+      // because a thrown gauntlet unanswered is a broken promise, not
+      // decoration.
 
       // ---- the debrief, folded shut for a fresh finish ---------------------
       debriefP = p;
@@ -50377,11 +50281,6 @@ MR.HUD = (function () {
       n.shareBox.classList.remove('revealed');
       n.shareText.value = '';
       shareNote('');
-
-      const tom = tomorrowLine();
-      n.tomorrowRoute.textContent = tom;
-      n.tomorrow.classList.toggle('empty', !tom);
-      n.tomorrowHook.textContent = tom ? hookLine(t, st0) : '';
 
       n.endPanel.classList.remove('hidden');
       syncPanels();
@@ -50938,8 +50837,15 @@ MR.unbail = function () {
     const sum = NOSAVE ? null : MR.Store.summary(dateKey);
     hud.setMemory(sum);
     hud.setHistory(sum);
-    locked = !!(LOCKOUT && sum && sum.done);
-    hud.setLocked(locked ? { time: sum.doneTime, dateKey: dateKey } : null);
+    // Locked two ways now: the record fell, or the three tries are spent
+    // (owner, 2026-09-22). The reason travels so the panel can say which.
+    const runsToday = sum && sum.today ? (sum.today.runs | 0) : 0;
+    locked = !!(LOCKOUT && sum && (sum.done || runsToday >= K.TRIES_PER_DAY));
+    hud.setLocked(locked ? {
+      time: sum.done ? sum.doneTime : (sum.today ? sum.today.time : 0),
+      dateKey: dateKey,
+      reason: sum.done ? 'record' : 'tries',
+    } : null);
   }
 
   function reset() {

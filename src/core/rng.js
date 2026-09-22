@@ -30,13 +30,56 @@ MR.rng = (function () {
     };
   }
 
-  /** 'YYYY-MM-DD' for a Date, in UTC. */
+  /**
+   * 'YYYY-MM-DD' for a Date -- the GAME DAY, which rolls at midnight
+   * PACIFIC TIME (owner, 2026-09-22: "needs to reset at midnight PT").
+   * One authority: every consumer of "today" -- the course seed, the
+   * save's rows, the one-a-day door, the tries cap -- reads this label,
+   * so the reset moves everywhere by moving here.
+   *
+   * Intl carries the DST boundary (PST/PDT), so the roll is honest at
+   * 00:00 Pacific all year. The fallback, for a browser with no zoned
+   * Intl, is fixed UTC-8 -- an hour late in summer on museum browsers,
+   * and consistently so, which beats throwing on boot.
+   *
+   * DIFFERENCES between keys (streaks, shift) are pure label arithmetic
+   * in store.js, untouched by which wall clock mints the labels.
+   */
+  const DAY_TZ = 'America/Los_Angeles';
+  let dayFmt = null;
+  try {
+    // en-CA formats as YYYY-MM-DD, exactly the key shape.
+    dayFmt = new Intl.DateTimeFormat('en-CA',
+      { timeZone: DAY_TZ, year: 'numeric', month: '2-digit', day: '2-digit' });
+    dayFmt.format(new Date());   // throw NOW if the zone is unknown
+  } catch (e) { dayFmt = null; }
   function dateKey(d) {
     d = d || new Date();
-    const y = d.getUTCFullYear();
-    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(d.getUTCDate()).padStart(2, '0');
+    if (dayFmt) return dayFmt.format(d);
+    const t = new Date(d.getTime() - 8 * 3600000);
+    const y = t.getUTCFullYear();
+    const m = String(t.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(t.getUTCDate()).padStart(2, '0');
     return `${y}-${m}-${day}`;
+  }
+
+  /**
+   * Milliseconds until the game day rolls (the next midnight Pacific).
+   * Derived from the PT wall clock rather than key arithmetic, so the
+   * DST-length days (23h and 25h) count down honestly; the lockout
+   * panel re-derives every 30s and self-corrects across the jump.
+   */
+  function nextResetMs(now) {
+    const at = now === undefined ? Date.now() : now;
+    try {
+      const f = new Intl.DateTimeFormat('en-GB',
+        { timeZone: DAY_TZ, hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
+      const p = f.format(new Date(at)).split(':').map(Number);
+      return ((24 - p[0]) * 3600 - p[1] * 60 - p[2]) * 1000;
+    } catch (e) {
+      const el = ((at - 8 * 3600000) % 86400000 + 86400000) % 86400000;
+      return 86400000 - el;
+    }
   }
 
   /**
@@ -72,5 +115,5 @@ MR.rng = (function () {
     };
   }
 
-  return { hashString, mulberry32, dateKey, stream };
+  return { hashString, mulberry32, dateKey, nextResetMs, stream };
 })();

@@ -9581,3 +9581,42 @@ twenty-five cities, the medal ladder -- a site that promised
 
 Gates: 8/8 shots, 90+90 courses, simulate PASS, sharecard PASS
 (re-taught the ladder), tries and pan/zoom probed on the page.
+
+## 127. Midnight Pacific, and the world as it is (2026-09-22)
+
+TWO OWNER ORDERS, same day.
+
+"NEEDS TO RESET AT MIDNIGHT PT." The game day had one authority
+already -- rng.dateKey, which every consumer of "today" reads (the
+course seed, the save rows, the one-a-day door, the tries cap) --
+so the reset moved everywhere by moving there: the key is now the
+date in America/Los_Angeles via Intl (DST-honest at 00:00 Pacific
+all year), with a fixed UTC-8 fallback for museum browsers. The
+lockout countdown stopped doing UTC arithmetic on the key -- the
+two would have disagreed by seven or eight hours -- and asks the
+new rng.nextResetMs() instead, which counts down the PT wall clock
+and self-corrects across the DST-length days. Verified in a
+sandbox: at 14:51 UTC the key read 2026-09-22 and the reset sat
+16.15 hours out -- 00:00 PDT exactly. Key DIFFERENCES (streaks,
+shift) are label arithmetic and were never wall-clock functions.
+The how-to-play page says Pacific now too.
+
+"THE MAP NEEDS TO BE PROPERLY SCALED... IT NEEDS TO BE ACCURATE,"
+with a reference world map. The hand-sketched LAND polygons are
+replaced with real coastlines: Natural Earth 1:110m countries
+(fetched as the world-atlas package from the npm registry, the one
+reachable mirror), grouped into the four tour regions, unioned and
+simplified at 0.9 degrees with topology preserved, islands under
+six square degrees dropped, clipped to 84N..56S. 670 points in 37
+parts -- the budget of the old sketch, the shapes of the planet:
+Alaska, the Patagonian taper the old map cut off at 45S, Africa's
+real bulge and horn, Japan, Madagascar, Britain. The band widened
+(MAP_Y0 6, MAP_H 140) to hold the new latitudes; Greenland stays
+regionless furniture; Antarctica stays off the paper; Europe and
+Asia meet at a drawn seam because the regions union separately,
+which is exactly what the scratch-map coloring wants. mapPt is
+still the one projection shared by land, pins and trail, so the
+three cannot disagree -- and the pan/zoom shipped this morning now
+has a planet worth zooming into.
+
+Gates: 8/8 shots, 90+90 courses, simulate PASS, sharecard PASS.

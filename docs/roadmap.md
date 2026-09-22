@@ -9792,3 +9792,18 @@ execution-% table for qualitative bars, per the review.
 Gates: 8/8 shots, 90+90 courses, simulate PASS, sharecard PASS,
 contrast-sweep 25/25 clean, tries/tour/lock probe 19/19, splits +
 story probe on a played finish.
+
+## 133. Plausible analytics on the site flavor (2026-09-22)
+
+The owner's own snippet (the keyed pa-0u... script), injected by
+build.js into the SITE flavor only: the committed index.html is the
+file:// page every probe drives and the artifact is a frame on
+claude.ai -- neither is a visitor. how-to-play carries the same
+snippet directly. Two custom events ride a guard that no-ops
+wherever window.plausible is absent and is additionally gated on
+LOCKOUT, so bots, skips and nosave inspections can never count:
+Run Start (city, featured|tour) and Run Finish (city, featured|tour,
+medal, and the finish clock as one-minute buckets from under-1:55
+to over-2:15 -- a distribution, not a per-second shatter). Probed:
+a player start fires exactly one event with its props; a bot boot
+fires none.

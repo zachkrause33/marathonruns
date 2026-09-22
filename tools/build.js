@@ -131,7 +131,23 @@ if (fs.existsSync(assetDir)) {
 let game = banner('assets (embedded)') + embed;
 for (const m of MODULES) game += banner(m) + read(m);
 
+// Plausible rides the SITE flavor only. The committed index.html is opened
+// as file:// by every tool in tools/ -- a probe run is not a visitor -- and
+// the artifact frame both blocks the request and is not the site. The page
+// exposes window.plausible via the snippet; main.js sends its custom events
+// through a guard that no-ops when the function is absent, so the other two
+// flavors need nothing.
+const ANALYTICS = SITE
+  ? `<!-- Privacy-friendly analytics by Plausible -->
+<script async src="https://plausible.io/js/pa-0u-V3FrCl3qXqStnjXIKZ.js"></script>
+<script>
+  window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
+  plausible.init()
+</script>`
+  : '';
+
 const out = shell
+  .replace('<!--__ANALYTICS__-->', () => ANALYTICS)
   .replace('/*__CSS__*/', () => css)
   .replace('/*__THREE__*/', () => three)
   .replace('/*__GAME__*/', () => game);

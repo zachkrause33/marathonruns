@@ -493,6 +493,23 @@ MR.unbail = function () {
   let locked = false;
 
   /**
+   * Plausible custom events. The snippet is injected into the SITE flavor
+   * only (see tools/build.js), so window.plausible exists exactly where a
+   * visitor is real; everywhere else -- the committed file:// page every
+   * probe drives, the artifact frame -- this is a no-op by construction.
+   * Gated on LOCKOUT for the same reason the tries are: a bot, a skip or a
+   * nosave inspection is not a player, and an analytics panel counting the
+   * gate suite would be the instrument measuring itself. Fire-and-forget,
+   * and never allowed to throw into the game loop.
+   */
+  function track(name, props) {
+    if (!LOCKOUT) return;
+    try {
+      if (window.plausible) window.plausible(name, props ? { props: props } : undefined);
+    } catch (e) { /* analytics must never cost a frame, let alone a run */ }
+  }
+
+  /**
    * Re-read the save and redraw everything that hangs off it: the memory
    * plates, the history tab, and whether today's start button still exists.
    * Under ?nosave= this passes null everywhere -- reads nothing, shows
@@ -584,6 +601,10 @@ MR.unbail = function () {
       MR.Store.spendTry(dateKey);
       refreshDaily();
     }
+    track('Run Start', {
+      city: cityTag,
+      featured: cityTag === featuredTag ? 'featured' : 'tour',
+    });
     if (NOCOUNT) { state = RUN; standT = 0; hud.countdown(null); }
     else { state = COUNT; countT = 0; }
   }
@@ -1396,6 +1417,22 @@ MR.unbail = function () {
         // the record fell this is the moment today locks -- the finish card's
         // RUN IT AGAIN relabels and routes back to the completed start panel.
         if (saved) refreshDaily();
+        track('Run Finish', {
+          city: cityTag,
+          featured: cityTag === featuredTag ? 'featured' : 'tour',
+          medal: (course.settings && course.settings.length && MR.Course.tierFor
+            ? MR.Course.tierFor(pace.finishTime, course.settings[0].tag) : '') || 'none',
+          // A coarse minute bucket, not the exact time: the panel wants a
+          // distribution, and a per-second prop would shatter it into noise.
+          clock: (function (t) {
+            const m = Math.floor(t / 60);
+            const lab = function (mm) {
+              return Math.floor(mm / 60) + ':' + String(mm % 60).padStart(2, '0');
+            };
+            return m < 115 ? 'under-1:55' : m >= 135 ? 'over-2:15'
+              : lab(m) + '-' + lab(m + 1);
+          })(pace.finishTime),
+        });
         // See finishJoy above. Read here, once, off the result that is now a
         // fact -- never off the projection, which is still twitching a quarter
         // of a second before the line.

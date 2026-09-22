@@ -9681,3 +9681,48 @@ between them was drawing attention to geography's flight paths
 rather than the player's next city.
 
 Gates: 8/8 shots, 90+90 courses, simulate PASS, sharecard PASS.
+
+## 131. Levels, and the audit that learned the crosser (2026-09-22)
+
+The owner, in two beats. First: "organize this by region and level.
+Level is based off the course record... group them into easy,
+medium hard... The passport should be able to be organized by
+either region or level." Then the correction that set the design:
+"the level should be based off the course record. We want the
+obstacles to be the same across the board. All boards should have
+27.5/11.7."
+
+THE LEVEL IS A LABEL, NOT A KNOB. levelFor(rec) cuts the 25 into
+EASY (rec past ~2:07), MEDIUM, HARD (within ~4 minutes of the world
+record) -- derived, so city 26 classifies itself. Every course
+carries the SAME motion density: MOTION_SCALE 1.35 uniformly, which
+lands 24-27.5 oncoming and 11.7-12.7 crossers a course (the spread
+is course geometry, not difficulty). What makes a HARD city hard is
+its record alone -- same road, faster bar -- and the world record
+stays a perfect run everywhere because the economy never varied by
+city in the first place.
+
+THE PASSPORT SHELVES BOTH WAYS: BY REGION or BY LEVEL, two chips,
+remembered per player, one grouping loop serving both. Inside a
+level shelf the hardest record leads. Every stamp, picker bubble
+and map popup wears its level chip in the game's own three colors
+-- ahead-green EASY, accent MEDIUM, behind-pink HARD.
+
+AND THE DENSITY PASS CAUGHT A LATENT INSTRUMENT GAP, the day's real
+work. At 1.35 the shoot gate failed 08-level: LOW x3, HIDES x3 --
+present at 1.35, absent at 1.0. The first theory (an oncoming
+vehicle reading smaller than the deck it emerged behind) produced
+an exclusion window at mile 20; the mesh dump falsified it: the
+"scenery" was the STREET CROSSER itself, twelve limb-cut meshes
+mid-zebra, 27 units out. The walker has ALWAYS violated the
+letter of LOW -- it stands in the corridor by design -- and the
+audit's eight daily samples had simply never stood 25-45 units from
+a walk gate in the three weeks since roadmap 111. It was never
+tagged with the notScenery contract that the hazards, the aid and
+the sky all carry ("a corridor actor is the thing the audit
+protects, not a thing it polices"). Tagged; the theory-based
+window REMOVED once the true fix passed without it; 8/8 clean at
+full density. The census entry: green history can be sampling luck,
+and a density change is an audit of the audit.
+
+Gates: 8/8 shots, 90+90 courses, simulate PASS, sharecard PASS.

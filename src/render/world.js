@@ -19954,6 +19954,18 @@ MR.World = (function () {
      */
     const walkerPool = Pool(function () {
       const g = new THREE.Group();
+      // The crosser is a CORRIDOR ACTOR, not scenery -- the same sentence
+      // that exempts the hazards themselves ("meant to be in the
+      // corridor"; see api.crossings). It was never tagged when it joined
+      // in roadmap 111, and the audit's eight daily samples simply never
+      // stood 25-45 units from a walk gate until the 1.35x motion pass
+      // made walk gates common enough to catch one mid-zebra: LOW and
+      // HIDES on 08-level, 2026-09-22. Its fairness lives in its own
+      // contract -- WALK_ENTER/WALK_EXIT time it to clear the zebra ~0.2s
+      // before the runner arrives -- and a thin moving figure briefly
+      // fronting a gate is the game, exactly as one gate fronting another
+      // is.
+      g.userData.notScenery = true;
       const lean = new THREE.Group();
       g.add(lean);
       const variants = [];

@@ -1011,6 +1011,35 @@ html, body {
 
 /* The tour tabs retired with the one-page merge (2026-09-22). */
 
+/* The shelving chips: region or level, remembered. */
+#sortRow { display: flex; gap: 6px; justify-content: center; margin: 12px 0 2px; }
+#sortRow button {
+  font: inherit; color: inherit; cursor: pointer;
+  font-size: 9px; font-weight: 800; letter-spacing: 0.16em;
+  padding: 6px 13px;
+  background: none; border: 1px solid var(--hair); border-radius: 3px;
+  opacity: 0.6;
+}
+#sortRow button.on {
+  opacity: 1; color: #14183a; background: var(--accent); border-color: var(--accent);
+}
+
+/* The level chip, in the game's own three colors: ahead-green for EASY,
+ * the accent for MEDIUM, behind-pink for HARD. */
+.sLvl, .rbLvl {
+  font-size: 6.5px; font-weight: 800; letter-spacing: 0.14em;
+  padding: 1px 4px; border-radius: 2px; border: 1px solid;
+  vertical-align: 1px;
+}
+.lvE { color: var(--ahead); border-color: rgba(77, 251, 160, 0.55); }
+.lvM { color: var(--accent); border-color: rgba(255, 228, 94, 0.55); }
+.lvH { color: var(--behind); border-color: rgba(255, 107, 132, 0.55); }
+/* On the popup's paper, the same ladder in ink-legible tones. */
+.mpLvl { font-weight: 800; letter-spacing: 0.14em; }
+.mpLvl.lvE { color: #2e7d4f; border: none; }
+.mpLvl.lvM { color: #a8862a; border: none; }
+.mpLvl.lvH { color: #c2455e; border: none; }
+
 /* THE CITY POPUP: a paper callout over the tapped pin -- white like
  * the map it floats on, ink type, a real shadow, and the door inside
  * it. Absolutely positioned by showMapPop through the same viewBox the

@@ -2387,8 +2387,35 @@ MR.Course = (function () {
   // rolling from beyond the fog to its lock -- so paired gates overlap
   // in motion and closure still reads at 1.6x run speed.
   const ONCOMING_RATIO = 0.6;
+  /**
+   * THE LEVEL (owner, 2026-09-22): every city is EASY, MEDIUM or HARD,
+   * derived from its own course record rather than hand-tagged, so a
+   * twenty-sixth city classifies itself the day it lands. The cut
+   * points split the current 25 roughly in thirds: a record within
+   * ~4 minutes of the world record is HARD company, past ~7 minutes
+   * the road is forgiving.
+   */
+  function levelFor(rec) {
+    if (!(rec > 0)) return 'MEDIUM';
+    if (rec <= 7420) return 'HARD';
+    if (rec <= 7600) return 'MEDIUM';
+    return 'EASY';
+  }
+  /**
+   * The level is a LABEL, not a knob (owner, 2026-09-22: "the level
+   * should be based off the course record. We want the obstacles to be
+   * the same across the board"). Every course carries the same motion
+   * density -- the 1.35x rate below, measured at ~27.5 oncoming drives
+   * and ~11.7 street crossers a course -- and what makes a HARD city
+   * hard is its record alone: the same road, a faster bar. The world
+   * record stays a perfect run everywhere by the same token, since the
+   * economy never varied by city in the first place.
+   */
+  const MOTION_SCALE = 1.35;
+
   function markMotion(key, gates, tally) {
     if (!(SWEEP > 0)) return;
+    const LM = MOTION_SCALE;
     // THE PAIR BIAS. "Potentially multiple at one time" shipped as a
     // hope: independent per-gate hashes put two oncoming drives in motion
     // at the same instant on 10 days of 365 (a drive window is ~59 units
@@ -2407,6 +2434,7 @@ MR.Course = (function () {
       // the same opening family the closures use (narrowRate opens at
       // 0.12): past the learning stretch, before the race's hard middle.
       if (gate.f < 0.15 || gate.f > 0.90) continue;
+
       /**
        * ELIGIBILITY SPLITS BY KIND HERE, because the clauses protect
        * different things. The sweep and the cross dart CHANGE LANES, so
@@ -2434,7 +2462,7 @@ MR.Course = (function () {
       // days had a simultaneous pair); in front of it, a pair follows
       // nearly every natural roll that the course geometry can host.
       const echoArm = echoRun < 2 && gate.z - lastOnZ < 80;
-      if (!echoArm && (h % 4096) / 4096 >= SWEEP_RATE * SWEEP) continue;
+      if (!echoArm && (h % 4096) / 4096 >= Math.min(0.98, SWEEP_RATE * SWEEP * LM)) continue;
       const single = blockLanes.length === 1
         && !(i > 0 && gates[i - 1].lanes[blockLanes[0]] === K.BLOCK);
       // The oncoming lane: any block lane (a hash bit picks between two);
@@ -2475,7 +2503,7 @@ MR.Course = (function () {
       // An armed echo whose corridor failed still only got here on its
       // own rate roll (the arm bypassed the gate above) -- so a dead
       // echo falls back to the ordinary rotation, not to silence.
-      if (echoArm && !corridor && (h % 4096) / 4096 >= SWEEP_RATE * SWEEP) continue;
+      if (echoArm && !corridor && (h % 4096) / 4096 >= Math.min(0.98, SWEEP_RATE * SWEEP * LM)) continue;
       const prefer = echo || roll < 7 ? ['on', 'sweep'] : ['sweep', 'on'];
       for (const p of prefer) {
         if (p === 'on' && corridor) {
@@ -2510,7 +2538,7 @@ MR.Course = (function () {
       if (gate.sweep) continue;
       if (gate.f < 0.12 || gate.f > 0.92) continue;
       const h = MR.rng.hashString(key + '|walk/v1|' + i);
-      if ((h % 4096) / 4096 >= WALK_RATE * SWEEP) continue;
+      if ((h % 4096) / 4096 >= WALK_RATE * SWEEP * LM) continue;
       gate.walk = { side: (h >>> 12) & 1 ? 1 : -1 };
       tally.walkers++;
     }
@@ -3185,7 +3213,7 @@ MR.Course = (function () {
   }
 
   const api = { generate, generateAid, validate, solvable, biomeAt, difficulty,
-           BIOMES, SETTINGS, pickSettings, tierFor, ACTION_WINDOW, actionWindowAt,
+           BIOMES, SETTINGS, pickSettings, tierFor, levelFor, ACTION_WINDOW, actionWindowAt,
            // Exported so tools/shoot.js reads the read window from the file
            // that enforces it instead of recomputing the same sum. The two
            // cannot drift, which is the whole point of the invariant.

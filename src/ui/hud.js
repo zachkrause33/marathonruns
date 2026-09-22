@@ -523,6 +523,16 @@ MR.HUD = (function () {
           SETTINGS.length and the rows are the table's own order; adding a
           thirteenth city updates this panel by existing.
         -->
+        <!--
+          HOW THE WALL IS SHELVED (owner, 2026-09-22: "The passport
+          should be able to be organized by either region or level.
+          Everyone may want to play differently"). Two chips; the choice
+          is remembered.
+        -->
+        <div id="sortRow">
+          <button type="button" data-sort="region" class="on">BY REGION</button>
+          <button type="button" data-sort="level">BY LEVEL</button>
+        </div>
         <div class="rule" id="cityRule"></div>
         <!--
           THE STAMP WALL. One stamp per city in the pool, four states: an
@@ -817,6 +827,7 @@ MR.HUD = (function () {
       shareNote: q('shareNote'), shareText: q('shareText'),
       cityRule: q('cityRule'), stampWall: q('stampWall'), mapBox: q('mapBox'),
       mapWrap: q('mapWrap'), mapPop: q('mapPop'), histTitle: q('histTitle'),
+      sortRow: q('sortRow'),
       stampMoment: q('stampMoment'), stampInk: q('stampInk'),
       stampCity: q('stampCity'), stampWord: q('stampWord'),
       stampDate: q('stampDate'), stampCtx: q('stampCtx'),
@@ -982,6 +993,17 @@ MR.HUD = (function () {
      * a record day), the best time answers bronze against the city's real
      * course record carried on the pool entry.
      */
+    /** The difficulty ladder, worn as a small chip everywhere a city is. */
+    function lvlOf(s) {
+      return MR.Course.levelFor ? MR.Course.levelFor(s.rec) : 'MEDIUM';
+    }
+    function lvlCls(s) {
+      const l = lvlOf(s);
+      return l === 'EASY' ? 'lvE' : l === 'HARD' ? 'lvH' : 'lvM';
+    }
+    let passSort = 'region';
+    try { passSort = localStorage.getItem('marathonruns/passsort/v1') || 'region'; } catch (e) { /* fine */ }
+
     function stampTier(s, c) {
       // The medal ladder (owner, 2026-09-22): GOLD for the world record,
       // SILVER for the course record, BRONZE for completing the course.
@@ -1402,7 +1424,8 @@ MR.HUD = (function () {
         '<button type="button" class="mpClose" aria-label="Close">&#215;</button>'
         + '<div class="mpTop"><span class="mpCity">' + s.name + '</span>'
         + '<span class="mpTier ' + tier + '">' + word + '</span></div>'
-        + '<div class="mpReg">' + (s.region || '') + '</div>'
+        + '<div class="mpReg">' + (s.region || '')
+        + ' &middot; <span class="mpLvl ' + lvlCls(s) + '">' + lvlOf(s) + '</span></div>'
         + '<div class="mpRows num">'
         + (c ? '<div><i>YOUR BEST</i><b>' + Pace.clock(c.best) + '</b></div>'
              + '<div><i>RUNS</i><b>' + c.runs + '</b></div>'
@@ -1446,14 +1469,30 @@ MR.HUD = (function () {
       const featTag = sum && sum.dateKey && MR.Course.pickSettings
         ? MR.Course.pickSettings(sum.dateKey)[0].tag : null;
       if (!mapSel) mapSel = loadedTag;
+      for (const el of n.sortRow.querySelectorAll('button')) {
+        el.classList.toggle('on', el.getAttribute('data-sort') === passSort);
+      }
       drawMap(sum, pool, loadedTag, true);
       hideMapPop();   // the save changed under it; a stale popup is a lie
-      const regions = [];
-      const byReg = {};
+      /**
+       * The shelving: BY REGION (the tour's geography) or BY LEVEL (its
+       * difficulty ladder, derived from each record by course.js). One
+       * grouping loop serves both -- only the key function and the
+       * shelf order change -- and the choice persists per player.
+       */
+      const byLevel = passSort === 'level';
+      const regions = byLevel ? ['EASY', 'MEDIUM', 'HARD'] : [];
+      const byReg = byLevel ? { EASY: [], MEDIUM: [], HARD: [] } : {};
       for (const s of pool) {
-        const r = s.region || 'THE WORLD';
+        const r = byLevel
+          ? (MR.Course.levelFor ? MR.Course.levelFor(s.rec) : 'MEDIUM')
+          : (s.region || 'THE WORLD');
         if (!byReg[r]) { byReg[r] = []; regions.push(r); }
         byReg[r].push(s);
+      }
+      if (byLevel) {
+        // Inside a shelf, hardest record first: the ladder within the ladder.
+        for (const r of regions) byReg[r].sort(function (a, b) { return a.rec - b.rec; });
       }
       let gold = 0, run = 0, html = '';
       for (const reg of regions) {
@@ -1475,6 +1514,7 @@ MR.HUD = (function () {
             + (door ? ' data-city="' + s.tag + '"' : '') + '>'
             + '<span class="sCity">' + s.name + '</span>'
             + '<span class="sTier">' + word
+            + ' <span class="sLvl ' + lvlCls(s) + '">' + lvlOf(s) + '</span>'
             + (s.tag === featTag ? ' <span class="sFeat">TODAY\'S RACE</span>' : '') + '</span>'
             + (c ? '<span class="sBest num">' + Pace.clock(c.best) + '</span>' : '<span class="sBest num">&mdash;</span>')
             + (s.rec && s.rec > K.RECORD_SECONDS
@@ -1513,6 +1553,17 @@ MR.HUD = (function () {
       };
     }
     n.stampWall.addEventListener('click', cityClick(n.stampWall));
+    n.sortRow.addEventListener('click', function (ev) {
+      const b = ev.target && ev.target.getAttribute && ev.target.getAttribute('data-sort');
+      if (!b || b === passSort) return;
+      passSort = b;
+      try { localStorage.setItem('marathonruns/passsort/v1', passSort); } catch (e) { /* fine */ }
+      for (const el of n.sortRow.querySelectorAll('button')) {
+        el.classList.toggle('on', el.getAttribute('data-sort') === passSort);
+      }
+      drawPassport(lastSum);
+    });
+
     n.mapPop.addEventListener('click', cityClick(n.mapPop));
     n.mapPop.addEventListener('click', function (ev) {
       if (ev.target && ev.target.classList && ev.target.classList.contains('mpClose')) hideMapPop();
@@ -1641,6 +1692,7 @@ MR.HUD = (function () {
         return '<button type="button" class="' + cls + '"'
           + (d.door ? ' data-city="' + s.tag + '"' : '') + '>'
           + '<span class="rbCity">' + s.name
+          + ' <span class="rbLvl ' + lvlCls(s) + '">' + lvlOf(s) + '</span>'
           + (s.tag === featTag ? ' <span class="sFeat">TODAY\'S RACE</span>' : '') + '</span>'
           + '<span class="rbRec num">' + (s.rec ? 'RECORD ' + Pace.clock(s.rec) : '') + '</span>'
           + (c && c.best ? '<span class="rbBest num">YOUR BEST ' + Pace.clock(c.best) + '</span>' : '')

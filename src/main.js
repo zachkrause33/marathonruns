@@ -170,14 +170,27 @@ MR.unbail = function () {
   const featuredTag = MR.Course.pickSettings(dateKey)[0].tag;
   let cityTag = featuredTag;
   {
+    /**
+     * TODAY'S MARATHON FIRST, THEN THE TOUR (2026-09-22 restructure).
+     * The featured city is everyone's shared daily race: until it has
+     * been finished once today, every load resolves there and ?city= is
+     * ignored. Once it is finished, the remaining tries are TOUR MODE
+     * and any city loads freely -- including the featured one again,
+     * because gold no longer closes the day and a 1:58 wants a 1:57.
+     */
     const pool = MR.Course.SETTINGS;
     const want = (params.get('city') || '').toUpperCase();
-    const sum0 = params.get('nosave') === '1' ? null : MR.Store.summary(dateKey);
-    const spentName = sum0 && sum0.todayCity;
-    let spentTag = null;
-    if (spentName) for (const c of pool) if (c.name === spentName) spentTag = c.tag;
-    if (spentTag) cityTag = spentTag;
-    else if (want) for (const c of pool) if (c.tag === want) cityTag = want;
+    // An inspection load -- nosave, a bot, a skip -- honors ?city=
+    // unconditionally: the featured-first rule is a statement about a
+    // player's day, and an instrument that silently swept the featured
+    // city 25 times under 25 different tags would be the exact defect
+    // rule 3 exists for. Same predicate as LOCKOUT below, restated here
+    // because LOCKOUT does not exist yet at resolution time.
+    const inspecting = params.get('nosave') === '1' || params.get('bot') !== null
+      || parseFloat(params.get('skip') || '0') > 0;
+    const sum0 = inspecting ? null : MR.Store.summary(dateKey);
+    const tourOpen = inspecting || !!(sum0 && sum0.featuredDone);
+    if (tourOpen && want) for (const c of pool) if (c.tag === want) cityTag = want;
   }
   const courseKey = cityTag === featuredTag ? dateKey : dateKey + '|' + cityTag;
   /**
@@ -489,14 +502,18 @@ MR.unbail = function () {
     const sum = NOSAVE ? null : MR.Store.summary(dateKey);
     hud.setMemory(sum);
     hud.setHistory(sum);
-    // Locked two ways now: the record fell, or the three tries are spent
-    // (owner, 2026-09-22). The reason travels so the panel can say which.
-    const runsToday = sum && sum.today ? (sum.today.runs | 0) : 0;
-    locked = !!(LOCKOUT && sum && (sum.done || runsToday >= K.TRIES_PER_DAY));
+    // Locked ONE way now: the three tries are spent. Breaking the record
+    // is a badge, never a door -- the reviewer's point stood: the player
+    // who golds on attempt one is the most engaged player in the game,
+    // and telling them they are done is the wrong reward. Tries are
+    // counted at the GUN (see spendTry at start()), so a mid-run reload
+    // still shows the honest count.
+    const attempts = sum ? (sum.attempts | 0) : 0;
+    locked = !!(LOCKOUT && sum && attempts >= K.TRIES_PER_DAY);
     hud.setLocked(locked ? {
-      time: sum.done ? sum.doneTime : (sum.today ? sum.today.time : 0),
+      time: sum.today ? sum.today.time : (sum.doneTime || 0),
       dateKey: dateKey,
-      reason: sum.done ? 'record' : 'tries',
+      reason: 'tries',
     } : null);
   }
 
@@ -559,6 +576,14 @@ MR.unbail = function () {
     // would photograph and measure a launch instead of a run. Every tool in this
     // project drives the game through one of those two, so releasing the clock
     // here is what keeps the standing start out of every number they report.
+    // THE GUN SPENDS THE TRY (2026-09-22): committing to the road is the
+    // attempt, so a doomed run is recovered or carried, never quit and
+    // refunded -- and restart-fishing for a friendly opening dies with
+    // it. Inspectors, bots and skips spend nothing, same as ever.
+    if (LOCKOUT) {
+      MR.Store.spendTry(dateKey);
+      refreshDaily();
+    }
     if (NOCOUNT) { state = RUN; standT = 0; hud.countdown(null); }
     else { state = COUNT; countT = 0; }
   }
@@ -1363,6 +1388,8 @@ MR.unbail = function () {
           // decided here because this file owns RECORD_SECONDS and the store
           // deliberately does not. Same comparison the celebration uses.
           city: course.settings && course.settings.length ? course.settings[0].name : '',
+          // Featured or tour: the store's calendar-vs-passport split.
+          featured: cityTag === featuredTag,
           record: pace.finishTime <= K.RECORD_SECONDS,
         });
         // The save just changed; the panels that hang off it follow, and if

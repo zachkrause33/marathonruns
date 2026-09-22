@@ -1441,12 +1441,6 @@ button.stampC:active { transform: scale(0.96); }
 #debrief .dbSec:first-child { margin-top: 0; }
 #debrief .dbLine { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; margin-top: 3px; }
 #debrief .dbLine.dim { opacity: 0.65; font-weight: 600; font-size: 9px; }
-#debrief .dbLeg {
-  display: flex; align-items: center; gap: 7px; margin-top: 4px;
-}
-#debrief .dbLeg .sblock { width: 10px; height: 10px; }
-#debrief .dbLegName { font-size: 9px; font-weight: 800; letter-spacing: 0.1em; flex: 1; }
-#debrief .dbLegNote { font-size: 9px; opacity: 0.75; }
 #debrief .dbBars {
   display: flex; align-items: flex-end; gap: 2px; height: 24px; margin-top: 6px;
 }
@@ -1456,6 +1450,14 @@ button.stampC:active { transform: scale(0.96); }
 }
 #debrief .dbBar.fastest { background: var(--ahead); }
 #debrief .dbBar.slowest { background: var(--behind); }
+#debrief .dbSplit {
+  display: flex; align-items: baseline; gap: 10px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.08em; margin-top: 3px;
+}
+#debrief .dbSplit .dbSpK { width: 46px; opacity: 0.65; }
+#debrief .dbSplit .dbSpT { width: 58px; }
+#debrief .dbSplit .dbSpD.ahead { color: var(--ahead); }
+#debrief .dbSplit .dbSpD.behind { color: var(--behind); }
 
 #shareBox {
   margin-top: 15px; padding: 10px 12px 11px;

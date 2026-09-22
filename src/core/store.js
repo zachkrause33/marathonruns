@@ -138,11 +138,17 @@ MR.Store = (function () {
   function blank() {
     return {
       v: V,
-      day: null,    // { date, time, streak, tier, runs }  best for that date
+      day: null,    // { date, time, streak, tier, runs }  best FEATURED finish for that date
       prev: null,   // { date, time, streak, tier }        the previous date played
       days: { count: 0, last: null },
       best: null,   // { time, tier, date, streak, streakDate }
-      hist: [],     // [{ date, city, time, rec, runs }]   one row per finished date
+      hist: [],     // [{ date, city, time, rec, runs, tour }] one row per (date, city)
+      // The attempts ledger (2026-09-22 restructure): a try is spent when
+      // the GUN goes, not when the tape is crossed -- quitting a doomed
+      // run no longer refunds it, which kills restart-fishing and makes a
+      // disastrous start something to recover rather than discard. Kept
+      // apart from `day` because an attempt exists before any finish does.
+      att: { date: null, n: 0 },
     };
   }
 
@@ -170,14 +176,24 @@ MR.Store = (function () {
         // revisits existed were all live, so an absent field inherits rec.
         recDay: e.recDay === true || (e.recDay === undefined && e.rec === true),
         rv: e.rv === true,
+        // A TOUR row: a same-day run in a city other than the day's
+        // marathon (2026-09-22 restructure). It enriches that city's
+        // passport but is not the day's result -- every calendar-shaped
+        // read below skips it.
+        tour: e.tour === true,
         runs: Math.max(1, Math.round(num(e.runs, 1))),
       });
     }
     rows.sort(function (x, y) { return x.date < y.date ? -1 : x.date > y.date ? 1 : 0; });
+    // One row per (date, city) now, not per date: tour mode can finish
+    // several cities on one calendar day. Old saves collapse identically
+    // (their same-date rows always shared a city).
     const out = [];
+    const at = {};
     for (const e of rows) {
-      if (out.length && out[out.length - 1].date === e.date) out[out.length - 1] = e;
-      else out.push(e);
+      const k = e.date + '|' + e.city;
+      if (at[k] !== undefined) out[at[k]] = e;
+      else { at[k] = out.length; out.push(e); }
     }
     return out.slice(-HIST_MAX);
   }
@@ -221,6 +237,9 @@ MR.Store = (function () {
       s.days.count = s.days.last ? Math.max(0, Math.round(num(o.days.count, 0))) : 0;
     }
     s.hist = cleanHist(o.hist);
+    if (o.att && key(o.att.date)) {
+      s.att = { date: o.att.date, n: Math.max(0, Math.round(num(o.att.n, 0))) };
+    }
     if (o.best && pos(o.best.time)) {
       s.best = {
         time: pos(o.best.time),
@@ -275,8 +294,10 @@ MR.Store = (function () {
     // from yesterday -- a chain whose last link is two days old is not a
     // streak, it is a streak that used to be one, and a missed day breaks it
     // by construction because a missed day has no row.
+    // The calendar reads FEATURED rows only: a tour detour is a fact about
+    // a city, never about what the day was.
     const byDate = {};
-    for (const e of s.hist) byDate[e.date] = e;
+    for (const e of s.hist) if (!e.tour && !byDate[e.date]) byDate[e.date] = e;
     const todayRow = byDate[dateKey] || null;
     const doneToday = !!(todayRow && todayRow.rec);
     // Walked on `recDay`, not `rec`: a revisit that finally breaks the
@@ -302,10 +323,11 @@ MR.Store = (function () {
     // the history, which is exactly the defect the record streak was rewritten
     // to avoid.
     const cities = {};
-    let totalRuns = 0, totalRecs = 0;
+    let totalRuns = 0, totalRecs = 0, totalDays = 0;
     for (const e of s.hist) {
       totalRuns += e.runs;
       if (e.rec) totalRecs++;
+      if (!e.tour) totalDays++;
       if (!e.city) continue;
       const c = cities[e.city] || (cities[e.city] = { days: 0, rec: false, best: 0, last: null, runs: 0, first: null });
       c.days++;
@@ -337,15 +359,19 @@ MR.Store = (function () {
       // The passport ledger: days finished, marathons run (every rerun is
       // its own 26.2), records fallen. Derived on every read, same as the
       // city set and for the same reason.
-      totalDays: s.hist.length,
+      totalDays: totalDays,
       totalRuns: totalRuns,
       totalRecs: totalRecs,
       // The city today's choice was spent on, or null while the day is
       // still open. main.js resolves every load through this: one city a
       // day, and the first finished run is what chooses it.
       todayCity: todayRow ? (todayRow.city || null) : null,
-      done: doneToday,                    // the record fell today: today is over
+      // The day's marathon is FINISHED (any medal): tour mode is open.
+      featuredDone: !!todayRow,
+      done: doneToday,                    // the record fell today (a badge now, not a lock)
       doneTime: doneToday ? todayRow.time : 0,
+      // Tries spent at the gun, whatever came of them.
+      attempts: (s.att && s.att.date === dateKey) ? s.att.n : 0,
       recordStreak: recStreak,
       recordStreakCounted: doneToday,     // today already counts toward it
     };
@@ -412,12 +438,42 @@ MR.Store = (function () {
      * its date-independent all-time marks below and writes nothing else.
      */
     const cityNow = str(run && run.city);
-    let clashRow = null;
-    for (const e of s.hist) if (e.date === dateKey) { clashRow = e; break; }
-    const cityClash = !!(clashRow && cityNow && clashRow.city && clashRow.city !== cityNow);
+    /**
+     * THE DAY'S MARATHON AND THE TOUR (2026-09-22 restructure). The
+     * caller says whether this run was the date's FEATURED city. A
+     * featured run is the day: it rotates the day record, advances the
+     * day streak and writes the date's calendar row, exactly as before.
+     * A same-day run anywhere else is a TOUR run: it folds into that
+     * CITY's own (date, city) row -- best time, the rec latch, the run
+     * count -- and touches nothing calendar-shaped. The old cityClash
+     * corruption guard survives as exactly this split: a second city on
+     * the same date is no longer a clash, it is the tour.
+     */
+    const featured = !(run && run.featured === false);
+    let featRow = null;
+    for (const e of s.hist) if (e.date === dateKey && !e.tour) { featRow = e; break; }
+    const cityClash = !!(featured && featRow && cityNow && featRow.city && featRow.city !== cityNow);
     if (cityClash) out.cityClash = true;
 
-    if (!backwards && !cityClash) {
+    if (!backwards && !cityClash && !featured) {
+      // ---- the tour fold ------------------------------------------------
+      const rec = !!(run && run.record === true);
+      let h = null;
+      for (const e of s.hist) if (e.date === dateKey && e.city === cityNow) { h = e; break; }
+      if (!h) {
+        h = { date: dateKey, city: cityNow, time: r.time, rec: rec, recDay: false, tour: true, runs: 1 };
+        s.hist.push(h);
+        s.hist.sort(function (x, y) { return x.date < y.date ? -1 : x.date > y.date ? 1 : 0; });
+        if (s.hist.length > HIST_MAX) s.hist = s.hist.slice(-HIST_MAX);
+        out.beatToday = true;
+      } else {
+        h.runs++;
+        if (r.time < h.time) { h.time = r.time; out.beatToday = true; }
+        if (rec) h.rec = true;
+      }
+      out.tour = true;
+      out.recordBroken = rec;
+    } else if (!backwards && !cityClash) {
       const newDay = !s.day || s.day.date !== dateKey;
       if (newDay) {
         if (s.day) s.prev = { date: s.day.date, time: s.day.time, streak: s.day.streak, tier: s.day.tier };
@@ -475,8 +531,10 @@ MR.Store = (function () {
        */
       const rec = !!(run && run.record === true);
       const city = str(run && run.city);
+      // City-aware under (date, city) rows: fold into this city's row for
+      // the date when one exists, never into a different city's.
       let h = null;
-      for (const e of s.hist) if (e.date === dateKey) { h = e; break; }
+      for (const e of s.hist) if (e.date === dateKey && (e.city === city || !e.city)) { h = e; break; }
       if (!h) {
         h = { date: dateKey, city: city, time: r.time, rec: rec, recDay: false, rv: true, runs: 1 };
         s.hist.push(h);
@@ -515,6 +573,20 @@ MR.Store = (function () {
     return out;
   }
 
+  /**
+   * A try is spent HERE, at the gun. Returns the attempts now on the
+   * date's ledger (today's count after this spend). Never throws; a
+   * store that cannot write still counts within the tab.
+   */
+  function spendTry(dateKey) {
+    let s2;
+    try { s2 = load(); } catch (e) { s2 = blank(); }
+    if (!s2.att || s2.att.date !== dateKey) s2.att = { date: dateKey, n: 0 };
+    s2.att.n++;
+    save(s2);
+    return s2.att.n;
+  }
+
   /** Wipe the save. Exposed for testing the first-visit path by hand. */
   function clear() {
     memBlob = null;
@@ -524,7 +596,7 @@ MR.Store = (function () {
 
   return {
     KEY, VERSION: V, persistent,
-    summary, record, clear,
+    summary, record, spendTry, clear,
     load, save, blank,
     dayDiff, shift, parseKey,
   };

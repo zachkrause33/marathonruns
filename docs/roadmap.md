@@ -9726,3 +9726,69 @@ full density. The census entry: green history can be sampling luck,
 and a density change is an audit of the audit.
 
 Gates: 8/8 shots, 90+90 courses, simulate PASS, sharecard PASS.
+
+## 132. The day restructure: today's marathon, the tour, and the city's own street (2026-09-22)
+
+The owner forwarded a design review and ruled on it live. What
+shipped, all of it behind the same 27.5/11.7 uniform-density order:
+
+TODAY'S MARATHON, THEN THE TOUR. The featured city (the calendar's
+own pick for the date) is everyone's shared race: until it has a
+finished run today, every load lands there and ?city= is ignored.
+Finish it -- any medal -- and the picker opens as TOUR MODE: rerun
+for a faster time or take any of the 25. Store rows are (date, city)
+now with a `tour` flag; calendar reads (streaks, totalDays, the
+day record) see featured rows only, so a tour detour enriches a
+city's stamp without rewriting what the day was.
+
+GOLD IS A BADGE, NOT A LOCK. The reviewer: "Gold should unlock
+bragging rights, not end play." The day now closes one way only:
+three tries spent. RECORD BROKEN rides the tries line as a prefix.
+
+A TRY IS SPENT AT THE GUN (Store.spendTry, called from start()
+under LOCKOUT), not at the tape -- which kills quit-fishing and
+makes a bad first mile something to save. Lock reads the attempts
+ledger (s.att), not finish counts.
+
+STORY-FIRST SHARES. storyLine() ranks the headline by drama: WORLD
+RECORD BROKEN · 0:38 UNDER, MISSED GOLD BY 1:18 (a 90s window that
+outranks even a won silver as a headline), COURSE RECORD BEATEN BY,
+MISSED SILVER BY. It leads the share text, replaces the raw delta
+on the PNG stamp card, and an answered challenge mints its link as
+"Rematch:". sharecard.js was re-cut to find lines by what they ARE
+(blockLine/resultLine/storyLine) after the fixed indexes failed
+honestly, plus a staged near-miss case; cap 200 -> 220 measured.
+
+5K SPLITS lead the debrief: cumulative clock at 5K..40K + FINISH,
+interpolated from the mile splits, delta vs even record pace. Then
+the owner cropped the card down live: THE CONTACTS, THE TANK and
+THE LEGS came off (contactsCost() with them) -- the debrief is the
+splits and the mile strip now.
+
+THE CITY'S OWN STREET. The owner: "obstacles must change city to
+city, but the same obstacles can be used... more of some in some
+cities." CITY_MIX: 25 casting sheets that REWEIGHT the shared
+variant bags (every def got a name; bagOf(mix) builds a per-city
+bag; sweeps draw from the same weights). A mix can only retick
+existing defs -- collision, counts and the contrast audit are
+untouched by construction. Census (variantPlan, dealt not
+authored): London deals barrier x41/barricade x32 + buses and cabs,
+Amsterdam planter x61/bridge x60 + trams and bikes, Rome
+trench+cones/scaffold x62 + mopeds, Nairobi drums x42/boom x58 +
+matatu vans, Mumbai crates x51 + awnings and shopsigns.
+
+AND THE RESTRUCTURE CAUGHT ITS OWN INSTRUMENT BUG: featured-first
+resolution read the save before honoring ?city=, so every
+inspection load (nosave/bot/skip) would have swept the FEATURED
+city under 25 different tags -- contrast-sweep measuring one road
+25 times. Resolution now treats inspection loads as tour-open.
+
+Copy followed everywhere: how-to-play (featured+tour, gun-spend,
+gold-keeps-playing), the passport rule line (TODAY'S MARATHON,
+THEN THE TOUR replaces ONE A DAY), and the shareable overview
+dropped "the real marathon world record" phrasing and the
+execution-% table for qualitative bars, per the review.
+
+Gates: 8/8 shots, 90+90 courses, simulate PASS, sharecard PASS,
+contrast-sweep 25/25 clean, tries/tour/lock probe 19/19, splits +
+story probe on a played finish.

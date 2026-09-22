@@ -8918,14 +8918,27 @@ MR.World = (function () {
       // are then picked by hashing into the bag, so the ratio a variant is
       // authored with is the ratio it actually spawns at, instead of being an
       // emergent property of an ad-hoc modulo. See castGates.
-      const bag = [];
-      defs.forEach(function (d, i) {
-        // weight: 0 is a real value -- a variant only a cast site can
-        // deal -- so it must not default to 1. (No def uses it today;
-        // the crossing minicar did, and the mechanism outlives it.)
-        const w = d.weight === 0 ? 0 : (d.weight || 1);
-        for (let k = 0; k < w; k++) bag.push(i);
-      });
+      //
+      // buildBag takes an optional per-city mix ({name: tickets}) -- the
+      // owner: "obstacles must change city to city, but the same obstacles
+      // can be used. we can use more of some in some cities and some of
+      // others in other cities." A mix REWEIGHTS the same defs and can
+      // never add or remove one, so the collision contract, the count of
+      // hazards on the board and the contrast audit (which walks every def
+      // regardless of tickets) are untouched by it.
+      function buildBag(mix) {
+        const bag = [];
+        defs.forEach(function (d, i) {
+          // weight: 0 is a real value -- a variant only a cast site can
+          // deal -- so it must not default to 1. (No def uses it today;
+          // the crossing minicar did, and the mechanism outlives it.)
+          let w = d.weight === 0 ? 0 : (d.weight || 1);
+          if (mix && d.name && mix[d.name] != null) w = mix[d.name];
+          for (let k = 0; k < w; k++) bag.push(i);
+        });
+        return bag;
+      }
+      const bag = buildBag(null);
       const pool = Pool(function () {
         const g = new THREE.Group();
         const variants = [];
@@ -9108,7 +9121,8 @@ MR.World = (function () {
       // casting is computed for the whole course before any hazard has been
       // claimed, so it cannot borrow an object to find out what the bag is --
       // which is what api.variantPlan used to have to do.
-      pool.bagOf = function () { return bag; };
+      pool.bagOf = function (mix) { return mix ? buildBag(mix) : bag; };
+      pool.defsOf = function () { return defs; };
       return pool;
     }
 
@@ -10560,7 +10574,7 @@ MR.World = (function () {
     })();
 
     const jumpPool = hazardPool(K.JUMP, 'jump', [
-      { geo: jumpSandGeo, face: null },
+      { geo: jumpSandGeo, name: 'sandbags', face: null },
       /**
        * THE CONES CARRY NO CAUTION FACE AT ALL, and this was the first variant
        * in the game with face: null.
@@ -10588,21 +10602,21 @@ MR.World = (function () {
        *
        * That argument has now been generalised to three more variants above.
        */
-      { geo: jumpConeGeo, face: null },
-      { geo: jumpTrenchGeo, face: [2.16, 0.075, 0.038, -0.512] },
-      { geo: jumpScooterGeo, face: null },
-      { geo: jumpBarrierGeo, face: [2.20, 0.14, 0.072, -0.512] },
-      { geo: jumpPipeGeo, face: null },
+      { geo: jumpConeGeo, name: 'cones', face: null },
+      { geo: jumpTrenchGeo, name: 'trench', face: [2.16, 0.075, 0.038, -0.512] },
+      { geo: jumpScooterGeo, name: 'scooter', face: null },
+      { geo: jumpBarrierGeo, name: 'barrier', face: [2.20, 0.14, 0.072, -0.512] },
+      { geo: jumpPipeGeo, name: 'pipes', face: null },
       // The kerbside furniture, in the lane. See the promotion note above.
-      { geo: jumpPlanterGeo, face: null },
-      { geo: jumpCrateGeo, face: null },
+      { geo: jumpPlanterGeo, name: 'planter', face: null },
+      { geo: jumpCrateGeo, name: 'crates', face: null },
       // The citylook batch: the reference's own vocabulary, weighted so the
       // barricades -- its signature obstacle -- turn up often. All face: null,
       // because each carries its own bands or is its own object.
-      { geo: jumpBarricadeGeo, face: null, weight: 2 },
-      { geo: jumpDrumGeo, face: null },
-      { geo: jumpLowBarGeo, face: null },
-      { geo: jumpTrashGeo, face: null },
+      { geo: jumpBarricadeGeo, name: 'barricade', face: null, weight: 2 },
+      { geo: jumpDrumGeo, name: 'drums', face: null },
+      { geo: jumpLowBarGeo, name: 'lowbar', face: null },
+      { geo: jumpTrashGeo, name: 'trash', face: null },
     ]);
 
     /**
@@ -12231,18 +12245,18 @@ MR.World = (function () {
     })();
 
     const duckPool = hazardPool(K.DUCK, 'duck', [
-      { geo: duckGeo, face: [2.26, 0.40, 1.62, -0.292] },
-      { geo: duckScaffoldGeo, face: [2.26, 0.36, 1.58, -0.292] },
-      { geo: duckSignGeo, face: [2.26, 0.34, 1.62, -0.292] },
-      { geo: duckBoomGeo, face: [2.26, 0.38, 1.62, -0.292] },
-      { geo: duckPipeGeo, face: [2.26, 0.34, 1.62, -0.292] },
-      { geo: duckWalkGeo, face: [2.26, 0.36, 1.60, -0.292] },
-      { geo: duckFloodGeo, face: [2.26, 0.34, 1.62, -0.292] },
-      { geo: duckBridgeGeo, face: [2.26, 0.38, 1.62, -0.292] },
+      { geo: duckGeo, name: 'bar', face: [2.26, 0.40, 1.62, -0.292] },
+      { geo: duckScaffoldGeo, name: 'scaffold', face: [2.26, 0.36, 1.58, -0.292] },
+      { geo: duckSignGeo, name: 'gantry', face: [2.26, 0.34, 1.62, -0.292] },
+      { geo: duckBoomGeo, name: 'boom', face: [2.26, 0.38, 1.62, -0.292] },
+      { geo: duckPipeGeo, name: 'pipe', face: [2.26, 0.34, 1.62, -0.292] },
+      { geo: duckWalkGeo, name: 'walkway', face: [2.26, 0.36, 1.60, -0.292] },
+      { geo: duckFloodGeo, name: 'floodlight', face: [2.26, 0.34, 1.62, -0.292] },
+      { geo: duckBridgeGeo, name: 'bridge', face: [2.26, 0.38, 1.62, -0.292] },
       // The citylook batch: the reference's own overhead vocabulary.
-      { geo: duckAwningGeo, face: [2.26, 0.36, 1.58, -0.209] },
-      { geo: duckShopSignGeo, face: [2.26, 0.36, 1.58, -0.209] },
-      { geo: duckWalkboardGeo, face: [2.26, 0.34, 1.56, -0.169] },
+      { geo: duckAwningGeo, name: 'awning', face: [2.26, 0.36, 1.58, -0.209] },
+      { geo: duckShopSignGeo, name: 'shopsign', face: [2.26, 0.36, 1.58, -0.209] },
+      { geo: duckWalkboardGeo, name: 'walkboard', face: [2.26, 0.34, 1.56, -0.169] },
     ]);
 
     /**
@@ -14895,7 +14909,7 @@ MR.World = (function () {
         // out of the collision box on ten variants, on the axis the occlusion
         // audit measures from. Nothing was watching. It is now, and the rows
         // below are all inside their own box.
-        geo: blockTramGeo, face: [2.16, 0.30, 0.78, -1.945], weight: 1,
+        geo: blockTramGeo, name: 'tram', face: [2.16, 0.30, 0.78, -1.945], weight: 1,
         /**
          * ---- THE PANTOGRAPH IS GONE, AND THE DECK IS WHY -----------------
          *
@@ -14925,7 +14939,7 @@ MR.World = (function () {
          */
         ride: blockTramRampGeo,
       },
-      { geo: blockSignGeo, face: [2.06, 1.7, 1.58, -0.541], weight: 1 },
+      { geo: blockSignGeo, name: 'bigsign', face: [2.06, 1.7, 1.58, -0.541], weight: 1 },
       // THE TRAFFIC LIGHT, where the cargo trike used to be. No moving part
       // and no anim: a signal post standing in a lane is the one hazard in
       // this game that is CORRECTLY dead still, and the idle shudder every
@@ -14947,29 +14961,29 @@ MR.World = (function () {
       // face at y 1.09 sits inside it on every edge. Earlier drafts of this
       // row put the face at y 0.145 and then y 0.05 down on the plinth, where
       // it photographed as a striped mat lying on the road beside the pole.
-      { geo: blockLightGeo, face: [2.30, 0.40, 1.09, -0.455], weight: 1 },
+      { geo: blockLightGeo, name: 'signal', face: [2.30, 0.40, 1.09, -0.455], weight: 1 },
       {
-        geo: blockCrossGeo, face: [2.10, 0.50, 0.98, -0.641], weight: 2,
+        geo: blockCrossGeo, name: 'marshal', face: [2.10, 0.50, 0.98, -0.641], weight: 2,
         // Inner hand, and high. See blockPaddleGeo: the reach is 1.28 from
         // here, so the +/-0.42 wave sweeps to 1.07 from the lane centre
         // against a box halfX of 1.12, and the roundel tops out at 2.62
         // against a ceiling of 2.80 with the shudder counted.
         moving: blockPaddleGeo, pivot: [0.30, 1.26, 0.34], anim: 'paddle',
       },
-      { geo: blockBusGeo, face: [2.16, 0.28, 1.22, -1.941], weight: 2, anim: 'idle' },
-      { geo: blockTaxiGeo, face: [2.02, 0.22, 0.98, -1.941], weight: 2, anim: 'idle' },
+      { geo: blockBusGeo, name: 'bus', face: [2.16, 0.28, 1.22, -1.941], weight: 2, anim: 'idle' },
+      { geo: blockTaxiGeo, name: 'taxi', face: [2.02, 0.22, 0.98, -1.941], weight: 2, anim: 'idle' },
       // `idle` added in the 2026-09-03 difficulty pass -- the backlog's
       // "one-moving-part rule could be loosened deliberately", loosened:
       // a van and a hatchback standing in a live race have engines
       // running, and the shudder every other stopped vehicle carries was
       // their absence reading as toy. Motion inside the envelope only.
-      { geo: blockVanGeo, face: [2.10, 0.20, 1.06, -1.941], weight: 2, anim: 'idle' },
+      { geo: blockVanGeo, name: 'van', face: [2.10, 0.20, 1.06, -1.941], weight: 2, anim: 'idle' },
       {
         // The chevron board goes ON THE TAILGATE, big, where a real refuse
         // truck carries it -- this is the one vehicle in the set whose real
         // rear marking IS a full-width red-and-white chevron panel, so the
         // kind signal and the vehicle agree instead of arguing.
-        geo: blockRefuseGeo, face: [2.16, 0.36, 1.30, -1.921], weight: 1,
+        geo: blockRefuseGeo, name: 'refuse', face: [2.16, 0.36, 1.30, -1.921], weight: 1,
         moving: blockRefuseGateGeo, pivot: [0, 1.30, -1.86], anim: 'lift',
       },
       {
@@ -14993,20 +15007,20 @@ MR.World = (function () {
         // stack of crates is the one hazard in this game besides the traffic
         // light that is correctly dead still -- the idle shudder every stopped
         // vehicle carries would read as a landslide on a loaded pallet.
-        geo: blockCrateLoadGeo, face: [1.90, 0.30, 0.40, -0.632], weight: 2,
+        geo: blockCrateLoadGeo, name: 'bikes', face: [1.90, 0.30, 0.40, -0.632], weight: 2,
       },
       // Face row shrunk 0.75x with the sculpt (see the `shrink` note in
       // dressHazard): the moped's body is now 0.75 of the def box, and a
       // 1.30-wide stripe across a 0.98-wide machine is the mid-air-mat
       // defect this pool has now measured three times.
-      { geo: blockMopedGeo, face: [0.98, 0.20, 0.83, -0.921], weight: 2, anim: 'idle' },
+      { geo: blockMopedGeo, name: 'moped', face: [0.98, 0.20, 0.83, -0.921], weight: 2, anim: 'idle' },
       // The citylook batch. The container and the parked hatchback carry
       // double weight: they are the two objects the reference frames show
       // blocking lanes most often.
-      { geo: blockContainerGeo, face: [2.16, 0.32, 0.50, -1.945], weight: 2 },
-      { geo: blockDumpsterGeo, face: [2.10, 0.30, 0.60, -1.325], weight: 1 },
-      { geo: blockHatchGeo, face: [1.90, 0.22, 0.42, -1.90], weight: 2, anim: 'idle' },
-      { geo: blockPoliceGeo, face: [2.00, 0.22, 0.44, -1.90], weight: 1, anim: 'idle' },
+      { geo: blockContainerGeo, name: 'container', face: [2.16, 0.32, 0.50, -1.945], weight: 2 },
+      { geo: blockDumpsterGeo, name: 'dumpster', face: [2.10, 0.30, 0.60, -1.325], weight: 1 },
+      { geo: blockHatchGeo, name: 'car', face: [1.90, 0.22, 0.42, -1.90], weight: 2, anim: 'idle' },
+      { geo: blockPoliceGeo, name: 'police', face: [2.00, 0.22, 0.44, -1.90], weight: 1, anim: 'idle' },
       /**
        * THE CARGO TRUCK (v14), and it is the first variant born straight
        * from a sculpt: the owner's props-v3 blue box lorry. A new variant
@@ -15026,7 +15040,7 @@ MR.World = (function () {
       // idle's +/-0.022 bob would leave the collision box -- the same
       // arithmetic that took the tram's pantograph sway. A vehicle at
       // the ceiling stands still.
-      { geo: blockLorryGeo, face: [2.16, 0.30, 0.78, -1.940], weight: 2 },
+      { geo: blockLorryGeo, name: 'lorry', face: [2.16, 0.30, 0.78, -1.940], weight: 2 },
     ]);
 
     /**
@@ -16058,10 +16072,65 @@ MR.World = (function () {
       }
     }
 
-    function castGates(gates, key) {
+    /**
+     * ---- THE CITY'S OWN STREET -------------------------------------------
+     *
+     * The owner (2026-09-22): "obstacles must change city to city, but the
+     * same obstacles can be used. we can use more of some in some cities
+     * and some of others in other cities. the obstacles need to be unique
+     * and different to change the game up."
+     *
+     * So: one obstacle library, twenty-five casting sheets. Each entry
+     * reweights the draw bags -- a named variant's ticket count replaces
+     * its default -- and that is ALL it may do. Nothing here can add a
+     * variant, change a collision box, or move a gate: the standing order
+     * that every board carries the same obstacle counts (27.5/11.7) holds,
+     * and a London board differs from a Rome board in what the hazards ARE,
+     * never in how many there are or where they stand.
+     *
+     * Unnamed variants keep their default ticket, so every city still deals
+     * from the full library -- the signature objects dominate, they do not
+     * monopolise. The signatures are the street the city is famous for:
+     * London's buses and black cabs, Amsterdam's trams and bikes, Rome's
+     * mopeds and eternal scaffolding, Nairobi's matatu vans, Toronto's
+     * streetcars and construction cones, Marrakesh's souk awnings.
+     */
+    const CITY_MIX = {
+      BOSTON:      { block: { police: 4, van: 3 }, jump: { barricade: 6, barrier: 3 }, duck: { gantry: 3 } },
+      LONDON:      { block: { bus: 6, taxi: 5 }, jump: { barrier: 4, barricade: 3 }, duck: { scaffold: 4 } },
+      BERLIN:      { block: { van: 4, car: 4, container: 3 }, jump: { drums: 4, barrier: 3 }, duck: { boom: 4 } },
+      CHICAGO:     { block: { lorry: 5, bus: 3 }, jump: { drums: 3, barrier: 3 }, duck: { bridge: 6 } },
+      NEWYORK:     { block: { taxi: 6, dumpster: 4, refuse: 3 }, jump: { trash: 4, barricade: 3 }, duck: { scaffold: 6 } },
+      TOKYO:       { block: { taxi: 5, signal: 3 }, jump: { cones: 4, lowbar: 3 }, duck: { shopsign: 5, gantry: 3 } },
+      SYDNEY:      { block: { van: 4, car: 3 }, jump: { pipes: 4, barrier: 3 }, duck: { walkway: 5, boom: 3 } },
+      PARIS:       { block: { moped: 4, van: 3 }, jump: { planter: 4, barrier: 3 }, duck: { awning: 6 } },
+      VALENCIA:    { block: { moped: 4, car: 3 }, jump: { planter: 4, cones: 3 }, duck: { awning: 3, floodlight: 3 } },
+      AMSTERDAM:   { block: { tram: 6, bikes: 5, moped: 3 }, jump: { planter: 4 }, duck: { bridge: 5 } },
+      ROME:        { block: { moped: 6, dumpster: 3 }, jump: { cones: 4, trench: 4 }, duck: { scaffold: 6 } },
+      CAPETOWN:    { block: { taxi: 5, van: 4, container: 3 }, jump: { drums: 3, crates: 3 }, duck: { boom: 4 } },
+      ATHENS:      { block: { moped: 4, dumpster: 3 }, jump: { trench: 5, cones: 3 }, duck: { scaffold: 4, pipe: 3 } },
+      SEOUL:       { block: { bus: 4, taxi: 3, signal: 3 }, jump: { lowbar: 4, cones: 3 }, duck: { shopsign: 6 } },
+      SINGAPORE:   { block: { taxi: 4, signal: 3 }, jump: { planter: 6, lowbar: 3 }, duck: { walkboard: 4, gantry: 3 } },
+      BUENOSAIRES: { block: { bus: 6, taxi: 3 }, jump: { barricade: 3, drums: 3 }, duck: { awning: 4 } },
+      NAIROBI:     { block: { van: 6, moped: 3, lorry: 3 }, jump: { drums: 4, crates: 3 }, duck: { boom: 5 } },
+      TORONTO:     { block: { tram: 5, car: 3 }, jump: { cones: 5, drums: 3 }, duck: { scaffold: 4, walkway: 3 } },
+      MEXICOCITY:  { block: { taxi: 4, bus: 4 }, jump: { trench: 3, barricade: 3 }, duck: { awning: 4, floodlight: 3 } },
+      MADRID:      { block: { taxi: 4, moped: 3 }, jump: { barrier: 3, planter: 3 }, duck: { awning: 4, scaffold: 3 } },
+      DUBAI:       { block: { car: 5, police: 4, taxi: 3 }, jump: { barrier: 5, cones: 3 }, duck: { gantry: 5, walkboard: 3 } },
+      SHANGHAI:    { block: { moped: 4, container: 4, bus: 3 }, jump: { crates: 3, lowbar: 3 }, duck: { shopsign: 5, walkboard: 3 } },
+      MUMBAI:      { block: { marshal: 5, moped: 4, taxi: 4 }, jump: { crates: 4, trash: 3 }, duck: { awning: 4, shopsign: 4 } },
+      MARRAKESH:   { block: { moped: 5, bikes: 4, dumpster: 3 }, jump: { crates: 4, trash: 3 }, duck: { awning: 7 } },
+      LAGOS:       { block: { van: 6, moped: 3, lorry: 3 }, jump: { drums: 5, trash: 3 }, duck: { boom: 4, awning: 3 } },
+    };
+
+    function castGates(gates, key, tag) {
+      const mix = CITY_MIX[tag
+        || (course && course.settings && course.settings.length ? course.settings[0].tag : '')]
+        || null;
       const bags = {};
-      bags[K.JUMP] = jumpPool.bagOf(); bags[K.DUCK] = duckPool.bagOf();
-      bags[K.BLOCK] = blockPool.bagOf();
+      bags[K.JUMP] = jumpPool.bagOf(mix && mix.jump);
+      bags[K.DUCK] = duckPool.bagOf(mix && mix.duck);
+      bags[K.BLOCK] = blockPool.bagOf(mix && mix.block);
       const deal = {};
       for (const k of Object.keys(bags)) {
         deal[k] = { left: [], rnd: MR.rng.stream(key || '', 'variants/v1|' + k) };
@@ -16099,6 +16168,21 @@ MR.World = (function () {
       // 1.6x run speed. It parks; the vehicles that move are the ones
       // with a nose.
       const SWEEP_CAST = [4, 5, 6, 7, 9, 12, 13];
+      // The movers take the city's casting sheet too: a London sweep is
+      // most often a bus or a cab, a Nairobi one a matatu van, a Rome one
+      // a moped. Weighted the same way as the bag -- the mix's ticket
+      // count where it names a mover, the def's own weight where it does
+      // not -- with a floor of one ticket so no mover ever leaves a city's
+      // roads entirely. Still a pure hash of (key, gate), so a day's cast
+      // is deterministic for everyone who runs it.
+      const blockDefs = blockPool.defsOf();
+      const sweepBag = [];
+      for (const si of SWEEP_CAST) {
+        const d = blockDefs[si];
+        let w = d.weight === 0 ? 0 : (d.weight || 1);
+        if (mix && mix.block && d.name && mix.block[d.name] != null) w = mix.block[d.name];
+        for (let k = 0; k < Math.max(1, w); k++) sweepBag.push(si);
+      }
       const cast = [];
       for (let g = 0; g < gates.length; g++) {
         const gate = gates[g];
@@ -16113,8 +16197,8 @@ MR.World = (function () {
               // identical twins. The lane that is not driving takes a
               // salted draw; the moving lane's cast is unchanged, so every
               // already-shipped single-wall gate wears what it wore.
-              ? SWEEP_CAST[MR.rng.hashString((key || '') + '|sweep-skin|' + g
-                  + (gate.on && gate.on.lane !== l ? '|escort' : '')) % SWEEP_CAST.length]
+              ? sweepBag[MR.rng.hashString((key || '') + '|sweep-skin|' + g
+                  + (gate.on && gate.on.lane !== l ? '|escort' : '')) % sweepBag.length]
               : draw(kind);
         }
         cast[g] = row;
@@ -22247,7 +22331,10 @@ MR.World = (function () {
     api.variantPlan = function (arg, key) {
       const gates = (arg && arg.gates) || arg;
       const seed = (arg && arg.key) || key || (course && course.key);
-      const cast = castGates(gates, seed);
+      // A whole course carries its own city, so its plan is cast on that
+      // city's sheet; a bare gate array is answered for THIS world's city.
+      const tag = arg && arg.settings && arg.settings.length ? arg.settings[0].tag : undefined;
+      const cast = castGates(gates, seed, tag);
       const out = [];
       for (let g = 0; g < gates.length; g++) {
         const gate = gates[g];

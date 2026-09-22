@@ -75,6 +75,26 @@ function shiftKey(key, n) {
 const GREEN = '🟩', YELLOW = '🟨', RED = '🟥';
 const TROPHY = '🏆';
 
+// The story-first layout (2026-09-22, the design review: "The result card
+// should tell a story") made line INDEXES a lie: an optional story line --
+// WORLD RECORD BROKEN, MISSED GOLD BY, COURSE RECORD BEATEN BY -- stands
+// between the wordmark and the result, when the run earned one. So the
+// instrument finds lines by what they ARE, not where they sit, and asserting
+// on a fixed index is the defect this comment exists to stop coming back.
+function blockLine(s) {
+  return s.split('\n').find((l) => l.length > 0
+    && l.replace(new RegExp(GREEN, 'g'), '').replace(new RegExp(YELLOW, 'g'), '')
+        .replace(new RegExp(RED, 'g'), '') === '') || '';
+}
+function resultLine(s) {
+  // The line carrying the clock and the parenthesised record delta.
+  return s.split('\n').find((l) => /\([-+]\d?:?\d+:\d\d\)|\([-+]\d+:\d\d\)/.test(l)) || '';
+}
+function storyLine(s) {
+  return s.split('\n').find((l) =>
+    /WORLD RECORD BROKEN|MISSED GOLD BY|COURSE RECORD BEATEN BY|MISSED SILVER BY/.test(l)) || '';
+}
+
 /**
  * The spoiler test, as a property rather than as an opinion.
  *
@@ -174,7 +194,7 @@ function spoilers(s) {
   const clean = await page.evaluate(() => window.__stage(7300, [], [], 6));
   strings.clean = clean;
   check('clean: every block is green',
-    clean.split('\n')[2] === GREEN.repeat(legN), 'blocks: ' + clean.split('\n')[2]);
+    blockLine(clean) === GREEN.repeat(legN), 'blocks: ' + blockLine(clean));
   check('clean: no trophy on a run that missed the record', clean.indexOf(TROPHY) < 0);
   if (SHOTS) await page.screenshot({ path: path.join(ROOT, 'shots', 'share-clean.png') });
 
@@ -183,10 +203,10 @@ function spoilers(s) {
   const guarded = await page.evaluate(() => window.__stage(7290, [], [1, 4], 6));
   strings.guarded = guarded;
   check('guarded: the guarded legs are yellow and the rest green',
-    guarded.split('\n')[2] === [GREEN, YELLOW, GREEN, GREEN, YELLOW, GREEN].join(''),
-    'blocks: ' + guarded.split('\n')[2]);
+    blockLine(guarded) === [GREEN, YELLOW, GREEN, GREEN, YELLOW, GREEN].join(''),
+    'blocks: ' + blockLine(guarded));
   check('guarded: a guarded run still costs no time in the string',
-    /7|SUB|RECORD/.test(guarded.split('\n')[1]));
+    /7|SUB|RECORD/.test(resultLine(guarded)));
   if (SHOTS) await page.screenshot({ path: path.join(ROOT, 'shots', 'share-guarded.png') });
 
   // REAL HITS, plus a guard, plus a leg that took both -- the last one proving
@@ -194,30 +214,47 @@ function spoilers(s) {
   const hit = await page.evaluate(() => window.__stage(7307, [2, 4], [1, 4], 3));
   strings.hit = hit;
   check('hit: red where the run was hit, yellow where the pool paid',
-    hit.split('\n')[2] === [GREEN, YELLOW, RED, GREEN, RED, GREEN].join(''),
-    'blocks: ' + hit.split('\n')[2]);
+    blockLine(hit) === [GREEN, YELLOW, RED, GREEN, RED, GREEN].join(''),
+    'blocks: ' + blockLine(hit));
   check('hit: the delta is positive and stated',
-    /\(\+\d/.test(hit.split('\n')[1]), 'line reads ' + hit.split('\n')[1]);
+    /\(\+\d/.test(resultLine(hit)), 'line reads ' + resultLine(hit));
   if (SHOTS) await page.screenshot({ path: path.join(ROOT, 'shots', 'share-hit.png') });
 
   // A RECORD. Under 1:59:30, so the trophy and a negative delta.
   const record = await page.evaluate(() => window.__stage(7122, [], [], 6));
   strings.record = record;
-  // The trophy leads the RESULT line, not the string: line 1 is the wordmark
-  // and the city. The first draft of this assertion tested the whole string
-  // and failed a correct card -- an instrument reading the wrong line.
-  check('record: the trophy leads the result line',
-    record.split('\n')[1].indexOf(TROPHY) === 0,
-    'line 2 reads ' + record.split('\n')[1]);
-  check('record: the grade says RECORD', /RECORD/.test(record.split('\n')[1]));
-  check('record: the delta is negative', /\(-\d/.test(record.split('\n')[1]),
-    'line 2 reads ' + record.split('\n')[1]);
+  // The trophy leads the STORY line -- the headline the story-first cut put
+  // above the result -- and the result line keeps the clock and the negative
+  // delta. The first draft of the old assertion tested the whole string and
+  // failed a correct card; an instrument reading the wrong line, twice now.
+  check('record: the trophy leads the story line',
+    storyLine(record).indexOf(TROPHY) === 0,
+    'story reads ' + storyLine(record));
+  check('record: the story says the record broke',
+    /WORLD RECORD BROKEN/.test(storyLine(record)), 'story reads ' + storyLine(record));
+  check('record: the grade says RECORD', /RECORD/.test(resultLine(record)));
+  check('record: the delta is negative', /\(-\d/.test(resultLine(record)),
+    'result reads ' + resultLine(record));
   if (SHOTS) await page.screenshot({ path: path.join(ROOT, 'shots', 'share-record.png') });
+
+  // A NEAR MISS. +0:50 over the record is inside the 90-second window the
+  // story-first cut carved out ("MISSED GOLD BY 1:18" beats "+1:18" as a
+  // headline), and the window is city-independent, so this stages anywhere.
+  const near = await page.evaluate(() => window.__stage(7220, [], [], 6));
+  strings.near = near;
+  check('near: the story names the miss',
+    /MISSED GOLD BY 0:50/.test(storyLine(near)), 'story reads ' + storyLine(near));
+  check('near: no trophy on a miss', near.indexOf(TROPHY) < 0);
 
   // Shape, length and the streak rule, over all four.
   for (const k of ['clean', 'guarded', 'hit', 'record']) {
     const s = strings[k];
-    check(k + ': the string is under 200 characters', s.length < 200,
+    // 220, up from 200 when the story headline joined the string: the
+    // longest legitimate card (BUENOS AIRES, a course-record story, a
+    // streak and the challenge link) measures ~190 UTF-16 units, and the
+    // cap's job is to catch a line that should not be there, not to shave
+    // ten characters off a correct one.
+    check(k + ': the string is under 220 characters', s.length < 220,
       s.length + ' characters');
     check(k + ': it names the game and the city',
       s.split('\n')[0] === 'MARATHON MILES · ' + city, 'line 1 reads ' + s.split('\n')[0]);
@@ -342,7 +379,7 @@ function spoilers(s) {
     // The passport wall replaced the old #cityGrid checklist (roadmaps
     // 108-110): stamps carry the TIER language now -- gold for the world
     // record, bronze for the city record, ink for a finish, new for a road
-    // not yet run -- and the rule line reads PICK A CITY - ONE A DAY.
+    // not yet run -- and the rule line leads TODAY'S MARATHON, THEN THE TOUR.
     return page.evaluate(() => ({
       open: true,
       rule: document.getElementById('cityRule').textContent.trim(),
@@ -370,7 +407,7 @@ function spoilers(s) {
     days: { count: 1, last: shiftKey(dateKey, -2) }, best: null, hist: someRows });
   check('cities: the panel opened', cr.open === true);
   check('cities: three run, two gold, on the rule line',
-    cr.rule === 'PICK A CITY · ONE A DAY · 3 OF ' + pool.length + ' RUN · 2 GOLD',
+    cr.rule === "TODAY'S MARATHON, THEN THE TOUR · 3 OF " + pool.length + ' RUN · 2 GOLD',
     'rule reads "' + cr.rule + '"');
   // The wall groups by REGION, so stamp order is not pool order: compare as
   // sets, which is what the tier claim actually is.
@@ -395,7 +432,7 @@ function spoilers(s) {
   cr = await readCities({ v: 1, day: null, prev: null,
     days: { count: 1, last: shiftKey(dateKey, -1) }, best: null, hist: allRows });
   check('cities: all of them counted',
-    cr.rule === 'PICK A CITY · ONE A DAY · ' + pool.length + ' OF ' + pool.length
+    cr.rule === "TODAY'S MARATHON, THEN THE TOUR · " + pool.length + ' OF ' + pool.length
       + ' RUN · ' + pool.length + ' GOLD',
     'rule reads "' + cr.rule + '"');
   check('cities: none left unvisited', cr.fresh.length === 0 && cr.ran.length === 0,
@@ -418,7 +455,7 @@ function spoilers(s) {
     };
   });
   check('cities: a bad save leaves the panel standing', survived.start
-    && /PICK A CITY/.test(survived.rule), 'rule reads "' + survived.rule + '"');
+    && /TODAY'S MARATHON/.test(survived.rule), 'rule reads "' + survived.rule + '"');
   notes.push('corrupt save rule: "' + survived.rule + '"');
 
   // ---- 6. the head the share string travels with -------------------------

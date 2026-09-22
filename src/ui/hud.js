@@ -433,7 +433,7 @@ MR.HUD = (function () {
         </div>
 
         <!--
-          THE DAY IS OVER, either way: the record fell, or the three tries
+          THE DAY IS OVER one way only now: the three tries
           are spent (owner, 2026-09-22: "No unlimited tries - 3 a day
           max"). Same box, different chip -- setLocked carries the reason.
         -->
@@ -833,7 +833,7 @@ MR.HUD = (function () {
       stampDate: q('stampDate'), stampCtx: q('stampCtx'),
       cityBar: q('cityBar'), cityBarLab: q('cityBarLab'), cityBarTime: q('cityBarTime'),
       challengeBar: q('challengeBar'), challengeTime: q('challengeTime'),
-      pickLine: q('pickLine'), pickBtn: q('pickBtn'), pickCity: q('pickCity'),
+      pickLine: q('pickLine'), pickBtn: q('pickBtn'), pickCity: q('pickCity'), pickLab: q('pickLab'),
       racePick: q('racePick'), triesLine: q('triesLine'), triesEnd: q('triesEnd'),
       lockChip: q('lockChip'), lockSub: q('lockSub'),
       againBtn: q('againBtn'),
@@ -1155,14 +1155,26 @@ MR.HUD = (function () {
     }
 
     /** The one-a-day door state, shared by the stamp wall and the map card. */
+    /**
+     * The one-a-day door became the DAY'S MARATHON door (2026-09-22
+     * restructure): until today's featured city is finished once, it is
+     * the only open road; after that, tour mode opens every city for the
+     * tries that remain. Out of tries, everything closes till tomorrow.
+     */
     function doorState(sum, s, loadedTag) {
-      const spent = !!(sum && sum.todayCity);
-      const dayDone = !!(sum && sum.done);
+      const featDone = !!(sum && sum.featuredDone);
+      const attempts = sum ? (sum.attempts | 0) : 0;
+      const left = Math.max(0, (K.TRIES_PER_DAY || 3) - attempts);
       const isLoaded = s.tag === loadedTag;
-      const isSpent = spent && sum.todayCity === s.name;
-      const door = !dayDone && !spent && !isLoaded;
-      const note = isLoaded ? (dayDone ? 'TODAY · SEALED' : spent ? 'TODAY' : 'AT THE LINE')
-        : isSpent ? 'TODAY' : door ? 'RUN IT TODAY' : 'BACK TOMORROW';
+      const featTag = sum && sum.dateKey && MR.Course.pickSettings
+        ? MR.Course.pickSettings(sum.dateKey)[0].tag : null;
+      const isFeat = s.tag === featTag;
+      const door = left > 0 && !isLoaded && (featDone || isFeat);
+      const note = isLoaded ? 'AT THE LINE'
+        : left <= 0 ? 'BACK TOMORROW'
+        : featDone ? 'RUN IT TODAY'
+        : isFeat ? 'TODAY\'S MARATHON'
+        : 'AFTER TODAY\'S MARATHON';
       return { door: door, note: note };
     }
 
@@ -1528,7 +1540,7 @@ MR.HUD = (function () {
           + (rGold ? ' · ' + rGold + ' GOLD' : '')
           + (rGold === byReg[reg].length ? ' · COMPLETE' : '') + '</div>' + cards;
       }
-      n.cityRule.textContent = 'PICK A CITY · ONE A DAY · ' + run + ' OF ' + pool.length + ' RUN · ' + gold + ' GOLD';
+      n.cityRule.textContent = "TODAY'S MARATHON, THEN THE TOUR · " + run + ' OF ' + pool.length + ' RUN · ' + gold + ' GOLD';
       n.stampWall.innerHTML = html;
     }
 
@@ -1729,33 +1741,40 @@ MR.HUD = (function () {
       const loaded = set && set.length ? set[0] : null;
       const feat = lastSum && lastSum.dateKey && MR.Course.pickSettings
         ? MR.Course.pickSettings(lastSum.dateKey)[0] : null;
-      const spent = !!(lastSum && lastSum.todayCity);
+      const featDone = !!(lastSum && lastSum.featuredDone);
       const done = !!(lastSum && lastSum.done);
-      // The pick row: the chosen city ON the button. Spent or done, the
-      // button stays visible but shut -- the panel should still say where
-      // today went -- and the line under it explains.
+      const attempts = lastSum ? (lastSum.attempts | 0) : 0;
+      const leftN = Math.max(0, (K.TRIES_PER_DAY || 3) - attempts);
+
+      // The pick row wears the day's structure: before the featured city
+      // is finished it reads TODAY'S MARATHON and the button is shut
+      // (everyone runs the same road first); after, it reads TOUR MODE
+      // and the bubbles open. The world's shared race is what a friend's
+      // "Berlin today is brutal" refers to; the tour is your own map.
       n.pickBtn.classList.toggle('hidden', !loaded);
-      n.pickBtn.disabled = !!(spent || done);
-      if (loaded) n.pickCity.textContent = spent ? (lastSum.todayCity || loaded.name) : loaded.name;
+      n.pickBtn.disabled = !featDone || leftN <= 0;
+      if (loaded) n.pickCity.textContent = loaded.name;
+      if (n.pickLab) n.pickLab.textContent = featDone ? 'TOUR MODE · PICK A CITY:' : 'TODAY\'S MARATHON:';
       let line = '';
-      if (loaded && feat && !done) {
-        if (spent) line = 'NEW PICK TOMORROW';
-        else if (loaded.tag !== feat.tag) line = 'YOUR PICK · THE WORLD RUNS ' + feat.name + ' TODAY';
+      if (loaded && feat) {
+        if (!featDone) line = 'EVERYONE RUNS ' + feat.name + ' TODAY · FINISH IT TO OPEN THE TOUR';
+        else if (loaded.tag !== feat.tag) line = 'TOURING · THE WORLD RAN ' + feat.name + ' TODAY';
+        else if (leftN > 0) line = 'IMPROVE IT, OR TOUR ANY CITY';
       }
       n.pickLine.textContent = line;
       n.pickLine.classList.toggle('hidden', !line);
 
-      // The tries line, on both panels (owner: three a day). Quiet until
-      // one is spent; the locked box takes over when they are gone.
-      const runs = lastSum && lastSum.today ? (lastSum.today.runs | 0) : 0;
-      const leftN = Math.max(0, (K.TRIES_PER_DAY || 3) - runs);
-      const triesTxt = runs > 0 && leftN > 0 && !done
-        ? leftN + (leftN === 1 ? ' TRY' : ' TRIES') + ' LEFT TODAY' : '';
+      // The tries line counts ATTEMPTS (spent at the gun) and carries the
+      // record badge when 1:59:30 fell -- a badge, not a door.
+      const won = done ? 'RECORD BROKEN' : '';
+      const triesTxt = attempts > 0 && leftN > 0
+        ? (won ? won + ' · ' : '') + leftN + (leftN === 1 ? ' TRY' : ' TRIES') + ' LEFT TODAY'
+        : won;
       n.triesLine.textContent = triesTxt;
       n.triesLine.classList.toggle('hidden', !triesTxt);
-      n.triesEnd.textContent = done ? 'RECORD BROKEN · DONE FOR TODAY'
-        : leftN > 0 ? leftN + (leftN === 1 ? ' TRY' : ' TRIES') + ' LEFT TODAY'
-        : lastSum && lastSum.today ? 'NO TRIES LEFT · NEW ROAD TOMORROW' : '';
+      n.triesEnd.textContent = leftN > 0
+        ? (won ? won + ' · ' : '') + leftN + (leftN === 1 ? ' TRY' : ' TRIES') + ' LEFT TODAY'
+        : lastSum ? (won ? won + ' · ' : '') + 'NO TRIES LEFT · NEW ROAD TOMORROW' : '';
     }
     n.endHistBtn.addEventListener('click', function () { openHist(n.endPanel); });
     n.histBack.addEventListener('click', function () {
@@ -1791,11 +1810,10 @@ MR.HUD = (function () {
       n.againBtn.classList.toggle('hidden', !!info);
       if (lockTimer) { clearInterval(lockTimer); lockTimer = null; }
       if (!info) return;
-      const tries = info.reason === 'tries';
-      n.lockChip.textContent = tries ? '3 TRIES USED' : 'RECORD BROKEN';
-      n.lockSub.textContent = tries ? 'BEST OF TODAY ABOVE · NEW ROAD TOMORROW'
-                                    : 'MILES IS DONE FOR TODAY';
-      n.lockTime.textContent = Pace.clock(info.time);
+      n.lockChip.textContent = '3 TRIES USED';
+      n.lockSub.textContent = info.time ? 'BEST OF TODAY ABOVE · NEW ROAD TOMORROW'
+                                        : 'NEW ROAD TOMORROW';
+      n.lockTime.textContent = info.time ? Pace.clock(info.time) : '';
       // The countdown asks the day's own authority (rng, which rolls at
       // midnight PACIFIC now) rather than doing UTC arithmetic on the
       // key -- the two disagreed by seven or eight hours the day the
@@ -1972,43 +1990,12 @@ MR.HUD = (function () {
 
     // ---- the debrief ------------------------------------------------------
 
-    /**
-     * The whole run, erased of its unguarded contacts, replayed once. Same
-     * reconstruction as chapterCosts and the same honesty rule: the answer is
-     * a DIFFERENCE of two aid-less replays, so what the replay cannot model
-     * (the pickups the real run took) is common to both terms and cancels,
-     * and the result is reported against the run's own finish time. Guards
-     * are added arithmetically -- a guarded contact costs GUARD_TIME flat by
-     * construction, so no replay is needed to price one.
-     */
-    function contactsCost(p) {
-      let cost = (p.guards | 0) * 1.5;   // GUARD_TIME, fixed in pace.js
-      if (hitZ && hitZ.size && course && course.gates && course.gates.length) {
-        const run = function (erase) {
-          const q = Pace.create();
-          let gi = 0, guard = 0;
-          while (!q.finished && guard++ < 40000) {
-            q.update(1 / 60);
-            while (gi < course.gates.length && q.units >= course.gates[gi].z) {
-              const g = course.gates[gi];
-              gi++;
-              if (!erase && hitZ.has(g.z)) q.onHit(); else q.onClean();
-            }
-          }
-          return q.finished ? q.finishTime : 0;
-        };
-        const base = run(false), clean = run(true);
-        if (base && clean) cost += Math.max(0, base - clean);
-      }
-      return cost;
-    }
+    // contactsCost() -- the erased-contacts counterfactual -- went with THE
+    // CONTACTS section it priced (the owner's 2026-09-22 crop).
 
     /**
-     * THE DEBRIEF: the four questions a coach answers after a race, built
-     * only when the player asks for them. Facts lead and the counterfactual
-     * follows, under the same noise guard chapterCosts measured: past twelve
-     * contacts the reconstruction drifts (55s adrift at twenty), so a wreck
-     * gets its facts and not a fiction with a decimal point on it.
+     * THE DEBRIEF, cut to two questions on the owner's crop: the 5K splits
+     * against record pace, and the mile strip.
      *
      * The mile strip deliberately does NOT grade the early miles against the
      * record ghost -- the comparison is structurally negative before the
@@ -2019,66 +2006,52 @@ MR.HUD = (function () {
      */
     function buildDebrief(p) {
       const out = [];
-      const nHit = p.hits | 0, nG = p.guards | 0;
 
-      // 1. The contacts, and what they cost.
-      let head = nHit + nG === 0 ? 'CLEAN RUN · NO CONTACTS'
-        : (nHit + nG) + ' CONTACT' + (nHit + nG === 1 ? '' : 'S')
-          + (nG ? ' · ' + nG + ' GUARDED' : '');
-      let costLine = '';
-      if (nHit + nG > 0 && nHit <= 12) {
-        const c = contactsCost(p);
-        if (c >= 1) {
-          costLine = 'CLEAN, THIS RUN FINISHES ' + Pace.clock(Math.max(0, p.finishTime - c))
-            + ' · CONTACTS COST ' + Pace.clock(c);
+      // The splits, first, because they answer the first question a
+      // finisher asks: where did the attempt die. Cumulative clock at each
+      // 5K checkpoint -- the checkpoints a real marathon posts -- against
+      // even record pace, read off the mile splits by interpolation. The
+      // delta column is the story: watch it grow, and you have found the
+      // 5K that lost the run.
+      const spl = p.splits || [];
+      const FULL_MI = 26.21875;
+      if (spl.length >= 10 && p.finishTime > 0) {
+        const timeAt = function (mile) {
+          if (mile <= spl[0].mile) return spl[0].time * mile / spl[0].mile;
+          for (let i = 1; i < spl.length; i++) {
+            if (mile <= spl[i].mile) {
+              const a = spl[i - 1], b = spl[i];
+              return a.time + (b.time - a.time) * (mile - a.mile) / (b.mile - a.mile);
+            }
+          }
+          const z = spl[spl.length - 1];
+          if (FULL_MI - z.mile < 0.01) return p.finishTime;
+          return z.time + (p.finishTime - z.time) * (mile - z.mile) / (FULL_MI - z.mile);
+        };
+        const rows = [];
+        for (let k = 5; k <= 40; k += 5) {
+          const mi = k / 1.609344;
+          if (mi >= FULL_MI) break;
+          const tk = timeAt(mi);
+          rows.push({ name: k + 'K', t: tk, d: tk - K.RECORD_SECONDS * (k / 42.195) });
         }
-      }
-      out.push('<div class="dbSec"><div class="lab">THE CONTACTS</div>'
-        + '<div class="dbLine">' + head + '</div>'
-        + (costLine ? '<div class="dbLine num dim">' + costLine + '</div>' : '')
-        + '</div>');
-
-      // 2. The tank.
-      const total = course && course.aid ? course.aid.length : 0;
-      if (total && p.aid !== undefined) {
-        const taken = p.aid | 0;
-        const pct = Math.round(100 * taken / total);
-        const dry = Math.round(p.drySeconds || 0);
-        const bits = ['FUEL ' + taken + ' OF ' + total + ' · ' + pct + '%'];
-        // Race-seconds, and a wreck can spend most of the race under the
-        // knee -- 8340 raw seconds was measured on a bot run -- so past a
-        // minute and a half it reads as a clock, not a count.
-        if (dry >= 1) bits.push('RAN DRY ' + (dry >= 90 ? Pace.clock(dry) : dry + 'S'));
-        if ((p.wasted | 0) >= 3) bits.push((p.wasted | 0) + ' TAKEN FULL');
-        out.push('<div class="dbSec"><div class="lab">THE TANK</div>'
-          + '<div class="dbLine num">' + bits.join(' · ') + '</div>'
-          + (dry >= 1 ? '<div class="dbLine dim">EVERY DRY SECOND IS ROAD GIVEN BACK</div>' : '')
-          + '</div>');
-      }
-
-      // 3. The legs: the share row's six blocks, given their names and
-      // their counts. Same cut, same colors, so the two cannot disagree.
-      const cutter = legCut();
-      if (cutter) {
-        const marks = legMarks();
-        const hitsIn = cutter.legs.map(function () { return 0; });
-        const guardsIn = cutter.legs.map(function () { return 0; });
-        if (hitZ) for (const z of hitZ) hitsIn[cutter.of(z)]++;
-        if (guardZ) for (const z of guardZ) guardsIn[cutter.of(z)]++;
-        const CLS = ['clean', 'guard', 'hit'];
-        out.push('<div class="dbSec"><div class="lab">THE LEGS</div>'
-          + cutter.legs.map(function (b, i) {
-            const note = hitsIn[i]
-              ? hitsIn[i] + ' CONTACT' + (hitsIn[i] === 1 ? '' : 'S')
-                + (guardsIn[i] ? ' +' + guardsIn[i] + 'G' : '')
-              : guardsIn[i] ? guardsIn[i] + ' GUARDED' : 'CLEAN';
-            return '<div class="dbLeg"><span class="sblock ' + CLS[marks[i]] + '"></span>'
-              + '<span class="dbLegName">' + b.name + '</span>'
-              + '<span class="dbLegNote num">' + note + '</span></div>';
+        rows.push({ name: 'FINISH', t: p.finishTime, d: p.finishTime - K.RECORD_SECONDS });
+        out.push('<div class="dbSec"><div class="lab">THE SPLITS · VS RECORD PACE</div>'
+          + rows.map(function (r) {
+            return '<div class="dbSplit num">'
+              + '<span class="dbSpK">' + r.name + '</span>'
+              + '<span class="dbSpT">' + Pace.clock(r.t) + '</span>'
+              + '<span class="dbSpD ' + (r.d <= 0 ? 'ahead' : 'behind') + '">'
+              + (r.d <= 0 ? '-' : '+') + Pace.clock(Math.abs(r.d)) + '</span></div>';
           }).join('') + '</div>');
       }
 
-      // 4. The miles.
+      // THE CONTACTS, THE TANK and THE LEGS came off on the owner's crop
+      // (2026-09-22, "take out this portion of the card and leave the
+      // rest"), with the sank footer: the debrief is the splits and the
+      // miles now. The share row's six blocks still carry the legs story.
+
+      // The miles.
       const sp = p.splits || [];
       if (sp.length >= 5) {
         const mt = [];
@@ -2188,6 +2161,24 @@ MR.HUD = (function () {
      * holds it back: a streak of one is just today wearing a label -- and on
      * a shared result it would be a boast about having turned up once.
      */
+    /**
+     * The one sentence this finish is, ranked by how good the story is
+     * rather than by how good the run was: a gold is a broken record, a
+     * near miss of gold beats a comfortable silver as a headline even
+     * when the silver is the medal that was actually won -- the stamp
+     * carries the medal, the headline carries the drama. Empty when the
+     * run has no story beyond its time, and the plain lines stand alone.
+     */
+    function storyLine(t, medal, cityRec) {
+      const over = t - K.RECORD_SECONDS;
+      if (medal === 'gold') return 'WORLD RECORD BROKEN · ' + Pace.clock(-over) + ' UNDER';
+      if (over > 0 && over <= 90) return 'MISSED GOLD BY ' + Pace.clock(over);
+      if (medal === 'silver') return 'COURSE RECORD BEATEN BY ' + Pace.clock(cityRec - t);
+      if (cityRec && cityRec > K.RECORD_SECONDS && t > cityRec && t - cityRec <= 90)
+        return 'MISSED SILVER BY ' + Pace.clock(t - cityRec);
+      return '';
+    }
+
     function buildShare(p, rec, marks) {
       const t = p.finishTime;
       const set = course && course.settings;
@@ -2196,14 +2187,16 @@ MR.HUD = (function () {
       const isRec = t <= K.RECORD_SECONDS;
 
       const out = [];
-      // The medal travels: a bronze names the real record it beat, which
-      // is the line a group chat actually asks about.
+      // The story leads. The medal travels on the stamp and in the story
+      // line: a broken record, a near miss, a course record beaten -- the
+      // line a group chat actually asks about, before the time.
       const medal = set && set.length && MR.Course.tierFor ? MR.Course.tierFor(t, set[0].tag) : '';
+      const story = storyLine(t, medal, set && set.length ? set[0].rec : 0);
       out.push('MARATHON MILES' + (city ? ' · ' + city : ''));
-      out.push((isRec ? TROPHY + ' ' : '') + Tier.of(t).name
+      if (story) out.push((isRec ? TROPHY + ' ' : '') + story);
+      out.push((isRec && !story ? TROPHY + ' ' : '') + Tier.of(t).name
         + ' · ' + Pace.clock(t)
-        + ' (' + (vs <= 0 ? '-' : '+') + Pace.clock(Math.abs(vs)) + ')'
-        + (medal === 'silver' ? ' · COURSE RECORD BEATEN' : ''));
+        + ' (' + (vs <= 0 ? '-' : '+') + Pace.clock(Math.abs(vs)) + ')');
       if (marks.length) out.push(marks.map(function (m) { return BLOCK[m]; }).join(''));
       const streak = rec && rec.dayStreak ? rec.dayStreak | 0 : 0;
       if (streak >= 2) out.push('Day streak: ' + streak);
@@ -2217,9 +2210,12 @@ MR.HUD = (function () {
       // "the game has no domain yet" was true; site/CNAME says it is not.
       // The link carries the city and this finish as the target, so the
       // result IS the challenge: whoever taps it races this exact wager.
+      // Answering a challenge, the link is the return shot; fresh, it is
+      // the opening one. Same wager either way: this city, this finish.
       const tag = set && set.length ? set[0].tag : '';
       if (tag) {
-        out.push('Beat me: https://marathon-miles.com/?city=' + tag
+        out.push((challengeBeat ? 'Rematch: ' : 'Beat me: ')
+          + 'https://marathon-miles.com/?city=' + tag
           + '&beat=' + Math.round(t));
       }
       return out.join('\n');
@@ -2368,9 +2364,12 @@ MR.HUD = (function () {
 
       font('900', 216);
       g.fillText(Pace.clock(d.t), 540, 500);
-      g.fillStyle = d.vs <= 0 ? '#4dfba0' : d.vs <= 30 ? ACCENT : 'rgba(255, 253, 245, 0.70)';
-      font('800', 44);
-      g.fillText((d.vs <= 0 ? '-' : '+') + Pace.clock(Math.abs(d.vs)) + ' VS ' + K.RECORD_LABEL, 540, 630);
+      // The story where the raw delta stood: MISSED GOLD BY 1:18 says more
+      // than +1:18, and when the run has no story the delta line returns.
+      g.fillStyle = d.vs <= 0 ? '#4dfba0' : d.vs <= 90 ? ACCENT : 'rgba(255, 253, 245, 0.70)';
+      const vsLine = d.story
+        || (d.vs <= 0 ? '-' : '+') + Pace.clock(Math.abs(d.vs)) + ' VS ' + K.RECORD_LABEL;
+      g.fillText(fit(vsLine, '800', 44, 960), 540, 630);
 
       // The six legs, the run's own weather report.
       if (d.marks && d.marks.length) {
@@ -3205,6 +3204,8 @@ MR.HUD = (function () {
         t: t, vs: vs, marks: marks,
         city: st0 ? st0.name : 'GLOBAL COURSE',
         medal: st0 && MR.Course.tierFor ? MR.Course.tierFor(t, st0.tag) : '',
+        story: st0 ? storyLine(t,
+          MR.Course.tierFor ? MR.Course.tierFor(t, st0.tag) : '', st0.rec) : '',
         word: st0 ? n.stampWord.textContent : Tier.of(t).name,
         date: rec.dateKey || '',
         revisit: !!rec.revisit,

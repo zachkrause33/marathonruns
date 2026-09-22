@@ -9654,3 +9654,16 @@ route trail carry vector-effect non-scaling-stroke so the world
 stays crisp at 6x.
 
 Gates: 8/8 shots, 90+90 courses, simulate PASS, sharecard PASS.
+
+## 129. Two colors on the paper (2026-09-22)
+
+The owner, on the new map: "pins need to be smaller. maybe one
+color for cities completed, and one color for not completed." Pins
+drop to 0.72x (0.4x in the Europe lens) with the tap target held at
+thumb size inside the counter-scale wrapper, and the four-metal
+palette leaves the paper: a pin is GOLD (done) or GRAY (not yet),
+because four metals on twenty-five small pins read as confetti.
+Which medal a city is done AT belongs to the popup and the wall,
+which is where the eye already goes to ask.
+
+Gates: 8/8 shots, 90+90 courses, simulate PASS.

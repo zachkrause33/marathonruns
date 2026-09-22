@@ -1550,6 +1550,10 @@ MR.HUD = (function () {
      * session must not leak into a player's run.
      */
     function goCity(tag) {
+      // Every door into a city passes here -- the picker bubbles, the
+      // stamp wall, the map popup -- so this is the one honest place to
+      // count which cities get CHOSEN (Run Start counts which get run).
+      try { if (MR.track) MR.track('City Pick', { city: tag }); } catch (e) { /* fine */ }
       const cur = new URLSearchParams(location.search);
       const next = new URLSearchParams();
       if (cur.get('date')) next.set('date', cur.get('date'));
@@ -2298,6 +2302,11 @@ MR.HUD = (function () {
     n.shareBtn.addEventListener('click', function () {
       const text = shareStr;
       if (!text) return;
+      // The sending half of the viral loop; Challenge Open in main.js is
+      // the receiving half. Counted at the press -- intent -- because the
+      // ladder below has three exits and all of them put the result in
+      // the player's hands.
+      try { if (MR.track) MR.track('Share Copy', { kind: 'text' }); } catch (e) { /* fine */ }
       const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
       if (coarse && navigator.share) {
         let p = null;
@@ -2428,6 +2437,7 @@ MR.HUD = (function () {
     let shareImgData = null;
     n.shareImgBtn.addEventListener('click', function () {
       if (!shareImgData) return;
+      try { if (MR.track) MR.track('Share Copy', { kind: 'image' }); } catch (e) { /* fine */ }
       let cv;
       try { cv = drawShareCard(shareImgData); }
       catch (e) { shareNote('COULD NOT DRAW THE CARD', true); return; }

@@ -508,6 +508,38 @@ MR.unbail = function () {
       if (window.plausible) window.plausible(name, props ? { props: props } : undefined);
     } catch (e) { /* analytics must never cost a frame, let alone a run */ }
   }
+  // hud.js fires its own moments (a city picked, a result copied) through
+  // this handle; the same LOCKOUT gate rides along with it.
+  MR.track = track;
+
+  // A label for a count: the first cut it fits under, else the last label.
+  function bucket(x, cuts, labs) {
+    for (let i = 0; i < cuts.length; i++) if (x <= cuts[i]) return labs[i];
+    return labs[labs.length - 1];
+  }
+
+  // ---- the day's arrival, counted once --------------------------------
+  // Two boot facts the panels cannot see. A challenge link opened is the
+  // receiving half of the viral loop (the sending half is Share Copy).
+  // And RETURN VISIT is the retention number a cookieless Plausible cannot
+  // measure by itself across days -- so the save measures it: a load by a
+  // player whose passport has history, before today's first gun, counted
+  // once per date via its own latch.
+  if (LOCKOUT) {
+    if (BEAT) track('Challenge Open', { city: cityTag });
+    try {
+      const sumB = MR.Store.summary(dateKey);
+      if (sumB && sumB.totalDays > 0 && !sumB.featuredDone && (sumB.attempts | 0) === 0
+          && localStorage.getItem('marathonruns/ret/v1') !== dateKey) {
+        localStorage.setItem('marathonruns/ret/v1', dateKey);
+        track('Return Visit', {
+          streak: sumB.dayStreak <= 0 ? 'broken'
+            : bucket(sumB.dayStreak, [1, 3, 7], ['1', '2-3', '4-7', '8+']),
+          days: bucket(sumB.totalDays, [1, 5, 15], ['1', '2-5', '6-15', '16+']),
+        });
+      }
+    } catch (e) { /* counting a return must never break a boot */ }
+  }
 
   /**
    * Re-read the save and redraw everything that hangs off it: the memory
@@ -683,6 +715,21 @@ MR.unbail = function () {
   // pause the run it is measuring.
   document.addEventListener('visibilitychange', function () {
     if (!BOT && document.visibilityState === 'hidden' && state === RUN) pause();
+  });
+  // The abandon, counted at the door. A hidden tab is a pause, not an
+  // abandon -- the handler above already turned it into one -- so only
+  // pagehide (a navigation or a close) counts, and only mid-race. Best
+  // effort by nature: an unload beacon can be lost, so the DASHBOARD
+  // truth for abandons is Run Start minus Run Finish; this event exists
+  // to say WHERE the run died, not to be the count.
+  window.addEventListener('pagehide', function () {
+    if (state !== RUN && state !== PAUSED && state !== COUNT) return;
+    const mi = pace ? pace.units / K.UNITS_PER_MILE : 0;
+    track('Run Abandon', {
+      city: cityTag,
+      at: mi < 6 ? 'miles-0-5' : mi < 14 ? 'miles-6-13'
+        : mi < 20 ? 'miles-14-19' : 'miles-20-26',
+    });
   });
   // Any input during the celebration ends the hold and brings the card up now.
   // The alternative to this is a player who has seen the ending once being made
@@ -1420,6 +1467,9 @@ MR.unbail = function () {
         track('Run Finish', {
           city: cityTag,
           featured: cityTag === featuredTag ? 'featured' : 'tour',
+          // The receiving half of the loop, closed: a challenger who
+          // FINISHED, not merely arrived.
+          challenge: BEAT ? 'yes' : 'no',
           medal: (course.settings && course.settings.length && MR.Course.tierFor
             ? MR.Course.tierFor(pace.finishTime, course.settings[0].tag) : '') || 'none',
           // A coarse minute bucket, not the exact time: the panel wants a

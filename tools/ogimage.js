@@ -52,6 +52,70 @@ const OUT = i >= 0 && process.argv[i + 1]
   ? path.resolve(process.argv[i + 1])
   : path.join(ROOT, 'shots', 'share-og-1200x630.png');
 
+/**
+ * ---- --gameplay: THE CARD IS NOW A FRAME OF THE GAME ---------------------
+ *
+ * The typographic card below was drawn on the argument that a screenshot
+ * "would be a picture of one day's road ... a spoiler ... and stale the next
+ * morning". The owner overruled it on seeing the card in a Reddit composer
+ * (2026-09-22): "how can that be adjusted to show the gameplay or something
+ * more standard". A game's link preview showing the game is the standard,
+ * the spoiler is a still of one arbitrary moment on a FIXED past date (not
+ * today's road), and marketing art is allowed to be a photograph.
+ *
+ *   node tools/ogimage.js --gameplay [--city TAG] [--skip N] [--out P]
+ *
+ * Boots the real built page as a bot on a pinned date, hides #ui, stamps
+ * the wordmark and the wager over the frame in the page's own typeface,
+ * and screenshots 1200x630. The old drawn card remains the default mode.
+ */
+const GAMEPLAY = process.argv.includes('--gameplay');
+const argOf = (name, dflt) => {
+  const k = process.argv.indexOf(name);
+  return k >= 0 && process.argv[k + 1] ? process.argv[k + 1] : dflt;
+};
+if (GAMEPLAY) {
+  (async () => {
+    const { chromium: ch } = require('playwright');
+    const browser = await ch.launch({
+      executablePath: process.env.MR_CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+      args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader',
+        '--disable-dev-shm-usage', '--no-sandbox'],
+    });
+    const page = await (await browser.newContext({
+      viewport: { width: 1200, height: 630 }, deviceScaleFactor: 1,
+    })).newPage();
+    page.on('pageerror', (e) => { console.error('PAGE ERROR', e.message); process.exitCode = 1; });
+    // A pinned date, so regenerating the card reproduces the same road and
+    // no card is ever a picture of the road someone is about to run.
+    const city = argOf('--city', 'LONDON');
+    const skip = argOf('--skip', '18');
+    await page.goto('file://' + path.join(ROOT, 'index.html')
+      + '?bot=1&nosave=1&nocount=1&date=2026-09-01&city=' + city + '&skip=' + skip);
+    await page.waitForFunction(() => window.MR && MR.game && MR.game.ready, null, { timeout: 60000 });
+    // Let the skip land and the camera settle on the running frame.
+    await page.waitForTimeout(2500);
+    await page.evaluate(() => {
+      const ui = document.getElementById('ui');
+      if (ui) ui.style.display = 'none';
+      const o = document.createElement('div');
+      o.style.cssText = 'position:fixed;left:0;right:0;bottom:0;padding:26px 44px 30px;'
+        + 'background:linear-gradient(transparent,rgba(10,13,38,0.88) 55%);'
+        + "font-family:'MRCond',sans-serif;color:#fffdf5;z-index:99;";
+      o.innerHTML = '<div style="font-size:64px;font-weight:700;letter-spacing:0.06em;'
+        + 'line-height:1">MARATHON MILES</div>'
+        + '<div style="font-size:25px;font-weight:700;letter-spacing:0.22em;margin-top:10px;'
+        + 'color:#ffe45e">BREAK 1:59:30 &nbsp;&middot;&nbsp; ONE MARATHON A DAY &nbsp;&middot;&nbsp; FREE IN YOUR BROWSER</div>';
+      document.body.appendChild(o);
+    });
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: OUT });
+    await browser.close();
+    console.log('wrote ' + OUT + '  (gameplay: ' + city + ' @ mile-skip ' + skip + ')');
+  })().catch((e) => { console.error(e); process.exit(1); });
+  return;
+}
+
 // The game's own typeface, from the file the build inlines, so the card is set
 // in the same face as the wordmark it is advertising.
 const font = fs.readFileSync(path.join(ROOT, 'src/ui/font.css'), 'utf8');

@@ -9807,3 +9807,47 @@ medal, and the finish clock as one-minute buckets from under-1:55
 to over-2:15 -- a distribution, not a per-second shatter). Probed:
 a player start fires exactly one event with its props; a bot boot
 fires none.
+
+## 134. The event surface, and a gameplay link card (2026-09-22)
+
+THE EVENTS the owner asked for, each behind the same double guard
+(no window.plausible = no-op; LOCKOUT only, so bots, skips and
+nosave inspections never count):
+
+  Run Start      city, featured|tour -- already live; with Run
+                 Finish it IS the abandon rate (start minus finish),
+                 which is the robust way to count abandons because
+                 an unload beacon is lossy by nature.
+  Run Abandon    city, at (miles-0-5 / 6-13 / 14-19 / 20-26), fired
+                 best-effort on pagehide mid-race: it exists to say
+                 WHERE runs die, not to be the count. A hidden tab
+                 is a pause, not an abandon.
+  City Pick      city, from goCity -- the one door every picker
+                 (bubbles, stamp wall, map popup) already used.
+  Run Finish     + challenge: yes|no -- the challenger who FINISHED,
+                 closing the viral loop; medal and clock buckets
+                 were already aboard.
+  Share Copy     kind: text|image, at the press (the sending half;
+                 Challenge Open at boot is the receiving half).
+  Return Visit   streak + days buckets, once per date via its own
+                 latch. Counted from the SAVE because cookieless
+                 Plausible cannot see day-over-day returns by
+                 itself; a load with passport history before the
+                 day's first gun is a return.
+
+Probed end to end (7/7): each event with its props, the bot page
+firing nothing, the return latch firing once across a reload. The
+probe itself needed a lesson: file:// localStorage writes from a
+just-left document surface late to the next one, so reads poll --
+a probe artifact, not a product one (real Plausible ships over
+fetch keepalive).
+
+AND THE LINK CARD IS NOW THE GAME. The owner, from the Reddit
+composer: "how can that be adjusted to show the gameplay or
+something more standard". ogimage.js grew --gameplay: boots the
+built page as a bot on a PINNED past date (never today's road),
+hides #ui, stamps the wordmark and wager in the page's own face,
+screenshots 1200x630. Shipped frame: LONDON mile ~1, runner on the
+racing line, jump barrier and crate train ahead. og:image URLs
+carry ?v=2 so scrapers refetch. The old drawn card remains the
+tool's default mode, argument preserved in the file.

@@ -932,21 +932,14 @@ html, body {
 #mapBox { max-width: 520px; margin: 4px auto 8px; }
 #mapBox:empty { display: none; }
 /* A pannable map must own its gestures: no browser scroll or pinch
- * inside the paper, a grab cursor, and the zoom buttons floated on it. */
+ * inside the paper and a grab cursor; the fingers ARE the buttons now
+ * (owner, 2026-09-22): pinch zooms, a drag pans, wheel and double-tap
+ * serve the desk. The wrapper anchors the city popup over the paper. */
+#mapWrap { position: relative; }
 #mapBox { position: relative; touch-action: none; }
 #mapBox svg { cursor: grab; }
 #mapBox.zoomed svg { cursor: move; }
-#mapZoom {
-  position: relative; max-width: 520px; margin: 0 auto; height: 0;
-}
-#mapZoom button {
-  position: absolute; right: 6px; width: 30px; height: 30px;
-  font: inherit; font-size: 17px; font-weight: 800; line-height: 1;
-  color: #14183a; background: #fffdf5; border: none; border-radius: 4px;
-  cursor: pointer; opacity: 0.9;
-}
-#mapZoom #zoomIn { top: -76px; }
-#mapZoom #zoomOut { top: -42px; }
+#mapBox.deep .mapLab, #mapBox.deep .wave { display: none; }
 #mapBox svg {
   display: block; width: 100%; height: auto;
   filter: drop-shadow(0 6px 14px rgba(4, 6, 20, 0.55));
@@ -956,6 +949,7 @@ html, body {
 #mapBox .ocean1 { fill: #6cb6f0; }
 #mapBox .crease { stroke: rgba(20, 40, 80, 0.18); stroke-width: 1; }
 #mapBox .land {
+  vector-effect: non-scaling-stroke;   /* coastlines stay crisp at zoom */
   fill: #cfd8de;
   stroke: rgba(30, 50, 80, 0.25); stroke-width: 0.6;
   stroke-linejoin: round;
@@ -964,6 +958,7 @@ html, body {
 #mapBox .land.lit { fill: #f6f2e6; }
 #mapBox .land.goldland { fill: #ffe45e; stroke: rgba(120, 90, 0, 0.35); }
 #mapBox .trail {
+  vector-effect: non-scaling-stroke;   /* the route stays a thread, not a rope */
   fill: none; stroke: #e8433f; stroke-width: 1.4;
   stroke-linecap: round; stroke-linejoin: round;
   stroke-dasharray: 3 3;
@@ -1030,31 +1025,48 @@ html, body {
 
 /* The tour tabs retired with the one-page merge (2026-09-22). */
 
-/* The city card under the map: the tapped pin's facts, and the door. */
-#mapCard {
-  max-width: 520px; margin: 0 auto;
-  padding: 9px 12px 10px;
-  background: var(--ink); border-left: 4px solid var(--accent);
+/* THE CITY POPUP: a paper callout over the tapped pin -- white like
+ * the map it floats on, ink type, a real shadow, and the door inside
+ * it. Absolutely positioned by showMapPop through the same viewBox the
+ * camera drives. */
+#mapPop {
+  position: absolute; z-index: 3;
+  width: 208px; box-sizing: border-box;
+  padding: 9px 11px 10px;
+  background: #fffdf5; color: #1c2038;
+  border-radius: 7px;
+  box-shadow: 0 8px 20px rgba(4, 6, 20, 0.5);
   text-align: left;
 }
-#mapCard:empty { display: none; }
-.mcTop { display: flex; align-items: baseline; gap: 8px; }
-.mcCity { font-size: 16px; font-weight: 800; letter-spacing: 0.08em; }
-.mcReg { font-size: 8px; font-weight: 800; letter-spacing: 0.16em; opacity: 0.55; }
-.mcTier { margin-left: auto; font-size: 9px; font-weight: 800; letter-spacing: 0.18em; }
-.mcTier.gold { color: var(--accent); }
-.mcTier.silver { color: #dfe6ee; }
-.mcTier.bronze { color: #eda56a; }
-.mcRow { font-size: 10px; opacity: 0.8; margin-top: 3px; letter-spacing: 0.05em; }
-.mcRun {
+#mapPop.hidden { display: none; }
+.mpClose {
+  position: absolute; top: 2px; right: 4px;
+  font: inherit; font-size: 15px; line-height: 1;
+  padding: 4px 6px;
+  color: #1c2038; opacity: 0.55;
+  background: none; border: none; cursor: pointer;
+}
+.mpTop { display: flex; align-items: baseline; gap: 8px; padding-right: 16px; }
+.mpCity { font-size: 13.5px; font-weight: 800; letter-spacing: 0.07em; }
+.mpTier { margin-left: auto; font-size: 8px; font-weight: 800; letter-spacing: 0.16em; }
+.mpTier.gold { color: #a8862a; }
+.mpTier.silver { color: #6e7c8c; }
+.mpTier.bronze { color: #b06a34; }
+.mpTier.new { opacity: 0.5; }
+.mpReg { font-size: 7.5px; font-weight: 800; letter-spacing: 0.18em; opacity: 0.5; margin-top: 1px; }
+.mpRows { margin-top: 5px; }
+.mpRows div { display: flex; justify-content: space-between; align-items: baseline; margin-top: 2px; }
+.mpRows i { font-style: normal; font-size: 7.5px; font-weight: 800; letter-spacing: 0.16em; opacity: 0.55; }
+.mpRows b { font-size: 11px; font-weight: 700; }
+.mpRun {
   display: block; width: 100%; margin-top: 8px;
   font: inherit; cursor: pointer;
-  font-size: 11px; font-weight: 800; letter-spacing: 0.14em;
-  padding: 9px 0;
-  color: #14183a; background: var(--accent); border: none; border-radius: 3px;
+  font-size: 10px; font-weight: 800; letter-spacing: 0.12em;
+  padding: 8px 0;
+  color: #14183a; background: var(--accent); border: none; border-radius: 4px;
 }
-.mcRun:active { transform: scale(0.98); }
-.mcNote { margin-top: 7px; font-size: 9px; font-weight: 800; letter-spacing: 0.14em; opacity: 0.7; }
+.mpRun:active { transform: scale(0.98); }
+.mpNote { margin-top: 7px; font-size: 8px; font-weight: 800; letter-spacing: 0.14em; opacity: 0.6; }
 
 /* ---- the stamp wall ----
  * Four states in the border and the tier word: dashed outline for a city

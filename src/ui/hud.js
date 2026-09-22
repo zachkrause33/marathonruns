@@ -486,12 +486,18 @@ MR.HUD = (function () {
           run and turns gold when every city in it is sealed. Tapping a pin
           opens the city card under the map, and the card carries the door.
         -->
-        <div id="mapBox"></div>
-        <div id="mapZoom" aria-hidden="true">
-          <button type="button" id="zoomIn">+</button>
-          <button type="button" id="zoomOut">&#8722;</button>
+        <!--
+          The map owns its gestures outright now (owner, 2026-09-22:
+          "instead of the zoom in and out button - allow that to zoom and
+          move with your fingers"): pinch zooms, a finger pans, wheel and
+          double-tap serve the desk. A tapped pin opens the CITY POPUP --
+          a paper callout floated over the map with your stats there and
+          the door in it -- which replaced the static card below.
+        -->
+        <div id="mapWrap">
+          <div id="mapBox"></div>
+          <div id="mapPop" class="hidden"></div>
         </div>
-        <div id="mapCard"></div>
 
         <!--
           EVERY CITY IN THE POOL, AND WHERE THE RECORD HAS FALLEN.
@@ -810,8 +816,7 @@ MR.HUD = (function () {
       shareBtn: q('shareBtn'), shareImgBtn: q('shareImgBtn'),
       shareNote: q('shareNote'), shareText: q('shareText'),
       cityRule: q('cityRule'), stampWall: q('stampWall'), mapBox: q('mapBox'),
-      mapCard: q('mapCard'), histTitle: q('histTitle'),
-      zoomIn: q('zoomIn'), zoomOut: q('zoomOut'),
+      mapWrap: q('mapWrap'), mapPop: q('mapPop'), histTitle: q('histTitle'),
       stampMoment: q('stampMoment'), stampInk: q('stampInk'),
       stampCity: q('stampCity'), stampWord: q('stampWord'),
       stampDate: q('stampDate'), stampCtx: q('stampCtx'),
@@ -1196,8 +1201,8 @@ MR.HUD = (function () {
       // (staggered), and the tap target is far larger than the pin. One
       // renderer, because the Europe inset below draws the same pins again
       // at magnification and the two must never disagree.
-      const pinsFor = function (list, labelSel, ps, hitR) {
-        ps = ps || 1; hitR = hitR || 11;
+      const pinsFor = function (list, labelSel, ps) {
+        ps = ps || 1;
         const order = list.slice().filter(function (s) { return s.latlon; })
           .sort(function (a, b) { return b.latlon[0] - a.latlon[0]; });
         return order.map(function (s, i) {
@@ -1206,17 +1211,23 @@ MR.HUD = (function () {
           const xy = mapPt(s.latlon[1], s.latlon[0]).split(',');
           const isSel = s.tag === mapSel;
           const isLoaded = s.tag === loadedTag;
+          // Everything -- art, label, HIT -- rides one .pinScale wrapper
+          // whose transform applyMapView() rewrites to ps / zoom, so pins
+          // stay pin-sized while the world grows under them (the way any
+          // map app draws its markers), and the tap target stays a thumb's
+          // width at every zoom instead of swallowing its neighbours.
           return '<g class="pinP' + (isSel ? ' sel' : '') + '" transform="translate(' + xy[0] + ',' + xy[1] + ')'
             + (isSel ? ' scale(1.3)' : '') + '">'
-            + '<g' + (ps !== 1 ? ' transform="scale(' + ps + ')"' : '') + '>'
+            + '<g class="pinScale" data-ps="' + ps + '" transform="scale(' + ps + ')">'
             + '<ellipse class="pinShadow" cx="0.6" cy="0.7" rx="3.4" ry="1.2"/>'
             + (isLoaded ? '<circle class="pinPulse" cy="-1" r="6"/>' : '')
             + '<g class="pinDrop"' + (animate ? ' style="animation-delay:' + (0.05 * i).toFixed(2) + 's"' : '') + '>'
             + '<path class="pin ' + tier + '" d="M0 0C-4.2-6.2-6.5-8.4-6.5-12A6.5 6.5 0 1 1 6.5-12C6.5-8.4 4.2-6.2 0 0Z"/>'
             + '<circle class="pinHole" cx="0" cy="-12" r="2.5"/>'
-            + '</g></g>'
+            + '</g>'
             + (isSel && labelSel ? '<text class="pinLab" y="-22">' + s.name + '</text>' : '')
-            + '<circle class="pinHit" r="' + hitR + '" cy="' + (-9 * ps) + '" data-pin="' + s.tag + '"><title>' + s.name + '</title></circle>'
+            + '<circle class="pinHit" r="9.5" cy="-9" data-pin="' + s.tag + '"><title>' + s.name + '</title></circle>'
+            + '</g>'
             + '</g>';
         }).join('');
       };
@@ -1249,7 +1260,7 @@ MR.HUD = (function () {
        * circle is outside the counter-scale and sized so its on-screen
        * radius (~10.4) matches the main map's. */
       const EU = pool.filter(function (s) { return s.region === 'EUROPE'; });
-      const eupins = pinsFor(EU, false, 0.5, 4);
+      const eupins = pinsFor(EU, false, 0.5);
       const ICX = 63, ICY = 92, IR = 33, ISC = 2.6, ECX = 190, ECY = 46;
       const inset =
         '<g class="inset">'
@@ -1301,6 +1312,16 @@ MR.HUD = (function () {
       svg.setAttribute('viewBox',
         MV.x.toFixed(2) + ' ' + MV.y.toFixed(2) + ' ' + vw.toFixed(2) + ' ' + vh.toFixed(2));
       n.mapBox.classList.toggle('zoomed', MV.s > 1.01);
+      // Deep zoom hides the cartographer's furniture -- region caps and
+      // waves scale with the paper and turn to shouting past ~2x.
+      n.mapBox.classList.toggle('deep', MV.s > 1.8);
+      // Pins counter-scale so they stay pin-sized over the growing world.
+      const k = 1 / MV.s;
+      const gs = svg.querySelectorAll('.pinScale');
+      for (let i = 0; i < gs.length; i++) {
+        const base = parseFloat(gs[i].getAttribute('data-ps')) || 1;
+        gs[i].setAttribute('transform', 'scale(' + (base * k).toFixed(4) + ')');
+      }
     }
     /** Zoom to ns keeping the content point under view-fraction (fx,fy) still. */
     function mapZoom(ns, fx, fy) {
@@ -1364,14 +1385,19 @@ MR.HUD = (function () {
         const f = frac(e);
         if (!f) return;
         e.preventDefault();
+        hideMapPop();
         mapZoom(MV.s * Math.pow(1.0015, -e.deltaY), f.fx, f.fy);
       }, { passive: false });
       box.addEventListener('dblclick', function (e) {
         const f = frac(e);
-        if (f) mapZoom(MV.s > 1.5 ? 1 : 2.5, f.fx, f.fy);
+        if (f) { hideMapPop(); mapZoom(MV.s > 1.5 ? 1 : 2.5, f.fx, f.fy); }
       });
-      if (n.zoomIn) n.zoomIn.addEventListener('click', function () { mapZoom(MV.s * 1.6, 0.5, 0.5); });
-      if (n.zoomOut) n.zoomOut.addEventListener('click', function () { mapZoom(MV.s / 1.6, 0.5, 0.5); });
+      // Any gesture that moves the camera closes the popup: a callout
+      // pinned to a coastline that just slid out from under it is worse
+      // than no callout.
+      box.addEventListener('pointermove', function () {
+        if (movedPx > 8 || live.size === 2) hideMapPop();
+      });
     }
 
     /**
@@ -1379,27 +1405,67 @@ MR.HUD = (function () {
      * one-a-day rule allows, the door. The same facts as that city's stamp
      * -- the map page is for CHOOSING, the passport page is for KEEPING.
      */
-    function drawMapCard(sum, pool, loadedTag) {
-      const s = pool.filter(function (x) { return x.tag === mapSel; })[0]
-        || pool.filter(function (x) { return x.tag === loadedTag; })[0] || pool[0];
-      if (!s) { n.mapCard.innerHTML = ''; return; }
+    /**
+     * THE CITY POPUP: a paper callout floated over the tapped pin, with
+     * the city, your stats there, both records, the medal, and the door.
+     * Placed at the pin's SCREEN position -- computed through the same
+     * viewBox the camera drives, so zoom and pan cannot lie to it --
+     * above the pin where there is room, below it where there is not,
+     * clamped to the paper either way.
+     */
+    function hideMapPop() {
+      if (n.mapPop) n.mapPop.classList.add('hidden');
+    }
+    function showMapPop(tag) {
+      const pool = (MR.Course && MR.Course.SETTINGS) ? MR.Course.SETTINGS : [];
+      const s = pool.filter(function (x) { return x.tag === tag; })[0];
+      if (!s || !s.latlon) { hideMapPop(); return; }
+      const sum = lastSum;
       const seen = (sum && sum.cities) || {};
       const c = seen[s.name];
       const tier = stampTier(s, c);
+      const loadedTag = course && course.settings && course.settings.length ? course.settings[0].tag : null;
       const d = doorState(sum, s, loadedTag);
       const word = tier === 'gold' ? 'GOLD' : tier === 'silver' ? 'SILVER'
         : tier === 'bronze' ? 'BRONZE' : 'NEW ROAD';
-      n.mapCard.innerHTML =
-        '<div class="mcTop"><span class="mcCity">' + s.name + '</span>'
-        + '<span class="mcReg">' + (s.region || '') + '</span>'
-        + '<span class="mcTier ' + tier + '">' + word + '</span></div>'
-        + '<div class="mcRow num">'
-        + (c ? 'BEST ' + Pace.clock(c.best) + ' · ' : '')
-        + (s.rec && s.rec > K.RECORD_SECONDS ? 'CR ' + Pace.clock(s.rec) + ' · ' : '')
-        + 'WR ' + K.RECORD_LABEL + '</div>'
+      n.mapPop.innerHTML =
+        '<button type="button" class="mpClose" aria-label="Close">&#215;</button>'
+        + '<div class="mpTop"><span class="mpCity">' + s.name + '</span>'
+        + '<span class="mpTier ' + tier + '">' + word + '</span></div>'
+        + '<div class="mpReg">' + (s.region || '') + '</div>'
+        + '<div class="mpRows num">'
+        + (c ? '<div><i>YOUR BEST</i><b>' + Pace.clock(c.best) + '</b></div>'
+             + '<div><i>RUNS</i><b>' + c.runs + '</b></div>'
+           : '<div><i>YOUR BEST</i><b>&mdash;</b></div>')
+        + (s.rec && s.rec > K.RECORD_SECONDS
+            ? '<div><i>COURSE RECORD</i><b>' + Pace.clock(s.rec) + '</b></div>' : '')
+        + '<div><i>WORLD RECORD</i><b>' + K.RECORD_LABEL + '</b></div>'
+        + '</div>'
         + (d.door
-          ? '<button type="button" class="mcRun" data-city="' + s.tag + '">RUN ' + s.name + ' TODAY</button>'
-          : '<div class="mcNote">' + d.note + '</div>');
+          ? '<button type="button" class="mpRun" data-city="' + s.tag + '">RUN ' + s.name + ' TODAY</button>'
+          : '<div class="mpNote">' + d.note + '</div>');
+
+      // Where the pin is on screen: content -> outer svg -> pixels.
+      const svg = n.mapBox.querySelector('svg');
+      if (!svg) return;
+      const xy = mapPt(s.latlon[1], s.latlon[0]).split(',');
+      const ox = parseFloat(xy[0]) + MAP_PAD;
+      const oy = parseFloat(xy[1]) + (MAP_PAD - MAP_Y0);
+      const sr = svg.getBoundingClientRect();
+      const wr = n.mapWrap.getBoundingClientRect();
+      const px = (sr.left - wr.left) + (ox - MV.x) / (MV.W / MV.s) * sr.width;
+      const py = (sr.top - wr.top) + (oy - MV.y) / (MV.H / MV.s) * sr.height;
+
+      n.mapPop.classList.remove('hidden');
+      const pw = n.mapPop.offsetWidth, ph = n.mapPop.offsetHeight;
+      const left = Math.max(6, Math.min(wr.width - pw - 6, px - pw / 2));
+      // Above the pin's head (the teardrop is ~22px tall) when there is
+      // room; under its foot when there is not.
+      let top = py - ph - 26;
+      if (top < 4) top = py + 12;
+      top = Math.max(4, Math.min(wr.height - ph - 4, top));
+      n.mapPop.style.left = left + 'px';
+      n.mapPop.style.top = top + 'px';
     }
 
     function drawPassport(sum) {
@@ -1411,7 +1477,7 @@ MR.HUD = (function () {
         ? MR.Course.pickSettings(sum.dateKey)[0].tag : null;
       if (!mapSel) mapSel = loadedTag;
       drawMap(sum, pool, loadedTag, true);
-      drawMapCard(sum, pool, loadedTag);
+      hideMapPop();   // the save changed under it; a stale popup is a lie
       const regions = [];
       const byReg = {};
       for (const s of pool) {
@@ -1477,7 +1543,10 @@ MR.HUD = (function () {
       };
     }
     n.stampWall.addEventListener('click', cityClick(n.stampWall));
-    n.mapCard.addEventListener('click', cityClick(n.mapCard));
+    n.mapPop.addEventListener('click', cityClick(n.mapPop));
+    n.mapPop.addEventListener('click', function (ev) {
+      if (ev.target && ev.target.classList && ev.target.classList.contains('mpClose')) hideMapPop();
+    });
 
     // A tapped pin moves the card, not the page: the map redraws without
     // replaying the drop (the settled class stills the animation), and the
@@ -1485,12 +1554,12 @@ MR.HUD = (function () {
     n.mapBox.addEventListener('click', function (ev) {
       const t = ev.target;
       const tag = t && t.getAttribute && t.getAttribute('data-pin');
-      if (!tag) return;
+      if (!tag) { hideMapPop(); return; }
       mapSel = tag;
       const pool = (MR.Course && MR.Course.SETTINGS) ? MR.Course.SETTINGS : [];
       const loadedTag = course && course.settings && course.settings.length ? course.settings[0].tag : null;
       drawMap(lastSum, pool, loadedTag, false);
-      drawMapCard(lastSum, pool, loadedTag);
+      showMapPop(tag);
     });
 
     // The tabs went with the one-page merge (2026-09-22): the map and the

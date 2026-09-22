@@ -9620,3 +9620,37 @@ three cannot disagree -- and the pan/zoom shipped this morning now
 has a planet worth zooming into.
 
 Gates: 8/8 shots, 90+90 courses, simulate PASS, sharecard PASS.
+
+## 128. The map in your fingers (2026-09-22)
+
+The owner: "instead of the zoom in and out button - allow that to
+zoom and move with your fingers. If you click on a city a pop up
+should come up of the city, your stats there etc. make it
+interactive."
+
+THE BUTTONS ARE GONE; THE FINGERS ARE THE BUTTONS. Pinch zooms
+about the midpoint of the fingers, a drag pans, wheel and
+double-tap serve the desk. Verified with synthetic two-pointer
+events: a 3x finger spread produced exactly 3x zoom centered on the
+pinch.
+
+THE PIN OPENS A POPUP: a paper callout floated over the tapped pin
+-- city, region, the medal, YOUR BEST, RUNS, COURSE RECORD, WORLD
+RECORD, and RUN <CITY> TODAY inside it -- positioned through the
+same viewBox the camera drives so zoom and pan cannot lie to it,
+above the pin where there is room, clamped to the paper always. It
+closes on the x, on a tap in open water, and on ANY gesture that
+moves the camera -- a callout pinned to a coastline that just slid
+out from under it is worse than none. The static card below the map
+went; the popup is the card now.
+
+AND THE MAP LEARNED WHAT MAP APPS KNOW: pins ride a .pinScale
+wrapper that applyMapView() rewrites to base/zoom every frame, so
+markers stay pin-sized over the growing world and the tap target
+stays a thumb's width at every depth instead of swallowing its
+neighbours; deep zoom (past 1.8x) hides the region caps and waves,
+which scale with the paper and turn to shouting; coastlines and the
+route trail carry vector-effect non-scaling-stroke so the world
+stays crisp at 6x.
+
+Gates: 8/8 shots, 90+90 courses, simulate PASS, sharecard PASS.

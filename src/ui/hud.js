@@ -1185,16 +1185,8 @@ MR.HUD = (function () {
           + '" x2="' + (i * 90) + '" y2="' + (MAP_Y0 + MAP_H) + '"/>';
       }
 
-      // The route so far: a dashed travel line through the visited cities
-      // in the order they were first run.
-      const visited = pool
-        .map(function (s) { return { s: s, c: seen[s.name] }; })
-        .filter(function (x) { return x.c && x.c.first && x.s.latlon; });
-      visited.sort(function (a, b) { return a.c.first < b.c.first ? -1 : 1; });
-      const trail = visited.length > 1
-        ? '<polyline class="trail" points="'
-          + visited.map(function (x) { return mapPt(x.s.latlon[1], x.s.latlon[0]); }).join(' ') + '"/>'
-        : '';
+      // The dashed travel trail came off on the owner's word
+      // (2026-09-22), with the Europe lens below it.
 
       // The pins, southernmost drawn last so an overlapping pair stacks the
       // way paper pins would. Each drops onto the paper when the page opens
@@ -1248,34 +1240,9 @@ MR.HUD = (function () {
         + '<text class="mapLab" x="252" y="42">ASIA-PACIFIC</text>'
         + '<text class="mapLab" x="204" y="94">AFRICA</text>';
 
-      /**
-       * THE EUROPE INSET. Six of seventeen pins live inside twenty
-       * degrees of longitude, and at phone width they were a single
-       * golden blob nobody could tap. A paper map solves this the way
-       * paper maps always have: a magnifier circle in the empty
-       * Atlantic, the same land and the same pins at 2.6x, tappable --
-       * the delegation reads data-pin wherever it is drawn.
-       */
-      /* Pins inside the magnifier counter-scale to 0.5x so that, after the
-       * 2.6x lens, they render only ~30% larger than main-map pins while
-       * their POSITIONS spread the full 2.6x -- a full-size pin under the
-       * lens would be 34 units tall, taller than the lens itself. The hit
-       * circle is outside the counter-scale and sized so its on-screen
-       * radius (~10.4) matches the main map's. */
-      const EU = pool.filter(function (s) { return s.region === 'EUROPE'; });
-      const eupins = pinsFor(EU, false, 0.4);
-      const ICX = 63, ICY = 92, IR = 33, ISC = 2.6, ECX = 190, ECY = 46;
-      const inset =
-        '<g class="inset">'
-        + '<clipPath id="euclip"><circle cx="' + ICX + '" cy="' + ICY + '" r="' + IR + '"/></clipPath>'
-        + '<circle class="insetSea" cx="' + ICX + '" cy="' + ICY + '" r="' + IR + '"/>'
-        + '<g clip-path="url(#euclip)">'
-        + '<g transform="translate(' + ICX + ',' + ICY + ') scale(' + ISC + ') translate(' + (-ECX) + ',' + (-ECY) + ')">'
-        + polys + '<g class="insetPins">' + eupins + '</g>'
-        + '</g></g>'
-        + '<circle class="insetRing" cx="' + ICX + '" cy="' + ICY + '" r="' + IR + '"/>'
-        + '<text class="mapLab insetLab" x="' + ICX + '" y="' + (ICY + IR + 7) + '">EUROPE</text>'
-        + '</g>';
+      // The Europe lens is retired (owner, 2026-09-22: "Take out the
+      // zoomed in area of Europe"): the map zooms UNDER YOUR FINGERS
+      // now, so the cluster it existed to resolve is one pinch away.
 
       const W = 360 + MAP_PAD * 2, H = MAP_H + MAP_PAD * 2;
       n.mapBox.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="World tour map"'
@@ -1283,8 +1250,8 @@ MR.HUD = (function () {
         + '<rect class="paper" x="0" y="0" width="' + W + '" height="' + H + '" rx="5"/>'
         + '<clipPath id="mclip"><rect x="0" y="' + MAP_Y0 + '" width="360" height="' + MAP_H + '" rx="3"/></clipPath>'
         + '<g transform="translate(' + MAP_PAD + ',' + (MAP_PAD - MAP_Y0) + ')">'
-        + '<g clip-path="url(#mclip)">' + folds + waves + polys + trail + regLabels + '</g>'
-        + pins + inset
+        + '<g clip-path="url(#mclip)">' + folds + waves + polys + regLabels + '</g>'
+        + pins
         + '</g></svg>';
       MV.W = W; MV.H = H;
       applyMapView();

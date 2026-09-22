@@ -9667,3 +9667,17 @@ Which medal a city is done AT belongs to the popup and the wall,
 which is where the eye already goes to ask.
 
 Gates: 8/8 shots, 90+90 courses, simulate PASS.
+
+## 130. Less on the paper (2026-09-22)
+
+The owner: "Take out the zoomed in area of Europe in the bottom
+right. Also take out the dotted redline from city to city." Both
+gone. The Europe lens existed to resolve a pin cluster the map
+could not otherwise reach -- and since this morning the map zooms
+under your fingers, so the cluster is one pinch away and the lens
+was a second, worse camera. The dashed travel trail goes with it:
+the pins' two colors already say where you have been, and the line
+between them was drawing attention to geography's flight paths
+rather than the player's next city.
+
+Gates: 8/8 shots, 90+90 courses, simulate PASS, sharecard PASS.

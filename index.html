@@ -1088,11 +1088,10 @@ html, body {
  * animation -- each pin falls onto the paper with one bounce -- and a
  * settled redraw (a pin tap) stills it. */
 #mapBox .pin { stroke: rgba(20, 20, 40, 0.5); stroke-width: 0.7; }
+/* Two states on the paper (2026-09-22): done in the game's gold, not
+ * yet done in map-pin gray. The medal detail lives in the popup. */
 #mapBox .pin.new { fill: #9fb0bc; }
-#mapBox .pin.ink { fill: #e8433f; }
-#mapBox .pin.silver { fill: #cfd6de; }
-#mapBox .pin.bronze { fill: #e0955a; }
-#mapBox .pin.gold { fill: #ffd93e; }
+#mapBox .pin.done { fill: #ffd93e; }
 #mapBox .pinHole { fill: #fffdf5; }
 #mapBox .pinShadow { fill: rgba(20, 30, 60, 0.30); }
 #mapBox .pinHit { fill: transparent; cursor: pointer; }
@@ -48499,7 +48498,10 @@ MR.HUD = (function () {
           .sort(function (a, b) { return b.latlon[0] - a.latlon[0]; });
         return order.map(function (s, i) {
           const c = seen[s.name];
-          const tier = stampTier(s, c);
+          // Two colors on the paper (owner, 2026-09-22): a city is DONE or
+          // it is not. Which medal it is done AT belongs to the popup and
+          // the wall -- four metals on 25 small pins read as confetti.
+          const done = !!c;
           const xy = mapPt(s.latlon[1], s.latlon[0]).split(',');
           const isSel = s.tag === mapSel;
           const isLoaded = s.tag === loadedTag;
@@ -48514,16 +48516,16 @@ MR.HUD = (function () {
             + '<ellipse class="pinShadow" cx="0.6" cy="0.7" rx="3.4" ry="1.2"/>'
             + (isLoaded ? '<circle class="pinPulse" cy="-1" r="6"/>' : '')
             + '<g class="pinDrop"' + (animate ? ' style="animation-delay:' + (0.05 * i).toFixed(2) + 's"' : '') + '>'
-            + '<path class="pin ' + tier + '" d="M0 0C-4.2-6.2-6.5-8.4-6.5-12A6.5 6.5 0 1 1 6.5-12C6.5-8.4 4.2-6.2 0 0Z"/>'
+            + '<path class="pin ' + (done ? 'done' : 'new') + '" d="M0 0C-4.2-6.2-6.5-8.4-6.5-12A6.5 6.5 0 1 1 6.5-12C6.5-8.4 4.2-6.2 0 0Z"/>'
             + '<circle class="pinHole" cx="0" cy="-12" r="2.5"/>'
             + '</g>'
             + (isSel && labelSel ? '<text class="pinLab" y="-22">' + s.name + '</text>' : '')
-            + '<circle class="pinHit" r="9.5" cy="-9" data-pin="' + s.tag + '"><title>' + s.name + '</title></circle>'
+            + '<circle class="pinHit" r="13" cy="-9" data-pin="' + s.tag + '"><title>' + s.name + '</title></circle>'
             + '</g>'
             + '</g>';
         }).join('');
       };
-      const pins = pinsFor(pool, true);
+      const pins = pinsFor(pool, true, 0.72);
 
       // The cartographer's furniture: a few wave strokes in the open
       // water and the region names in faint small caps -- the marks that
@@ -48552,7 +48554,7 @@ MR.HUD = (function () {
        * circle is outside the counter-scale and sized so its on-screen
        * radius (~10.4) matches the main map's. */
       const EU = pool.filter(function (s) { return s.region === 'EUROPE'; });
-      const eupins = pinsFor(EU, false, 0.5);
+      const eupins = pinsFor(EU, false, 0.4);
       const ICX = 63, ICY = 92, IR = 33, ISC = 2.6, ECX = 190, ECY = 46;
       const inset =
         '<g class="inset">'

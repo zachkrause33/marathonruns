@@ -1559,12 +1559,6 @@ button.stampC:active { transform: scale(0.96); }
 #debrief .dbSec:first-child { margin-top: 0; }
 #debrief .dbLine { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; margin-top: 3px; }
 #debrief .dbLine.dim { opacity: 0.65; font-weight: 600; font-size: 9px; }
-#debrief .dbLeg {
-  display: flex; align-items: center; gap: 7px; margin-top: 4px;
-}
-#debrief .dbLeg .sblock { width: 10px; height: 10px; }
-#debrief .dbLegName { font-size: 9px; font-weight: 800; letter-spacing: 0.1em; flex: 1; }
-#debrief .dbLegNote { font-size: 9px; opacity: 0.75; }
 #debrief .dbBars {
   display: flex; align-items: flex-end; gap: 2px; height: 24px; margin-top: 6px;
 }
@@ -1574,6 +1568,14 @@ button.stampC:active { transform: scale(0.96); }
 }
 #debrief .dbBar.fastest { background: var(--ahead); }
 #debrief .dbBar.slowest { background: var(--behind); }
+#debrief .dbSplit {
+  display: flex; align-items: baseline; gap: 10px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.08em; margin-top: 3px;
+}
+#debrief .dbSplit .dbSpK { width: 46px; opacity: 0.65; }
+#debrief .dbSplit .dbSpT { width: 58px; }
+#debrief .dbSplit .dbSpD.ahead { color: var(--ahead); }
+#debrief .dbSplit .dbSpD.behind { color: var(--behind); }
 
 #shareBox {
   margin-top: 15px; padding: 10px 12px 11px;
@@ -12259,11 +12261,17 @@ MR.Store = (function () {
   function blank() {
     return {
       v: V,
-      day: null,    // { date, time, streak, tier, runs }  best for that date
+      day: null,    // { date, time, streak, tier, runs }  best FEATURED finish for that date
       prev: null,   // { date, time, streak, tier }        the previous date played
       days: { count: 0, last: null },
       best: null,   // { time, tier, date, streak, streakDate }
-      hist: [],     // [{ date, city, time, rec, runs }]   one row per finished date
+      hist: [],     // [{ date, city, time, rec, runs, tour }] one row per (date, city)
+      // The attempts ledger (2026-09-22 restructure): a try is spent when
+      // the GUN goes, not when the tape is crossed -- quitting a doomed
+      // run no longer refunds it, which kills restart-fishing and makes a
+      // disastrous start something to recover rather than discard. Kept
+      // apart from `day` because an attempt exists before any finish does.
+      att: { date: null, n: 0 },
     };
   }
 
@@ -12291,14 +12299,24 @@ MR.Store = (function () {
         // revisits existed were all live, so an absent field inherits rec.
         recDay: e.recDay === true || (e.recDay === undefined && e.rec === true),
         rv: e.rv === true,
+        // A TOUR row: a same-day run in a city other than the day's
+        // marathon (2026-09-22 restructure). It enriches that city's
+        // passport but is not the day's result -- every calendar-shaped
+        // read below skips it.
+        tour: e.tour === true,
         runs: Math.max(1, Math.round(num(e.runs, 1))),
       });
     }
     rows.sort(function (x, y) { return x.date < y.date ? -1 : x.date > y.date ? 1 : 0; });
+    // One row per (date, city) now, not per date: tour mode can finish
+    // several cities on one calendar day. Old saves collapse identically
+    // (their same-date rows always shared a city).
     const out = [];
+    const at = {};
     for (const e of rows) {
-      if (out.length && out[out.length - 1].date === e.date) out[out.length - 1] = e;
-      else out.push(e);
+      const k = e.date + '|' + e.city;
+      if (at[k] !== undefined) out[at[k]] = e;
+      else { at[k] = out.length; out.push(e); }
     }
     return out.slice(-HIST_MAX);
   }
@@ -12342,6 +12360,9 @@ MR.Store = (function () {
       s.days.count = s.days.last ? Math.max(0, Math.round(num(o.days.count, 0))) : 0;
     }
     s.hist = cleanHist(o.hist);
+    if (o.att && key(o.att.date)) {
+      s.att = { date: o.att.date, n: Math.max(0, Math.round(num(o.att.n, 0))) };
+    }
     if (o.best && pos(o.best.time)) {
       s.best = {
         time: pos(o.best.time),
@@ -12396,8 +12417,10 @@ MR.Store = (function () {
     // from yesterday -- a chain whose last link is two days old is not a
     // streak, it is a streak that used to be one, and a missed day breaks it
     // by construction because a missed day has no row.
+    // The calendar reads FEATURED rows only: a tour detour is a fact about
+    // a city, never about what the day was.
     const byDate = {};
-    for (const e of s.hist) byDate[e.date] = e;
+    for (const e of s.hist) if (!e.tour && !byDate[e.date]) byDate[e.date] = e;
     const todayRow = byDate[dateKey] || null;
     const doneToday = !!(todayRow && todayRow.rec);
     // Walked on `recDay`, not `rec`: a revisit that finally breaks the
@@ -12423,10 +12446,11 @@ MR.Store = (function () {
     // the history, which is exactly the defect the record streak was rewritten
     // to avoid.
     const cities = {};
-    let totalRuns = 0, totalRecs = 0;
+    let totalRuns = 0, totalRecs = 0, totalDays = 0;
     for (const e of s.hist) {
       totalRuns += e.runs;
       if (e.rec) totalRecs++;
+      if (!e.tour) totalDays++;
       if (!e.city) continue;
       const c = cities[e.city] || (cities[e.city] = { days: 0, rec: false, best: 0, last: null, runs: 0, first: null });
       c.days++;
@@ -12458,15 +12482,19 @@ MR.Store = (function () {
       // The passport ledger: days finished, marathons run (every rerun is
       // its own 26.2), records fallen. Derived on every read, same as the
       // city set and for the same reason.
-      totalDays: s.hist.length,
+      totalDays: totalDays,
       totalRuns: totalRuns,
       totalRecs: totalRecs,
       // The city today's choice was spent on, or null while the day is
       // still open. main.js resolves every load through this: one city a
       // day, and the first finished run is what chooses it.
       todayCity: todayRow ? (todayRow.city || null) : null,
-      done: doneToday,                    // the record fell today: today is over
+      // The day's marathon is FINISHED (any medal): tour mode is open.
+      featuredDone: !!todayRow,
+      done: doneToday,                    // the record fell today (a badge now, not a lock)
       doneTime: doneToday ? todayRow.time : 0,
+      // Tries spent at the gun, whatever came of them.
+      attempts: (s.att && s.att.date === dateKey) ? s.att.n : 0,
       recordStreak: recStreak,
       recordStreakCounted: doneToday,     // today already counts toward it
     };
@@ -12533,12 +12561,42 @@ MR.Store = (function () {
      * its date-independent all-time marks below and writes nothing else.
      */
     const cityNow = str(run && run.city);
-    let clashRow = null;
-    for (const e of s.hist) if (e.date === dateKey) { clashRow = e; break; }
-    const cityClash = !!(clashRow && cityNow && clashRow.city && clashRow.city !== cityNow);
+    /**
+     * THE DAY'S MARATHON AND THE TOUR (2026-09-22 restructure). The
+     * caller says whether this run was the date's FEATURED city. A
+     * featured run is the day: it rotates the day record, advances the
+     * day streak and writes the date's calendar row, exactly as before.
+     * A same-day run anywhere else is a TOUR run: it folds into that
+     * CITY's own (date, city) row -- best time, the rec latch, the run
+     * count -- and touches nothing calendar-shaped. The old cityClash
+     * corruption guard survives as exactly this split: a second city on
+     * the same date is no longer a clash, it is the tour.
+     */
+    const featured = !(run && run.featured === false);
+    let featRow = null;
+    for (const e of s.hist) if (e.date === dateKey && !e.tour) { featRow = e; break; }
+    const cityClash = !!(featured && featRow && cityNow && featRow.city && featRow.city !== cityNow);
     if (cityClash) out.cityClash = true;
 
-    if (!backwards && !cityClash) {
+    if (!backwards && !cityClash && !featured) {
+      // ---- the tour fold ------------------------------------------------
+      const rec = !!(run && run.record === true);
+      let h = null;
+      for (const e of s.hist) if (e.date === dateKey && e.city === cityNow) { h = e; break; }
+      if (!h) {
+        h = { date: dateKey, city: cityNow, time: r.time, rec: rec, recDay: false, tour: true, runs: 1 };
+        s.hist.push(h);
+        s.hist.sort(function (x, y) { return x.date < y.date ? -1 : x.date > y.date ? 1 : 0; });
+        if (s.hist.length > HIST_MAX) s.hist = s.hist.slice(-HIST_MAX);
+        out.beatToday = true;
+      } else {
+        h.runs++;
+        if (r.time < h.time) { h.time = r.time; out.beatToday = true; }
+        if (rec) h.rec = true;
+      }
+      out.tour = true;
+      out.recordBroken = rec;
+    } else if (!backwards && !cityClash) {
       const newDay = !s.day || s.day.date !== dateKey;
       if (newDay) {
         if (s.day) s.prev = { date: s.day.date, time: s.day.time, streak: s.day.streak, tier: s.day.tier };
@@ -12596,8 +12654,10 @@ MR.Store = (function () {
        */
       const rec = !!(run && run.record === true);
       const city = str(run && run.city);
+      // City-aware under (date, city) rows: fold into this city's row for
+      // the date when one exists, never into a different city's.
       let h = null;
-      for (const e of s.hist) if (e.date === dateKey) { h = e; break; }
+      for (const e of s.hist) if (e.date === dateKey && (e.city === city || !e.city)) { h = e; break; }
       if (!h) {
         h = { date: dateKey, city: city, time: r.time, rec: rec, recDay: false, rv: true, runs: 1 };
         s.hist.push(h);
@@ -12636,6 +12696,20 @@ MR.Store = (function () {
     return out;
   }
 
+  /**
+   * A try is spent HERE, at the gun. Returns the attempts now on the
+   * date's ledger (today's count after this spend). Never throws; a
+   * store that cannot write still counts within the tab.
+   */
+  function spendTry(dateKey) {
+    let s2;
+    try { s2 = load(); } catch (e) { s2 = blank(); }
+    if (!s2.att || s2.att.date !== dateKey) s2.att = { date: dateKey, n: 0 };
+    s2.att.n++;
+    save(s2);
+    return s2.att.n;
+  }
+
   /** Wipe the save. Exposed for testing the first-visit path by hand. */
   function clear() {
     memBlob = null;
@@ -12645,7 +12719,7 @@ MR.Store = (function () {
 
   return {
     KEY, VERSION: V, persistent,
-    summary, record, clear,
+    summary, record, spendTry, clear,
     load, save, blank,
     dayDiff, shift, parseKey,
   };
@@ -29892,14 +29966,27 @@ MR.World = (function () {
       // are then picked by hashing into the bag, so the ratio a variant is
       // authored with is the ratio it actually spawns at, instead of being an
       // emergent property of an ad-hoc modulo. See castGates.
-      const bag = [];
-      defs.forEach(function (d, i) {
-        // weight: 0 is a real value -- a variant only a cast site can
-        // deal -- so it must not default to 1. (No def uses it today;
-        // the crossing minicar did, and the mechanism outlives it.)
-        const w = d.weight === 0 ? 0 : (d.weight || 1);
-        for (let k = 0; k < w; k++) bag.push(i);
-      });
+      //
+      // buildBag takes an optional per-city mix ({name: tickets}) -- the
+      // owner: "obstacles must change city to city, but the same obstacles
+      // can be used. we can use more of some in some cities and some of
+      // others in other cities." A mix REWEIGHTS the same defs and can
+      // never add or remove one, so the collision contract, the count of
+      // hazards on the board and the contrast audit (which walks every def
+      // regardless of tickets) are untouched by it.
+      function buildBag(mix) {
+        const bag = [];
+        defs.forEach(function (d, i) {
+          // weight: 0 is a real value -- a variant only a cast site can
+          // deal -- so it must not default to 1. (No def uses it today;
+          // the crossing minicar did, and the mechanism outlives it.)
+          let w = d.weight === 0 ? 0 : (d.weight || 1);
+          if (mix && d.name && mix[d.name] != null) w = mix[d.name];
+          for (let k = 0; k < w; k++) bag.push(i);
+        });
+        return bag;
+      }
+      const bag = buildBag(null);
       const pool = Pool(function () {
         const g = new THREE.Group();
         const variants = [];
@@ -30082,7 +30169,8 @@ MR.World = (function () {
       // casting is computed for the whole course before any hazard has been
       // claimed, so it cannot borrow an object to find out what the bag is --
       // which is what api.variantPlan used to have to do.
-      pool.bagOf = function () { return bag; };
+      pool.bagOf = function (mix) { return mix ? buildBag(mix) : bag; };
+      pool.defsOf = function () { return defs; };
       return pool;
     }
 
@@ -31534,7 +31622,7 @@ MR.World = (function () {
     })();
 
     const jumpPool = hazardPool(K.JUMP, 'jump', [
-      { geo: jumpSandGeo, face: null },
+      { geo: jumpSandGeo, name: 'sandbags', face: null },
       /**
        * THE CONES CARRY NO CAUTION FACE AT ALL, and this was the first variant
        * in the game with face: null.
@@ -31562,21 +31650,21 @@ MR.World = (function () {
        *
        * That argument has now been generalised to three more variants above.
        */
-      { geo: jumpConeGeo, face: null },
-      { geo: jumpTrenchGeo, face: [2.16, 0.075, 0.038, -0.512] },
-      { geo: jumpScooterGeo, face: null },
-      { geo: jumpBarrierGeo, face: [2.20, 0.14, 0.072, -0.512] },
-      { geo: jumpPipeGeo, face: null },
+      { geo: jumpConeGeo, name: 'cones', face: null },
+      { geo: jumpTrenchGeo, name: 'trench', face: [2.16, 0.075, 0.038, -0.512] },
+      { geo: jumpScooterGeo, name: 'scooter', face: null },
+      { geo: jumpBarrierGeo, name: 'barrier', face: [2.20, 0.14, 0.072, -0.512] },
+      { geo: jumpPipeGeo, name: 'pipes', face: null },
       // The kerbside furniture, in the lane. See the promotion note above.
-      { geo: jumpPlanterGeo, face: null },
-      { geo: jumpCrateGeo, face: null },
+      { geo: jumpPlanterGeo, name: 'planter', face: null },
+      { geo: jumpCrateGeo, name: 'crates', face: null },
       // The citylook batch: the reference's own vocabulary, weighted so the
       // barricades -- its signature obstacle -- turn up often. All face: null,
       // because each carries its own bands or is its own object.
-      { geo: jumpBarricadeGeo, face: null, weight: 2 },
-      { geo: jumpDrumGeo, face: null },
-      { geo: jumpLowBarGeo, face: null },
-      { geo: jumpTrashGeo, face: null },
+      { geo: jumpBarricadeGeo, name: 'barricade', face: null, weight: 2 },
+      { geo: jumpDrumGeo, name: 'drums', face: null },
+      { geo: jumpLowBarGeo, name: 'lowbar', face: null },
+      { geo: jumpTrashGeo, name: 'trash', face: null },
     ]);
 
     /**
@@ -33205,18 +33293,18 @@ MR.World = (function () {
     })();
 
     const duckPool = hazardPool(K.DUCK, 'duck', [
-      { geo: duckGeo, face: [2.26, 0.40, 1.62, -0.292] },
-      { geo: duckScaffoldGeo, face: [2.26, 0.36, 1.58, -0.292] },
-      { geo: duckSignGeo, face: [2.26, 0.34, 1.62, -0.292] },
-      { geo: duckBoomGeo, face: [2.26, 0.38, 1.62, -0.292] },
-      { geo: duckPipeGeo, face: [2.26, 0.34, 1.62, -0.292] },
-      { geo: duckWalkGeo, face: [2.26, 0.36, 1.60, -0.292] },
-      { geo: duckFloodGeo, face: [2.26, 0.34, 1.62, -0.292] },
-      { geo: duckBridgeGeo, face: [2.26, 0.38, 1.62, -0.292] },
+      { geo: duckGeo, name: 'bar', face: [2.26, 0.40, 1.62, -0.292] },
+      { geo: duckScaffoldGeo, name: 'scaffold', face: [2.26, 0.36, 1.58, -0.292] },
+      { geo: duckSignGeo, name: 'gantry', face: [2.26, 0.34, 1.62, -0.292] },
+      { geo: duckBoomGeo, name: 'boom', face: [2.26, 0.38, 1.62, -0.292] },
+      { geo: duckPipeGeo, name: 'pipe', face: [2.26, 0.34, 1.62, -0.292] },
+      { geo: duckWalkGeo, name: 'walkway', face: [2.26, 0.36, 1.60, -0.292] },
+      { geo: duckFloodGeo, name: 'floodlight', face: [2.26, 0.34, 1.62, -0.292] },
+      { geo: duckBridgeGeo, name: 'bridge', face: [2.26, 0.38, 1.62, -0.292] },
       // The citylook batch: the reference's own overhead vocabulary.
-      { geo: duckAwningGeo, face: [2.26, 0.36, 1.58, -0.209] },
-      { geo: duckShopSignGeo, face: [2.26, 0.36, 1.58, -0.209] },
-      { geo: duckWalkboardGeo, face: [2.26, 0.34, 1.56, -0.169] },
+      { geo: duckAwningGeo, name: 'awning', face: [2.26, 0.36, 1.58, -0.209] },
+      { geo: duckShopSignGeo, name: 'shopsign', face: [2.26, 0.36, 1.58, -0.209] },
+      { geo: duckWalkboardGeo, name: 'walkboard', face: [2.26, 0.34, 1.56, -0.169] },
     ]);
 
     /**
@@ -35869,7 +35957,7 @@ MR.World = (function () {
         // out of the collision box on ten variants, on the axis the occlusion
         // audit measures from. Nothing was watching. It is now, and the rows
         // below are all inside their own box.
-        geo: blockTramGeo, face: [2.16, 0.30, 0.78, -1.945], weight: 1,
+        geo: blockTramGeo, name: 'tram', face: [2.16, 0.30, 0.78, -1.945], weight: 1,
         /**
          * ---- THE PANTOGRAPH IS GONE, AND THE DECK IS WHY -----------------
          *
@@ -35899,7 +35987,7 @@ MR.World = (function () {
          */
         ride: blockTramRampGeo,
       },
-      { geo: blockSignGeo, face: [2.06, 1.7, 1.58, -0.541], weight: 1 },
+      { geo: blockSignGeo, name: 'bigsign', face: [2.06, 1.7, 1.58, -0.541], weight: 1 },
       // THE TRAFFIC LIGHT, where the cargo trike used to be. No moving part
       // and no anim: a signal post standing in a lane is the one hazard in
       // this game that is CORRECTLY dead still, and the idle shudder every
@@ -35921,29 +36009,29 @@ MR.World = (function () {
       // face at y 1.09 sits inside it on every edge. Earlier drafts of this
       // row put the face at y 0.145 and then y 0.05 down on the plinth, where
       // it photographed as a striped mat lying on the road beside the pole.
-      { geo: blockLightGeo, face: [2.30, 0.40, 1.09, -0.455], weight: 1 },
+      { geo: blockLightGeo, name: 'signal', face: [2.30, 0.40, 1.09, -0.455], weight: 1 },
       {
-        geo: blockCrossGeo, face: [2.10, 0.50, 0.98, -0.641], weight: 2,
+        geo: blockCrossGeo, name: 'marshal', face: [2.10, 0.50, 0.98, -0.641], weight: 2,
         // Inner hand, and high. See blockPaddleGeo: the reach is 1.28 from
         // here, so the +/-0.42 wave sweeps to 1.07 from the lane centre
         // against a box halfX of 1.12, and the roundel tops out at 2.62
         // against a ceiling of 2.80 with the shudder counted.
         moving: blockPaddleGeo, pivot: [0.30, 1.26, 0.34], anim: 'paddle',
       },
-      { geo: blockBusGeo, face: [2.16, 0.28, 1.22, -1.941], weight: 2, anim: 'idle' },
-      { geo: blockTaxiGeo, face: [2.02, 0.22, 0.98, -1.941], weight: 2, anim: 'idle' },
+      { geo: blockBusGeo, name: 'bus', face: [2.16, 0.28, 1.22, -1.941], weight: 2, anim: 'idle' },
+      { geo: blockTaxiGeo, name: 'taxi', face: [2.02, 0.22, 0.98, -1.941], weight: 2, anim: 'idle' },
       // `idle` added in the 2026-09-03 difficulty pass -- the backlog's
       // "one-moving-part rule could be loosened deliberately", loosened:
       // a van and a hatchback standing in a live race have engines
       // running, and the shudder every other stopped vehicle carries was
       // their absence reading as toy. Motion inside the envelope only.
-      { geo: blockVanGeo, face: [2.10, 0.20, 1.06, -1.941], weight: 2, anim: 'idle' },
+      { geo: blockVanGeo, name: 'van', face: [2.10, 0.20, 1.06, -1.941], weight: 2, anim: 'idle' },
       {
         // The chevron board goes ON THE TAILGATE, big, where a real refuse
         // truck carries it -- this is the one vehicle in the set whose real
         // rear marking IS a full-width red-and-white chevron panel, so the
         // kind signal and the vehicle agree instead of arguing.
-        geo: blockRefuseGeo, face: [2.16, 0.36, 1.30, -1.921], weight: 1,
+        geo: blockRefuseGeo, name: 'refuse', face: [2.16, 0.36, 1.30, -1.921], weight: 1,
         moving: blockRefuseGateGeo, pivot: [0, 1.30, -1.86], anim: 'lift',
       },
       {
@@ -35967,20 +36055,20 @@ MR.World = (function () {
         // stack of crates is the one hazard in this game besides the traffic
         // light that is correctly dead still -- the idle shudder every stopped
         // vehicle carries would read as a landslide on a loaded pallet.
-        geo: blockCrateLoadGeo, face: [1.90, 0.30, 0.40, -0.632], weight: 2,
+        geo: blockCrateLoadGeo, name: 'bikes', face: [1.90, 0.30, 0.40, -0.632], weight: 2,
       },
       // Face row shrunk 0.75x with the sculpt (see the `shrink` note in
       // dressHazard): the moped's body is now 0.75 of the def box, and a
       // 1.30-wide stripe across a 0.98-wide machine is the mid-air-mat
       // defect this pool has now measured three times.
-      { geo: blockMopedGeo, face: [0.98, 0.20, 0.83, -0.921], weight: 2, anim: 'idle' },
+      { geo: blockMopedGeo, name: 'moped', face: [0.98, 0.20, 0.83, -0.921], weight: 2, anim: 'idle' },
       // The citylook batch. The container and the parked hatchback carry
       // double weight: they are the two objects the reference frames show
       // blocking lanes most often.
-      { geo: blockContainerGeo, face: [2.16, 0.32, 0.50, -1.945], weight: 2 },
-      { geo: blockDumpsterGeo, face: [2.10, 0.30, 0.60, -1.325], weight: 1 },
-      { geo: blockHatchGeo, face: [1.90, 0.22, 0.42, -1.90], weight: 2, anim: 'idle' },
-      { geo: blockPoliceGeo, face: [2.00, 0.22, 0.44, -1.90], weight: 1, anim: 'idle' },
+      { geo: blockContainerGeo, name: 'container', face: [2.16, 0.32, 0.50, -1.945], weight: 2 },
+      { geo: blockDumpsterGeo, name: 'dumpster', face: [2.10, 0.30, 0.60, -1.325], weight: 1 },
+      { geo: blockHatchGeo, name: 'car', face: [1.90, 0.22, 0.42, -1.90], weight: 2, anim: 'idle' },
+      { geo: blockPoliceGeo, name: 'police', face: [2.00, 0.22, 0.44, -1.90], weight: 1, anim: 'idle' },
       /**
        * THE CARGO TRUCK (v14), and it is the first variant born straight
        * from a sculpt: the owner's props-v3 blue box lorry. A new variant
@@ -36000,7 +36088,7 @@ MR.World = (function () {
       // idle's +/-0.022 bob would leave the collision box -- the same
       // arithmetic that took the tram's pantograph sway. A vehicle at
       // the ceiling stands still.
-      { geo: blockLorryGeo, face: [2.16, 0.30, 0.78, -1.940], weight: 2 },
+      { geo: blockLorryGeo, name: 'lorry', face: [2.16, 0.30, 0.78, -1.940], weight: 2 },
     ]);
 
     /**
@@ -37032,10 +37120,65 @@ MR.World = (function () {
       }
     }
 
-    function castGates(gates, key) {
+    /**
+     * ---- THE CITY'S OWN STREET -------------------------------------------
+     *
+     * The owner (2026-09-22): "obstacles must change city to city, but the
+     * same obstacles can be used. we can use more of some in some cities
+     * and some of others in other cities. the obstacles need to be unique
+     * and different to change the game up."
+     *
+     * So: one obstacle library, twenty-five casting sheets. Each entry
+     * reweights the draw bags -- a named variant's ticket count replaces
+     * its default -- and that is ALL it may do. Nothing here can add a
+     * variant, change a collision box, or move a gate: the standing order
+     * that every board carries the same obstacle counts (27.5/11.7) holds,
+     * and a London board differs from a Rome board in what the hazards ARE,
+     * never in how many there are or where they stand.
+     *
+     * Unnamed variants keep their default ticket, so every city still deals
+     * from the full library -- the signature objects dominate, they do not
+     * monopolise. The signatures are the street the city is famous for:
+     * London's buses and black cabs, Amsterdam's trams and bikes, Rome's
+     * mopeds and eternal scaffolding, Nairobi's matatu vans, Toronto's
+     * streetcars and construction cones, Marrakesh's souk awnings.
+     */
+    const CITY_MIX = {
+      BOSTON:      { block: { police: 4, van: 3 }, jump: { barricade: 6, barrier: 3 }, duck: { gantry: 3 } },
+      LONDON:      { block: { bus: 6, taxi: 5 }, jump: { barrier: 4, barricade: 3 }, duck: { scaffold: 4 } },
+      BERLIN:      { block: { van: 4, car: 4, container: 3 }, jump: { drums: 4, barrier: 3 }, duck: { boom: 4 } },
+      CHICAGO:     { block: { lorry: 5, bus: 3 }, jump: { drums: 3, barrier: 3 }, duck: { bridge: 6 } },
+      NEWYORK:     { block: { taxi: 6, dumpster: 4, refuse: 3 }, jump: { trash: 4, barricade: 3 }, duck: { scaffold: 6 } },
+      TOKYO:       { block: { taxi: 5, signal: 3 }, jump: { cones: 4, lowbar: 3 }, duck: { shopsign: 5, gantry: 3 } },
+      SYDNEY:      { block: { van: 4, car: 3 }, jump: { pipes: 4, barrier: 3 }, duck: { walkway: 5, boom: 3 } },
+      PARIS:       { block: { moped: 4, van: 3 }, jump: { planter: 4, barrier: 3 }, duck: { awning: 6 } },
+      VALENCIA:    { block: { moped: 4, car: 3 }, jump: { planter: 4, cones: 3 }, duck: { awning: 3, floodlight: 3 } },
+      AMSTERDAM:   { block: { tram: 6, bikes: 5, moped: 3 }, jump: { planter: 4 }, duck: { bridge: 5 } },
+      ROME:        { block: { moped: 6, dumpster: 3 }, jump: { cones: 4, trench: 4 }, duck: { scaffold: 6 } },
+      CAPETOWN:    { block: { taxi: 5, van: 4, container: 3 }, jump: { drums: 3, crates: 3 }, duck: { boom: 4 } },
+      ATHENS:      { block: { moped: 4, dumpster: 3 }, jump: { trench: 5, cones: 3 }, duck: { scaffold: 4, pipe: 3 } },
+      SEOUL:       { block: { bus: 4, taxi: 3, signal: 3 }, jump: { lowbar: 4, cones: 3 }, duck: { shopsign: 6 } },
+      SINGAPORE:   { block: { taxi: 4, signal: 3 }, jump: { planter: 6, lowbar: 3 }, duck: { walkboard: 4, gantry: 3 } },
+      BUENOSAIRES: { block: { bus: 6, taxi: 3 }, jump: { barricade: 3, drums: 3 }, duck: { awning: 4 } },
+      NAIROBI:     { block: { van: 6, moped: 3, lorry: 3 }, jump: { drums: 4, crates: 3 }, duck: { boom: 5 } },
+      TORONTO:     { block: { tram: 5, car: 3 }, jump: { cones: 5, drums: 3 }, duck: { scaffold: 4, walkway: 3 } },
+      MEXICOCITY:  { block: { taxi: 4, bus: 4 }, jump: { trench: 3, barricade: 3 }, duck: { awning: 4, floodlight: 3 } },
+      MADRID:      { block: { taxi: 4, moped: 3 }, jump: { barrier: 3, planter: 3 }, duck: { awning: 4, scaffold: 3 } },
+      DUBAI:       { block: { car: 5, police: 4, taxi: 3 }, jump: { barrier: 5, cones: 3 }, duck: { gantry: 5, walkboard: 3 } },
+      SHANGHAI:    { block: { moped: 4, container: 4, bus: 3 }, jump: { crates: 3, lowbar: 3 }, duck: { shopsign: 5, walkboard: 3 } },
+      MUMBAI:      { block: { marshal: 5, moped: 4, taxi: 4 }, jump: { crates: 4, trash: 3 }, duck: { awning: 4, shopsign: 4 } },
+      MARRAKESH:   { block: { moped: 5, bikes: 4, dumpster: 3 }, jump: { crates: 4, trash: 3 }, duck: { awning: 7 } },
+      LAGOS:       { block: { van: 6, moped: 3, lorry: 3 }, jump: { drums: 5, trash: 3 }, duck: { boom: 4, awning: 3 } },
+    };
+
+    function castGates(gates, key, tag) {
+      const mix = CITY_MIX[tag
+        || (course && course.settings && course.settings.length ? course.settings[0].tag : '')]
+        || null;
       const bags = {};
-      bags[K.JUMP] = jumpPool.bagOf(); bags[K.DUCK] = duckPool.bagOf();
-      bags[K.BLOCK] = blockPool.bagOf();
+      bags[K.JUMP] = jumpPool.bagOf(mix && mix.jump);
+      bags[K.DUCK] = duckPool.bagOf(mix && mix.duck);
+      bags[K.BLOCK] = blockPool.bagOf(mix && mix.block);
       const deal = {};
       for (const k of Object.keys(bags)) {
         deal[k] = { left: [], rnd: MR.rng.stream(key || '', 'variants/v1|' + k) };
@@ -37073,6 +37216,21 @@ MR.World = (function () {
       // 1.6x run speed. It parks; the vehicles that move are the ones
       // with a nose.
       const SWEEP_CAST = [4, 5, 6, 7, 9, 12, 13];
+      // The movers take the city's casting sheet too: a London sweep is
+      // most often a bus or a cab, a Nairobi one a matatu van, a Rome one
+      // a moped. Weighted the same way as the bag -- the mix's ticket
+      // count where it names a mover, the def's own weight where it does
+      // not -- with a floor of one ticket so no mover ever leaves a city's
+      // roads entirely. Still a pure hash of (key, gate), so a day's cast
+      // is deterministic for everyone who runs it.
+      const blockDefs = blockPool.defsOf();
+      const sweepBag = [];
+      for (const si of SWEEP_CAST) {
+        const d = blockDefs[si];
+        let w = d.weight === 0 ? 0 : (d.weight || 1);
+        if (mix && mix.block && d.name && mix.block[d.name] != null) w = mix.block[d.name];
+        for (let k = 0; k < Math.max(1, w); k++) sweepBag.push(si);
+      }
       const cast = [];
       for (let g = 0; g < gates.length; g++) {
         const gate = gates[g];
@@ -37087,8 +37245,8 @@ MR.World = (function () {
               // identical twins. The lane that is not driving takes a
               // salted draw; the moving lane's cast is unchanged, so every
               // already-shipped single-wall gate wears what it wore.
-              ? SWEEP_CAST[MR.rng.hashString((key || '') + '|sweep-skin|' + g
-                  + (gate.on && gate.on.lane !== l ? '|escort' : '')) % SWEEP_CAST.length]
+              ? sweepBag[MR.rng.hashString((key || '') + '|sweep-skin|' + g
+                  + (gate.on && gate.on.lane !== l ? '|escort' : '')) % sweepBag.length]
               : draw(kind);
         }
         cast[g] = row;
@@ -43221,7 +43379,10 @@ MR.World = (function () {
     api.variantPlan = function (arg, key) {
       const gates = (arg && arg.gates) || arg;
       const seed = (arg && arg.key) || key || (course && course.key);
-      const cast = castGates(gates, seed);
+      // A whole course carries its own city, so its plan is cast on that
+      // city's sheet; a bare gate array is answered for THIS world's city.
+      const tag = arg && arg.settings && arg.settings.length ? arg.settings[0].tag : undefined;
+      const cast = castGates(gates, seed, tag);
       const out = [];
       for (let g = 0; g < gates.length; g++) {
         const gate = gates[g];
@@ -47780,7 +47941,7 @@ MR.HUD = (function () {
         </div>
 
         <!--
-          THE DAY IS OVER, either way: the record fell, or the three tries
+          THE DAY IS OVER one way only now: the three tries
           are spent (owner, 2026-09-22: "No unlimited tries - 3 a day
           max"). Same box, different chip -- setLocked carries the reason.
         -->
@@ -48180,7 +48341,7 @@ MR.HUD = (function () {
       stampDate: q('stampDate'), stampCtx: q('stampCtx'),
       cityBar: q('cityBar'), cityBarLab: q('cityBarLab'), cityBarTime: q('cityBarTime'),
       challengeBar: q('challengeBar'), challengeTime: q('challengeTime'),
-      pickLine: q('pickLine'), pickBtn: q('pickBtn'), pickCity: q('pickCity'),
+      pickLine: q('pickLine'), pickBtn: q('pickBtn'), pickCity: q('pickCity'), pickLab: q('pickLab'),
       racePick: q('racePick'), triesLine: q('triesLine'), triesEnd: q('triesEnd'),
       lockChip: q('lockChip'), lockSub: q('lockSub'),
       againBtn: q('againBtn'),
@@ -48502,14 +48663,26 @@ MR.HUD = (function () {
     }
 
     /** The one-a-day door state, shared by the stamp wall and the map card. */
+    /**
+     * The one-a-day door became the DAY'S MARATHON door (2026-09-22
+     * restructure): until today's featured city is finished once, it is
+     * the only open road; after that, tour mode opens every city for the
+     * tries that remain. Out of tries, everything closes till tomorrow.
+     */
     function doorState(sum, s, loadedTag) {
-      const spent = !!(sum && sum.todayCity);
-      const dayDone = !!(sum && sum.done);
+      const featDone = !!(sum && sum.featuredDone);
+      const attempts = sum ? (sum.attempts | 0) : 0;
+      const left = Math.max(0, (K.TRIES_PER_DAY || 3) - attempts);
       const isLoaded = s.tag === loadedTag;
-      const isSpent = spent && sum.todayCity === s.name;
-      const door = !dayDone && !spent && !isLoaded;
-      const note = isLoaded ? (dayDone ? 'TODAY · SEALED' : spent ? 'TODAY' : 'AT THE LINE')
-        : isSpent ? 'TODAY' : door ? 'RUN IT TODAY' : 'BACK TOMORROW';
+      const featTag = sum && sum.dateKey && MR.Course.pickSettings
+        ? MR.Course.pickSettings(sum.dateKey)[0].tag : null;
+      const isFeat = s.tag === featTag;
+      const door = left > 0 && !isLoaded && (featDone || isFeat);
+      const note = isLoaded ? 'AT THE LINE'
+        : left <= 0 ? 'BACK TOMORROW'
+        : featDone ? 'RUN IT TODAY'
+        : isFeat ? 'TODAY\'S MARATHON'
+        : 'AFTER TODAY\'S MARATHON';
       return { door: door, note: note };
     }
 
@@ -48875,7 +49048,7 @@ MR.HUD = (function () {
           + (rGold ? ' · ' + rGold + ' GOLD' : '')
           + (rGold === byReg[reg].length ? ' · COMPLETE' : '') + '</div>' + cards;
       }
-      n.cityRule.textContent = 'PICK A CITY · ONE A DAY · ' + run + ' OF ' + pool.length + ' RUN · ' + gold + ' GOLD';
+      n.cityRule.textContent = "TODAY'S MARATHON, THEN THE TOUR · " + run + ' OF ' + pool.length + ' RUN · ' + gold + ' GOLD';
       n.stampWall.innerHTML = html;
     }
 
@@ -49076,33 +49249,40 @@ MR.HUD = (function () {
       const loaded = set && set.length ? set[0] : null;
       const feat = lastSum && lastSum.dateKey && MR.Course.pickSettings
         ? MR.Course.pickSettings(lastSum.dateKey)[0] : null;
-      const spent = !!(lastSum && lastSum.todayCity);
+      const featDone = !!(lastSum && lastSum.featuredDone);
       const done = !!(lastSum && lastSum.done);
-      // The pick row: the chosen city ON the button. Spent or done, the
-      // button stays visible but shut -- the panel should still say where
-      // today went -- and the line under it explains.
+      const attempts = lastSum ? (lastSum.attempts | 0) : 0;
+      const leftN = Math.max(0, (K.TRIES_PER_DAY || 3) - attempts);
+
+      // The pick row wears the day's structure: before the featured city
+      // is finished it reads TODAY'S MARATHON and the button is shut
+      // (everyone runs the same road first); after, it reads TOUR MODE
+      // and the bubbles open. The world's shared race is what a friend's
+      // "Berlin today is brutal" refers to; the tour is your own map.
       n.pickBtn.classList.toggle('hidden', !loaded);
-      n.pickBtn.disabled = !!(spent || done);
-      if (loaded) n.pickCity.textContent = spent ? (lastSum.todayCity || loaded.name) : loaded.name;
+      n.pickBtn.disabled = !featDone || leftN <= 0;
+      if (loaded) n.pickCity.textContent = loaded.name;
+      if (n.pickLab) n.pickLab.textContent = featDone ? 'TOUR MODE · PICK A CITY:' : 'TODAY\'S MARATHON:';
       let line = '';
-      if (loaded && feat && !done) {
-        if (spent) line = 'NEW PICK TOMORROW';
-        else if (loaded.tag !== feat.tag) line = 'YOUR PICK · THE WORLD RUNS ' + feat.name + ' TODAY';
+      if (loaded && feat) {
+        if (!featDone) line = 'EVERYONE RUNS ' + feat.name + ' TODAY · FINISH IT TO OPEN THE TOUR';
+        else if (loaded.tag !== feat.tag) line = 'TOURING · THE WORLD RAN ' + feat.name + ' TODAY';
+        else if (leftN > 0) line = 'IMPROVE IT, OR TOUR ANY CITY';
       }
       n.pickLine.textContent = line;
       n.pickLine.classList.toggle('hidden', !line);
 
-      // The tries line, on both panels (owner: three a day). Quiet until
-      // one is spent; the locked box takes over when they are gone.
-      const runs = lastSum && lastSum.today ? (lastSum.today.runs | 0) : 0;
-      const leftN = Math.max(0, (K.TRIES_PER_DAY || 3) - runs);
-      const triesTxt = runs > 0 && leftN > 0 && !done
-        ? leftN + (leftN === 1 ? ' TRY' : ' TRIES') + ' LEFT TODAY' : '';
+      // The tries line counts ATTEMPTS (spent at the gun) and carries the
+      // record badge when 1:59:30 fell -- a badge, not a door.
+      const won = done ? 'RECORD BROKEN' : '';
+      const triesTxt = attempts > 0 && leftN > 0
+        ? (won ? won + ' · ' : '') + leftN + (leftN === 1 ? ' TRY' : ' TRIES') + ' LEFT TODAY'
+        : won;
       n.triesLine.textContent = triesTxt;
       n.triesLine.classList.toggle('hidden', !triesTxt);
-      n.triesEnd.textContent = done ? 'RECORD BROKEN · DONE FOR TODAY'
-        : leftN > 0 ? leftN + (leftN === 1 ? ' TRY' : ' TRIES') + ' LEFT TODAY'
-        : lastSum && lastSum.today ? 'NO TRIES LEFT · NEW ROAD TOMORROW' : '';
+      n.triesEnd.textContent = leftN > 0
+        ? (won ? won + ' · ' : '') + leftN + (leftN === 1 ? ' TRY' : ' TRIES') + ' LEFT TODAY'
+        : lastSum ? (won ? won + ' · ' : '') + 'NO TRIES LEFT · NEW ROAD TOMORROW' : '';
     }
     n.endHistBtn.addEventListener('click', function () { openHist(n.endPanel); });
     n.histBack.addEventListener('click', function () {
@@ -49138,11 +49318,10 @@ MR.HUD = (function () {
       n.againBtn.classList.toggle('hidden', !!info);
       if (lockTimer) { clearInterval(lockTimer); lockTimer = null; }
       if (!info) return;
-      const tries = info.reason === 'tries';
-      n.lockChip.textContent = tries ? '3 TRIES USED' : 'RECORD BROKEN';
-      n.lockSub.textContent = tries ? 'BEST OF TODAY ABOVE · NEW ROAD TOMORROW'
-                                    : 'MILES IS DONE FOR TODAY';
-      n.lockTime.textContent = Pace.clock(info.time);
+      n.lockChip.textContent = '3 TRIES USED';
+      n.lockSub.textContent = info.time ? 'BEST OF TODAY ABOVE · NEW ROAD TOMORROW'
+                                        : 'NEW ROAD TOMORROW';
+      n.lockTime.textContent = info.time ? Pace.clock(info.time) : '';
       // The countdown asks the day's own authority (rng, which rolls at
       // midnight PACIFIC now) rather than doing UTC arithmetic on the
       // key -- the two disagreed by seven or eight hours the day the
@@ -49319,43 +49498,12 @@ MR.HUD = (function () {
 
     // ---- the debrief ------------------------------------------------------
 
-    /**
-     * The whole run, erased of its unguarded contacts, replayed once. Same
-     * reconstruction as chapterCosts and the same honesty rule: the answer is
-     * a DIFFERENCE of two aid-less replays, so what the replay cannot model
-     * (the pickups the real run took) is common to both terms and cancels,
-     * and the result is reported against the run's own finish time. Guards
-     * are added arithmetically -- a guarded contact costs GUARD_TIME flat by
-     * construction, so no replay is needed to price one.
-     */
-    function contactsCost(p) {
-      let cost = (p.guards | 0) * 1.5;   // GUARD_TIME, fixed in pace.js
-      if (hitZ && hitZ.size && course && course.gates && course.gates.length) {
-        const run = function (erase) {
-          const q = Pace.create();
-          let gi = 0, guard = 0;
-          while (!q.finished && guard++ < 40000) {
-            q.update(1 / 60);
-            while (gi < course.gates.length && q.units >= course.gates[gi].z) {
-              const g = course.gates[gi];
-              gi++;
-              if (!erase && hitZ.has(g.z)) q.onHit(); else q.onClean();
-            }
-          }
-          return q.finished ? q.finishTime : 0;
-        };
-        const base = run(false), clean = run(true);
-        if (base && clean) cost += Math.max(0, base - clean);
-      }
-      return cost;
-    }
+    // contactsCost() -- the erased-contacts counterfactual -- went with THE
+    // CONTACTS section it priced (the owner's 2026-09-22 crop).
 
     /**
-     * THE DEBRIEF: the four questions a coach answers after a race, built
-     * only when the player asks for them. Facts lead and the counterfactual
-     * follows, under the same noise guard chapterCosts measured: past twelve
-     * contacts the reconstruction drifts (55s adrift at twenty), so a wreck
-     * gets its facts and not a fiction with a decimal point on it.
+     * THE DEBRIEF, cut to two questions on the owner's crop: the 5K splits
+     * against record pace, and the mile strip.
      *
      * The mile strip deliberately does NOT grade the early miles against the
      * record ghost -- the comparison is structurally negative before the
@@ -49366,66 +49514,52 @@ MR.HUD = (function () {
      */
     function buildDebrief(p) {
       const out = [];
-      const nHit = p.hits | 0, nG = p.guards | 0;
 
-      // 1. The contacts, and what they cost.
-      let head = nHit + nG === 0 ? 'CLEAN RUN · NO CONTACTS'
-        : (nHit + nG) + ' CONTACT' + (nHit + nG === 1 ? '' : 'S')
-          + (nG ? ' · ' + nG + ' GUARDED' : '');
-      let costLine = '';
-      if (nHit + nG > 0 && nHit <= 12) {
-        const c = contactsCost(p);
-        if (c >= 1) {
-          costLine = 'CLEAN, THIS RUN FINISHES ' + Pace.clock(Math.max(0, p.finishTime - c))
-            + ' · CONTACTS COST ' + Pace.clock(c);
+      // The splits, first, because they answer the first question a
+      // finisher asks: where did the attempt die. Cumulative clock at each
+      // 5K checkpoint -- the checkpoints a real marathon posts -- against
+      // even record pace, read off the mile splits by interpolation. The
+      // delta column is the story: watch it grow, and you have found the
+      // 5K that lost the run.
+      const spl = p.splits || [];
+      const FULL_MI = 26.21875;
+      if (spl.length >= 10 && p.finishTime > 0) {
+        const timeAt = function (mile) {
+          if (mile <= spl[0].mile) return spl[0].time * mile / spl[0].mile;
+          for (let i = 1; i < spl.length; i++) {
+            if (mile <= spl[i].mile) {
+              const a = spl[i - 1], b = spl[i];
+              return a.time + (b.time - a.time) * (mile - a.mile) / (b.mile - a.mile);
+            }
+          }
+          const z = spl[spl.length - 1];
+          if (FULL_MI - z.mile < 0.01) return p.finishTime;
+          return z.time + (p.finishTime - z.time) * (mile - z.mile) / (FULL_MI - z.mile);
+        };
+        const rows = [];
+        for (let k = 5; k <= 40; k += 5) {
+          const mi = k / 1.609344;
+          if (mi >= FULL_MI) break;
+          const tk = timeAt(mi);
+          rows.push({ name: k + 'K', t: tk, d: tk - K.RECORD_SECONDS * (k / 42.195) });
         }
-      }
-      out.push('<div class="dbSec"><div class="lab">THE CONTACTS</div>'
-        + '<div class="dbLine">' + head + '</div>'
-        + (costLine ? '<div class="dbLine num dim">' + costLine + '</div>' : '')
-        + '</div>');
-
-      // 2. The tank.
-      const total = course && course.aid ? course.aid.length : 0;
-      if (total && p.aid !== undefined) {
-        const taken = p.aid | 0;
-        const pct = Math.round(100 * taken / total);
-        const dry = Math.round(p.drySeconds || 0);
-        const bits = ['FUEL ' + taken + ' OF ' + total + ' · ' + pct + '%'];
-        // Race-seconds, and a wreck can spend most of the race under the
-        // knee -- 8340 raw seconds was measured on a bot run -- so past a
-        // minute and a half it reads as a clock, not a count.
-        if (dry >= 1) bits.push('RAN DRY ' + (dry >= 90 ? Pace.clock(dry) : dry + 'S'));
-        if ((p.wasted | 0) >= 3) bits.push((p.wasted | 0) + ' TAKEN FULL');
-        out.push('<div class="dbSec"><div class="lab">THE TANK</div>'
-          + '<div class="dbLine num">' + bits.join(' · ') + '</div>'
-          + (dry >= 1 ? '<div class="dbLine dim">EVERY DRY SECOND IS ROAD GIVEN BACK</div>' : '')
-          + '</div>');
-      }
-
-      // 3. The legs: the share row's six blocks, given their names and
-      // their counts. Same cut, same colors, so the two cannot disagree.
-      const cutter = legCut();
-      if (cutter) {
-        const marks = legMarks();
-        const hitsIn = cutter.legs.map(function () { return 0; });
-        const guardsIn = cutter.legs.map(function () { return 0; });
-        if (hitZ) for (const z of hitZ) hitsIn[cutter.of(z)]++;
-        if (guardZ) for (const z of guardZ) guardsIn[cutter.of(z)]++;
-        const CLS = ['clean', 'guard', 'hit'];
-        out.push('<div class="dbSec"><div class="lab">THE LEGS</div>'
-          + cutter.legs.map(function (b, i) {
-            const note = hitsIn[i]
-              ? hitsIn[i] + ' CONTACT' + (hitsIn[i] === 1 ? '' : 'S')
-                + (guardsIn[i] ? ' +' + guardsIn[i] + 'G' : '')
-              : guardsIn[i] ? guardsIn[i] + ' GUARDED' : 'CLEAN';
-            return '<div class="dbLeg"><span class="sblock ' + CLS[marks[i]] + '"></span>'
-              + '<span class="dbLegName">' + b.name + '</span>'
-              + '<span class="dbLegNote num">' + note + '</span></div>';
+        rows.push({ name: 'FINISH', t: p.finishTime, d: p.finishTime - K.RECORD_SECONDS });
+        out.push('<div class="dbSec"><div class="lab">THE SPLITS · VS RECORD PACE</div>'
+          + rows.map(function (r) {
+            return '<div class="dbSplit num">'
+              + '<span class="dbSpK">' + r.name + '</span>'
+              + '<span class="dbSpT">' + Pace.clock(r.t) + '</span>'
+              + '<span class="dbSpD ' + (r.d <= 0 ? 'ahead' : 'behind') + '">'
+              + (r.d <= 0 ? '-' : '+') + Pace.clock(Math.abs(r.d)) + '</span></div>';
           }).join('') + '</div>');
       }
 
-      // 4. The miles.
+      // THE CONTACTS, THE TANK and THE LEGS came off on the owner's crop
+      // (2026-09-22, "take out this portion of the card and leave the
+      // rest"), with the sank footer: the debrief is the splits and the
+      // miles now. The share row's six blocks still carry the legs story.
+
+      // The miles.
       const sp = p.splits || [];
       if (sp.length >= 5) {
         const mt = [];
@@ -49535,6 +49669,24 @@ MR.HUD = (function () {
      * holds it back: a streak of one is just today wearing a label -- and on
      * a shared result it would be a boast about having turned up once.
      */
+    /**
+     * The one sentence this finish is, ranked by how good the story is
+     * rather than by how good the run was: a gold is a broken record, a
+     * near miss of gold beats a comfortable silver as a headline even
+     * when the silver is the medal that was actually won -- the stamp
+     * carries the medal, the headline carries the drama. Empty when the
+     * run has no story beyond its time, and the plain lines stand alone.
+     */
+    function storyLine(t, medal, cityRec) {
+      const over = t - K.RECORD_SECONDS;
+      if (medal === 'gold') return 'WORLD RECORD BROKEN · ' + Pace.clock(-over) + ' UNDER';
+      if (over > 0 && over <= 90) return 'MISSED GOLD BY ' + Pace.clock(over);
+      if (medal === 'silver') return 'COURSE RECORD BEATEN BY ' + Pace.clock(cityRec - t);
+      if (cityRec && cityRec > K.RECORD_SECONDS && t > cityRec && t - cityRec <= 90)
+        return 'MISSED SILVER BY ' + Pace.clock(t - cityRec);
+      return '';
+    }
+
     function buildShare(p, rec, marks) {
       const t = p.finishTime;
       const set = course && course.settings;
@@ -49543,14 +49695,16 @@ MR.HUD = (function () {
       const isRec = t <= K.RECORD_SECONDS;
 
       const out = [];
-      // The medal travels: a bronze names the real record it beat, which
-      // is the line a group chat actually asks about.
+      // The story leads. The medal travels on the stamp and in the story
+      // line: a broken record, a near miss, a course record beaten -- the
+      // line a group chat actually asks about, before the time.
       const medal = set && set.length && MR.Course.tierFor ? MR.Course.tierFor(t, set[0].tag) : '';
+      const story = storyLine(t, medal, set && set.length ? set[0].rec : 0);
       out.push('MARATHON MILES' + (city ? ' · ' + city : ''));
-      out.push((isRec ? TROPHY + ' ' : '') + Tier.of(t).name
+      if (story) out.push((isRec ? TROPHY + ' ' : '') + story);
+      out.push((isRec && !story ? TROPHY + ' ' : '') + Tier.of(t).name
         + ' · ' + Pace.clock(t)
-        + ' (' + (vs <= 0 ? '-' : '+') + Pace.clock(Math.abs(vs)) + ')'
-        + (medal === 'silver' ? ' · COURSE RECORD BEATEN' : ''));
+        + ' (' + (vs <= 0 ? '-' : '+') + Pace.clock(Math.abs(vs)) + ')');
       if (marks.length) out.push(marks.map(function (m) { return BLOCK[m]; }).join(''));
       const streak = rec && rec.dayStreak ? rec.dayStreak | 0 : 0;
       if (streak >= 2) out.push('Day streak: ' + streak);
@@ -49564,9 +49718,12 @@ MR.HUD = (function () {
       // "the game has no domain yet" was true; site/CNAME says it is not.
       // The link carries the city and this finish as the target, so the
       // result IS the challenge: whoever taps it races this exact wager.
+      // Answering a challenge, the link is the return shot; fresh, it is
+      // the opening one. Same wager either way: this city, this finish.
       const tag = set && set.length ? set[0].tag : '';
       if (tag) {
-        out.push('Beat me: https://marathon-miles.com/?city=' + tag
+        out.push((challengeBeat ? 'Rematch: ' : 'Beat me: ')
+          + 'https://marathon-miles.com/?city=' + tag
           + '&beat=' + Math.round(t));
       }
       return out.join('\n');
@@ -49715,9 +49872,12 @@ MR.HUD = (function () {
 
       font('900', 216);
       g.fillText(Pace.clock(d.t), 540, 500);
-      g.fillStyle = d.vs <= 0 ? '#4dfba0' : d.vs <= 30 ? ACCENT : 'rgba(255, 253, 245, 0.70)';
-      font('800', 44);
-      g.fillText((d.vs <= 0 ? '-' : '+') + Pace.clock(Math.abs(d.vs)) + ' VS ' + K.RECORD_LABEL, 540, 630);
+      // The story where the raw delta stood: MISSED GOLD BY 1:18 says more
+      // than +1:18, and when the run has no story the delta line returns.
+      g.fillStyle = d.vs <= 0 ? '#4dfba0' : d.vs <= 90 ? ACCENT : 'rgba(255, 253, 245, 0.70)';
+      const vsLine = d.story
+        || (d.vs <= 0 ? '-' : '+') + Pace.clock(Math.abs(d.vs)) + ' VS ' + K.RECORD_LABEL;
+      g.fillText(fit(vsLine, '800', 44, 960), 540, 630);
 
       // The six legs, the run's own weather report.
       if (d.marks && d.marks.length) {
@@ -50552,6 +50712,8 @@ MR.HUD = (function () {
         t: t, vs: vs, marks: marks,
         city: st0 ? st0.name : 'GLOBAL COURSE',
         medal: st0 && MR.Course.tierFor ? MR.Course.tierFor(t, st0.tag) : '',
+        story: st0 ? storyLine(t,
+          MR.Course.tierFor ? MR.Course.tierFor(t, st0.tag) : '', st0.rec) : '',
         word: st0 ? n.stampWord.textContent : Tier.of(t).name,
         date: rec.dateKey || '',
         revisit: !!rec.revisit,
@@ -50817,14 +50979,27 @@ MR.unbail = function () {
   const featuredTag = MR.Course.pickSettings(dateKey)[0].tag;
   let cityTag = featuredTag;
   {
+    /**
+     * TODAY'S MARATHON FIRST, THEN THE TOUR (2026-09-22 restructure).
+     * The featured city is everyone's shared daily race: until it has
+     * been finished once today, every load resolves there and ?city= is
+     * ignored. Once it is finished, the remaining tries are TOUR MODE
+     * and any city loads freely -- including the featured one again,
+     * because gold no longer closes the day and a 1:58 wants a 1:57.
+     */
     const pool = MR.Course.SETTINGS;
     const want = (params.get('city') || '').toUpperCase();
-    const sum0 = params.get('nosave') === '1' ? null : MR.Store.summary(dateKey);
-    const spentName = sum0 && sum0.todayCity;
-    let spentTag = null;
-    if (spentName) for (const c of pool) if (c.name === spentName) spentTag = c.tag;
-    if (spentTag) cityTag = spentTag;
-    else if (want) for (const c of pool) if (c.tag === want) cityTag = want;
+    // An inspection load -- nosave, a bot, a skip -- honors ?city=
+    // unconditionally: the featured-first rule is a statement about a
+    // player's day, and an instrument that silently swept the featured
+    // city 25 times under 25 different tags would be the exact defect
+    // rule 3 exists for. Same predicate as LOCKOUT below, restated here
+    // because LOCKOUT does not exist yet at resolution time.
+    const inspecting = params.get('nosave') === '1' || params.get('bot') !== null
+      || parseFloat(params.get('skip') || '0') > 0;
+    const sum0 = inspecting ? null : MR.Store.summary(dateKey);
+    const tourOpen = inspecting || !!(sum0 && sum0.featuredDone);
+    if (tourOpen && want) for (const c of pool) if (c.tag === want) cityTag = want;
   }
   const courseKey = cityTag === featuredTag ? dateKey : dateKey + '|' + cityTag;
   /**
@@ -51136,14 +51311,18 @@ MR.unbail = function () {
     const sum = NOSAVE ? null : MR.Store.summary(dateKey);
     hud.setMemory(sum);
     hud.setHistory(sum);
-    // Locked two ways now: the record fell, or the three tries are spent
-    // (owner, 2026-09-22). The reason travels so the panel can say which.
-    const runsToday = sum && sum.today ? (sum.today.runs | 0) : 0;
-    locked = !!(LOCKOUT && sum && (sum.done || runsToday >= K.TRIES_PER_DAY));
+    // Locked ONE way now: the three tries are spent. Breaking the record
+    // is a badge, never a door -- the reviewer's point stood: the player
+    // who golds on attempt one is the most engaged player in the game,
+    // and telling them they are done is the wrong reward. Tries are
+    // counted at the GUN (see spendTry at start()), so a mid-run reload
+    // still shows the honest count.
+    const attempts = sum ? (sum.attempts | 0) : 0;
+    locked = !!(LOCKOUT && sum && attempts >= K.TRIES_PER_DAY);
     hud.setLocked(locked ? {
-      time: sum.done ? sum.doneTime : (sum.today ? sum.today.time : 0),
+      time: sum.today ? sum.today.time : (sum.doneTime || 0),
       dateKey: dateKey,
-      reason: sum.done ? 'record' : 'tries',
+      reason: 'tries',
     } : null);
   }
 
@@ -51206,6 +51385,14 @@ MR.unbail = function () {
     // would photograph and measure a launch instead of a run. Every tool in this
     // project drives the game through one of those two, so releasing the clock
     // here is what keeps the standing start out of every number they report.
+    // THE GUN SPENDS THE TRY (2026-09-22): committing to the road is the
+    // attempt, so a doomed run is recovered or carried, never quit and
+    // refunded -- and restart-fishing for a friendly opening dies with
+    // it. Inspectors, bots and skips spend nothing, same as ever.
+    if (LOCKOUT) {
+      MR.Store.spendTry(dateKey);
+      refreshDaily();
+    }
     if (NOCOUNT) { state = RUN; standT = 0; hud.countdown(null); }
     else { state = COUNT; countT = 0; }
   }
@@ -52010,6 +52197,8 @@ MR.unbail = function () {
           // decided here because this file owns RECORD_SECONDS and the store
           // deliberately does not. Same comparison the celebration uses.
           city: course.settings && course.settings.length ? course.settings[0].name : '',
+          // Featured or tour: the store's calendar-vs-passport split.
+          featured: cityTag === featuredTag,
           record: pace.finishTime <= K.RECORD_SECONDS,
         });
         // The save just changed; the panels that hang off it follow, and if

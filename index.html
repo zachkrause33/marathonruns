@@ -1129,6 +1129,35 @@ html, body {
 
 /* The tour tabs retired with the one-page merge (2026-09-22). */
 
+/* The shelving chips: region or level, remembered. */
+#sortRow { display: flex; gap: 6px; justify-content: center; margin: 12px 0 2px; }
+#sortRow button {
+  font: inherit; color: inherit; cursor: pointer;
+  font-size: 9px; font-weight: 800; letter-spacing: 0.16em;
+  padding: 6px 13px;
+  background: none; border: 1px solid var(--hair); border-radius: 3px;
+  opacity: 0.6;
+}
+#sortRow button.on {
+  opacity: 1; color: #14183a; background: var(--accent); border-color: var(--accent);
+}
+
+/* The level chip, in the game's own three colors: ahead-green for EASY,
+ * the accent for MEDIUM, behind-pink for HARD. */
+.sLvl, .rbLvl {
+  font-size: 6.5px; font-weight: 800; letter-spacing: 0.14em;
+  padding: 1px 4px; border-radius: 2px; border: 1px solid;
+  vertical-align: 1px;
+}
+.lvE { color: var(--ahead); border-color: rgba(77, 251, 160, 0.55); }
+.lvM { color: var(--accent); border-color: rgba(255, 228, 94, 0.55); }
+.lvH { color: var(--behind); border-color: rgba(255, 107, 132, 0.55); }
+/* On the popup's paper, the same ladder in ink-legible tones. */
+.mpLvl { font-weight: 800; letter-spacing: 0.14em; }
+.mpLvl.lvE { color: #2e7d4f; border: none; }
+.mpLvl.lvM { color: #a8862a; border: none; }
+.mpLvl.lvH { color: #c2455e; border: none; }
+
 /* THE CITY POPUP: a paper callout over the tapped pin -- white like
  * the map it floats on, ink type, a real shadow, and the door inside
  * it. Absolutely positioned by showMapPop through the same viewBox the
@@ -11209,8 +11238,35 @@ MR.Course = (function () {
   // rolling from beyond the fog to its lock -- so paired gates overlap
   // in motion and closure still reads at 1.6x run speed.
   const ONCOMING_RATIO = 0.6;
+  /**
+   * THE LEVEL (owner, 2026-09-22): every city is EASY, MEDIUM or HARD,
+   * derived from its own course record rather than hand-tagged, so a
+   * twenty-sixth city classifies itself the day it lands. The cut
+   * points split the current 25 roughly in thirds: a record within
+   * ~4 minutes of the world record is HARD company, past ~7 minutes
+   * the road is forgiving.
+   */
+  function levelFor(rec) {
+    if (!(rec > 0)) return 'MEDIUM';
+    if (rec <= 7420) return 'HARD';
+    if (rec <= 7600) return 'MEDIUM';
+    return 'EASY';
+  }
+  /**
+   * The level is a LABEL, not a knob (owner, 2026-09-22: "the level
+   * should be based off the course record. We want the obstacles to be
+   * the same across the board"). Every course carries the same motion
+   * density -- the 1.35x rate below, measured at ~27.5 oncoming drives
+   * and ~11.7 street crossers a course -- and what makes a HARD city
+   * hard is its record alone: the same road, a faster bar. The world
+   * record stays a perfect run everywhere by the same token, since the
+   * economy never varied by city in the first place.
+   */
+  const MOTION_SCALE = 1.35;
+
   function markMotion(key, gates, tally) {
     if (!(SWEEP > 0)) return;
+    const LM = MOTION_SCALE;
     // THE PAIR BIAS. "Potentially multiple at one time" shipped as a
     // hope: independent per-gate hashes put two oncoming drives in motion
     // at the same instant on 10 days of 365 (a drive window is ~59 units
@@ -11229,6 +11285,7 @@ MR.Course = (function () {
       // the same opening family the closures use (narrowRate opens at
       // 0.12): past the learning stretch, before the race's hard middle.
       if (gate.f < 0.15 || gate.f > 0.90) continue;
+
       /**
        * ELIGIBILITY SPLITS BY KIND HERE, because the clauses protect
        * different things. The sweep and the cross dart CHANGE LANES, so
@@ -11256,7 +11313,7 @@ MR.Course = (function () {
       // days had a simultaneous pair); in front of it, a pair follows
       // nearly every natural roll that the course geometry can host.
       const echoArm = echoRun < 2 && gate.z - lastOnZ < 80;
-      if (!echoArm && (h % 4096) / 4096 >= SWEEP_RATE * SWEEP) continue;
+      if (!echoArm && (h % 4096) / 4096 >= Math.min(0.98, SWEEP_RATE * SWEEP * LM)) continue;
       const single = blockLanes.length === 1
         && !(i > 0 && gates[i - 1].lanes[blockLanes[0]] === K.BLOCK);
       // The oncoming lane: any block lane (a hash bit picks between two);
@@ -11297,7 +11354,7 @@ MR.Course = (function () {
       // An armed echo whose corridor failed still only got here on its
       // own rate roll (the arm bypassed the gate above) -- so a dead
       // echo falls back to the ordinary rotation, not to silence.
-      if (echoArm && !corridor && (h % 4096) / 4096 >= SWEEP_RATE * SWEEP) continue;
+      if (echoArm && !corridor && (h % 4096) / 4096 >= Math.min(0.98, SWEEP_RATE * SWEEP * LM)) continue;
       const prefer = echo || roll < 7 ? ['on', 'sweep'] : ['sweep', 'on'];
       for (const p of prefer) {
         if (p === 'on' && corridor) {
@@ -11332,7 +11389,7 @@ MR.Course = (function () {
       if (gate.sweep) continue;
       if (gate.f < 0.12 || gate.f > 0.92) continue;
       const h = MR.rng.hashString(key + '|walk/v1|' + i);
-      if ((h % 4096) / 4096 >= WALK_RATE * SWEEP) continue;
+      if ((h % 4096) / 4096 >= WALK_RATE * SWEEP * LM) continue;
       gate.walk = { side: (h >>> 12) & 1 ? 1 : -1 };
       tally.walkers++;
     }
@@ -12007,7 +12064,7 @@ MR.Course = (function () {
   }
 
   const api = { generate, generateAid, validate, solvable, biomeAt, difficulty,
-           BIOMES, SETTINGS, pickSettings, tierFor, ACTION_WINDOW, actionWindowAt,
+           BIOMES, SETTINGS, pickSettings, tierFor, levelFor, ACTION_WINDOW, actionWindowAt,
            // Exported so tools/shoot.js reads the read window from the file
            // that enforces it instead of recomputing the same sum. The two
            // cannot drift, which is the whole point of the invariant.
@@ -40871,6 +40928,18 @@ MR.World = (function () {
      */
     const walkerPool = Pool(function () {
       const g = new THREE.Group();
+      // The crosser is a CORRIDOR ACTOR, not scenery -- the same sentence
+      // that exempts the hazards themselves ("meant to be in the
+      // corridor"; see api.crossings). It was never tagged when it joined
+      // in roadmap 111, and the audit's eight daily samples simply never
+      // stood 25-45 units from a walk gate until the 1.35x motion pass
+      // made walk gates common enough to catch one mid-zebra: LOW and
+      // HIDES on 08-level, 2026-09-22. Its fairness lives in its own
+      // contract -- WALK_ENTER/WALK_EXIT time it to clear the zebra ~0.2s
+      // before the runner arrives -- and a thin moving figure briefly
+      // fronting a gate is the game, exactly as one gate fronting another
+      // is.
+      g.userData.notScenery = true;
       const lean = new THREE.Group();
       g.add(lean);
       const variants = [];
@@ -47801,6 +47870,16 @@ MR.HUD = (function () {
           SETTINGS.length and the rows are the table's own order; adding a
           thirteenth city updates this panel by existing.
         -->
+        <!--
+          HOW THE WALL IS SHELVED (owner, 2026-09-22: "The passport
+          should be able to be organized by either region or level.
+          Everyone may want to play differently"). Two chips; the choice
+          is remembered.
+        -->
+        <div id="sortRow">
+          <button type="button" data-sort="region" class="on">BY REGION</button>
+          <button type="button" data-sort="level">BY LEVEL</button>
+        </div>
         <div class="rule" id="cityRule"></div>
         <!--
           THE STAMP WALL. One stamp per city in the pool, four states: an
@@ -48095,6 +48174,7 @@ MR.HUD = (function () {
       shareNote: q('shareNote'), shareText: q('shareText'),
       cityRule: q('cityRule'), stampWall: q('stampWall'), mapBox: q('mapBox'),
       mapWrap: q('mapWrap'), mapPop: q('mapPop'), histTitle: q('histTitle'),
+      sortRow: q('sortRow'),
       stampMoment: q('stampMoment'), stampInk: q('stampInk'),
       stampCity: q('stampCity'), stampWord: q('stampWord'),
       stampDate: q('stampDate'), stampCtx: q('stampCtx'),
@@ -48260,6 +48340,17 @@ MR.HUD = (function () {
      * a record day), the best time answers bronze against the city's real
      * course record carried on the pool entry.
      */
+    /** The difficulty ladder, worn as a small chip everywhere a city is. */
+    function lvlOf(s) {
+      return MR.Course.levelFor ? MR.Course.levelFor(s.rec) : 'MEDIUM';
+    }
+    function lvlCls(s) {
+      const l = lvlOf(s);
+      return l === 'EASY' ? 'lvE' : l === 'HARD' ? 'lvH' : 'lvM';
+    }
+    let passSort = 'region';
+    try { passSort = localStorage.getItem('marathonruns/passsort/v1') || 'region'; } catch (e) { /* fine */ }
+
     function stampTier(s, c) {
       // The medal ladder (owner, 2026-09-22): GOLD for the world record,
       // SILVER for the course record, BRONZE for completing the course.
@@ -48680,7 +48771,8 @@ MR.HUD = (function () {
         '<button type="button" class="mpClose" aria-label="Close">&#215;</button>'
         + '<div class="mpTop"><span class="mpCity">' + s.name + '</span>'
         + '<span class="mpTier ' + tier + '">' + word + '</span></div>'
-        + '<div class="mpReg">' + (s.region || '') + '</div>'
+        + '<div class="mpReg">' + (s.region || '')
+        + ' &middot; <span class="mpLvl ' + lvlCls(s) + '">' + lvlOf(s) + '</span></div>'
         + '<div class="mpRows num">'
         + (c ? '<div><i>YOUR BEST</i><b>' + Pace.clock(c.best) + '</b></div>'
              + '<div><i>RUNS</i><b>' + c.runs + '</b></div>'
@@ -48724,14 +48816,30 @@ MR.HUD = (function () {
       const featTag = sum && sum.dateKey && MR.Course.pickSettings
         ? MR.Course.pickSettings(sum.dateKey)[0].tag : null;
       if (!mapSel) mapSel = loadedTag;
+      for (const el of n.sortRow.querySelectorAll('button')) {
+        el.classList.toggle('on', el.getAttribute('data-sort') === passSort);
+      }
       drawMap(sum, pool, loadedTag, true);
       hideMapPop();   // the save changed under it; a stale popup is a lie
-      const regions = [];
-      const byReg = {};
+      /**
+       * The shelving: BY REGION (the tour's geography) or BY LEVEL (its
+       * difficulty ladder, derived from each record by course.js). One
+       * grouping loop serves both -- only the key function and the
+       * shelf order change -- and the choice persists per player.
+       */
+      const byLevel = passSort === 'level';
+      const regions = byLevel ? ['EASY', 'MEDIUM', 'HARD'] : [];
+      const byReg = byLevel ? { EASY: [], MEDIUM: [], HARD: [] } : {};
       for (const s of pool) {
-        const r = s.region || 'THE WORLD';
+        const r = byLevel
+          ? (MR.Course.levelFor ? MR.Course.levelFor(s.rec) : 'MEDIUM')
+          : (s.region || 'THE WORLD');
         if (!byReg[r]) { byReg[r] = []; regions.push(r); }
         byReg[r].push(s);
+      }
+      if (byLevel) {
+        // Inside a shelf, hardest record first: the ladder within the ladder.
+        for (const r of regions) byReg[r].sort(function (a, b) { return a.rec - b.rec; });
       }
       let gold = 0, run = 0, html = '';
       for (const reg of regions) {
@@ -48753,6 +48861,7 @@ MR.HUD = (function () {
             + (door ? ' data-city="' + s.tag + '"' : '') + '>'
             + '<span class="sCity">' + s.name + '</span>'
             + '<span class="sTier">' + word
+            + ' <span class="sLvl ' + lvlCls(s) + '">' + lvlOf(s) + '</span>'
             + (s.tag === featTag ? ' <span class="sFeat">TODAY\'S RACE</span>' : '') + '</span>'
             + (c ? '<span class="sBest num">' + Pace.clock(c.best) + '</span>' : '<span class="sBest num">&mdash;</span>')
             + (s.rec && s.rec > K.RECORD_SECONDS
@@ -48791,6 +48900,17 @@ MR.HUD = (function () {
       };
     }
     n.stampWall.addEventListener('click', cityClick(n.stampWall));
+    n.sortRow.addEventListener('click', function (ev) {
+      const b = ev.target && ev.target.getAttribute && ev.target.getAttribute('data-sort');
+      if (!b || b === passSort) return;
+      passSort = b;
+      try { localStorage.setItem('marathonruns/passsort/v1', passSort); } catch (e) { /* fine */ }
+      for (const el of n.sortRow.querySelectorAll('button')) {
+        el.classList.toggle('on', el.getAttribute('data-sort') === passSort);
+      }
+      drawPassport(lastSum);
+    });
+
     n.mapPop.addEventListener('click', cityClick(n.mapPop));
     n.mapPop.addEventListener('click', function (ev) {
       if (ev.target && ev.target.classList && ev.target.classList.contains('mpClose')) hideMapPop();
@@ -48919,6 +49039,7 @@ MR.HUD = (function () {
         return '<button type="button" class="' + cls + '"'
           + (d.door ? ' data-city="' + s.tag + '"' : '') + '>'
           + '<span class="rbCity">' + s.name
+          + ' <span class="rbLvl ' + lvlCls(s) + '">' + lvlOf(s) + '</span>'
           + (s.tag === featTag ? ' <span class="sFeat">TODAY\'S RACE</span>' : '') + '</span>'
           + '<span class="rbRec num">' + (s.rec ? 'RECORD ' + Pace.clock(s.rec) : '') + '</span>'
           + (c && c.best ? '<span class="rbBest num">YOUR BEST ' + Pace.clock(c.best) + '</span>' : '')

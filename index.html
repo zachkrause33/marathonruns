@@ -1720,19 +1720,27 @@ button.stampC:active { transform: scale(0.96); }
 @media (max-width: 620px) {
   #clockCell { min-width: 78px; padding: 6px 10px 7px; }
   #clockCell .val { font-size: 19px; }
-  #projCell { min-width: 172px; padding: 5px 11px 7px; }
-  #projCell .val { font-size: 31px; }
-  #projCell .sub { font-size: 10px; }
-  #projCell .cap { gap: 7px; }
+  #projCell { min-width: 148px; padding: 4px 9px 6px; }
+  #projCell .val { font-size: 25px; }
+  #projCell .sub { font-size: 9px; }
+  #projCell .cap { gap: 6px; }
   .lab { font-size: 8px; letter-spacing: 0.12em; }
   .chip { font-size: 8px; padding: 2px 4px; letter-spacing: 0.06em; }
   .wideOnly { display: none; }
   .narrowOnly { display: inline; }
 
-  #leftCol { left: 9px; top: 22px; gap: 7px; }
-  #engine { min-width: 124px; max-width: 142px; padding: 6px 11px 7px; }
-  #engine .val { font-size: 21px; }
-  #why { font-size: 8px; margin-top: 4px; }
+  /* Phones give up less of the road to the readout (2026-09-23 review:
+   * "the two top-left panels take up about a third of the view and cut
+   * off the START arch"): tighter plates, lighter ink, smaller headline
+   * numbers. The information is unchanged -- only its footprint. */
+  #projCell, #engine, #clockCell, #dist {
+    background: rgba(14, 18, 48, 0.66);
+    border-left-width: 3px;
+  }
+  #leftCol { left: 9px; top: 18px; gap: 5px; }
+  #engine { min-width: 112px; max-width: 130px; padding: 5px 9px 6px; }
+  #engine .val { font-size: 18px; }
+  #why { font-size: 8px; margin-top: 3px; }
 
   #dist { right: 9px; top: 22px; min-width: 112px; padding: 6px 11px 7px; }
   /* The offsets follow #dist; the 46px box does not shrink. See its own note. */
@@ -10929,6 +10937,32 @@ MR.Course = (function () {
     }
 
     /**
+     * ---- THE OPENING TRAIL (2026-09-23) ----------------------------------
+     *
+     * Every road feature hangs off a gate, and the first gate stands at
+     * START_GRACE -- so the first pickup used to appear at mile 0.94, and
+     * a brand-new player ran the whole opening being told FUEL BUYS SPEED
+     * without ever seeing fuel (the review: "neither screenshot shows a
+     * single water bottle"). A line of bottles now runs down the CENTRE
+     * lane inside the grace runway: the player spawns in that lane, so a
+     * first-timer collects them by simply running, which is the loop
+     * taught by feel before the first obstacle asks for anything. Fixed
+     * rather than seeded, because it is the same tutorial-shaped runway
+     * for everyone and there is nothing about the day's course to leak.
+     * The runway stays a runway: aid is the merciful family, not a gate.
+     */
+    {
+      const n = 8;
+      for (let i = 0; i < n; i++) {
+        items.push({
+          z: 30 + AID_STEP * i, lane: 1,
+          kind: i === n - 1 ? 'banana' : 'water',
+          gain: i === n - 1 ? K.AID_BANANA : K.AID_WATER,
+        });
+      }
+    }
+
+    /**
      * ---- THE ROAD: ONE FEATURE PER GATE, DRAWN IN GATE ORDER -------------
      *
      * The walk is over GATES rather than over a z cursor, because every
@@ -13506,6 +13540,54 @@ MR.shading = (function () {
   }
 
   /**
+   * The outline for a SkinnedMesh: same displacement, same ink fog, same
+   * fragment stage as outlineMaterial, with the position and normal run
+   * through the skinning chunks FIRST so the shell follows the bones. The
+   * renderer defines USE_SKINNING and uploads the bone texture for any
+   * material on a SkinnedMesh, ShaderMaterial included, so the chunks
+   * compile against the same skeleton the fill reads. Built per call, not
+   * cached: there is one runner and a handful of crossers, and a cache
+   * keyed like outlineMats would be a map of one entry.
+   *
+   * This exists because the sculpted runner was the ONE THING in the game
+   * without the ink line (2026-09-23 review: "the runner doesn't match the
+   * world ... assembled from parts") -- every prop, vehicle and building
+   * wears the outline pass, and the character that is on screen for the
+   * entire run did not.
+   */
+  function skinnedOutlineMaterial(thickness, color) {
+    const t = thickness === undefined ? INK.character : thickness;
+    if (!(t > 0)) return hiddenInkMaterial();
+    return new THREE.ShaderMaterial({
+      uniforms: {
+        thickness: { value: t },
+        oColor: { value: displayColor(color === undefined ? PALETTE.ink : color) },
+        inkFogColor: fogU.inkFogColor,
+        inkFogNear: fogU.inkFogNear,
+        inkFogFar: fogU.inkFogFar,
+      },
+      vertexShader: `
+      uniform float thickness;
+      varying float vDepth;
+      #include <skinning_pars_vertex>
+      void main() {
+        vec3 objectNormal = vec3(normal);
+        #include <skinbase_vertex>
+        #include <skinnormal_vertex>
+        vec3 transformed = vec3(position);
+        #include <skinning_vertex>
+        vec3 n = normalize(normalMatrix * objectNormal);
+        vec4 mv = modelViewMatrix * vec4(transformed, 1.0);
+        vDepth = -mv.z;
+        mv.xyz += n * thickness * clamp(0.75 + 0.05 * vDepth, 0.90, 3.6);
+        gl_Position = projectionMatrix * mv;
+      }`,
+      fragmentShader: OUTLINE_FS,
+      side: THREE.BackSide,
+    });
+  }
+
+  /**
    * Wrap a mesh in its own outline shell. Returns a Group holding both, so
    * animating the group moves silhouette and fill together and they can never
    * drift apart.
@@ -14153,7 +14235,7 @@ MR.shading = (function () {
   }
 
   return {
-    PALETTE, INK, ramp, toon, flat, outlineMaterial, outlined, skyDome, lights,
+    PALETTE, INK, ramp, toon, flat, outlineMaterial, skinnedOutlineMaterial, outlined, skyDome, lights,
     clouds, syncFog, contactShadow,
   };
 })();
@@ -14637,6 +14719,34 @@ MR.Skin = (function () {
     parts.body.add(sm);
     parts.body.updateMatrixWorld(true);
     sm.bind(new THREE.Skeleton(bones));
+
+    // The ink line, at last. The sculpt was the one thing in the frame
+    // without it -- every prop, vehicle and building wears the outline
+    // pass -- and a smooth unlined character over lined low-poly streets
+    // was the review's "assembled from parts". The shell is a second
+    // SkinnedMesh on the SAME skeleton and geometry (one extra draw call,
+    // zero extra bones), displaced along the skinned normal by the same
+    // shader every static outline uses.
+    const shell = new THREE.SkinnedMesh(norm.geom, MR.shading.skinnedOutlineMaterial());
+    shell.frustumCulled = false;
+    shell.renderOrder = -1;
+    parts.body.add(shell);
+    shell.bind(sm.skeleton, sm.bindMatrix);
+
+    // ---- elite proportions (2026-09-23) --------------------------------
+    // "Make him look like an actual elite marathoner: lean build" -- the
+    // full kit change (singlet, racing flats) needs a new sculpt, but the
+    // BUILD is the skeleton's to give: thighs 7% leaner and 4% longer,
+    // upper arms 7% leaner, through bone scale so the same costume hangs
+    // off a distance-runner frame. Scales inherit down the chain, so the
+    // shin and foot are set neutral and take the thigh's slimming once.
+    // The torso is left alone: the bib rides the chest bone and a scaled
+    // chest would scale the bib with it. Collision is untouched -- the
+    // envelope is MR.Collision.BOX, and art never decides clearance.
+    for (const s of [-1, 1]) {
+      sides[s].thigh.scale.set(0.93, 1.04, 0.93);
+      sides[s].shoulder.scale.set(0.93, 1.0, 0.93);
+    }
 
     // ---- the bib rides the sculpt's own chest --------------------------
     // The 26.2 panel survives the swap (runner.js keeps it), but it was
@@ -18733,7 +18843,13 @@ MR.Runner = (function () {
       // Without the clinging third the cloud drains backwards faster than it
       // is made, leaving a fat plume three units behind the runner and bare
       // road around him -- which is the one place the player is looking.
-      dVz[i] = rnd() < 0.35 ? 23.0 + rnd() * 4.0 : 15.0 + rnd() * 7.0;
+      // 2026-09-23: the clinging share came down from 0.35 at the
+      // runner's own 25 u/s -- in any still frame that cloud sat ON the
+      // body and read as smoke swallowing a fallen runner (both outside
+      // reviews screenshotted exactly that). A smaller share at slightly
+      // under his speed keeps dust in the frame but sliding toward the
+      // tail, so the figure stays legible inside his own effect.
+      dVz[i] = rnd() < 0.18 ? 21.0 + rnd() * 3.0 : 15.0 + rnd() * 7.0;
       dAge[i] = 0;
       dTtl[i] = 0.40 + rnd() * 0.26;
     }
@@ -18829,7 +18945,9 @@ MR.Runner = (function () {
         fxEmit += dt;
         while (fxEmit >= 0.05) {
           fxEmit -= 0.05;
-          for (let k = 0; k < 8; k++) spawn(cx, cz, 1.15);
+          // 8 -> 5 per pulse (2026-09-23): with the clinging share cut the
+          // full rate re-pooled at the tail as one opaque mass.
+          for (let k = 0; k < 5; k++) spawn(cx, cz, 1.15);
         }
       }
 
@@ -18862,7 +18980,7 @@ MR.Runner = (function () {
         // 0.26 was tried and merged thirty puffs back into the single flat
         // wash the whole puff texture exists to avoid.
         const s = 0.19 + 0.54 * Math.pow(t, 0.60);
-        const a = Math.min(1, t * 7) * Math.pow(1 - t, 1.05);
+        const a = 0.85 * Math.min(1, t * 7) * Math.pow(1 - t, 1.05);
         const ax = rx * s, ay = ry * s, az = rz * s;
         const bx = ux * s, by = uy * s, bz = uz * s;
         const px = dPx[i], py = dPy[i], pz = dPz[i];
@@ -23319,7 +23437,9 @@ MR.World = (function () {
        * whole first third of the draw distance.
        */
       const aw = AWNING[Math.floor(rnd() * AWNING.length)];
-      const AWN_SEG = 7;
+      // A bay in four goes bare (2026-09-23): an unbroken canopy the full
+      // length of every row was the single strongest repeat in the wall.
+      const AWN_SEG = rnd() < 0.74 ? 7 : 0;
       for (let sg = 0; sg < AWN_SEG; sg++) {
         const segW = (bw * 0.88) / AWN_SEG;
         const zc = -bw * 0.44 + segW * (sg + 0.5);
@@ -29901,7 +30021,15 @@ MR.World = (function () {
         const j = i * 3;
         _matV.set(rest[j], rest[j + 1], rest[j + 2]);
         _matV.applyMatrix4(this.matrixWorld);          // where the rest pose puts it
-        _matV.y = roadSurfaceY(_matV.z) + MAT_LIFT;    // where the tarmac is under it
+        // + rest[j+1], NOT just MAT_LIFT (2026-09-23). The rest pose's y is
+        // "a LIFT above the tarmac" -- the strip builder puts its spine at
+        // 0.001 and its glyphs at 0.002 precisely so the dart sits ON its
+        // spine -- and this line used to overwrite y wholesale, flattening
+        // that separation to one identical height. A mesh coplanar with
+        // itself z-fights itself: photographed as ragged bright shreds
+        // tearing through the mark nearest the lens, worst at glancing
+        // angles and on low-precision depth buffers.
+        _matV.y = roadSurfaceY(_matV.z) + MAT_LIFT + rest[j + 1];
         _matV.applyMatrix4(_matInv);                   // back into the mesh's frame
         arr[j] = _matV.x; arr[j + 1] = _matV.y; arr[j + 2] = _matV.z;
       }
@@ -37708,10 +37836,18 @@ MR.World = (function () {
     const fasciaMat = new THREE.MeshBasicMaterial({ map: fasciaTexture() });
     const streetPools = SETS.map(function (st) {
       const t = st.look.terrace;
-      return [11, 47, 83].map(function (seed) {
+      // FIVE variants, each with its own BAY RHYTHM (2026-09-23 review:
+      // "the same building and awning repeat down both sides"). Three
+      // rows of one rhythm repeated every 30 units read as wallpaper;
+      // five rows whose bay widths differ up to 12% break the period to
+      // 150 units and desynchronise the two shoulders. Cost: two more
+      // merged geometries for the day's one or two settings, zero draws.
+      return [[11, 1], [47, 0.92], [83, 1.08], [131, 1], [197, 0.95]].map(function (sv) {
+        const seed = sv[0];
+        const bay = t.bay * sv[1];
         const parts = [];
-        const opts = Object.assign({ bays: Math.max(3, Math.round(STREET_LEN / t.bay)) }, t,
-          { signs: [] });
+        const opts = Object.assign({ bays: Math.max(3, Math.round(STREET_LEN / bay)) }, t,
+          { bay: bay, signs: [] });
         vTerrace(parts, opts, seed);
         const geo = merge(parts);
         const signGeo = opts.signs.length ? merge(opts.signs) : null;
@@ -39992,8 +40128,19 @@ MR.World = (function () {
         // frame at the distance it is first read.
         bx(0.9, 2.8, 0.9, -(ARCH - 1.2), 10.9 + L - 0.7, 0, 0x2b2f52),
         bx(0.9, 2.8, 0.9, ARCH - 1.2, 10.9 + L - 0.7, 0, 0x2b2f52),
+        // The flags. A bare 2.6 x 1.5 yellow plate beside a dark post
+        // photographed from the start camera as "a plain yellow and grey
+        // block that looks like placeholder geometry" (the 2026-09-23
+        // review) -- so the plate is now a BORDERED PENNANT: yellow field,
+        // inset navy panel proud of it on both faces (0.18 deep against
+        // 0.12, so the two can never sit coplanar), and a gold cap
+        // crowning each post. Boxes all, built on every side.
         bx(2.6, 1.5, 0.12, -(ARCH - 2.4), 12.4 + L - 1.0, 0, 0xffe45e),
         bx(2.6, 1.5, 0.12, ARCH - 2.4, 12.4 + L - 1.0, 0, 0xffe45e),
+        bx(1.9, 0.85, 0.18, -(ARCH - 2.4), 12.4 + L - 1.0, 0, 0x1b1633),
+        bx(1.9, 0.85, 0.18, ARCH - 2.4, 12.4 + L - 1.0, 0, 0x1b1633),
+        bx(1.25, 0.30, 1.25, -(ARCH - 1.2), 11.75 + L, 0, 0xffe45e),
+        bx(1.25, 0.30, 1.25, ARCH - 1.2, 11.75 + L, 0, 0xffe45e),
       ]);
     })();
     const archPool = Pool(function () {
@@ -40890,7 +41037,7 @@ MR.World = (function () {
         for (const side of [-1, 1]) {
           const take = rnd.chance(dens);
           const si = settingIndexAt(z, rnd.next());
-          const v = rnd.int(0, 2);
+          const v = rnd.int(0, 4);
           if (!take) continue;
           if (b.look.bank === side) continue;          // never over the water
           if (deckLift(z) > 0.15) continue;            // nor on the bridge ramp
@@ -44037,6 +44184,15 @@ MR.Ghost = (function () {
       // gets a lift of its own on top of the crossover flash.
       const level = 1 - smoothstep(5, 22, Math.abs(gap));
       alpha = Math.min(1, alpha + s.flash * 0.55 + level * 0.10);
+
+      // NOT AT THE LINE. The start frame is cropped tight on the runner,
+      // and a translucent torso sliced by the viewport edge photographs as
+      // a rendering bug, not a pacer -- the 2026-09-23 review's "ghost
+      // runner cut off by the left edge of the screen". The record needs
+      // no body until it is up the road being chased: it fades in across
+      // the first seconds after the gun, by which time record pace has
+      // pulled it clear of the crop and it stands whole in frame.
+      alpha *= smoothstep(1.0, 3.5, pace.raceTime || 0);
 
       // Once the record is home there is no body to draw -- only the tag, left
       // standing over the finish line where it crossed.
@@ -48407,7 +48563,12 @@ MR.HUD = (function () {
     // than either answer, and the record genuinely does not come back.
     let recordGone = false;
     // The debounced RECORD ON / OFF RECORD verdict. See update().
-    let chipOn = null, chipAt = 0;
+    let chipOn = null, chipAt = 0, nearOn = null;
+    // True until the first-run coaching has ever been shown -- the same
+    // flag main.js keys the coach cards off, read once at boot. Gates the
+    // FUEL BUYS SPEED teach line to the first run only.
+    let firstEver = true;
+    try { firstEver = !localStorage.getItem('marathonruns/coach/v1'); } catch (e) { /* stays true */ }
     const CHIP_DEAD = 6;    // projected seconds either side of the record
     const CHIP_HOLD = 900;  // ms a verdict must stand before it may flip back
 
@@ -48417,14 +48578,19 @@ MR.HUD = (function () {
     api.reset = function () {
       recordGone = false;
       chipOn = null;
+      nearOn = null;
       chipAt = 0;
       cache.chip = cache.chipCls = cache.projCls = undefined;
     };
 
     api.setDate = function (key) {
       dateKey = key;
-      n.startDate.textContent = key + ' · GLOBAL COURSE';
-      n.endDate.textContent = key + ' · GLOBAL COURSE';
+      // The city, when the course has already landed; the placeholder only
+      // for the frames before it does (setCourse rewrites both lines).
+      const nm = course && course.settings && course.settings.length
+        ? course.settings[0].name : 'GLOBAL COURSE';
+      n.startDate.textContent = key + ' · ' + nm;
+      n.endDate.textContent = key + ' · ' + nm;
     };
 
     // ---- memory ---------------------------------------------------------
@@ -50098,6 +50264,13 @@ MR.HUD = (function () {
         n.cityBarLab.textContent = st0.name + ' COURSE RECORD';
         n.cityBarTime.textContent = Pace.clock(st0.rec);
       }
+      // The masthead names the CITY now. "GLOBAL COURSE" was the label
+      // from before cities existed, and it survived as the first line of
+      // text on both the start and score screens (2026-09-23 review).
+      if (st0 && dateKey) {
+        n.startDate.textContent = dateKey + ' · ' + st0.name;
+        n.endDate.textContent = dateKey + ' · ' + st0.name;
+      }
       drawRoute(set);
       syncChoice();
       // The route and the gate count arrive after the panel is first laid out
@@ -50149,7 +50322,8 @@ MR.HUD = (function () {
       // 1:58:14; this reads 1:57:48 there and is exact from about mile 3.
       const proj = p.projectClean();
       const margin = K.RECORD_SECONDS - proj;         // positive = under the record
-      set(n.projVal, 'proj', Pace.clock(proj));
+      const warmup = p.miles < 2 && !recordGone;
+      set(n.projVal, 'proj', warmup ? '–:––' : Pace.clock(proj));
 
       // Pace required over the road that is left. This is the race-desk number
       // and it is also the exact test for a dead record: FLOOR_PACE is the
@@ -50171,7 +50345,20 @@ MR.HUD = (function () {
       const bleeding = p.targetPace() - p.pace > 1.5; // streak was cut, pace sliding back
 
       let state, chip, sub;
-      if (gone) {
+      if (warmup) {
+        // ---- THE WARM-UP WINDOW (2026-09-23) ----------------------------
+        // The projection used to read "2:07:08 · 7:38 OVER 1:59:30" while
+        // the player was still standing at the line, and a red OFF RECORD
+        // by mile 0.7 -- the review's sharpest point: "it tells you you're
+        // failing before you start". The model is structurally pessimistic
+        // before the build-up ends (the same defect that removed the old
+        // split table), so before mile 2 the panel simply declines to
+        // grade: no number, no verdict, neutral ink. The race clock and
+        // the ghost rail below carry the early story, and they are facts.
+        state = 'est';
+        chip = bleeding ? 'BLEEDING SPEED ▲' : 'WARMING UP';
+        sub = 'PROJECTION FROM MILE 2';
+      } else if (gone) {
         // THE RECORD IS DEAD; THE RACE IS NOT.
         //
         // Measured on the model as it stands, a 90%-accuracy run loses the
@@ -50229,8 +50416,22 @@ MR.HUD = (function () {
                  && now - chipAt > CHIP_HOLD) {
           chipOn = want; chipAt = now;
         }
-        state = chipOn ? 'on' : 'off';
-        chip = chipOn ? 'RECORD ON' : 'OFF RECORD';
+        // OFF RECORD wears red only once the gap is genuinely deep. Down
+        // by less than ~45s the record is one strong stretch away, and a
+        // red verdict there grades a live chase as a failure -- the
+        // review: "use neutral colors until the gap actually matters".
+        // The band WIDENS early: measured on a bot that finished under
+        // 1:59:30, the projection still read +1:04 at mile 2.8 -- the
+        // model keeps residual build-up pessimism past the warm-up window
+        // -- so until mile 6 the gap must clear a larger bar before the
+        // panel is allowed to call the record off. Hysteresis (+-5s) so
+        // the boundary cannot flicker.
+        const band = 45 + Math.max(0, 6 - p.miles) * 18;
+        if (nearOn === null) nearOn = margin > -band;
+        else if (nearOn && margin < -(band + 5)) nearOn = false;
+        else if (!nearOn && margin > -(band - 5)) nearOn = true;
+        state = chipOn ? 'on' : nearOn ? 'est' : 'off';
+        chip = chipOn ? 'RECORD ON' : nearOn ? 'IN REACH' : 'OFF RECORD';
       }
       if (sub === undefined) {
         sub = Pace.clock(Math.abs(margin))
@@ -50299,10 +50500,14 @@ MR.HUD = (function () {
       set(n.paceVal, 'pace', Pace.pace(p.pace));
       cls(n.paceVal, 'paceCls', 'val num' + (p.pace <= K.RECORD_PACE ? ' ahead' : ''));
 
-      // Nothing else on screen says why the pace moves, so the line stays up
-      // until the player has plainly felt it, and comes back on every break.
+      // Nothing else on screen says why the pace moves. The HIT line still
+      // comes back on every break -- that one is feedback -- but the teach
+      // line is FIRST RUN, FIRST MILE only now (2026-09-23 review: the
+      // most-covered HUD frame of the game was the very first one a new
+      // player ever saw, and a returning player was being taught to grab
+      // bananas on every single start).
       const hint = performance.now() < hintUntil ? 'cut'
-        : (p.streak < 12 && p.miles < 2.5) ? 'teach' : 'off';
+        : (firstEver && p.streak < 12 && p.miles < 1) ? 'teach' : 'off';
       if (cache.hint !== hint) {
         cache.hint = hint;
         n.why.textContent = hint === 'cut'
@@ -50454,7 +50659,11 @@ MR.HUD = (function () {
       // quiet.
       const nearGh = p.miles > 0.5 && Math.abs(p.ghostMiles() - p.miles) < 0.04;
       const vel = cache.gapVel || 0;
-      const drift = vel < -0.5 ? ' · CLOSING' : vel > 0.5 ? ' · SLIPPING' : '';
+      // CLOSING is always welcome; SLIPPING holds until the projection is
+      // allowed to grade (mile 2) -- in the build-up everyone slips against
+      // a ghost running record pace, and naming it is noise, not news.
+      const drift = vel < -0.5 ? ' · CLOSING'
+        : vel > 0.5 && p.miles > 2 ? ' · SLIPPING' : '';
       set(n.gapLabel, 'gapLab', 'RECORD GHOST');
       set(n.gapVal, 'gap', Pace.delta(d));
       cls(n.gapVal, 'gapCls', 'num ' + tone + (nearGh ? ' near' : ''));

@@ -777,6 +777,54 @@ MR.shading = (function () {
   }
 
   /**
+   * The outline for a SkinnedMesh: same displacement, same ink fog, same
+   * fragment stage as outlineMaterial, with the position and normal run
+   * through the skinning chunks FIRST so the shell follows the bones. The
+   * renderer defines USE_SKINNING and uploads the bone texture for any
+   * material on a SkinnedMesh, ShaderMaterial included, so the chunks
+   * compile against the same skeleton the fill reads. Built per call, not
+   * cached: there is one runner and a handful of crossers, and a cache
+   * keyed like outlineMats would be a map of one entry.
+   *
+   * This exists because the sculpted runner was the ONE THING in the game
+   * without the ink line (2026-09-23 review: "the runner doesn't match the
+   * world ... assembled from parts") -- every prop, vehicle and building
+   * wears the outline pass, and the character that is on screen for the
+   * entire run did not.
+   */
+  function skinnedOutlineMaterial(thickness, color) {
+    const t = thickness === undefined ? INK.character : thickness;
+    if (!(t > 0)) return hiddenInkMaterial();
+    return new THREE.ShaderMaterial({
+      uniforms: {
+        thickness: { value: t },
+        oColor: { value: displayColor(color === undefined ? PALETTE.ink : color) },
+        inkFogColor: fogU.inkFogColor,
+        inkFogNear: fogU.inkFogNear,
+        inkFogFar: fogU.inkFogFar,
+      },
+      vertexShader: `
+      uniform float thickness;
+      varying float vDepth;
+      #include <skinning_pars_vertex>
+      void main() {
+        vec3 objectNormal = vec3(normal);
+        #include <skinbase_vertex>
+        #include <skinnormal_vertex>
+        vec3 transformed = vec3(position);
+        #include <skinning_vertex>
+        vec3 n = normalize(normalMatrix * objectNormal);
+        vec4 mv = modelViewMatrix * vec4(transformed, 1.0);
+        vDepth = -mv.z;
+        mv.xyz += n * thickness * clamp(0.75 + 0.05 * vDepth, 0.90, 3.6);
+        gl_Position = projectionMatrix * mv;
+      }`,
+      fragmentShader: OUTLINE_FS,
+      side: THREE.BackSide,
+    });
+  }
+
+  /**
    * Wrap a mesh in its own outline shell. Returns a Group holding both, so
    * animating the group moves silhouette and fill together and they can never
    * drift apart.
@@ -1424,7 +1472,7 @@ MR.shading = (function () {
   }
 
   return {
-    PALETTE, INK, ramp, toon, flat, outlineMaterial, outlined, skyDome, lights,
+    PALETTE, INK, ramp, toon, flat, outlineMaterial, skinnedOutlineMaterial, outlined, skyDome, lights,
     clouds, syncFog, contactShadow,
   };
 })();

@@ -3411,7 +3411,13 @@ MR.Runner = (function () {
       // Without the clinging third the cloud drains backwards faster than it
       // is made, leaving a fat plume three units behind the runner and bare
       // road around him -- which is the one place the player is looking.
-      dVz[i] = rnd() < 0.35 ? 23.0 + rnd() * 4.0 : 15.0 + rnd() * 7.0;
+      // 2026-09-23: the clinging share came down from 0.35 at the
+      // runner's own 25 u/s -- in any still frame that cloud sat ON the
+      // body and read as smoke swallowing a fallen runner (both outside
+      // reviews screenshotted exactly that). A smaller share at slightly
+      // under his speed keeps dust in the frame but sliding toward the
+      // tail, so the figure stays legible inside his own effect.
+      dVz[i] = rnd() < 0.18 ? 21.0 + rnd() * 3.0 : 15.0 + rnd() * 7.0;
       dAge[i] = 0;
       dTtl[i] = 0.40 + rnd() * 0.26;
     }
@@ -3507,7 +3513,9 @@ MR.Runner = (function () {
         fxEmit += dt;
         while (fxEmit >= 0.05) {
           fxEmit -= 0.05;
-          for (let k = 0; k < 8; k++) spawn(cx, cz, 1.15);
+          // 8 -> 5 per pulse (2026-09-23): with the clinging share cut the
+          // full rate re-pooled at the tail as one opaque mass.
+          for (let k = 0; k < 5; k++) spawn(cx, cz, 1.15);
         }
       }
 
@@ -3540,7 +3548,7 @@ MR.Runner = (function () {
         // 0.26 was tried and merged thirty puffs back into the single flat
         // wash the whole puff texture exists to avoid.
         const s = 0.19 + 0.54 * Math.pow(t, 0.60);
-        const a = Math.min(1, t * 7) * Math.pow(1 - t, 1.05);
+        const a = 0.85 * Math.min(1, t * 7) * Math.pow(1 - t, 1.05);
         const ax = rx * s, ay = ry * s, az = rz * s;
         const bx = ux * s, by = uy * s, bz = uz * s;
         const px = dPx[i], py = dPy[i], pz = dPz[i];

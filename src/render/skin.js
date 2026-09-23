@@ -477,6 +477,34 @@ MR.Skin = (function () {
     parts.body.updateMatrixWorld(true);
     sm.bind(new THREE.Skeleton(bones));
 
+    // The ink line, at last. The sculpt was the one thing in the frame
+    // without it -- every prop, vehicle and building wears the outline
+    // pass -- and a smooth unlined character over lined low-poly streets
+    // was the review's "assembled from parts". The shell is a second
+    // SkinnedMesh on the SAME skeleton and geometry (one extra draw call,
+    // zero extra bones), displaced along the skinned normal by the same
+    // shader every static outline uses.
+    const shell = new THREE.SkinnedMesh(norm.geom, MR.shading.skinnedOutlineMaterial());
+    shell.frustumCulled = false;
+    shell.renderOrder = -1;
+    parts.body.add(shell);
+    shell.bind(sm.skeleton, sm.bindMatrix);
+
+    // ---- elite proportions (2026-09-23) --------------------------------
+    // "Make him look like an actual elite marathoner: lean build" -- the
+    // full kit change (singlet, racing flats) needs a new sculpt, but the
+    // BUILD is the skeleton's to give: thighs 7% leaner and 4% longer,
+    // upper arms 7% leaner, through bone scale so the same costume hangs
+    // off a distance-runner frame. Scales inherit down the chain, so the
+    // shin and foot are set neutral and take the thigh's slimming once.
+    // The torso is left alone: the bib rides the chest bone and a scaled
+    // chest would scale the bib with it. Collision is untouched -- the
+    // envelope is MR.Collision.BOX, and art never decides clearance.
+    for (const s of [-1, 1]) {
+      sides[s].thigh.scale.set(0.93, 1.04, 0.93);
+      sides[s].shoulder.scale.set(0.93, 1.0, 0.93);
+    }
+
     // ---- the bib rides the sculpt's own chest --------------------------
     // The 26.2 panel survives the swap (runner.js keeps it), but it was
     // hung on the DRIVER chest -- 0.19 lower than the sculpt's chest and

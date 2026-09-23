@@ -1601,19 +1601,27 @@ button.stampC:active { transform: scale(0.96); }
 @media (max-width: 620px) {
   #clockCell { min-width: 78px; padding: 6px 10px 7px; }
   #clockCell .val { font-size: 19px; }
-  #projCell { min-width: 172px; padding: 5px 11px 7px; }
-  #projCell .val { font-size: 31px; }
-  #projCell .sub { font-size: 10px; }
-  #projCell .cap { gap: 7px; }
+  #projCell { min-width: 148px; padding: 4px 9px 6px; }
+  #projCell .val { font-size: 25px; }
+  #projCell .sub { font-size: 9px; }
+  #projCell .cap { gap: 6px; }
   .lab { font-size: 8px; letter-spacing: 0.12em; }
   .chip { font-size: 8px; padding: 2px 4px; letter-spacing: 0.06em; }
   .wideOnly { display: none; }
   .narrowOnly { display: inline; }
 
-  #leftCol { left: 9px; top: 22px; gap: 7px; }
-  #engine { min-width: 124px; max-width: 142px; padding: 6px 11px 7px; }
-  #engine .val { font-size: 21px; }
-  #why { font-size: 8px; margin-top: 4px; }
+  /* Phones give up less of the road to the readout (2026-09-23 review:
+   * "the two top-left panels take up about a third of the view and cut
+   * off the START arch"): tighter plates, lighter ink, smaller headline
+   * numbers. The information is unchanged -- only its footprint. */
+  #projCell, #engine, #clockCell, #dist {
+    background: rgba(14, 18, 48, 0.66);
+    border-left-width: 3px;
+  }
+  #leftCol { left: 9px; top: 18px; gap: 5px; }
+  #engine { min-width: 112px; max-width: 130px; padding: 5px 9px 6px; }
+  #engine .val { font-size: 18px; }
+  #why { font-size: 8px; margin-top: 3px; }
 
   #dist { right: 9px; top: 22px; min-width: 112px; padding: 6px 11px 7px; }
   /* The offsets follow #dist; the 46px box does not shrink. See its own note. */

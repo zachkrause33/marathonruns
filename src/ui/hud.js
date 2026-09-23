@@ -898,7 +898,12 @@ MR.HUD = (function () {
     // than either answer, and the record genuinely does not come back.
     let recordGone = false;
     // The debounced RECORD ON / OFF RECORD verdict. See update().
-    let chipOn = null, chipAt = 0;
+    let chipOn = null, chipAt = 0, nearOn = null;
+    // True until the first-run coaching has ever been shown -- the same
+    // flag main.js keys the coach cards off, read once at boot. Gates the
+    // FUEL BUYS SPEED teach line to the first run only.
+    let firstEver = true;
+    try { firstEver = !localStorage.getItem('marathonruns/coach/v1'); } catch (e) { /* stays true */ }
     const CHIP_DEAD = 6;    // projected seconds either side of the record
     const CHIP_HOLD = 900;  // ms a verdict must stand before it may flip back
 
@@ -908,14 +913,19 @@ MR.HUD = (function () {
     api.reset = function () {
       recordGone = false;
       chipOn = null;
+      nearOn = null;
       chipAt = 0;
       cache.chip = cache.chipCls = cache.projCls = undefined;
     };
 
     api.setDate = function (key) {
       dateKey = key;
-      n.startDate.textContent = key + ' · GLOBAL COURSE';
-      n.endDate.textContent = key + ' · GLOBAL COURSE';
+      // The city, when the course has already landed; the placeholder only
+      // for the frames before it does (setCourse rewrites both lines).
+      const nm = course && course.settings && course.settings.length
+        ? course.settings[0].name : 'GLOBAL COURSE';
+      n.startDate.textContent = key + ' · ' + nm;
+      n.endDate.textContent = key + ' · ' + nm;
     };
 
     // ---- memory ---------------------------------------------------------
@@ -2589,6 +2599,13 @@ MR.HUD = (function () {
         n.cityBarLab.textContent = st0.name + ' COURSE RECORD';
         n.cityBarTime.textContent = Pace.clock(st0.rec);
       }
+      // The masthead names the CITY now. "GLOBAL COURSE" was the label
+      // from before cities existed, and it survived as the first line of
+      // text on both the start and score screens (2026-09-23 review).
+      if (st0 && dateKey) {
+        n.startDate.textContent = dateKey + ' · ' + st0.name;
+        n.endDate.textContent = dateKey + ' · ' + st0.name;
+      }
       drawRoute(set);
       syncChoice();
       // The route and the gate count arrive after the panel is first laid out
@@ -2640,7 +2657,8 @@ MR.HUD = (function () {
       // 1:58:14; this reads 1:57:48 there and is exact from about mile 3.
       const proj = p.projectClean();
       const margin = K.RECORD_SECONDS - proj;         // positive = under the record
-      set(n.projVal, 'proj', Pace.clock(proj));
+      const warmup = p.miles < 2 && !recordGone;
+      set(n.projVal, 'proj', warmup ? '–:––' : Pace.clock(proj));
 
       // Pace required over the road that is left. This is the race-desk number
       // and it is also the exact test for a dead record: FLOOR_PACE is the
@@ -2662,7 +2680,20 @@ MR.HUD = (function () {
       const bleeding = p.targetPace() - p.pace > 1.5; // streak was cut, pace sliding back
 
       let state, chip, sub;
-      if (gone) {
+      if (warmup) {
+        // ---- THE WARM-UP WINDOW (2026-09-23) ----------------------------
+        // The projection used to read "2:07:08 · 7:38 OVER 1:59:30" while
+        // the player was still standing at the line, and a red OFF RECORD
+        // by mile 0.7 -- the review's sharpest point: "it tells you you're
+        // failing before you start". The model is structurally pessimistic
+        // before the build-up ends (the same defect that removed the old
+        // split table), so before mile 2 the panel simply declines to
+        // grade: no number, no verdict, neutral ink. The race clock and
+        // the ghost rail below carry the early story, and they are facts.
+        state = 'est';
+        chip = bleeding ? 'BLEEDING SPEED ▲' : 'WARMING UP';
+        sub = 'PROJECTION FROM MILE 2';
+      } else if (gone) {
         // THE RECORD IS DEAD; THE RACE IS NOT.
         //
         // Measured on the model as it stands, a 90%-accuracy run loses the
@@ -2720,8 +2751,22 @@ MR.HUD = (function () {
                  && now - chipAt > CHIP_HOLD) {
           chipOn = want; chipAt = now;
         }
-        state = chipOn ? 'on' : 'off';
-        chip = chipOn ? 'RECORD ON' : 'OFF RECORD';
+        // OFF RECORD wears red only once the gap is genuinely deep. Down
+        // by less than ~45s the record is one strong stretch away, and a
+        // red verdict there grades a live chase as a failure -- the
+        // review: "use neutral colors until the gap actually matters".
+        // The band WIDENS early: measured on a bot that finished under
+        // 1:59:30, the projection still read +1:04 at mile 2.8 -- the
+        // model keeps residual build-up pessimism past the warm-up window
+        // -- so until mile 6 the gap must clear a larger bar before the
+        // panel is allowed to call the record off. Hysteresis (+-5s) so
+        // the boundary cannot flicker.
+        const band = 45 + Math.max(0, 6 - p.miles) * 18;
+        if (nearOn === null) nearOn = margin > -band;
+        else if (nearOn && margin < -(band + 5)) nearOn = false;
+        else if (!nearOn && margin > -(band - 5)) nearOn = true;
+        state = chipOn ? 'on' : nearOn ? 'est' : 'off';
+        chip = chipOn ? 'RECORD ON' : nearOn ? 'IN REACH' : 'OFF RECORD';
       }
       if (sub === undefined) {
         sub = Pace.clock(Math.abs(margin))
@@ -2790,10 +2835,14 @@ MR.HUD = (function () {
       set(n.paceVal, 'pace', Pace.pace(p.pace));
       cls(n.paceVal, 'paceCls', 'val num' + (p.pace <= K.RECORD_PACE ? ' ahead' : ''));
 
-      // Nothing else on screen says why the pace moves, so the line stays up
-      // until the player has plainly felt it, and comes back on every break.
+      // Nothing else on screen says why the pace moves. The HIT line still
+      // comes back on every break -- that one is feedback -- but the teach
+      // line is FIRST RUN, FIRST MILE only now (2026-09-23 review: the
+      // most-covered HUD frame of the game was the very first one a new
+      // player ever saw, and a returning player was being taught to grab
+      // bananas on every single start).
       const hint = performance.now() < hintUntil ? 'cut'
-        : (p.streak < 12 && p.miles < 2.5) ? 'teach' : 'off';
+        : (firstEver && p.streak < 12 && p.miles < 1) ? 'teach' : 'off';
       if (cache.hint !== hint) {
         cache.hint = hint;
         n.why.textContent = hint === 'cut'
@@ -2945,7 +2994,11 @@ MR.HUD = (function () {
       // quiet.
       const nearGh = p.miles > 0.5 && Math.abs(p.ghostMiles() - p.miles) < 0.04;
       const vel = cache.gapVel || 0;
-      const drift = vel < -0.5 ? ' · CLOSING' : vel > 0.5 ? ' · SLIPPING' : '';
+      // CLOSING is always welcome; SLIPPING holds until the projection is
+      // allowed to grade (mile 2) -- in the build-up everyone slips against
+      // a ghost running record pace, and naming it is noise, not news.
+      const drift = vel < -0.5 ? ' · CLOSING'
+        : vel > 0.5 && p.miles > 2 ? ' · SLIPPING' : '';
       set(n.gapLabel, 'gapLab', 'RECORD GHOST');
       set(n.gapVal, 'gap', Pace.delta(d));
       cls(n.gapVal, 'gapCls', 'num ' + tone + (nearGh ? ' near' : ''));

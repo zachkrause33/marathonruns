@@ -9851,3 +9851,74 @@ screenshots 1200x630. Shipped frame: LONDON mile ~1, runner on the
 racing line, jump barrier and crate train ahead. og:image URLs
 carry ?v=2 so scrapers refetch. The old drawn card remains the
 tool's default mode, argument preserved in the file.
+
+## 135. The first-impression batch (2026-09-23)
+
+An outside review called the game slop and itemised why. Most of its
+visual-tell list described a different game (no emoji objects, no
+sprite depth, no layout collisions -- measured at 390px across seven
+screens), but the review of the review found real defects, the owner
+said go for all of them, and this batch is the lot:
+
+THE PROJECTION NO LONGER GRADES THE WARM-UP. It used to read
+"2:07:08 · 7:38 OVER" at 0.00 miles and go red OFF RECORD by 0.7 --
+"it tells you you're failing before you start", and the same
+structural pessimism that removed the old split table. Before mile 2
+the panel declines to grade (WARMING UP · PROJECTION FROM MILE 2, no
+number); after it, OFF RECORD needs a gap deeper than a band that
+starts wide (~117s at mile 2, decaying to 45s by mile 6 -- measured
+on a bot that finished UNDER the record while the mile-2.8 projection
+still read +1:04) and IN REACH holds neutral ink inside it. SLIPPING
+on the ghost rail also waits for mile 2; CLOSING never did.
+
+THE HUD GAVE THE ROAD BACK on phones: lighter ink (0.66), thinner
+plates, smaller headline numbers -- the START arch is fully visible
+behind the readout for the first time. The FUEL BUYS SPEED teach
+line is first-run-first-mile only, keyed off the coach flag; the HIT
+line still returns on every contact because that one is feedback.
+
+THE START LINE CLEANED UP: the record ghost fades in across the
+first seconds after the gun instead of standing at the line sliced
+by the viewport ("cut off by the left edge... overlaps the barrier"
+-- and almost certainly the review's "semi-transparent scooter rider"
+too); the arch flags became bordered pennants with capped posts
+instead of a bare yellow slab; the masthead names the CITY (GLOBAL
+COURSE was a fossil from before cities existed).
+
+THE OPENING TRAIL: first pickup was at mile 0.94 -- a new player ran
+the whole opening being told fuel buys speed without seeing fuel.
+Eight bottles now run down the centre lane from z=30 (first at mile
+0.13), collected by simply running, the loop taught by feel before
+the first gate at 0.63.
+
+THE RUNNER JOINED THE WORLD'S OWN INK. The sculpt was the one thing
+in the game without the outline pass -- the review's "assembled from
+parts" -- so shading.js grew skinnedOutlineMaterial (the same
+displaced-shell shader, run through the skinning chunks) and skin.js
+binds a second SkinnedMesh to the same skeleton: one extra draw
+call. Elite proportions rode along: thighs 7% leaner and 4% longer,
+upper arms 7% leaner, by bone scale; the collision envelope is
+MR.Collision.BOX and never moved. The FULL kit change (singlet,
+racing flats) needs a resculpt -- the Tripo atlas is fragmented
+islands no honest repaint survives -- and the prompt is with the
+owner.
+
+THE STRIP STOPPED FIGHTING ITSELF. fitMatToRoad overwrote every
+vertex y with one identical lift, flattening the tempo strip's
+authored spine/glyph separation (0.001/0.002) to a coplanar mesh
+that z-fought itself -- the ragged pink shreds in the review frame.
+The fit now adds the rest lift back. The slide dust was retuned to
+trail rather than envelop (clinging share 0.35 -> 0.18 at slightly
+under run speed, 5 puffs per pulse, alpha x0.85): the runner stays
+legible inside his own effect.
+
+THE STREET WALL BROKE ITS WALLPAPER: five row variants per setting
+(from three), each with its own bay rhythm (+-12%), and a bay in
+four goes bare of awning -- the unbroken canopy was the strongest
+repeat in the wall. Madrid, the review's example, already carried
+the Metropolis five times and the Puerta de Alcala over the road;
+now the blocks between them differ too.
+
+Gates: 8/8 shots, 90+90 courses, simulate PASS (perfect-policy
+spread 1373.5s), sharecard PASS, and every fix photographed at
+390x844 before and after.

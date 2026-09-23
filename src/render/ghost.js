@@ -523,6 +523,15 @@ MR.Ghost = (function () {
       const level = 1 - smoothstep(5, 22, Math.abs(gap));
       alpha = Math.min(1, alpha + s.flash * 0.55 + level * 0.10);
 
+      // NOT AT THE LINE. The start frame is cropped tight on the runner,
+      // and a translucent torso sliced by the viewport edge photographs as
+      // a rendering bug, not a pacer -- the 2026-09-23 review's "ghost
+      // runner cut off by the left edge of the screen". The record needs
+      // no body until it is up the road being chased: it fades in across
+      // the first seconds after the gun, by which time record pace has
+      // pulled it clear of the crop and it stands whole in frame.
+      alpha *= smoothstep(1.0, 3.5, pace.raceTime || 0);
+
       // Once the record is home there is no body to draw -- only the tag, left
       // standing over the finish line where it crossed.
       const bodyOn = running && ahead > 1.2 && alpha > 0.02;

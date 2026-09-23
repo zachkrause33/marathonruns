@@ -2075,6 +2075,32 @@ MR.Course = (function () {
     }
 
     /**
+     * ---- THE OPENING TRAIL (2026-09-23) ----------------------------------
+     *
+     * Every road feature hangs off a gate, and the first gate stands at
+     * START_GRACE -- so the first pickup used to appear at mile 0.94, and
+     * a brand-new player ran the whole opening being told FUEL BUYS SPEED
+     * without ever seeing fuel (the review: "neither screenshot shows a
+     * single water bottle"). A line of bottles now runs down the CENTRE
+     * lane inside the grace runway: the player spawns in that lane, so a
+     * first-timer collects them by simply running, which is the loop
+     * taught by feel before the first obstacle asks for anything. Fixed
+     * rather than seeded, because it is the same tutorial-shaped runway
+     * for everyone and there is nothing about the day's course to leak.
+     * The runway stays a runway: aid is the merciful family, not a gate.
+     */
+    {
+      const n = 8;
+      for (let i = 0; i < n; i++) {
+        items.push({
+          z: 30 + AID_STEP * i, lane: 1,
+          kind: i === n - 1 ? 'banana' : 'water',
+          gain: i === n - 1 ? K.AID_BANANA : K.AID_WATER,
+        });
+      }
+    }
+
+    /**
      * ---- THE ROAD: ONE FEATURE PER GATE, DRAWN IN GATE ORDER -------------
      *
      * The walk is over GATES rather than over a z cursor, because every

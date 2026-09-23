@@ -2270,7 +2270,9 @@ MR.World = (function () {
        * whole first third of the draw distance.
        */
       const aw = AWNING[Math.floor(rnd() * AWNING.length)];
-      const AWN_SEG = 7;
+      // A bay in four goes bare (2026-09-23): an unbroken canopy the full
+      // length of every row was the single strongest repeat in the wall.
+      const AWN_SEG = rnd() < 0.74 ? 7 : 0;
       for (let sg = 0; sg < AWN_SEG; sg++) {
         const segW = (bw * 0.88) / AWN_SEG;
         const zc = -bw * 0.44 + segW * (sg + 0.5);
@@ -8852,7 +8854,15 @@ MR.World = (function () {
         const j = i * 3;
         _matV.set(rest[j], rest[j + 1], rest[j + 2]);
         _matV.applyMatrix4(this.matrixWorld);          // where the rest pose puts it
-        _matV.y = roadSurfaceY(_matV.z) + MAT_LIFT;    // where the tarmac is under it
+        // + rest[j+1], NOT just MAT_LIFT (2026-09-23). The rest pose's y is
+        // "a LIFT above the tarmac" -- the strip builder puts its spine at
+        // 0.001 and its glyphs at 0.002 precisely so the dart sits ON its
+        // spine -- and this line used to overwrite y wholesale, flattening
+        // that separation to one identical height. A mesh coplanar with
+        // itself z-fights itself: photographed as ragged bright shreds
+        // tearing through the mark nearest the lens, worst at glancing
+        // angles and on low-precision depth buffers.
+        _matV.y = roadSurfaceY(_matV.z) + MAT_LIFT + rest[j + 1];
         _matV.applyMatrix4(_matInv);                   // back into the mesh's frame
         arr[j] = _matV.x; arr[j + 1] = _matV.y; arr[j + 2] = _matV.z;
       }
@@ -16659,10 +16669,18 @@ MR.World = (function () {
     const fasciaMat = new THREE.MeshBasicMaterial({ map: fasciaTexture() });
     const streetPools = SETS.map(function (st) {
       const t = st.look.terrace;
-      return [11, 47, 83].map(function (seed) {
+      // FIVE variants, each with its own BAY RHYTHM (2026-09-23 review:
+      // "the same building and awning repeat down both sides"). Three
+      // rows of one rhythm repeated every 30 units read as wallpaper;
+      // five rows whose bay widths differ up to 12% break the period to
+      // 150 units and desynchronise the two shoulders. Cost: two more
+      // merged geometries for the day's one or two settings, zero draws.
+      return [[11, 1], [47, 0.92], [83, 1.08], [131, 1], [197, 0.95]].map(function (sv) {
+        const seed = sv[0];
+        const bay = t.bay * sv[1];
         const parts = [];
-        const opts = Object.assign({ bays: Math.max(3, Math.round(STREET_LEN / t.bay)) }, t,
-          { signs: [] });
+        const opts = Object.assign({ bays: Math.max(3, Math.round(STREET_LEN / bay)) }, t,
+          { bay: bay, signs: [] });
         vTerrace(parts, opts, seed);
         const geo = merge(parts);
         const signGeo = opts.signs.length ? merge(opts.signs) : null;
@@ -18943,8 +18961,19 @@ MR.World = (function () {
         // frame at the distance it is first read.
         bx(0.9, 2.8, 0.9, -(ARCH - 1.2), 10.9 + L - 0.7, 0, 0x2b2f52),
         bx(0.9, 2.8, 0.9, ARCH - 1.2, 10.9 + L - 0.7, 0, 0x2b2f52),
+        // The flags. A bare 2.6 x 1.5 yellow plate beside a dark post
+        // photographed from the start camera as "a plain yellow and grey
+        // block that looks like placeholder geometry" (the 2026-09-23
+        // review) -- so the plate is now a BORDERED PENNANT: yellow field,
+        // inset navy panel proud of it on both faces (0.18 deep against
+        // 0.12, so the two can never sit coplanar), and a gold cap
+        // crowning each post. Boxes all, built on every side.
         bx(2.6, 1.5, 0.12, -(ARCH - 2.4), 12.4 + L - 1.0, 0, 0xffe45e),
         bx(2.6, 1.5, 0.12, ARCH - 2.4, 12.4 + L - 1.0, 0, 0xffe45e),
+        bx(1.9, 0.85, 0.18, -(ARCH - 2.4), 12.4 + L - 1.0, 0, 0x1b1633),
+        bx(1.9, 0.85, 0.18, ARCH - 2.4, 12.4 + L - 1.0, 0, 0x1b1633),
+        bx(1.25, 0.30, 1.25, -(ARCH - 1.2), 11.75 + L, 0, 0xffe45e),
+        bx(1.25, 0.30, 1.25, ARCH - 1.2, 11.75 + L, 0, 0xffe45e),
       ]);
     })();
     const archPool = Pool(function () {
@@ -19841,7 +19870,7 @@ MR.World = (function () {
         for (const side of [-1, 1]) {
           const take = rnd.chance(dens);
           const si = settingIndexAt(z, rnd.next());
-          const v = rnd.int(0, 2);
+          const v = rnd.int(0, 4);
           if (!take) continue;
           if (b.look.bank === side) continue;          // never over the water
           if (deckLift(z) > 0.15) continue;            // nor on the bridge ramp
